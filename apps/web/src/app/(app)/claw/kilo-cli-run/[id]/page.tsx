@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useKiloCliRunStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
+import { ClawConfigServiceBannerWithStatus } from '../../components/ClawConfigServiceBanner';
 
 /** Strip ANSI escape codes so raw terminal output renders in a browser <pre>. */
 function stripAnsi(raw: string): string {
@@ -79,6 +80,8 @@ export default function KiloCliRunPage() {
           Back to Dashboard
         </Button>
       </div>
+
+      <ClawConfigServiceBannerWithStatus />
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">

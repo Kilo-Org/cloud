@@ -4,6 +4,7 @@ import { CreditCard } from 'lucide-react';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
 import { BillingWrapper } from './billing/BillingWrapper';
+import { ClawConfigServiceBannerWithStatus } from './ClawConfigServiceBanner';
 import { SubscriptionTab } from './SubscriptionTab';
 
 export function ClawSubscriptionPage() {
@@ -14,6 +15,7 @@ export function ClawSubscriptionPage() {
         icon={<CreditCard className="text-muted-foreground h-4 w-4" />}
       />
       <BillingWrapper>
+        <ClawConfigServiceBannerWithStatus />
         <Card>
           <CardContent className="p-5">
             <SubscriptionTab />

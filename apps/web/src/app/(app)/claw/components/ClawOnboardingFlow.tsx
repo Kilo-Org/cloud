@@ -17,6 +17,7 @@ import { BotIdentityStep } from './BotIdentityStep';
 import { ChannelPairingStep } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawContextProvider, useClawContext } from './ClawContext';
+import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { CreateInstanceCard } from './CreateInstanceCard';
 import { PermissionStep } from './PermissionStep';
@@ -172,6 +173,8 @@ function ClawOnboardingFlowInner({
           </AlertDescription>
         </Alert>
       )}
+
+      <ClawConfigServiceBanner status={status} />
 
       <MaybeBillingWrapper skip={!!organizationId} hideBanners>
         {mode === 'post-provisioning' ? (

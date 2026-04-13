@@ -128,6 +128,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'kiloclaw-tunnel'],
     dir: 'services/kiloclaw',
   },
+  'kiloclaw-inbound-email': {
+    group: 'kiloclaw',
+    dependsOn: ['kiloclaw'],
+    dir: 'services/kiloclaw-inbound-email',
+  },
   'kiloclaw-billing': {
     group: 'kiloclaw',
     dependsOn: ['postgres', 'nextjs', 'kiloclaw'],

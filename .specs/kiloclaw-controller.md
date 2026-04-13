@@ -344,15 +344,19 @@ patches to `openclaw.json`. The patches MUST include:
 12. Channel configuration from `TELEGRAM_BOT_TOKEN`,
     `DISCORD_BOT_TOKEN`, `SLACK_BOT_TOKEN`/`SLACK_APP_TOKEN`, with
     corresponding plugin enablement.
-13. Hooks configuration from `KILOCLAW_HOOKS_TOKEN` when present:
-    enabled, token, gmail preset.
+13. Hooks configuration from `KILOCLAW_HOOKS_TOKEN`: enabled,
+    token, inbound email mapping. When Gmail credentials are present, the
+    gmail preset MUST also be enabled.
 
 ### Hooks Token
 
-1. When `KILOCLAW_GOG_CONFIG_TARBALL` is set, the controller MUST
-   generate a per-boot random hooks token (32 bytes, hex-encoded) and
-   set it as `KILOCLAW_HOOKS_TOKEN`.
+1. The controller MUST generate a per-boot random hooks token (32 bytes,
+   hex-encoded) and set it as `KILOCLAW_HOOKS_TOKEN`.
 2. The hooks token MUST NOT be reused across boots.
+3. External Workers MUST NOT receive `KILOCLAW_HOOKS_TOKEN`; they
+   authenticate to controller endpoints with the gateway token, and the
+   controller forwards to local OpenClaw hook endpoints with the hooks
+   token.
 
 ### Gateway Args
 

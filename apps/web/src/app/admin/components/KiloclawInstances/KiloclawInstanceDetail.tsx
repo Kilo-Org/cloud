@@ -1287,7 +1287,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     })
   );
 
-  const volumeId = data?.workerStatus?.flyVolumeId;
+  const provider = data?.workerStatus?.provider ?? null;
+  const isFlyProvider = provider === 'fly';
+  const runtimeId = data?.workerStatus?.runtimeId ?? null;
+  const storageId = data?.workerStatus?.storageId ?? null;
+  const flyMachineId = data?.workerStatus?.flyMachineId ?? null;
+  const volumeId = isFlyProvider ? storageId : null;
   const snapshotsEnabled = data !== undefined && data.destroyed_at === null && !!volumeId;
 
   const {
@@ -1312,9 +1317,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   });
 
   const gatewayControlsEnabled =
-    data?.destroyed_at === null &&
-    !!data?.workerStatus?.flyMachineId &&
-    data?.workerStatus?.status !== 'restoring';
+    data?.destroyed_at === null && !!runtimeId && data?.workerStatus?.status !== 'restoring';
 
   const {
     data: gatewayStatus,
@@ -1420,10 +1423,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     data?.destroyed_at === null &&
     data?.workerStatus?.status !== 'restoring' &&
     data?.workerStatus?.status !== 'recovering';
-  const hasMachine = !!data?.workerStatus?.flyMachineId;
+  const hasRuntime = !!runtimeId;
+  const hasFlyMachine = isFlyProvider && !!flyMachineId;
   const canRetryMetadataRecovery =
     data?.destroyed_at === null &&
-    !data?.workerStatus?.flyMachineId &&
+    isFlyProvider &&
+    !flyMachineId &&
     data?.workerStatus?.status === 'stopped';
 
   const invalidateMachineQueries = () => {
@@ -1589,8 +1594,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     }
   };
 
-  // Reset the destroyed success state when the machine ID changes (e.g. new machine created)
-  const flyMachineId = data?.workerStatus?.flyMachineId;
+  // Reset the destroyed success state when the Fly machine ID changes (e.g. new machine created)
   useEffect(() => {
     resetDestroyFlyMachine();
   }, [flyMachineId, resetDestroyFlyMachine]);
@@ -2014,32 +2018,34 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
                 <div className="flex items-center gap-2">
                   <Server className="text-muted-foreground h-4 w-4 shrink-0" />
-                  <DetailField label="Fly Machine ID">
-                    {data.workerStatus.flyMachineId && data.workerStatus.flyAppName ? (
+                  <DetailField label="Runtime ID">
+                    {isFlyProvider &&
+                    data.workerStatus.runtimeId &&
+                    data.workerStatus.flyAppName ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <a
-                          href={`https://fly.io/apps/${data.workerStatus.flyAppName}/machines/${data.workerStatus.flyMachineId}`}
+                          href={`https://fly.io/apps/${data.workerStatus.flyAppName}/machines/${data.workerStatus.runtimeId}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-blue-600 hover:underline"
                         >
-                          <code className="text-sm">{data.workerStatus.flyMachineId}</code>
+                          <code className="text-sm">{data.workerStatus.runtimeId}</code>
                           <ExternalLink className="h-3 w-3" />
                         </a>
                         <CopySshCommandButton
                           flyAppName={data.workerStatus.flyAppName}
-                          flyMachineId={data.workerStatus.flyMachineId}
+                          flyMachineId={data.workerStatus.runtimeId}
                         />
                       </div>
                     ) : (
-                      <code className="text-sm">{data.workerStatus.flyMachineId ?? '—'}</code>
+                      <code className="text-sm">{data.workerStatus.runtimeId ?? '—'}</code>
                     )}
                   </DetailField>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <Globe className="text-muted-foreground h-4 w-4 shrink-0" />
-                  <DetailField label="Fly Region">{data.workerStatus.flyRegion ?? '—'}</DetailField>
+                  <DetailField label="Region">{data.workerStatus.region ?? '—'}</DetailField>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -2061,36 +2067,38 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
                 <div className="flex items-center gap-2">
                   <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />
-                  <DetailField label="Fly Volume ID">
-                    <code className="text-sm">{data.workerStatus.flyVolumeId ?? '—'}</code>
+                  <DetailField label="Storage ID">
+                    <code className="text-sm">{data.workerStatus.storageId ?? '—'}</code>
                   </DetailField>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Server className="text-muted-foreground h-4 w-4 shrink-0" />
-                  <DetailField label="Fly App">
-                    {data.workerStatus.flyAppName ? (
-                      <a
-                        href={`https://fly.io/apps/${data.workerStatus.flyAppName}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-blue-600 hover:underline"
-                      >
-                        <code className="text-sm">{data.workerStatus.flyAppName}</code>
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </DetailField>
-                </div>
+                {isFlyProvider && (
+                  <div className="flex items-center gap-2">
+                    <Server className="text-muted-foreground h-4 w-4 shrink-0" />
+                    <DetailField label="Fly App">
+                      {data.workerStatus.flyAppName ? (
+                        <a
+                          href={`https://fly.io/apps/${data.workerStatus.flyAppName}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                        >
+                          <code className="text-sm">{data.workerStatus.flyAppName}</code>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        '—'
+                      )}
+                    </DetailField>
+                  </div>
+                )}
 
-                {data.workerStatus.flyAppName && data.workerStatus.flyMachineId && (
+                {isFlyProvider && data.workerStatus.flyAppName && data.workerStatus.runtimeId && (
                   <div className="flex items-center gap-2">
                     <BarChart className="text-muted-foreground h-4 w-4 shrink-0" />
                     <DetailField label="Metrics">
                       <a
-                        href={`https://fly-metrics.net/d/fly-instance/fly-instance?from=now-1h&orgId=1480569&to=now&var-app=${data.workerStatus.flyAppName}&var-instance=${data.workerStatus.flyMachineId}`}
+                        href={`https://fly-metrics.net/d/fly-instance/fly-instance?from=now-1h&orgId=1480569&to=now&var-app=${data.workerStatus.flyAppName}&var-instance=${data.workerStatus.runtimeId}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-blue-600 hover:underline"
@@ -2300,14 +2308,16 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           />
         )}
 
-        {/* Machine Controls */}
+        {/* Runtime Controls */}
         {isActive && machineControlsEnabled && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <CardTitle>Machine Controls</CardTitle>
-                  <CardDescription>Start, stop, resize, or destroy the Fly machine</CardDescription>
+                  <CardTitle>Runtime Controls</CardTitle>
+                  <CardDescription>
+                    Start, stop, resize, or redeploy the provider runtime
+                  </CardDescription>
                 </div>
                 <StatusBadge status={data.workerStatus?.status ?? null} />
               </div>
@@ -2325,12 +2335,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   ) : (
                     <Play className="mr-1 h-4 w-4" />
                   )}
-                  Start Machine
+                  Start Runtime
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={machineActionPending || !hasMachine}
+                  disabled={machineActionPending || !hasRuntime}
                   onClick={() => void machineStop({ userId: data.user_id, instanceId: data.id })}
                 >
                   {isMachineStopping ? (
@@ -2338,12 +2348,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   ) : (
                     <Square className="mr-1 h-4 w-4" />
                   )}
-                  Stop Machine
+                  Stop Runtime
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={machineActionPending || machineRestartBlocked || !hasMachine}
+                  disabled={machineActionPending || machineRestartBlocked || !hasRuntime}
                   onClick={() => void machineRedeploy({ instanceId: data.id, imageTag: undefined })}
                 >
                   {isMachineRedeploying ? (
@@ -2353,19 +2363,21 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   )}
                   Redeploy
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={machineActionPending || machineRestartBlocked || !hasMachine}
-                  onClick={() => void machineUpgrade({ instanceId: data.id, imageTag: 'latest' })}
-                >
-                  {isMachineUpgrading ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowUpCircle className="mr-1 h-4 w-4" />
-                  )}
-                  Upgrade to Latest
-                </Button>
+                {isFlyProvider && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={machineActionPending || machineRestartBlocked || !hasRuntime}
+                    onClick={() => void machineUpgrade({ instanceId: data.id, imageTag: 'latest' })}
+                  >
+                    {isMachineUpgrading ? (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    ) : (
+                      <ArrowUpCircle className="mr-1 h-4 w-4" />
+                    )}
+                    Upgrade to Latest
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -2382,28 +2394,30 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   }}
                 >
                   <ArrowUpDown className="mr-1 h-4 w-4" />
-                  Resize Machine
+                  Resize Runtime
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className={
-                    isFlyMachineDestroyed
-                      ? 'border-green-500 text-green-500'
-                      : 'border-orange-500 text-orange-500 hover:bg-orange-500/10'
-                  }
-                  disabled={machineActionPending || !hasMachine || isFlyMachineDestroyed}
-                  onClick={() => setDestroyMachineDialogOpen(true)}
-                >
-                  {isDestroyingFlyMachine ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  ) : isFlyMachineDestroyed ? (
-                    <CheckCircle2 className="mr-1 h-4 w-4" />
-                  ) : (
-                    <Trash2 className="mr-1 h-4 w-4" />
-                  )}
-                  {isFlyMachineDestroyed ? 'Machine Destroyed' : 'Destroy Machine'}
-                </Button>
+                {isFlyProvider && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={
+                      isFlyMachineDestroyed
+                        ? 'border-green-500 text-green-500'
+                        : 'border-orange-500 text-orange-500 hover:bg-orange-500/10'
+                    }
+                    disabled={machineActionPending || !hasFlyMachine || isFlyMachineDestroyed}
+                    onClick={() => setDestroyMachineDialogOpen(true)}
+                  >
+                    {isDestroyingFlyMachine ? (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    ) : isFlyMachineDestroyed ? (
+                      <CheckCircle2 className="mr-1 h-4 w-4" />
+                    ) : (
+                      <Trash2 className="mr-1 h-4 w-4" />
+                    )}
+                    {isFlyMachineDestroyed ? 'Machine Destroyed' : 'Destroy Fly Machine'}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -2674,7 +2688,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             <CardContent className="space-y-4">
               {!gatewayControlsEnabled && (
                 <p className="text-muted-foreground text-sm">
-                  Gateway process controls are available when the instance has a machine ID.
+                  Gateway process controls are available when the instance has a runtime ID.
                 </p>
               )}
 
@@ -2802,16 +2816,19 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         )}
 
         {/* Volume Reassociation (danger zone) */}
-        {isActive && data.workerStatus && data.workerStatus.status !== 'recovering' && (
-          <VolumeReassociationCard
-            userId={data.user_id}
-            instanceId={data.id}
-            currentStatus={data.workerStatus.status}
-            currentMachineId={data.workerStatus.flyMachineId}
-            previousVolumeId={data.workerStatus.previousVolumeId ?? null}
-            onStatusChange={invalidateMachineQueries}
-          />
-        )}
+        {isActive &&
+          isFlyProvider &&
+          data.workerStatus &&
+          data.workerStatus.status !== 'recovering' && (
+            <VolumeReassociationCard
+              userId={data.user_id}
+              instanceId={data.id}
+              currentStatus={data.workerStatus.status}
+              currentMachineId={data.workerStatus.flyMachineId}
+              previousVolumeId={data.workerStatus.previousVolumeId ?? null}
+              onStatusChange={invalidateMachineQueries}
+            />
+          )}
 
         {/* Volume Snapshots */}
         {snapshotsEnabled && (

@@ -31,7 +31,12 @@ import {
 import { resolveLatestVersion, resolveVersionByTag } from '../../lib/image-version';
 import { lookupCatalogVersion } from '../../lib/catalog-registration';
 import { ImageVariantSchema } from '../../schemas/image-version';
-import { LIVE_CHECK_THROTTLE_MS, OPENCLAW_BUILTIN_DEFAULT_MODEL } from '../../config';
+import {
+  LIVE_CHECK_THROTTLE_MS,
+  OPENCLAW_BUILTIN_DEFAULT_MODEL,
+  RESTARTING_TIMEOUT_MS,
+  STARTING_TIMEOUT_MS,
+} from '../../config';
 import {
   SECRET_CATALOG,
   FIELD_KEY_TO_ENV_VAR,
@@ -231,6 +236,150 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           error: toLoggable(err),
         });
       }
+    }
+  }
+
+  private async markStartFailedFromProvider(message: string): Promise<void> {
+    const now = Date.now();
+    this.s.status = 'stopped';
+    this.s.startingAt = null;
+    this.s.lastStoppedAt = now;
+    this.s.lastStartErrorMessage = message;
+    this.s.lastStartErrorAt = now;
+    await this.persist({
+      status: 'stopped',
+      startingAt: null,
+      lastStoppedAt: now,
+      lastStartErrorMessage: message,
+      lastStartErrorAt: now,
+    });
+  }
+
+  private async markRestartFailedFromProvider(message: string): Promise<void> {
+    const now = Date.now();
+    this.s.status = 'stopped';
+    this.s.startingAt = null;
+    this.s.restartingAt = null;
+    this.s.restartUpdateSent = false;
+    this.s.lastStoppedAt = now;
+    this.s.lastRestartErrorMessage = message;
+    this.s.lastRestartErrorAt = now;
+    await this.persist({
+      status: 'stopped',
+      startingAt: null,
+      restartingAt: null,
+      restartUpdateSent: false,
+      lastStoppedAt: now,
+      lastRestartErrorMessage: message,
+      lastRestartErrorAt: now,
+    });
+  }
+
+  private async markNonFlyRunningFromProvider(reason: 'start' | 'runtime'): Promise<void> {
+    const startingAt = this.s.startingAt;
+    this.s.status = 'running';
+    this.s.startingAt = null;
+    this.s.restartingAt = null;
+    this.s.restartUpdateSent = false;
+    if (this.s.lastStartedAt === null) {
+      this.s.lastStartedAt = Date.now();
+    }
+    this.s.healthCheckFailCount = 0;
+    this.s.lastStartErrorMessage = null;
+    this.s.lastStartErrorAt = null;
+    this.s.lastRestartErrorMessage = null;
+    this.s.lastRestartErrorAt = null;
+    await this.persist({
+      status: 'running',
+      startingAt: null,
+      restartingAt: null,
+      restartUpdateSent: false,
+      lastStartedAt: this.s.lastStartedAt,
+      healthCheckFailCount: 0,
+      lastStartErrorMessage: null,
+      lastStartErrorAt: null,
+      lastRestartErrorMessage: null,
+      lastRestartErrorAt: null,
+    });
+
+    if (reason === 'start') {
+      this.emitEvent({
+        event: 'instance.started',
+        status: 'running',
+        durationMs: startingAt ? Date.now() - startingAt : undefined,
+      });
+    }
+  }
+
+  private async reconcileNonFlyRuntimeFromAlarm(): Promise<void> {
+    if (this.s.provider === 'fly') {
+      throw new Error('reconcileNonFlyRuntimeFromAlarm should not be used for Fly providers');
+    }
+
+    if (!['starting', 'restarting', 'running'].includes(this.s.status ?? '')) {
+      return;
+    }
+
+    const result = await this.provider().inspectRuntime({
+      env: this.env,
+      state: this.s,
+    });
+    await this.persistProviderResult(result);
+    const runtimeState = result.observation?.runtimeState ?? 'missing';
+
+    if (runtimeState === 'running') {
+      if (this.s.status === 'restarting') {
+        await markRestartSuccessful(
+          this.ctx,
+          this.s,
+          createReconcileContext(this.s, this.env, 'alarm_non_fly')
+        );
+      } else if (this.s.status === 'starting') {
+        await this.markNonFlyRunningFromProvider('start');
+      }
+      await this.scheduleAlarm();
+      return;
+    }
+
+    if (this.s.status === 'starting') {
+      const timedOut =
+        this.s.startingAt !== null && Date.now() - this.s.startingAt > STARTING_TIMEOUT_MS;
+      if (timedOut || runtimeState === 'failed') {
+        const message = `Provider ${this.s.provider} runtime ${runtimeState} during start`;
+        await this.markStartFailedFromProvider(message);
+        this.emitProvisioningFailed('provider_runtime_not_running', message);
+        return;
+      }
+      await this.scheduleAlarm();
+      return;
+    }
+
+    if (this.s.status === 'restarting') {
+      const timedOut =
+        this.s.restartingAt !== null && Date.now() - this.s.restartingAt > RESTARTING_TIMEOUT_MS;
+      if (timedOut || runtimeState === 'failed' || runtimeState === 'missing') {
+        await this.markRestartFailedFromProvider(
+          `Provider ${this.s.provider} runtime ${runtimeState} during restart`
+        );
+        return;
+      }
+      await this.scheduleAlarm();
+      return;
+    }
+
+    if (this.s.status === 'running' && runtimeState !== 'starting') {
+      const now = Date.now();
+      this.s.status = 'stopped';
+      this.s.lastStoppedAt = now;
+      await this.persist({
+        status: 'stopped',
+        lastStoppedAt: now,
+      });
+      this.emitEvent({
+        event: 'instance.stopped',
+        status: 'stopped',
+        label: `provider_runtime_${runtimeState}`,
+      });
     }
   }
 
@@ -1405,31 +1554,49 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           ? parsedProviderState.data
           : null;
         const storedFlyMachineId = storedEntries.get('flyMachineId');
+        const storedFlyMachineIdValue =
+          typeof storedFlyMachineId === 'string' ? storedFlyMachineId : null;
         const currentStatus = storedEntries.get('status');
         const storedRuntimeId = getRuntimeId({
           providerState: storedProviderState,
-          flyMachineId: typeof storedFlyMachineId === 'string' ? storedFlyMachineId : null,
+          flyMachineId: storedFlyMachineIdValue,
         });
-        if (!storedRuntimeId && currentStatus !== 'destroying') {
+        const storedProviderId =
+          storedProviderState?.provider ?? (storedFlyMachineIdValue ? 'fly' : null);
+        let providerStillOwnsRunningRuntime = false;
+        if (currentStatus !== 'destroying' && storedProviderId === 'fly') {
+          providerStillOwnsRunningRuntime = Boolean(storedRuntimeId || storedFlyMachineIdValue);
+        } else if (storedProviderState && currentStatus !== 'destroying') {
+          try {
+            const inspected = await getProviderAdapter(this.env, {
+              provider: storedProviderState.provider,
+            }).inspectRuntime({
+              env: this.env,
+              state: {
+                ...this.s,
+                provider: storedProviderState.provider,
+                providerState: storedProviderState,
+                flyMachineId: storedFlyMachineIdValue,
+              },
+            });
+            providerStillOwnsRunningRuntime =
+              inspected.observation?.runtimeState === 'running' ||
+              inspected.observation?.runtimeState === 'starting';
+          } catch (inspectErr) {
+            doWarn(this.s, 'startAsync: failed to inspect runtime after start failure', {
+              error: toLoggable(inspectErr),
+            });
+          }
+        }
+
+        if (!providerStillOwnsRunningRuntime && currentStatus !== 'destroying') {
           // start() threw before persisting a machine ID. Reconcile cannot
           // distinguish this from "still in progress", so write the terminal
           // state explicitly to avoid the 5-min stuck window.
           // Skip if destroy() has taken ownership — writing 'stopped' would
           // clobber the 'destroying' state and strand cleanup.
-          const now = Date.now();
           const errorMessage = err instanceof Error ? err.message : String(err);
-          this.s.status = 'stopped';
-          this.s.startingAt = null;
-          this.s.lastStoppedAt = now;
-          this.s.lastStartErrorMessage = errorMessage;
-          this.s.lastStartErrorAt = now;
-          await this.persist({
-            status: 'stopped',
-            startingAt: null,
-            lastStoppedAt: now,
-            lastStartErrorMessage: errorMessage,
-            lastStartErrorAt: now,
-          });
+          await this.markStartFailedFromProvider(errorMessage);
           this.emitProvisioningFailed('no_machine_created', errorMessage);
         }
         // If storedMachineId exists the machine was created — reconcileStarting
@@ -1749,6 +1916,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     sandboxId: string | null;
     orgId: string | null;
     provider: ProviderId;
+    runtimeId: string | null;
+    storageId: string | null;
+    region: string | null;
     status: InstanceStatus | null;
     provisionedAt: number | null;
     lastStartedAt: number | null;
@@ -1800,6 +1970,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       sandboxId: this.s.sandboxId,
       orgId: this.s.orgId,
       provider: this.s.provider,
+      runtimeId: getRuntimeId(this.s),
+      storageId: getStorageId(this.s),
+      region: getProviderRegion(this.s),
       status: this.s.status,
       provisionedAt: this.s.provisionedAt,
       lastStartedAt: this.s.lastStartedAt,
@@ -2619,6 +2792,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           if (!finalized.finalized) {
             await this.scheduleAlarm();
           }
+        } else {
+          await this.reconcileNonFlyRuntimeFromAlarm();
         }
         return;
       }
@@ -2681,7 +2856,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         return;
       }
     } catch (err) {
-      doError(this.s, 'reconcileWithFly failed', {
+      doError(this.s, 'alarm reconcile failed', {
         error: toLoggable(err),
       });
     }

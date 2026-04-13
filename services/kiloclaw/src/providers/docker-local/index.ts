@@ -1,5 +1,5 @@
 import type { DockerLocalProviderState } from '../../schemas/instance-config';
-import type { InstanceProviderAdapter } from '../types';
+import type { InstanceProviderAdapter, ProviderResult } from '../types';
 import { getDockerLocalProviderState } from '../../durable-objects/kiloclaw-instance/state';
 import type { KiloClawEnv } from '../../types';
 import type { RuntimeSpec } from '../types';
@@ -22,6 +22,16 @@ type DockerContainerInspect = {
     Running?: boolean;
     Status?: string;
   };
+};
+
+type DockerHostConfig = {
+  Binds: string[];
+  PortBindings: Record<string, Array<{ HostIp: string; HostPort: string }>>;
+  RestartPolicy: {
+    Name: 'no';
+  };
+  Memory?: number;
+  NanoCpus?: number;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -261,6 +271,34 @@ function buildContainerEnv(runtimeSpec: RuntimeSpec): string[] {
   }).map(([key, value]) => `${key}=${value}`);
 }
 
+function buildHostConfig(config: {
+  volumeName: string;
+  hostPort: number;
+  runtimeSpec: RuntimeSpec;
+}): DockerHostConfig {
+  const { volumeName, hostPort, runtimeSpec } = config;
+  return {
+    Binds: [`${volumeName}:${runtimeSpec.rootMountPath}`],
+    PortBindings: {
+      [`${runtimeSpec.controllerPort}/tcp`]: [
+        {
+          HostIp: '127.0.0.1',
+          HostPort: String(hostPort),
+        },
+      ],
+    },
+    RestartPolicy: {
+      Name: 'no',
+    },
+    ...(runtimeSpec.machineSize
+      ? {
+          Memory: runtimeSpec.machineSize.memory_mb * 1024 * 1024,
+          NanoCpus: runtimeSpec.machineSize.cpus * 1_000_000_000,
+        }
+      : {}),
+  };
+}
+
 function requireContainerConfig(providerState: DockerLocalProviderState): {
   containerName: string;
   volumeName: string;
@@ -300,24 +338,25 @@ async function createContainer(
           sandboxId: state.sandboxId ?? '',
           userId: state.userId ?? '',
         },
-        HostConfig: {
-          Binds: [`${config.volumeName}:${runtimeSpec.rootMountPath}`],
-          PortBindings: {
-            [`${runtimeSpec.controllerPort}/tcp`]: [
-              {
-                HostIp: '127.0.0.1',
-                HostPort: String(config.hostPort),
-              },
-            ],
-          },
-          RestartPolicy: {
-            Name: 'no',
-          },
-        },
+        HostConfig: buildHostConfig({
+          volumeName: config.volumeName,
+          hostPort: config.hostPort,
+          runtimeSpec,
+        }),
       }),
     },
     [201]
   );
+}
+
+async function persistProviderState(
+  providerState: DockerLocalProviderState,
+  onProviderResult: ((result: ProviderResult) => Promise<void>) | undefined
+): Promise<void> {
+  if (!onProviderResult) {
+    throw dockerConfigError('Provider docker-local requires provider state persistence callback');
+  }
+  await onProviderResult({ providerState });
 }
 
 async function startContainer(env: KiloClawEnv, containerName: string): Promise<void> {
@@ -410,7 +449,7 @@ export const dockerLocalProviderAdapter: InstanceProviderAdapter = {
     return { providerState };
   },
 
-  async startRuntime({ env, state, runtimeSpec }) {
+  async startRuntime({ env, state, runtimeSpec, onProviderResult }) {
     let providerState = ensureNames(state, getDockerLocalProviderState(state));
     if (!providerState.volumeName || !providerState.containerName) {
       throw dockerConfigError('Provider docker-local is missing deterministic resource names');
@@ -418,16 +457,22 @@ export const dockerLocalProviderAdapter: InstanceProviderAdapter = {
     const volumeName = providerState.volumeName;
     const containerName = providerState.containerName;
     await ensureVolume(env, volumeName);
+    const previousHostPort = providerState.hostPort;
     providerState = {
       ...providerState,
       hostPort: await allocateHostPort(env, providerState.hostPort),
     };
+    if (providerState.hostPort !== previousHostPort) {
+      await persistProviderState(providerState, onProviderResult);
+    }
 
     const existing = await inspectContainer(env, containerName);
     if (!existing) {
       await createContainer(env, state, providerState, runtimeSpec);
       await startContainer(env, containerName);
-    } else if (!existing.State?.Running) {
+    } else if (!existing.State?.Running || state.status !== 'running') {
+      await removeContainer(env, containerName);
+      await createContainer(env, state, providerState, runtimeSpec);
       await startContainer(env, containerName);
     }
 
@@ -452,7 +497,7 @@ export const dockerLocalProviderAdapter: InstanceProviderAdapter = {
     };
   },
 
-  async restartRuntime({ env, state, runtimeSpec }) {
+  async restartRuntime({ env, state, runtimeSpec, onProviderResult }) {
     let providerState = ensureNames(state, getDockerLocalProviderState(state));
     if (!providerState.volumeName || !providerState.containerName) {
       throw dockerConfigError('Provider docker-local is missing deterministic resource names');
@@ -460,10 +505,14 @@ export const dockerLocalProviderAdapter: InstanceProviderAdapter = {
     const volumeName = providerState.volumeName;
     const containerName = providerState.containerName;
     await ensureVolume(env, volumeName);
+    const previousHostPort = providerState.hostPort;
     providerState = {
       ...providerState,
       hostPort: await allocateHostPort(env, providerState.hostPort),
     };
+    if (providerState.hostPort !== previousHostPort) {
+      await persistProviderState(providerState, onProviderResult);
+    }
 
     await removeContainer(env, containerName);
     await createContainer(env, state, providerState, runtimeSpec);
@@ -473,6 +522,26 @@ export const dockerLocalProviderAdapter: InstanceProviderAdapter = {
       providerState,
       observation: {
         runtimeState: 'running',
+      },
+    };
+  },
+
+  async inspectRuntime({ env, state }) {
+    const providerState = ensureNames(state, getDockerLocalProviderState(state));
+    if (!providerState.containerName) {
+      return {
+        providerState,
+        observation: {
+          runtimeState: 'missing',
+        },
+      };
+    }
+
+    const container = await inspectContainer(env, providerState.containerName);
+    return {
+      providerState,
+      observation: {
+        runtimeState: !container ? 'missing' : container.State?.Running ? 'running' : 'stopped',
       },
     };
   },

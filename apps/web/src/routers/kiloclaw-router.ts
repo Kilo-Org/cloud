@@ -462,6 +462,10 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
   return {
     userId,
     sandboxId: null,
+    provider: null,
+    runtimeId: null,
+    storageId: null,
+    region: null,
     status: null,
     provisionedAt: null,
     lastStartedAt: null,

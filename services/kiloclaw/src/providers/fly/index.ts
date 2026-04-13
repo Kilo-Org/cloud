@@ -256,6 +256,47 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
     };
   },
 
+  async inspectRuntime({ env, state }) {
+    const providerState = getFlyProviderState(state);
+    if (!providerState.machineId) {
+      return {
+        providerState,
+        observation: {
+          runtimeState: 'missing',
+        },
+      };
+    }
+
+    const flyConfig = getFlyConfig(env, state);
+    try {
+      const machine = await fly.getMachine(flyConfig, providerState.machineId);
+      const runtimeState =
+        machine.state === 'started'
+          ? 'running'
+          : machine.state === 'starting'
+            ? 'starting'
+            : machine.state === 'stopped' || machine.state === 'suspended'
+              ? 'stopped'
+              : 'failed';
+      return {
+        providerState,
+        observation: {
+          runtimeState,
+        },
+      };
+    } catch (err) {
+      if (fly.isFlyNotFound(err)) {
+        return {
+          providerState,
+          observation: {
+            runtimeState: 'missing',
+          },
+        };
+      }
+      throw err;
+    }
+  },
+
   async destroyRuntime({ env, state }) {
     const providerState = getFlyProviderState(state);
     if (!providerState.machineId) {

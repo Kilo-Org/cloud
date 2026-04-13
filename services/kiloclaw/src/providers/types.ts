@@ -40,7 +40,7 @@ export type RuntimeSpec = {
 };
 
 export type ProviderObservation = {
-  runtimeState?: 'starting' | 'running' | 'stopped' | 'failed';
+  runtimeState?: 'starting' | 'running' | 'stopped' | 'failed' | 'missing';
   machineSize?: MachineSize | null;
 };
 
@@ -89,6 +89,7 @@ export type InstanceProviderAdapter = {
   startRuntime(args: StartRuntimeArgs): Promise<ProviderResult>;
   stopRuntime(args: StopRuntimeArgs): Promise<ProviderResult>;
   restartRuntime(args: RestartRuntimeArgs): Promise<ProviderResult>;
+  inspectRuntime(args: ProviderContext): Promise<ProviderResult>;
   destroyRuntime(args: DestroyRuntimeArgs): Promise<ProviderResult>;
   destroyStorage(args: DestroyStorageArgs): Promise<ProviderResult>;
 };

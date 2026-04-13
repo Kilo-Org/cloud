@@ -897,6 +897,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       } catch (err) {
         throwKiloclawAdminError(err, 'Failed to verify machine state before destroy');
       }
+      if (status.provider !== 'fly') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Direct Fly machine destroy is not supported for provider ${status.provider}`,
+        });
+      }
       if (status.flyAppName !== input.appName || status.flyMachineId !== input.machineId) {
         throw new TRPCError({
           code: 'BAD_REQUEST',

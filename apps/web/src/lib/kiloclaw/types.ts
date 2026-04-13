@@ -130,6 +130,8 @@ export type MachineSize = {
   cpu_kind?: 'shared' | 'performance';
 };
 
+export type KiloClawProviderId = 'fly' | 'docker-local' | 'northflank' | 'aws' | 'k8s';
+
 /** Response from POST /api/platform/restore-volume-snapshot */
 export type RestoreVolumeSnapshotResponse = {
   acknowledged: boolean;
@@ -140,6 +142,10 @@ export type RestoreVolumeSnapshotResponse = {
 export type PlatformStatusResponse = {
   userId: string | null;
   sandboxId: string | null;
+  provider: KiloClawProviderId | null;
+  runtimeId: string | null;
+  storageId: string | null;
+  region: string | null;
   status:
     | 'provisioned'
     | 'starting'
@@ -196,7 +202,6 @@ export type RegistryEntriesResponse = {
 /** Response from GET /api/platform/debug-status (internal/admin only). */
 export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   orgId: string | null;
-  provider: 'fly' | 'northflank' | 'aws' | 'k8s';
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
   pendingPostgresMarkOnFinalize: boolean;

@@ -147,8 +147,15 @@ if (!publicKeyPem || !publicKeyPem.includes('BEGIN PUBLIC KEY')) {
 // Step 3: Sign into gcloud and set up GCP project + APIs
 // ---------------------------------------------------------------------------
 
+if (!process.stdin.isTTY) {
+  console.error('Error: stdin is not a TTY. This script requires an interactive terminal.');
+  console.error('If running via Docker, make sure to use "docker run -it ..." (both -i and -t).');
+  process.exit(1);
+}
+
 console.log('Signing into Google Cloud...');
-console.log('A browser window will open for you to sign in.\n');
+console.log('You will be shown a URL to open in your browser. Sign in, copy the');
+console.log('verification code back here, and press Enter.\n');
 
 await runCommand('gcloud', ['auth', 'login', '--brief']);
 

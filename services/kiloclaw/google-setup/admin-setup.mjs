@@ -22,8 +22,15 @@ console.log('KiloClaw Google Setup — Admin Mode\n');
 console.log('This will set up the GCP project and credentials for your organization.');
 console.log('Members will run a separate, simpler command afterwards.\n');
 
+if (!process.stdin.isTTY) {
+  console.error('Error: stdin is not a TTY. This script requires an interactive terminal.');
+  console.error('If running via Docker, make sure to use "docker run -it ..." (both -i and -t).');
+  process.exit(1);
+}
+
 console.log('Signing into Google Cloud...');
-console.log('A browser window will open for you to sign in.\n');
+console.log('You will be shown a URL to open in your browser. Sign in, copy the');
+console.log('verification code back here, and press Enter.\n');
 
 await runCommand('gcloud', ['auth', 'login', '--brief']);
 

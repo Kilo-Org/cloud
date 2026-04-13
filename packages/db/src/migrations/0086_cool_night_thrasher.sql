@@ -1,0 +1,1 @@
+ALTER TABLE "kilocode_users" ADD COLUMN "web_session_version" integer DEFAULT 0 NOT NULL;

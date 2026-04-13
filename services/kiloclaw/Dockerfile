@@ -66,15 +66,16 @@ RUN npm install -g \
     opusscript@^0.1.1
 RUN npm install -g openclaw@2026.4.5 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
-    && PM_FILE=$(find "$OC_DIST" -name 'provider-models-*.js' | head -1) \
-    && if [ -z "$PM_FILE" ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
-    && BEFORE=$(grep -c 'DISCOVERY_TIMEOUT_MS = 5e3' "$PM_FILE") \
-    && if [ "$BEFORE" -ne 1 ]; then echo "ERROR: expected exactly 1 occurrence of DISCOVERY_TIMEOUT_MS = 5e3, found $BEFORE — openclaw may have changed" >&2; exit 1; fi \
+    && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
+    && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
+    && BEFORE=$(grep -h 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null | wc -l | tr -d ' ') \
+    && if [ "$BEFORE" -ne 1 ]; then echo "ERROR: expected exactly 1 occurrence of DISCOVERY_TIMEOUT_MS = 5e3, found $BEFORE - openclaw may have changed" >&2; exit 1; fi \
+    && PM_FILE=$(grep -l 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null | head -1) \
     && sed -i 's/DISCOVERY_TIMEOUT_MS = 5e3/DISCOVERY_TIMEOUT_MS = 60e3/' "$PM_FILE" \
-    && AFTER=$(grep -c 'DISCOVERY_TIMEOUT_MS = 60e3' "$PM_FILE") \
-    && if [ "$AFTER" -ne 1 ]; then echo "ERROR: sed patch failed — expected 1 occurrence of 60e3, found $AFTER" >&2; exit 1; fi \
-    && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$PM_FILE"; then echo "ERROR: old 5e3 value still present after patch" >&2; exit 1; fi \
-    && echo "OK: patched DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename $PM_FILE)" \
+    && AFTER=$(grep -h 'DISCOVERY_TIMEOUT_MS = 60e3' "$OC_DIST"/provider-models-*.js 2>/dev/null | wc -l | tr -d ' ') \
+    && if [ "$AFTER" -ne 1 ]; then echo "ERROR: sed patch failed - expected 1 occurrence of 60e3, found $AFTER" >&2; exit 1; fi \
+    && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null; then echo "ERROR: old 5e3 value still present after patch" >&2; exit 1; fi \
+    && echo "OK: patched DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
     && openclaw --version
 
 # Install ClawHub CLI

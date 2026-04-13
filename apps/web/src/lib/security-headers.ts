@@ -1,10 +1,32 @@
 export const CSP_NONCE_HEADER = 'x-nonce';
 
+type CspDirective =
+  | 'script-src'
+  | 'connect-src'
+  | 'img-src'
+  | 'style-src'
+  | 'font-src'
+  | 'frame-src'
+  | 'worker-src'
+  | 'media-src';
+
 export type ContentSecurityPolicyOptions = {
   nonce: string;
   isDevelopment?: boolean;
   connectSrcUrls?: Array<string | undefined>;
+  env?: Record<string, string | undefined>;
 };
+
+const ADDITIONAL_SOURCE_ENV_BY_DIRECTIVE = {
+  'script-src': 'CSP_ADDITIONAL_SCRIPT_SRC',
+  'connect-src': 'CSP_ADDITIONAL_CONNECT_SRC',
+  'img-src': 'CSP_ADDITIONAL_IMG_SRC',
+  'style-src': 'CSP_ADDITIONAL_STYLE_SRC',
+  'font-src': 'CSP_ADDITIONAL_FONT_SRC',
+  'frame-src': 'CSP_ADDITIONAL_FRAME_SRC',
+  'worker-src': 'CSP_ADDITIONAL_WORKER_SRC',
+  'media-src': 'CSP_ADDITIONAL_MEDIA_SRC',
+} satisfies Record<CspDirective, string>;
 
 function compactUnique(values: Array<string | null | undefined>): string[] {
   const compacted = values.filter((value): value is string => Boolean(value && value.length > 0));
@@ -18,6 +40,23 @@ function originFromUrl(value: string | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+function parseAdditionalCspSources(value: string | undefined): string[] {
+  if (!value || value.includes(';')) return [];
+  return compactUnique(
+    value
+      .split(/[\s,]+/)
+      .map(source => source.trim())
+      .filter(source => source.length > 0)
+  );
+}
+
+function getAdditionalCspSources(
+  directive: CspDirective,
+  env: Record<string, string | undefined>
+): string[] {
+  return parseAdditionalCspSources(env[ADDITIONAL_SOURCE_ENV_BY_DIRECTIVE[directive]]);
 }
 
 export function getConfiguredConnectSrcOrigins(
@@ -34,8 +73,10 @@ export function getConfiguredConnectSrcOrigins(
 export function buildContentSecurityPolicy({
   nonce,
   isDevelopment = false,
-  connectSrcUrls = getConfiguredConnectSrcOrigins(),
+  connectSrcUrls,
+  env = process.env,
 }: ContentSecurityPolicyOptions): string {
+  const configuredConnectSrcUrls = connectSrcUrls ?? getConfiguredConnectSrcOrigins(env);
   const scriptSrc = compactUnique([
     "'self'",
     `'nonce-${nonce}'`,
@@ -49,6 +90,7 @@ export function buildContentSecurityPolicy({
     'https://*.js.stripe.com',
     'https://checkout.stripe.com',
     'https://challenges.cloudflare.com',
+    ...getAdditionalCspSources('script-src', env),
   ]);
 
   const connectSrc = compactUnique([
@@ -66,7 +108,8 @@ export function buildContentSecurityPolicy({
     'https://unpkg.com',
     isDevelopment ? 'http://localhost:*' : null,
     isDevelopment ? 'ws://localhost:*' : null,
-    ...connectSrcUrls.map(originFromUrl),
+    ...configuredConnectSrcUrls.map(originFromUrl),
+    ...getAdditionalCspSources('connect-src', env),
   ]);
 
   const directives: Record<string, string[]> = {
@@ -87,9 +130,10 @@ export function buildContentSecurityPolicy({
       'https://www.googletagmanager.com',
       'https://utt.impactcdn.com',
       'https://challenges.cloudflare.com',
+      ...getAdditionalCspSources('img-src', env),
     ],
-    'style-src': ["'self'", "'unsafe-inline'"],
-    'font-src': ["'self'", 'data:'],
+    'style-src': ["'self'", "'unsafe-inline'", ...getAdditionalCspSources('style-src', env)],
+    'font-src': ["'self'", 'data:', ...getAdditionalCspSources('font-src', env)],
     'frame-src': [
       "'self'",
       'https://js.stripe.com',
@@ -97,9 +141,10 @@ export function buildContentSecurityPolicy({
       'https://hooks.stripe.com',
       'https://checkout.stripe.com',
       'https://challenges.cloudflare.com',
+      ...getAdditionalCspSources('frame-src', env),
     ],
-    'worker-src': ["'self'", 'blob:'],
-    'media-src': ["'self'", 'blob:'],
+    'worker-src': ["'self'", 'blob:', ...getAdditionalCspSources('worker-src', env)],
+    'media-src': ["'self'", 'blob:', ...getAdditionalCspSources('media-src', env)],
     'manifest-src': ["'self'"],
   };
 

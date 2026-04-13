@@ -49,4 +49,35 @@ describe('security headers', () => {
       'https://gastown.example.com',
     ]);
   });
+
+  it('allows extra CSP sources through directive-specific env vars', () => {
+    const policy = buildContentSecurityPolicy({
+      nonce: 'n',
+      env: {
+        CSP_ADDITIONAL_SCRIPT_SRC: 'https://tag.example.com, https://cdn.example.com',
+        CSP_ADDITIONAL_CONNECT_SRC: 'https://api.example.com',
+        CSP_ADDITIONAL_IMG_SRC: 'https://images.example.com',
+        CSP_ADDITIONAL_FRAME_SRC: 'https://frames.example.com',
+      },
+    });
+
+    expect(policy).toContain('script-src');
+    expect(policy).toContain('https://tag.example.com');
+    expect(policy).toContain('https://cdn.example.com');
+    expect(policy).toContain('https://api.example.com');
+    expect(policy).toContain('https://images.example.com');
+    expect(policy).toContain('https://frames.example.com');
+  });
+
+  it('ignores additional CSP sources that would inject directives', () => {
+    const policy = buildContentSecurityPolicy({
+      nonce: 'n',
+      env: {
+        CSP_ADDITIONAL_SCRIPT_SRC: 'https://good.example.com; object-src *',
+      },
+    });
+
+    expect(policy).not.toContain('https://good.example.com;');
+    expect(policy).not.toContain('object-src *');
+  });
 });

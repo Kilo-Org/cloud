@@ -29,7 +29,7 @@ function isKiloClawNewPath(pathname: string): boolean {
 export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const currentOrgId = useUrlOrganizationId();
   const pathname = usePathname();
-  const { open, setOpen, setOpenMobile } = useSidebar();
+  const { open, setOpenMobile, setOpenTransient } = useSidebar();
   const previousSidebarOpen = useRef<boolean | null>(null);
 
   useEffect(() => {
@@ -37,16 +37,16 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
       if (previousSidebarOpen.current === null) {
         previousSidebarOpen.current = open;
       }
-      setOpen(false);
+      setOpenTransient(false);
       setOpenMobile(false);
       return;
     }
 
     if (previousSidebarOpen.current !== null) {
-      setOpen(previousSidebarOpen.current);
+      setOpenTransient(previousSidebarOpen.current);
       previousSidebarOpen.current = null;
     }
-  }, [open, pathname, setOpen, setOpenMobile]);
+  }, [open, pathname, setOpenMobile, setOpenTransient]);
 
   // Personal gastown town — show the town-specific sidebar
   const gastownTownId = extractGastownTownId(pathname);

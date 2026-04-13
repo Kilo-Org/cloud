@@ -44,7 +44,7 @@ import { usePathname } from 'next/navigation';
 
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { data: user, isLoading } = useUser();
-  const { data: kiloClawStatus } = useKiloClawStatus();
+  const kiloClawStatusQuery = useKiloClawStatus();
   const pathname = usePathname();
 
   // Feature flags
@@ -242,7 +242,12 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   ];
 
   const kiloClawBaseUrl = '/claw';
-  const hasKiloClawInstance = kiloClawStatus !== undefined && kiloClawStatus.status !== null;
+  const kiloClawInstanceState = kiloClawStatusQuery.isSuccess
+    ? kiloClawStatusQuery.data.status === null
+      ? 'absent'
+      : 'present'
+    : 'unknown';
+  const hasKiloClawInstance = kiloClawInstanceState === 'present';
   const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');
   const [sidebarMenu, setSidebarMenu] = useState<'main' | 'kiloClaw'>(
     isKiloClawPath && hasKiloClawInstance ? 'kiloClaw' : 'main'
@@ -273,7 +278,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
         {
           title: 'KiloClaw',
           icon: MessageSquare,
-          url: `${kiloClawBaseUrl}/new`,
+          url: kiloClawInstanceState === 'absent' ? `${kiloClawBaseUrl}/new` : kiloClawBaseUrl,
           isActive: isKiloClawPath,
         },
       ];
@@ -300,7 +305,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
         ...accountItems,
         ...startItems,
       ].map(i => (typeof i === 'string' ? i : i.url)),
-    [dashboardItems, kiloClawItems, cloudItems, accountItems, startItems]
+    [kiloClawBaseUrl, dashboardItems, kiloClawItems, cloudItems, accountItems, startItems]
   );
 
   return (

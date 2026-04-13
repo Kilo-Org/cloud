@@ -53,7 +53,7 @@ export default function OrganizationAppSidebar({
   const { assumedRole, setAssumedRole, setOriginalRole } = useRoleTesting();
   // Fetch full organization data to access settings
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
-  const { data: kiloClawStatus } = useOrgKiloClawStatus(organizationId);
+  const kiloClawStatusQuery = useOrgKiloClawStatus(organizationId);
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
@@ -292,7 +292,12 @@ export default function OrganizationAppSidebar({
   ];
 
   const kiloClawBaseUrl = `/organizations/${organizationId}/claw`;
-  const hasKiloClawInstance = kiloClawStatus !== undefined && kiloClawStatus.status !== null;
+  const kiloClawInstanceState = kiloClawStatusQuery.isSuccess
+    ? kiloClawStatusQuery.data.status === null
+      ? 'absent'
+      : 'present'
+    : 'unknown';
+  const hasKiloClawInstance = kiloClawInstanceState === 'present';
   const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');
   const [sidebarMenu, setSidebarMenu] = useState<'main' | 'kiloClaw'>(
     isKiloClawPath && hasKiloClawInstance ? 'kiloClaw' : 'main'
@@ -323,7 +328,7 @@ export default function OrganizationAppSidebar({
         {
           title: 'KiloClaw',
           icon: MessageSquare,
-          url: `${kiloClawBaseUrl}/new`,
+          url: kiloClawInstanceState === 'absent' ? `${kiloClawBaseUrl}/new` : kiloClawBaseUrl,
           isActive: isKiloClawPath,
         },
       ];

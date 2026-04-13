@@ -1,4 +1,4 @@
-import { defineChannelPluginEntry } from 'openclaw/plugin-sdk/channel-core';
+import { defineChannelPluginEntry } from 'openclaw/plugin-sdk/core';
 import { kiloChatPlugin } from './channel.js';
 import { createKiloChatWebhookHandler } from './webhook.js';
 

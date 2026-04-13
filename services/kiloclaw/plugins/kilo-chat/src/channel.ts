@@ -1,5 +1,5 @@
-import { createChannelPluginBase, createChatChannelPlugin } from 'openclaw/plugin-sdk/channel-core';
-import type { OpenClawConfig } from 'openclaw/plugin-sdk/channel-core';
+import { createChannelPluginBase, createChatChannelPlugin } from 'openclaw/plugin-sdk/core';
+import type { OpenClawConfig } from 'openclaw/plugin-sdk/core';
 import { createKiloChatClient } from './client';
 
 const CHANNEL_ID = 'kilo-chat';

@@ -1,7 +1,11 @@
 const SENSITIVE_QUERY_PARAMS = new Set(['callbackurl', 'code', 'email', 'state', 'token']);
 const SENSITIVE_PATHS = new Set(['/auth/verify-magic-link']);
 
-export function sanitizeAnalyticsUrl(origin: string, pathname: string, searchParams: string): string {
+export function sanitizeAnalyticsUrl(
+  origin: string,
+  pathname: string,
+  searchParams: string
+): string {
   const baseUrl = `${origin}${pathname}`;
   if (SENSITIVE_PATHS.has(pathname) || !searchParams) {
     return baseUrl;

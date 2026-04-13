@@ -203,7 +203,21 @@ export function SecretEntrySection({
                   >
                     {new URL(entry.helpUrl).hostname.replace('www.', '')}
                   </a>
-                  .
+                  {entry.guideUrl ? (
+                    <span className="block">
+                      <a
+                        href={entry.guideUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline"
+                      >
+                        {entry.guideText ?? 'Step by Step Guide'}
+                      </a>
+                      .
+                    </span>
+                  ) : (
+                    '.'
+                  )}
                 </>
               ) : (
                 entry.helpText

@@ -17,12 +17,14 @@
   "scripts": {
     "prepack": "npm run build",
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --external:openclaw --external:openclaw/* --outfile=dist/index.js",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "openclaw": ">=2026.3.24-beta.2"
   },
   "devDependencies": {
-    "esbuild": "^0.25.2"
+    "esbuild": "^0.25.2",
+    "vitest": "^4.1.0"
   }
 }

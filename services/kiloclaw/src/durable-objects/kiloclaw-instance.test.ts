@@ -3532,7 +3532,7 @@ describe('start: 412 insufficient resources recovery', () => {
     const regions412Call = (flyClient.createVolumeWithFallback as Mock).mock.calls[0];
     expect(regions412Call[1]).toEqual(
       expect.objectContaining({
-        compute: expect.objectContaining({ cpus: 2, memory_mb: 3072 }) as unknown,
+        compute: expect.objectContaining({ cpus: 1, memory_mb: 3072 }) as unknown,
       })
     );
     // Regions are passed in configured order, and deprioritize is a no-op here
@@ -3587,7 +3587,7 @@ describe('start: 412 insufficient resources recovery', () => {
     expect(regionsForkCall[1]).toEqual(
       expect.objectContaining({
         source_volume_id: 'vol-1',
-        compute: expect.objectContaining({ cpus: 2, memory_mb: 3072 }) as unknown,
+        compute: expect.objectContaining({ cpus: 1, memory_mb: 3072 }) as unknown,
       })
     );
     const forkCreateVolumeCall = (flyClient.createVolumeWithFallback as Mock).mock
@@ -3655,7 +3655,7 @@ describe('start: 412 insufficient resources recovery', () => {
     expect(regionsUpdateCall[1]).toEqual(
       expect.objectContaining({
         source_volume_id: 'vol-1',
-        compute: expect.objectContaining({ cpus: 2, memory_mb: 3072 }) as unknown,
+        compute: expect.objectContaining({ cpus: 1, memory_mb: 3072 }) as unknown,
       })
     );
     const updateForkCreateVolumeCall = (flyClient.createVolumeWithFallback as Mock).mock
@@ -6941,6 +6941,97 @@ describe('reassociateVolume', () => {
 
     expect(result.newRegion).toBe('lax');
     expect(storage._store.get('flyRegion')).toBe('lax');
+  });
+});
+
+// ============================================================================
+// resizeMachine
+// ============================================================================
+
+describe('resizeMachine', () => {
+  it('rejects when instance is not provisioned', async () => {
+    const { instance } = createInstance();
+    await expect(
+      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
+    ).rejects.toThrow('Instance is not provisioned');
+  });
+
+  it('rejects when instance is being destroyed', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'destroying' });
+
+    await expect(
+      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
+    ).rejects.toThrow('Cannot resize: instance is being destroyed');
+  });
+
+  it('rejects when instance is restoring', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'restoring' });
+
+    await expect(
+      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
+    ).rejects.toThrow('Cannot resize: instance is restoring from snapshot');
+  });
+
+  it('rejects when instance is recovering', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'recovering' });
+
+    await expect(
+      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
+    ).rejects.toThrow('Cannot resize: instance is recovering');
+  });
+
+  it('persists new machine size and returns previous', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      machineSize: { cpus: 2, memory_mb: 3072, cpu_kind: 'shared' },
+    });
+
+    const result = await instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' });
+
+    expect(result.previousSize).toEqual({ cpus: 2, memory_mb: 3072, cpu_kind: 'shared' });
+    expect(result.newSize).toEqual({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' });
+    const stored = storage._store.get('machineSize') as { cpus: number; memory_mb: number };
+    expect(stored.cpus).toBe(4);
+    expect(stored.memory_mb).toBe(3072);
+  });
+
+  it('returns null previousSize when no prior size set', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const result = await instance.resizeMachine({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+
+    expect(result.previousSize).toBeNull();
+    expect(result.newSize).toEqual({ cpus: 1, memory_mb: 3072, cpu_kind: 'performance' });
+  });
+
+  it('allows resize when instance is running', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage);
+
+    const result = await instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' });
+
+    expect(result.newSize.cpus).toBe(4);
+  });
+
+  it('allows resize when instance is stopped', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'stopped' });
+
+    const result = await instance.resizeMachine({
+      cpus: 2,
+      memory_mb: 4096,
+      cpu_kind: 'performance',
+    });
+
+    expect(result.newSize).toEqual({ cpus: 2, memory_mb: 4096, cpu_kind: 'performance' });
   });
 });
 

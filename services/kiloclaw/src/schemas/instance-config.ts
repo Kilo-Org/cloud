@@ -16,7 +16,7 @@ export const EncryptedEnvelopeSchema = z.object({
   version: z.literal(1),
 });
 
-const MachineSizeSchema = z.object({
+export const MachineSizeSchema = z.object({
   cpus: z.number().int().min(1).max(8),
   memory_mb: z.number().int().min(256).max(16384),
   cpu_kind: z.enum(['shared', 'performance']).optional(),

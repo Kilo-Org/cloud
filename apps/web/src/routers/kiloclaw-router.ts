@@ -1925,6 +1925,8 @@ export const kiloclawRouter = createTRPCRouter({
       })),
       helpText: entry.helpText,
       helpUrl: entry.helpUrl,
+      guideText: entry.guideText,
+      guideUrl: entry.guideUrl,
       allFieldsRequired: entry.allFieldsRequired ?? false,
     }));
   }),
@@ -1954,6 +1956,8 @@ export const kiloclawRouter = createTRPCRouter({
       })),
       helpText: entry.helpText,
       helpUrl: entry.helpUrl,
+      guideText: entry.guideText,
+      guideUrl: entry.guideUrl,
       allFieldsRequired: entry.allFieldsRequired ?? false,
     }));
   }),

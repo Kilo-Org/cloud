@@ -52,95 +52,15 @@
                   "
                 >
                   The 6 hours of complimentary AI usage included with your KiloClaw trial have now
-                  ended. Your KiloClaw is still running so no worries.
+                  ended. Your instance is still running. AI model requests will use credits from
+                  your account balance going forward.
                 </p>
-                <p
-                  style="
-                    margin: 0 0 24px;
-                    font-size: 14px;
-                    line-height: 22px;
-                    color: #9ca3af;
-                    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
-                  "
-                >
-                  You have two ways to keep going:
-                </p>
-
-                <!-- Options block -->
-                <table
-                  width="100%"
-                  cellpadding="0"
-                  cellspacing="0"
-                  style="
-                    background-color: #1a1a1a;
-                    border: 1px solid #3a3a3a;
-                    border-radius: 6px;
-                    margin-bottom: 28px;
-                  "
-                >
-                  <tr>
-                    <td style="padding: 20px 24px">
-                      <p
-                        style="
-                          margin: 0 0 6px;
-                          font-size: 11px;
-                          font-weight: 700;
-                          color: #f4e452;
-                          letter-spacing: 0.08em;
-                          text-transform: uppercase;
-                          font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
-                        "
-                      >
-                        Option 1 — Add Credits
-                      </p>
-                      <p
-                        style="
-                          margin: 0 0 16px;
-                          font-size: 13px;
-                          line-height: 21px;
-                          color: #9ca3af;
-                          font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
-                        "
-                      >
-                        Add credits to continue using any model. You pay only what the AI provider
-                        charges — no markup.
-                      </p>
-                      <p
-                        style="
-                          margin: 0 0 6px;
-                          font-size: 11px;
-                          font-weight: 700;
-                          color: #f4e452;
-                          letter-spacing: 0.08em;
-                          text-transform: uppercase;
-                          font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
-                        "
-                      >
-                        Option 2 — Use the Free Model
-                      </p>
-                      <p
-                        style="
-                          margin: 0;
-                          font-size: 13px;
-                          line-height: 21px;
-                          color: #9ca3af;
-                          font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
-                        "
-                      >
-                        Switch to
-                        <span style="color: #d1d5db">{{ free_model_name }}</span>
-                        in your KiloClaw settings for free models with limited intelligence.
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-
-                <!-- Primary CTA -->
+                <!-- CTA -->
                 <table width="100%" cellpadding="0" cellspacing="0">
                   <tr>
-                    <td align="center" style="padding: 0 0 12px">
+                    <td align="center" style="padding: 10px 0 20px">
                       <a
-                        href="{{ credits_url }}"
+                        href="{{ claw_url }}"
                         style="
                           display: inline-block;
                           padding: 14px 32px;
@@ -149,28 +69,6 @@
                           text-decoration: none;
                           border-radius: 6px;
                           font-size: 16px;
-                          font-weight: 700;
-                          font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
-                        "
-                      >
-                        Add Credits
-                      </a>
-                    </td>
-                  </tr>
-                  <!-- Secondary CTA -->
-                  <tr>
-                    <td align="center" style="padding: 0 0 20px">
-                      <a
-                        href="{{ claw_url }}"
-                        style="
-                          display: inline-block;
-                          padding: 12px 32px;
-                          background-color: transparent;
-                          color: #f4e452;
-                          text-decoration: none;
-                          border-radius: 6px;
-                          border: 1px solid #f4e452;
-                          font-size: 14px;
                           font-weight: 700;
                           font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
                         "
@@ -222,7 +120,7 @@
                     font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
                   "
                 >
-                  © {{ year }} Kilo Code, LLC<br />455 Market St, Ste 1940 PMB 993504<br />San
+                  © {{ year }} Kilo Code, Inc<br />455 Market St, Ste 1940 PMB 993504<br />San
                   Francisco, CA 94105, USA
                 </p>
               </td>

@@ -198,12 +198,7 @@ export function generateBaseConfig(
     config.models.providers.kilocode.headers = config.models.providers.kilocode.headers ?? {};
     config.models.providers.kilocode.headers['X-KiloCode-OrganizationId'] =
       env.KILOCODE_ORGANIZATION_ID;
-    // Clean up any stale `models` array that may have been preserved from previous
-    // config (e.g., from the stale provider migration preserving the entry for org
-    // instances). When `models` is present (even as []), OpenClaw treats it as an
-    // explicit allowlist, restricting visible models. Deleting it lets the built-in
-    // kilocode provider's full catalog be used.
-    delete config.models.providers.kilocode.models;
+    config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
     console.log('Configured KiloCode organization header from KILOCODE_ORGANIZATION_ID');
   } else {
     // Remove stale org header from previous boots (e.g., instance was transferred
@@ -227,9 +222,10 @@ export function generateBaseConfig(
     delete config.agents.defaults.models;
   }
 
-  // Tool profile: on fresh install (or explicit config restore), override the
-  // onboard default "messaging" with "full" so agents have all tools. On
-  // subsequent boots, leave the user's choice untouched.
+  // Tool profile: on fresh install, override the onboard default "messaging"
+  // with "full" so agents have all tools. Also backfill to "full" when the
+  // profile field is missing. On subsequent boots, leave user's explicit
+  // profile choice untouched.
   config.tools = config.tools ?? {};
   if (env.KILOCLAW_FRESH_INSTALL === 'true' || !config.tools.profile) {
     config.tools.profile = 'full';
@@ -569,16 +565,11 @@ export function writeBaseConfig(
     console.log('Onboard completed, patching config...');
 
     // 4. Patch the fresh onboard config with env-var-derived fields.
-    // writeBaseConfig is called for both fresh installs (bootstrap onboard path)
-    // and config restores (/_kilo/config/restore). In both cases, tools.profile
-    // should be forced to 'full' — the onboard default 'messaging' leaves agents
-    // without shell/file/web tools.
-    const prevFreshInstall = env.KILOCLAW_FRESH_INSTALL;
-    env.KILOCLAW_FRESH_INSTALL = 'true';
     const config = generateBaseConfig(env, tmpPath, deps);
-    // Restore the original value so callers that set it before calling us
-    // (like bootstrap's runOnboardOrDoctor) don't get surprised.
-    env.KILOCLAW_FRESH_INSTALL = prevFreshInstall;
+    // Restore flow should still force full tools profile even when
+    // KILOCLAW_FRESH_INSTALL is not set.
+    config.tools = config.tools ?? {};
+    config.tools.profile = 'full';
 
     // 5. Serialize and validate roundtrip
     const serialized = JSON.stringify(config, null, 2);

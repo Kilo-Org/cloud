@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { kiloclaw_instances, user_push_tokens } from '@kilocode/db/schema';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { channel_badge_counts, kiloclaw_instances, user_push_tokens } from '@kilocode/db/schema';
+import { and, eq, inArray, isNull, sql, sum } from 'drizzle-orm';
 import type { Event } from 'stream-chat';
 
 import type { ExpoPushMessage, TicketTokenPair } from '../lib/expo-push';
@@ -135,6 +135,25 @@ export class NotificationChannelDO extends DurableObject<Env> {
       return;
     }
 
+    // Increment the badge count for this channel and return the new total across all channels.
+    // Done before the token guard so unread state is always persisted even if the user
+    // temporarily has no registered push tokens (e.g. between reinstalls).
+    // Uses UPSERT so the row is created on first notification for this channel.
+    await db
+      .insert(channel_badge_counts)
+      .values({ user_id: instance.user_id, channel_id: sandboxId, badge_count: 1 })
+      .onConflictDoUpdate({
+        target: [channel_badge_counts.user_id, channel_badge_counts.channel_id],
+        set: { badge_count: sql`${channel_badge_counts.badge_count} + 1` },
+      });
+
+    const [totals] = await db
+      .select({ total: sum(channel_badge_counts.badge_count) })
+      .from(channel_badge_counts)
+      .where(eq(channel_badge_counts.user_id, instance.user_id));
+
+    const badgeCount = Number(totals?.total ?? 0);
+
     const tokens = await db
       .select({ token: user_push_tokens.token })
       .from(user_push_tokens)
@@ -152,6 +171,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
       body: truncatedMessage,
       // Keep in sync with NotificationData in apps/mobile/src/lib/notifications.ts
       data: { type: 'chat', instanceId: sandboxId },
+      badge: badgeCount,
       sound: 'default' as const,
       priority: 'high' as const,
     }));

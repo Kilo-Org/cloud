@@ -34,6 +34,7 @@ import type {
   GmailNotificationsResponse,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
+  ResizeMachineResponse,
   RestoreVolumeSnapshotResponse,
   CleanupRecoveryPreviousVolumeResponse,
   RegionsResponse,
@@ -708,6 +709,22 @@ export class KiloClawInternalClient {
     );
   }
 
+  async resizeMachine(
+    userId: string,
+    machineSize: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' },
+    instanceId?: string
+  ): Promise<ResizeMachineResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/resize-machine${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, machineSize }),
+      },
+      { userId }
+    );
+  }
+
   async restoreVolumeFromSnapshot(
     userId: string,
     snapshotId: string,
@@ -736,6 +753,23 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId, appName, machineId }),
+      },
+      { userId }
+    );
+  }
+
+  async extendVolume(
+    userId: string,
+    appName: string,
+    volumeId: string,
+    instanceId?: string
+  ): Promise<{ ok: true; needsRestart: boolean }> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/extend-volume${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, appName, volumeId }),
       },
       { userId }
     );

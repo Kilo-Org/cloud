@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { Brain, ChevronRight, MessageSquare, Sun, Wrench, Zap } from 'lucide-react';
 import { toast } from 'sonner';
@@ -113,6 +114,14 @@ export function CreateInstanceCard({
   // $feature/button-vs-card to events fired in this component.
   useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
+  const hasCapturedPageView = useRef(false);
+
+  useEffect(() => {
+    if (hasCapturedPageView.current) return;
+    hasCapturedPageView.current = true;
+    posthog?.capture('claw_page_viewed');
+  }, [posthog]);
+
   const selectedModel = KILO_AUTO_BALANCED_MODEL.id;
   function handleCreate() {
     posthog?.capture('claw_create_instance_clicked', {

@@ -172,12 +172,18 @@ future, the system MUST redirect from the old path to the new one.
     `/subscriptions/kilo-pass`.
 
 19. The Kilo Pass detail page MUST support the following management
-    actions:
+    actions, using the same canonical Kilo Pass management flows as
+    other Kilo Pass surfaces:
     - Change subscription tier
     - Change billing cadence (monthly / yearly)
-    - Cancel subscription
+    - Cancel subscription through the canonical cancellation flow
     - Resume a subscription pending cancellation
     - View scheduled changes and cancel a pending scheduled change
+
+    Cancellation flow completion MUST be explicit: abandoning or
+    dismissing the flow MUST NOT schedule cancellation. If the canonical
+    flow is unavailable, the system MAY fall back to direct cancellation
+    confirmation before scheduling cancellation.
 
 20. The Kilo Pass detail page MUST display:
     - Current tier and cadence
@@ -407,6 +413,12 @@ not yet enforced in the current codebase:
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-04-10 -- Kilo Pass cancellation flow
+
+- Clarified that the Subscription Center uses the canonical Kilo Pass
+  cancellation flow and leaves subscriptions unchanged when that flow is
+  dismissed.
 
 ### 2026-03-31 -- Initial spec
 

@@ -1787,7 +1787,6 @@ async function runComplementaryInferenceEndedSweep(
   summary: BillingSummary
 ): Promise<void> {
   const clawUrl = buildClawUrl(env);
-  const creditsUrl = `${env.KILOCODE_BACKEND_BASE_URL}/credits`;
   const windowCutoff = new Date(Date.now() - COMPLEMENTARY_INFERENCE_WINDOW_MS).toISOString();
 
   // Find users whose "instance ready" email was sent more than 6 hours ago
@@ -1843,11 +1842,7 @@ async function runComplementaryInferenceEndedSweep(
         row.email,
         `claw_complementary_inference_ended:${row.sandbox_id}`,
         'clawComplementaryInferenceEnded',
-        {
-          claw_url: clawUrl,
-          credits_url: creditsUrl,
-          free_model_name: 'Kilo Auto Free',
-        },
+        { claw_url: clawUrl },
         summary
       );
 

@@ -17,6 +17,7 @@ export default function ApiRequestLogPage() {
   const [userId, setUserId] = useState('');
   const [startDate, setStartDate] = useState(weekAgo);
   const [endDate, setEndDate] = useState(today);
+  const [model, setModel] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   function handleDownload() {
@@ -36,6 +37,9 @@ export default function ApiRequestLogPage() {
       startDate,
       endDate,
     });
+    if (model.trim()) {
+      params.set('model', model.trim());
+    }
 
     // Navigate directly to preserve server-side streaming
     window.location.href = `/admin/api/api-request-log/download?${params}`;
@@ -58,6 +62,16 @@ export default function ApiRequestLogPage() {
                 placeholder="Enter user ID"
                 value={userId}
                 onChange={e => setUserId(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="model">Model (optional)</Label>
+              <Input
+                id="model"
+                placeholder="e.g. claude-sonnet-4-20250514"
+                value={model}
+                onChange={e => setModel(e.target.value)}
               />
             </div>
 

@@ -20,6 +20,7 @@ import { KIMI_CURRENT_MODEL_ID } from '@/lib/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/providers/morph';
 import { gpt_oss_20b_free_model } from '@/lib/providers/openai';
 import { qwen36_plus_model } from '@/lib/providers/qwen';
+import { stepfun_35_flash_free_model } from '@/lib/providers/stepfun';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
@@ -69,6 +70,7 @@ export const kiloExclusiveModels = [
   qwen36_plus_model,
   trinity_large_thinking_free_model,
   claude_sonnet_clawsetup_model,
+  stepfun_35_flash_free_model,
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {

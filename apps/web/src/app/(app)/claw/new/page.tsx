@@ -33,6 +33,17 @@ function ClawNewLoader({
   onCreateFlowStarted: () => void;
 }) {
   const statusQuery = useKiloClawStatus();
+
+  if (mode === 'create-first') {
+    return (
+      <ClawOnboardingFlow
+        status={statusQuery.data}
+        mode={mode}
+        onCreateFlowStarted={onCreateFlowStarted}
+      />
+    );
+  }
+
   return (
     <ClawOnboardingWithBoundary
       statusQuery={statusQuery}
@@ -86,15 +97,5 @@ export default function ClawNewPage() {
   const mode: ClawOnboardingMode =
     createFlowStarted || !hasActiveInstance ? 'create-first' : 'post-provisioning';
 
-  if (hasActiveInstance) {
-    return <ClawNewLoader mode={mode} onCreateFlowStarted={onCreateFlowStarted} />;
-  }
-
-  return (
-    <ClawOnboardingFlow
-      status={undefined}
-      mode="create-first"
-      onCreateFlowStarted={onCreateFlowStarted}
-    />
-  );
+  return <ClawNewLoader mode={mode} onCreateFlowStarted={onCreateFlowStarted} />;
 }

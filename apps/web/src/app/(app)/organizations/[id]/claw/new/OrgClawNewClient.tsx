@@ -20,6 +20,20 @@ export function OrgClawNewClient({ organizationId }: { organizationId: string })
   const mode: ClawOnboardingMode =
     createFlowStarted || !hasInstance ? 'create-first' : 'post-provisioning';
 
+  if (
+    mode === 'create-first' &&
+    (createFlowStarted || (!statusQuery.isLoading && !statusQuery.error))
+  ) {
+    return (
+      <ClawOnboardingFlow
+        status={statusQuery.data}
+        mode={mode}
+        organizationId={organizationId}
+        onCreateFlowStarted={onCreateFlowStarted}
+      />
+    );
+  }
+
   return (
     <ClawOnboardingWithBoundary
       statusQuery={statusQuery}

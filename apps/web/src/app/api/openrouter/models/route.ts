@@ -8,30 +8,11 @@ import { getDirectByokModelsForUser } from '@/lib/providers/direct-byok';
 import { unstable_cache } from 'next/cache';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 
-const getDirectByokModelsForUser_cached = unstable_cache(
+const getDirectByokModels = unstable_cache(
   (userId: string) => getDirectByokModelsForUser(userId),
   undefined,
   { revalidate: 60 }
 );
-
-async function getAuthContext() {
-  try {
-    return await getUserFromAuth({ adminOnly: false });
-  } catch (e) {
-    console.debug('[openrouter/models] error getting auth context, database unavailable?', e);
-    return null;
-  }
-}
-
-async function getDirectByokModels(userId: string) {
-  try {
-    console.debug('[getDirectByokModels] authenticated request, fetching direct byok models');
-    return await getDirectByokModelsForUser_cached(userId);
-  } catch (e) {
-    console.debug('[getDirectByokModels] error, database unavailable?', e);
-    return [];
-  }
-}
 
 /**
  * Test using:
@@ -40,23 +21,15 @@ async function getDirectByokModels(userId: string) {
 export async function GET(
   _request: NextRequest
 ): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
-  const auth = await getAuthContext();
-
-  if (auth?.organizationId) {
-    try {
-      const result = await getAvailableModelsForOrganization(auth.organizationId);
-      if (result) {
-        return NextResponse.json(result);
-      }
-    } catch (error) {
-      captureException(error, {
-        tags: { endpoint: 'openrouter/models' },
-        extra: { action: 'fetching_org_models', organizationId: auth.organizationId },
-      });
-    }
-  }
-
+  const auth = await getUserFromAuth({ adminOnly: false });
   try {
+    const result = auth?.organizationId
+      ? await getAvailableModelsForOrganization(auth.organizationId)
+      : null;
+    if (result) {
+      return NextResponse.json(result);
+    }
+
     const data = await getEnhancedOpenRouterModels();
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
@@ -68,6 +41,8 @@ export async function GET(
       tags: { endpoint: 'openrouter/models' },
       extra: {
         action: 'fetching_models',
+        userId: auth?.user?.id,
+        organizationId: auth?.organizationId,
       },
     });
     return NextResponse.json(

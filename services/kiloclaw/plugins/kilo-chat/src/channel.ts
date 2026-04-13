@@ -98,44 +98,7 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
   }),
   threading: { topLevelReplyToMode: 'reply' },
   outbound: {
-    // FRAGILE: editText/deleteMessage reach `plugin.outbound.attachedResults.*` only
-    // because `resolveChatChannelOutbound` in the OpenClaw SDK spreads `outbound.base`
-    // verbatim onto the final adapter. If the SDK ever enumerates known `base` keys,
-    // these handlers will silently disappear. Consider lobbying OpenClaw for a
-    // first-class `base.actions` or `extraOutbound` escape hatch.
-    //
-    // The OpenClaw SDK's `outbound.base` type doesn't declare an `attachedResults`
-    // field, but `resolveChatChannelOutbound` spreads `base` verbatim onto the final
-    // adapter, so fields added here become reachable as `plugin.outbound.*` at
-    // runtime. Narrow cast keeps `deliveryMode` type-checked.
-    base: {
-      deliveryMode: 'direct',
-      attachedResults: {
-        channel: CHANNEL_ID,
-        editText: async (params: {
-          to: string;
-          messageId: string;
-          text: string;
-          version: number;
-        }) => {
-          const client = makeClient();
-          const result = await client.editMessage({
-            conversationId: params.to,
-            messageId: params.messageId,
-            text: params.text,
-            version: params.version,
-          });
-          return { messageId: result.messageId, version: result.version };
-        },
-        deleteMessage: async (params: { to: string; messageId: string }) => {
-          const client = makeClient();
-          await client.deleteMessage({
-            conversationId: params.to,
-            messageId: params.messageId,
-          });
-        },
-      },
-    } as { deliveryMode: 'direct'; attachedResults: unknown },
+    base: { deliveryMode: 'direct' },
     attachedResults: {
       channel: CHANNEL_ID,
       sendText: async params => {

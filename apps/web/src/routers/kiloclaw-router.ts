@@ -2272,7 +2272,7 @@ export const kiloclawRouter = createTRPCRouter({
       return result;
     }),
 
-  listKiloCliRuns: clawAccessProcedure
+  listKiloCliRuns: baseProcedure
     .input(z.object({ limit: z.number().min(1).max(50).default(10) }).optional())
     .query(async ({ ctx, input }) => {
       const instance = await getActiveInstance(ctx.user.id);

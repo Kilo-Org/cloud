@@ -44,18 +44,18 @@ const testAppName = 'acct-abc123def456';
 const testMachineId = 'd8901e123456';
 const testUserId = 'test-target-user-id';
 
-beforeAll(async () => {
+beforeEach(async () => {
   regularUser = await insertTestUser({
-    google_user_email: 'regular-destroy-machine@example.com',
+    google_user_email: `regular-destroy-machine-${Math.random()}@example.com`,
     is_admin: false,
   });
   adminUser = await insertTestUser({
-    google_user_email: 'admin-destroy-machine@admin.example.com',
+    google_user_email: `admin-destroy-machine-${Math.random()}@admin.example.com`,
     is_admin: true,
   });
 
   cliRunUser = await insertTestUser({
-    google_user_email: 'admin-cli-run-target@example.com',
+    google_user_email: `admin-cli-run-target-${Math.random()}@example.com`,
     is_admin: false,
   });
 
@@ -83,9 +83,6 @@ beforeAll(async () => {
     .returning({ id: kiloclaw_cli_runs.id });
 
   cliRunId = run.id;
-});
-
-beforeEach(async () => {
   mockGetDebugStatus.mockReset();
   mockDestroyFlyMachine.mockReset();
   mockGetKiloCliRunStatus.mockReset();

@@ -193,7 +193,7 @@ export function InstanceControls({
   const gatewayUrl = useGatewayUrl(status);
   const { organizationId, currentRunPath } = useClawContext();
   const isRunning = status.status === 'running';
-  const currentRun = useCurrentCliRun(organizationId, status.instanceId ?? undefined, isRunning);
+  const currentRun = useCurrentCliRun(organizationId, status.instanceId ?? undefined, true);
   const personalRunStatus = useKiloCliRunStatus(
     organizationId === undefined ? (currentRun?.id ?? null) : null
   );

@@ -158,7 +158,14 @@ export function ClawSettingsPage({
   organizationName?: string;
 }) {
   return (
-    <ClawContextProvider organizationId={organizationId}>
+    <ClawContextProvider
+      organizationId={organizationId}
+      currentRunPath={
+        organizationId
+          ? `/organizations/${organizationId}/claw/kilo-cli-run`
+          : '/claw/kilo-cli-run'
+      }
+    >
       <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
         <SetPageTitle
           title="Settings"

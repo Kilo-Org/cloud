@@ -16,30 +16,48 @@ export function OrgClawNewClient({ organizationId }: { organizationId: string })
   const onCreateFlowStarted = useCallback(() => setCreateFlowStartedAt(Date.now()), []);
   const onCreateFlowFailed = useCallback(() => setCreateFlowStartedAt(null), []);
 
-  const status = statusQuery.data;
-  const hasInstance = status !== undefined && status.status !== null;
-  const mode: ClawOnboardingMode =
-    createFlowStartedAt !== null || !hasInstance ? 'create-first' : 'post-provisioning';
-
-  if (
-    mode === 'create-first' &&
-    (createFlowStartedAt !== null || (!statusQuery.isLoading && !statusQuery.error))
-  ) {
+  if (createFlowStartedAt !== null) {
     const createStatus =
-      createFlowStartedAt !== null && statusQuery.dataUpdatedAt >= createFlowStartedAt
-        ? statusQuery.data
-        : undefined;
+      statusQuery.dataUpdatedAt >= createFlowStartedAt ? statusQuery.data : undefined;
 
     return (
       <ClawOnboardingFlow
         status={createStatus}
-        mode={mode}
+        mode="create-first"
         organizationId={organizationId}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
       />
     );
   }
+
+  const hasStalePopulatedStatus =
+    statusQuery.data !== undefined && statusQuery.data.status !== null && statusQuery.isFetching;
+
+  if (statusQuery.isLoading || hasStalePopulatedStatus) {
+    return (
+      <ClawOnboardingWithBoundary
+        statusQuery={{ data: undefined, isLoading: true, error: null }}
+        mode="post-provisioning"
+        organizationId={organizationId}
+        onCreateFlowStarted={onCreateFlowStarted}
+      />
+    );
+  }
+
+  if (statusQuery.error) {
+    return (
+      <ClawOnboardingWithBoundary
+        statusQuery={statusQuery}
+        mode="post-provisioning"
+        organizationId={organizationId}
+        onCreateFlowStarted={onCreateFlowStarted}
+      />
+    );
+  }
+
+  const hasFreshInstance = statusQuery.data !== undefined && statusQuery.data.status !== null;
+  const mode: ClawOnboardingMode = hasFreshInstance ? 'post-provisioning' : 'create-first';
 
   return (
     <ClawOnboardingWithBoundary

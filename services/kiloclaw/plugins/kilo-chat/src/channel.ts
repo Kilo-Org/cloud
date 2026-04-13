@@ -22,6 +22,14 @@ export const __pluginInternals = {
   fetchImpl: undefined as typeof fetch | undefined,
 };
 
+function makeClient() {
+  return createKiloChatClient({
+    controllerBaseUrl: resolveControllerUrl(),
+    gatewayToken: resolveGatewayToken(),
+    fetchImpl: __pluginInternals.fetchImpl,
+  });
+}
+
 export type ResolvedKiloChatAccount = {
   accountId: string | null;
   baseUrl: string;
@@ -90,13 +98,18 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
   }),
   threading: { topLevelReplyToMode: 'reply' },
   outbound: {
+    // FRAGILE: editText/deleteMessage reach `plugin.outbound.attachedResults.*` only
+    // because `resolveChatChannelOutbound` in the OpenClaw SDK spreads `outbound.base`
+    // verbatim onto the final adapter. If the SDK ever enumerates known `base` keys,
+    // these handlers will silently disappear. Consider lobbying OpenClaw for a
+    // first-class `base.actions` or `extraOutbound` escape hatch.
+    //
+    // The OpenClaw SDK's `outbound.base` type doesn't declare an `attachedResults`
+    // field, but `resolveChatChannelOutbound` spreads `base` verbatim onto the final
+    // adapter, so fields added here become reachable as `plugin.outbound.*` at
+    // runtime. Narrow cast keeps `deliveryMode` type-checked.
     base: {
       deliveryMode: 'direct',
-      // editText and deleteMessage are placed on base so they survive the SDK's
-      // resolveChatChannelOutbound spread onto the flat ChannelOutboundAdapter.
-      // The SDK only promotes sendText/sendMedia/sendPoll from attachedResults;
-      // these two actions are dispatched by OpenClaw at runtime by key name from
-      // the flat outbound object (via the attachedResults sub-object here).
       attachedResults: {
         channel: CHANNEL_ID,
         editText: async (params: {
@@ -105,11 +118,7 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
           text: string;
           version: number;
         }) => {
-          const client = createKiloChatClient({
-            controllerBaseUrl: resolveControllerUrl(),
-            gatewayToken: resolveGatewayToken(),
-            fetchImpl: __pluginInternals.fetchImpl,
-          });
+          const client = makeClient();
           const result = await client.editMessage({
             conversationId: params.to,
             messageId: params.messageId,
@@ -119,26 +128,18 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
           return { messageId: result.messageId, version: result.version };
         },
         deleteMessage: async (params: { to: string; messageId: string }) => {
-          const client = createKiloChatClient({
-            controllerBaseUrl: resolveControllerUrl(),
-            gatewayToken: resolveGatewayToken(),
-            fetchImpl: __pluginInternals.fetchImpl,
-          });
+          const client = makeClient();
           await client.deleteMessage({
             conversationId: params.to,
             messageId: params.messageId,
           });
         },
       },
-    } as never, // TODO(openclaw sdk): ChannelOutboundAdapter base type lacks editText/deleteMessage; cast needed to attach extra action methods.
+    } as { deliveryMode: 'direct'; attachedResults: unknown },
     attachedResults: {
       channel: CHANNEL_ID,
       sendText: async params => {
-        const client = createKiloChatClient({
-          controllerBaseUrl: resolveControllerUrl(),
-          gatewayToken: resolveGatewayToken(),
-          fetchImpl: __pluginInternals.fetchImpl,
-        });
+        const client = makeClient();
         const result = await client.sendText({
           conversationId: params.to,
           text: params.text,

@@ -22,8 +22,6 @@ function AddUserData() {
     if (status === 'authenticated' && session?.user?.email) {
       const evt = {
         event: 'data_layer_update',
-        email: session.user.email,
-        name: session.user.name,
         is_new_user: session.isNewUser || false,
       };
       window.dataLayer.push(evt);

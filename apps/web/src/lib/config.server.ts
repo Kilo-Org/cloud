@@ -25,6 +25,8 @@ export const GITHUB_CLIENT_ID = getEnvVariable('GITHUB_CLIENT_ID');
 export const GITHUB_CLIENT_SECRET = getEnvVariable('GITHUB_CLIENT_SECRET');
 // Admin-only GitHub access (used for admin dashboards)
 export const GITHUB_ADMIN_STATS_TOKEN = getEnvVariable('GITHUB_ADMIN_STATS_TOKEN');
+export const CONTRIBUTOR_CHAMPION_TEAM_EMAILS =
+  getEnvVariable('CONTRIBUTOR_CHAMPION_TEAM_EMAILS') || '';
 export const GITLAB_CLIENT_ID = getEnvVariable('GITLAB_CLIENT_ID');
 export const GITLAB_CLIENT_SECRET = getEnvVariable('GITLAB_CLIENT_SECRET');
 export const LINKEDIN_CLIENT_ID = getEnvVariable('LINKEDIN_CLIENT_ID');

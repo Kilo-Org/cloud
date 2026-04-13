@@ -73,7 +73,7 @@ import {
   type KiloclawEventRow,
   type KiloclawAllEventRow,
 } from '@/app/admin/api/kiloclaw-analytics/hooks';
-import { useControllerTelemetryDiskUsage } from '@/app/admin/api/kiloclaw-controller-telemetry/hooks';
+import type { AnalyticsEngineResponse, ControllerTelemetryRow } from '@/lib/kiloclaw/disk-usage';
 
 function parseTimestamp(timestamp: string): Date {
   const normalized = timestamp.includes('T') ? timestamp : timestamp.replace(' ', 'T');
@@ -133,6 +133,23 @@ function formatVolumeUsageLine(used: number | null | undefined, total: number | 
       {formatBytes(used)} used / {formatBytes(total)} total ({pct}%)
     </span>
   );
+}
+
+function useControllerTelemetryDiskUsage(sandboxId: string) {
+  return useQuery<AnalyticsEngineResponse<ControllerTelemetryRow>>({
+    queryKey: ['kiloclaw-controller-telemetry', 'disk-usage', sandboxId],
+    queryFn: async () => {
+      const response = await fetch(
+        `/admin/api/kiloclaw-controller-telemetry?sandboxId=${encodeURIComponent(sandboxId)}`
+      );
+      if (!response.ok) {
+        throw new Error('Failed to fetch controller telemetry disk usage');
+      }
+      return response.json() as Promise<AnalyticsEngineResponse<ControllerTelemetryRow>>;
+    },
+    enabled: !!sandboxId,
+    refetchInterval: 60_000,
+  });
 }
 
 function formatUptime(seconds: number): string {

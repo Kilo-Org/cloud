@@ -1,6 +1,8 @@
 'use client';
 
-import { Activity, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Activity, HardDrive, Loader2 } from 'lucide-react';
+import type { AnalyticsEngineResponse, ControllerTelemetryRow } from '@/lib/kiloclaw/disk-usage';
 import type { KiloClawDashboardStatus, GatewayProcessStatusResponse } from '@/lib/kiloclaw/types';
 import { Badge } from '@/components/ui/badge';
 import { formatTs } from './time';
@@ -52,6 +54,36 @@ function formatLastExit(lastExit: NonNullable<GatewayProcessStatusResponse['last
   return `exit ${code} / ${signal} at ${timeStr}`;
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** i;
+  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function formatVolumeUsage(used: number | null, total: number | null): string {
+  if (used === null || total === null) return '—';
+  const raw = (used / total) * 100;
+  const pct = raw % 1 === 0 ? raw.toFixed(0) : (Math.round(raw * 10) / 10).toFixed(1);
+  return `${formatBytes(used)} / ${formatBytes(total)} (${pct}%)`;
+}
+
+function useDiskUsage(enabled: boolean) {
+  return useQuery<AnalyticsEngineResponse<ControllerTelemetryRow>>({
+    queryKey: ['kiloclaw', 'disk-usage'],
+    queryFn: async () => {
+      const response = await fetch('/api/kiloclaw/disk-usage');
+      if (!response.ok) {
+        throw new Error('Failed to fetch disk usage');
+      }
+      return response.json() as Promise<AnalyticsEngineResponse<ControllerTelemetryRow>>;
+    },
+    enabled,
+    refetchInterval: 60_000,
+  });
+}
+
 export function InstanceTab({
   status,
   gatewayStatus,
@@ -64,6 +96,12 @@ export function InstanceTab({
   gatewayError: { message: string; data?: { code?: string } | null } | null;
 }) {
   const isRunning = status.status === 'running';
+  const diskUsage = useDiskUsage(isRunning);
+  const diskUsageRow = diskUsage.data?.data?.[0];
+  const diskUsed =
+    diskUsageRow && diskUsageRow.disk_used_bytes > 0 ? diskUsageRow.disk_used_bytes : null;
+  const diskTotal =
+    diskUsageRow && diskUsageRow.disk_total_bytes > 0 ? diskUsageRow.disk_total_bytes : null;
 
   if (!isRunning) {
     return (
@@ -98,7 +136,7 @@ export function InstanceTab({
   const stateStyle = GATEWAY_STATE_STYLES[gatewayStatus.state];
 
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-5">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-6">
       <div>
         <p className="text-muted-foreground mb-1.5 text-xs">State</p>
         <Badge variant="outline" className={stateStyle.className}>
@@ -123,6 +161,13 @@ export function InstanceTab({
       <div>
         <p className="text-muted-foreground mb-1.5 text-xs">Provisioned</p>
         <p className="text-foreground text-sm font-medium">{formatTs(status.provisionedAt)}</p>
+      </div>
+      <div>
+        <p className="text-muted-foreground mb-1.5 text-xs">Volume Usage</p>
+        <p className="text-foreground inline-flex items-center gap-1 text-sm font-medium">
+          <HardDrive className="h-3.5 w-3.5" />
+          {formatVolumeUsage(diskUsed, diskTotal)}
+        </p>
       </div>
     </div>
   );

@@ -1,0 +1,26 @@
+{
+  "id": "kilo-chat",
+  "kind": "channel",
+  "name": "Kilo Chat",
+  "description": "Kilo Chat channel plugin",
+  "channels": ["kilo-chat"],
+  "channelEnvVars": {
+    "kilo-chat": ["KILOCHAT_API_TOKEN", "KILOCHAT_WEBHOOK_SECRET", "KILOCHAT_BASE_URL"]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "kilo-chat": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "baseUrl": { "type": "string" },
+          "dmPolicy": { "type": "string" },
+          "allowFrom": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

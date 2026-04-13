@@ -4,7 +4,6 @@ import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { isWebSessionCurrent, revokeWebSession } from '@/lib/web-session-revocation';
 
-
 describe('web session revocation', () => {
   afterEach(async () => {
     await db.delete(kilocode_users).where(sql`${kilocode_users.id} LIKE 'test-user-%'`);

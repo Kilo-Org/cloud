@@ -719,6 +719,17 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     promotion_ends_at: new Date('2026-04-30'),
     total_redemptions_allowed: 563,
   },
+  {
+    encrypted_credit_category:
+      'uUuur9I2iZOBVuFT12Qesw==:nzwZRYrw5yNyIceuzIlFIA==:2gJR8oVMRq6ka1mEQ0U=',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 10,
+    description: 'Free AI Inference KiloClaw email',
+    promotion_ends_at: new Date('2026-04-21T23:59:59Z'),
+    total_redemptions_allowed: 4175,
+    expiry_hours: 7 * 24,
+  },
 ];
 
 const selfServicePromos: readonly SelfServicePromoCreditCategoryConfig[] =

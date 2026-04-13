@@ -503,11 +503,12 @@ function sanitizeKiloCodeConfigResponse(
 
 async function provisionInstance(
   user: Parameters<typeof generateApiToken>[0],
-  input: z.infer<typeof updateConfigSchema>
+  input: z.infer<typeof updateConfigSchema>,
+  /** Snapshot of the active row taken *before* ensureProvisionAccess, which may
+   *  itself create a row. Passing the snapshot in lets us correctly detect
+   *  whether the row was created as part of this provisioning attempt. */
+  preExistingRow: ActiveKiloClawInstance | null
 ) {
-  // Remember which row existed before so we can detect whether
-  // ensureActiveInstance created a new one for this attempt.
-  const preExistingRow = await getActiveInstance(user.id);
   const instanceRow = await ensureActiveInstance(user.id);
   const rowIsNew = !preExistingRow || preExistingRow.id !== instanceRow.id;
 
@@ -1738,8 +1739,12 @@ export const kiloclawRouter = createTRPCRouter({
 
   // Explicit lifecycle APIs
   provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
+    // Snapshot the active row *before* ensureProvisionAccess, which may create
+    // one. provisionInstance uses this to detect whether the row is new so it
+    // can clean up on failure.
+    const preExistingRow = await getActiveInstance(ctx.user.id);
     await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
-    return provisionInstance(ctx.user, input);
+    return provisionInstance(ctx.user, input, preExistingRow);
   }),
 
   patchConfig: clawAccessProcedure
@@ -1751,8 +1756,9 @@ export const kiloclawRouter = createTRPCRouter({
   // Backward-compatible alias — uses the same trial-bootstrap flow as provision
   // so first-time callers can create a trial row (clawAccessProcedure would reject them).
   updateConfig: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
+    const preExistingRow = await getActiveInstance(ctx.user.id);
     await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
-    return provisionInstance(ctx.user, input);
+    return provisionInstance(ctx.user, input, preExistingRow);
   }),
 
   updateKiloCodeConfig: clawAccessProcedure

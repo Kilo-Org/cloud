@@ -7,6 +7,19 @@ function getContainerEnv(body: Record<string, unknown> | null): string[] {
   return env.filter((entry): entry is string => typeof entry === 'string');
 }
 
+function fetchInputUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
+
+function requestJsonBody(init: RequestInit | undefined): Record<string, unknown> {
+  if (typeof init?.body !== 'string') {
+    throw new Error('Expected JSON string request body');
+  }
+  return JSON.parse(init.body) as Record<string, unknown>;
+}
+
 describe('dockerLocalProviderAdapter', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
@@ -109,7 +122,7 @@ describe('dockerLocalProviderAdapter', () => {
       events.push('persist');
     });
     fetchMock.mockImplementation(async (input, init) => {
-      const url = String(input);
+      const url = fetchInputUrl(input);
       if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
         return new Response('', { status: 404 });
       }
@@ -131,7 +144,7 @@ describe('dockerLocalProviderAdapter', () => {
       }
       if (url.includes('/containers/create?name=kiloclaw-sandbox-1')) {
         events.push('create-container');
-        createBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        createBody = requestJsonBody(init);
         return new Response(JSON.stringify({ Id: 'container-1' }), {
           status: 201,
           headers: { 'content-type': 'application/json' },
@@ -193,7 +206,7 @@ describe('dockerLocalProviderAdapter', () => {
     const events: string[] = [];
     let createBody: Record<string, unknown> | null = null;
     fetchMock.mockImplementation(async (input, init) => {
-      const url = String(input);
+      const url = fetchInputUrl(input);
       if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
         return new Response(JSON.stringify({ Name: 'kiloclaw-root-sandbox-1' }), {
           status: 200,
@@ -217,7 +230,7 @@ describe('dockerLocalProviderAdapter', () => {
       }
       if (url.includes('/containers/create?name=kiloclaw-sandbox-1')) {
         events.push('create-container');
-        createBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        createBody = requestJsonBody(init);
         return new Response(JSON.stringify({ Id: 'container-2' }), {
           status: 201,
           headers: { 'content-type': 'application/json' },
@@ -260,7 +273,7 @@ describe('dockerLocalProviderAdapter', () => {
     const fetchMock = vi.mocked(fetch);
     const events: string[] = [];
     fetchMock.mockImplementation(async (input, init) => {
-      const url = String(input);
+      const url = fetchInputUrl(input);
       if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
         return new Response(JSON.stringify({ Name: 'kiloclaw-root-sandbox-1' }), {
           status: 200,
@@ -284,7 +297,7 @@ describe('dockerLocalProviderAdapter', () => {
       }
       if (url.includes('/containers/create?name=kiloclaw-sandbox-1')) {
         events.push('create-container');
-        expect(JSON.parse(String(init?.body))).toMatchObject({ Image: 'kiloclaw:new' });
+        expect(requestJsonBody(init)).toMatchObject({ Image: 'kiloclaw:new' });
         return new Response(JSON.stringify({ Id: 'container-2' }), {
           status: 201,
           headers: { 'content-type': 'application/json' },

@@ -235,6 +235,12 @@ function analyticsEventsByName(
   });
 }
 
+function fetchInputUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
+
 function createInstance(
   storage = createFakeStorage(),
   env = createFakeEnv()
@@ -535,7 +541,7 @@ describe('two-phase destroy', () => {
     });
 
     vi.mocked(fetch).mockImplementation(async input => {
-      const url = String(input);
+      const url = fetchInputUrl(input);
       if (url.endsWith('/containers/kiloclaw-sandbox-1?force=true')) {
         return new Response(null, { status: 204 });
       }
@@ -574,7 +580,7 @@ describe('two-phase destroy', () => {
     });
 
     vi.mocked(fetch).mockImplementation(async input => {
-      const url = String(input);
+      const url = fetchInputUrl(input);
       if (url.endsWith('/containers/kiloclaw-sandbox-1?force=true')) {
         return new Response(null, { status: 204 });
       }
@@ -597,7 +603,7 @@ describe('two-phase destroy', () => {
     });
 
     vi.mocked(fetch).mockImplementation(async input => {
-      const url = String(input);
+      const url = fetchInputUrl(input);
       if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
         return new Response(null, { status: 204 });
       }
@@ -5378,7 +5384,7 @@ describe('startAsync: catch handler writes stopped state on pre-machine failure'
     });
 
     vi.mocked(fetch).mockImplementation(async input => {
-      const url = String(input);
+      const url = fetchInputUrl(input);
       if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
         return new Response(JSON.stringify({ Name: 'kiloclaw-root-sandbox-1' }), {
           status: 200,

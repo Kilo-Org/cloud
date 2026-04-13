@@ -65,9 +65,7 @@ describe('kilo-exa web search provider', () => {
     const config = provider.applySelectionConfig?.({}) ?? {};
 
     expect(config.plugins?.entries?.['kiloclaw-customizer']?.enabled).toBe(true);
-    expect(config.plugins?.entries?.['kiloclaw-customizer']?.config?.webSearch?.enabled).toBe(
-      true
-    );
+    expect(config.plugins?.entries?.['kiloclaw-customizer']?.config?.webSearch?.enabled).toBe(true);
   });
 
   it('normalizes uppercase freshness values', async () => {

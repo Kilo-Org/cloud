@@ -331,7 +331,8 @@ export function generateBaseConfig(
       delete config.tools.web.search.provider;
     }
   } else if (hasExplicitSearchProvider) {
-    customizerWebSearchConfig.enabled = config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID;
+    customizerWebSearchConfig.enabled =
+      config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID;
   } else {
     customizerWebSearchConfig.enabled = true;
     config.tools = config.tools ?? {};

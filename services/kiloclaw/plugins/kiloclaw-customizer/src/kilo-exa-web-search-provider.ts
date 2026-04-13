@@ -67,11 +67,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function resolveCustomizerWebSearchConfig(config: {
-  plugins?: {
-    entries?: Record<string, unknown>;
-  };
-} | undefined): Record<string, unknown> | undefined {
+function resolveCustomizerWebSearchConfig(
+  config:
+    | {
+        plugins?: {
+          entries?: Record<string, unknown>;
+        };
+      }
+    | undefined
+): Record<string, unknown> | undefined {
   const pluginEntry = config?.plugins?.entries?.[KILOCLAW_CUSTOMIZER_PLUGIN_ID];
   if (!isRecord(pluginEntry)) {
     return undefined;

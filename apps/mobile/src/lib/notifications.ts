@@ -42,22 +42,6 @@ const suppressed = {
   shouldShowList: false,
 } as const;
 
-const shown = {
-  shouldShowAlert: true,
-  shouldPlaySound: true,
-  shouldSetBadge: true,
-  shouldShowBanner: true,
-  shouldShowList: true,
-} as const;
-
-const suppressed = {
-  shouldShowAlert: false,
-  shouldPlaySound: false,
-  shouldSetBadge: false,
-  shouldShowBanner: false,
-  shouldShowList: false,
-} as const;
-
 export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
     // eslint-disable-next-line require-await -- expo-notifications requires async callback type but logic is synchronous

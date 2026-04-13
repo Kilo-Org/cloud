@@ -5,7 +5,8 @@ export type KiloChatClientOptions = {
 };
 
 export type CreateMessageParams = { conversationId: string; text: string };
-export type CreateMessageResult = { messageId: string; version: number; dropped?: boolean };
+export type CreateMessageResult = { messageId: string; version: number };
+export type EditMessageResult = CreateMessageResult & { dropped?: boolean };
 
 export type EditMessageParams = {
   conversationId: string;
@@ -21,7 +22,7 @@ export type SendTextResult = { messageId: string };
 
 export type KiloChatClient = {
   createMessage(p: CreateMessageParams): Promise<CreateMessageResult>;
-  editMessage(p: EditMessageParams): Promise<CreateMessageResult>;
+  editMessage(p: EditMessageParams): Promise<EditMessageResult>;
   deleteMessage(p: DeleteMessageParams): Promise<void>;
   /** Back-compat alias for createMessage; returns only messageId. */
   sendText(p: SendTextParams): Promise<SendTextResult>;
@@ -63,7 +64,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     return parseCreateResult(await response.json());
   }
 
-  async function editMessage(params: EditMessageParams): Promise<CreateMessageResult> {
+  async function editMessage(params: EditMessageParams): Promise<EditMessageResult> {
     const response = await fetchImpl(
       `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}`,
       {
@@ -77,7 +78,8 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
       }
     );
     if (response.status === 409) {
-      // Stale version — benign drop.
+      // Stale version — benign drop. Cancel the body so undici releases the socket.
+      void response.body?.cancel();
       return { messageId: params.messageId, version: params.version, dropped: true };
     }
     if (!response.ok) {

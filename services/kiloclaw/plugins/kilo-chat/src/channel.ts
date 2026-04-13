@@ -3,7 +3,6 @@ import type { OpenClawConfig } from 'openclaw/plugin-sdk/core';
 import { createKiloChatClient } from './client';
 
 const CHANNEL_ID = 'kilo-chat';
-const DEFAULT_BASE_URL = 'http://127.0.0.1:18789';
 const DEFAULT_CONTROLLER_URL = 'http://127.0.0.1:18789';
 
 function resolveControllerUrl(): string {
@@ -29,41 +28,28 @@ function makeClient() {
   });
 }
 
+// Single-account plugin. SDK requires `accountId` on the resolved account
+// (TResolvedAccount extends { accountId?: string | null }); nothing else on
+// the account shape is consumed since we pass no `security` option, so we
+// keep the type minimal.
 export type ResolvedKiloChatAccount = {
   accountId: string | null;
-  baseUrl: string;
-  dmPolicy: string | undefined;
-  allowFrom: string[];
 };
 
-function readChannelSection(cfg: OpenClawConfig): Record<string, unknown> | undefined {
-  const channels = (cfg as { channels?: Record<string, unknown> }).channels;
-  const section = channels?.[CHANNEL_ID];
-  return typeof section === 'object' && section !== null
-    ? (section as Record<string, unknown>)
-    : undefined;
-}
-
-function resolveAccount(cfg: OpenClawConfig, accountId?: string | null): ResolvedKiloChatAccount {
-  const section = readChannelSection(cfg) ?? {};
-  const baseUrl =
-    typeof section.baseUrl === 'string' && section.baseUrl.length > 0
-      ? section.baseUrl
-      : DEFAULT_BASE_URL;
-  const dmPolicy = typeof section.dmPolicy === 'string' ? section.dmPolicy : undefined;
-  const allowFrom = Array.isArray(section.allowFrom)
-    ? section.allowFrom.filter((v): v is string => typeof v === 'string')
-    : [];
-
-  return { accountId: accountId ?? null, baseUrl, dmPolicy, allowFrom };
+function resolveAccount(_cfg: OpenClawConfig, accountId?: string | null): ResolvedKiloChatAccount {
+  return { accountId: accountId ?? null };
 }
 
 function inspectAccount(
   cfg: OpenClawConfig,
   _accountId?: string | null
 ): { enabled: boolean; configured: boolean } {
-  const section = readChannelSection(cfg);
-  const enabled = section?.enabled === true;
+  const channels = (cfg as { channels?: Record<string, unknown> }).channels;
+  const section = channels?.[CHANNEL_ID];
+  const enabled =
+    typeof section === 'object' &&
+    section !== null &&
+    (section as { enabled?: unknown }).enabled === true;
   return { enabled, configured: enabled };
 }
 

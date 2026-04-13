@@ -15,10 +15,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "enabled": { "type": "boolean" },
-          "baseUrl": { "type": "string" },
-          "dmPolicy": { "type": "string" },
-          "allowFrom": { "type": "array", "items": { "type": "string" } }
+          "enabled": { "type": "boolean" }
         }
       }
     }

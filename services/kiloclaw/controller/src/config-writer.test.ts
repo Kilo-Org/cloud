@@ -654,9 +654,6 @@ describe('generateBaseConfig', () => {
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
     expect(config.channels['kilo-chat'].enabled).toBe(true);
-    expect(config.channels['kilo-chat'].baseUrl).toBe('https://chat.example.test');
-    expect(config.channels['kilo-chat'].dmPolicy).toBe('open');
-    expect(config.channels['kilo-chat'].allowFrom).toEqual(['*']);
     expect(config.plugins.load.paths).toContain('/usr/local/lib/node_modules/@kiloclaw/kilo-chat');
     expect(config.plugins.entries['kilo-chat'].enabled).toBe(true);
   });

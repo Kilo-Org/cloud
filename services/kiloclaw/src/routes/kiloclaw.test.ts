@@ -15,7 +15,6 @@ describe('buildConfiguredSecrets', () => {
       telegram: false,
       discord: false,
       slack: false,
-      'kilo-chat': false,
       github: false,
       linear: false,
       agentcard: false,
@@ -117,7 +116,7 @@ describe('buildConfiguredSecrets', () => {
     expect(keys).toContain('linear');
     expect(keys).toContain('onepassword');
     expect(keys).toContain('brave-search');
-    expect(keys).toHaveLength(9);
+    expect(keys).toHaveLength(8);
   });
 
   it('treats null values as not configured', () => {

@@ -266,7 +266,11 @@ async function dispatchInbound(
     });
     await wiring.finalize();
   } catch (err) {
-    await wiring.finalize(err);
+    try {
+      await wiring.finalize(err);
+    } catch {
+      // best-effort cleanup; do not let finalize errors mask the original dispatch error
+    }
     throw err;
   }
 }

@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildDeliverWiring,
   createKiloChatWebhookHandler,
@@ -178,38 +178,53 @@ describe('buildDeliverWiring', () => {
   });
 
   it('mode=partial: partial replies stream, first deliver finalizes preview', async () => {
-    const calls: { type: string; args: unknown }[] = [];
-    const wiring = buildDeliverWiring({
-      client: fakeClient(calls),
-      conversationId: 'c1',
-      streamingMode: 'partial',
-      throttleMs: 10,
-      warn: () => {},
-    });
-    expect(wiring.replyOptions?.onPartialReply).toBeDefined();
-    await wiring.replyOptions!.onPartialReply!({ text: 'H' });
-    // Wait for the immediate first-POST microtask.
-    await new Promise(r => setTimeout(r, 5));
-    await wiring.deliver({ text: 'Hello!' });
-    await wiring.finalize();
-    const types = calls.map(c => c.type);
-    expect(types[0]).toBe('create');
-    expect(types.at(-1)).toBe('edit');
+    vi.useFakeTimers();
+    try {
+      const calls: { type: string; args: unknown }[] = [];
+      const wiring = buildDeliverWiring({
+        client: fakeClient(calls),
+        conversationId: 'c1',
+        streamingMode: 'partial',
+        throttleMs: 10,
+        warn: () => {},
+      });
+      expect(wiring.replyOptions?.onPartialReply).toBeDefined();
+      // First partial: fires an immediate POST. Drain microtasks so it resolves.
+      await wiring.replyOptions!.onPartialReply!({ text: 'H' });
+      await vi.advanceTimersByTimeAsync(0);
+      // First deliver should now finalize the preview via PATCH (not POST).
+      await wiring.deliver({ text: 'Hello!' });
+      await wiring.finalize();
+
+      const creates = calls.filter(c => c.type === 'create');
+      const edits = calls.filter(c => c.type === 'edit');
+      expect(creates).toHaveLength(1);
+      expect(edits).toHaveLength(1);
+      // The PATCH carries the final text.
+      expect((edits[0]!.args as { text: string }).text).toBe('Hello!');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('mode=partial: error during dispatch aborts preview and deletes message', async () => {
-    const calls: { type: string; args: unknown }[] = [];
-    const wiring = buildDeliverWiring({
-      client: fakeClient(calls),
-      conversationId: 'c1',
-      streamingMode: 'partial',
-      throttleMs: 10,
-      warn: () => {},
-    });
-    await wiring.replyOptions!.onPartialReply!({ text: 'H' });
-    await new Promise(r => setTimeout(r, 5));
-    await wiring.finalize(new Error('downstream error'));
-    expect(calls.some(c => c.type === 'delete')).toBe(true);
+    vi.useFakeTimers();
+    try {
+      const calls: { type: string; args: unknown }[] = [];
+      const wiring = buildDeliverWiring({
+        client: fakeClient(calls),
+        conversationId: 'c1',
+        streamingMode: 'partial',
+        throttleMs: 10,
+        warn: () => {},
+      });
+      await wiring.replyOptions!.onPartialReply!({ text: 'H' });
+      await vi.advanceTimersByTimeAsync(0);
+      await wiring.finalize(new Error('downstream error'));
+      expect(calls.some(c => c.type === 'delete')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('mode=partial: subsequent blocks after the first call createMessage directly', async () => {

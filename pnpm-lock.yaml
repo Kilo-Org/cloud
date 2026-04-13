@@ -1192,8 +1192,8 @@ importers:
   services/cloud-agent-next:
     dependencies:
       '@cloudflare/sandbox':
-        specifier: 0.7.13
-        version: 0.7.13(@xterm/xterm@6.0.0)
+        specifier: 0.8.9
+        version: 0.8.9(@xterm/xterm@6.0.0)
       '@hono/trpc-server':
         specifier: ^0.4.2
         version: 0.4.2(@trpc/server@11.13.0(typescript@5.9.3))(hono@4.12.8)
@@ -1232,8 +1232,8 @@ importers:
         version: 4.3.6
     devDependencies:
       '@cloudflare/containers':
-        specifier: 0.1.1
-        version: 0.1.1
+        specifier: 0.3.0
+        version: 0.3.0
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.12.21
         version: 0.12.21(@cloudflare/workers-types@4.20260313.1)(@vitest/runner@4.1.0)(@vitest/snapshot@4.1.0)(vitest@3.2.4)
@@ -2970,6 +2970,9 @@ packages:
   '@cloudflare/containers@0.1.1':
     resolution: {integrity: sha512-YTdobRTnTlUOUPMFemufH367A9Z8pDfZ+UboYMLbGpO0VlvEXZDiioSmXPQMHld2vRtkL31mcRii3bcbQU6fdw==}
 
+  '@cloudflare/containers@0.3.0':
+    resolution: {integrity: sha512-8HM1NgXThWCTk7SH28QFxqMNLJwl6RrMkj3qd0KvDA59BALsn3mZXNDT94i1JaGZnP4Bc8sPGs1u9UAl/mVUVg==}
+
   '@cloudflare/kv-asset-handler@0.4.0':
     resolution: {integrity: sha512-+tv3z+SPp+gqTIcImN9o0hqE9xyfQjI1XD9pL6NuKjua9B1y7mNYv0S9cP+QEbA4ppVgGZEmKOvHX5G5Ei1CVA==}
     engines: {node: '>=18.0.0'}
@@ -3002,6 +3005,20 @@ packages:
 
   '@cloudflare/sandbox@0.7.13':
     resolution: {integrity: sha512-HVbg6nUqudsUPGMKznyG4gPgYVdEH6nt2NYgKmCJzUJeXixoWDiqCVsJpmCzNueHg/2HX982A6EhQgIUol6jzQ==}
+    peerDependencies:
+      '@openai/agents': ^0.3.3
+      '@opencode-ai/sdk': ^1.1.40
+      '@xterm/xterm': '>=5.0.0'
+    peerDependenciesMeta:
+      '@openai/agents':
+        optional: true
+      '@opencode-ai/sdk':
+        optional: true
+      '@xterm/xterm':
+        optional: true
+
+  '@cloudflare/sandbox@0.8.9':
+    resolution: {integrity: sha512-4lmMo96fOVck9lcmjJAJYRf2NNspcoGy8pNuEdBTary3WWuFeXBQLmzuid4ay5i6aGu2AeRegPSmjD+Z1K6qJw==}
     peerDependencies:
       '@openai/agents': ^0.3.3
       '@opencode-ai/sdk': ^1.1.40
@@ -16279,6 +16296,8 @@ snapshots:
 
   '@cloudflare/containers@0.1.1': {}
 
+  '@cloudflare/containers@0.3.0': {}
+
   '@cloudflare/kv-asset-handler@0.4.0':
     dependencies:
       mime: 3.0.0
@@ -16296,6 +16315,13 @@ snapshots:
   '@cloudflare/sandbox@0.7.13(@xterm/xterm@6.0.0)':
     dependencies:
       '@cloudflare/containers': 0.1.1
+      aws4fetch: 1.0.20
+    optionalDependencies:
+      '@xterm/xterm': 6.0.0
+
+  '@cloudflare/sandbox@0.8.9(@xterm/xterm@6.0.0)':
+    dependencies:
+      '@cloudflare/containers': 0.3.0
       aws4fetch: 1.0.20
     optionalDependencies:
       '@xterm/xterm': 6.0.0

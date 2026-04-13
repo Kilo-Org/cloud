@@ -26,7 +26,7 @@
     "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.7.13",
+    "@cloudflare/sandbox": "0.8.9",
     "@hono/trpc-server": "^0.4.2",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
@@ -41,7 +41,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/containers": "0.1.1",
+    "@cloudflare/containers": "0.3.0",
     "@cloudflare/vitest-pool-workers": "^0.12.21",
     "@types/jsonwebtoken": "catalog:",
     "@types/node": ">=24 <25",

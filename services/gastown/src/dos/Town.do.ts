@@ -797,6 +797,32 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
+    // Persist custom env_vars to DO storage so they survive container restarts.
+    // Compare against the previously-persisted set of keys to clear removed ones.
+    const CUSTOM_ENV_KEYS_STORAGE_KEY = 'container:custom_env_var_keys';
+    const prevCustomKeys: string[] =
+      (await this.ctx.storage.get<string[]>(CUSTOM_ENV_KEYS_STORAGE_KEY)) ?? [];
+    const newCustomKeys = Object.keys(townConfig.env_vars);
+    const newCustomKeySet = new Set(newCustomKeys);
+
+    for (const key of prevCustomKeys) {
+      if (!newCustomKeySet.has(key)) {
+        try {
+          await container.deleteEnvVar(key);
+        } catch (err) {
+          console.warn(`[Town.do] syncConfigToContainer: delete custom ${key} failed:`, err);
+        }
+      }
+    }
+    for (const [key, value] of Object.entries(townConfig.env_vars)) {
+      try {
+        await container.setEnvVar(key, value);
+      } catch (err) {
+        console.warn(`[Town.do] syncConfigToContainer: set custom ${key} failed:`, err);
+      }
+    }
+    await this.ctx.storage.put(CUSTOM_ENV_KEYS_STORAGE_KEY, newCustomKeys);
+
     // Phase 2: Push to the running container's process.env via the
     // /sync-config endpoint. The X-Town-Config header delivers the
     // full config; the endpoint applies CONFIG_ENV_MAP to process.env.

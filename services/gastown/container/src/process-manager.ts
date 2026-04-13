@@ -12,6 +12,7 @@ import * as fs from 'node:fs/promises';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
 import { buildKiloConfigContent } from './agent-runner';
+import { getCurrentTownConfig } from './control-server';
 import { log } from './logger';
 
 const MANAGER_LOG = '[process-manager]';
@@ -1262,6 +1263,23 @@ export async function updateAgentModel(
     if (key in hotSwapEnv) continue;
     const live = process.env[key];
     if (live) hotSwapEnv[key] = live;
+  }
+
+  // Overlay custom env_vars from the town config so hot-swap picks up
+  // values that were added/changed after the initial dispatch. Infra
+  // keys in LIVE_ENV_KEYS always take precedence (they were already
+  // populated from process.env above), so custom vars cannot override.
+  const freshConfig = getCurrentTownConfig();
+  const freshEnvVars = freshConfig?.env_vars;
+  if (freshEnvVars !== null && typeof freshEnvVars === 'object' && !Array.isArray(freshEnvVars)) {
+    for (const [key, value] of Object.entries(freshEnvVars as Record<string, unknown>)) {
+      if (LIVE_ENV_KEYS.has(key)) continue;
+      if (value !== undefined && value !== null) {
+        hotSwapEnv[key] = String(value);
+      } else {
+        delete hotSwapEnv[key];
+      }
+    }
   }
 
   // Re-derive GH_TOKEN from live values using the same priority chain

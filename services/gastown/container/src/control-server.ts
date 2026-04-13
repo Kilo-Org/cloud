@@ -43,6 +43,9 @@ const TownConfigHeader = z.record(z.string(), z.unknown());
 // Used as a fallback by code that runs outside a request context (e.g. background tasks).
 let lastKnownTownConfig: Record<string, unknown> | null = null;
 
+// Track which custom env var keys were applied last sync so removed keys can be cleared.
+let lastAppliedEnvVarKeys = new Set<string>();
+
 /** Get the latest town config delivered via X-Town-Config header. */
 export function getCurrentTownConfig(): Record<string, unknown> | null {
   return lastKnownTownConfig;
@@ -102,6 +105,24 @@ function syncTownConfigToProcessEnv(): void {
   } else {
     delete process.env.GASTOWN_ORGANIZATION_ID;
   }
+
+  // Apply custom env_vars from the town config. Infra keys above always take
+  // precedence — custom keys are applied after so they cannot override them.
+  const rawEnvVars = cfg.env_vars;
+  const customEnvVars: Record<string, string> =
+    rawEnvVars !== null && typeof rawEnvVars === 'object' && !Array.isArray(rawEnvVars)
+      ? (rawEnvVars as Record<string, string>)
+      : {};
+  const newCustomKeys = new Set(Object.keys(customEnvVars));
+  // Remove keys that were present in the previous sync but are gone now.
+  for (const key of lastAppliedEnvVarKeys) {
+    if (!newCustomKeys.has(key)) delete process.env[key];
+  }
+  // Apply current custom env vars.
+  for (const [key, value] of Object.entries(customEnvVars)) {
+    process.env[key] = String(value);
+  }
+  lastAppliedEnvVarKeys = newCustomKeys;
 }
 
 export const app = new Hono();

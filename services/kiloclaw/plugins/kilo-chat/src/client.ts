@@ -89,9 +89,20 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     }
     return parseCreateResult(await response.json());
   }
-  // deleteMessage is added in a later task.
-  async function deleteMessage(_params: DeleteMessageParams): Promise<void> {
-    throw new Error('kilo-chat: deleteMessage not yet implemented');
+  async function deleteMessage(params: DeleteMessageParams): Promise<void> {
+    const response = await fetchImpl(
+      `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}`,
+      {
+        method: 'DELETE',
+        headers,
+        body: JSON.stringify({ conversationId: params.conversationId }),
+      }
+    );
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller DELETE responded ${response.status}: ${await response.text()}`
+      );
+    }
   }
 
   return {

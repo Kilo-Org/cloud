@@ -166,3 +166,32 @@ describe('editMessage', () => {
     ).rejects.toThrow(/500/);
   });
 });
+
+describe('deleteMessage', () => {
+  it('DELETEs /_kilo/kilo-chat/messages/:id with conversationId in body', async () => {
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 204 }));
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    await client.deleteMessage({ conversationId: 'c1', messageId: 'm1' });
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe('http://127.0.0.1:18789/_kilo/kilo-chat/messages/m1');
+    const init2 = init as RequestInit;
+    expect(init2.method).toBe('DELETE');
+    expect(JSON.parse(init2.body as string)).toEqual({ conversationId: 'c1' });
+  });
+
+  it('throws on non-2xx', async () => {
+    const fetchImpl = (async () => new Response('x', { status: 500 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl,
+    });
+    await expect(client.deleteMessage({ conversationId: 'c1', messageId: 'm1' })).rejects.toThrow(
+      /500/
+    );
+  });
+});

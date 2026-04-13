@@ -1,9 +1,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
+import { createChannelReplyPipeline } from 'openclaw/plugin-sdk/channel-reply-pipeline';
 import { resolveInboundRouteEnvelopeBuilderWithRuntime } from 'openclaw/plugin-sdk/inbound-envelope';
-import { recordInboundSessionAndDispatchReply } from 'openclaw/plugin-sdk/inbound-reply-dispatch';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/plugin-entry';
+import { createNormalizedOutboundDeliverer } from 'openclaw/plugin-sdk/reply-payload';
 
 import { createKiloChatClient, type KiloChatClient } from './client.js';
 import { createPreviewStream } from './preview-stream.js';
@@ -137,6 +138,20 @@ export function buildDeliverWiring(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Typing params
+// ---------------------------------------------------------------------------
+
+export function buildTypingParams(params: { client: KiloChatClient; conversationId: string }): {
+  start: () => Promise<void>;
+  onStartError: (err: unknown) => void;
+} {
+  return {
+    start: () => params.client.sendTyping({ conversationId: params.conversationId }),
+    onStartError: err => console.warn('[kilo-chat] typing start failed:', err),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
 
@@ -194,9 +209,13 @@ async function dispatchInbound(
     OriginatingTo: `kilo-chat:${payload.conversationId}`,
   });
 
+  const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN;
+  if (!gatewayToken) {
+    throw new Error('kilo-chat: OPENCLAW_GATEWAY_TOKEN is required');
+  }
   const client = createKiloChatClient({
     controllerBaseUrl: process.env.KILOCLAW_CONTROLLER_URL ?? 'http://127.0.0.1:18789',
-    gatewayToken: process.env.OPENCLAW_GATEWAY_TOKEN ?? '',
+    gatewayToken,
   });
 
   const wiring = buildDeliverWiring({
@@ -206,22 +225,35 @@ async function dispatchInbound(
   });
 
   try {
-    await recordInboundSessionAndDispatchReply({
+    await channelRuntime.session.recordInboundSession({
+      storePath,
+      sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
+      ctx: ctxPayload,
+      onRecordError: err => console.error('[kilo-chat] recordInboundSession:', err),
+    });
+
+    const { onModelSelected, ...replyPipeline } = createChannelReplyPipeline({
       cfg,
+      agentId: route.agentId,
       channel: 'kilo-chat',
       accountId: '',
-      agentId: route.agentId,
-      routeSessionKey: route.sessionKey,
-      storePath,
-      ctxPayload,
-      recordInboundSession: channelRuntime.session.recordInboundSession,
-      dispatchReplyWithBufferedBlockDispatcher:
-        channelRuntime.reply.dispatchReplyWithBufferedBlockDispatcher,
-      deliver: wiring.deliver,
-      replyOptions: wiring.replyOptions,
-      onRecordError: err => console.error('[kilo-chat] recordInboundSession:', err),
-      onDispatchError: (err, info) =>
-        console.error(`[kilo-chat] dispatchReply (${info.kind}):`, err),
+      typing: buildTypingParams({ client, conversationId: payload.conversationId }),
+    });
+
+    const deliver = createNormalizedOutboundDeliverer(wiring.deliver);
+
+    await channelRuntime.reply.dispatchReplyWithBufferedBlockDispatcher({
+      ctx: ctxPayload,
+      cfg,
+      dispatcherOptions: {
+        ...replyPipeline,
+        deliver,
+        onError: (err, info) => console.error(`[kilo-chat] dispatchReply (${info.kind}):`, err),
+      },
+      replyOptions: {
+        ...wiring.replyOptions,
+        onModelSelected,
+      },
     });
     await wiring.finalize();
   } catch (err) {

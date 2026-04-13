@@ -4,6 +4,7 @@ import { Socket } from 'node:net';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildDeliverWiring,
+  buildTypingParams,
   createKiloChatWebhookHandler,
   parseInboundPayload,
   verifyWebhookSignature,
@@ -157,6 +158,9 @@ function fakeClient(calls: { type: string; args: unknown }[]): KiloChatClient {
     deleteMessage: async args => {
       calls.push({ type: 'delete', args });
     },
+    sendTyping: async args => {
+      calls.push({ type: 'typing', args });
+    },
   };
 }
 
@@ -223,5 +227,29 @@ describe('buildDeliverWiring', () => {
     expect(createCalls.length).toBeGreaterThanOrEqual(2);
     const texts = createCalls.map(c => (c.args as { text: string }).text);
     expect(texts).toContain('second block');
+  });
+});
+
+describe('buildTypingParams', () => {
+  it('start() invokes client.sendTyping with conversationId', async () => {
+    const calls: { type: string; args: unknown }[] = [];
+    const typing = buildTypingParams({
+      client: fakeClient(calls),
+      conversationId: 'c1',
+    });
+    await typing.start();
+    const typingCalls = calls.filter(c => c.type === 'typing');
+    expect(typingCalls).toHaveLength(1);
+    expect(typingCalls[0]!.args).toEqual({ conversationId: 'c1' });
+  });
+
+  it('onStartError is provided (SDK guard catches typing failures silently)', () => {
+    const typing = buildTypingParams({
+      client: fakeClient([]),
+      conversationId: 'c1',
+    });
+    expect(typeof typing.onStartError).toBe('function');
+    // Must not throw when called with an error.
+    expect(() => typing.onStartError(new Error('boom'))).not.toThrow();
   });
 });

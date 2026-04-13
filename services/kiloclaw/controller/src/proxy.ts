@@ -69,15 +69,21 @@ export function createHttpProxy(options: ProxyOptions) {
     headers.set('host', `${backendHost}:${backendPort}`);
 
     const method = c.req.method.toUpperCase();
-    const init: RequestInit & { duplex?: 'half' } = {
+    const init: RequestInit = {
       method,
       headers,
       redirect: 'manual',
     };
 
+    // Buffer the request body instead of streaming it. Streaming with duplex: 'half'
+    // races with undici when the upstream handler returns quickly, producing
+    // "expected non-null body source" errors. Our controller only proxies
+    // small JSON/control payloads — the memory cost of buffering is negligible.
     if (method !== 'GET' && method !== 'HEAD') {
-      init.body = c.req.raw.body;
-      init.duplex = 'half';
+      const buf = await c.req.arrayBuffer();
+      if (buf.byteLength > 0) {
+        init.body = buf;
+      }
     }
 
     try {

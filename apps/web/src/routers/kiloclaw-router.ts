@@ -505,13 +505,18 @@ async function provisionInstance(
   user: Parameters<typeof generateApiToken>[0],
   input: z.infer<typeof updateConfigSchema>,
   /** Whether ensureProvisionAccess (or an earlier step in this request)
-   *  created the instance row. When true and the DO provision fails, the
-   *  row is cleaned up. This is authoritative — it comes from the
-   *  ensureActiveInstance call that actually inserted, not from a
-   *  before/after snapshot that races with concurrent requests. */
-  instanceCreatedByThisRequest: boolean
+   *  created the instance row. This is combined with the created flag
+   *  from ensureActiveInstance below — either source means this request
+   *  owns the row and should clean it up on failure. */
+  instanceCreatedByAccessCheck: boolean
 ) {
-  const { instance: instanceRow } = await ensureActiveInstance(user.id);
+  const { instance: instanceRow, created: instanceCreatedHere } =
+    await ensureActiveInstance(user.id);
+  // The row was created by this request if either ensureProvisionAccess
+  // or the ensureActiveInstance call above inserted it. The earlybird
+  // path skips ensureActiveInstance in the access check, so the row may
+  // be created here instead.
+  const rowIsOwnedByThisRequest = instanceCreatedByAccessCheck || instanceCreatedHere;
 
   const encryptedSecrets = input.secrets
     ? Object.fromEntries(
@@ -549,10 +554,10 @@ async function provisionInstance(
       workerInstanceId(instanceRow) ? { instanceId: instanceRow.id } : undefined
     );
   } catch (error) {
-    // Only clean up the exact row this request created. The
-    // instanceCreatedByThisRequest flag comes from the ensureActiveInstance
-    // call that actually inserted — not a racy before/after snapshot.
-    if (instanceCreatedByThisRequest) {
+    // Only clean up the exact row this request created. The flag comes
+    // from ensureActiveInstance calls that actually inserted — not a
+    // racy before/after snapshot.
+    if (rowIsOwnedByThisRequest) {
       await markInstanceDestroyedById(instanceRow.id).catch(cleanupErr => {
         console.error(
           '[kiloclaw] Failed to clean up instance row after provision error:',

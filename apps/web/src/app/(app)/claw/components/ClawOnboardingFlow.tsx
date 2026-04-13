@@ -187,16 +187,12 @@ function ClawOnboardingFlowInner({
           ) : (
             <ProvisioningStepView />
           )
-        ) : !instanceStatus ? (
-          createProvisioningStarted ? (
-            <ProvisioningStepView />
-          ) : (
-            <CreateInstanceCard
-              mutations={mutations}
-              onProvisionStart={handleCreateFlowStarted}
-              onProvisionFailed={handleCreateFlowFailed}
-            />
-          )
+        ) : !instanceStatus && !createProvisioningStarted ? (
+          <CreateInstanceCard
+            mutations={mutations}
+            onProvisionStart={handleCreateFlowStarted}
+            onProvisionFailed={handleCreateFlowFailed}
+          />
         ) : onboardingStep === 'identity' ? (
           <BotIdentityStep
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}

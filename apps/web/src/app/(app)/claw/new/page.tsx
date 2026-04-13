@@ -14,13 +14,14 @@ import { WelcomePage } from '../components/billing/WelcomePage';
 
 const ClawOnboardingWithBoundary = withStatusQueryBoundary(ClawOnboardingFlow);
 
-function LoadingState() {
+function CheckingSubscriptionState() {
   return (
     <div
-      className="container m-auto flex w-full max-w-[1140px] items-center justify-center p-4 md:p-6"
+      className="container m-auto flex w-full max-w-[1140px] items-center justify-center gap-3 p-4 md:p-6"
       style={{ minHeight: '50vh' }}
     >
-      <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+      <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+      <p className="text-muted-foreground text-sm">Checking subscription&hellip;</p>
     </div>
   );
 }
@@ -49,7 +50,7 @@ export default function ClawNewPage() {
   const onCreateFlowStarted = useCallback(() => setCreateFlowStarted(true), []);
 
   if (billingQuery.isLoading) {
-    return <LoadingState />;
+    return <CheckingSubscriptionState />;
   }
 
   if (billingQuery.isError) {

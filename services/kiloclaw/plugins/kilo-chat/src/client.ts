@@ -34,7 +34,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
       });
       if (!response.ok) {
         throw new Error(
-          `kilo-chat: controller /send responded ${response.status}: ${await response.text()}`,
+          `kilo-chat: controller /send responded ${response.status}: ${await response.text()}`
         );
       }
       const data = (await response.json()) as { messageId?: string };

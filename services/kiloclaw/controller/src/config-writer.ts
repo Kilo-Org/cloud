@@ -351,14 +351,15 @@ export function generateBaseConfig(
     config.plugins.entries[scEntry].enabled = true;
   }
 
-  // Kilo Chat (pre-provisioned channel — no setup wizard)
-  if (env.KILOCHAT_API_TOKEN) {
+  // Kilo Chat (pre-provisioned channel — no setup wizard).
+  // Require BOTH vars: KILOCHAT_BASE_URL is also required by the outbound route
+  // registered in the controller (index.ts). Without it the channel would be
+  // enabled in config but the route wouldn't exist, producing silent 404s.
+  if (env.KILOCHAT_API_TOKEN && env.KILOCHAT_BASE_URL) {
     config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
     config.channels['kilo-chat'].enabled = true;
     config.channels['kilo-chat'].dmPolicy = 'open';
-    if (env.KILOCHAT_BASE_URL) {
-      config.channels['kilo-chat'].baseUrl = env.KILOCHAT_BASE_URL;
-    }
+    config.channels['kilo-chat'].baseUrl = env.KILOCHAT_BASE_URL;
     if (!('allowFrom' in config.channels['kilo-chat'])) {
       config.channels['kilo-chat'].allowFrom = ['*'];
     }

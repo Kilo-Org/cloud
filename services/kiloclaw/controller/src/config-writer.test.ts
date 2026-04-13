@@ -643,7 +643,7 @@ describe('generateBaseConfig', () => {
 
   // ─── Kilo Chat ───────────────────────────────────────────────────────────
 
-  it('configures kilo-chat channel and plugin when KILOCHAT_API_TOKEN is set', () => {
+  it('configures kilo-chat channel and plugin when both KILOCHAT_API_TOKEN and KILOCHAT_BASE_URL are set', () => {
     const { deps } = fakeDeps();
     const env = {
       ...minimalEnv(),
@@ -664,6 +664,14 @@ describe('generateBaseConfig', () => {
   it('leaves kilo-chat channel unconfigured when KILOCHAT_API_TOKEN is missing', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.channels?.['kilo-chat']).toBeUndefined();
+  });
+
+  it('leaves kilo-chat channel unconfigured when KILOCHAT_BASE_URL is missing (token-only is not enough)', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILOCHAT_API_TOKEN: 'tok' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
     expect(config.channels?.['kilo-chat']).toBeUndefined();
   });

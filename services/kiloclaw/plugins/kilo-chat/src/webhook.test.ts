@@ -2,7 +2,11 @@ import { createHmac } from 'node:crypto';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
 import { describe, expect, it } from 'vitest';
-import { createKiloChatWebhookHandler, parseInboundPayload, verifyWebhookSignature } from './webhook.js';
+import {
+  createKiloChatWebhookHandler,
+  parseInboundPayload,
+  verifyWebhookSignature,
+} from './webhook.js';
 
 const SECRET = 'whk';
 

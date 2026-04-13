@@ -31,7 +31,7 @@ export type KiloChatWebhookDeps = {
 export function verifyWebhookSignature(
   rawBody: string,
   signatureHeader: string | null,
-  secret: string,
+  secret: string
 ): boolean {
   if (!signatureHeader) return false;
   if (!signatureHeader.startsWith('sha256=')) return false;
@@ -72,10 +72,15 @@ export function parseInboundPayload(raw: unknown): KiloChatInboundPayload | null
 // Dispatch
 // ---------------------------------------------------------------------------
 
-async function dispatchInbound(api: OpenClawPluginApi, payload: KiloChatInboundPayload): Promise<void> {
+async function dispatchInbound(
+  api: OpenClawPluginApi,
+  payload: KiloChatInboundPayload
+): Promise<void> {
   const cfg = api.config;
   const channelRuntime = api.runtime.channel;
 
+  // accountId: the SDK type requires a non-nullable string; this is a single-account
+  // plugin so there is no meaningful account to scope to — use '' as the default.
   const { route, buildEnvelope } = resolveInboundRouteEnvelopeBuilderWithRuntime({
     cfg,
     channel: 'kilo-chat',
@@ -126,14 +131,15 @@ async function dispatchInbound(api: OpenClawPluginApi, payload: KiloChatInboundP
   await recordInboundSessionAndDispatchReply({
     cfg,
     channel: 'kilo-chat',
-    accountId: undefined,
+    accountId: '',
     agentId: route.agentId,
     routeSessionKey: route.sessionKey,
     storePath,
     ctxPayload,
     recordInboundSession: channelRuntime.session.recordInboundSession,
-    dispatchReplyWithBufferedBlockDispatcher: channelRuntime.reply.dispatchReplyWithBufferedBlockDispatcher,
-    deliver: async (outboundPayload) => {
+    dispatchReplyWithBufferedBlockDispatcher:
+      channelRuntime.reply.dispatchReplyWithBufferedBlockDispatcher,
+    deliver: async outboundPayload => {
       if (!outboundPayload.text) return;
       const client = createKiloChatClient({
         controllerBaseUrl: process.env.KILOCLAW_CONTROLLER_URL ?? 'http://127.0.0.1:18789',
@@ -144,9 +150,8 @@ async function dispatchInbound(api: OpenClawPluginApi, payload: KiloChatInboundP
         text: outboundPayload.text,
       });
     },
-    onRecordError: (err) => console.error('[kilo-chat] recordInboundSession:', err),
-    onDispatchError: (err, info) =>
-      console.error(`[kilo-chat] dispatchReply (${info.kind}):`, err),
+    onRecordError: err => console.error('[kilo-chat] recordInboundSession:', err),
+    onDispatchError: (err, info) => console.error(`[kilo-chat] dispatchReply (${info.kind}):`, err),
   });
 }
 
@@ -178,8 +183,9 @@ export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
 
     const rawBody = await readBody(req);
     const sigRaw = req.headers['x-kilo-chat-signature'];
-    const sigHeader =
-      Array.isArray(sigRaw) ? (sigRaw[0] ?? null) : ((sigRaw as string | undefined) ?? null);
+    const sigHeader = Array.isArray(sigRaw)
+      ? (sigRaw[0] ?? null)
+      : ((sigRaw as string | undefined) ?? null);
 
     if (!verifyWebhookSignature(rawBody, sigHeader, secret)) {
       res.statusCode = 401;

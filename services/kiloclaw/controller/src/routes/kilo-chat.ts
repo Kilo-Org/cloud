@@ -12,10 +12,7 @@ export type KiloChatSendRouteOptions = {
 
 const KILO_CHAT_SEND_PATH = '/_kilo/kilo-chat/send';
 
-export function registerKiloChatSendRoute(
-  app: Hono,
-  options: KiloChatSendRouteOptions
-): void {
+export function registerKiloChatSendRoute(app: Hono, options: KiloChatSendRouteOptions): void {
   const fetchImpl = options.fetchImpl ?? fetch;
 
   app.post(KILO_CHAT_SEND_PATH, async c => {

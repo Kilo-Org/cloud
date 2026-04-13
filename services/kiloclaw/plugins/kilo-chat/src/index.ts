@@ -8,6 +8,11 @@ export default defineChannelPluginEntry({
   description: 'Kilo Chat channel plugin',
   plugin: kiloChatPlugin,
   registerFull(api) {
+    if (!process.env.KILOCHAT_WEBHOOK_SECRET) {
+      console.warn(
+        '[kilo-chat] KILOCHAT_WEBHOOK_SECRET not set — inbound webhook will return 503 until configured'
+      );
+    }
     api.registerHttpRoute({
       path: '/plugins/kilo-chat/webhook',
       match: 'exact',

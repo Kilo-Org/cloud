@@ -79,8 +79,7 @@ describe('POST /_kilo/kilo-chat/send', () => {
   });
 
   it('surfaces upstream error status', async () => {
-    const fetchImpl = (async () =>
-      new Response('bad', { status: 502 })) as typeof fetch;
+    const fetchImpl = (async () => new Response('bad', { status: 502 })) as typeof fetch;
     const app = makeApp(fetchImpl);
     const res = await app.fetch(
       new Request('http://x/_kilo/kilo-chat/send', {

@@ -96,6 +96,32 @@ const SECRET_CATALOG_RAW = [
     guideUrl: 'https://docs.kilo.ai/docs/kiloclaw/chat-platforms/slack',
   },
   {
+    id: 'kilo-chat',
+    label: 'Kilo Chat',
+    category: 'channel',
+    icon: 'key',
+    order: 4,
+    allFieldsRequired: true,
+    fields: [
+      {
+        key: 'kiloChatApiToken',
+        label: 'API Token',
+        placeholder: 'tok_...',
+        placeholderConfigured: 'Enter new token to replace',
+        envVar: 'KILOCHAT_API_TOKEN',
+        maxLength: 500,
+      },
+      {
+        key: 'kiloChatWebhookSecret',
+        label: 'Webhook Secret',
+        placeholder: 'whk_...',
+        placeholderConfigured: 'Enter new secret to replace',
+        envVar: 'KILOCHAT_WEBHOOK_SECRET',
+        maxLength: 500,
+      },
+    ],
+  },
+  {
     id: 'github',
     label: 'GitHub',
     category: 'tool',

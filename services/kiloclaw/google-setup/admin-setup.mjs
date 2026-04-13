@@ -180,7 +180,9 @@ let pushSetupOk = true;
 // Create Pub/Sub topic
 console.log('Creating Pub/Sub topic gog-gmail-watch...');
 try {
-  execFileSync('gcloud', ['pubsub', 'topics', 'create', 'gog-gmail-watch', '--quiet'], { stdio: 'pipe' });
+  execFileSync('gcloud', ['pubsub', 'topics', 'create', 'gog-gmail-watch', '--quiet'], {
+    stdio: 'pipe',
+  });
   console.log('Topic created.');
 } catch (topicErr) {
   const topicOutput = topicErr.stderr?.toString() ?? topicErr.message;
@@ -197,11 +199,19 @@ try {
 if (pushSetupOk) {
   console.log('Granting Gmail push publisher role...');
   try {
-    execFileSync('gcloud', [
-      'pubsub', 'topics', 'add-iam-policy-binding', 'gog-gmail-watch',
-      '--member=serviceAccount:gmail-api-push@system.gserviceaccount.com',
-      '--role=roles/pubsub.publisher', '--quiet',
-    ], { stdio: 'pipe' });
+    execFileSync(
+      'gcloud',
+      [
+        'pubsub',
+        'topics',
+        'add-iam-policy-binding',
+        'gog-gmail-watch',
+        '--member=serviceAccount:gmail-api-push@system.gserviceaccount.com',
+        '--role=roles/pubsub.publisher',
+        '--quiet',
+      ],
+      { stdio: 'pipe' }
+    );
     console.log('Publisher role granted.');
   } catch (err) {
     const errOutput = err.stderr?.toString() ?? err.message;
@@ -223,11 +233,19 @@ if (pushSetupOk) {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
       await ask('Press Enter when done...');
       try {
-        execFileSync('gcloud', [
-          'pubsub', 'topics', 'add-iam-policy-binding', 'gog-gmail-watch',
-          '--member=serviceAccount:gmail-api-push@system.gserviceaccount.com',
-          '--role=roles/pubsub.publisher', '--quiet',
-        ], { stdio: 'pipe' });
+        execFileSync(
+          'gcloud',
+          [
+            'pubsub',
+            'topics',
+            'add-iam-policy-binding',
+            'gog-gmail-watch',
+            '--member=serviceAccount:gmail-api-push@system.gserviceaccount.com',
+            '--role=roles/pubsub.publisher',
+            '--quiet',
+          ],
+          { stdio: 'pipe' }
+        );
         console.log('Publisher role granted.');
       } catch {
         console.error('Error: Still could not grant publisher role.');
@@ -248,10 +266,18 @@ const pushSaEmail = `${pushSaName}@${projectId}.iam.gserviceaccount.com`;
 if (pushSetupOk) {
   console.log(`Creating push auth service account ${pushSaEmail}...`);
   try {
-    execFileSync('gcloud', [
-      'iam', 'service-accounts', 'create', pushSaName,
-      '--display-name=Gmail push notification auth', '--quiet',
-    ], { stdio: 'pipe' });
+    execFileSync(
+      'gcloud',
+      [
+        'iam',
+        'service-accounts',
+        'create',
+        pushSaName,
+        '--display-name=Gmail push notification auth',
+        '--quiet',
+      ],
+      { stdio: 'pipe' }
+    );
     console.log('Service account created.');
   } catch (saErr) {
     const saOutput = saErr.stderr?.toString() ?? saErr.message;
@@ -269,14 +295,24 @@ if (pushSetupOk) {
 if (pushSetupOk) {
   console.log('Granting Pub/Sub token creator role...');
   try {
-    const projectNumber = execFileSync('gcloud', [
-      'projects', 'describe', projectId, '--format=value(projectNumber)',
-    ], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-    execFileSync('gcloud', [
-      'iam', 'service-accounts', 'add-iam-policy-binding', pushSaEmail,
-      `--member=serviceAccount:service-${projectNumber}@gcp-sa-pubsub.iam.gserviceaccount.com`,
-      '--role=roles/iam.serviceAccountTokenCreator', '--quiet',
-    ], { stdio: 'pipe' });
+    const projectNumber = execFileSync(
+      'gcloud',
+      ['projects', 'describe', projectId, '--format=value(projectNumber)'],
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+    ).trim();
+    execFileSync(
+      'gcloud',
+      [
+        'iam',
+        'service-accounts',
+        'add-iam-policy-binding',
+        pushSaEmail,
+        `--member=serviceAccount:service-${projectNumber}@gcp-sa-pubsub.iam.gserviceaccount.com`,
+        '--role=roles/iam.serviceAccountTokenCreator',
+        '--quiet',
+      ],
+      { stdio: 'pipe' }
+    );
     console.log('Token creator role granted.');
   } catch (tokenErr) {
     console.error('Error: Could not grant token creator role.');
@@ -312,19 +348,36 @@ if (memberEmails.length > 0) {
     for (const email of memberEmails) {
       console.log(`  ${email}:`);
       try {
-        execFileSync('gcloud', [
-          'projects', 'add-iam-policy-binding', projectId,
-          `--member=user:${email}`, '--role=roles/pubsub.editor', '--quiet',
-        ], { stdio: 'pipe' });
+        execFileSync(
+          'gcloud',
+          [
+            'projects',
+            'add-iam-policy-binding',
+            projectId,
+            `--member=user:${email}`,
+            '--role=roles/pubsub.editor',
+            '--quiet',
+          ],
+          { stdio: 'pipe' }
+        );
         console.log('    Pub/Sub Editor granted');
       } catch (err) {
         console.error(`    Pub/Sub Editor failed: ${err.stderr?.toString() ?? err.message}`);
       }
       try {
-        execFileSync('gcloud', [
-          'iam', 'service-accounts', 'add-iam-policy-binding', pushSaEmail,
-          `--member=user:${email}`, '--role=roles/iam.serviceAccountUser', '--quiet',
-        ], { stdio: 'pipe' });
+        execFileSync(
+          'gcloud',
+          [
+            'iam',
+            'service-accounts',
+            'add-iam-policy-binding',
+            pushSaEmail,
+            `--member=user:${email}`,
+            '--role=roles/iam.serviceAccountUser',
+            '--quiet',
+          ],
+          { stdio: 'pipe' }
+        );
         console.log('    Service Account User granted');
       } catch (err) {
         console.error(`    Service Account User failed: ${err.stderr?.toString() ?? err.message}`);
@@ -381,14 +434,22 @@ console.log('  docker run -it --network host ghcr.io/kilo-org/google-setup \\');
 console.log('    --token=<THEIR_TOKEN> \\');
 console.log(`    --client-id="${clientId}" \\`);
 console.log(`    --client-secret="${clientSecret}" \\`);
-console.log(`    --project-id="${projectId}"`);
+console.log(`    --project-id="${projectId}" \\`);
+console.log('    --instance-id=<ORG_INSTANCE_ID>');
 console.log('');
 console.log('  Each member needs their own --token from https://app.kilo.ai');
+console.log('  and the <ORG_INSTANCE_ID> of the org KiloClaw instance to target');
+console.log('  (visible in the Kilo web app). Without --instance-id, credentials');
+console.log("  upload to the member's personal instance instead of the org.");
 if (memberEmails.length > 0) {
   console.log('');
   console.log('  To add more members later, grant them access with:');
-  console.log(`    gcloud projects add-iam-policy-binding ${projectId} --member="user:EMAIL" --role="roles/pubsub.editor"`);
-  console.log(`    gcloud iam service-accounts add-iam-policy-binding ${pushSaEmail} --member="user:EMAIL" --role="roles/iam.serviceAccountUser"`);
+  console.log(
+    `    gcloud projects add-iam-policy-binding ${projectId} --member="user:EMAIL" --role="roles/pubsub.editor"`
+  );
+  console.log(
+    `    gcloud iam service-accounts add-iam-policy-binding ${pushSaEmail} --member="user:EMAIL" --role="roles/iam.serviceAccountUser"`
+  );
   console.log('  Then add them as test users on the consent screen:');
   console.log(`    ${audienceUrl}`);
 }

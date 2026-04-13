@@ -50,7 +50,9 @@ const projectIdFlag = projectIdArg?.substring(projectIdArg.indexOf('=') + 1);
 const isMemberMode = !!(clientIdFlag && clientSecretFlag && projectIdFlag);
 
 if (!isMemberMode && (clientIdFlag || clientSecretFlag || projectIdFlag)) {
-  console.error('Member mode requires all three flags: --client-id, --client-secret, and --project-id');
+  console.error(
+    'Member mode requires all three flags: --client-id, --client-secret, and --project-id'
+  );
   process.exit(1);
 }
 
@@ -473,11 +475,19 @@ if (!isMemberMode) {
   if (pushSetupOk) {
     console.log('Granting Gmail push publisher role...');
     try {
-      execFileSync('gcloud', [
-        'pubsub', 'topics', 'add-iam-policy-binding', 'gog-gmail-watch',
-        '--member=serviceAccount:gmail-api-push@system.gserviceaccount.com',
-        '--role=roles/pubsub.publisher', '--quiet',
-      ], { stdio: 'pipe' });
+      execFileSync(
+        'gcloud',
+        [
+          'pubsub',
+          'topics',
+          'add-iam-policy-binding',
+          'gog-gmail-watch',
+          '--member=serviceAccount:gmail-api-push@system.gserviceaccount.com',
+          '--role=roles/pubsub.publisher',
+          '--quiet',
+        ],
+        { stdio: 'pipe' }
+      );
       console.log('Publisher role granted.');
     } catch (err) {
       const errOutput = err.stderr?.toString() ?? err.message;
@@ -499,11 +509,19 @@ if (!isMemberMode) {
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
         await ask('Press Enter when done...');
         try {
-          execFileSync('gcloud', [
-            'pubsub', 'topics', 'add-iam-policy-binding', 'gog-gmail-watch',
-            '--member=serviceAccount:gmail-api-push@system.gserviceaccount.com',
-            '--role=roles/pubsub.publisher', '--quiet',
-          ], { stdio: 'pipe' });
+          execFileSync(
+            'gcloud',
+            [
+              'pubsub',
+              'topics',
+              'add-iam-policy-binding',
+              'gog-gmail-watch',
+              '--member=serviceAccount:gmail-api-push@system.gserviceaccount.com',
+              '--role=roles/pubsub.publisher',
+              '--quiet',
+            ],
+            { stdio: 'pipe' }
+          );
           console.log('Publisher role granted.');
         } catch (retryErr) {
           console.error(
@@ -547,7 +565,10 @@ if (isMemberMode) {
 
 if (pushUserId && pushSetupOk) {
   // Get GCP project ID for topic path and SA email
-  const gcpProject = execFileSync('gcloud', ['config', 'get-value', 'project'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  const gcpProject = execFileSync('gcloud', ['config', 'get-value', 'project'], {
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  }).trim();
   if (!gcpProject || gcpProject === '(unset)') {
     console.error('Error: No active GCP project. Run setup again from the beginning.');
     pushSetupOk = false;
@@ -561,10 +582,18 @@ if (pushUserId && pushSetupOk) {
     pushSaEmail = `${pushSaName}@${gcpProject}.iam.gserviceaccount.com`;
     console.log(`Creating push auth service account ${pushSaEmail}...`);
     try {
-      execFileSync('gcloud', [
-        'iam', 'service-accounts', 'create', pushSaName,
-        '--display-name=Gmail push notification auth', '--quiet',
-      ], { stdio: 'pipe' });
+      execFileSync(
+        'gcloud',
+        [
+          'iam',
+          'service-accounts',
+          'create',
+          pushSaName,
+          '--display-name=Gmail push notification auth',
+          '--quiet',
+        ],
+        { stdio: 'pipe' }
+      );
       console.log('Service account created.');
     } catch (saErr) {
       const saOutput = saErr.stderr?.toString() ?? saErr.message;
@@ -583,14 +612,24 @@ if (pushUserId && pushSetupOk) {
     if (pushSetupOk) {
       console.log('Granting Pub/Sub token creator role...');
       try {
-        const projectNumber = execFileSync('gcloud', [
-          'projects', 'describe', gcpProject, '--format=value(projectNumber)',
-        ], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-        execFileSync('gcloud', [
-          'iam', 'service-accounts', 'add-iam-policy-binding', pushSaEmail,
-          `--member=serviceAccount:service-${projectNumber}@gcp-sa-pubsub.iam.gserviceaccount.com`,
-          '--role=roles/iam.serviceAccountTokenCreator', '--quiet',
-        ], { stdio: 'pipe' });
+        const projectNumber = execFileSync(
+          'gcloud',
+          ['projects', 'describe', gcpProject, '--format=value(projectNumber)'],
+          { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+        ).trim();
+        execFileSync(
+          'gcloud',
+          [
+            'iam',
+            'service-accounts',
+            'add-iam-policy-binding',
+            pushSaEmail,
+            `--member=serviceAccount:service-${projectNumber}@gcp-sa-pubsub.iam.gserviceaccount.com`,
+            '--role=roles/iam.serviceAccountTokenCreator',
+            '--quiet',
+          ],
+          { stdio: 'pipe' }
+        );
         console.log('Token creator role granted.');
       } catch (tokenErr) {
         console.error(
@@ -614,27 +653,42 @@ if (pushUserId && pushSetupOk) {
     const pushAudience = `https://kiloclaw-gmail.kiloapps.io/push/user/${encodeURIComponent(pushUserId)}`;
     console.log(`Creating push subscription ${subscriptionName} → ${pushEndpoint}`);
     try {
-      execFileSync('gcloud', [
-        'pubsub', 'subscriptions', 'create', subscriptionName,
-        '--topic=gog-gmail-watch',
-        `--push-endpoint=${pushEndpoint}`,
-        `--push-auth-service-account=${pushSaEmail}`,
-        `--push-auth-token-audience=${pushAudience}`,
-        '--ack-deadline=30', '--quiet',
-      ], { stdio: 'pipe' });
+      execFileSync(
+        'gcloud',
+        [
+          'pubsub',
+          'subscriptions',
+          'create',
+          subscriptionName,
+          '--topic=gog-gmail-watch',
+          `--push-endpoint=${pushEndpoint}`,
+          `--push-auth-service-account=${pushSaEmail}`,
+          `--push-auth-token-audience=${pushAudience}`,
+          '--ack-deadline=30',
+          '--quiet',
+        ],
+        { stdio: 'pipe' }
+      );
       console.log('Push subscription created.');
     } catch (createErr) {
       const createOutput = createErr.stderr?.toString() ?? createErr.message;
       if (createOutput.includes('ALREADY_EXISTS') || createOutput.includes('already exists')) {
         // Subscription exists — update it
         try {
-          execFileSync('gcloud', [
-            'pubsub', 'subscriptions', 'update', subscriptionName,
-            `--push-endpoint=${pushEndpoint}`,
-            `--push-auth-service-account=${pushSaEmail}`,
-            `--push-auth-token-audience=${pushAudience}`,
-            '--quiet',
-          ], { stdio: 'pipe' });
+          execFileSync(
+            'gcloud',
+            [
+              'pubsub',
+              'subscriptions',
+              'update',
+              subscriptionName,
+              `--push-endpoint=${pushEndpoint}`,
+              `--push-auth-service-account=${pushSaEmail}`,
+              `--push-auth-token-audience=${pushAudience}`,
+              '--quiet',
+            ],
+            { stdio: 'pipe' }
+          );
           console.log('Push subscription updated.');
         } catch (updateErr) {
           console.error(
@@ -665,11 +719,17 @@ if (pushUserId && pushSetupOk) {
   if (pushSetupOk) {
     console.log('Registering Gmail watch...');
     try {
-      execFileSync('gog', [
-        'gmail', 'watch', 'start',
-        `--account=${userEmail}`,
-        `--topic=projects/${gcpProject}/topics/gog-gmail-watch`,
-      ], { stdio: 'inherit', env: gogEnv });
+      execFileSync(
+        'gog',
+        [
+          'gmail',
+          'watch',
+          'start',
+          `--account=${userEmail}`,
+          `--topic=projects/${gcpProject}/topics/gog-gmail-watch`,
+        ],
+        { stdio: 'inherit', env: gogEnv }
+      );
       console.log('Gmail watch registered successfully.');
     } catch (err) {
       console.error('Error: Gmail watch registration failed:', err.message);

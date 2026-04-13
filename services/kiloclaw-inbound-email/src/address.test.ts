@@ -18,7 +18,9 @@ describe('instanceIdFromRecipient', () => {
         'clawmail.kilosessions.ai'
       )
     ).toBeNull();
-    expect(instanceIdFromRecipient('hello@clawmail.kilosessions.ai', 'clawmail.kilosessions.ai')).toBeNull();
+    expect(
+      instanceIdFromRecipient('hello@clawmail.kilosessions.ai', 'clawmail.kilosessions.ai')
+    ).toBeNull();
   });
 });
 

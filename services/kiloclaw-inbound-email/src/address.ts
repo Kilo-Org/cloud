@@ -1,6 +1,9 @@
 const INSTANCE_LOCAL_PART = /^ki-([0-9a-f]{32})$/;
 
-export function instanceIdFromRecipient(recipient: string, expectedDomain: string | undefined): string | null {
+export function instanceIdFromRecipient(
+  recipient: string,
+  expectedDomain: string | undefined
+): string | null {
   const [localPart, domain, ...extra] = recipient.trim().toLowerCase().split('@');
   if (!localPart || !domain || extra.length > 0) return null;
   if (expectedDomain && domain !== expectedDomain.toLowerCase()) return null;

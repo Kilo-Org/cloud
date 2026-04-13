@@ -183,6 +183,9 @@ describe('POST /inbound-email', () => {
     );
 
     expect(response.status).toBe(202);
-    expect(resolveDoKey).toHaveBeenCalledWith('org:22222222-2222-4222-8222-222222222222', INSTANCE_ID);
+    expect(resolveDoKey).toHaveBeenCalledWith(
+      'org:22222222-2222-4222-8222-222222222222',
+      INSTANCE_ID
+    );
   });
 });

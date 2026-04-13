@@ -39,8 +39,13 @@ export function registerInboundEmailRoute(
       }
 
       if (upstream.status >= 400 && upstream.status < 500) {
-        console.warn(`[inbound-email] Hook rejected ${upstream.status}: ${upstreamBody.slice(0, 500)}`);
-        return c.json({ error: 'Hook rejected', hookStatus: upstream.status }, upstream.status as 400);
+        console.warn(
+          `[inbound-email] Hook rejected ${upstream.status}: ${upstreamBody.slice(0, 500)}`
+        );
+        return c.json(
+          { error: 'Hook rejected', hookStatus: upstream.status },
+          upstream.status as 400
+        );
       }
 
       console.error(`[inbound-email] Hook error ${upstream.status}: ${upstreamBody.slice(0, 500)}`);

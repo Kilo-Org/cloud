@@ -43,9 +43,7 @@ describe('buildQueueMessage', () => {
     expect(queueMessage?.instanceId).toBe('11111111-1111-4111-8111-111111111111');
     expect(queueMessage?.messageId).toBe('<msg-1@example.com>');
     expect(queueMessage?.from).toBe('ada@example.com');
-    expect(queueMessage?.to).toBe(
-      'ki-11111111111141118111111111111111@clawmail.kilosessions.ai'
-    );
+    expect(queueMessage?.to).toBe('ki-11111111111141118111111111111111@clawmail.kilosessions.ai');
     expect(queueMessage?.subject).toBe('Hello');
     expect(queueMessage?.text).toBe('Body text');
     expect(typeof queueMessage?.receivedAt).toBe('string');

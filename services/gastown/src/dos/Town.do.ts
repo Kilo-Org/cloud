@@ -1134,6 +1134,14 @@ export class TownDO extends DurableObject<Env> {
     beadOps.deleteBead(this.sql, beadId);
   }
 
+  async deleteBeads(beadIds: string[]): Promise<number> {
+    return beadOps.deleteBeads(this.sql, beadIds);
+  }
+
+  async deleteBeadsByStatus(status: string, rigId?: string): Promise<number> {
+    return beadOps.deleteBeadsByStatus(this.sql, status, rigId);
+  }
+
   async listBeadEvents(options: {
     beadId?: string;
     since?: string;

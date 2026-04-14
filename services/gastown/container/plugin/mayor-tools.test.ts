@@ -153,6 +153,7 @@ function makeFakeMayorClient(overrides: Partial<MayorGastownClient> = {}): Mayor
     updateBead: vi.fn<() => Promise<Bead>>().mockResolvedValue(FAKE_BEAD),
     reassignBead: vi.fn<() => Promise<Bead>>().mockResolvedValue(FAKE_BEAD),
     deleteBead: vi.fn().mockResolvedValue(undefined),
+    deleteBeads: vi.fn().mockResolvedValue({ deleted: 1 }),
     resetAgent: vi.fn().mockResolvedValue(undefined),
     closeConvoy: vi.fn().mockResolvedValue(undefined),
     updateConvoy: vi.fn().mockResolvedValue(undefined),
@@ -313,14 +314,29 @@ describe('mayor tools', () => {
   });
 
   describe('gt_bead_delete', () => {
-    it('deletes bead and confirms', async () => {
+    it('deletes a single bead and confirms', async () => {
       const result = await tools.gt_bead_delete.execute(
         { rig_id: 'rig-1', bead_id: 'bead-1' },
         CTX
       );
       expect(result).toContain('bead-1');
       expect(result).toContain('deleted');
-      expect(client.deleteBead).toHaveBeenCalledWith('rig-1', 'bead-1');
+      expect(client.deleteBeads).toHaveBeenCalledWith('rig-1', ['bead-1']);
+    });
+
+    it('deletes multiple beads via array', async () => {
+      client.deleteBeads = vi.fn().mockResolvedValue({ deleted: 3 });
+      const result = await tools.gt_bead_delete.execute(
+        { rig_id: 'rig-1', bead_id: ['bead-1', 'bead-2', 'bead-3'] },
+        CTX
+      );
+      expect(result).toContain('3');
+      expect(result).toContain('deleted');
+      expect(client.deleteBeads).toHaveBeenCalledWith('rig-1', [
+        'bead-1',
+        'bead-2',
+        'bead-3',
+      ]);
     });
   });
 

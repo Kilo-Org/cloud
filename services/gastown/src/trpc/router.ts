@@ -650,14 +650,17 @@ export const gastownRouter = router({
     .input(
       z.object({
         rigId: z.string().uuid(),
-        beadId: z.string().uuid(),
+        beadId: z.union([z.string().uuid(), z.array(z.string().uuid())]),
         townId: z.string().uuid().optional(),
       })
     )
+    .output(z.object({ deleted: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
-      await townStub.deleteBead(input.beadId);
+      const ids = Array.isArray(input.beadId) ? input.beadId : [input.beadId];
+      await townStub.deleteBeads(ids);
+      return { deleted: ids.length };
     }),
 
   updateBead: gastownProcedure
@@ -1555,6 +1558,34 @@ export const gastownRouter = router({
         message: 'Manually failed by admin',
         source: 'admin',
       });
+    }),
+
+  adminDeleteBeads: adminProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        beadIds: z.array(z.string().uuid()),
+      })
+    )
+    .output(z.object({ deleted: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      const deleted = await townStub.deleteBeads(input.beadIds);
+      return { deleted };
+    }),
+
+  adminDeleteBeadsByStatus: adminProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        status: z.string(),
+      })
+    )
+    .output(z.object({ deleted: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      const deleted = await townStub.deleteBeadsByStatus(input.status);
+      return { deleted };
     }),
 
   adminGetAlarmStatus: adminProcedure

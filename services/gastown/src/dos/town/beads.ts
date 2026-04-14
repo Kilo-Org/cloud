@@ -715,6 +715,41 @@ export function deleteBead(sql: SqlStorage, beadId: string): void {
   query(sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.bead_id} = ?`, [beadId]);
 }
 
+export function deleteBeads(sql: SqlStorage, beadIds: string[]): number {
+  if (beadIds.length === 0) return 0;
+  for (const beadId of beadIds) {
+    deleteBead(sql, beadId);
+  }
+  return beadIds.length;
+}
+
+export function deleteBeadsByStatus(
+  sql: SqlStorage,
+  status: string,
+  rigId?: string
+): number {
+  const conditions = [`${beads.status} = ?`];
+  const params: string[] = [status];
+  if (rigId) {
+    conditions.push(`${beads.rig_id} = ?`);
+    params.push(rigId);
+  }
+  const whereClause = conditions.join(' AND ');
+  const ids = BeadRecord.pick({ bead_id: true })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${whereClause}`,
+        params
+      ),
+    ]);
+  for (const { bead_id } of ids) {
+    deleteBead(sql, bead_id);
+  }
+  return ids.length;
+}
+
 // ── Bead Events ─────────────────────────────────────────────────────
 
 export function logBeadEvent(

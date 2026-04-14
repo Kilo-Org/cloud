@@ -113,6 +113,7 @@ import {
   handleMayorConvoyClose,
   handleMayorConvoyUpdate,
   handleMayorBeadDelete,
+  handleMayorBeadBulkDelete,
   handleMayorEscalationAcknowledge,
   handleMayorConvoyStart,
   handleMayorUiAction,
@@ -971,6 +972,11 @@ app.patch('/api/mayor/:townId/tools/rigs/:rigId/beads/:beadId', c =>
 app.post('/api/mayor/:townId/tools/rigs/:rigId/beads/:beadId/reassign', c =>
   instrumented(c, 'POST /api/mayor/:townId/tools/rigs/:rigId/beads/:beadId/reassign', () =>
     handleMayorBeadReassign(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/rigs/:rigId/beads/bulk-delete', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/rigs/:rigId/beads/bulk-delete', () =>
+    handleMayorBeadBulkDelete(c, c.req.param())
   )
 );
 app.delete('/api/mayor/:townId/tools/rigs/:rigId/beads/:beadId', c =>

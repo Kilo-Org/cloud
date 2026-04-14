@@ -337,14 +337,18 @@ export function createMayorTools(client: MayorGastownClient) {
     }),
 
     gt_bead_delete: tool({
-      description: 'Delete a bead. Use with caution — this is irreversible.',
+      description:
+        'Delete one or more beads. Accepts a single bead_id string or an array of bead_id strings. Use with caution — this is irreversible.',
       args: {
-        rig_id: tool.schema.string().describe('The UUID of the rig the bead belongs to'),
-        bead_id: tool.schema.string().describe('The UUID of the bead to delete'),
+        rig_id: tool.schema.string().describe('The UUID of the rig the bead(s) belong to'),
+        bead_id: tool.schema
+          .union(tool.schema.string(), tool.schema.array(tool.schema.string()))
+          .describe('The UUID of the bead to delete, or an array of UUIDs for bulk deletion'),
       },
       async execute(args) {
-        await client.deleteBead(args.rig_id, args.bead_id);
-        return `Bead ${args.bead_id} deleted.`;
+        const ids = Array.isArray(args.bead_id) ? args.bead_id : [args.bead_id];
+        await client.deleteBeads(args.rig_id, ids);
+        return `${ids.length} bead(s) deleted: ${ids.join(', ')}`;
       },
     }),
 

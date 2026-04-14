@@ -635,6 +635,48 @@ export async function handleMayorBeadDelete(
   return c.json(resSuccess({ deleted: true }));
 }
 
+const MayorBulkDeleteBody = z.object({
+  bead_ids: z.array(z.string().uuid()).min(1),
+});
+
+/**
+ * POST /api/mayor/:townId/tools/rigs/:rigId/beads/bulk-delete
+ * Delete multiple beads that belong to the specified rig.
+ */
+export async function handleMayorBeadBulkDelete(
+  c: Context<GastownEnv>,
+  params: { townId: string; rigId: string }
+) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  const parsed = MayorBulkDeleteBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(resError('Invalid request body', parsed.error.issues), 400);
+  }
+
+  const { bead_ids } = parsed.data;
+
+  console.log(
+    `${HANDLER_LOG} handleMayorBeadBulkDelete: townId=${params.townId} rigId=${params.rigId} count=${bead_ids.length}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+
+  for (const beadId of bead_ids) {
+    const bead = await town.getBeadAsync(beadId);
+    if (bead && bead.rig_id !== params.rigId) {
+      return c.json(resError(`Bead ${beadId} does not belong to this rig`), 403);
+    }
+  }
+
+  const deleted = await town.deleteBeads(bead_ids);
+
+  return c.json(resSuccess({ deleted }));
+}
+
 /**
  * POST /api/mayor/:townId/tools/escalations/:escalationId/acknowledge
  * Acknowledge an escalation, marking it as reviewed.

@@ -268,10 +268,12 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
     deleteBead: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         rigId: string;
-        beadId: string;
+        beadId: string | string[];
         townId?: string | undefined;
       };
-      output: void;
+      output: {
+        deleted: number;
+      };
       meta: object;
     }>;
     updateBead: import('@trpc/server').TRPCMutationProcedure<{
@@ -1284,6 +1286,26 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    adminDeleteBeads: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        townId: string;
+        beadIds: string[];
+      };
+      output: {
+        deleted: number;
+      };
+      meta: object;
+    }>;
+    adminDeleteBeadsByStatus: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        townId: string;
+        status: string;
+      };
+      output: {
+        deleted: number;
+      };
+      meta: object;
+    }>;
     adminGetAlarmStatus: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         townId: string;
@@ -1667,10 +1689,12 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
         deleteBead: import('@trpc/server').TRPCMutationProcedure<{
           input: {
             rigId: string;
-            beadId: string;
+            beadId: string | string[];
             townId?: string | undefined;
           };
-          output: void;
+          output: {
+            deleted: number;
+          };
           meta: object;
         }>;
         updateBead: import('@trpc/server').TRPCMutationProcedure<{
@@ -2680,6 +2704,26 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             created_at: string;
             updated_at: string;
             closed_at: string | null;
+          };
+          meta: object;
+        }>;
+        adminDeleteBeads: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            townId: string;
+            beadIds: string[];
+          };
+          output: {
+            deleted: number;
+          };
+          meta: object;
+        }>;
+        adminDeleteBeadsByStatus: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            townId: string;
+            status: string;
+          };
+          output: {
+            deleted: number;
           };
           meta: object;
         }>;

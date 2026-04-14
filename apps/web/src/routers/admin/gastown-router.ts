@@ -744,6 +744,32 @@ export const adminGastownRouter = createTRPCRouter({
       );
     }),
 
+  deleteBeads: adminProcedure
+    .input(z.object({ townId: z.string().uuid(), beadIds: z.array(z.string().uuid()) }))
+    .output(z.object({ deleted: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const result = await gastownTrpcMutate(
+        ctx.user,
+        'gastown.adminDeleteBeads',
+        { townId: input.townId, beadIds: input.beadIds },
+        z.object({ deleted: z.number() })
+      );
+      return result ?? { deleted: 0 };
+    }),
+
+  deleteBeadsByStatus: adminProcedure
+    .input(z.object({ townId: z.string().uuid(), status: z.string() }))
+    .output(z.object({ deleted: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const result = await gastownTrpcMutate(
+        ctx.user,
+        'gastown.adminDeleteBeadsByStatus',
+        { townId: input.townId, status: input.status },
+        z.object({ deleted: z.number() })
+      );
+      return result ?? { deleted: 0 };
+    }),
+
   forceRestartContainer: adminProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {

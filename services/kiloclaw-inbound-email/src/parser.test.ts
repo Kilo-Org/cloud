@@ -58,10 +58,10 @@ describe('parseRawEmail', () => {
       [
         'Received: from smtp.example.com (127.0.0.1)',
         '        by cloudflare-email.com (unknown) id 4fwwffRXOpyR',
-        '        for <ki-e7e9395338874489839efdad131e6c16@clawmail.kilosessions.ai>; Tue, 27 Aug 2024 15:50:20 +0000',
+        '        for <ki-e7e9395338874489839efdad131e6c16@kiloclaw.ai>; Tue, 27 Aug 2024 15:50:20 +0000',
         'From: "John" <remon@kilocode.ai>',
         'Reply-To: remon@kilocode.ai',
-        'To: ki-e7e9395338874489839efdad131e6c16@clawmail.kilosessions.ai',
+        'To: ki-e7e9395338874489839efdad131e6c16@kiloclaw.ai',
         'Subject: Testing Email Workers Local Dev',
         'Content-Type: text/html; charset="windows-1252"',
         'X-Mailer: Curl',

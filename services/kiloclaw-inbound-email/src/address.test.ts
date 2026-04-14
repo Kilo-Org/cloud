@@ -5,8 +5,8 @@ describe('instanceIdFromRecipient', () => {
   it('parses ki-prefixed instance recipient addresses', () => {
     expect(
       instanceIdFromRecipient(
-        'ki-11111111111141118111111111111111@clawmail.kilosessions.ai',
-        'clawmail.kilosessions.ai'
+        'ki-11111111111141118111111111111111@kiloclaw.ai',
+        'kiloclaw.ai'
       )
     ).toBe('11111111-1111-4111-8111-111111111111');
   });
@@ -15,11 +15,11 @@ describe('instanceIdFromRecipient', () => {
     expect(
       instanceIdFromRecipient(
         'ki-11111111111141118111111111111111@example.com',
-        'clawmail.kilosessions.ai'
+        'kiloclaw.ai'
       )
     ).toBeNull();
     expect(
-      instanceIdFromRecipient('hello@clawmail.kilosessions.ai', 'clawmail.kilosessions.ai')
+      instanceIdFromRecipient('hello@kiloclaw.ai', 'kiloclaw.ai')
     ).toBeNull();
   });
 });

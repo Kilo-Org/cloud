@@ -16,7 +16,7 @@ function makeEmail(overrides: Partial<ForwardableEmailMessage> = {}): Forwardabl
     'Message-ID: <msg-1@example.com>\r\nFrom: Ada <ada@example.com>\r\nSubject: Hello\r\n\r\nBody text';
   return {
     from: 'ada@example.com',
-    to: 'ki-11111111111141118111111111111111@clawmail.kilosessions.ai',
+    to: 'ki-11111111111141118111111111111111@kiloclaw.ai',
     headers: new Headers(),
     raw: rawStream(raw),
     rawSize: raw.length,
@@ -29,7 +29,7 @@ function makeEmail(overrides: Partial<ForwardableEmailMessage> = {}): Forwardabl
 
 function makeEnv(overrides: Record<string, unknown> = {}): AppEnv {
   return {
-    INBOUND_EMAIL_DOMAIN: 'clawmail.kilosessions.ai',
+    INBOUND_EMAIL_DOMAIN: 'kiloclaw.ai',
     MAX_EMAIL_RAW_BYTES: '1048576',
     MAX_EMAIL_TEXT_CHARS: '32000',
     ...overrides,
@@ -43,7 +43,7 @@ describe('buildQueueMessage', () => {
     expect(queueMessage?.instanceId).toBe('11111111-1111-4111-8111-111111111111');
     expect(queueMessage?.messageId).toBe('<msg-1@example.com>');
     expect(queueMessage?.from).toBe('ada@example.com');
-    expect(queueMessage?.to).toBe('ki-11111111111141118111111111111111@clawmail.kilosessions.ai');
+    expect(queueMessage?.to).toBe('ki-11111111111141118111111111111111@kiloclaw.ai');
     expect(queueMessage?.subject).toBe('Hello');
     expect(queueMessage?.text).toBe('Body text');
     expect(typeof queueMessage?.receivedAt).toBe('string');
@@ -65,7 +65,7 @@ describe('buildQueueMessage', () => {
 
   it('rejects invalid recipient addresses', async () => {
     const setReject = vi.fn();
-    const email = makeEmail({ to: 'hello@clawmail.kilosessions.ai', setReject });
+    const email = makeEmail({ to: 'hello@kiloclaw.ai', setReject });
 
     const queueMessage = await buildQueueMessage(email, makeEnv());
 

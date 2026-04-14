@@ -9,7 +9,7 @@
   "observability": { "enabled": true },
   "placement": { "mode": "smart" },
   "vars": {
-    "INBOUND_EMAIL_DOMAIN": "clawmail.kilosessions.ai",
+    "INBOUND_EMAIL_DOMAIN": "kiloclaw.ai",
     "MAX_EMAIL_RAW_BYTES": "1048576",
     "MAX_EMAIL_TEXT_CHARS": "32000",
   },

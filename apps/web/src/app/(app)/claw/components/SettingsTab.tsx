@@ -63,8 +63,7 @@ import { WebhookIntegrationSection } from './WebhookIntegrationSection';
 import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.types';
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
-// TODO: Replace with the controller calver from the Docker-image PR deploy.
-const EXA_SEARCH_UI_MIN_CONTROLLER_VERSION = '9999.99.99';
+const EXA_SEARCH_UI_MIN_CONTROLLER_VERSION = '2026.4.14';
 
 // ---------------------------------------------------------------------------
 // 1Password setup guide dialog

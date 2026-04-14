@@ -29,6 +29,8 @@ const UsageDetailsInputSchema = OrganizationIdInputSchema.extend({
   period: TimePeriodSchema.default('month'),
   userFilter: z.enum(['all', 'me']).default('all'),
   groupByModel: z.boolean().default(false),
+  startDate: z.iso.datetime().optional(),
+  endDate: z.iso.datetime().optional(),
 });
 
 const UsageTimeseriesInputSchema = OrganizationIdInputSchema.extend({
@@ -290,13 +292,17 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
     .input(UsageDetailsInputSchema)
     .output(UsageDetailsResponseSchema)
     .query(async ({ input, ctx }): Promise<UsageDetails> => {
-      const { organizationId, period, userFilter, groupByModel } = input;
-
-      const dateThreshold = getDateThreshold(period);
+      const { organizationId, period, userFilter, groupByModel, startDate, endDate } = input;
 
       const whereConditions = [eq(microdollar_usage.organization_id, organizationId)];
-      if (dateThreshold) {
-        whereConditions.push(gte(microdollar_usage.created_at, dateThreshold));
+      if (startDate && endDate) {
+        whereConditions.push(gte(microdollar_usage.created_at, startDate));
+        whereConditions.push(lte(microdollar_usage.created_at, endDate));
+      } else {
+        const dateThreshold = getDateThreshold(period);
+        if (dateThreshold) {
+          whereConditions.push(gte(microdollar_usage.created_at, dateThreshold));
+        }
       }
 
       // Add user filter if "me" is selected
@@ -367,20 +373,26 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
     .input(
       OrganizationIdInputSchema.extend({
         period: TimePeriodSchema.default('month'),
+        startDate: z.iso.datetime().optional(),
+        endDate: z.iso.datetime().optional(),
       })
     )
     .output(AutocompleteMetricsOutputSchema)
     .query(async ({ input }) => {
-      const { organizationId, period } = input;
-
-      const dateThreshold = getDateThreshold(period);
+      const { organizationId, period, startDate, endDate } = input;
 
       const whereConditions = [
         eq(microdollar_usage.organization_id, organizationId),
         eq(microdollar_usage.model, AUTOCOMPLETE_MODEL),
       ];
-      if (dateThreshold) {
-        whereConditions.push(gte(microdollar_usage.created_at, dateThreshold));
+      if (startDate && endDate) {
+        whereConditions.push(gte(microdollar_usage.created_at, startDate));
+        whereConditions.push(lte(microdollar_usage.created_at, endDate));
+      } else {
+        const dateThreshold = getDateThreshold(period);
+        if (dateThreshold) {
+          whereConditions.push(gte(microdollar_usage.created_at, dateThreshold));
+        }
       }
 
       const result = await timedUsageQuery(

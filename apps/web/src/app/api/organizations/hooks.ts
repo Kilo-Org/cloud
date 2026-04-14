@@ -50,7 +50,9 @@ export function useOrganizationUsageDetails(
   organizationId: string,
   timePeriod: string = 'week',
   userFilter: string = 'all',
-  groupByModel: boolean = false
+  groupByModel: boolean = false,
+  startDate?: string,
+  endDate?: string
 ) {
   const trpc = useTRPC();
   return useQuery(
@@ -59,6 +61,8 @@ export function useOrganizationUsageDetails(
       period: timePeriod as 'week' | 'month' | 'year' | 'all',
       userFilter: userFilter as 'all' | 'me',
       groupByModel,
+      startDate,
+      endDate,
     })
   );
 }
@@ -94,13 +98,17 @@ export function useOrganizationUsageStats(organizationId: string) {
 
 export function useOrganizationAutocompleteMetrics(
   organizationId: string,
-  period: TimePeriod = 'month'
+  period: TimePeriod = 'month',
+  startDate?: string,
+  endDate?: string
 ) {
   const trpc = useTRPC();
   return useQuery(
     trpc.organizations.usageDetails.getAutocomplete.queryOptions({
       organizationId,
       period,
+      startDate,
+      endDate,
     })
   );
 }

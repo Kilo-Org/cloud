@@ -15,7 +15,6 @@ import { UsageWarning } from '@/components/usage/UsageWarning';
 import { UsageTableBase } from '@/components/usage/UsageTableBase';
 import { FormattedMicrodollars } from '@/components/organizations/FormattedMicrodollars';
 import { formatLargeNumber, fromMicrodollars, formatDollars } from '@/lib/utils';
-import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,13 +33,12 @@ import {
 import type { ChartSplitBy } from './types';
 import type { OrganizationUsageMetric } from './FormattedValue';
 import { useUsageFilters } from './hooks/useUsageFilters';
-import { useDateRangeFromPeriod } from './hooks/useDateRangeFromPeriod';
 import { useProcessedMetrics } from './hooks/useProcessedMetrics';
 import { useUsageTableData } from './hooks/useUsageTableData';
 import { exportUsageToCSV } from './utils/csvExport';
 import { convertTimeseriesData } from './utils/metricFormatters';
-import { getTimePeriodLabel } from './utils/timePeriodUtils';
-import { UsageControls } from './components/UsageControls';
+import { UsageControls, computePresetRange } from './components/UsageControls';
+import type { DateRangeSelection } from './components/UsageControls';
 import { MetricsSection } from './components/MetricsSection';
 import { ActiveFiltersBar } from './components/ActiveFiltersBar';
 import { FiltersSection } from './FiltersSection';
@@ -48,6 +46,22 @@ import { OrganizationAdminContextProvider } from '@/components/organizations/Org
 
 // Chart color constant
 const CHART_COLOR = '#3b82f6';
+
+const DEFAULT_DATE_RANGE: DateRangeSelection = {
+  preset: 'last_7_days',
+  ...computePresetRange('last_7_days'),
+  label: 'Last 7 days',
+};
+
+// Map preset to TimePeriod for the table query (backwards compat)
+const PRESET_TO_TIME_PERIOD: Record<string, TimePeriod> = {
+  last_7_days: 'week',
+  last_30_days: 'month',
+  this_month: 'month',
+  last_month: 'month',
+  last_year: 'year',
+  all: 'all',
+};
 
 // Maps internal camelCase metric keys to the snake_case keys used by FiltersSection
 const METRIC_KEY_TO_FILTER_METRIC: Record<string, OrganizationUsageMetric> = {
@@ -60,6 +74,15 @@ const METRIC_KEY_TO_FILTER_METRIC: Record<string, OrganizationUsageMetric> = {
   users: 'active_users',
 };
 
+function getDateRangeLabel(dateRange: DateRangeSelection): string {
+  if (dateRange.preset === 'custom') {
+    const start = new Date(dateRange.startDate).toLocaleDateString();
+    const end = new Date(dateRange.endDate).toLocaleDateString();
+    return `${start} – ${end}`;
+  }
+  return dateRange.label;
+}
+
 export function OrganizationUsageDetailsPage({ organizationId }: { organizationId: string }) {
   return (
     <OrganizationAdminContextProvider organizationId={organizationId}>
@@ -70,7 +93,7 @@ export function OrganizationUsageDetailsPage({ organizationId }: { organizationI
 
 export function OrganizationUsageDetails({ organizationId }: { organizationId: string }) {
   // State management
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('week');
+  const [dateRange, setDateRange] = useState<DateRangeSelection>(DEFAULT_DATE_RANGE);
   const [groupByModel, setGroupByModel] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState('cost');
   const [chartSplitBy, setChartSplitBy] = useState<ChartSplitBy>({
@@ -83,16 +106,24 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
   const { data: session } = useSession();
   const currentUserEmail = session?.user?.email;
 
-  // Fetch usage details
+  // Derive the time period for table query and start/end dates
+  const timePeriod: TimePeriod = PRESET_TO_TIME_PERIOD[dateRange.preset] ?? 'month';
+  const { startDate, endDate } = dateRange;
+
+  // Fetch usage details (table data) — pass startDate/endDate for accurate filtering
   const {
     data: usageDetails,
     isLoading,
     error,
     refetch,
-  } = useOrganizationUsageDetails(organizationId, timePeriod, 'all', groupByModel);
-
-  // Calculate date range for timeseries
-  const { startDate, endDate } = useDateRangeFromPeriod(timePeriod);
+  } = useOrganizationUsageDetails(
+    organizationId,
+    timePeriod,
+    'all',
+    groupByModel,
+    startDate,
+    endDate
+  );
 
   // Fetch timeseries data
   const { data: timeseriesResponse, isLoading: timeseriesLoading } = useOrganizationUsageTimeseries(
@@ -106,7 +137,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
 
   // Fetch autocomplete metrics
   const { data: autocompleteMetrics, isLoading: isLoadingAutocompleteMetrics } =
-    useOrganizationAutocompleteMetrics(organizationId, timePeriod);
+    useOrganizationAutocompleteMetrics(organizationId, timePeriod, startDate, endDate);
 
   // Apply filters using custom hook
   const {
@@ -254,144 +285,142 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
         <UsageControls
           showMyUsageOnly={showMyUsageOnly}
           onShowMyUsageOnlyChange={setShowMyUsageOnly}
-          timePeriod={timePeriod}
-          onTimePeriodChange={setTimePeriod}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
           onExport={handleExport}
           canExport={!!usageDetails?.daily?.length}
           isLoading={isLoading}
         />
       </div>
 
-      <Tabs value={timePeriod} onValueChange={value => setTimePeriod(value as TimePeriod)}>
-        <TabsContent value={timePeriod}>
-          <MetricsSection
-            adoption={adoption}
-            metrics={metricsData}
-            selectedMetric={selectedMetric}
-            onMetricChange={handleMetricChange}
-            timeseriesData={filteredTimeseriesData}
-            chartSplitBy={chartSplitBy}
-            onChartSplitByChange={setChartSplitBy}
-            organizationId={organizationId}
-          />
+      <div>
+        <MetricsSection
+          adoption={adoption}
+          metrics={metricsData}
+          selectedMetric={selectedMetric}
+          onMetricChange={handleMetricChange}
+          timeseriesData={filteredTimeseriesData}
+          chartSplitBy={chartSplitBy}
+          onChartSplitByChange={setChartSplitBy}
+          organizationId={organizationId}
+        />
 
-          {/* Autocomplete metrics section */}
-          <div className="mt-6">
-            <h3 className="text-muted-foreground mb-3 flex items-center gap-2 text-sm font-medium">
-              <Sparkles className="h-4 w-4" />
-              Autocomplete Usage
-            </h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-muted-foreground text-sm font-medium">
-                    Autocomplete Cost
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-bold">
-                    {isLoadingAutocompleteMetrics ? (
-                      <Skeleton className="h-8 w-16" />
-                    ) : (
-                      formatDollars(fromMicrodollars(autocompleteMetrics?.cost || 0))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+        {/* Autocomplete metrics section */}
+        <div className="mt-6">
+          <h3 className="text-muted-foreground mb-3 flex items-center gap-2 text-sm font-medium">
+            <Sparkles className="h-4 w-4" />
+            Autocomplete Usage
+          </h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-muted-foreground text-sm font-medium">
+                  Autocomplete Cost
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">
+                  {isLoadingAutocompleteMetrics ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    formatDollars(fromMicrodollars(autocompleteMetrics?.cost || 0))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-muted-foreground text-sm font-medium whitespace-nowrap">
-                    Autocomplete Requests
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-bold">
-                    {isLoadingAutocompleteMetrics ? (
-                      <Skeleton className="h-8 w-20" />
-                    ) : (
-                      formatLargeNumber(autocompleteMetrics?.requests || 0)
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-muted-foreground text-sm font-medium whitespace-nowrap">
+                  Autocomplete Requests
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">
+                  {isLoadingAutocompleteMetrics ? (
+                    <Skeleton className="h-8 w-20" />
+                  ) : (
+                    formatLargeNumber(autocompleteMetrics?.requests || 0)
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-muted-foreground text-sm font-medium">
-                    Autocomplete Tokens
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-bold">
-                    {isLoadingAutocompleteMetrics ? (
-                      <Skeleton className="h-8 w-16" />
-                    ) : (
-                      formatLargeNumber(autocompleteMetrics?.tokens || 0)
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-muted-foreground text-sm font-medium">
+                  Autocomplete Tokens
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">
+                  {isLoadingAutocompleteMetrics ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    formatLargeNumber(autocompleteMetrics?.tokens || 0)
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
+        </div>
 
-          {(timeseriesResponse?.timeseries?.length ?? 0) > 0 && (
-            <div className="mt-8">
-              <FiltersSection
-                selectedMetric={METRIC_KEY_TO_FILTER_METRIC[selectedMetric] ?? 'cost'}
-                timeseriesData={timeseriesResponse?.timeseries || []}
-                filteredTimeseriesData={filteredTimeseriesData}
-                activeFilters={activeFilters}
-                onFilter={handleFilter}
-                onExclude={handleExclude}
-              />
-            </div>
+        {(timeseriesResponse?.timeseries?.length ?? 0) > 0 && (
+          <div className="mt-8">
+            <FiltersSection
+              selectedMetric={METRIC_KEY_TO_FILTER_METRIC[selectedMetric] ?? 'cost'}
+              timeseriesData={timeseriesResponse?.timeseries || []}
+              filteredTimeseriesData={filteredTimeseriesData}
+              activeFilters={activeFilters}
+              onFilter={handleFilter}
+              onExclude={handleExclude}
+            />
+          </div>
+        )}
+
+        <div className="mt-6">
+          {isLoading ? (
+            <LoadingCard
+              title="Usage Details"
+              description="Loading detailed usage information..."
+              rowCount={5}
+            />
+          ) : error ? (
+            <ErrorCard
+              title="Usage Details"
+              description="Error loading usage details"
+              error={error}
+              onRetry={() => refetch()}
+            />
+          ) : (
+            <UsageTableBase
+              title={getDateRangeLabel(dateRange)}
+              columns={columns}
+              data={tableData}
+              emptyMessage="No usage data available"
+              headerContent={<UsageWarning />}
+              headerActions={
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={groupByModel ? 'outline' : 'default'}
+                    size="sm"
+                    onClick={() => setGroupByModel(false)}
+                  >
+                    By Day
+                  </Button>
+                  <Button
+                    variant={groupByModel ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setGroupByModel(true)}
+                  >
+                    By Model & Day
+                  </Button>
+                </div>
+              }
+            />
           )}
-
-          <div className="mt-6">
-            {isLoading ? (
-              <LoadingCard
-                title="Usage Details"
-                description="Loading detailed usage information..."
-                rowCount={5}
-              />
-            ) : error ? (
-              <ErrorCard
-                title="Usage Details"
-                description="Error loading usage details"
-                error={error}
-                onRetry={() => refetch()}
-              />
-            ) : (
-              <UsageTableBase
-                title={getTimePeriodLabel(timePeriod)}
-                columns={columns}
-                data={tableData}
-                emptyMessage="No usage data available"
-                headerContent={<UsageWarning />}
-                headerActions={
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant={groupByModel ? 'outline' : 'default'}
-                      size="sm"
-                      onClick={() => setGroupByModel(false)}
-                    >
-                      By Day
-                    </Button>
-                    <Button
-                      variant={groupByModel ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setGroupByModel(true)}
-                    >
-                      By Model & Day
-                    </Button>
-                  </div>
-                }
-              />
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
 
       {/* Fixed status bar for active filters */}
       <ActiveFiltersBar

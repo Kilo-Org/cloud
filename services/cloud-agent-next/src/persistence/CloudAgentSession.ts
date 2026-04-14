@@ -88,7 +88,7 @@ const REAPER_INTERVAL_MS_DEFAULT = 5 * 60 * 1000;
 const REAPER_ACTIVE_INTERVAL_MS = 2 * 60 * 1000;
 /** Longer reaper interval when idle (no active execution): 1 hour */
 const REAPER_IDLE_INTERVAL_MS = 60 * 60 * 1000;
-const PENDING_START_TIMEOUT_MS_DEFAULT = 5 * 60 * 1000;
+const PENDING_START_TIMEOUT_MS_DEFAULT = 3 * 60 * 1000;
 
 /** Event retention period: 90 days (aligns with session TTL) */
 const EVENT_RETENTION_MS = Limits.SESSION_TTL_MS;
@@ -2674,21 +2674,40 @@ export class CloudAgentSession extends DurableObject {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      this.broadcastVolatileEvent({
-        executionId,
-        sessionId,
-        streamEventType: 'cloud.status',
-        payload: JSON.stringify({ cloudStatus: { type: 'error', message: errorMessage } }),
-        timestamp: Date.now(),
-      });
+      try {
+        this.broadcastVolatileEvent({
+          executionId,
+          sessionId,
+          streamEventType: 'cloud.status',
+          payload: JSON.stringify({ cloudStatus: { type: 'error', message: errorMessage } }),
+          timestamp: Date.now(),
+        });
+      } catch {
+        // Best-effort — must not prevent failExecution from running.
+      }
 
-      await this.failExecution({
-        executionId,
-        status: 'failed',
-        error: errorMessage,
-        streamEventType: 'error',
-        suppressCallback: opts?.suppressCallbackOnError,
-      });
+      try {
+        await this.failExecution({
+          executionId,
+          status: 'failed',
+          error: errorMessage,
+          streamEventType: 'error',
+          suppressCallback: opts?.suppressCallbackOnError,
+        });
+      } catch (failError) {
+        // failExecution itself threw — force-clear the active execution as a
+        // last-resort safety net so the session is not permanently locked.
+        logger
+          .withFields({ sessionId, executionId, error: String(failError) })
+          .error(
+            'failExecution threw during executeDirectly cleanup — force-clearing active execution'
+          );
+        try {
+          await this.executionQueries.clearActiveExecution();
+        } catch {
+          // Storage write failed — the reaper alarm will catch this.
+        }
+      }
 
       throw error;
     }

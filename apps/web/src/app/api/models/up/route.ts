@@ -8,6 +8,7 @@ import { getMonitoredModels } from '@/lib/monitored-models';
 const HEALTH_CHECK_KEY = 'kilo-models-health-check';
 
 type ModelHealthMetrics = {
+  healthy: boolean;
   currentRequests: number;
   previousRequests: number;
   baselineRequests: number;
@@ -136,7 +137,22 @@ export async function GET(
           : 0;
       const absoluteDrop = currentRequests - baselineRequests;
 
+      // Per-model health: unhealthy when the baseline had enough distinct organic
+      // users AND the model shows a significant traffic drop.
+      const modelUnhealthy =
+        uniqueUsersBaseline >= MIN_UNIQUE_USERS_FOR_ALERT &&
+        ((baselineRequests > HIGH_BASELINE && percentChange < -90) ||
+          (baselineRequests > LOW_BASELINE &&
+            baselineRequests < HIGH_BASELINE &&
+            currentRequests === 0 &&
+            previousRequests === 0));
+
+      if (modelUnhealthy) {
+        hasSignificantDrop = true;
+      }
+
       models[row.requested_model] = {
+        healthy: !modelUnhealthy,
         currentRequests,
         previousRequests,
         baselineRequests,
@@ -145,29 +161,13 @@ export async function GET(
         uniqueUsersCurrent,
         uniqueUsersBaseline,
       };
-
-      // Alert logic:
-      // - High traffic models (>HIGH_BASELINE): Alert on >90% drop
-      // - Low traffic models (>LOW_BASELINE && <HIGH_BASELINE): Alert on consecutive zeros (current AND previous)
-      // - Only alert if the baseline had enough distinct users to represent organic traffic
-
-      if (uniqueUsersBaseline >= MIN_UNIQUE_USERS_FOR_ALERT) {
-        if (
-          (baselineRequests > HIGH_BASELINE && percentChange < -90) ||
-          (baselineRequests > LOW_BASELINE &&
-            baselineRequests < HIGH_BASELINE &&
-            currentRequests === 0 &&
-            previousRequests === 0)
-        ) {
-          hasSignificantDrop = true;
-        }
-      }
     });
 
     // Ensure all preferred models are in the response (even if no data)
     monitoredModels.forEach(requested_model => {
       if (!models[requested_model]) {
         models[requested_model] = {
+          healthy: true,
           currentRequests: 0,
           previousRequests: 0,
           baselineRequests: 0,
@@ -176,7 +176,6 @@ export async function GET(
           uniqueUsersCurrent: 0,
           uniqueUsersBaseline: 0,
         };
-        // Don't mark as unhealthy if no data - baseline is 0 anyway
       }
     });
 

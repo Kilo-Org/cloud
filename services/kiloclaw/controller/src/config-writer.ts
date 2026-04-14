@@ -60,6 +60,17 @@ type ConfigObject = Record<string, any>;
 
 type EnvLike = Record<string, string | undefined>;
 
+const INBOUND_EMAIL_HOOK_MAPPING = {
+  id: 'cloudflare-email-inbound',
+  match: { path: 'email' },
+  action: 'wake',
+  wakeMode: 'now',
+  name: 'Inbound Email',
+  sessionKey: '{{payload.sessionKey}}',
+  messageTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+  deliver: false,
+};
+
 type ExecFileOptions = { env?: NodeJS.ProcessEnv; stdio?: 'inherit' | 'pipe' };
 
 export type ConfigWriterDeps = {
@@ -351,21 +362,35 @@ export function generateBaseConfig(
     config.plugins.entries[scEntry].enabled = true;
   }
 
-  // Webhook hooks configuration (required for Gmail push notifications via gog).
-  // hooks.token authenticates incoming hook requests from gog's --hook-token.
-  // The gmail preset maps gog's gmailHookPayload into OpenClaw's expected format.
+  // Webhook hooks configuration for controller-mediated inbound events.
+  // hooks.token stays local to the machine; external Workers authenticate to
+  // controller endpoints with the gateway token instead.
   if (env.KILOCLAW_HOOKS_TOKEN) {
     config.hooks = config.hooks ?? {};
     config.hooks.enabled = true;
     config.hooks.token = env.KILOCLAW_HOOKS_TOKEN;
-    config.hooks.presets = config.hooks.presets ?? [];
-    if (!Array.isArray(config.hooks.presets)) {
-      config.hooks.presets = [];
+    config.hooks.path = '/hooks';
+
+    config.hooks.mappings = Array.isArray(config.hooks.mappings) ? config.hooks.mappings : [];
+    const existingEmailMappingIndex = config.hooks.mappings.findIndex(
+      (mapping: ConfigObject) => mapping.id === INBOUND_EMAIL_HOOK_MAPPING.id
+    );
+    if (existingEmailMappingIndex === -1) {
+      config.hooks.mappings.push(INBOUND_EMAIL_HOOK_MAPPING);
+    } else {
+      config.hooks.mappings[existingEmailMappingIndex] = INBOUND_EMAIL_HOOK_MAPPING;
     }
-    if (!(config.hooks.presets as string[]).includes('gmail')) {
-      (config.hooks.presets as string[]).push('gmail');
+
+    if (env.KILOCLAW_GOG_CONFIG_TARBALL) {
+      config.hooks.presets = config.hooks.presets ?? [];
+      if (!Array.isArray(config.hooks.presets)) {
+        config.hooks.presets = [];
+      }
+      if (!(config.hooks.presets as string[]).includes('gmail')) {
+        (config.hooks.presets as string[]).push('gmail');
+      }
     }
-    console.log('Hooks enabled with gmail preset (dedicated token)');
+    console.log('Hooks enabled with inbound email mapping (dedicated token)');
   }
 
   // Custom secret config path patching — set decrypted secret values at

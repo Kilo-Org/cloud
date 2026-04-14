@@ -73,6 +73,7 @@ import {
   type KiloclawEventRow,
   type KiloclawAllEventRow,
 } from '@/app/admin/api/kiloclaw-analytics/hooks';
+import { useControllerTelemetryDiskUsage } from '@/app/admin/api/kiloclaw-controller-telemetry/hooks';
 
 function parseTimestamp(timestamp: string): Date {
   const normalized = timestamp.includes('T') ? timestamp : timestamp.replace(' ', 'T');
@@ -1241,6 +1242,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     enabled: !!userId,
   });
 
+  const sandboxId = data?.sandbox_id;
+  const aeDiskUsage = useControllerTelemetryDiskUsage(sandboxId ?? '');
+  const aeRow = aeDiskUsage.data?.data?.[0];
+  const diskUsed = aeRow && aeRow.disk_used_bytes > 0 ? aeRow.disk_used_bytes : null;
+  const diskTotal = aeRow && aeRow.disk_total_bytes > 0 ? aeRow.disk_total_bytes : null;
+
   const { mutateAsync: destroyInstance, isPending: isDestroying } = useMutation(
     trpc.admin.kiloclawInstances.destroy.mutationOptions({
       onSuccess: () => {
@@ -1819,10 +1826,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             <div className="flex items-center gap-2">
               <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />
               <DetailField label="Volume Usage">
-                {formatVolumeUsageLine(
-                  data.workerStatus?.diskUsedBytes,
-                  data.workerStatus?.diskTotalBytes
-                )}
+                {formatVolumeUsageLine(diskUsed, diskTotal)}
               </DetailField>
             </div>
           </CardContent>

@@ -224,8 +224,6 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     // Legacy instances pre-dating this field treat absence as already-sent
     // to avoid spurious emails after deploy.
     s.instanceReadyEmailSent = 'instanceReadyEmailSent' in raw ? d.instanceReadyEmailSent : true;
-    s.diskUsedBytes = d.diskUsedBytes;
-    s.diskTotalBytes = d.diskTotalBytes;
     s.customSecretMeta = d.customSecretMeta;
     s.streamChatApiKey = d.streamChatApiKey;
     s.streamChatBotUserId = d.streamChatBotUserId;
@@ -311,8 +309,6 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.preRestoreStatus = null;
   s.pendingRestoreVolumeId = null;
   s.instanceReadyEmailSent = false;
-  s.diskUsedBytes = null;
-  s.diskTotalBytes = null;
   s.streamChatApiKey = null;
   s.streamChatBotUserId = null;
   s.streamChatBotUserToken = null;
@@ -391,8 +387,6 @@ export function createMutableState(): InstanceMutableState {
     preRestoreStatus: null,
     pendingRestoreVolumeId: null,
     instanceReadyEmailSent: false,
-    diskUsedBytes: null,
-    diskTotalBytes: null,
     customSecretMeta: null,
     streamChatApiKey: null,
     streamChatBotUserId: null,

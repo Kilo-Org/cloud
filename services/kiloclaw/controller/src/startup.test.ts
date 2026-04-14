@@ -22,11 +22,23 @@ describe('controller startup config', () => {
     ).toThrow('OPENCLAW_GATEWAY_TOKEN is required');
   });
 
+  it('fails fast when KILOCLAW_HOOKS_TOKEN is missing', () => {
+    expect(() =>
+      loadRuntimeConfig(
+        asEnv({
+          OPENCLAW_GATEWAY_TOKEN: 'token',
+          KILOCLAW_GATEWAY_ARGS: '["--port","3001"]',
+        })
+      )
+    ).toThrow('KILOCLAW_HOOKS_TOKEN is required');
+  });
+
   it('fails fast when KILOCLAW_GATEWAY_ARGS is missing', () => {
     expect(() =>
       loadRuntimeConfig(
         asEnv({
           OPENCLAW_GATEWAY_TOKEN: 'token',
+          KILOCLAW_HOOKS_TOKEN: 'hooks-token',
         })
       )
     ).toThrow('KILOCLAW_GATEWAY_ARGS is required');
@@ -37,6 +49,7 @@ describe('controller startup config', () => {
       loadRuntimeConfig(
         asEnv({
           OPENCLAW_GATEWAY_TOKEN: 'token',
+          KILOCLAW_HOOKS_TOKEN: 'hooks-token',
           KILOCLAW_GATEWAY_ARGS: '{invalid-json}',
         })
       )
@@ -48,6 +61,7 @@ describe('controller startup config', () => {
       loadRuntimeConfig(
         asEnv({
           OPENCLAW_GATEWAY_TOKEN: 'token',
+          KILOCLAW_HOOKS_TOKEN: 'hooks-token',
           KILOCLAW_GATEWAY_ARGS: '[1,2,3]',
         })
       )
@@ -58,6 +72,7 @@ describe('controller startup config', () => {
     const config = loadRuntimeConfig(
       asEnv({
         OPENCLAW_GATEWAY_TOKEN: 'token',
+        KILOCLAW_HOOKS_TOKEN: 'hooks-token',
         KILOCLAW_GATEWAY_ARGS: '["--port","3001"]',
       })
     );
@@ -71,6 +86,7 @@ describe('controller startup config', () => {
     const config = loadRuntimeConfig(
       asEnv({
         OPENCLAW_GATEWAY_TOKEN: 'token',
+        KILOCLAW_HOOKS_TOKEN: 'hooks-token',
         KILOCLAW_GATEWAY_ARGS: '["--port","3001"]',
         MAX_WS_CONNS: '50',
         WS_IDLE_TIMEOUT_MS: '600000',
@@ -88,6 +104,7 @@ describe('controller startup config', () => {
       loadRuntimeConfig(
         asEnv({
           OPENCLAW_GATEWAY_TOKEN: 'token',
+          KILOCLAW_HOOKS_TOKEN: 'hooks-token',
           KILOCLAW_GATEWAY_ARGS: '["--port","3001"]',
           MAX_WS_CONNS: '0',
         })
@@ -102,6 +119,7 @@ describe('controller startup config', () => {
     const config = loadRuntimeConfig(
       asEnv({
         OPENCLAW_GATEWAY_TOKEN: 'tok-123',
+        KILOCLAW_HOOKS_TOKEN: 'hooks-token',
         KILOCLAW_GATEWAY_ARGS: serialized,
       })
     );

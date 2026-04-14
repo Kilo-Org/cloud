@@ -18,6 +18,7 @@ import {
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
+  KILO_AUTO_LEGACY_MODEL,
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 
@@ -39,7 +40,7 @@ export async function resolveAutoModel(
   }
   const modeResult = modeSchema.safeParse(modeHeader?.trim() ?? '');
   const mode = modeResult.success ? modeResult.data : null;
-  if (model === KILO_AUTO_BALANCED_MODEL.id) {
+  if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
     if (mode === modeSchema.enum.KiloClaw) {
       const user = await userPromise;
       if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {

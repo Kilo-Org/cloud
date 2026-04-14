@@ -104,56 +104,14 @@ export async function upsertSecurityFinding(
     }>(sql`
       WITH existing_match AS (
         SELECT ${security_findings.id} AS id,
-               ${security_findings.status} AS previous_status,
-               ${security_findings.ignored_reason} AS ignored_reason,
-               ${security_findings.ignored_by} AS ignored_by,
-               ${security_findings.created_at} AS created_at
+               ${security_findings.status} AS previous_status
         FROM ${security_findings}
         WHERE ${security_findings.repo_full_name} = ${params.repoFullName}
           AND ${security_findings.source} = ${params.source}
           AND ${security_findings.source_id} = ${params.source_id}
         FOR UPDATE
       ),
-      updated AS (
-        UPDATE ${security_findings}
-        SET
-          ${sql.identifier(security_findings.severity.name)} = ${params.severity},
-          ${sql.identifier(security_findings.ghsa_id.name)} = ${params.ghsa_id},
-          ${sql.identifier(security_findings.cve_id.name)} = ${params.cve_id},
-          ${sql.identifier(security_findings.vulnerable_version_range.name)} = ${params.vulnerable_version_range},
-          ${sql.identifier(security_findings.patched_version.name)} = ${params.patched_version},
-          ${sql.identifier(security_findings.title.name)} = ${params.title},
-          ${sql.identifier(security_findings.description.name)} = ${params.description},
-          ${sql.identifier(security_findings.status.name)} = CASE
-            WHEN existing_match.ignored_reason LIKE 'superseded:%' THEN existing_match.previous_status
-            ELSE ${params.status}
-          END,
-          ${sql.identifier(security_findings.ignored_reason.name)} = CASE
-            WHEN existing_match.ignored_reason LIKE 'superseded:%' THEN existing_match.ignored_reason
-            ELSE ${params.ignored_reason}
-          END,
-          ${sql.identifier(security_findings.ignored_by.name)} = CASE
-            WHEN existing_match.ignored_reason LIKE 'superseded:%' THEN existing_match.ignored_by
-            ELSE ${params.ignored_by}
-          END,
-          ${sql.identifier(security_findings.fixed_at.name)} = ${params.fixed_at},
-          ${sql.identifier(security_findings.sla_due_at.name)} = ${params.slaDueAt?.toISOString() || null},
-          ${sql.identifier(security_findings.dependabot_html_url.name)} = ${params.dependabot_html_url},
-          ${sql.identifier(security_findings.raw_data.name)} = ${params.raw_data},
-          ${sql.identifier(security_findings.cwe_ids.name)} = ${sql.param(params.cwe_ids)}::text[],
-          ${sql.identifier(security_findings.cvss_score.name)} = ${params.cvss_score?.toString() || null},
-          ${sql.identifier(security_findings.dependency_scope.name)} = ${params.dependency_scope},
-          ${sql.identifier(security_findings.last_synced_at.name)} = now(),
-          ${sql.identifier(security_findings.updated_at.name)} = now()
-        FROM existing_match
-        WHERE ${security_findings.id} = existing_match.id
-        RETURNING
-          ${security_findings.id} AS id,
-          existing_match.previous_status AS previous_status,
-          ${security_findings.status} AS effective_status,
-          ${security_findings.created_at} AS created_at
-      ),
-      inserted AS (
+      upserted AS (
         INSERT INTO ${security_findings} (
           ${sql.identifier(security_findings.owned_by_organization_id.name)},
           ${sql.identifier(security_findings.owned_by_user_id.name)},
@@ -211,49 +169,87 @@ export async function upsertSecurityFinding(
           ${sql.param(params.cwe_ids)}::text[],
           ${params.cvss_score?.toString() || null},
           ${params.dependency_scope}
-        WHERE NOT EXISTS (SELECT 1 FROM updated)
-        ON CONFLICT (${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) DO NOTHING
-        RETURNING ${security_findings.id} AS id,
-          NULL::text AS previous_status,
-          ${security_findings.status} AS effective_status,
-          ${security_findings.created_at} AS created_at
-      ),
-      -- fallback: concurrent insert race — previous_status reflects the current row state
-      -- (written by the concurrent winner), not the true pre-update value. This means
-      -- syncAutoAnalysisQueueForFinding may misidentify a status transition during races.
-      -- Acceptable because the concurrent winner's sync call will have the correct value.
-      fallback AS (
-        SELECT
+        FROM (SELECT 1) AS input
+        LEFT JOIN existing_match ON true
+        ON CONFLICT (${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) DO UPDATE
+        SET
+          ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
+          ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
+          ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},
+          ${sql.identifier(security_findings.vulnerable_version_range.name)} = EXCLUDED.${sql.identifier(security_findings.vulnerable_version_range.name)},
+          ${sql.identifier(security_findings.patched_version.name)} = EXCLUDED.${sql.identifier(security_findings.patched_version.name)},
+          ${sql.identifier(security_findings.title.name)} = EXCLUDED.${sql.identifier(security_findings.title.name)},
+          ${sql.identifier(security_findings.description.name)} = EXCLUDED.${sql.identifier(security_findings.description.name)},
+          ${sql.identifier(security_findings.status.name)} = CASE
+            WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.status}
+            ELSE EXCLUDED.${sql.identifier(security_findings.status.name)}
+          END,
+          ${sql.identifier(security_findings.ignored_reason.name)} = CASE
+            WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.ignored_reason}
+            ELSE EXCLUDED.${sql.identifier(security_findings.ignored_reason.name)}
+          END,
+          ${sql.identifier(security_findings.ignored_by.name)} = CASE
+            WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.ignored_by}
+            ELSE EXCLUDED.${sql.identifier(security_findings.ignored_by.name)}
+          END,
+          ${sql.identifier(security_findings.fixed_at.name)} = EXCLUDED.${sql.identifier(security_findings.fixed_at.name)},
+          ${sql.identifier(security_findings.sla_due_at.name)} = EXCLUDED.${sql.identifier(security_findings.sla_due_at.name)},
+          ${sql.identifier(security_findings.dependabot_html_url.name)} = EXCLUDED.${sql.identifier(security_findings.dependabot_html_url.name)},
+          ${sql.identifier(security_findings.raw_data.name)} = EXCLUDED.${sql.identifier(security_findings.raw_data.name)},
+          ${sql.identifier(security_findings.cwe_ids.name)} = EXCLUDED.${sql.identifier(security_findings.cwe_ids.name)},
+          ${sql.identifier(security_findings.cvss_score.name)} = EXCLUDED.${sql.identifier(security_findings.cvss_score.name)},
+          ${sql.identifier(security_findings.dependency_scope.name)} = EXCLUDED.${sql.identifier(security_findings.dependency_scope.name)},
+          ${sql.identifier(security_findings.last_synced_at.name)} = now(),
+          ${sql.identifier(security_findings.updated_at.name)} = now()
+        -- Avoid stale first-insert racers rewriting the concurrent winner.
+        WHERE EXISTS (SELECT 1 FROM existing_match)
+        RETURNING
           ${security_findings.id} AS id,
-          ${security_findings.status} AS previous_status,
+          (xmax = 0) AS was_inserted,
           ${security_findings.status} AS effective_status,
           ${security_findings.created_at} AS created_at
+      )
+      SELECT
+        upserted.id AS "findingId",
+        upserted.was_inserted AS "wasInserted",
+        -- If the conflict row was inserted after this statement snapshot, existing_match
+        -- is empty. Use the persisted status so duplicate initial syncs do not look like
+        -- a fresh transition; the concurrent inserter reports the actual insert.
+        CASE
+          WHEN upserted.was_inserted THEN NULL::text
+          ELSE COALESCE(existing_match.previous_status, upserted.effective_status)
+        END AS "previousStatus",
+        upserted.effective_status AS "effectiveStatus",
+        upserted.created_at AS "findingCreatedAt"
+      FROM upserted
+      LEFT JOIN existing_match ON existing_match.id = upserted.id
+      LIMIT 1
+    `);
+
+    let finding = rows[0];
+    if (!finding) {
+      const fallback = await db.execute<{
+        findingId: string;
+        wasInserted: boolean;
+        previousStatus: SecurityFindingStatus;
+        effectiveStatus: SecurityFindingStatus;
+        findingCreatedAt: string;
+      }>(sql`
+        SELECT
+          ${security_findings.id} AS "findingId",
+          false AS "wasInserted",
+          ${security_findings.status} AS "previousStatus",
+          ${security_findings.status} AS "effectiveStatus",
+          ${security_findings.created_at} AS "findingCreatedAt"
         FROM ${security_findings}
         WHERE ${security_findings.repo_full_name} = ${params.repoFullName}
           AND ${security_findings.source} = ${params.source}
           AND ${security_findings.source_id} = ${params.source_id}
-          AND NOT EXISTS (SELECT 1 FROM updated)
-          AND NOT EXISTS (SELECT 1 FROM inserted)
         LIMIT 1
-      ),
-      chosen AS (
-        SELECT id, false AS was_inserted, previous_status, effective_status, created_at FROM updated
-        UNION ALL
-        SELECT id, true AS was_inserted, previous_status, effective_status, created_at FROM inserted
-        UNION ALL
-        SELECT id, false AS was_inserted, previous_status, effective_status, created_at FROM fallback
-      )
-      SELECT
-        chosen.id AS "findingId",
-        chosen.was_inserted AS "wasInserted",
-        chosen.previous_status AS "previousStatus",
-        chosen.effective_status AS "effectiveStatus",
-        chosen.created_at AS "findingCreatedAt"
-      FROM chosen
-      LIMIT 1
-    `);
+      `);
+      finding = fallback.rows[0];
+    }
 
-    const finding = rows[0];
     if (!finding) {
       throw new Error('Failed to upsert security finding');
     }

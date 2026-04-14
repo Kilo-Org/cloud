@@ -704,13 +704,36 @@ describe('generateBaseConfig', () => {
     expect(config.channels.telegram.dmPolicy).toBe('pairing');
   });
 
-  it('configures hooks when KILOCLAW_HOOKS_TOKEN is set', () => {
+  it('configures inbound email hooks when KILOCLAW_HOOKS_TOKEN is set', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'test-hooks-token' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
     expect(config.hooks.enabled).toBe(true);
     expect(config.hooks.token).toBe('test-hooks-token');
+    expect(config.hooks.path).toBe('/hooks');
+    expect(config.hooks.presets).toBeUndefined();
+    expect(config.hooks.mappings).toContainEqual({
+      id: 'cloudflare-email-inbound',
+      match: { path: 'email' },
+      action: 'wake',
+      wakeMode: 'now',
+      name: 'Inbound Email',
+      sessionKey: '{{payload.sessionKey}}',
+      messageTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+      deliver: false,
+    });
+  });
+
+  it('adds gmail preset when Gog credentials are configured', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_HOOKS_TOKEN: 'test-hooks-token',
+      KILOCLAW_GOG_CONFIG_TARBALL: 'tarball',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
     expect(config.hooks.presets).toContain('gmail');
   });
 
@@ -726,7 +749,11 @@ describe('generateBaseConfig', () => {
       hooks: { enabled: true, token: 'old-token', presets: ['gmail'] },
     });
     const { deps } = fakeDeps(existing);
-    const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'new-token' };
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_HOOKS_TOKEN: 'new-token',
+      KILOCLAW_GOG_CONFIG_TARBALL: 'tarball',
+    };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
     expect(config.hooks.presets).toEqual(['gmail']);

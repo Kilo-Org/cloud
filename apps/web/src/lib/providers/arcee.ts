@@ -13,4 +13,5 @@ export const trinity_large_thinking_free_model: KiloExclusiveModel = {
   internal_id: 'arcee-ai/trinity-large-thinking',
   inference_provider: 'arcee-ai',
   pricing: null,
+  exclusive_to: ['kiloclaw', 'openclaw'],
 };

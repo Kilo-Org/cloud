@@ -145,6 +145,7 @@ describe('startController degraded behavior', () => {
 
     const env = {
       OPENCLAW_GATEWAY_TOKEN: 'test-token',
+      KILOCLAW_HOOKS_TOKEN: 'test-hooks-token',
       KILOCLAW_GATEWAY_ARGS: '["--port","3001"]',
     } as unknown as NodeJS.ProcessEnv;
 
@@ -184,6 +185,7 @@ describe('startController degraded behavior', () => {
 
     const env = {
       OPENCLAW_GATEWAY_TOKEN: 'test-token',
+      KILOCLAW_HOOKS_TOKEN: 'test-hooks-token',
       KILOCLAW_GATEWAY_ARGS: '["--port","3001"]',
     } as unknown as NodeJS.ProcessEnv;
 

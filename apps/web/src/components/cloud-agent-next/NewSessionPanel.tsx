@@ -23,7 +23,12 @@ import { Badge } from '@/components/ui/badge';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
 
-import { useProfile, useProfiles, useCombinedProfiles } from '@/hooks/useCloudAgentProfiles';
+import {
+  useProfile,
+  useProfiles,
+  useCombinedProfiles,
+  useRepoBindings,
+} from '@/hooks/useCloudAgentProfiles';
 import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
@@ -46,6 +51,10 @@ import { ModeCombobox, NEXT_MODE_OPTIONS } from '@/components/shared/ModeCombobo
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { AdvancedConfig } from '@/components/shared/AdvancedConfig';
+import {
+  buildProfileConfigIndicatorState,
+  ProfileConfigIndicator,
+} from '@/components/cloud-agent/ProfileConfigIndicator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -186,11 +195,19 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   // ---------------------------------------------------------------------------
   // Profiles
   // ---------------------------------------------------------------------------
-  const { data: combinedProfilesData } = useCombinedProfiles({
+  const {
+    data: combinedProfilesData,
+    isLoading: isLoadingCombinedProfiles,
+    error: combinedProfilesError,
+  } = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: !!organizationId,
   });
-  const { data: personalProfiles } = useProfiles({
+  const {
+    data: personalProfiles,
+    isLoading: isLoadingPersonalProfiles,
+    error: personalProfilesError,
+  } = useProfiles({
     organizationId: undefined,
     enabled: !organizationId,
   });
@@ -233,6 +250,38 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       setProfileConfig(null);
     }
   }, [allProfiles, selectedProfileId, setProfileConfig, setSelectedProfileId]);
+
+  const selectedProfileSummary = selectedProfileId
+    ? allProfiles.find(profile => profile.id === selectedProfileId)
+    : undefined;
+
+  const { data: repoBindings, error: repoBindingsError } = useRepoBindings({
+    organizationId,
+    enabled: !!selectedRepo,
+  });
+
+  const repoBoundProfileName = useMemo(() => {
+    if (!selectedRepo || !repoBindings) return null;
+    const binding = repoBindings.find(
+      repoBinding =>
+        repoBinding.repoFullName.toLowerCase() === selectedRepo.toLowerCase() &&
+        repoBinding.platform === selectedPlatform
+    );
+    return binding?.profileName ?? null;
+  }, [repoBindings, selectedPlatform, selectedRepo]);
+
+  const isProfilesLoading = organizationId ? isLoadingCombinedProfiles : isLoadingPersonalProfiles;
+  const profilesError = organizationId ? combinedProfilesError : personalProfilesError;
+  const profileIndicatorState = buildProfileConfigIndicatorState({
+    selectedProfileName: selectedProfileSummary?.name ?? null,
+    repoBoundProfileName,
+    hasManualEnvVars: Object.keys(manualEnvVars).length > 0,
+    hasManualSetupCommands: manualSetupCommands.length > 0,
+    hasSelectedProfileId: !!selectedProfileId,
+    isProfilesLoading,
+    hasProfileError: !!profilesError,
+    hasRepoBindingError: !!selectedRepo && !!repoBindingsError,
+  });
 
   // Fetch selected profile data
   const { data: selectedProfile } = useProfile(selectedProfileId || '', {
@@ -480,6 +529,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   // Repo popover state (must be declared before early returns to satisfy Rules of Hooks)
   // ---------------------------------------------------------------------------
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
+  const [settingsPopoverOpen, setSettingsPopoverOpen] = useState(false);
 
   const recentFullNames = useMemo(() => new Set(recentRepos.map(r => r.fullName)), [recentRepos]);
   const githubRepos = unifiedRepositories.filter(
@@ -893,44 +943,51 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
           </Popover>
 
           {/* Settings — bottom right */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+          <div className="flex shrink-0 items-center gap-3">
+            <ProfileConfigIndicator
+              state={profileIndicatorState}
+              onOpenSettings={() => setSettingsPopoverOpen(true)}
+            />
+            {profileIndicatorState && <Separator orientation="vertical" className="h-4" />}
+            <Popover open={settingsPopoverOpen} onOpenChange={setSettingsPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                  Settings
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[min(28rem,calc(100vw-2rem))] p-0"
+                align="end"
+                side="bottom"
+                sideOffset={8}
               >
-                <Settings className="h-3.5 w-3.5" />
-                Settings
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              className="w-[min(28rem,calc(100vw-2rem))] p-0"
-              align="end"
-              side="bottom"
-              sideOffset={8}
-            >
-              <div className="px-4 py-3">
-                <p className="text-sm font-medium">Advanced settings</p>
-              </div>
-              <Separator />
-              <div className="p-4">
-                <AdvancedConfig
-                  label=""
-                  organizationId={organizationId}
-                  selectedProfileId={selectedProfileId}
-                  onProfileSelect={handleProfileSelect}
-                  manualEnvVars={manualEnvVars}
-                  manualSetupCommands={manualSetupCommands}
-                  effectiveEnvVars={effectiveEnvVars}
-                  effectiveSetupCommands={effectiveSetupCommands}
-                  onManualEnvVarsChange={setManualEnvVars}
-                  onManualSetupCommandsChange={setManualSetupCommands}
-                  repoFullName={selectedRepo || undefined}
-                  platform={selectedPlatform}
-                />
-              </div>
-            </PopoverContent>
-          </Popover>
+                <div className="px-4 py-3">
+                  <p className="text-sm font-medium">Advanced settings</p>
+                </div>
+                <Separator />
+                <div className="p-4">
+                  <AdvancedConfig
+                    label=""
+                    organizationId={organizationId}
+                    selectedProfileId={selectedProfileId}
+                    onProfileSelect={handleProfileSelect}
+                    manualEnvVars={manualEnvVars}
+                    manualSetupCommands={manualSetupCommands}
+                    effectiveEnvVars={effectiveEnvVars}
+                    effectiveSetupCommands={effectiveSetupCommands}
+                    onManualEnvVarsChange={setManualEnvVars}
+                    onManualSetupCommandsChange={setManualSetupCommands}
+                    repoFullName={selectedRepo || undefined}
+                    platform={selectedPlatform}
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </div>
     </div>

@@ -32,6 +32,8 @@ export type ResolvedAutoModel = {
 
 export const GPT_53_CODEX_ID = 'openai/gpt-5.3-codex';
 
+export const KILO_AUTO_LEGACY_MODEL = 'kilo/auto'; // hardcoded in upstream OpenClaw
+
 export const modeSchema = z.enum([
   'KiloClaw',
   'plan',
@@ -201,5 +203,5 @@ export const AUTO_MODELS = [
 ];
 
 export function isKiloAutoModel(model: string) {
-  return AUTO_MODELS.some(m => m.id === model);
+  return AUTO_MODELS.some(m => m.id === model) || model === KILO_AUTO_LEGACY_MODEL;
 }

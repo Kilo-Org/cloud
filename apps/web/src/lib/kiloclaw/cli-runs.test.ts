@@ -45,7 +45,10 @@ async function getRunStatus(runId: string) {
     throw new Error('Failed to load KiloClaw CLI run');
   }
 
-  return row;
+  return {
+    ...row,
+    completed_at: row.completed_at ? new Date(row.completed_at).toISOString() : null,
+  };
 }
 
 describe('cancelCliRun', () => {

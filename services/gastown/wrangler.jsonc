@@ -35,9 +35,9 @@
   "containers": [
     {
       "class_name": "TownContainerDO",
-      "image": "./container/Dockerfile",
+      "image": "registry.cloudflare.com/e115e769bcdd4c3d66af59d3332cb394/gastown-towncontainerdo:197958b7",
       "instance_type": "standard-4",
-      "max_instances": 700,
+      "max_instances": 800,
     },
   ],
 

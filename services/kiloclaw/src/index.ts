@@ -11,17 +11,18 @@
  * - Public routes: no auth (health check only)
  */
 
+import { WorkerEntrypoint } from 'cloudflare:workers';
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import { getCookie, deleteCookie } from 'hono/cookie';
 
-import type { AppEnv, KiloClawEnv } from './types';
+import type { AppEnv, KiloClawEnv, ChatWebhookPayload } from './types';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform, controller } from './routes';
 import { handleSnapshotRestoreQueue } from './queue/snapshot-restore';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
-import { sandboxIdFromUserId } from './auth/sandbox-id';
+import { sandboxIdFromUserId, userIdFromSandboxId } from './auth/sandbox-id';
 import { InstanceIdParam } from './schemas/instance-config';
 import { isValidInstanceId } from '@kilocode/worker-utils/instance-id';
 import { registerVersionIfNeeded } from './lib/image-version';
@@ -202,7 +203,7 @@ async function deriveSandboxId(c: Context<AppEnv>, next: Next) {
 // App assembly
 // =============================================================================
 
-const app = new Hono<AppEnv>();
+export const app = new Hono<AppEnv>();
 
 // Global middleware (all routes)
 app.use('*', timingMiddleware);
@@ -1094,30 +1095,107 @@ app.all('*', async c => {
   return httpResponse;
 });
 
-export default {
-  fetch(request: Request, env: KiloClawEnv, ctx: ExecutionContext) {
+export default class extends WorkerEntrypoint<KiloClawEnv> {
+  fetch(request: Request) {
     // Self-register the current OpenClaw version in KV on deploy.
     // Runs after the response is sent. If the very first request after deploy
     // is a provision(), the KV write races with resolveLatestVersion() —
     // provision may see the previous latest (or null) and fall back to
     // FLY_IMAGE_TAG, which is already correct for the new deploy. This is benign.
-    if (env.OPENCLAW_VERSION && env.FLY_IMAGE_TAG) {
-      ctx.waitUntil(
+    if (this.env.OPENCLAW_VERSION && this.env.FLY_IMAGE_TAG) {
+      this.ctx.waitUntil(
         registerVersionIfNeeded(
-          env.KV_CLAW_CACHE,
-          env.OPENCLAW_VERSION,
+          this.env.KV_CLAW_CACHE,
+          this.env.OPENCLAW_VERSION,
           'default', // variant hardcoded day 1
-          env.FLY_IMAGE_TAG,
-          env.FLY_IMAGE_DIGEST ?? null,
-          env.HYPERDRIVE?.connectionString
+          this.env.FLY_IMAGE_TAG,
+          this.env.FLY_IMAGE_DIGEST ?? null,
+          this.env.HYPERDRIVE?.connectionString
         )
       );
     }
 
-    return app.fetch(request, env, ctx);
-  },
+    return app.fetch(request, this.env, this.ctx);
+  }
 
-  async queue(batch: MessageBatch<SnapshotRestoreMessage>, env: KiloClawEnv): Promise<void> {
-    await handleSnapshotRestoreQueue(batch, env);
-  },
-};
+  async queue(batch: MessageBatch<SnapshotRestoreMessage>): Promise<void> {
+    await handleSnapshotRestoreQueue(batch, this.env);
+  }
+
+  /**
+   * RPC method called by kilo-chat service via service binding.
+   * Routes the webhook payload to the correct kiloclaw Fly machine
+   * based on the targetBotId (bot:kiloclaw:{sandboxId}).
+   */
+  async deliverChatWebhook(payload: ChatWebhookPayload): Promise<void> {
+    const botPrefix = 'bot:kiloclaw:';
+    if (!payload.targetBotId.startsWith(botPrefix)) {
+      throw new Error(`Invalid targetBotId: ${payload.targetBotId}`);
+    }
+    const sandboxId = payload.targetBotId.slice(botPrefix.length);
+    const userId = userIdFromSandboxId(sandboxId);
+
+    // Resolve instance via registry (same logic as resolveRegistryEntry)
+    let stub: ReturnType<KiloClawEnv['KILOCLAW_INSTANCE']['get']>;
+    try {
+      const registryKey = `user:${userId}`;
+      const registryStub = this.env.KILOCLAW_REGISTRY.get(
+        this.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+      );
+      const entries = await registryStub.listInstances(registryKey);
+      if (entries.length === 0) {
+        throw new Error(`No instance found for user ${userId}`);
+      }
+      stub = this.env.KILOCLAW_INSTANCE.get(
+        this.env.KILOCLAW_INSTANCE.idFromName(entries[0].doKey)
+      );
+    } catch (err) {
+      console.error('[WEBHOOK] Registry lookup failed, falling back to userId:', err);
+      const fallbackDoKey =
+        (await resolveDoKeyForUser(this.env.HYPERDRIVE?.connectionString, userId).catch(
+          fallbackErr => {
+            console.error('[WEBHOOK] Postgres fallback failed, using userId:', fallbackErr);
+            return null;
+          }
+        )) ?? userId;
+      stub = this.env.KILOCLAW_INSTANCE.get(this.env.KILOCLAW_INSTANCE.idFromName(fallbackDoKey));
+    }
+
+    const status = await stub.getStatus();
+    if (!status.sandboxId) {
+      throw new Error(`Instance for user ${userId} has no sandboxId`);
+    }
+
+    const routingTarget = await stub.getRoutingTarget();
+    if (!routingTarget) {
+      throw new Error(`No routing target for user ${userId}`);
+    }
+    const targetUrl = `${routingTarget.origin}/plugins/kilo-chat/webhook`;
+
+    if (!this.env.GATEWAY_TOKEN_SECRET) {
+      throw new Error('GATEWAY_TOKEN_SECRET not configured');
+    }
+
+    const forwardHeaders = await buildForwardHeaders({
+      requestHeaders: new Headers({ 'content-type': 'application/json' }),
+      sandboxId: status.sandboxId,
+      gatewayTokenSecret: this.env.GATEWAY_TOKEN_SECRET,
+      providerHeaders: routingTarget.headers,
+    });
+
+    // Forward the webhook payload (without targetBotId) to the controller
+    const { targetBotId: _, ...webhookPayload } = payload;
+    const body = JSON.stringify(webhookPayload);
+
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: forwardHeaders,
+      body,
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => '(could not read body)');
+      throw new Error(`Webhook forward failed: ${response.status} ${responseText}`);
+    }
+  }
+}

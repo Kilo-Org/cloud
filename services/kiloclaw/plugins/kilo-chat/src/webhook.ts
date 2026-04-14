@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { createChannelReplyPipeline } from 'openclaw/plugin-sdk/channel-reply-pipeline';
@@ -23,27 +22,7 @@ export type KiloChatInboundPayload = {
 
 export type KiloChatWebhookDeps = {
   api: OpenClawPluginApi;
-  getWebhookSecret: () => string | undefined;
 };
-
-// ---------------------------------------------------------------------------
-// Signature verification
-// ---------------------------------------------------------------------------
-
-export function verifyWebhookSignature(
-  rawBody: string,
-  signatureHeader: string | null,
-  secret: string
-): boolean {
-  if (!signatureHeader) return false;
-  if (!signatureHeader.startsWith('sha256=')) return false;
-  const providedHex = signatureHeader.slice('sha256='.length);
-  const expectedHex = createHmac('sha256', secret).update(rawBody).digest('hex');
-  const providedBuf = Buffer.from(providedHex, 'hex');
-  const expectedBuf = Buffer.from(expectedHex, 'hex');
-  if (providedBuf.length !== expectedBuf.length) return false;
-  return timingSafeEqual(providedBuf, expectedBuf);
-}
 
 // ---------------------------------------------------------------------------
 // Payload parsing
@@ -284,26 +263,7 @@ async function readBody(req: IncomingMessage): Promise<string> {
 
 export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
-    const secret = deps.getWebhookSecret();
-    if (!secret) {
-      res.statusCode = 503;
-      res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ error: 'kilo-chat webhook not configured' }));
-      return true;
-    }
-
     const rawBody = await readBody(req);
-    const sigRaw = req.headers['x-kilo-chat-signature'];
-    const sigHeader = Array.isArray(sigRaw)
-      ? (sigRaw[0] ?? null)
-      : ((sigRaw as string | undefined) ?? null);
-
-    if (!verifyWebhookSignature(rawBody, sigHeader, secret)) {
-      res.statusCode = 401;
-      res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ error: 'Invalid signature' }));
-      return true;
-    }
 
     let parsed: unknown;
     try {

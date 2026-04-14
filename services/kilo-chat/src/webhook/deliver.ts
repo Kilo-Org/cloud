@@ -1,6 +1,5 @@
-import { createHmac } from 'node:crypto';
-
 export type WebhookMessage = {
+  targetBotId: string;
   conversationId: string;
   messageId: string;
   from: string;
@@ -28,34 +27,4 @@ export function buildWebhookPayload(msg: WebhookMessage): WebhookPayload {
     text,
     sentAt: msg.sentAt,
   };
-}
-
-export function signPayload(body: string, secret: string): string {
-  const hex = createHmac('sha256', secret).update(body).digest('hex');
-  return `sha256=${hex}`;
-}
-
-export async function deliverWebhook(
-  msg: WebhookMessage,
-  webhookUrl: string,
-  webhookSecret: string,
-  fetchImpl: typeof fetch = fetch
-): Promise<void> {
-  const payload = buildWebhookPayload(msg);
-  const body = JSON.stringify(payload);
-  const signature = signPayload(body, webhookSecret);
-
-  const response = await fetchImpl(webhookUrl, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-kilo-chat-signature': signature,
-    },
-    body,
-  });
-
-  if (!response.ok) {
-    const responseText = await response.text().catch(() => '(could not read body)');
-    throw new Error(`Webhook delivery failed: ${response.status} ${responseText}`);
-  }
 }

@@ -40,7 +40,7 @@ vi.mock('./lib/image-version', async () => {
   };
 });
 
-import worker from './index';
+import { app } from './index';
 import { deriveGatewayToken } from './auth/gateway-token';
 import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
 
@@ -69,7 +69,7 @@ describe('platform route env validation', () => {
   });
 
   it('rejects platform routes when NEXTAUTH_SECRET is missing', async () => {
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/api/platform/provision', {
         method: 'POST',
         headers: {
@@ -122,7 +122,7 @@ describe('proxy recovering state', () => {
       }),
     };
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/'),
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
@@ -187,7 +187,7 @@ describe('proxy routing target usage', () => {
       })
     );
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/i/550e8400-e29b-41d4-a716-446655440000/api/foo?bar=baz'),
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
@@ -236,7 +236,7 @@ describe('proxy routing target usage', () => {
       getRoutingTarget: vi.fn().mockResolvedValue(null),
     };
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/', {
         headers: {
           Cookie: `${KILOCLAW_ACTIVE_INSTANCE_COOKIE}=550e8400-e29b-41d4-a716-446655440000`,
@@ -281,7 +281,7 @@ describe('proxy routing target usage', () => {
     const fetchMock = vi.mocked(fetch) as FetchMock;
     fetchMock.mockResolvedValue(new Response('ok', { status: 200 }));
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/i/550e8400-e29b-41d4-a716-446655440000/api/foo'),
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
@@ -371,7 +371,7 @@ describe('proxy routing target usage', () => {
       .mockRejectedValueOnce(new Error('socket hang up'))
       .mockResolvedValueOnce(new Response('ok', { status: 200 }));
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/api/foo?bar=baz'),
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
@@ -476,7 +476,7 @@ describe('proxy routing target usage', () => {
       .mockRejectedValueOnce(new Error('socket hang up'))
       .mockResolvedValueOnce(new Response('ok', { status: 200 }));
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/socket', {
         headers: { Upgrade: 'websocket' },
       }),

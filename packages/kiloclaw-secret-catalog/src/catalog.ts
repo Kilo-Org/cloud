@@ -284,7 +284,6 @@ export const INTERNAL_SENSITIVE_ENV_VARS: ReadonlySet<string> = new Set([
   // worker env via buildEnvVars; the KILOCHAT_ prefix is reserved in
   // DENIED_ENV_VAR_PREFIXES to keep users from shadowing them.
   'KILOCHAT_API_TOKEN',
-  'KILOCHAT_WEBHOOK_SECRET',
 ]);
 
 /**

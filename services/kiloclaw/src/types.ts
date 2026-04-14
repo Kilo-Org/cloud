@@ -64,7 +64,6 @@ export type KiloClawEnv = {
 
   // KiloChat channel plugin
   KILOCHAT_API_TOKEN?: string;
-  KILOCHAT_WEBHOOK_SECRET?: string;
   KILOCHAT_BASE_URL?: string;
 
   // PostHog product telemetry
@@ -73,6 +72,18 @@ export type KiloClawEnv = {
   // Tuning overrides (wrangler vars)
   /** Override proactive API key refresh threshold (hours). Default: 72 (3 days). */
   PROACTIVE_REFRESH_THRESHOLD_HOURS?: string;
+};
+
+/**
+ * Payload for kilo-chat webhook delivery via service binding RPC.
+ */
+export type ChatWebhookPayload = {
+  targetBotId: string;
+  conversationId: string;
+  messageId: string;
+  from: string;
+  text: string;
+  sentAt: string;
 };
 
 /**

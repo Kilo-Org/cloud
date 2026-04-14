@@ -68,18 +68,23 @@ export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: Auth
     // Enqueue webhook if there are bot members that aren't the sender
     const botMembers = await convStub.getBotMembersExcluding(callerId);
     if (botMembers.length > 0) {
-      const sendPromise = c.env.WEBHOOK_QUEUE.send({
-        conversationId,
-        messageId,
-        from: callerId,
-        content,
-        sentAt: new Date().toISOString(),
-      });
+      const now = new Date().toISOString();
+      const sendPromise = Promise.all(
+        botMembers.map(botId =>
+          c.env.WEBHOOK_QUEUE.send({
+            targetBotId: botId,
+            conversationId,
+            messageId,
+            from: callerId,
+            content,
+            sentAt: now,
+          })
+        )
+      );
       try {
         c.executionCtx.waitUntil(sendPromise);
       } catch {
         // executionCtx may not be available in some contexts (e.g. tests)
-        // fall through; queue send already initiated
       }
     }
 

@@ -534,15 +534,13 @@ describe('buildEnvVars', () => {
 
   // ─── kilo-chat env passthrough ──────────────────────────────────────
 
-  it('places KILOCHAT_API_TOKEN and KILOCHAT_WEBHOOK_SECRET into sensitive, KILOCHAT_BASE_URL into env', async () => {
+  it('places KILOCHAT_API_TOKEN into sensitive, KILOCHAT_BASE_URL into env', async () => {
     const env = createMockEnv({
       KILOCHAT_API_TOKEN: 'tok_secret',
-      KILOCHAT_WEBHOOK_SECRET: 'whk_secret',
       KILOCHAT_BASE_URL: 'https://chat.example.test',
     });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
     expect(result.sensitive.KILOCHAT_API_TOKEN).toBe('tok_secret');
-    expect(result.sensitive.KILOCHAT_WEBHOOK_SECRET).toBe('whk_secret');
     expect(result.env.KILOCHAT_BASE_URL).toBe('https://chat.example.test');
   });
 
@@ -550,7 +548,6 @@ describe('buildEnvVars', () => {
     const env = createMockEnv();
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
     expect(result.sensitive.KILOCHAT_API_TOKEN).toBeUndefined();
-    expect(result.sensitive.KILOCHAT_WEBHOOK_SECRET).toBeUndefined();
     expect(result.env.KILOCHAT_BASE_URL).toBeUndefined();
   });
 });

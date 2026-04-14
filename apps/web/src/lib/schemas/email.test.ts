@@ -125,9 +125,7 @@ describe('normalizeGmailAddress', () => {
   });
 
   it('should strip multiple dots', () => {
-    expect(normalizeGmailAddress('h.e.n.k.j.a.n.s.s.e.n@gmail.com')).toBe(
-      'henkjanssen@gmail.com'
-    );
+    expect(normalizeGmailAddress('h.e.n.k.j.a.n.s.s.e.n@gmail.com')).toBe('henkjanssen@gmail.com');
   });
 
   it('should handle addresses without dots', () => {
@@ -135,9 +133,7 @@ describe('normalizeGmailAddress', () => {
   });
 
   it('should work with googlemail.com', () => {
-    expect(normalizeGmailAddress('henk.janssen@googlemail.com')).toBe(
-      'henkjanssen@googlemail.com'
-    );
+    expect(normalizeGmailAddress('henk.janssen@googlemail.com')).toBe('henkjanssen@googlemail.com');
   });
 
   it('should lowercase the domain', () => {

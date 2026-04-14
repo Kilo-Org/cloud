@@ -200,9 +200,7 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
  *
  * Only searches Gmail/Googlemail addresses. Returns undefined for non-Gmail emails.
  */
-export async function findUserByNormalizedGmailEmail(
-  email: string
-): Promise<User | undefined> {
+export async function findUserByNormalizedGmailEmail(email: string): Promise<User | undefined> {
   if (!isGmailAddress(email)) return undefined;
 
   const normalized = normalizeGmailAddress(email);

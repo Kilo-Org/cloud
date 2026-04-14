@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
   // Check if this is an existing user (sign-in) or new user (signup).
   // Also check Gmail dot-variants: henk.janssen@gmail.com and henkjanssen@gmail.com
   // are the same inbox, so treat dot-variants of existing accounts as sign-ins.
-  const existingUser = (await findUserByEmail(email)) ?? (await findUserByNormalizedGmailEmail(email));
+  const existingUser =
+    (await findUserByEmail(email)) ?? (await findUserByNormalizedGmailEmail(email));
 
   // For new users, enforce stricter email validation and TLD blocking
   if (!existingUser) {

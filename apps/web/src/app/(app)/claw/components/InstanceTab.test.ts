@@ -6,7 +6,7 @@ import {
   getVolumeUsagePercent,
   getVolumeBarColor,
 } from '@/lib/kiloclaw/instance-display';
-import { diskUsageQueryKey } from './InstanceTab';
+import { diskUsageQueryKey, hasVolumeUsageData } from './InstanceTab';
 
 describe('formatUptime', () => {
   test.each([
@@ -86,5 +86,16 @@ describe('diskUsageQueryKey', () => {
 
   test('different orgs produce different keys', () => {
     expect(diskUsageQueryKey('org-a')).not.toEqual(diskUsageQueryKey('org-b'));
+  });
+});
+
+describe('hasVolumeUsageData', () => {
+  test.each([
+    [null, null, false],
+    [1000, null, false],
+    [null, 2000, false],
+    [1000, 2000, true],
+  ])('diskUsed=%s diskTotal=%s → %s', (diskUsed, diskTotal, expected) => {
+    expect(hasVolumeUsageData(diskUsed, diskTotal)).toBe(expected);
   });
 });

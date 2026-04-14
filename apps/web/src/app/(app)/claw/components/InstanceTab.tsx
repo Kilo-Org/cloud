@@ -56,6 +56,10 @@ export function diskUsageQueryKey(organizationId: string | undefined) {
   return ['kiloclaw', 'disk-usage', organizationId ?? 'personal'] as const;
 }
 
+export function hasVolumeUsageData(diskUsed: number | null, diskTotal: number | null) {
+  return diskUsed !== null && diskTotal !== null;
+}
+
 function useDiskUsage(enabled: boolean, organizationId: string | undefined) {
   return useQuery<AnalyticsEngineResponse<ControllerTelemetryRow>>({
     queryKey: diskUsageQueryKey(organizationId),
@@ -142,21 +146,23 @@ export function InstanceTab({
         </p>
       </div>
 
-      <div className="rounded-lg border p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <HardDrive className="text-muted-foreground h-4 w-4" />
-          <p className="text-foreground text-sm font-medium">Volume Usage</p>
+      {hasVolumeUsageData(diskUsed, diskTotal) && (
+        <div className="rounded-lg border p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <HardDrive className="text-muted-foreground h-4 w-4" />
+            <p className="text-foreground text-sm font-medium">Volume Usage</p>
+          </div>
+          <p className="text-foreground text-sm font-semibold">
+            {formatVolumeUsage(diskUsed, diskTotal)}
+          </p>
+          <div className="bg-muted mt-3 h-2 overflow-hidden rounded-full">
+            <div
+              className={`h-full rounded-full ${getVolumeBarColor(diskUsagePercent)} transition-all`}
+              style={{ width: `${diskUsagePercent ?? 0}%` }}
+            />
+          </div>
         </div>
-        <p className="text-foreground text-sm font-semibold">
-          {formatVolumeUsage(diskUsed, diskTotal)}
-        </p>
-        <div className="bg-muted mt-3 h-2 overflow-hidden rounded-full">
-          <div
-            className={`h-full rounded-full ${getVolumeBarColor(diskUsagePercent)} transition-all`}
-            style={{ width: `${diskUsagePercent ?? 0}%` }}
-          />
-        </div>
-      </div>
+      )}
 
       <div className="rounded-lg border p-4">
         <div className="mb-3 flex items-center gap-2">

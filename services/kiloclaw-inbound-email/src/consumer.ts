@@ -26,6 +26,8 @@ export async function deliverInboundEmail(
         message: 'inbound email permanently rejected',
         instanceId: message.instanceId,
         messageId: message.messageId,
+        from: message.from,
+        to: message.to,
         status: response.status,
       })
     );

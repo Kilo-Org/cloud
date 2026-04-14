@@ -8,10 +8,9 @@ import { failureResult } from '@/lib/maybe-result';
 import type { User } from '@kilocode/db/schema';
 import type { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import type { PlatformStatusResponse } from '@/lib/kiloclaw/types';
+import type { getUserFromAuth } from '@/lib/user.server';
 
-type GetUserFromAuthResult = Awaited<
-  ReturnType<typeof import('@/lib/user.server').getUserFromAuth>
->;
+type GetUserFromAuthResult = Awaited<ReturnType<typeof getUserFromAuth>>;
 type GetStatusResult = Awaited<ReturnType<KiloClawUserClient['getStatus']>>;
 
 const mockGetUserFromAuth = jest.fn<() => Promise<GetUserFromAuthResult>>();

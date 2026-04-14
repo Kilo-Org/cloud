@@ -1736,7 +1736,7 @@ function inboundEmailTitleSlug(subject: string): string {
 }
 
 function inboundEmailSessionKey(subject: string, receivedAt: string): string {
-  return `hooks:email:${receivedAt.slice(0, 10)}-${inboundEmailTitleSlug(subject)}`;
+  return `inbound-email:${receivedAt.slice(0, 10)}-${inboundEmailTitleSlug(subject)}`;
 }
 
 async function resolveInboundEmailDoKey(

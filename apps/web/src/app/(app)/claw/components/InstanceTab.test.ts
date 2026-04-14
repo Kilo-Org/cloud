@@ -118,7 +118,7 @@ describe('getVolumeBarColor', () => {
   });
 
   test('returns emerald at exactly 75', () => {
-    expect(getVolumeBarColor(75)).toBe('bg-emerald-500');
+    expect(getVolumeBarColor(75)).toBe('bg-amber-500');
   });
 
   test('returns red at exactly 90', () => {

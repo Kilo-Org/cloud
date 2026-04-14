@@ -10,11 +10,7 @@ export default defineWorkersConfig({
             // Stub the kiloclaw service binding for tests — RPC calls are not
             // exercised in unit tests; this prevents miniflare from failing to
             // resolve the external worker.
-            KILOCLAW: {
-              async fetch() {
-                return new Response('{}', { status: 200 });
-              },
-            },
+            KILOCLAW: () => new Response('{}', { status: 200 }),
           },
         },
       },

@@ -2,17 +2,25 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_admin_audit_logs } from '@kilocode/db/schema';
+import {
+  kiloclaw_admin_audit_logs,
+  kiloclaw_cli_runs,
+  kiloclaw_instances,
+} from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockGetDebugStatus: jest.Mock<any, any> = jest.fn();
 const mockDestroyFlyMachine: jest.Mock<any, any> = jest.fn();
+const mockGetKiloCliRunStatus: jest.Mock<any, any> = jest.fn();
+const mockCancelKiloCliRun: jest.Mock<any, any> = jest.fn();
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn().mockImplementation(() => ({
     getDebugStatus: mockGetDebugStatus,
     destroyFlyMachine: mockDestroyFlyMachine,
+    getKiloCliRunStatus: mockGetKiloCliRunStatus,
+    cancelKiloCliRun: mockCancelKiloCliRun,
   })),
   KiloClawApiError: class KiloClawApiError extends Error {
     statusCode: number;
@@ -28,6 +36,9 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
 
 let regularUser: User;
 let adminUser: User;
+let cliRunUser: User;
+let cliRunInstanceId: string;
+let cliRunId: string;
 
 const testAppName = 'acct-abc123def456';
 const testMachineId = 'd8901e123456';
@@ -46,24 +57,63 @@ function flyDebugStatus(overrides: Record<string, unknown> = {}) {
   };
 }
 
-beforeAll(async () => {
+beforeEach(async () => {
   regularUser = await insertTestUser({
-    google_user_email: 'regular-destroy-machine@example.com',
+    google_user_email: `regular-destroy-machine-${Math.random()}@example.com`,
     is_admin: false,
   });
   adminUser = await insertTestUser({
-    google_user_email: 'admin-destroy-machine@admin.example.com',
+    google_user_email: `admin-destroy-machine-${Math.random()}@admin.example.com`,
     is_admin: true,
   });
-});
 
-beforeEach(async () => {
+  cliRunUser = await insertTestUser({
+    google_user_email: `admin-cli-run-target-${Math.random()}@example.com`,
+    is_admin: false,
+  });
+
+  const [instance] = await db
+    .insert(kiloclaw_instances)
+    .values({
+      id: crypto.randomUUID(),
+      user_id: cliRunUser.id,
+      sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+    })
+    .returning({ id: kiloclaw_instances.id });
+
+  cliRunInstanceId = instance.id;
+
+  const [run] = await db
+    .insert(kiloclaw_cli_runs)
+    .values({
+      user_id: cliRunUser.id,
+      instance_id: cliRunInstanceId,
+      prompt: 'older admin-target run',
+      status: 'running',
+      started_at: '2026-04-08T12:00:00.000Z',
+      initiated_by_admin_id: adminUser.id,
+    })
+    .returning({ id: kiloclaw_cli_runs.id });
+
+  cliRunId = run.id;
   mockGetDebugStatus.mockReset();
   mockDestroyFlyMachine.mockReset();
+  mockGetKiloCliRunStatus.mockReset();
+  mockCancelKiloCliRun.mockReset();
   // Clean audit logs between tests so counts are accurate
   await db
     .delete(kiloclaw_admin_audit_logs)
     .where(eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id));
+
+  await db
+    .update(kiloclaw_cli_runs)
+    .set({
+      status: 'running',
+      exit_code: null,
+      output: null,
+      completed_at: null,
+    })
+    .where(eq(kiloclaw_cli_runs.id, cliRunId));
 });
 
 /* eslint-disable drizzle/enforce-delete-with-where */
@@ -72,6 +122,8 @@ afterAll(async () => {
     await db
       .delete(kiloclaw_admin_audit_logs)
       .where(eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id));
+    await db.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.id, cliRunId));
+    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, cliRunInstanceId));
   } catch {
     // Test DB may already be torn down
   }
@@ -231,5 +283,207 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
     ).rejects.toThrow('Invalid Fly machine ID');
 
     expect(mockGetDebugStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
+  it('does not overwrite a stored run when controller status belongs to a newer run', async () => {
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'completed',
+      output: 'newer admin run output',
+      exitCode: 0,
+      startedAt: '2026-04-08T12:05:00Z',
+      completedAt: '2026-04-08T12:06:00Z',
+      prompt: 'newer admin run',
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.getKiloCliRunStatus({
+      userId: cliRunUser.id,
+      instanceId: cliRunInstanceId,
+      runId: cliRunId,
+    });
+
+    expect(result.status).toBe('running');
+    expect(result.output).toBeNull();
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, cliRunId));
+
+    expect(row.status).toBe('running');
+    expect(row.output).toBeNull();
+    expect(row.completed_at).toBeNull();
+  });
+
+  it('writes start audit metadata with runId and stores the initiating admin id', async () => {
+    const startKiloCliRun = jest.fn().mockResolvedValue({
+      startedAt: '2026-04-08T12:10:00.000Z',
+      status: 'running',
+    });
+    const { KiloClawInternalClient } = jest.requireMock('@/lib/kiloclaw/kiloclaw-internal-client');
+    KiloClawInternalClient.mockImplementation(() => ({
+      getDebugStatus: mockGetDebugStatus,
+      destroyFlyMachine: mockDestroyFlyMachine,
+      getKiloCliRunStatus: mockGetKiloCliRunStatus,
+      cancelKiloCliRun: mockCancelKiloCliRun,
+      startKiloCliRun,
+    }));
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.startKiloCliRun({
+      userId: cliRunUser.id,
+      instanceId: cliRunInstanceId,
+      prompt: 'new admin run',
+    });
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, result.id));
+
+    expect(row.initiated_by_admin_id).toBe(adminUser.id);
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_admin_audit_logs)
+      .where(
+        and(
+          eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+          eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.cli_run.start')
+        )
+      );
+
+    expect(logs[0]?.metadata).toEqual({
+      runId: result.id,
+      instanceId: cliRunInstanceId,
+      promptLength: 'new admin run'.length,
+    });
+
+    await db.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.id, result.id));
+  });
+
+  it('lists the initiating admin email for admin-started runs', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.listAllCliRuns({
+      offset: 0,
+      limit: 10,
+      initiatedBy: 'admin',
+      status: 'all',
+    });
+
+    const run = result.runs.find(row => row.id === cliRunId);
+
+    expect(run?.initiated_by_admin_id).toBe(adminUser.id);
+    expect(run?.initiated_by_admin_email).toBe(adminUser.google_user_email);
+    expect(run).not.toHaveProperty('initiated_by_admin_name');
+  });
+});
+
+describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
+  it('throws before calling the controller when the scoped CLI run row does not exist', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.kiloclawInstances.cancelKiloCliRun({
+        userId: cliRunUser.id,
+        instanceId: cliRunInstanceId,
+        runId: crypto.randomUUID(),
+      })
+    ).rejects.toThrow('CLI run not found');
+
+    expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
+  });
+
+  it('throws before calling the controller when the run belongs to another instance', async () => {
+    const [otherInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: cliRunUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    const caller = await createCallerForUser(adminUser.id);
+
+    try {
+      await expect(
+        caller.admin.kiloclawInstances.cancelKiloCliRun({
+          userId: cliRunUser.id,
+          instanceId: otherInstance.id,
+          runId: cliRunId,
+        })
+      ).rejects.toThrow('CLI run not found');
+
+      expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, otherInstance.id));
+    }
+  });
+
+  it('returns ok without calling the controller when the run is already terminal', async () => {
+    await db
+      .update(kiloclaw_cli_runs)
+      .set({
+        status: 'completed',
+        exit_code: 0,
+        output: 'done',
+        completed_at: '2026-04-08T12:01:00.000Z',
+      })
+      .where(eq(kiloclaw_cli_runs.id, cliRunId));
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.cancelKiloCliRun({
+        userId: cliRunUser.id,
+        instanceId: cliRunInstanceId,
+        runId: cliRunId,
+      })
+    ).resolves.toEqual({ ok: true });
+
+    expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
+  });
+
+  it('calls the controller, marks the row cancelled, and writes audit metadata for a running run', async () => {
+    mockCancelKiloCliRun.mockResolvedValue({ ok: true });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.cancelKiloCliRun({
+        userId: cliRunUser.id,
+        instanceId: cliRunInstanceId,
+        runId: cliRunId,
+      })
+    ).resolves.toEqual({ ok: true });
+
+    expect(mockCancelKiloCliRun).toHaveBeenCalledWith(cliRunUser.id, cliRunInstanceId);
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, cliRunId));
+
+    expect(row.status).toBe('cancelled');
+    expect(row.completed_at).not.toBeNull();
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_admin_audit_logs)
+      .where(
+        and(
+          eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+          eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.cli_run.cancel')
+        )
+      );
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].target_user_id).toBe(cliRunUser.id);
+    expect(logs[0].metadata).toEqual({
+      instanceId: cliRunInstanceId,
+      runId: cliRunId,
+    });
   });
 });

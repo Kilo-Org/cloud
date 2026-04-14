@@ -23,6 +23,12 @@ import {
   createKiloClawAdminAuditLog,
   listKiloClawAdminAuditLogs,
 } from '@/lib/kiloclaw/admin-audit-log';
+import {
+  cancelCliRun,
+  createCliRun,
+  getCliRunStatus,
+  getEmptyCliRunStatus,
+} from '@/lib/kiloclaw/cli-runs';
 import type {
   PlatformDebugStatusResponse,
   VolumeSnapshot,
@@ -34,6 +40,7 @@ import type {
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import { alias } from 'drizzle-orm/pg-core';
 import {
   eq,
   and,
@@ -49,6 +56,8 @@ import {
   lte,
   type SQL,
 } from 'drizzle-orm';
+
+const initiatingAdminUsers = alias(kilocode_users, 'initiating_admin_users');
 
 const ListInstancesSchema = z.object({
   offset: z.number().min(0).default(0),
@@ -159,17 +168,23 @@ function throwKiloclawAdminError(
  * Otherwise fall back to the user's active (personal) instance.
  */
 async function resolveInstance(userId: string, instanceId?: string) {
-  if (instanceId) {
-    const instance = await getInstanceById(instanceId);
-    if (!instance) {
+  const instance = instanceId ? await getInstanceById(instanceId) : await getActiveInstance(userId);
+
+  if (!instance) {
+    if (instanceId) {
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: `Instance ${instanceId} not found`,
       });
     }
-    return instance;
+    return null;
   }
-  return getActiveInstance(userId);
+
+  if (instance.userId !== userId) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+  }
+
+  return instance;
 }
 
 export type AdminKiloclawInstance = {
@@ -565,29 +580,130 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         prompt: z.string().min(1).max(10_000),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const fallbackMessage = 'Failed to start kilo CLI run';
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
+        if (!instance) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+        }
         const client = new KiloClawInternalClient();
-        return await client.startKiloCliRun(input.userId, input.prompt, workerInstanceId(instance));
+        const result = await client.startKiloCliRun(
+          input.userId,
+          input.prompt,
+          workerInstanceId(instance)
+        );
+
+        const runId = await createCliRun({
+          userId: input.userId,
+          instanceId: instance.id,
+          prompt: input.prompt,
+          startedAt: result.startedAt,
+          initiatedByAdminId: ctx.user.id,
+        });
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.cli_run.start',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `CLI run started on instance ${instance.id}`,
+            metadata: {
+              runId,
+              instanceId: instance.id,
+              promptLength: input.prompt.length,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for startKiloCliRun:', auditErr);
+        }
+
+        return { ...result, id: runId };
       } catch (err) {
         console.error('Failed to start kilo CLI run for user:', input.userId, err);
         throwKiloclawAdminError(err, fallbackMessage);
       }
     }),
 
-  getKiloCliRunStatus: adminProcedure.input(GatewayProcessSchema).query(async ({ input }) => {
-    const fallbackMessage = 'Failed to get kilo CLI run status';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      return await client.getKiloCliRunStatus(input.userId, workerInstanceId(instance));
-    } catch (err) {
-      console.error('Failed to get kilo CLI run status for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
+  getKiloCliRunStatus: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.uuid().optional(),
+        runId: z.uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      const fallbackMessage = 'Failed to get kilo CLI run status';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        if (!instance) {
+          return getEmptyCliRunStatus();
+        }
+
+        return getCliRunStatus({
+          runId: input.runId,
+          userId: input.userId,
+          instanceId: instance.id,
+          workerInstanceId: workerInstanceId(instance),
+        });
+      } catch (err) {
+        console.error('Failed to get kilo CLI run status for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
+  cancelKiloCliRun: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.uuid().optional(),
+        runId: z.uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const fallbackMessage = 'Failed to cancel kilo CLI run';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        if (!instance) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+        }
+        const result = await cancelCliRun({
+          runId: input.runId,
+          userId: input.userId,
+          instanceId: instance.id,
+          workerInstanceId: workerInstanceId(instance),
+        });
+
+        if (!result.runFound) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'CLI run not found' });
+        }
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.cli_run.cancel',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `CLI run cancelled on instance ${instance.id}`,
+            metadata: {
+              instanceId: instance.id,
+              runId: input.runId,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for cancelKiloCliRun:', auditErr);
+        }
+
+        return { ok: result.ok };
+      } catch (err) {
+        console.error('Failed to cancel kilo CLI run for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
 
   listKiloCliRuns: adminProcedure
     .input(z.object({ userId: z.string().min(1), limit: z.number().min(1).max(50).default(20) }))
@@ -609,14 +725,23 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         limit: z.number().min(1).max(100).default(25),
         search: z.string().optional(),
         status: z.enum(['all', 'running', 'completed', 'failed', 'cancelled']).default('all'),
+        initiatedBy: z.enum(['all', 'admin', 'user']).default('all'),
       })
     )
     .query(async ({ input }) => {
-      const { offset, limit, search, status } = input;
+      const { offset, limit, search, status, initiatedBy } = input;
       const conditions: SQL[] = [];
 
       if (status !== 'all') {
         conditions.push(eq(kiloclaw_cli_runs.status, status));
+      }
+
+      if (initiatedBy !== 'all') {
+        conditions.push(
+          initiatedBy === 'admin'
+            ? sql`${kiloclaw_cli_runs.initiated_by_admin_id} IS NOT NULL`
+            : sql`${kiloclaw_cli_runs.initiated_by_admin_id} IS NULL`
+        );
       }
 
       const searchTerm = search?.trim();
@@ -638,6 +763,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             id: kiloclaw_cli_runs.id,
             user_id: kiloclaw_cli_runs.user_id,
             user_email: kilocode_users.google_user_email,
+            initiated_by_admin_id: kiloclaw_cli_runs.initiated_by_admin_id,
+            initiated_by_admin_email: initiatingAdminUsers.google_user_email,
             prompt: kiloclaw_cli_runs.prompt,
             status: kiloclaw_cli_runs.status,
             exit_code: kiloclaw_cli_runs.exit_code,
@@ -646,6 +773,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           })
           .from(kiloclaw_cli_runs)
           .leftJoin(kilocode_users, eq(kiloclaw_cli_runs.user_id, kilocode_users.id))
+          .leftJoin(
+            initiatingAdminUsers,
+            eq(kiloclaw_cli_runs.initiated_by_admin_id, initiatingAdminUsers.id)
+          )
           .where(where)
           .orderBy(desc(kiloclaw_cli_runs.started_at))
           .limit(limit)

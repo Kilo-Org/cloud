@@ -84,6 +84,7 @@ import {
   KILOCLAW_PLAN_COST_MICRODOLLARS,
   KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/credit-billing';
+import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
@@ -93,7 +94,11 @@ import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
  * Error codes whose messages may contain raw internal details (e.g. filesystem
  * paths) and should NOT be forwarded to the client.
  */
-const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed']);
+const UNSAFE_ERROR_CODES = new Set([
+  'config_read_failed',
+  'config_replace_failed',
+  'gateway_controller_error',
+]);
 
 /**
  * Adopt a single orphaned subscription onto the given active personal instance.
@@ -2181,23 +2186,26 @@ export const kiloclawRouter = createTRPCRouter({
               cause: new UpstreamApiError('controller_route_unavailable'),
             });
           }
+          if (err.statusCode === 409) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'A Kilo CLI run is already in progress',
+              cause: code ? new UpstreamApiError(code) : undefined,
+            });
+          }
         }
         throw err;
       }
 
-      // Persist the run in the database and return its ID
-      const [row] = await db
-        .insert(kiloclaw_cli_runs)
-        .values({
-          user_id: ctx.user.id,
-          instance_id: instance?.id ?? null,
-          prompt: input.prompt,
-          status: 'running',
-          started_at: result.startedAt,
-        })
-        .returning({ id: kiloclaw_cli_runs.id });
+      const runId = await createCliRun({
+        userId: ctx.user.id,
+        instanceId: instance?.id ?? null,
+        prompt: input.prompt,
+        startedAt: result.startedAt,
+        initiatedByAdminId: null,
+      });
 
-      return { ...result, id: row.id };
+      return { ...result, id: runId };
     }),
 
   getKiloCliRunStatus: clawAccessProcedure
@@ -2205,114 +2213,30 @@ export const kiloclawRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const instance = await getActiveInstance(ctx.user.id);
 
-      // Load the requested run from the DB to avoid cross-run data leaks.
-      // The controller only tracks the *current* run, so polling it for an
-      // older run would return the wrong output.
-      const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
-      const [row] = await db
-        .select()
-        .from(kiloclaw_cli_runs)
-        .where(
-          and(
-            eq(kiloclaw_cli_runs.id, input.runId),
-            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
-            instanceFilter
-          )
-        )
-        .limit(1);
-
-      if (!row) {
-        return {
-          hasRun: false,
-          status: null,
-          output: null,
-          exitCode: null,
-          startedAt: null,
-          completedAt: null,
-          prompt: null,
-        };
-      }
-
-      // If the DB row is already terminal, return it directly — no need to
-      // poll the controller (which may be running a different job).
-      if (row.status !== 'running') {
-        return {
-          hasRun: true,
-          status: row.status as 'completed' | 'failed' | 'cancelled',
-          output: row.output,
-          exitCode: row.exit_code,
-          startedAt: row.started_at,
-          completedAt: row.completed_at ?? null,
-          prompt: row.prompt,
-        };
-      }
-
-      // Run is still active — poll the controller for live output.
-      const client = new KiloClawInternalClient();
-      const controllerStatus = await client.getKiloCliRunStatus(
-        ctx.user.id,
-        workerInstanceId(instance)
-      );
-
-      // If controller reports the run finished, persist to the DB row.
-      if (
-        controllerStatus.hasRun &&
-        controllerStatus.status !== 'running' &&
-        controllerStatus.startedAt
-      ) {
-        await db
-          .update(kiloclaw_cli_runs)
-          .set({
-            status: controllerStatus.status ?? 'failed',
-            exit_code: controllerStatus.exitCode,
-            output: controllerStatus.output,
-            completed_at: controllerStatus.completedAt ?? new Date().toISOString(),
-          })
-          .where(
-            and(
-              eq(kiloclaw_cli_runs.id, input.runId),
-              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
-              instanceFilter,
-              eq(kiloclaw_cli_runs.status, 'running')
-            )
-          );
-      }
-
-      return {
-        ...controllerStatus,
-        prompt: row.prompt,
-      };
+      return getCliRunStatus({
+        runId: input.runId,
+        userId: ctx.user.id,
+        instanceId: instance?.id ?? null,
+        workerInstanceId: workerInstanceId(instance),
+      });
     }),
 
   cancelKiloCliRun: clawAccessProcedure
     .input(z.object({ runId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const instance = await getActiveInstance(ctx.user.id);
-      const client = new KiloClawInternalClient();
-      const result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
+      const result = await cancelCliRun({
+        runId: input.runId,
+        userId: ctx.user.id,
+        instanceId: instance?.id ?? null,
+        workerInstanceId: workerInstanceId(instance),
+      });
 
-      // Mark the specific run as cancelled in DB
-      if (result.ok) {
-        const instanceFilter = instance
-          ? eq(kiloclaw_cli_runs.instance_id, instance.id)
-          : undefined;
-        await db
-          .update(kiloclaw_cli_runs)
-          .set({
-            status: 'cancelled',
-            completed_at: new Date().toISOString(),
-          })
-          .where(
-            and(
-              eq(kiloclaw_cli_runs.id, input.runId),
-              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
-              instanceFilter,
-              eq(kiloclaw_cli_runs.status, 'running')
-            )
-          );
+      if (!result.runFound) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'CLI run not found' });
       }
 
-      return result;
+      return { ok: result.ok };
     }),
 
   listKiloCliRuns: clawAccessProcedure

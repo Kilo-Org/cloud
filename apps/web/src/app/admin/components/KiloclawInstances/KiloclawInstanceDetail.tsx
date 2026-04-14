@@ -70,6 +70,7 @@ import { toast } from 'sonner';
 import { AdminFileEditor } from './AdminFileEditor';
 import { BumpVolumeTo15GbButton } from './BumpVolumeTo15GbDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { stripAnsi } from '@/lib/stripAnsi';
 import {
   useKiloclawInstanceEvents,
   useKiloclawAllEvents,
@@ -77,6 +78,8 @@ import {
   type KiloclawAllEventRow,
 } from '@/app/admin/api/kiloclaw-analytics/hooks';
 import type { AnalyticsEngineResponse, ControllerTelemetryRow } from '@/lib/kiloclaw/disk-usage';
+import { KiloCliRunCard } from './KiloCliRunCard';
+import { parseTimestamp, formatRelativeTime, formatAbsoluteTime, DetailField } from './shared';
 
 function formatEpochTime(epoch: number | null): string {
   if (epoch === null) return '—';
@@ -2762,6 +2765,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* Kilo CLI Run */}
+        {isActive && gatewayControlsEnabled && (
+          <KiloCliRunCard userId={data.user_id} instanceId={data.id} />
         )}
 
         {/* Volume Reassociation (danger zone) */}

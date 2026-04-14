@@ -18,16 +18,15 @@ import { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import type { PlatformStatusResponse } from '@/lib/kiloclaw/types';
 import { AnimatedDots } from './AnimatedDots';
 
+function getErrorUpstreamCode(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('data' in error)) return undefined;
+  const { data } = error;
+  if (typeof data !== 'object' || data === null || !('upstreamCode' in data)) return undefined;
+  return typeof data.upstreamCode === 'string' ? data.upstreamCode : undefined;
+}
+
 function isNeedsRedeployError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'data' in error &&
-    typeof (error as { data?: unknown }).data === 'object' &&
-    (error as { data?: { upstreamCode?: unknown } }).data !== null &&
-    (error as { data: { upstreamCode?: unknown } }).data.upstreamCode ===
-      'controller_route_unavailable'
-  );
+  return getErrorUpstreamCode(error) === 'controller_route_unavailable';
 }
 
 export function StartKiloCliRunDialog({
@@ -67,6 +66,8 @@ export function StartKiloCliRunDialog({
           onOpenChange(false);
           router.push(`/claw/kilo-cli-run/${data.id}`);
         },
+        onError: err =>
+          toast.error(err.message || 'Failed to start recovery run', { duration: 10000 }),
       }
     );
   };
@@ -168,7 +169,7 @@ export function StartKiloCliRunDialog({
                 onKeyDown={e => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault();
-                    handleStart();
+                    void handleStart();
                   }
                 }}
               />
@@ -183,7 +184,7 @@ export function StartKiloCliRunDialog({
                 Cancel
               </Button>
               <Button
-                onClick={handleStart}
+                onClick={() => void handleStart()}
                 disabled={!machineReady || !prompt.trim() || startMutation.isPending}
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
               >

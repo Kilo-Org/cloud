@@ -14,9 +14,7 @@ export function selectCurrentCliRun<TRun extends CliRunLike>(
   }
 
   return (
-    (preferredRunId
-      ? runs.find(run => run.id === preferredRunId && run.instance_id === instanceId)
-      : undefined) ??
+    (preferredRunId ? runs.find(run => run.id === preferredRunId) : undefined) ??
     runs.find(run => run.instance_id === instanceId && run.status === 'running') ??
     runs.find(run => run.instance_id === instanceId) ??
     null

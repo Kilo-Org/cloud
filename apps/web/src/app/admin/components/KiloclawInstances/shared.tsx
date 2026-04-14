@@ -18,7 +18,7 @@ export function formatRelativeTime(timestamp: string | null): string {
 }
 
 export function formatAbsoluteTime(timestamp: string): string {
-  return parseTimestamp(timestamp).toLocaleString('en-US');
+  return parseTimestamp(timestamp).toLocaleString();
 }
 
 export function DetailField({ label, children }: { label: string; children: React.ReactNode }) {

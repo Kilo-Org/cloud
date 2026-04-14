@@ -1,6 +1,8 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
 
+export { MembershipDO } from './do/membership-do';
+
 const app = new Hono<{ Bindings: Env }>();
 
 app.get('/health', c => c.json({ ok: true }));

@@ -46,6 +46,8 @@ type OrphanRow = {
   organization_id: string | null;
   created_at: string;
   user_email: string | null;
+  subscription_id: string | null;
+  subscription_status: string | null;
   workerStatusError: string | null;
 };
 
@@ -326,6 +328,7 @@ export function KiloclawOrphansTab() {
                     <TableHead>User</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Sandbox ID</TableHead>
+                    <TableHead>Subscription</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Status Check</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -349,6 +352,24 @@ export function KiloclawOrphansTab() {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{orphan.sandbox_id}</TableCell>
+                      <TableCell>
+                        {orphan.subscription_status ? (
+                          <Badge
+                            variant="outline"
+                            title={orphan.subscription_id ?? undefined}
+                            className={
+                              orphan.subscription_status === 'active' ||
+                              orphan.subscription_status === 'trialing'
+                                ? 'border-amber-500/30 bg-amber-500/15 text-amber-400'
+                                : undefined
+                            }
+                          >
+                            {orphan.subscription_status}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
                       <TableCell title={new Date(orphan.created_at).toLocaleString()}>
                         {formatRelativeTime(orphan.created_at)}
                       </TableCell>

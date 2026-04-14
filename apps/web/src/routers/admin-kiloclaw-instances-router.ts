@@ -1349,9 +1349,15 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         organization_id: kiloclaw_instances.organization_id,
         created_at: kiloclaw_instances.created_at,
         user_email: kilocode_users.google_user_email,
+        subscription_id: kiloclaw_subscriptions.id,
+        subscription_status: kiloclaw_subscriptions.status,
       })
       .from(kiloclaw_instances)
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+      .leftJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
+      )
       .where(
         and(
           isNull(kiloclaw_instances.destroyed_at),
@@ -1380,6 +1386,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       organization_id: string | null;
       created_at: string;
       user_email: string | null;
+      subscription_id: string | null;
+      subscription_status: string | null;
       workerStatusError: string | null;
     };
 
@@ -1408,6 +1416,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               organization_id: instance.organization_id,
               created_at: instance.created_at,
               user_email: instance.user_email,
+              subscription_id: instance.subscription_id,
+              subscription_status: instance.subscription_status,
               workerStatusError: null,
             });
           }
@@ -1423,6 +1433,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               organization_id: instance.organization_id,
               created_at: instance.created_at,
               user_email: instance.user_email,
+              subscription_id: instance.subscription_id,
+              subscription_status: instance.subscription_status,
               workerStatusError:
                 result.reason instanceof Error ? result.reason.message : 'Status check failed',
             });

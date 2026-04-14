@@ -15,7 +15,6 @@ const CHANNEL_ENV_VARS = new Set(
 
 /** Channel field keys — used to check legacy `channels` storage for backward compat. */
 const CHANNEL_FIELD_KEYS = getFieldKeysByCategory('channel');
-const NON_SECRET_ENCRYPTED_ENV_VARS = new Set(['KILO_EXA_SEARCH_MODE']);
 
 /**
  * User-facing KiloClaw routes (JWT auth via authMiddleware).
@@ -51,9 +50,7 @@ kiloclaw.get('/config', c =>
     return c.json({
       envVarKeys: config.envVars ? Object.keys(config.envVars) : [],
       secretCount: config.encryptedSecrets
-        ? Object.keys(config.encryptedSecrets).filter(
-            k => !CHANNEL_ENV_VARS.has(k) && !NON_SECRET_ENCRYPTED_ENV_VARS.has(k)
-          ).length
+        ? Object.keys(config.encryptedSecrets).filter(k => !CHANNEL_ENV_VARS.has(k)).length
         : 0,
       kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
       hasKiloCodeApiKey: !!config.kilocodeApiKey,

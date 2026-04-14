@@ -121,7 +121,6 @@ export { METADATA_KEY_USER_ID } from '../machine-config';
 const CHANNEL_ENV_VARS = new Set(
   SECRET_CATALOG.filter(e => e.category === 'channel').flatMap(e => e.fields.map(f => f.envVar))
 );
-const NON_SECRET_ENCRYPTED_ENV_VARS = new Set(['KILO_EXA_SEARCH_MODE']);
 const BRAVE_SEARCH_FIELD_KEY = 'braveSearchApiKey';
 
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
@@ -859,13 +858,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (patch.exaMode !== undefined) {
       this.s.kiloExaSearchMode = patch.exaMode;
       pending.kiloExaSearchMode = this.s.kiloExaSearchMode;
-    }
-
-    if (this.s.encryptedSecrets?.KILO_EXA_SEARCH_MODE) {
-      const next = { ...this.s.encryptedSecrets };
-      delete next.KILO_EXA_SEARCH_MODE;
-      this.s.encryptedSecrets = Object.keys(next).length > 0 ? next : null;
-      pending.encryptedSecrets = this.s.encryptedSecrets;
     }
 
     if (Object.keys(pending).length > 0) {
@@ -1893,9 +1885,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       lastStoppedAt: this.s.lastStoppedAt,
       envVarCount: this.s.envVars ? Object.keys(this.s.envVars).length : 0,
       secretCount: this.s.encryptedSecrets
-        ? Object.keys(this.s.encryptedSecrets).filter(
-            k => !CHANNEL_ENV_VARS.has(k) && !NON_SECRET_ENCRYPTED_ENV_VARS.has(k)
-          ).length
+        ? Object.keys(this.s.encryptedSecrets).filter(k => !CHANNEL_ENV_VARS.has(k)).length
         : 0,
       channelCount: this.s.channels ? Object.values(this.s.channels).filter(Boolean).length : 0,
       flyAppName: this.s.flyAppName,
@@ -2018,9 +2008,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       lastStoppedAt: this.s.lastStoppedAt,
       envVarCount: this.s.envVars ? Object.keys(this.s.envVars).length : 0,
       secretCount: this.s.encryptedSecrets
-        ? Object.keys(this.s.encryptedSecrets).filter(
-            k => !CHANNEL_ENV_VARS.has(k) && !NON_SECRET_ENCRYPTED_ENV_VARS.has(k)
-          ).length
+        ? Object.keys(this.s.encryptedSecrets).filter(k => !CHANNEL_ENV_VARS.has(k)).length
         : 0,
       channelCount: this.s.channels ? Object.values(this.s.channels).filter(Boolean).length : 0,
       flyAppName: this.s.flyAppName,

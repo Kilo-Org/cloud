@@ -209,8 +209,8 @@ const CancelKiloClawSubscriptionSchema = z.object({
 export const adminRouter = createTRPCRouter({
   ipClusters: createTRPCRouter({
     list: adminProcedure.input(IpClustersListSchema).query(async ({ input }) => {
-      const accountCount = sql<number>`count(distinct ${microdollar_usage.kilo_user_id})::int`;
-      const requestCount = sql<number>`count(*)::int`;
+      const accountCount = sql<number>`count(distinct ${microdollar_usage.kilo_user_id})::int`.as('account_count');
+      const requestCount = sql<number>`count(*)::int`.as('request_count');
       const clusterSubquery = db
         .select({
           httpIpId: microdollar_usage_metadata.http_ip_id,
@@ -241,7 +241,11 @@ export const adminRouter = createTRPCRouter({
         .orderBy(desc(clusterSubquery.accountCount), desc(clusterSubquery.requestCount));
 
       return {
-        clusters: rows,
+        clusters: rows.flatMap((r) =>
+          r.httpIpId != null
+            ? [{ httpIpId: r.httpIpId, ip: r.ip, accountCount: r.accountCount ?? 0, requestCount: r.requestCount ?? 0 }]
+            : [],
+        ),
         threshold: input.threshold,
         days: input.days,
       };

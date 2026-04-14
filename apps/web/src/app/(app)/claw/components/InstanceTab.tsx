@@ -74,6 +74,13 @@ function getVolumeUsagePercent(used: number | null, total: number | null): numbe
   return Math.max(0, Math.min(100, (used / total) * 100));
 }
 
+function getVolumeBarColor(percent: number | null): string {
+  if (percent === null) return 'bg-emerald-500';
+  if (percent >= 90) return 'bg-red-500';
+  if (percent > 75) return 'bg-amber-500';
+  return 'bg-emerald-500';
+}
+
 function useDiskUsage(enabled: boolean) {
   return useQuery<AnalyticsEngineResponse<ControllerTelemetryRow>>({
     queryKey: ['kiloclaw', 'disk-usage'],
@@ -151,7 +158,9 @@ export function InstanceTab({
             {stateStyle.label}
           </Badge>
         </div>
-        <p className="text-muted-foreground mt-5 text-xs font-medium uppercase tracking-wide">Uptime</p>
+        <p className="text-muted-foreground mt-5 text-xs font-medium uppercase tracking-wide">
+          Uptime
+        </p>
         <p className="text-foreground mt-2 text-lg font-semibold leading-none">
           {formatUptime(gatewayStatus.uptime)}
         </p>
@@ -167,7 +176,7 @@ export function InstanceTab({
         </p>
         <div className="bg-muted mt-3 h-2 overflow-hidden rounded-full">
           <div
-            className="h-full rounded-full bg-emerald-500 transition-all"
+            className={`h-full rounded-full ${getVolumeBarColor(diskUsagePercent)} transition-all`}
             style={{ width: `${diskUsagePercent ?? 0}%` }}
           />
         </div>

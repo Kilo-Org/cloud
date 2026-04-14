@@ -24,7 +24,7 @@ async function isLoggingEnabledForUser(
   return false;
 }
 
-export function handleRequestLogging(params: {
+export async function handleRequestLogging(params: {
   clonedResponse: Response;
   user: User | null;
   organization_id: string | null;
@@ -33,10 +33,10 @@ export function handleRequestLogging(params: {
   request: GatewayRequest;
 }) {
   const { clonedResponse, user, organization_id, provider, model, request } = params;
+  if (!(await isLoggingEnabledForUser(user, organization_id))) {
+    return;
+  }
   after(async () => {
-    if (!(await isLoggingEnabledForUser(user, organization_id))) {
-      return;
-    }
     try {
       const apiRequestLogId = await db
         .insert(api_request_log)

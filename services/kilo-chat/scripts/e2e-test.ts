@@ -162,7 +162,9 @@ async function main() {
   const start = Date.now();
   while (Date.now() - start < TIMEOUT_MS) {
     const botMessage = events.find(
-      e => e.event === 'message.created' && (e.data as { senderId?: string }).senderId?.startsWith('bot:')
+      e =>
+        e.event === 'message.created' &&
+        (e.data as { senderId?: string }).senderId?.startsWith('bot:')
     );
     if (botMessage) {
       console.log(`\n✓ Agent responded!`);
@@ -172,9 +174,17 @@ async function main() {
     await new Promise(r => setTimeout(r, 500));
   }
 
-  if (!events.find(e => e.event === 'message.created' && (e.data as { senderId?: string }).senderId?.startsWith('bot:'))) {
+  if (
+    !events.find(
+      e =>
+        e.event === 'message.created' &&
+        (e.data as { senderId?: string }).senderId?.startsWith('bot:')
+    )
+  ) {
     console.log('\n⏰ Timeout — no agent response received.');
-    console.log('This is expected if kiloclaw is not running or webhook delivery is not configured.');
+    console.log(
+      'This is expected if kiloclaw is not running or webhook delivery is not configured.'
+    );
     console.log(`\nReceived ${events.length} SSE events total:`);
     for (const e of events) {
       console.log(`  - ${e.event}`);
@@ -186,7 +196,9 @@ async function main() {
   const listRes = await fetch(`${BASE_URL}/v1/conversations/${conversationId}/messages?limit=10`, {
     headers: { authorization: `Bearer ${userToken}` },
   });
-  const { messages } = (await listRes.json()) as { messages: Array<{ id: string; senderId: string; content: string }> };
+  const { messages } = (await listRes.json()) as {
+    messages: Array<{ id: string; senderId: string; content: string }>;
+  };
   console.log(`${messages.length} message(s) in conversation:`);
   for (const m of messages) {
     const content = JSON.parse(m.content);

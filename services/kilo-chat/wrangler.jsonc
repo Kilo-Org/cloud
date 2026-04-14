@@ -10,6 +10,12 @@
   "placement": { "mode": "smart" },
   "dev": { "port": 8802 },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "routes": [
+    {
+      "pattern": "chat.kiloapps.io",
+      "custom_domain": true
+    }
+  ],
 
   "durable_objects": {
     "bindings": [

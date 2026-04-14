@@ -17,6 +17,7 @@
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "node-html-markdown": "^2.0.0",
     "postal-mime": "^2.7.4"
   }
 }

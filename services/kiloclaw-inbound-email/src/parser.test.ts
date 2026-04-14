@@ -69,6 +69,20 @@ describe('parseRawEmail', () => {
     expect(parsed.text).toBe('Hi there');
   });
 
+  it('converts html fallback bodies to markdown', async () => {
+    const parsed = await parseRawEmail(
+      [
+        'From: sender@example.com',
+        'Subject: HTML fallback',
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        '<p>Tom &amp; Jerry&nbsp;<a href="https://example.com">link</a> <img src="https://example.com/cat.png" alt="cat"></p>',
+      ].join('\r\n')
+    );
+
+    expect(parsed.text).toBe('Tom & Jerry [link](https://example.com) https://example.com/cat.png');
+  });
+
   it('extracts nested multipart text without attachment bodies', async () => {
     const parsed = await parseRawEmail(
       [

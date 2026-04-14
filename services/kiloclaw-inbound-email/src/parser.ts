@@ -1,3 +1,4 @@
+import { NodeHtmlMarkdown, type TranslatorConfigFactory } from 'node-html-markdown';
 import PostalMime, { type Address, type RawEmail } from 'postal-mime';
 
 export type ParsedInboundEmail = {
@@ -18,38 +19,43 @@ function firstAddress(address: Address | undefined): string | null {
   return null;
 }
 
-function decodeHtmlEntities(value: string): string {
-  return value
-    .replaceAll('&nbsp;', ' ')
-    .replaceAll('&amp;', '&')
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&#39;', "'")
-    .replace(/&#(\d+);/g, (_match, codePoint: string) =>
-      String.fromCodePoint(Number.parseInt(codePoint, 10))
-    )
-    .replace(/&#x([\da-f]+);/gi, (_match, codePoint: string) =>
-      String.fromCodePoint(Number.parseInt(codePoint, 16))
-    );
+function imageSrcFromNode(node: unknown): string | null {
+  if (!node || typeof node !== 'object' || !('getAttribute' in node)) return null;
+
+  const getAttribute = node.getAttribute;
+  if (typeof getAttribute !== 'function') return null;
+
+  const src: unknown = Reflect.apply(getAttribute, node, ['src']);
+  if (typeof src !== 'string') return null;
+
+  const trimmedSrc = src.trim();
+  return trimmedSrc.length > 0 ? trimmedSrc : null;
 }
 
-function htmlToText(html: string): string {
-  return decodeHtmlEntities(
-    html
-      .replace(/<\s*(br|\/p|\/div|\/li|\/h[1-6])\b[^>]*>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/[\t ]+\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
-  ).trim();
-}
+const imageSourceTranslator = (({ node }) => {
+  const src = imageSrcFromNode(node);
+  return src ? { content: src, recurse: false } : { ignore: true };
+}) satisfies TranslatorConfigFactory;
+
+const markdownConverter = new NodeHtmlMarkdown(
+  {
+    bulletMarker: '-',
+    codeBlockStyle: 'fenced',
+    emDelimiter: '*',
+    strongDelimiter: '**',
+  },
+  { img: imageSourceTranslator }
+);
+
+markdownConverter.aTagTranslators.set('img', imageSourceTranslator);
+markdownConverter.tableCellTranslators.set('img', imageSourceTranslator);
 
 function normalizeText(text: string | undefined, html: string | undefined): string {
   const trimmedText = text?.trim() ?? '';
   if (trimmedText.length > 0) return trimmedText;
 
-  const trimmedHtml = html ? htmlToText(html) : '';
-  return trimmedHtml.length > 0 ? trimmedHtml : '(No plain text body)';
+  const markdown = html ? markdownConverter.translate(html).replaceAll('\u00a0', ' ').trim() : '';
+  return markdown.length > 0 ? markdown : '(No plain text body)';
 }
 
 export async function parseRawEmail(raw: RawEmail): Promise<ParsedInboundEmail> {

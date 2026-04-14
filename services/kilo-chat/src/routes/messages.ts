@@ -20,9 +20,7 @@ const deleteMessageSchema = z.object({
   conversationId: z.string().min(1),
 });
 
-export function registerMessageRoutes(
-  app: Hono<{ Bindings: Env; Variables: AuthContext }>
-): void {
+export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
   // POST /v1/messages — create message
   app.post('/v1/messages', async c => {
     let rawBody: unknown;
@@ -41,9 +39,7 @@ export function registerMessageRoutes(
     const callerKind = c.get('callerKind');
     const { conversationId, content, inReplyToMessageId } = body.data;
 
-    const convStub = c.env.CONVERSATION_DO.get(
-      c.env.CONVERSATION_DO.idFromName(conversationId)
-    );
+    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
 
     if (!(await convStub.isMember(callerId))) {
       return c.json({ error: 'Forbidden' }, 403);
@@ -86,9 +82,7 @@ export function registerMessageRoutes(
     if (info) {
       await Promise.all(
         info.members.map(member => {
-          const stub = c.env.MEMBERSHIP_DO.get(
-            c.env.MEMBERSHIP_DO.idFromName(member.id)
-          );
+          const stub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(member.id));
           return stub.updateLastMessageId(conversationId, messageId);
         })
       );
@@ -102,9 +96,7 @@ export function registerMessageRoutes(
     const conversationId = c.req.param('id');
     const callerId = c.get('callerId');
 
-    const convStub = c.env.CONVERSATION_DO.get(
-      c.env.CONVERSATION_DO.idFromName(conversationId)
-    );
+    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
 
     if (!(await convStub.isMember(callerId))) {
       return c.json({ error: 'Forbidden' }, 403);
@@ -141,9 +133,7 @@ export function registerMessageRoutes(
 
     const { conversationId, content, version } = body.data;
 
-    const convStub = c.env.CONVERSATION_DO.get(
-      c.env.CONVERSATION_DO.idFromName(conversationId)
-    );
+    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
 
     if (!(await convStub.isMember(callerId))) {
       return c.json({ error: 'Forbidden' }, 403);
@@ -167,7 +157,10 @@ export function registerMessageRoutes(
     }
 
     if (result.conflict) {
-      return c.json({ error: 'Conflict', messageId: result.messageId, version: result.version }, 409);
+      return c.json(
+        { error: 'Conflict', messageId: result.messageId, version: result.version },
+        409
+      );
     }
 
     return c.json({ messageId: result.messageId, version: result.version });
@@ -192,9 +185,7 @@ export function registerMessageRoutes(
 
     const { conversationId } = body.data;
 
-    const convStub = c.env.CONVERSATION_DO.get(
-      c.env.CONVERSATION_DO.idFromName(conversationId)
-    );
+    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
 
     if (!(await convStub.isMember(callerId))) {
       return c.json({ error: 'Forbidden' }, 403);

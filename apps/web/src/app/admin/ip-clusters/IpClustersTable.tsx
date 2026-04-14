@@ -29,12 +29,66 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+type AccountLinksProps = {
+  httpIpId: number;
+  days: number;
+  accountCount: number;
+};
+
+function AccountLinks({ httpIpId, days, accountCount }: AccountLinksProps) {
+  const trpc = useTRPC();
+  const [open, setOpen] = useState(false);
+  const query = useQuery({
+    ...trpc.admin.ipClusters.accounts.queryOptions({
+      httpIpId,
+      days,
+      limit: 200,
+    }),
+    enabled: open,
+  });
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" size="sm" className="px-0">
+          {open ? 'Hide' : 'Show'} {accountCount.toLocaleString()} account
+          {accountCount === 1 ? '' : 's'}
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 flex max-w-4xl flex-wrap gap-2">
+          {query.isLoading ? (
+            <span className="text-muted-foreground text-sm">Loading accounts...</span>
+          ) : query.error ? (
+            <span className="text-destructive text-sm">Failed to load accounts</span>
+          ) : (
+            query.data?.accountIds.map(id => (
+              <Link
+                key={id}
+                href={`/admin/users/${encodeURIComponent(id)}`}
+                className="bg-muted hover:bg-muted/80 rounded px-2 py-1 font-mono text-xs underline-offset-2 hover:underline"
+              >
+                {id}
+              </Link>
+            ))
+          )}
+          {query.data && query.data.accountIds.length < accountCount ? (
+            <span className="text-muted-foreground text-sm">
+              Showing first {query.data.accountIds.length.toLocaleString()} accounts.
+            </span>
+          ) : null}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 export function IpClustersTable() {
   const trpc = useTRPC();
   const router = useRouter();
   const search = useSearchParams();
   const threshold = clamp(parse(search.get('threshold'), 3), 2, 100);
-  const days = clamp(parse(search.get('days'), 7), 1, 90);
+  const days = clamp(parse(search.get('days'), 7), 1, 14);
   const [form, setForm] = useState({
     threshold: String(threshold),
     days: String(days),
@@ -71,7 +125,7 @@ export function IpClustersTable() {
   const apply = useCallback(() => {
     push({
       threshold: clamp(parse(form.threshold, input.threshold), 2, 100),
-      days: clamp(parse(form.days, input.days), 1, 90),
+      days: clamp(parse(form.days, input.days), 1, 14),
     });
   }, [form.days, form.threshold, input.days, input.threshold, push]);
 
@@ -127,7 +181,7 @@ export function IpClustersTable() {
                 id="days"
                 type="number"
                 min={1}
-                max={90}
+                max={14}
                 value={form.days}
                 onChange={event => setForm(prev => ({ ...prev, days: event.target.value }))}
                 onBlur={apply}
@@ -172,27 +226,11 @@ export function IpClustersTable() {
                     {cluster.requestCount.toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    <Collapsible>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="px-0">
-                          Show {cluster.accountIds.length.toLocaleString()} account
-                          {cluster.accountIds.length === 1 ? '' : 's'}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="mt-2 flex max-w-4xl flex-wrap gap-2">
-                          {cluster.accountIds.map(id => (
-                            <Link
-                              key={id}
-                              href={`/admin/users/${encodeURIComponent(id)}`}
-                              className="bg-muted hover:bg-muted/80 rounded px-2 py-1 font-mono text-xs underline-offset-2 hover:underline"
-                            >
-                              {id}
-                            </Link>
-                          ))}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
+                    <AccountLinks
+                      httpIpId={cluster.httpIpId}
+                      days={input.days}
+                      accountCount={cluster.accountCount}
+                    />
                   </TableCell>
                 </TableRow>
               ))

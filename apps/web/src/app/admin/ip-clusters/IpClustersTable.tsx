@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,6 +80,21 @@ function AccountLinks({ httpIpId, days, accountCount }: AccountLinksProps) {
         </div>
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+function SeedTestDataButton({ onSeeded }: { onSeeded: () => void }) {
+  const trpc = useTRPC();
+  const seed = useMutation(
+    trpc.admin.ipClusters.seedTestData.mutationOptions({
+      onSuccess: onSeeded,
+    })
+  );
+
+  return (
+    <Button variant="outline" onClick={() => seed.mutate()} disabled={seed.isPending}>
+      {seed.isPending ? 'Seeding...' : 'Seed test data'}
+    </Button>
   );
 }
 
@@ -194,6 +209,9 @@ export function IpClustersTable() {
             <Button variant="outline" onClick={() => push({ threshold: 3, days: 7 })}>
               Reset
             </Button>
+            {process.env.NODE_ENV === 'development' && (
+              <SeedTestDataButton onSeeded={() => query.refetch()} />
+            )}
           </div>
         </CardContent>
       </Card>

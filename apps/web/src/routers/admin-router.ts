@@ -282,6 +282,59 @@ export const adminRouter = createTRPCRouter({
         accountIds: rows.map(row => row.accountId),
       };
     }),
+    seedTestData: adminProcedure.mutation(async () => {
+      if (process.env.NODE_ENV !== 'development') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'This endpoint is only available in development mode',
+        });
+      }
+
+      // Create two test IPs
+      const [ip1] = await db
+        .insert(http_ip)
+        .values({ http_ip: `10.99.1.${Date.now() % 256}` })
+        .returning({ id: http_ip.http_ip_id });
+      const [ip2] = await db
+        .insert(http_ip)
+        .values({ http_ip: `10.99.2.${Date.now() % 256}` })
+        .returning({ id: http_ip.http_ip_id });
+
+      if (!ip1 || !ip2)
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to create test IPs',
+        });
+
+      // Cluster 1: 3 distinct accounts sharing IP1
+      // Cluster 2: 7 distinct accounts sharing IP2
+      const clusterConfigs = [
+        { ipId: ip1.id, accountCount: 3 },
+        { ipId: ip2.id, accountCount: 7 },
+      ];
+
+      for (const { ipId, accountCount } of clusterConfigs) {
+        for (let i = 0; i < accountCount; i++) {
+          const usageId = crypto.randomUUID();
+          await db.insert(microdollar_usage).values({
+            id: usageId,
+            kilo_user_id: `test-ip-cluster-user-${ipId}-${i}`,
+            cost: 1000,
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_write_tokens: 0,
+            cache_hit_tokens: 0,
+          });
+          await db.insert(microdollar_usage_metadata).values({
+            id: usageId,
+            message_id: `test-msg-${usageId}`,
+            http_ip_id: ipId,
+          });
+        }
+      }
+
+      return { success: true, message: 'Seeded 2 IP clusters (3 accounts + 7 accounts)' };
+    }),
   }),
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({

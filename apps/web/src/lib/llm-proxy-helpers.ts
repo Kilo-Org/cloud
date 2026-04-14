@@ -263,8 +263,10 @@ export function modelDoesNotExistResponse() {
   );
 }
 
-export function featureExclusiveModelResponse(exclusiveTo: ReadonlyArray<FeatureValue>) {
-  const error = `This model is only available for ${exclusiveTo.join(', ')}. Use ${KILO_AUTO_FREE_MODEL.id} as a free alternative.`;
+export function featureExclusiveModelResponse(modelId: string) {
+  const exclusiveTo =
+    kiloExclusiveModels.find(m => m.public_id === modelId)?.exclusive_to ?? [];
+  const error = `${modelId} is only available for ${exclusiveTo.join(', ')}. Use ${KILO_AUTO_FREE_MODEL.id} as a free alternative.`;
   return NextResponse.json({ error, message: error }, { status: 403 });
 }
 

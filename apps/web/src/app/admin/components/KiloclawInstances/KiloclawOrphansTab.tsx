@@ -146,7 +146,7 @@ export function KiloclawOrphansTab() {
   const queryClient = useQueryClient();
 
   const [createdAfterInput, setCreatedAfterInput] = useState(
-    toDatetimeLocalInput(subDays(new Date(), 7))
+    toDatetimeLocalInput(subDays(new Date(), 1))
   );
   const [createdBeforeInput, setCreatedBeforeInput] = useState(toDatetimeLocalInput(new Date()));
   const [scanResult, setScanResult] = useState<{

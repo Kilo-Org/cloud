@@ -55,6 +55,7 @@ export const CustomSecretMetaSchema = z.object({
 
 export type CustomSecretMeta = z.infer<typeof CustomSecretMetaSchema>;
 
+// Keep in sync with apps/web/src/lib/kiloclaw/types.ts KiloClawProviderId.
 export const ProviderIdSchema = z.enum(['fly', 'docker-local', 'northflank', 'aws', 'k8s']);
 export type ProviderId = z.infer<typeof ProviderIdSchema>;
 

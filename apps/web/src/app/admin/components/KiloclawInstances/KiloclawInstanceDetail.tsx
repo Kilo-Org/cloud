@@ -1292,6 +1292,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const runtimeId = data?.workerStatus?.runtimeId ?? null;
   const storageId = data?.workerStatus?.storageId ?? null;
   const flyMachineId = data?.workerStatus?.flyMachineId ?? null;
+  const canShowFlySshCommand =
+    isFlyProvider && !!data?.workerStatus?.runtimeId && !!data.workerStatus.flyAppName;
   const volumeId = isFlyProvider ? storageId : null;
   const snapshotsEnabled = data !== undefined && data.destroyed_at === null && !!volumeId;
 
@@ -2019,7 +2021,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <div className="flex items-center gap-2">
                   <Server className="text-muted-foreground h-4 w-4 shrink-0" />
                   <DetailField label="Runtime ID">
-                    {isFlyProvider &&
+                    {canShowFlySshCommand &&
                     data.workerStatus.runtimeId &&
                     data.workerStatus.flyAppName ? (
                       <div className="flex flex-wrap items-center gap-2">

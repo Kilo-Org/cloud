@@ -130,6 +130,7 @@ export type MachineSize = {
   cpu_kind?: 'shared' | 'performance';
 };
 
+// Keep in sync with services/kiloclaw/src/schemas/instance-config.ts ProviderIdSchema.
 export type KiloClawProviderId = 'fly' | 'docker-local' | 'northflank' | 'aws' | 'k8s';
 
 /** Response from POST /api/platform/restore-volume-snapshot */

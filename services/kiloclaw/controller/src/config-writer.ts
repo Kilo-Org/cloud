@@ -63,7 +63,7 @@ type EnvLike = Record<string, string | undefined>;
 const INBOUND_EMAIL_HOOK_MAPPING = {
   id: 'cloudflare-email-inbound',
   match: { path: 'email' },
-  action: 'agent',
+  action: 'wake',
   wakeMode: 'now',
   name: 'Inbound Email',
   sessionKey: '{{payload.sessionKey}}',

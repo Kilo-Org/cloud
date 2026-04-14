@@ -187,7 +187,9 @@ describe('buildDeliverWiring', () => {
       expect(creates).toHaveLength(1);
       expect(edits).toHaveLength(1);
       // The PATCH carries the final text.
-      expect((edits[0]!.args as { text: string }).text).toBe('Hello!');
+      const editContent = (edits[0]!.args as { content: Array<{ type: string; text: string }> })
+        .content;
+      expect(editContent).toEqual([{ type: 'text', text: 'Hello!' }]);
     } finally {
       vi.useRealTimers();
     }
@@ -225,8 +227,10 @@ describe('buildDeliverWiring', () => {
     await wiring.finalize();
     const createCalls = calls.filter(c => c.type === 'create');
     expect(createCalls.length).toBeGreaterThanOrEqual(2);
-    const texts = createCalls.map(c => (c.args as { text: string }).text);
-    expect(texts).toContain('second block');
+    const allContent = createCalls.map(
+      c => (c.args as { content: Array<{ type: string; text: string }> }).content
+    );
+    expect(allContent.some(blocks => blocks.some(b => b.text === 'second block'))).toBe(true);
   });
 });
 

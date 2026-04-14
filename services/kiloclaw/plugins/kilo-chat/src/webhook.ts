@@ -123,7 +123,7 @@ export function buildDeliverWiring(params: {
       // Subsequent blocks: plain create.
       await params.client.createMessage({
         conversationId: params.conversationId,
-        text: payload.text,
+        content: [{ type: 'text', text: payload.text }],
       });
     },
     finalize: async err => {

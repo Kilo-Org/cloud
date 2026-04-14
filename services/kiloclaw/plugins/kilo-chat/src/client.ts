@@ -4,14 +4,19 @@ export type KiloChatClientOptions = {
   fetchImpl?: typeof fetch;
 };
 
-export type CreateMessageParams = { conversationId: string; text: string };
+export type ContentBlock = { type: string; [key: string]: unknown };
+
+export type CreateMessageParams = {
+  conversationId: string;
+  content: ContentBlock[];
+};
 export type CreateMessageResult = { messageId: string; version: number };
 export type EditMessageResult = CreateMessageResult & { dropped?: boolean };
 
 export type EditMessageParams = {
   conversationId: string;
   messageId: string;
-  text: string;
+  content: ContentBlock[];
   version: number;
 };
 
@@ -52,7 +57,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     const response = await fetchImpl(`${base}/_kilo/kilo-chat/send`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ conversationId: params.conversationId, text: params.text }),
+      body: JSON.stringify({ conversationId: params.conversationId, content: params.content }),
     });
     if (!response.ok) {
       throw new Error(
@@ -70,7 +75,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         headers,
         body: JSON.stringify({
           conversationId: params.conversationId,
-          text: params.text,
+          content: params.content,
           version: params.version,
         }),
       }

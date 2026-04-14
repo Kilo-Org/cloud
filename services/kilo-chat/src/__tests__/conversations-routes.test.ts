@@ -1,0 +1,241 @@
+import { env } from 'cloudflare:test';
+import { describe, it, expect } from 'vitest';
+import { Hono } from 'hono';
+import { createMiddleware } from 'hono/factory';
+import type { AuthContext } from '../auth';
+import { registerConversationRoutes } from '../routes/conversations';
+import type { ConversationDO } from '../do/conversation-do';
+import type { MembershipDO } from '../do/membership-do';
+
+/**
+ * Build a test app that bypasses real JWT/API-key auth and injects
+ * callerId / callerKind directly so we can unit-test route logic.
+ */
+function makeApp(callerId: string, callerKind: 'user' | 'bot') {
+  const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(async (c, next) => {
+    c.set('callerId', callerId);
+    c.set('callerKind', callerKind);
+    await next();
+  });
+
+  const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+  app.use('/v1/*', mockAuth);
+  registerConversationRoutes(app);
+  return app;
+}
+
+function getConvStub(convId: string): DurableObjectStub<ConversationDO> {
+  return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(convId));
+}
+
+function getMemberStub(memberId: string): DurableObjectStub<MembershipDO> {
+  return env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(memberId));
+}
+
+describe('POST /v1/conversations', () => {
+  it('creates a conversation and returns conversationId', async () => {
+    const app = makeApp('user-alice', 'user');
+    const res = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sandbox-123', title: 'My Chat' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(201);
+    const body = await res.json<{ conversationId: string }>();
+    expect(body.conversationId).toBeTruthy();
+    expect(typeof body.conversationId).toBe('string');
+    expect(body.conversationId).toHaveLength(26);
+  });
+
+  it('initializes ConversationDO and MembershipDOs on creation', async () => {
+    const app = makeApp('user-bob', 'user');
+    const res = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sandbox-456', title: 'Bob Chat' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(201);
+    const { conversationId } = await res.json<{ conversationId: string }>();
+
+    // Verify ConversationDO has been initialized
+    const convStub = getConvStub(conversationId);
+    const info = await convStub.getInfo();
+    expect(info).not.toBeNull();
+    expect(info!.title).toBe('Bob Chat');
+    expect(info!.createdBy).toBe('user-bob');
+    expect(info!.members).toContainEqual({ id: 'user-bob', kind: 'user' });
+    expect(info!.members).toContainEqual({ id: 'bot:kiloclaw:sandbox-456', kind: 'bot' });
+
+    // Verify user MembershipDO has the conversation
+    const userMembership = getMemberStub('user-bob');
+    const list = await userMembership.listConversations();
+    const found = list.find(c => c.conversationId === conversationId);
+    expect(found).toBeDefined();
+    expect(found!.conversationTitle).toBe('Bob Chat');
+
+    // Verify bot MembershipDO has the conversation
+    const botMembership = getMemberStub('bot:kiloclaw:sandbox-456');
+    const botList = await botMembership.listConversations();
+    const botFound = botList.find(c => c.conversationId === conversationId);
+    expect(botFound).toBeDefined();
+  });
+
+  it('rejects bot callers with 403', async () => {
+    const app = makeApp('bot:kiloclaw:sandbox-789', 'bot');
+    const res = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sandbox-789' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(403);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toContain('Only users');
+  });
+
+  it('returns 400 for missing sandboxId', async () => {
+    const app = makeApp('user-carol', 'user');
+    const res = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'No sandbox' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toBe('Invalid request');
+  });
+
+  it('returns 400 for invalid JSON', async () => {
+    const app = makeApp('user-dave', 'user');
+    const res = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: 'not-json',
+      },
+      env
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toBe('Invalid JSON');
+  });
+});
+
+describe('GET /v1/conversations', () => {
+  it('lists conversations for the caller', async () => {
+    // First create a couple of conversations via a user app
+    const app = makeApp('user-eve', 'user');
+
+    await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sandbox-eve-1', title: 'First' }),
+      },
+      env
+    );
+    await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sandbox-eve-2', title: 'Second' }),
+      },
+      env
+    );
+
+    const res = await app.request('/v1/conversations', {}, env);
+    expect(res.status).toBe(200);
+    const body = await res.json<{
+      conversations: Array<{ conversationId: string; conversationTitle: string | null }>;
+    }>();
+    expect(Array.isArray(body.conversations)).toBe(true);
+    expect(body.conversations.length).toBeGreaterThanOrEqual(2);
+    const titles = body.conversations.map(c => c.conversationTitle);
+    expect(titles).toContain('First');
+    expect(titles).toContain('Second');
+  });
+
+  it('returns empty list for a new user with no conversations', async () => {
+    const app = makeApp('user-new-nobody', 'user');
+    const res = await app.request('/v1/conversations', {}, env);
+    expect(res.status).toBe(200);
+    const body = await res.json<{ conversations: unknown[] }>();
+    expect(body.conversations).toEqual([]);
+  });
+});
+
+describe('GET /v1/conversations/:id', () => {
+  it('returns conversation info for a member', async () => {
+    // Create a conversation first
+    const app = makeApp('user-frank', 'user');
+    const createRes = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sandbox-frank', title: 'Frank Chat' }),
+      },
+      env
+    );
+    const { conversationId } = await createRes.json<{ conversationId: string }>();
+
+    const res = await app.request(`/v1/conversations/${conversationId}`, {}, env);
+    expect(res.status).toBe(200);
+    const body = await res.json<{ id: string; title: string | null; members: unknown[] }>();
+    expect(body.id).toBe(conversationId);
+    expect(body.title).toBe('Frank Chat');
+    expect(Array.isArray(body.members)).toBe(true);
+  });
+
+  it('returns 403 for non-member', async () => {
+    // Create conversation as user-grace
+    const gracesApp = makeApp('user-grace', 'user');
+    const createRes = await gracesApp.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sandbox-grace', title: 'Grace Chat' }),
+      },
+      env
+    );
+    const { conversationId } = await createRes.json<{ conversationId: string }>();
+
+    // Try to access as a different user who is not a member
+    const strangerApp = makeApp('user-stranger-xyz', 'user');
+    const res = await strangerApp.request(`/v1/conversations/${conversationId}`, {}, env);
+    expect(res.status).toBe(403);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toBe('Forbidden');
+  });
+
+  it('returns 403 for unknown conversation id (no member row)', async () => {
+    const app = makeApp('user-nobody', 'user');
+    // Use a valid 26-char ULID-like ID that was never initialized
+    const res = await app.request('/v1/conversations/01ARZ3NDEKTSV4RRFFQ69G5FAV', {}, env);
+    expect(res.status).toBe(403);
+  });
+});

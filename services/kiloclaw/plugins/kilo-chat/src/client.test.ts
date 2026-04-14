@@ -16,7 +16,10 @@ describe('createKiloChatClient', () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
-    const result = await client.createMessage({ conversationId: 'c1', text: 'hello' });
+    const result = await client.createMessage({
+      conversationId: 'c1',
+      content: [{ type: 'text', text: 'hello' }],
+    });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, init] = fetchImpl.mock.calls[0]!;
@@ -27,7 +30,7 @@ describe('createKiloChatClient', () => {
     expect(headers.get('authorization')).toBe('Bearer gwt');
     expect(headers.get('content-type')).toBe('application/json');
     const body = JSON.parse(init2.body as string);
-    expect(body).toEqual({ conversationId: 'c1', text: 'hello' });
+    expect(body).toEqual({ conversationId: 'c1', content: [{ type: 'text', text: 'hello' }] });
     expect(result.messageId).toBe('m1');
   });
 
@@ -42,9 +45,9 @@ describe('createKiloChatClient', () => {
       gatewayToken: 'gwt',
       fetchImpl,
     });
-    await expect(client.createMessage({ conversationId: 'c1', text: 'hi' })).rejects.toThrow(
-      /missing messageId/
-    );
+    await expect(
+      client.createMessage({ conversationId: 'c1', content: [{ type: 'text', text: 'hi' }] })
+    ).rejects.toThrow(/missing messageId/);
   });
 
   it('throws when the controller returns non-2xx', async () => {
@@ -54,7 +57,9 @@ describe('createKiloChatClient', () => {
       gatewayToken: 'gwt',
       fetchImpl,
     });
-    await expect(client.createMessage({ conversationId: 'c1', text: 'hi' })).rejects.toThrow(/500/);
+    await expect(
+      client.createMessage({ conversationId: 'c1', content: [{ type: 'text', text: 'hi' }] })
+    ).rejects.toThrow(/500/);
   });
 
   it('createMessage posts to /_kilo/kilo-chat/send and returns messageId + version', async () => {
@@ -71,7 +76,10 @@ describe('createKiloChatClient', () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
-    const result = await client.createMessage({ conversationId: 'c1', text: 'hello' });
+    const result = await client.createMessage({
+      conversationId: 'c1',
+      content: [{ type: 'text', text: 'hello' }],
+    });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, init] = fetchImpl.mock.calls[0]!;
@@ -79,7 +87,7 @@ describe('createKiloChatClient', () => {
     const init2 = init as RequestInit;
     expect(init2.method).toBe('POST');
     const body = JSON.parse(init2.body as string);
-    expect(body).toEqual({ conversationId: 'c1', text: 'hello' });
+    expect(body).toEqual({ conversationId: 'c1', content: [{ type: 'text', text: 'hello' }] });
     expect(result).toEqual({ messageId: 'm1', version: 1 });
   });
 
@@ -94,7 +102,10 @@ describe('createKiloChatClient', () => {
       gatewayToken: 'gwt',
       fetchImpl,
     });
-    const result = await client.createMessage({ conversationId: 'c1', text: 'hi' });
+    const result = await client.createMessage({
+      conversationId: 'c1',
+      content: [{ type: 'text', text: 'hi' }],
+    });
     expect(result).toEqual({ messageId: 'm1', version: 1 });
   });
 });
@@ -116,7 +127,7 @@ describe('editMessage', () => {
     const result = await client.editMessage({
       conversationId: 'c1',
       messageId: 'm1',
-      text: 'Hel',
+      content: [{ type: 'text', text: 'Hel' }],
       version: 3,
     });
     const [url, init] = fetchImpl.mock.calls[0]!;
@@ -127,7 +138,7 @@ describe('editMessage', () => {
     expect(headers.get('authorization')).toBe('Bearer gwt');
     expect(JSON.parse(init2.body as string)).toEqual({
       conversationId: 'c1',
-      text: 'Hel',
+      content: [{ type: 'text', text: 'Hel' }],
       version: 3,
     });
     expect(result).toEqual({ messageId: 'm1', version: 3 });
@@ -147,7 +158,7 @@ describe('editMessage', () => {
     const result = await client.editMessage({
       conversationId: 'c1',
       messageId: 'm1',
-      text: 'x',
+      content: [{ type: 'text', text: 'x' }],
       version: 1,
     });
     // version echoed back equals the requested version; caller treats as drop.
@@ -162,7 +173,12 @@ describe('editMessage', () => {
       fetchImpl,
     });
     await expect(
-      client.editMessage({ conversationId: 'c1', messageId: 'm1', text: 'x', version: 1 })
+      client.editMessage({
+        conversationId: 'c1',
+        messageId: 'm1',
+        content: [{ type: 'text', text: 'x' }],
+        version: 1,
+      })
     ).rejects.toThrow(/500/);
   });
 });

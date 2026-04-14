@@ -3,12 +3,22 @@ import { createPreviewStream } from './preview-stream';
 import type { KiloChatClient } from './client';
 
 function makeClientSpies() {
-  const createMessage = vi.fn(async (p: { conversationId: string; text: string }) => ({
-    messageId: 'm1',
-    version: 1,
-  }));
+  const createMessage = vi.fn(
+    async (p: {
+      conversationId: string;
+      content: Array<{ type: string; [key: string]: unknown }>;
+    }) => ({
+      messageId: 'm1',
+      version: 1,
+    })
+  );
   const editMessage = vi.fn(
-    async (p: { conversationId: string; messageId: string; text: string; version: number }) => ({
+    async (p: {
+      conversationId: string;
+      messageId: string;
+      content: Array<{ type: string; [key: string]: unknown }>;
+      version: number;
+    }) => ({
       messageId: p.messageId,
       version: p.version,
     })
@@ -29,7 +39,10 @@ describe('createPreviewStream', () => {
     const result = await stream.finalize('Hello');
     expect(result).toEqual({ messageId: 'm1' });
     expect(createMessage).toHaveBeenCalledTimes(1);
-    expect(createMessage).toHaveBeenCalledWith({ conversationId: 'c1', text: 'Hello' });
+    expect(createMessage).toHaveBeenCalledWith({
+      conversationId: 'c1',
+      content: [{ type: 'text', text: 'Hello' }],
+    });
     expect(editMessage).not.toHaveBeenCalled();
   });
 
@@ -48,7 +61,7 @@ describe('createPreviewStream', () => {
       expect(editMessage).toHaveBeenCalledWith({
         conversationId: 'c1',
         messageId: 'm1',
-        text: 'Hel',
+        content: [{ type: 'text', text: 'Hel' }],
         version: 2,
       });
     } finally {
@@ -71,7 +84,7 @@ describe('createPreviewStream', () => {
       await vi.advanceTimersByTimeAsync(100);
       expect(editMessage).toHaveBeenCalledTimes(1);
       expect(editMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ text: 'Hell', version: 2 })
+        expect.objectContaining({ content: [{ type: 'text', text: 'Hell' }], version: 2 })
       );
     } finally {
       vi.useRealTimers();
@@ -112,7 +125,7 @@ describe('createPreviewStream', () => {
       expect(editMessage).toHaveBeenCalledWith({
         conversationId: 'c1',
         messageId: 'm1',
-        text: 'Hello!',
+        content: [{ type: 'text', text: 'Hello!' }],
         version: 2,
       });
     } finally {
@@ -231,7 +244,7 @@ describe('createPreviewStream', () => {
       await stream.finalize('Hello');
       expect(editMessage).toHaveBeenCalledTimes(2);
       expect(editMessage.mock.calls[1]![0]).toEqual(
-        expect.objectContaining({ text: 'Hello', version: 3 })
+        expect.objectContaining({ content: [{ type: 'text', text: 'Hello' }], version: 3 })
       );
     } finally {
       vi.useRealTimers();
@@ -257,10 +270,10 @@ describe('createPreviewStream', () => {
     await stream.finalize('Final');
     expect(editMessage).toHaveBeenCalledTimes(2);
     expect(editMessage.mock.calls[0]![0]).toEqual(
-      expect.objectContaining({ text: 'Final', version: 2 })
+      expect.objectContaining({ content: [{ type: 'text', text: 'Final' }], version: 2 })
     );
     expect(editMessage.mock.calls[1]![0]).toEqual(
-      expect.objectContaining({ text: 'Final', version: 3 })
+      expect.objectContaining({ content: [{ type: 'text', text: 'Final' }], version: 3 })
     );
   });
 });

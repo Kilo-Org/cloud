@@ -1,0 +1,64 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kilo-chat",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-02-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "logpush": true,
+  "placement": { "mode": "smart" },
+  "dev": { "port": 8802 },
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "routes": [
+    {
+      "pattern": "chat.kiloapps.io",
+      "custom_domain": true
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "CONVERSATION_DO", "class_name": "ConversationDO" },
+      { "name": "MEMBERSHIP_DO", "class_name": "MembershipDO" }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ConversationDO", "MembershipDO"]
+    }
+  ],
+
+  "queues": {
+    "producers": [
+      { "binding": "WEBHOOK_QUEUE", "queue": "kilo-chat-webhooks" }
+    ],
+    "consumers": [
+      { "queue": "kilo-chat-webhooks", "max_retries": 3 }
+    ]
+  },
+
+  "secrets_store_secrets": [
+    {
+      "binding": "KILOCHAT_WEBHOOK_URL",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "KILOCHAT_WEBHOOK_URL"
+    },
+    {
+      "binding": "KILOCHAT_WEBHOOK_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "KILOCHAT_WEBHOOK_SECRET"
+    },
+    {
+      "binding": "KILOCHAT_API_TOKEN",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "KILOCHAT_API_TOKEN"
+    },
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "NEXTAUTH_SECRET_PROD"
+    }
+  ]
+}

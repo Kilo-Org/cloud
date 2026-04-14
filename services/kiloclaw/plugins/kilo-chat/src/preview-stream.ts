@@ -68,7 +68,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
     if (messageId === undefined) {
       // First send: POST.
       const p = opts.client
-        .createMessage({ conversationId: opts.conversationId, text })
+        .createMessage({ conversationId: opts.conversationId, content: [{ type: 'text', text }] })
         .then(res => {
           messageId = res.messageId;
           version = 1;
@@ -92,7 +92,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       .editMessage({
         conversationId: opts.conversationId,
         messageId,
-        text,
+        content: [{ type: 'text', text }],
         version: nextVersion,
       })
       .then(res => {
@@ -160,7 +160,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       if (messageId === undefined) {
         const res = await opts.client.createMessage({
           conversationId: opts.conversationId,
-          text: finalText,
+          content: [{ type: 'text', text: finalText }],
         });
         messageId = res.messageId;
         version = res.version;
@@ -174,7 +174,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
           let res = await opts.client.editMessage({
             conversationId: opts.conversationId,
             messageId,
-            text: finalText,
+            content: [{ type: 'text', text: finalText }],
             version: nextVersion,
           });
           // On final edit, a 409 drop would leave the user-visible message
@@ -186,7 +186,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
             res = await opts.client.editMessage({
               conversationId: opts.conversationId,
               messageId,
-              text: finalText,
+              content: [{ type: 'text', text: finalText }],
               version: nextVersion,
             });
           }

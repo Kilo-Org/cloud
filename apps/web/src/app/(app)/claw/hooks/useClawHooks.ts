@@ -14,7 +14,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useClawContext } from '../components/ClawContext';
 
-// ── Config ──────────────────────────────────────────────────────
+// Config
 
 export function useClawConfig() {
   const trpc = useTRPC();
@@ -33,7 +33,7 @@ export function useClawConfig() {
   return organizationId ? org : personal;
 }
 
-// ── Disk usage ──────────────────────────────────────────────────
+// Disk usage
 
 type DiskUsageQueryOptions<TData = unknown> = {
   queryKey: readonly unknown[];
@@ -99,7 +99,7 @@ export function useClawDiskUsage(enabled: boolean) {
   return organizationId ? orgQuery : personalQuery;
 }
 
-// ── Controller version ──────────────────────────────────────────
+// Controller version
 
 export function useClawControllerVersion(enabled: boolean) {
   const trpc = useTRPC();
@@ -123,7 +123,7 @@ export function useClawControllerVersion(enabled: boolean) {
   return organizationId ? org : personal;
 }
 
-// ── Pairing ─────────────────────────────────────────────────────
+// Pairing
 
 export function useClawPairing(enabled = true) {
   const trpc = useTRPC();
@@ -221,7 +221,7 @@ export function useClawRefreshDevicePairing() {
   };
 }
 
-// ── Version pinning ─────────────────────────────────────────────
+// Version pinning
 
 export function useClawMyPin() {
   const trpc = useTRPC();
@@ -286,7 +286,7 @@ export function useClawAvailableVersions(offset = 0, limit = 25) {
   return organizationId ? org : personal;
 }
 
-// ── Gateway ─────────────────────────────────────────────────────
+// Gateway
 
 export function useClawGatewayReady(enabled: boolean) {
   const trpc = useTRPC();
@@ -311,7 +311,7 @@ export function useClawGatewayReady(enabled: boolean) {
   return organizationId ? org : personal;
 }
 
-// ── File operations ─────────────────────────────────────────────
+// File operations
 
 export function useClawFileTree(enabled: boolean) {
   const trpc = useTRPC();
@@ -358,7 +358,7 @@ export function useClawReadFile(path: string | null, enabled: boolean) {
   return organizationId ? org : personal;
 }
 
-// ── Google integration ──────────────────────────────────────────
+// Google integration
 
 export function useClawGoogleSetupCommand(enabled: boolean) {
   const trpc = useTRPC();
@@ -383,7 +383,7 @@ export function useClawGoogleSetupCommand(enabled: boolean) {
   return organizationId ? org : personal;
 }
 
-// ── Stream Chat ─────────────────────────────────────────────────
+// Stream Chat
 
 export function useClawStreamChatCredentials(enabled: boolean) {
   const trpc = useTRPC();
@@ -407,7 +407,7 @@ export function useClawStreamChatCredentials(enabled: boolean) {
   return organizationId ? org : personal;
 }
 
-// ── Kilo CLI Run ────────────────────────────────────────────────
+// Kilo CLI Run
 
 export function useClawKiloCliRunStatus(runId: string | null) {
   const trpc = useTRPC();
@@ -456,7 +456,7 @@ export function useClawKiloCliRunHistory(enabled: boolean) {
   return organizationId ? org : personal;
 }
 
-// ── Service status ──────────────────────────────────────────────
+// Service status
 
 export function useClawServiceDegraded() {
   const trpc = useTRPC();

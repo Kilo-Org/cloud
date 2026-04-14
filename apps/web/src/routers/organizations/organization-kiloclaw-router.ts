@@ -26,6 +26,7 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
+import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
 import {
   ensureActiveInstance,
   getActiveOrgInstance,
@@ -300,6 +301,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
       workerUrl,
       instanceId: instance.id,
     } satisfies KiloClawDashboardStatus;
+  }),
+
+  getDiskUsage: organizationMemberProcedure.query(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+    return queryDiskUsage(instance.sandboxId);
   }),
 
   renameInstance: organizationMemberMutationProcedure

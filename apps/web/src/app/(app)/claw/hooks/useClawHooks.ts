@@ -32,6 +32,30 @@ export function useClawConfig() {
   return organizationId ? org : personal;
 }
 
+// ── Disk usage ──────────────────────────────────────────────────
+
+export function useClawDiskUsage(enabled: boolean) {
+  const trpc = useTRPC();
+  const { organizationId } = useClawContext();
+
+  const personal = useQuery({
+    ...trpc.kiloclaw.getDiskUsage.queryOptions(undefined, {
+      refetchInterval: 60_000,
+    }),
+    enabled: enabled && !organizationId,
+  });
+
+  const org = useQuery({
+    ...trpc.organizations.kiloclaw.getDiskUsage.queryOptions(
+      { organizationId: organizationId ?? '' },
+      { refetchInterval: 60_000 }
+    ),
+    enabled: enabled && !!organizationId,
+  });
+
+  return organizationId ? org : personal;
+}
+
 // ── Controller version ──────────────────────────────────────────
 
 export function useClawControllerVersion(enabled: boolean) {

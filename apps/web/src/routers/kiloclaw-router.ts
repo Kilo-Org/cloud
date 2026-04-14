@@ -38,6 +38,7 @@ import { and, eq, ne, desc, isNotNull, isNull, inArray, sql, like, or } from 'dr
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
+import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
 import {
   ensureActiveInstance,
   getActiveInstance,
@@ -1526,6 +1527,14 @@ export const kiloclawRouter = createTRPCRouter({
       // cause the frontend/gateway to resolve the wrong DO.
       instanceId: workerInstanceId(instance) ? instance.id : null,
     } satisfies KiloClawDashboardStatus;
+  }),
+
+  getDiskUsage: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    if (!instance) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'No active instance' });
+    }
+    return queryDiskUsage(instance.sandboxId);
   }),
 
   renameInstance: baseProcedure

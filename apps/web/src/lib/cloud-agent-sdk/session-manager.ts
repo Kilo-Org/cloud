@@ -1,3 +1,4 @@
+import type { Images } from '@/lib/images-schema';
 import { errorShapeSchema } from './schemas';
 import { atom } from 'jotai';
 import type { Atom, WritableAtom } from 'jotai';
@@ -140,7 +141,13 @@ type SessionManagerAtoms = {
 
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
-  send(payload: { prompt: string; mode: string; model: string; variant?: string }): Promise<void>;
+  send(payload: {
+    prompt: string;
+    mode: string;
+    model: string;
+    variant?: string;
+    images?: Images;
+  }): Promise<boolean>;
   interrupt(): Promise<void>;
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
@@ -584,7 +591,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     mode: string;
     model: string;
     variant?: string;
-  }): Promise<void> {
+    images?: Images;
+  }): Promise<boolean> {
     store.set(errorAtom, null);
     setIndicator(null);
 
@@ -622,10 +630,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         model: payload.model,
         variant: payload.variant,
         messageId,
+        images: payload.images,
       });
       if (sessionType === 'remote' && kiloSessionId) {
         config.onRemoteSessionMessageSent?.({ kiloSessionId });
       }
+      return true;
     } catch (err) {
       if (storage && shouldStoreOptimisticMessage) {
         storage.deleteMessage(messageId);
@@ -633,6 +643,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(failedPromptAtom, payload.prompt);
       config.onSendFailed?.(payload.prompt);
       setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
+      return false;
     }
   }
 

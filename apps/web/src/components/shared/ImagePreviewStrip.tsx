@@ -44,7 +44,8 @@ export function ImagePreviewStrip({ images, onRemove, size = 'default' }: ImageP
             image.status === 'error' && 'border-red-500',
             image.status === 'complete' && 'border-zinc-700',
             image.status === 'uploading' && 'border-blue-500',
-            image.status === 'pending' && 'border-zinc-700'
+            image.status === 'pending' && 'border-zinc-700',
+            image.status === 'processing' && 'border-zinc-700'
           )}
           style={{ position: 'relative' }}
         >
@@ -54,13 +55,16 @@ export function ImagePreviewStrip({ images, onRemove, size = 'default' }: ImageP
             alt="Upload preview"
             className={cn(
               'h-full w-full object-cover',
-              (image.status === 'uploading' || image.status === 'pending') && 'opacity-50'
+              (image.status === 'uploading' ||
+                image.status === 'pending' ||
+                image.status === 'processing') &&
+                'opacity-50'
             )}
           />
 
           {/* Status overlay */}
           <div className="absolute inset-0 flex items-center justify-center">
-            {image.status === 'pending' && (
+            {(image.status === 'pending' || image.status === 'processing') && (
               <Loader2 className={cn('animate-spin text-zinc-300', config.icon)} />
             )}
             {image.status === 'uploading' && (

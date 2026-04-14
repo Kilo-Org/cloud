@@ -2101,6 +2101,7 @@ export class CloudAgentSession extends DurableObject {
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
     messageId?: string;
+    images?: Images;
     initContext?: InitializeContext;
     resumeContext?: TokenResumeContext;
     existingMetadata?: CloudAgentSessionState;
@@ -2122,6 +2123,7 @@ export class CloudAgentSession extends DurableObject {
                 appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
                 githubRepo: params.existingMetadata.githubRepo,
                 gitUrl: params.existingMetadata.gitUrl,
+                createdOnPlatform: params.existingMetadata.createdOnPlatform,
               }
             : undefined,
         }
@@ -2136,6 +2138,7 @@ export class CloudAgentSession extends DurableObject {
             branchName: params.existingMetadata?.branchName ?? '',
             githubToken: params.resumeContext?.githubToken,
             gitToken: params.resumeContext?.gitToken,
+            createdOnPlatform: params.existingMetadata?.createdOnPlatform,
           },
           existingMetadata: params.existingMetadata
             ? {
@@ -2148,6 +2151,7 @@ export class CloudAgentSession extends DurableObject {
                 appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
                 githubRepo: params.existingMetadata.githubRepo,
                 gitUrl: params.existingMetadata.gitUrl,
+                createdOnPlatform: params.existingMetadata.createdOnPlatform,
               }
             : undefined,
         };
@@ -2167,6 +2171,7 @@ export class CloudAgentSession extends DurableObject {
         autoCommit: params.autoCommit,
         condenseOnComplete: params.condenseOnComplete,
       },
+      images: params.images,
       messageId: params.messageId,
     };
   }
@@ -2456,6 +2461,7 @@ export class CloudAgentSession extends DurableObject {
           autoCommit: metadata.autoCommit,
           condenseOnComplete: metadata.condenseOnComplete,
           messageId: metadata.initialMessageId,
+          images: metadata.images,
           initContext,
           existingMetadata: metadata,
           kiloSessionId: metadata.kiloSessionId,
@@ -2536,6 +2542,7 @@ export class CloudAgentSession extends DurableObject {
         autoCommit: request.autoCommit ?? metadata.autoCommit,
         condenseOnComplete: request.condenseOnComplete ?? metadata.condenseOnComplete,
         messageId: request.messageId,
+        images: request.images,
         resumeContext,
         existingMetadata: metadata,
         kiloSessionId: metadata.kiloSessionId,

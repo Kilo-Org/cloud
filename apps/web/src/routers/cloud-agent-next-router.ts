@@ -32,7 +32,9 @@ import {
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
   baseAnswerPermissionNextSchema,
+  cloudAgentGetImageUploadUrlSchema,
 } from './cloud-agent-next-schemas';
+import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
@@ -188,6 +190,22 @@ export const cloudAgentNextRouter = createTRPCRouter({
         rethrowAsPaymentRequired(error);
         throw error;
       }
+    }),
+
+  /**
+   * Generate a presigned URL for uploading an image attachment.
+   */
+  getImageUploadUrl: baseProcedure
+    .input(cloudAgentGetImageUploadUrlSchema)
+    .mutation(async ({ ctx, input }) => {
+      return generateImageUploadUrl({
+        service: 'cloud-agent',
+        userId: ctx.user.id,
+        messageUuid: input.messageUuid,
+        imageId: input.imageId,
+        contentType: input.contentType,
+        contentLength: input.contentLength,
+      });
     }),
 
   /**

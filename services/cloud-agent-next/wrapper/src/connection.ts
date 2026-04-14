@@ -19,6 +19,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+export function trimIngestEvent(event: IngestEvent): IngestEvent {
+  return {
+    ...event,
+    data: trimPayload(event.streamEventType, event.data),
+  };
+}
+
 /**
  * Type guard for session.idle events.
  * Kilo server sends: {type: "session.idle", properties: {sessionID: "..."}}
@@ -461,17 +468,14 @@ export function createConnectionManager(
           }
 
           // Build and forward ingest event
-          const ingestEvent: IngestEvent = {
+          const untrimmedIngestEvent: IngestEvent = {
             streamEventType: 'kilocode',
             data: { ...properties, event: eventType, type: eventType, properties },
             timestamp: new Date().toISOString(),
           };
 
-          const trimmed: IngestEvent = {
-            ...ingestEvent,
-            data: trimPayload(ingestEvent.streamEventType, ingestEvent.data),
-          };
-          sendToIngest(trimmed);
+          const ingestEvent = trimIngestEvent(untrimmedIngestEvent);
+          sendToIngest(ingestEvent);
           callbacks.onSseEvent?.();
 
           // Track the last root-session assistant message ID for autocommit association

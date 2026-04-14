@@ -153,6 +153,7 @@ type FollowupExecutionRequest = BaseExecutionRequest & {
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   messageId?: string;
+  images?: Images;
   tokenOverrides?: {
     githubToken?: string;
     gitToken?: string;
@@ -224,6 +225,7 @@ export type ResumeContext = {
   githubToken?: string;
   /** Git token for non-GitHub repos (optional) */
   gitToken?: string;
+  createdOnPlatform?: string;
 };
 
 /**
@@ -271,6 +273,7 @@ export type ExistingSessionMetadata = {
   githubRepo?: string;
   /** Git URL (for token updates) */
   gitUrl?: string;
+  createdOnPlatform?: string;
 };
 
 /**

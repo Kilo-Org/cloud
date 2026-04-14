@@ -287,6 +287,36 @@ describe('WrapperClient', () => {
       expect(execCall).toContain('"variant":"high"');
     });
 
+    it('preserves file parts in request body', async () => {
+      const session = createMockSession(
+        createSuccessResponse({ status: 'sent', messageId: 'msg_files' })
+      );
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.prompt({
+        parts: [
+          { type: 'text', text: 'Describe these images' },
+          {
+            type: 'file',
+            mime: 'image/png',
+            url: 'file:///tmp/first.png',
+            filename: 'first.png',
+          },
+          {
+            type: 'file',
+            mime: 'image/jpeg',
+            url: 'file:///tmp/second.jpg',
+            filename: 'second.jpg',
+          },
+        ],
+      });
+
+      const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(execCall).toContain(
+        '"parts":[{"type":"text","text":"Describe these images"},{"type":"file","mime":"image/png","url":"file:///tmp/first.png","filename":"first.png"},{"type":"file","mime":"image/jpeg","url":"file:///tmp/second.jpg","filename":"second.jpg"}]'
+      );
+    });
+
     it('throws WrapperNoJobError when no job started', async () => {
       const session = createMockSession(createErrorResponse('NO_JOB', 'Call /job/start first'));
       const client = new WrapperClient({ session, port: defaultPort });

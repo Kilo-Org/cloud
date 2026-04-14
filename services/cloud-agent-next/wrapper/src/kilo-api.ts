@@ -36,7 +36,10 @@ export type WrapperKiloClient = {
   sendPromptAsync: (opts: {
     sessionId: string;
     messageId?: string;
-    parts?: Array<{ type: string; text: string }>;
+    parts?: Array<
+      | { type: 'text'; text: string }
+      | { type: 'file'; mime: string; url: string; filename?: string }
+    >;
     prompt?: string;
     variant?: string;
     agent?: string;
@@ -114,14 +117,23 @@ export function createWrapperKiloClient(
     },
 
     sendPromptAsync: async opts => {
-      const textParts: Array<{ type: 'text'; text: string }> = (
-        opts.parts ?? (opts.prompt ? [{ type: 'text', text: opts.prompt }] : [])
-      ).map(p => ({ type: 'text' as const, text: p.text }));
+      const rawParts =
+        opts.parts ?? (opts.prompt ? [{ type: 'text' as const, text: opts.prompt }] : []);
+      const parts = rawParts.map(p =>
+        p.type === 'file'
+          ? {
+              type: 'file' as const,
+              mime: p.mime,
+              url: p.url,
+              ...(p.filename ? { filename: p.filename } : {}),
+            }
+          : { type: 'text' as const, text: p.text }
+      );
       // Use v2 client — it supports `variant` (thinking effort); v1 SDK omits it.
       await v2Client.session.promptAsync({
         sessionID: opts.sessionId,
         ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
-        parts: textParts,
+        parts,
         ...(opts.variant ? { variant: opts.variant } : {}),
         ...(opts.model
           ? {

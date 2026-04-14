@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
@@ -15,6 +15,8 @@ import {
   Settings,
   Unlock,
   Check,
+  Paperclip,
+  Upload,
 } from 'lucide-react';
 import { startOfDay, subDays } from 'date-fns';
 import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
@@ -75,6 +77,15 @@ import {
 } from '@/components/cloud-agent-next/utils/git-utils';
 import type { AgentMode } from './types';
 import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
+import { useImageUpload } from '@/hooks/useImageUpload';
+import { ImagePreviewStrip } from '@/components/shared/ImagePreviewStrip';
+import {
+  CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
+  CLOUD_AGENT_IMAGE_MAX_COUNT,
+  CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX,
+  CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
+  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
+} from '@/lib/cloud-agent/constants';
 
 type Repository = {
   id: number;
@@ -93,6 +104,13 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { mutateAsync: personalUploadUrl } = useMutation(
+    trpc.cloudAgentNext.getImageUploadUrl.mutationOptions()
+  );
+  const { mutateAsync: orgUploadUrl } = useMutation(
+    trpc.organizations.cloudAgentNext.getImageUploadUrl.mutationOptions()
+  );
 
   // ---------------------------------------------------------------------------
   // Eligibility
@@ -144,6 +162,22 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [imageMessageUuid, setImageMessageUuid] = useState(() => crypto.randomUUID());
+
+  const imageUpload = useImageUpload({
+    messageUuid: imageMessageUuid,
+    organizationId,
+    maxImages: CLOUD_AGENT_IMAGE_MAX_COUNT,
+    maxOriginalFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
+    maxFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
+    allowedTypes: CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
+    resizeImages: { maxDimensionPx: CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX },
+    getUploadUrl: {
+      personal: personalUploadUrl,
+      organization: orgUploadUrl,
+    },
+  });
+  const isImageLimitReached = imageUpload.images.length >= CLOUD_AGENT_IMAGE_MAX_COUNT;
 
   // ---------------------------------------------------------------------------
   // Session form atoms (profile / env / commands)
@@ -555,10 +589,14 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   // Submit
   // ---------------------------------------------------------------------------
   const isFormValid =
-    prompt.trim().length > 0 && model.length > 0 && !isPreparing && !hasInsufficientBalance;
+    prompt.trim().length > 0 &&
+    model.length > 0 &&
+    !isPreparing &&
+    !hasInsufficientBalance &&
+    !imageUpload.hasUploadingImages;
 
   const handleStartSession = useCallback(async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || imageUpload.hasUploadingImages) return;
     if (!selectedRepo) {
       toast.error('Please select a repository');
       return;
@@ -579,6 +617,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         autoCommit: true,
         autoInitiate: true,
         initialMessageId,
+        images: imageUpload.getImagesData(),
       };
       let result: { kiloSessionId: string; cloudAgentSessionId: string };
 
@@ -619,6 +658,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         }),
       });
 
+      imageUpload.clearImages();
+      setImageMessageUuid(crypto.randomUUID());
+
       const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
     } catch (error) {
@@ -628,6 +670,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       setIsPreparing(false);
     }
   }, [
+    imageUpload,
     manualEnvVars,
     manualSetupCommands,
     model,
@@ -663,6 +706,19 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       resizeTextarea();
     },
     [resizeTextarea]
+  );
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const files = Array.from(e.clipboardData.items)
+        .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+        .map(item => item.getAsFile())
+        .filter((file): file is File => file !== null);
+      if (files.length > 0) {
+        imageUpload.addFiles(files);
+      }
+    },
+    [imageUpload]
   );
 
   const handleKeyDown = useCallback(
@@ -736,10 +792,47 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         {/* Textarea + model toolbar container */}
         <div
           className={cn(
-            'overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
-            isPreparing && 'pointer-events-none opacity-60'
+            'relative overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
+            isPreparing && 'pointer-events-none opacity-60',
+            imageUpload.isDragging && 'border-transparent focus-within:ring-0'
           )}
+          {...imageUpload.dragHandlers}
         >
+          {imageUpload.isDragging && (
+            <div
+              className={cn(
+                'absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed backdrop-blur-[2px]',
+                isImageLimitReached
+                  ? 'border-amber-500/60 bg-amber-500/10'
+                  : 'border-primary/60 bg-primary/5'
+              )}
+            >
+              <div
+                className={cn(
+                  'flex items-center gap-2 text-sm font-medium',
+                  isImageLimitReached ? 'text-amber-400' : 'text-primary'
+                )}
+              >
+                <Upload className="h-4 w-4" />
+                {isImageLimitReached
+                  ? `Maximum ${CLOUD_AGENT_IMAGE_MAX_COUNT} images attached`
+                  : 'Drop images here'}
+              </div>
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            className="hidden"
+            onChange={e => {
+              if (e.target.files) {
+                imageUpload.addFiles(e.target.files);
+                e.target.value = '';
+              }
+            }}
+          />
           <textarea
             ref={textareaRef}
             className="max-h-[50dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-base focus:ring-0 focus:outline-none md:text-sm"
@@ -748,8 +841,18 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             value={prompt}
             onChange={handlePromptChange}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             disabled={isPreparing}
           />
+          {imageUpload.images.length > 0 && (
+            <div className="px-4 pb-1">
+              <ImagePreviewStrip
+                images={imageUpload.images}
+                onRemove={imageUpload.removeImage}
+                size="compact"
+              />
+            </div>
+          )}
           <div className="flex min-w-0 items-center gap-2 px-3 py-1.5">
             {/* Mobile: single trigger that opens Mode + Model + Variant */}
             <MobileToolbarPopover
@@ -814,10 +917,21 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             {isPreparing && <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />}
             <UIButton
               type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isPreparing}
+              className="h-8 w-8 rounded-lg"
+              title="Attach images"
+            >
+              <Paperclip className="h-4 w-4" />
+            </UIButton>
+            <UIButton
+              type="button"
               variant="primary"
               size="icon"
               onClick={() => void handleStartSession()}
-              disabled={!isFormValid || isPreparing}
+              disabled={!isFormValid || isPreparing || imageUpload.hasUploadingImages}
               className="h-8 w-8 rounded-lg"
             >
               <Send className="h-4 w-4" />

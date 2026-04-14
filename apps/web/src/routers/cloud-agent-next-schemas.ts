@@ -1,10 +1,35 @@
 import * as z from 'zod';
+import {
+  CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
+  CLOUD_AGENT_IMAGE_MAX_COUNT,
+  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
+} from '@/lib/cloud-agent/constants';
 
 /**
  * Shared schemas for cloud-agent-next routers
  *
  * Uses V2 WebSocket-based API only.
  */
+
+const cloudAgentImageFilenameSchema = z
+  .string()
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(?:png|jpg|webp|gif)$/
+  );
+
+export const cloudAgentImagesSchema = z
+  .object({
+    path: z.uuid(),
+    files: z.array(cloudAgentImageFilenameSchema).min(1).max(CLOUD_AGENT_IMAGE_MAX_COUNT),
+  })
+  .optional();
+
+export const cloudAgentGetImageUploadUrlSchema = z.object({
+  messageUuid: z.uuid(),
+  imageId: z.uuid(),
+  contentType: z.enum(CLOUD_AGENT_IMAGE_ALLOWED_TYPES),
+  contentLength: z.number().int().positive().max(CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES),
+});
 
 /**
  * Agent mode enum - all supported modes.
@@ -89,6 +114,7 @@ export const basePrepareSessionNextSchema = z
     autoCommit: z.boolean().optional(),
     autoInitiate: z.boolean().optional(),
     initialMessageId: z.string().startsWith('msg_').length(30).optional(),
+    images: cloudAgentImagesSchema,
   })
   .refine(
     data => (data.githubRepo || data.gitlabProject) && !(data.githubRepo && data.gitlabProject),
@@ -126,6 +152,7 @@ export const baseSendMessageNextSchema = z.object({
     .optional(),
   autoCommit: z.boolean().optional(),
   messageId: z.string().startsWith('msg_').length(30).optional(),
+  images: cloudAgentImagesSchema,
 });
 
 // Schema for interrupting a session

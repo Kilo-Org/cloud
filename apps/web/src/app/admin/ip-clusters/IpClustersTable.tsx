@@ -92,8 +92,13 @@ function SeedTestDataButton({ onSeeded }: { onSeeded: () => void }) {
   );
 
   return (
-    <Button variant="outline" onClick={() => seed.mutate()} disabled={seed.isPending}>
-      {seed.isPending ? 'Seeding...' : 'Seed test data'}
+    <Button
+      variant="outline"
+      onClick={() => seed.mutate()}
+      disabled={seed.isPending}
+      className="border-dashed border-yellow-500 text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-950"
+    >
+      {seed.isPending ? 'Seeding...' : 'DEV: Seed test data'}
     </Button>
   );
 }

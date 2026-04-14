@@ -12,12 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type ModelHealthMetrics = {
   healthy: boolean;
@@ -211,10 +206,7 @@ export function ModelStatusContent() {
                   </TableCell>
                   {queriesReversed.map((q, i) => (
                     <TableCell key={snapshotsReversed[i]} className="px-1">
-                      <StatusDot
-                        metrics={q.data?.models[model]}
-                        timestamp={snapshotsReversed[i]}
-                      />
+                      <StatusDot metrics={q.data?.models[model]} timestamp={snapshotsReversed[i]} />
                     </TableCell>
                   ))}
                 </TableRow>

@@ -131,11 +131,12 @@ describe('ConversationDO', () => {
     expect(created.ok).toBe(true);
     if (!created.ok) return;
 
+    // Send current version (1) — server auto-increments to 2
     const result = await stub.editMessage({
       messageId: created.messageId,
       senderId: 'user-alice',
       content: [{ type: 'text', text: 'Edited' }],
-      version: 2,
+      version: 1,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -159,12 +160,12 @@ describe('ConversationDO', () => {
     expect(created.ok).toBe(true);
     if (!created.ok) return;
 
-    // Current version is 1, sending version 1 should conflict
+    // Current version is 1, sending stale version 0 should conflict
     const result = await stub.editMessage({
       messageId: created.messageId,
       senderId: 'user-alice',
       content: [{ type: 'text', text: 'Stale edit' }],
-      version: 1,
+      version: 0,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;

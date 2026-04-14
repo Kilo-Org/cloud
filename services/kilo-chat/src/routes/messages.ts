@@ -13,7 +13,7 @@ const createMessageSchema = z.object({
 const editMessageSchema = z.object({
   conversationId: z.string().min(1),
   content: z.array(contentBlockSchema).min(1),
-  version: z.number().int().positive(),
+  version: z.number().int().nonnegative(),
 });
 
 const deleteMessageSchema = z.object({
@@ -56,9 +56,9 @@ export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: Auth
 
     const { messageId, version } = result;
 
-    // Enqueue webhook for each bot member that isn't the sender
+    // Enqueue webhook if there are bot members that aren't the sender
     const botMembers = await convStub.getBotMembersExcluding(callerId);
-    for (const _bot of botMembers) {
+    if (botMembers.length > 0) {
       const sendPromise = c.env.WEBHOOK_QUEUE.send({
         conversationId,
         messageId,

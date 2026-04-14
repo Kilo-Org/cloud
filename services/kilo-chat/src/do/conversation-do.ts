@@ -218,15 +218,18 @@ export class ConversationDO extends DurableObject<Env> {
       };
     }
 
-    if (params.version <= row.version) {
+    // Optimistic concurrency: client sends the version it believes is current.
+    // If it doesn't match, the edit is stale (conflict).
+    if (params.version !== row.version) {
       return { ok: true, conflict: true, messageId: params.messageId, version: row.version };
     }
 
+    const newVersion = row.version + 1;
     this.db
       .update(messages)
       .set({
         content: JSON.stringify(params.content),
-        version: params.version,
+        version: newVersion,
         updated_at: Date.now(),
       })
       .where(eq(messages.id, params.messageId))
@@ -234,11 +237,11 @@ export class ConversationDO extends DurableObject<Env> {
 
     this.broadcast(
       'message.updated',
-      { messageId: params.messageId, content: params.content, version: params.version },
+      { messageId: params.messageId, content: params.content, version: newVersion },
       params.messageId
     );
 
-    return { ok: true, messageId: params.messageId, version: params.version };
+    return { ok: true, messageId: params.messageId, version: newVersion };
   }
 
   setTyping(memberId: string): { ok: true } | { ok: false; error: string } {

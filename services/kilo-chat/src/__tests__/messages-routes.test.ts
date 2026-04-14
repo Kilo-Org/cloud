@@ -246,7 +246,7 @@ describe('PATCH /v1/messages/:id', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
-    // Edit the message
+    // Edit the message — send current version (1), server increments to 2
     const editRes = await userApp.request(
       `/v1/messages/${messageId}`,
       {
@@ -255,7 +255,7 @@ describe('PATCH /v1/messages/:id', () => {
         body: JSON.stringify({
           conversationId,
           content: [{ type: 'text', text: 'Edited content' }],
-          version: 2,
+          version: 1,
         }),
       },
       env
@@ -281,7 +281,7 @@ describe('PATCH /v1/messages/:id', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
-    // Try to edit with same version (version=1 is not greater than current=1)
+    // Try to edit with stale version (version=0 doesn't match current=1)
     const editRes = await userApp.request(
       `/v1/messages/${messageId}`,
       {
@@ -290,7 +290,7 @@ describe('PATCH /v1/messages/:id', () => {
         body: JSON.stringify({
           conversationId,
           content: [{ type: 'text', text: 'Stale edit' }],
-          version: 1,
+          version: 0,
         }),
       },
       env
@@ -329,7 +329,7 @@ describe('PATCH /v1/messages/:id', () => {
         body: JSON.stringify({
           conversationId,
           content: [{ type: 'text', text: 'Bot edit attempt' }],
-          version: 2,
+          version: 1,
         }),
       },
       env

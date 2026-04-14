@@ -163,6 +163,24 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
   });
 
+  it('auto-assigns kilo-exa even when web search was explicitly disabled but provider is missing', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            enabled: false,
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
   it('preserves explicit kilo-exa provider when mode is unset', () => {
     const existing = JSON.stringify({
       tools: {

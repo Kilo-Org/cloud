@@ -1,16 +1,5 @@
-import AdminPage from '@/app/admin/components/AdminPage';
-import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
+import { redirect } from 'next/navigation';
 
 export default function ModelStatusPage() {
-  return (
-    <AdminPage
-      breadcrumbs={
-        <BreadcrumbItem>
-          <BreadcrumbPage>Model Status</BreadcrumbPage>
-        </BreadcrumbItem>
-      }
-    >
-      <p>Under construction</p>
-    </AdminPage>
-  );
+  redirect('/admin/alerting?tab=model-status');
 }

@@ -202,7 +202,21 @@ export function updateAgentStatus(sql: SqlStorage, agentId: string, status: stri
 }
 
 export function deleteAgent(sql: SqlStorage, agentId: string): void {
-  // Unassign beads that reference this agent
+  // Clear assignee on terminal beads (closed/failed) without reopening them.
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${beads}
+      SET ${beads.columns.assignee_agent_bead_id} = NULL,
+          ${beads.columns.updated_at} = ?
+      WHERE ${beads.assignee_agent_bead_id} = ?
+        AND ${beads.columns.status} IN ('closed', 'failed')
+    `,
+    [now(), agentId]
+  );
+
+  // Reopen non-terminal beads assigned to this agent so the reconciler
+  // can re-dispatch them.
   query(
     sql,
     /* sql */ `
@@ -211,6 +225,7 @@ export function deleteAgent(sql: SqlStorage, agentId: string): void {
           ${beads.columns.status} = 'open',
           ${beads.columns.updated_at} = ?
       WHERE ${beads.assignee_agent_bead_id} = ?
+        AND ${beads.columns.status} NOT IN ('closed', 'failed')
     `,
     [now(), agentId]
   );

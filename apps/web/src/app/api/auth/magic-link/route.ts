@@ -4,7 +4,7 @@ import { createMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { sendMagicLinkEmail } from '@/lib/email';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import * as z from 'zod';
-import { findUserByEmail } from '@/lib/user';
+import { findUserByEmail, findUserByNormalizedGmailEmail } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { isEmailBlacklistedByDomain, isBlockedTLD } from '@/lib/user.server';
 
@@ -41,8 +41,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'BLOCKED' }, { status: 403 });
   }
 
-  // Check if this is an existing user (sign-in) or new user (signup)
-  const existingUser = await findUserByEmail(email);
+  // Check if this is an existing user (sign-in) or new user (signup).
+  // Also check Gmail dot-variants: henk.janssen@gmail.com and henkjanssen@gmail.com
+  // are the same inbox, so treat dot-variants of existing accounts as sign-ins.
+  const existingUser = (await findUserByEmail(email)) ?? (await findUserByNormalizedGmailEmail(email));
 
   // For new users, enforce stricter email validation and TLD blocking
   if (!existingUser) {

@@ -59,3 +59,43 @@ export const magicLinkSignupEmailSchema = z
   .refine(email => !email.includes('+') || isKilocodeDomain(email), {
     message: 'Email address cannot contain a + character',
   });
+
+/**
+ * Gmail (and Googlemail) domains where dots in the local part are ignored.
+ * e.g. henk.janssen@gmail.com and henkjanssen@gmail.com deliver to the same inbox.
+ */
+const GMAIL_DOMAINS = ['gmail.com', 'googlemail.com'];
+
+/**
+ * Returns true if the email belongs to a Gmail/Googlemail domain.
+ */
+export function isGmailAddress(email: string): boolean {
+  const atIndex = email.lastIndexOf('@');
+  if (atIndex === -1) return false;
+  const domain = email.slice(atIndex + 1).toLowerCase();
+  return GMAIL_DOMAINS.includes(domain);
+}
+
+/**
+ * Normalizes a Gmail address by stripping dots from the local part
+ * and lowercasing the domain. For non-Gmail addresses, returns the
+ * email unchanged (lowercased).
+ *
+ * Examples:
+ *   henk.janssen@gmail.com  → henkjanssen@gmail.com
+ *   h.e.n.k@googlemail.com  → henk@googlemail.com
+ *   user.name@example.com   → user.name@example.com  (unchanged, not Gmail)
+ */
+export function normalizeGmailAddress(email: string): string {
+  const atIndex = email.lastIndexOf('@');
+  if (atIndex === -1) return email.toLowerCase();
+
+  const localPart = email.slice(0, atIndex);
+  const domain = email.slice(atIndex + 1).toLowerCase();
+
+  if (!GMAIL_DOMAINS.includes(domain)) {
+    return email.toLowerCase();
+  }
+
+  return localPart.replaceAll('.', '') + '@' + domain;
+}

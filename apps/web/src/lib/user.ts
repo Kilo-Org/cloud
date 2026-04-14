@@ -67,6 +67,7 @@ import { eq, and, inArray, isNotNull, sql, or } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
+import { isGmailAddress, normalizeGmailAddress } from '@/lib/schemas/email';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@/lib/maybe-result';
@@ -191,6 +192,32 @@ export async function findUserByEmail(email: string): Promise<User | undefined> 
   });
 }
 
+/**
+ * Finds a user whose Gmail address is equivalent after dot-normalization.
+ * Gmail ignores dots in the local part, so henk.janssen@gmail.com and
+ * henkjanssen@gmail.com are the same inbox. This catches duplicate accounts
+ * that differ only by dot placement.
+ *
+ * Only searches Gmail/Googlemail addresses. Returns undefined for non-Gmail emails.
+ */
+export async function findUserByNormalizedGmailEmail(
+  email: string
+): Promise<User | undefined> {
+  if (!isGmailAddress(email)) return undefined;
+
+  const normalized = normalizeGmailAddress(email);
+  const [localPart, domain] = normalized.split('@');
+  if (!localPart || !domain) return undefined;
+
+  // Match any stored Gmail address whose local part, with dots stripped, equals the normalized local part
+  return await db.query.kilocode_users.findFirst({
+    where: and(
+      sql`lower(split_part(${kilocode_users.google_user_email}, '@', 2)) IN ('gmail.com', 'googlemail.com')`,
+      sql`replace(split_part(${kilocode_users.google_user_email}, '@', 1), '.', '') = ${localPart}`
+    ),
+  });
+}
+
 function fireAuthEvent(
   user: Pick<User, 'id' | 'google_user_email' | 'created_at'>,
   eventType: 'signup' | 'signin',
@@ -305,6 +332,13 @@ export async function createOrUpdateUser(
       });
       return failureResult('DIFFERENT-OAUTH');
     }
+  }
+
+  // Gmail ignores dots in the local part, so check for existing accounts
+  // that are equivalent after dot-normalization (e.g. henk.janssen@ vs henkjanssen@gmail.com)
+  const gmailDotVariantUser = await findUserByNormalizedGmailEmail(args.google_user_email);
+  if (gmailDotVariantUser) {
+    return failureResult('DIFFERENT-OAUTH');
   }
 
   if (turnstile_guid && (await findUserById(turnstile_guid)))

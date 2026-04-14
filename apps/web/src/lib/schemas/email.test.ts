@@ -3,6 +3,8 @@ import {
   validateMagicLinkSignupEmail,
   magicLinkSignupEmailSchema,
   MAGIC_LINK_EMAIL_ERRORS,
+  isGmailAddress,
+  normalizeGmailAddress,
 } from './email';
 
 describe('validateMagicLinkSignupEmail', () => {
@@ -84,5 +86,73 @@ describe('magicLinkSignupEmailSchema', () => {
     if (!result.success) {
       expect(result.error.issues[0].message).toBe('Email address cannot contain a + character');
     }
+  });
+});
+
+describe('isGmailAddress', () => {
+  it('should return true for gmail.com', () => {
+    expect(isGmailAddress('henk.janssen@gmail.com')).toBe(true);
+  });
+
+  it('should return true for googlemail.com', () => {
+    expect(isGmailAddress('henk.janssen@googlemail.com')).toBe(true);
+  });
+
+  it('should be case-insensitive for the domain', () => {
+    expect(isGmailAddress('henk.janssen@Gmail.com')).toBe(true);
+    expect(isGmailAddress('henk.janssen@GMAIL.COM')).toBe(true);
+  });
+
+  it('should return false for non-Gmail domains', () => {
+    expect(isGmailAddress('henk.janssen@example.com')).toBe(false);
+    expect(isGmailAddress('henk.janssen@outlook.com')).toBe(false);
+    expect(isGmailAddress('henk.janssen@kilocode.ai')).toBe(false);
+  });
+
+  it('should return false for domains containing gmail but not being gmail', () => {
+    expect(isGmailAddress('henk@notgmail.com')).toBe(false);
+    expect(isGmailAddress('henk@gmail.com.evil.com')).toBe(false);
+  });
+
+  it('should return false for emails without @', () => {
+    expect(isGmailAddress('henkjanssen')).toBe(false);
+  });
+});
+
+describe('normalizeGmailAddress', () => {
+  it('should strip dots from the local part of gmail.com addresses', () => {
+    expect(normalizeGmailAddress('henk.janssen@gmail.com')).toBe('henkjanssen@gmail.com');
+  });
+
+  it('should strip multiple dots', () => {
+    expect(normalizeGmailAddress('h.e.n.k.j.a.n.s.s.e.n@gmail.com')).toBe(
+      'henkjanssen@gmail.com'
+    );
+  });
+
+  it('should handle addresses without dots', () => {
+    expect(normalizeGmailAddress('henkjanssen@gmail.com')).toBe('henkjanssen@gmail.com');
+  });
+
+  it('should work with googlemail.com', () => {
+    expect(normalizeGmailAddress('henk.janssen@googlemail.com')).toBe(
+      'henkjanssen@googlemail.com'
+    );
+  });
+
+  it('should lowercase the domain', () => {
+    expect(normalizeGmailAddress('henk.janssen@Gmail.COM')).toBe('henkjanssen@gmail.com');
+  });
+
+  it('should not strip dots for non-Gmail addresses', () => {
+    expect(normalizeGmailAddress('henk.janssen@example.com')).toBe('henk.janssen@example.com');
+  });
+
+  it('should lowercase non-Gmail addresses without stripping dots', () => {
+    expect(normalizeGmailAddress('Henk.Janssen@Example.COM')).toBe('henk.janssen@example.com');
+  });
+
+  it('should handle edge case of email without @', () => {
+    expect(normalizeGmailAddress('nodomain')).toBe('nodomain');
   });
 });

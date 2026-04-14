@@ -41,7 +41,13 @@ import {
   security_advisor_scans,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
-import { softDeleteUser, SoftDeletePreconditionError, findUserById, findUsersByIds } from './user';
+import {
+  softDeleteUser,
+  SoftDeletePreconditionError,
+  findUserById,
+  findUsersByIds,
+  findUserByNormalizedGmailEmail,
+} from './user';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
@@ -1347,6 +1353,77 @@ describe('User', () => {
 
       expect(result.size).toBe(0);
       expect(result).toEqual(new Map());
+    });
+  });
+
+  describe('findUserByNormalizedGmailEmail', () => {
+    it('should find a user when the Gmail address differs only by dots', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'henkjanssen@gmail.com',
+      });
+
+      const found = await findUserByNormalizedGmailEmail('henk.janssen@gmail.com');
+      expect(found?.id).toBe(user.id);
+    });
+
+    it('should find a user when the stored email has dots and the query does not', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'henk.janssen@gmail.com',
+      });
+
+      const found = await findUserByNormalizedGmailEmail('henkjanssen@gmail.com');
+      expect(found?.id).toBe(user.id);
+    });
+
+    it('should find a user with multiple dots in the stored address', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'h.e.n.k.janssen@gmail.com',
+      });
+
+      const found = await findUserByNormalizedGmailEmail('henk.janssen@gmail.com');
+      expect(found?.id).toBe(user.id);
+    });
+
+    it('should find a user on googlemail.com', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'henkjanssen@googlemail.com',
+      });
+
+      const found = await findUserByNormalizedGmailEmail('henk.janssen@googlemail.com');
+      expect(found?.id).toBe(user.id);
+    });
+
+    it('should match across gmail.com and googlemail.com (same inbox)', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'henkjanssen@gmail.com',
+      });
+
+      // gmail.com and googlemail.com deliver to the same inbox
+      const found = await findUserByNormalizedGmailEmail('henkjanssen@googlemail.com');
+      expect(found?.id).toBe(user.id);
+    });
+
+    it('should return undefined for non-Gmail addresses', async () => {
+      await insertTestUser({
+        google_user_email: 'henk.janssen@example.com',
+      });
+
+      const found = await findUserByNormalizedGmailEmail('henkjanssen@example.com');
+      expect(found).toBeUndefined();
+    });
+
+    it('should return undefined when no matching user exists', async () => {
+      const found = await findUserByNormalizedGmailEmail('nobody@gmail.com');
+      expect(found).toBeUndefined();
+    });
+
+    it('should find exact match (same email with same dots)', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'henk.janssen@gmail.com',
+      });
+
+      const found = await findUserByNormalizedGmailEmail('henk.janssen@gmail.com');
+      expect(found?.id).toBe(user.id);
     });
   });
 });

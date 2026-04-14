@@ -33,6 +33,10 @@ type HealthResponseError = {
 const HIGH_BASELINE = 300;
 const LOW_BASELINE = 50;
 
+// Models excluded from the health check but still preferred/recommended.
+// Useful for preview models with inconsistent traffic that cause false alerts.
+const HEALTH_CHECK_EXCLUSIONS = new Set(['google/gemini-3.1-pro-preview']);
+
 export async function GET(
   request: Request
 ): Promise<NextResponse<HealthResponse | HealthResponseError>> {
@@ -43,7 +47,7 @@ export async function GET(
     return NextResponse.json({ healthy: false }, { status: 401 });
   }
 
-  const monitoredModels = await getMonitoredModels();
+  const monitoredModels = (await getMonitoredModels()).filter(m => !HEALTH_CHECK_EXCLUSIONS.has(m));
 
   try {
     const queryStartTime = Date.now();

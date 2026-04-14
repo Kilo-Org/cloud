@@ -70,9 +70,9 @@ export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: Auth
     if (botMembers.length > 0) {
       const now = new Date().toISOString();
       const sendPromise = Promise.all(
-        botMembers.map(botId =>
+        botMembers.map(bot =>
           c.env.WEBHOOK_QUEUE.send({
-            targetBotId: botId,
+            targetBotId: bot.id,
             conversationId,
             messageId,
             from: callerId,

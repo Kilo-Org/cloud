@@ -3,14 +3,7 @@
 import { useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
-async function computeKilologHash(id: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode('kilolog|' + id);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
+import { kilologHash } from '@/lib/kilologHash';
 
 export function SafetyIdentifierHashGenerator() {
   const [id, setId] = useState('');
@@ -22,7 +15,7 @@ export function SafetyIdentifierHashGenerator() {
     setId(value);
     const gen = ++generation.current;
     if (value.trim()) {
-      const computed = await computeKilologHash(value.trim());
+      const computed = await kilologHash(value.trim());
       if (gen === generation.current) {
         setHash(computed);
       }

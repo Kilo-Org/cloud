@@ -35,9 +35,7 @@
     "consumers": [{ "queue": "kilo-chat-webhooks", "max_retries": 3 }],
   },
 
-  "services": [
-    { "binding": "KILOCLAW", "service": "kiloclaw" },
-  ],
+  "services": [{ "binding": "KILOCLAW", "service": "kiloclaw" }],
 
   "secrets_store_secrets": [
     {

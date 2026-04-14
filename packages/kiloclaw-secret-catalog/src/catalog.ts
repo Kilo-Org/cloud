@@ -380,11 +380,7 @@ export function isValidCustomSecretKey(key: string): boolean {
  * list out of the full encryptedSecrets record.
  */
 export function isCustomSecretEnvVar(envVarName: string): boolean {
-  return (
-    !ALL_SECRET_ENV_VARS.has(envVarName) &&
-    !INTERNAL_SENSITIVE_ENV_VARS.has(envVarName) &&
-    !DENIED_ENV_VAR_NAMES.has(envVarName)
-  );
+  return !ALL_SECRET_ENV_VARS.has(envVarName) && !INTERNAL_SENSITIVE_ENV_VARS.has(envVarName);
 }
 
 // --- Config path helpers ---

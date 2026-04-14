@@ -570,9 +570,6 @@ describe('Secret Catalog', () => {
       expect(isCustomSecretEnvVar('KILOCLAW_GOG_CONFIG_TARBALL')).toBe(false);
     });
 
-    it('returns false for internal non-secret reserved env vars', () => {
-      expect(isCustomSecretEnvVar('KILO_EXA_SEARCH_MODE')).toBe(false);
-    });
   });
 
   describe('custom secret constants', () => {

@@ -46,6 +46,10 @@ const MIN_UNIQUE_USERS_FOR_ALERT = 20;
 // being down.
 const STATEMENT_TIMEOUT_MS = 10_000;
 
+// Models excluded from the health check but still preferred/recommended.
+// Useful for preview models with inconsistent traffic that cause false alerts.
+const HEALTH_CHECK_EXCLUSIONS = new Set(['google/gemini-3.1-pro-preview']);
+
 export async function GET(
   request: Request
 ): Promise<NextResponse<HealthResponse | HealthResponseError>> {
@@ -72,7 +76,7 @@ export async function GET(
     anchorTime = parsed;
   }
 
-  const monitoredModels = await getMonitoredModels();
+  const monitoredModels = (await getMonitoredModels()).filter(m => !HEALTH_CHECK_EXCLUSIONS.has(m));
 
   try {
     const queryStartTime = Date.now();

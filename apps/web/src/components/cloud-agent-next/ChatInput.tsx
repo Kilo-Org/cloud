@@ -75,8 +75,14 @@ export function ChatInput({
   const [value, setValue] = useState('');
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const valueRef = useRef('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const setInputValue = useCallback((nextValue: string) => {
+    valueRef.current = nextValue;
+    setValue(nextValue);
+  }, []);
 
   const imageUpload = useImageUpload(imageUploadOptions);
   const maxImages = imageUploadOptions.maxImages ?? CLOUD_AGENT_IMAGE_MAX_COUNT;
@@ -85,11 +91,12 @@ export function ChatInput({
   // Restore text into the textarea when initialValue changes (e.g. after a failed send).
   // Treats undefined as "no opinion" (skip), but empty string actively clears the field.
   useEffect(() => {
-    if (initialValue !== undefined) {
-      setValue(initialValue);
-      textareaRef.current?.focus();
-    }
-  }, [initialValue]);
+    if (initialValue === undefined) return;
+    if (initialValue !== '' && valueRef.current !== '') return;
+
+    setInputValue(initialValue);
+    textareaRef.current?.focus();
+  }, [initialValue, setInputValue]);
 
   // Filter commands based on current input
   const filteredCommands = useMemo(() => {
@@ -134,19 +141,28 @@ export function ChatInput({
       if (imageUpload.hasUploadingImages) return false;
 
       const imagesData = imageUpload.getImagesData();
-      const accepted = await onSend(trimmed, imagesData);
-      if (!accepted) return false;
+      const submittedImageIds = imageUpload.images.map(image => image.id);
 
-      setValue('');
-      imageUpload.clearImages();
+      setInputValue('');
+      submittedImageIds.forEach(imageUpload.removeImage);
       setShowAutocomplete(false);
 
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
+
+      const accepted = await onSend(trimmed, imagesData);
+      if (!accepted) {
+        if (valueRef.current === '') {
+          setInputValue(trimmed);
+          textareaRef.current?.focus();
+        }
+        return false;
+      }
+
       return true;
     },
-    [disabled, imageUpload, onSend]
+    [disabled, imageUpload, onSend, setInputValue]
   );
 
   const handleSend = () => {
@@ -168,7 +184,7 @@ export function ChatInput({
       void sendMessage(expansion);
     } else {
       // Just fill the input for editing
-      setValue(expansion);
+      setInputValue(expansion);
       // Force height recalculation for expanded text
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -296,7 +312,7 @@ export function ChatInput({
             <textarea
               ref={textareaRef}
               value={value}
-              onChange={e => setValue(e.target.value)}
+              onChange={e => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={placeholder}

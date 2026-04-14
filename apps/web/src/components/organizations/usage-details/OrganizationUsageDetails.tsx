@@ -47,11 +47,13 @@ import { OrganizationAdminContextProvider } from '@/components/organizations/Org
 // Chart color constant
 const CHART_COLOR = '#3b82f6';
 
-const DEFAULT_DATE_RANGE: DateRangeSelection = {
-  preset: 'last_7_days',
-  ...computePresetRange('last_7_days'),
-  label: 'Last 7 days',
-};
+function createDefaultDateRange(): DateRangeSelection {
+  return {
+    preset: 'last_7_days',
+    ...computePresetRange('last_7_days'),
+    label: 'Last 7 days',
+  };
+}
 
 // Map preset to TimePeriod for the table query (backwards compat)
 const PRESET_TO_TIME_PERIOD: Record<string, TimePeriod> = {
@@ -93,7 +95,7 @@ export function OrganizationUsageDetailsPage({ organizationId }: { organizationI
 
 export function OrganizationUsageDetails({ organizationId }: { organizationId: string }) {
   // State management
-  const [dateRange, setDateRange] = useState<DateRangeSelection>(DEFAULT_DATE_RANGE);
+  const [dateRange, setDateRange] = useState<DateRangeSelection>(createDefaultDateRange);
   const [groupByModel, setGroupByModel] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState('cost');
   const [chartSplitBy, setChartSplitBy] = useState<ChartSplitBy>({

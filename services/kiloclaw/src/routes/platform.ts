@@ -301,15 +301,31 @@ async function requireProviderCapability(
   return jsonError(`${operation} is not supported for provider ${metadata.provider}`, 400);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isHttpStatus(value: unknown): value is { status: number } {
+  return isRecord(value) && typeof value.status === 'number';
+}
+
+function hasStringCode(value: unknown): value is { code: string } {
+  return isRecord(value) && typeof value.code === 'string';
+}
+
+/** Extract a string `code` from an error or its `.cause`, if present. */
+function getErrorCode(err: unknown): string | undefined {
+  if (hasStringCode(err)) return err.code;
+  if (err instanceof Error && hasStringCode(err.cause)) return err.cause.code;
+  return undefined;
+}
+
 function statusCodeFromError(err: unknown): number {
-  if (
-    typeof err === 'object' &&
-    err !== null &&
-    'status' in err &&
-    typeof (err as { status: unknown }).status === 'number'
-  ) {
-    const status = (err as { status: number }).status;
-    if (status >= 400 && status < 600) return status;
+  // Extract a valid HTTP status from the error or its cause, defaulting to 500.
+  for (const candidate of [err, err instanceof Error ? err.cause : undefined]) {
+    if (isHttpStatus(candidate) && candidate.status >= 400 && candidate.status < 600) {
+      return candidate.status;
+    }
   }
   return 500;
 }
@@ -344,6 +360,7 @@ const SAFE_ERROR_PREFIXES = [
   'Stream Chat sendMessage failed', // sendMessage HTTP errors
   'Stream Chat is not set up', // no Stream Chat on this instance
   'Provider ', // explicit not-implemented provider errors
+  'A Kilo CLI run is ', // e.g. "A Kilo CLI run is already in progress"
 ];
 
 function sanitizeError(err: unknown, operation: string): { message: string; status: number } {
@@ -398,13 +415,7 @@ function sanitizeOpenclawConfigError(
   const raw = err instanceof Error ? err.message : 'Unknown error';
   const status = statusCodeFromError(err);
   const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
-  const code =
-    typeof err === 'object' &&
-    err !== null &&
-    'code' in err &&
-    typeof (err as { code?: unknown }).code === 'string'
-      ? (err as { code: string }).code
-      : undefined;
+  const code = getErrorCode(err);
 
   console.error(`[platform] ${operation} failed:`, raw);
 
@@ -1392,11 +1403,15 @@ platform.post('/kilo-cli-run/start', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    // The DO returns a discriminated union: success | { conflict } | null.
+    // CF Workers' RPC type wrapping turns this into `Promise<A> | Promise<B>`
+    // instead of `Promise<A | B>`, which breaks narrowing. The `.then(r => r)`
+    // collapses the RPC wrapper back to a plain Promise union.
     const response = await withResolvedDORetry(
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.startKiloCliRun(result.data.prompt),
+      stub => stub.startKiloCliRun(result.data.prompt).then(r => r),
       'startKiloCliRun'
     );
     if (!response) {
@@ -1405,6 +1420,9 @@ platform.post('/kilo-cli-run/start', async c => {
         404,
         'controller_route_unavailable'
       );
+    }
+    if ('conflict' in response) {
+      return jsonError(response.conflict, 409);
     }
     return c.json(response, 200);
   } catch (err) {

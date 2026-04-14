@@ -1,9 +1,7 @@
-import { Hono } from 'hono';
+import type { Hono } from 'hono';
 import type { AuthContext } from '../auth';
 
-export function registerEventsRoutes(
-  app: Hono<{ Bindings: Env; Variables: AuthContext }>
-): void {
+export function registerEventsRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
   app.get('/v1/conversations/:id/events', async c => {
     const conversationId = c.req.param('id');
     const callerId = c.get('callerId');

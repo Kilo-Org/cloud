@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AuthContext } from '../auth';
 

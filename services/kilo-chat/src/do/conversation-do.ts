@@ -306,7 +306,11 @@ export class ConversationDO extends DurableObject<Env> {
           } else if (row.updated_at !== null) {
             return formatSseEvent(
               'message.updated',
-              { messageId: row.id, content: JSON.parse(row.content), version: row.version },
+              {
+                messageId: row.id,
+                content: JSON.parse(row.content) as Array<{ type: string; [key: string]: unknown }>,
+                version: row.version,
+              },
               row.id
             );
           } else {
@@ -315,7 +319,7 @@ export class ConversationDO extends DurableObject<Env> {
               {
                 messageId: row.id,
                 senderId: row.sender_id,
-                content: JSON.parse(row.content),
+                content: JSON.parse(row.content) as Array<{ type: string; [key: string]: unknown }>,
                 version: row.version,
                 inReplyToMessageId: row.in_reply_to_message_id,
               },
@@ -344,7 +348,6 @@ export class ConversationDO extends DurableObject<Env> {
       // Wrap readable in a new ReadableStream with a cancel callback that cleans up
       // the writer when the HTTP client disconnects (cancels the response body).
       const reader = readable.getReader();
-      const self = this;
       const outputReadable = new ReadableStream<Uint8Array>({
         pull(controller) {
           return reader.read().then(({ done, value }) => {
@@ -355,8 +358,8 @@ export class ConversationDO extends DurableObject<Env> {
             }
           });
         },
-        cancel() {
-          self.sseClients.delete(connId);
+        cancel: () => {
+          this.sseClients.delete(connId);
           reader.cancel().catch(() => {});
           writer.close().catch(() => {});
         },

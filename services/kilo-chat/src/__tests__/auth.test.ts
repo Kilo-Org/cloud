@@ -12,7 +12,7 @@ type MockEnv = {
 const TEST_API_KEY = 'test-api-key';
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
-function makeApp(env: MockEnv) {
+function makeApp(_env: MockEnv) {
   const app = new Hono<{ Bindings: MockEnv; Variables: AuthContext }>();
   app.use('*', authMiddleware);
   app.get('/test', c => c.json({ callerId: c.get('callerId'), callerKind: c.get('callerKind') }));

@@ -63,7 +63,10 @@ describe('deliverWebhook', () => {
       mockFetch
     );
     expect(mockFetch).toHaveBeenCalledOnce();
-    const [url, init] = mockFetch.mock.calls[0];
+    const [url, init] = mockFetch.mock.calls[0] as [
+      string,
+      RequestInit & { headers: Record<string, string> },
+    ];
     expect(url).toBe('https://webhook.test/endpoint');
     expect(init.method).toBe('POST');
     expect(init.headers['x-kilo-chat-signature']).toMatch(/^sha256=/);

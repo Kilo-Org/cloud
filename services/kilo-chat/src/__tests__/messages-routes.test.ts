@@ -1,12 +1,11 @@
 import { env } from 'cloudflare:test';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import type { AuthContext } from '../auth';
 import { registerConversationRoutes } from '../routes/conversations';
 import { registerMessageRoutes } from '../routes/messages';
 import type { ConversationDO } from '../do/conversation-do';
-import type { MembershipDO } from '../do/membership-do';
 
 function makeApp(callerId: string, callerKind: 'user' | 'bot') {
   const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(async (c, next) => {
@@ -24,10 +23,6 @@ function makeApp(callerId: string, callerKind: 'user' | 'bot') {
 
 function getConvStub(convId: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(convId));
-}
-
-function getMemberStub(memberId: string): DurableObjectStub<MembershipDO> {
-  return env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(memberId));
 }
 
 /**
@@ -305,8 +300,12 @@ describe('PATCH /v1/messages/:id', () => {
   });
 
   it('returns 403 when non-sender tries to edit', async () => {
-    const { conversationId, userId, botId, botApp } =
-      await createConversation('msg-edit-forbidden');
+    const {
+      conversationId,
+      userId,
+      botId: _botId,
+      botApp,
+    } = await createConversation('msg-edit-forbidden');
     const userApp = makeApp(userId, 'user');
 
     // User creates a message
@@ -378,8 +377,12 @@ describe('DELETE /v1/messages/:id', () => {
   });
 
   it('returns 403 when non-sender tries to delete', async () => {
-    const { conversationId, userId, botId, botApp } =
-      await createConversation('msg-delete-forbidden');
+    const {
+      conversationId,
+      userId,
+      botId: _botId,
+      botApp,
+    } = await createConversation('msg-delete-forbidden');
     const userApp = makeApp(userId, 'user');
 
     // User creates a message

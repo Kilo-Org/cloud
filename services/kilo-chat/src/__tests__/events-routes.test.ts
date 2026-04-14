@@ -8,13 +8,11 @@ import { registerEventsRoutes } from '../routes/events';
 import type { ConversationDO } from '../do/conversation-do';
 
 function makeApp(callerId: string, callerKind: 'user' | 'bot') {
-  const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(
-    async (c, next) => {
-      c.set('callerId', callerId);
-      c.set('callerKind', callerKind);
-      await next();
-    }
-  );
+  const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(async (c, next) => {
+    c.set('callerId', callerId);
+    c.set('callerKind', callerKind);
+    await next();
+  });
 
   const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
   app.use('/v1/*', mockAuth);
@@ -54,11 +52,7 @@ describe('GET /v1/conversations/:id/events - access control', () => {
     const { conversationId } = await createConversation('sse-nonmember-1');
     const strangerApp = makeApp('user-stranger-sse', 'user');
 
-    const res = await strangerApp.request(
-      `/v1/conversations/${conversationId}/events`,
-      {},
-      env
-    );
+    const res = await strangerApp.request(`/v1/conversations/${conversationId}/events`, {}, env);
 
     expect(res.status).toBe(403);
     await res.text(); // drain body
@@ -140,11 +134,7 @@ describe('GET /v1/conversations/:id/events - streaming response', () => {
   it('returns 200 with text/event-stream content-type for a member', async () => {
     const { conversationId, userApp } = await createConversation('sse-member-stream');
 
-    const res = await userApp.request(
-      `/v1/conversations/${conversationId}/events`,
-      {},
-      env
-    );
+    const res = await userApp.request(`/v1/conversations/${conversationId}/events`, {}, env);
 
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('text/event-stream');
@@ -222,7 +212,7 @@ describe('ConversationDO SSE subscribe via fetch() - streaming', () => {
     expect(res.status).toBe(200);
 
     // Read replay events with a timeout to avoid hanging indefinitely
-    const reader = res.body!.getReader();
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
     let received = '';
     const decoder = new TextDecoder();
 

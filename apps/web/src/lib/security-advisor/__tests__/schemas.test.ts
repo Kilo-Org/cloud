@@ -39,10 +39,12 @@ describe('SecurityAdvisorRequestSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts payload without optional fields', () => {
+  it('accepts minimal payload without optional fields', () => {
+    // Minimal valid payload: non-plugin method so pluginVersion is not
+    // required, no publicIp, no deep scan, no findings.
     const minimal = {
       apiVersion: '2026-04-01',
-      source: { platform: 'kiloclaw', method: 'api', pluginVersion: '0.1.0' },
+      source: { platform: 'kiloclaw', method: 'api' },
       audit: {
         ts: 1000,
         summary: { critical: 0, warn: 0, info: 0 },
@@ -53,12 +55,31 @@ describe('SecurityAdvisorRequestSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects payload missing pluginVersion', () => {
+  it('rejects plugin-method payload missing pluginVersion', () => {
+    // superRefine requires pluginVersion when method === 'plugin'.
     const result = SecurityAdvisorRequestSchema.safeParse({
       ...VALID_PAYLOAD,
       source: { platform: 'openclaw', method: 'plugin' },
     });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts non-plugin methods without pluginVersion', () => {
+    // Non-plugin callers (api, webhook, cloud-agent) have no plugin
+    // involved and shouldn't be forced to send a version string.
+    const baseAudit = {
+      ts: 1000,
+      summary: { critical: 0, warn: 0, info: 0 },
+      findings: [],
+    };
+    for (const method of ['api', 'webhook', 'cloud-agent'] as const) {
+      const result = SecurityAdvisorRequestSchema.safeParse({
+        apiVersion: '2026-04-01',
+        source: { platform: 'openclaw', method },
+        audit: baseAudit,
+      });
+      expect(result.success).toBe(true);
+    }
   });
 
   it('rejects payload with non-semver pluginVersion', () => {

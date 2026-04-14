@@ -32,49 +32,66 @@ export type AuditFinding = z.infer<typeof AuditFinding>;
 
 /**
  * Semver regex (major.minor.patch with optional prerelease + build metadata).
- * Matches the format used by `@kilocode/cli` and other kilocode packages —
- * the plugin MUST send `source.pluginVersion` in this shape so the server
- * can parse it consistently for observability and any future version-based
- * branching. We don't yet branch on the version, but requiring the format
- * up front gives us a clean foundation.
+ * Matches the format used by `@kilocode/cli` and other kilocode packages.
+ *
+ * `source.pluginVersion` is optional at the field level because non-plugin
+ * callers (`method: 'api' | 'webhook' | 'cloud-agent'`) have no plugin
+ * involved and shouldn't be forced to invent a version string. When the
+ * caller IS a plugin (`method: 'plugin'`), we enforce presence + semver
+ * format via the superRefine below, giving us a clean foundation for
+ * observability and future version-based branching without breaking any
+ * non-plugin integration path.
  */
 const SEMVER_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[\w.-]+)?(?:\+[\w.-]+)?$/;
 const SemverString = z
   .string()
   .regex(SEMVER_REGEX, 'Must be a semver version string (e.g. "1.2.3")');
 
-export const SecurityAdvisorRequestSchema = z.object({
-  apiVersion: z.literal('2026-04-01'),
+export const SecurityAdvisorRequestSchema = z
+  .object({
+    apiVersion: z.literal('2026-04-01'),
 
-  source: z.object({
-    platform: SourcePlatform,
-    method: SourceMethod,
-    // Plugin package semver — required from 0.1.0 onwards. Server logs and
-    // persists this to `security_advisor_scans.plugin_version` for every
-    // request; future versions may branch on it.
-    pluginVersion: SemverString,
-    // OpenClaw host version — optional because non-plugin callers (webhook,
-    // cloud-agent) may not know it.
-    openclawVersion: z.string().optional(),
-  }),
-
-  audit: z.object({
-    ts: z.number(),
-    summary: z.object({
-      critical: z.number(),
-      warn: z.number(),
-      info: z.number(),
+    source: z.object({
+      platform: SourcePlatform,
+      method: SourceMethod,
+      // Plugin package semver. Optional here so non-plugin callers aren't
+      // forced to send a version; superRefine below requires it (and
+      // enforces semver format) whenever method === 'plugin'. Server logs
+      // and persists this to `security_advisor_scans.plugin_version` on
+      // every scan; future schema evolutions may branch on it.
+      pluginVersion: SemverString.optional(),
+      openclawVersion: z.string().optional(),
     }),
-    findings: z.array(AuditFinding),
-    deep: z.record(z.string(), z.unknown()).optional(),
-    secretDiagnostics: z.array(z.unknown()).optional(),
-  }),
 
-  publicIp: z
-    .string()
-    .regex(/^(?:\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]+$/, 'Must be a valid IPv4 or IPv6 address')
-    .optional(),
-});
+    audit: z.object({
+      ts: z.number(),
+      summary: z.object({
+        critical: z.number(),
+        warn: z.number(),
+        info: z.number(),
+      }),
+      findings: z.array(AuditFinding),
+      deep: z.record(z.string(), z.unknown()).optional(),
+      secretDiagnostics: z.array(z.unknown()).optional(),
+    }),
+
+    publicIp: z
+      .string()
+      .regex(/^(?:\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]+$/, 'Must be a valid IPv4 or IPv6 address')
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    // Plugin callers must always announce their version. SemverString
+    // already validates format when pluginVersion is present; here we
+    // guard presence for the plugin-method path specifically.
+    if (data.source.method === 'plugin' && !data.source.pluginVersion) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['source', 'pluginVersion'],
+        message: 'source.pluginVersion is required when source.method is "plugin"',
+      });
+    }
+  });
 export type SecurityAdvisorRequest = z.infer<typeof SecurityAdvisorRequestSchema>;
 
 // --- Response schemas ---

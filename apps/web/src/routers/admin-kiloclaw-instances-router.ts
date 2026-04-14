@@ -739,8 +739,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       if (initiatedBy !== 'all') {
         conditions.push(
           initiatedBy === 'admin'
-            ? sql`${kiloclaw_cli_runs.initiated_by_admin_id} IS NOT NULL`
-            : sql`${kiloclaw_cli_runs.initiated_by_admin_id} IS NULL`
+            ? isNotNull(kiloclaw_cli_runs.initiated_by_admin_id)
+            : isNull(kiloclaw_cli_runs.initiated_by_admin_id)
         );
       }
 

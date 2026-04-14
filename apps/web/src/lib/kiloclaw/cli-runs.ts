@@ -182,6 +182,11 @@ export async function cancelCliRun(params: {
     });
   }
 
+  // When result.ok is false the controller rejected the cancel (e.g. the process
+  // had already exited between our DB check and the cancel request). The DB row
+  // intentionally stays 'running' so the caller can retry or poll again — the
+  // next getKiloCliRunStatus call will pick up the terminal state from the
+  // controller and persist it.
   return { ok: result.ok, runFound: true, cancelled: result.ok };
 }
 

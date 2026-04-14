@@ -55,6 +55,7 @@ export async function deliverWebhook(
   });
 
   if (!response.ok) {
-    throw new Error(`Webhook delivery failed: ${response.status} ${await response.text()}`);
+    const responseText = await response.text().catch(() => '(could not read body)');
+    throw new Error(`Webhook delivery failed: ${response.status} ${responseText}`);
   }
 }

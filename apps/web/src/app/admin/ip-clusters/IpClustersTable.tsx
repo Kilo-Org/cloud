@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -20,22 +20,30 @@ import {
 } from '@/components/ui/table';
 
 function parse(value: string | null, fallback: number) {
-  const num = Number(value);
+  const num = value === null ? fallback : Number(value);
   if (!Number.isFinite(num)) return fallback;
   return Math.floor(num);
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 export function IpClustersTable() {
   const trpc = useTRPC();
   const router = useRouter();
   const search = useSearchParams();
-  const threshold = parse(search.get('threshold'), 3);
-  const days = parse(search.get('days'), 7);
+  const threshold = clamp(parse(search.get('threshold'), 3), 2, 100);
+  const days = clamp(parse(search.get('days'), 7), 1, 90);
+  const [form, setForm] = useState({
+    threshold: String(threshold),
+    days: String(days),
+  });
 
   const input = useMemo(
     () => ({
-      threshold: Math.min(Math.max(threshold, 2), 100),
-      days: Math.min(Math.max(days, 1), 90),
+      threshold,
+      days,
       limit: 100,
     }),
     [threshold, days]
@@ -43,15 +51,29 @@ export function IpClustersTable() {
 
   const query = useQuery(trpc.admin.ipClusters.list.queryOptions(input));
 
+  useEffect(() => {
+    setForm({
+      threshold: String(input.threshold),
+      days: String(input.days),
+    });
+  }, [input.days, input.threshold]);
+
   const push = useCallback(
-    (next: { threshold?: number; days?: number }) => {
+    (next?: { threshold?: number; days?: number }) => {
       const params = new URLSearchParams();
-      params.set('threshold', String(next.threshold ?? input.threshold));
-      params.set('days', String(next.days ?? input.days));
+      params.set('threshold', String(next?.threshold ?? input.threshold));
+      params.set('days', String(next?.days ?? input.days));
       router.push(`/admin/ip-clusters?${params.toString()}`);
     },
     [input.days, input.threshold, router]
   );
+
+  const apply = useCallback(() => {
+    push({
+      threshold: clamp(parse(form.threshold, input.threshold), 2, 100),
+      days: clamp(parse(form.days, input.days), 1, 90),
+    });
+  }, [form.days, form.threshold, input.days, input.threshold, push]);
 
   if (query.error) {
     return (
@@ -93,8 +115,9 @@ export function IpClustersTable() {
                 type="number"
                 min={2}
                 max={100}
-                value={input.threshold}
-                onChange={event => push({ threshold: Number(event.target.value) })}
+                value={form.threshold}
+                onChange={event => setForm(prev => ({ ...prev, threshold: event.target.value }))}
+                onBlur={apply}
                 className="w-56"
               />
             </div>
@@ -105,11 +128,15 @@ export function IpClustersTable() {
                 type="number"
                 min={1}
                 max={90}
-                value={input.days}
-                onChange={event => push({ days: Number(event.target.value) })}
+                value={form.days}
+                onChange={event => setForm(prev => ({ ...prev, days: event.target.value }))}
+                onBlur={apply}
                 className="w-40"
               />
             </div>
+            <Button variant="outline" onClick={apply}>
+              Apply
+            </Button>
             <Button variant="outline" onClick={() => push({ threshold: 3, days: 7 })}>
               Reset
             </Button>

@@ -204,7 +204,10 @@ describe('ConversationDO', () => {
     expect(created.ok).toBe(true);
     if (!created.ok) return;
 
-    const result = await stub.deleteMessage({ messageId: created.messageId, senderId: 'user-alice' });
+    const result = await stub.deleteMessage({
+      messageId: created.messageId,
+      senderId: 'user-alice',
+    });
     expect(result.ok).toBe(true);
 
     const { messages } = await stub.listMessages({ limit: 10 });

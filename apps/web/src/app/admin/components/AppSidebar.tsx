@@ -4,6 +4,7 @@ import type React from 'react';
 import {
   Users,
   DollarSign,
+  Globe2,
   Building2,
   Shield,
   Ban,
@@ -64,6 +65,11 @@ const userManagementItems: MenuItem[] = [
     title: () => 'Organizations',
     url: '/admin/organizations',
     icon: () => <Building2 />,
+  },
+  {
+    title: () => 'IP Clusters',
+    url: '/admin/ip-clusters',
+    icon: () => <Globe2 />,
   },
   {
     title: () => 'Bulk Block',

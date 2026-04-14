@@ -15,6 +15,8 @@ import {
   kiloclaw_earlybird_purchases,
   kiloclaw_email_log,
   kiloclaw_instances,
+  microdollar_usage_metadata,
+  http_ip,
 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
@@ -180,6 +182,12 @@ const GetKiloClawStateSchema = z.object({
   userId: z.string(),
 });
 
+const IpClustersListSchema = z.object({
+  threshold: z.number().int().min(2).max(100).default(3),
+  days: z.number().int().min(1).max(90).default(7),
+  limit: z.number().int().min(1).max(200).default(100),
+});
+
 const UpdateKiloClawTrialEndAtSchema = z.object({
   userId: z.string(),
   subscriptionId: z.string(),
@@ -193,6 +201,34 @@ const CancelKiloClawSubscriptionSchema = z.object({
 });
 
 export const adminRouter = createTRPCRouter({
+  ipClusters: createTRPCRouter({
+    list: adminProcedure.input(IpClustersListSchema).query(async ({ input }) => {
+      const rows = await db
+        .select({
+          ip: http_ip.http_ip,
+          accountCount: sql<number>`count(distinct ${microdollar_usage.kilo_user_id})::int`,
+          requestCount: sql<number>`count(*)::int`,
+          accountIds: sql<string[]>`array_agg(distinct ${microdollar_usage.kilo_user_id} order by ${microdollar_usage.kilo_user_id})`,
+        })
+        .from(microdollar_usage)
+        .innerJoin(
+          microdollar_usage_metadata,
+          eq(microdollar_usage.id, microdollar_usage_metadata.id)
+        )
+        .innerJoin(http_ip, eq(microdollar_usage_metadata.http_ip_id, http_ip.http_ip_id))
+        .where(sql`${microdollar_usage.created_at} >= now() - (${input.days} * interval '1 day')`)
+        .groupBy(http_ip.http_ip)
+        .having(sql`count(distinct ${microdollar_usage.kilo_user_id}) >= ${input.threshold}`)
+        .orderBy(desc(sql`count(distinct ${microdollar_usage.kilo_user_id})`), desc(sql`count(*)`))
+        .limit(input.limit);
+
+      return {
+        clusters: rows,
+        threshold: input.threshold,
+        days: input.days,
+      };
+    }),
+  }),
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({
     getKilocodeOpenPullRequestCounts: adminProcedure.query(async () => {

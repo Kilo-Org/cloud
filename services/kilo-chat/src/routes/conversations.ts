@@ -36,9 +36,7 @@ export function registerConversationRoutes(
     const botId = `bot:kiloclaw:${body.data.sandboxId}`;
 
     // Initialize ConversationDO
-    const convStub = c.env.CONVERSATION_DO.get(
-      c.env.CONVERSATION_DO.idFromName(conversationId)
-    );
+    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
     await convStub.initialize({
       id: conversationId,
       title: body.data.title ?? null,
@@ -57,12 +55,8 @@ export function registerConversationRoutes(
       joinedAt: now,
     };
 
-    const userMembership = c.env.MEMBERSHIP_DO.get(
-      c.env.MEMBERSHIP_DO.idFromName(callerId)
-    );
-    const botMembership = c.env.MEMBERSHIP_DO.get(
-      c.env.MEMBERSHIP_DO.idFromName(botId)
-    );
+    const userMembership = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
+    const botMembership = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(botId));
     await Promise.all([
       userMembership.addConversation(memberParams),
       botMembership.addConversation(memberParams),
@@ -74,9 +68,7 @@ export function registerConversationRoutes(
   // GET /v1/conversations — list my conversations
   app.get('/v1/conversations', async c => {
     const callerId = c.get('callerId');
-    const stub = c.env.MEMBERSHIP_DO.get(
-      c.env.MEMBERSHIP_DO.idFromName(callerId)
-    );
+    const stub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
     const list = await stub.listConversations();
     return c.json({ conversations: list });
   });
@@ -85,9 +77,7 @@ export function registerConversationRoutes(
   app.get('/v1/conversations/:id', async c => {
     const conversationId = c.req.param('id');
     const callerId = c.get('callerId');
-    const stub = c.env.CONVERSATION_DO.get(
-      c.env.CONVERSATION_DO.idFromName(conversationId)
-    );
+    const stub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
 
     if (!(await stub.isMember(callerId))) {
       return c.json({ error: 'Forbidden' }, 403);

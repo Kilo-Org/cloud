@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { authMiddleware } from './auth';
 import type { AuthContext } from './auth';
 import { registerConversationRoutes } from './routes/conversations';
+import { registerMessageRoutes } from './routes/messages';
 
 export { MembershipDO } from './do/membership-do';
 export { ConversationDO } from './do/conversation-do';
@@ -13,6 +14,7 @@ app.get('/health', c => c.json({ ok: true }));
 
 app.use('/v1/*', authMiddleware);
 registerConversationRoutes(app);
+registerMessageRoutes(app);
 
 export default class extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {

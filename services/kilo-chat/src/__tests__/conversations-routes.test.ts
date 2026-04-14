@@ -12,13 +12,11 @@ import type { MembershipDO } from '../do/membership-do';
  * callerId / callerKind directly so we can unit-test route logic.
  */
 function makeApp(callerId: string, callerKind: 'user' | 'bot') {
-  const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(
-    async (c, next) => {
-      c.set('callerId', callerId);
-      c.set('callerKind', callerKind);
-      await next();
-    }
-  );
+  const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(async (c, next) => {
+    c.set('callerId', callerId);
+    c.set('callerKind', callerKind);
+    await next();
+  });
 
   const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
   app.use('/v1/*', mockAuth);
@@ -170,7 +168,9 @@ describe('GET /v1/conversations', () => {
 
     const res = await app.request('/v1/conversations', {}, env);
     expect(res.status).toBe(200);
-    const body = await res.json<{ conversations: Array<{ conversationId: string; conversationTitle: string | null }> }>();
+    const body = await res.json<{
+      conversations: Array<{ conversationId: string; conversationTitle: string | null }>;
+    }>();
     expect(Array.isArray(body.conversations)).toBe(true);
     expect(body.conversations.length).toBeGreaterThanOrEqual(2);
     const titles = body.conversations.map(c => c.conversationTitle);

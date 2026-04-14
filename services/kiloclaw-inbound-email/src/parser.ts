@@ -3,7 +3,7 @@ import PostalMime, { type Address, type RawEmail } from 'postal-mime';
 
 export type ParsedInboundEmail = {
   messageId: string | null;
-  from: string;
+  from: string | null;
   subject: string;
   text: string;
 };
@@ -63,7 +63,7 @@ export async function parseRawEmail(raw: RawEmail): Promise<ParsedInboundEmail> 
 
   return {
     messageId: email.messageId?.trim() ?? null,
-    from: firstAddress(email.from) ?? 'unknown',
+    from: firstAddress(email.from),
     subject: email.subject ?? '',
     text: normalizeText(email.text, email.html),
   };

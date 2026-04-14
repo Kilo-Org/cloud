@@ -47,6 +47,12 @@ describe('parseRawEmail', () => {
     expect(parsed.subject).toBe('Hello world');
   });
 
+  it('returns null when no sender header exists', async () => {
+    const parsed = await parseRawEmail('Subject: Missing sender\r\n\r\nBody');
+
+    expect(parsed.from).toBeNull();
+  });
+
   it('falls back to html content when no text part exists', async () => {
     const parsed = await parseRawEmail(
       [

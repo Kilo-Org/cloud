@@ -49,6 +49,20 @@ describe('buildQueueMessage', () => {
     expect(typeof queueMessage?.receivedAt).toBe('string');
   });
 
+  it('falls back to the envelope sender when the raw email has no sender header', async () => {
+    const raw = 'Message-ID: <msg-2@example.com>\r\nSubject: Missing sender\r\n\r\nBody text';
+    const queueMessage = await buildQueueMessage(
+      makeEmail({
+        from: 'envelope@example.com',
+        raw: rawStream(raw),
+        rawSize: raw.length,
+      }),
+      makeEnv()
+    );
+
+    expect(queueMessage?.from).toBe('envelope@example.com');
+  });
+
   it('rejects invalid recipient addresses', async () => {
     const setReject = vi.fn();
     const email = makeEmail({ to: 'hello@clawmail.kilosessions.ai', setReject });

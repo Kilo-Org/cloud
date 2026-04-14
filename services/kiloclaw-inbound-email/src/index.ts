@@ -40,7 +40,7 @@ async function buildQueueMessage(
   return {
     instanceId,
     messageId: truncate(messageId, 512),
-    from: truncate(parsed.from || message.from, 512),
+    from: truncate(parsed.from ?? message.from, 512),
     to: truncate(message.to, 512),
     subject: truncate(parsed.subject, 1_000),
     text: truncate(parsed.text, maxTextChars),

@@ -208,7 +208,9 @@ export const adminRouter = createTRPCRouter({
           ip: http_ip.http_ip,
           accountCount: sql<number>`count(distinct ${microdollar_usage.kilo_user_id})::int`,
           requestCount: sql<number>`count(*)::int`,
-          accountIds: sql<string[]>`array_agg(distinct ${microdollar_usage.kilo_user_id} order by ${microdollar_usage.kilo_user_id})`,
+          accountIds: sql<
+            string[]
+          >`array_agg(distinct ${microdollar_usage.kilo_user_id} order by ${microdollar_usage.kilo_user_id})`,
         })
         .from(microdollar_usage)
         .innerJoin(

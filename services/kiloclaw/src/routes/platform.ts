@@ -1723,6 +1723,8 @@ const InboundEmailSchema = z.object({
   receivedAt: z.string().datetime(),
 });
 
+type InboundEmailDelivery = z.infer<typeof InboundEmailSchema>;
+
 function inboundEmailTitleSlug(subject: string): string {
   const slug = subject
     .trim()
@@ -1737,6 +1739,43 @@ function inboundEmailTitleSlug(subject: string): string {
 
 function inboundEmailSessionKey(subject: string, receivedAt: string): string {
   return `inbound-email:${receivedAt.slice(0, 10)}-${inboundEmailTitleSlug(subject)}`;
+}
+
+function inboundEmailExpectedLocalPart(instanceId: string): string {
+  return `ki-${instanceId.replace(/-/g, '')}`;
+}
+
+function inboundEmailAddressParts(address: string): {
+  localPart: string;
+  domain: string;
+  validSingleAddress: boolean;
+} {
+  const [localPart, domain, ...extra] = address.trim().toLowerCase().split('@');
+  return {
+    localPart: localPart ?? '',
+    domain: domain ?? '',
+    validSingleAddress: Boolean(localPart && domain && extra.length === 0),
+  };
+}
+
+function inboundEmailLogContext(delivery: InboundEmailDelivery) {
+  const recipient = inboundEmailAddressParts(delivery.to);
+  const sender = inboundEmailAddressParts(delivery.from);
+  const expectedRecipientLocalPart = inboundEmailExpectedLocalPart(delivery.instanceId);
+
+  return {
+    instanceId: delivery.instanceId,
+    messageIdLength: delivery.messageId.length,
+    fromDomain: sender.domain,
+    toLocalPart: recipient.localPart,
+    toDomain: recipient.domain,
+    toAddressValid: recipient.validSingleAddress,
+    expectedToLocalPart: expectedRecipientLocalPart,
+    toMatchesInstanceId: recipient.localPart === expectedRecipientLocalPart,
+    subjectLength: delivery.subject.length,
+    textLength: delivery.text.length,
+    receivedAt: delivery.receivedAt,
+  };
 }
 
 async function resolveInboundEmailDoKey(
@@ -1763,42 +1802,109 @@ async function resolveInboundEmailDoKey(
 // POST /api/platform/inbound-email
 // Deliver a Cloudflare Email Routing message to an instance's OpenClaw hook endpoint.
 platform.post('/inbound-email', async c => {
+  const startedAt = performance.now();
   const result = await parseBody(c, InboundEmailSchema);
   if ('error' in result) return result.error;
 
   const delivery = result.data;
+  const logContext = inboundEmailLogContext(delivery);
+  console.log('[platform] inbound email received', logContext);
+  if (!logContext.toMatchesInstanceId) {
+    console.warn('[platform] inbound email recipient does not match instanceId', logContext);
+  }
+
   const connectionString = c.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
+    console.error('[platform] inbound email database unavailable', logContext);
     return jsonError('Database is not configured', 503);
   }
   if (!c.env.GATEWAY_TOKEN_SECRET) {
+    console.error('[platform] inbound email gateway token secret unavailable', logContext);
     return jsonError('GATEWAY_TOKEN_SECRET is not configured', 503);
   }
 
   try {
     const instance = await getInstanceById(getWorkerDb(connectionString), delivery.instanceId);
     if (!instance) {
+      console.warn('[platform] inbound email instance not found', logContext);
       return jsonError('Instance not found', 404);
     }
     c.set('userId', instance.userId);
+    console.log('[platform] inbound email instance resolved', {
+      ...logContext,
+      userId: instance.userId,
+      sandboxId: instance.sandboxId,
+      orgId: instance.orgId,
+    });
 
     const doKey = await resolveInboundEmailDoKey(c.env, instance);
+    console.log('[platform] inbound email DO resolved', {
+      ...logContext,
+      userId: instance.userId,
+      orgId: instance.orgId,
+      doKey,
+      doKeyMatchesInstanceId: doKey === instance.id,
+    });
+
     const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
     const status = await stub.getStatus();
+    console.log('[platform] inbound email status resolved', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      instanceStatus: status.status,
+      statusUserId: status.userId,
+      statusSandboxId: status.sandboxId,
+      hasSandboxId: Boolean(status.sandboxId),
+    });
 
     if (status.status !== 'running') {
+      console.warn('[platform] inbound email instance is not running', {
+        ...logContext,
+        userId: instance.userId,
+        doKey,
+        instanceStatus: status.status,
+      });
       return jsonError('Instance is not running', 503);
     }
     if (!status.sandboxId) {
+      console.error('[platform] inbound email instance has no sandboxId', {
+        ...logContext,
+        userId: instance.userId,
+        doKey,
+        instanceStatus: status.status,
+      });
       return jsonError('Instance has no sandboxId', 500);
     }
 
     const routingTarget = await stub.getRoutingTarget();
     if (!routingTarget) {
+      console.warn('[platform] inbound email instance not routable', {
+        ...logContext,
+        userId: instance.userId,
+        doKey,
+        instanceStatus: status.status,
+      });
       return jsonError('Instance not routable', 503);
     }
+    console.log('[platform] inbound email routing target resolved', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      targetOrigin: routingTarget.origin,
+      hasFlyForceInstanceId: 'fly-force-instance-id' in routingTarget.headers,
+    });
 
     const gatewayToken = await deriveGatewayToken(status.sandboxId, c.env.GATEWAY_TOKEN_SECRET);
+    const sessionKey = inboundEmailSessionKey(delivery.subject, delivery.receivedAt);
+    console.log('[platform] inbound email forwarding to controller', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      targetOrigin: routingTarget.origin,
+      sessionKeyPrefix: sessionKey.split(':')[0] ?? '',
+      sessionKeyLength: sessionKey.length,
+    });
     const response = await fetch(`${routingTarget.origin}/_kilo/hooks/email`, {
       method: 'POST',
       headers: {
@@ -1807,7 +1913,7 @@ platform.post('/inbound-email', async c => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        sessionKey: inboundEmailSessionKey(delivery.subject, delivery.receivedAt),
+        sessionKey,
         messageId: delivery.messageId,
         from: delivery.from,
         to: delivery.to,
@@ -1815,6 +1921,15 @@ platform.post('/inbound-email', async c => {
         text: delivery.text,
         receivedAt: delivery.receivedAt,
       }),
+    });
+
+    console.log('[platform] inbound email controller response', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      status: response.status,
+      ok: response.ok,
+      durationMs: performance.now() - startedAt,
     });
 
     if (response.ok) {
@@ -1829,15 +1944,28 @@ platform.post('/inbound-email', async c => {
     }
 
     const error = await response.text().catch(() => '');
-    console.error('[platform] inbound email controller delivery failed', {
-      instanceId: instance.id,
+    const controllerFailure = {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
       status: response.status,
       error: error.slice(0, 500),
-    });
+      durationMs: performance.now() - startedAt,
+    };
+    if (response.status >= 500) {
+      console.error('[platform] inbound email controller delivery failed', controllerFailure);
+    } else {
+      console.warn('[platform] inbound email controller rejected delivery', controllerFailure);
+    }
 
     const responseStatus = response.status >= 400 && response.status < 600 ? response.status : 502;
     return jsonError('Inbound email delivery failed', responseStatus);
   } catch (err) {
+    console.error('[platform] inbound email delivery threw', {
+      ...logContext,
+      error: err instanceof Error ? err.message : String(err),
+      durationMs: performance.now() - startedAt,
+    });
     const { message, status } = sanitizeError(err, 'inbound-email');
     return jsonError(message, status);
   }

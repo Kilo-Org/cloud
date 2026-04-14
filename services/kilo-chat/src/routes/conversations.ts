@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { ulid } from 'ulid';
 import type { AuthContext } from '../auth';
 
+const ulidSchema = z.string().regex(/^[0-9A-Z]{26}$/, 'Invalid ULID');
+
 const createConversationSchema = z.object({
   sandboxId: z.string().min(1),
   title: z.string().optional(),
@@ -75,7 +77,11 @@ export function registerConversationRoutes(
 
   // GET /v1/conversations/:id — get conversation details
   app.get('/v1/conversations/:id', async c => {
-    const conversationId = c.req.param('id');
+    const idParam = ulidSchema.safeParse(c.req.param('id'));
+    if (!idParam.success) {
+      return c.json({ error: 'Invalid conversation ID' }, 400);
+    }
+    const conversationId = idParam.data;
     const callerId = c.get('callerId');
     const stub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
 

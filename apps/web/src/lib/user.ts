@@ -338,6 +338,26 @@ export async function createOrUpdateUser(
   // that are equivalent after dot-normalization (e.g. henk.janssen@ vs henkjanssen@gmail.com)
   const gmailDotVariantUser = await findUserByNormalizedGmailEmail(args.google_user_email);
   if (gmailDotVariantUser) {
+    // For magic link (autoLinkToExistingUser), link to the existing account since the
+    // dot-variant Gmail address delivers to the same inbox — the user proved ownership.
+    if (autoLinkToExistingUser) {
+      const linkResult = await linkAccountToExistingUser(gmailDotVariantUser.id, args);
+      if (!linkResult.success) {
+        return { success: false, error: linkResult.error };
+      }
+      fireAuthEvent(gmailDotVariantUser, 'signin', args.provider, requestHeaders);
+      posthogClient.capture({
+        distinctId: gmailDotVariantUser.google_user_email,
+        event: 'user_signed_in_gmail_dot_variant_auto_linked',
+        properties: {
+          existing_email: gmailDotVariantUser.google_user_email,
+          new_email: args.google_user_email,
+          existing_id: gmailDotVariantUser.id,
+          provider: args.provider,
+        },
+      });
+      return successResult({ user: gmailDotVariantUser, isNew: false });
+    }
     return failureResult('DIFFERENT-OAUTH');
   }
 

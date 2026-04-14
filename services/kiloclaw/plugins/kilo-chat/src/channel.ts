@@ -74,7 +74,7 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         const client = makeClient();
         const { messageId } = await client.createMessage({
           conversationId: params.to,
-          text: params.text,
+          content: [{ type: 'text', text: params.text }],
         });
         return { messageId };
       },

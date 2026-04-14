@@ -13,10 +13,12 @@
 ## File structure
 
 **Create:**
+
 - `services/kiloclaw/plugins/kilo-chat/src/preview-stream.ts` — per-turn throttled POST/PATCH/DELETE controller.
 - `services/kiloclaw/plugins/kilo-chat/src/preview-stream.test.ts` — state-machine tests.
 
 **Modify:**
+
 - `services/kiloclaw/plugins/kilo-chat/src/client.ts` — add `createMessage`, `editMessage`, `deleteMessage`; keep `sendText` as thin alias.
 - `services/kiloclaw/plugins/kilo-chat/src/client.test.ts` — add tests for new methods.
 - `services/kiloclaw/plugins/kilo-chat/src/channel.ts` — add `editText`/`deleteMessage` outbound actions; resolve streaming config.
@@ -45,6 +47,7 @@ Working directory for every command: `/Users/igor/Projects/.worktrees/kilo-chat-
 ## Task 1: Client — add `createMessage` returning `{messageId, version}`
 
 **Files:**
+
 - Modify: `services/kiloclaw/plugins/kilo-chat/src/client.ts`
 - Test: `services/kiloclaw/plugins/kilo-chat/src/client.test.ts`
 
@@ -209,6 +212,7 @@ git commit -m "feat(kiloclaw/kilo-chat): add createMessage returning messageId+v
 ## Task 2: Client — add `editMessage` (PATCH + 409 drop)
 
 **Files:**
+
 - Modify: `services/kiloclaw/plugins/kilo-chat/src/client.ts`
 - Test: `services/kiloclaw/plugins/kilo-chat/src/client.test.ts`
 
@@ -342,6 +346,7 @@ git commit -m "feat(kiloclaw/kilo-chat): add editMessage client with 409 drop ha
 ## Task 3: Client — add `deleteMessage`
 
 **Files:**
+
 - Modify: `services/kiloclaw/plugins/kilo-chat/src/client.ts`
 - Test: `services/kiloclaw/plugins/kilo-chat/src/client.test.ts`
 
@@ -373,9 +378,9 @@ describe('deleteMessage', () => {
       gatewayToken: 'gwt',
       fetchImpl,
     });
-    await expect(
-      client.deleteMessage({ conversationId: 'c1', messageId: 'm1' })
-    ).rejects.toThrow(/500/);
+    await expect(client.deleteMessage({ conversationId: 'c1', messageId: 'm1' })).rejects.toThrow(
+      /500/
+    );
   });
 });
 ```
@@ -426,6 +431,7 @@ git commit -m "feat(kiloclaw/kilo-chat): add deleteMessage client"
 ## Task 4: Controller — `PATCH /_kilo/kilo-chat/messages/:id`
 
 **Files:**
+
 - Modify: `services/kiloclaw/controller/src/routes/kilo-chat.ts`
 - Test: `services/kiloclaw/controller/src/routes/kilo-chat.test.ts`
 
@@ -593,6 +599,7 @@ git commit -m "feat(kiloclaw): add PATCH /_kilo/kilo-chat/messages/:id route"
 ## Task 5: Controller — `DELETE /_kilo/kilo-chat/messages/:id`
 
 **Files:**
+
 - Modify: `services/kiloclaw/controller/src/routes/kilo-chat.ts`
 - Test: `services/kiloclaw/controller/src/routes/kilo-chat.test.ts`
 
@@ -715,6 +722,7 @@ git commit -m "feat(kiloclaw): add DELETE /_kilo/kilo-chat/messages/:id route"
 ## Task 6: Wire new controller routes in `controller/src/index.ts`
 
 **Files:**
+
 - Modify: `services/kiloclaw/controller/src/index.ts`
 
 - [ ] **Step 1: Update import and registration**
@@ -788,6 +796,7 @@ git commit -m "feat(kiloclaw): register kilo-chat edit and delete routes"
 ## Task 7: PreviewStream — state machine (idle → editing → finalized/aborted)
 
 **Files:**
+
 - Create: `services/kiloclaw/plugins/kilo-chat/src/preview-stream.ts`
 - Create: `services/kiloclaw/plugins/kilo-chat/src/preview-stream.test.ts`
 
@@ -1011,10 +1020,12 @@ export type CreatePreviewStreamOptions = {
 export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewStream {
   const setTimer = opts.setTimer ?? setTimeout;
   const clearTimer = opts.clearTimer ?? clearTimeout;
-  const warn = opts.onWarn ?? ((msg: string, err?: unknown) => {
-    // eslint-disable-next-line no-console
-    console.warn(`[kilo-chat preview] ${msg}`, err);
-  });
+  const warn =
+    opts.onWarn ??
+    ((msg: string, err?: unknown) => {
+      // eslint-disable-next-line no-console
+      console.warn(`[kilo-chat preview] ${msg}`, err);
+    });
 
   let phase: Phase = 'idle';
   let messageId: string | undefined;
@@ -1206,6 +1217,7 @@ git commit -m "feat(kiloclaw/kilo-chat): add PreviewStream controller for live e
 ## Task 8: Plugin config — streaming schema + resolver
 
 **Files:**
+
 - Modify: `services/kiloclaw/plugins/kilo-chat/openclaw.plugin.json`
 - Modify: `services/kiloclaw/plugins/kilo-chat/src/channel.ts`
 - Test: `services/kiloclaw/plugins/kilo-chat/src/channel.test.ts`
@@ -1320,10 +1332,7 @@ function resolveAccount(cfg: OpenClawConfig, accountId?: string | null): Resolve
     typeof section.streaming === 'object' && section.streaming !== null
       ? (section.streaming as Record<string, unknown>)
       : {};
-  const streamingMode = resolveChannelPreviewStreamMode(
-    { streaming: streamingSection },
-    'partial'
-  );
+  const streamingMode = resolveChannelPreviewStreamMode({ streaming: streamingSection }, 'partial');
   const throttleMsRaw = streamingSection['throttleMs'];
   const throttleMs =
     typeof throttleMsRaw === 'number' &&
@@ -1358,6 +1367,7 @@ git commit -m "feat(kiloclaw/kilo-chat): resolve streaming.mode and throttleMs f
 ## Task 9: Channel plugin — `editText` and `deleteMessage` outbound actions
 
 **Files:**
+
 - Modify: `services/kiloclaw/plugins/kilo-chat/src/channel.ts`
 - Test: `services/kiloclaw/plugins/kilo-chat/src/channel.test.ts`
 
@@ -1401,7 +1411,9 @@ describe('kilo-chat outbound.editText', () => {
 
 describe('kilo-chat outbound.deleteMessage', () => {
   it('calls the controller DELETE endpoint', async () => {
-    const fetchImpl = vi.fn(async () => new Response(null, { status: 204 })) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(
+      async () => new Response(null, { status: 204 })
+    ) as unknown as typeof fetch;
     const originalEnv = { ...process.env };
     process.env.OPENCLAW_GATEWAY_TOKEN = 'gwt';
     process.env.KILOCLAW_CONTROLLER_URL = 'http://127.0.0.1:18789';
@@ -1499,6 +1511,7 @@ git commit -m "feat(kiloclaw/kilo-chat): expose editText and deleteMessage outbo
 ## Task 10: Wire preview streaming into webhook dispatch
 
 **Files:**
+
 - Modify: `services/kiloclaw/plugins/kilo-chat/src/webhook.ts`
 - Test: `services/kiloclaw/plugins/kilo-chat/src/webhook.test.ts`
 
@@ -1511,10 +1524,7 @@ Extend `webhook.test.ts` with integration-style tests that exercise `dispatchInb
 ```ts
 import { createPreviewStream } from './preview-stream';
 
-function makeRuntimeStub(capture: {
-  partialReplies: string[];
-  delivered: string[];
-}) {
+function makeRuntimeStub(capture: { partialReplies: string[]; delivered: string[] }) {
   const channelRuntime = {
     routing: {
       resolveAgentRoute: () => ({ agentId: 'agent-1', sessionKey: 'sk-1', accountId: '' }),
@@ -1641,12 +1651,17 @@ function buildDeliverWiring(params: {
 Wire inside `dispatchInbound`:
 
 ```ts
-const account = (api as unknown as {
-  resolveAccount?: (cfg: unknown, id: string | null) => {
-    streamingMode: 'off' | 'partial' | 'block';
-    throttleMs: number;
-  };
-}).resolveAccount?.(cfg, null) ?? { streamingMode: 'off' as const, throttleMs: 500 };
+const account = (
+  api as unknown as {
+    resolveAccount?: (
+      cfg: unknown,
+      id: string | null
+    ) => {
+      streamingMode: 'off' | 'partial' | 'block';
+      throttleMs: number;
+    };
+  }
+).resolveAccount?.(cfg, null) ?? { streamingMode: 'off' as const, throttleMs: 500 };
 
 const client = createKiloChatClient({
   controllerBaseUrl: process.env.KILOCLAW_CONTROLLER_URL ?? 'http://127.0.0.1:18789',
@@ -1676,8 +1691,7 @@ try {
     deliver: wiring.deliver,
     replyOptions: wiring.replyOptions,
     onRecordError: err => console.error('[kilo-chat] recordInboundSession:', err),
-    onDispatchError: (err, info) =>
-      console.error(`[kilo-chat] dispatchReply (${info.kind}):`, err),
+    onDispatchError: (err, info) => console.error(`[kilo-chat] dispatchReply (${info.kind}):`, err),
   });
   await wiring.finalize();
 } catch (err) {
@@ -1704,7 +1718,10 @@ function fakeClient(calls: { type: string; args: unknown }[]): KiloChatClient {
     },
     editMessage: async args => {
       calls.push({ type: 'edit', args });
-      return { messageId: (args as { messageId: string }).messageId, version: (args as { version: number }).version };
+      return {
+        messageId: (args as { messageId: string }).messageId,
+        version: (args as { version: number }).version,
+      };
     },
     deleteMessage: async args => {
       calls.push({ type: 'delete', args });
@@ -1788,6 +1805,7 @@ git commit -m "feat(kiloclaw/kilo-chat): wire preview streaming into inbound dis
 ## Task 11: Docs + plugin README update
 
 **Files:**
+
 - Modify: `services/kiloclaw/plugins/kilo-chat/README.md`
 
 - [ ] **Step 1: Add a "Streaming" section**
@@ -1815,6 +1833,7 @@ git commit -m "docs(kiloclaw/kilo-chat): document streaming.mode + throttleMs"
 cd /Users/igor/Projects/.worktrees/kilo-chat-plugin
 pnpm run typecheck
 ```
+
 Expected: clean.
 
 - [ ] **Step 2: Lint**
@@ -1823,6 +1842,7 @@ Expected: clean.
 cd /Users/igor/Projects/.worktrees/kilo-chat-plugin
 pnpm run lint
 ```
+
 Expected: 0 errors.
 
 - [ ] **Step 3: Tests**
@@ -1833,6 +1853,7 @@ pnpm test
 cd ../../services/kiloclaw/plugins/kilo-chat
 pnpm test
 ```
+
 Both: all pass.
 
 - [ ] **Step 4: Format check**
@@ -1842,6 +1863,7 @@ cd /Users/igor/Projects/.worktrees/kilo-chat-plugin
 pnpm run format:changed
 git status
 ```
+
 Expected: clean working tree (nothing to format).
 
 - [ ] **Step 5: Push (no-verify per repo convention)**
@@ -1894,6 +1916,7 @@ EOF
 ## Self-review (performed by plan author)
 
 **Spec coverage:**
+
 - External-service contract (POST/PATCH/DELETE + version) — Tasks 1-5 (client) + Tasks 4-6 (controller).
 - Controller routes with existing auth pattern — Tasks 4, 5, 6.
 - PreviewStream state machine (idle → editing → finalized/aborted; throttle; coalesce; dedup) — Task 7.
@@ -1907,6 +1930,7 @@ EOF
 **Placeholder scan:** none found. Every step has concrete code or a concrete command. Three steps (Task 8 Step 4, Task 9 Step 3, Task 10 Step 3) flag runtime SDK shape uncertainty and tell the implementer exactly which files to read to resolve it — these are known-unknowns, not placeholders.
 
 **Type consistency:**
+
 - `CreateMessageResult` defined in Task 1 Step 3; extended with `dropped?: boolean` in Task 2 Step 3. Consistent use thereafter.
 - `KiloChatClient` defined in Task 1; imported and used identically in Tasks 7, 9, 10.
 - `ResolvedKiloChatAccount` fields `streamingMode` and `throttleMs` added in Task 8; consumed in Task 10.

@@ -103,18 +103,18 @@ Public surface:
 
 ```ts
 type PreviewStream = {
-  update(partialText: string): void;         // fire-and-forget, throttled
+  update(partialText: string): void; // fire-and-forget, throttled
   finalize(finalText: string): Promise<{ messageId: string }>; // awaits
-  abort(reason?: unknown): Promise<void>;    // best-effort cleanup
+  abort(reason?: unknown): Promise<void>; // best-effort cleanup
 };
 
 function createPreviewStream(opts: {
   client: KiloChatClient;
   conversationId: string;
-  throttleMs: number;                        // default 500
-  now?: () => number;                        // test seam
-  setTimer?: typeof setTimeout;              // test seam
-  clearTimer?: typeof clearTimeout;          // test seam
+  throttleMs: number; // default 500
+  now?: () => number; // test seam
+  setTimer?: typeof setTimeout; // test seam
+  clearTimer?: typeof clearTimeout; // test seam
 }): PreviewStream;
 ```
 
@@ -137,6 +137,7 @@ State machine:
 ```
 
 Invariants:
+
 - Only one in-flight HTTP request at a time; concurrent `update` calls coalesce pending text.
 - `finalize` waits for any in-flight request, then performs exactly one final POST (if idle) or PATCH (if editing). It is the only call that guarantees the external state matches its argument.
 - `abort` runs `DELETE` only if `messageId` exists; errors are logged and swallowed.

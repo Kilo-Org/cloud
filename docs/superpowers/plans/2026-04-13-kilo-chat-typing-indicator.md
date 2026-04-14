@@ -37,6 +37,7 @@ No new files. All work fits inside the existing PR.
 ## Task 1: Controller proxy route — add typing endpoint
 
 **Files:**
+
 - Modify: `services/kiloclaw/controller/src/routes/kilo-chat.ts`
 - Modify: `services/kiloclaw/controller/src/routes/kilo-chat.test.ts`
 
@@ -246,10 +247,10 @@ import {
 Update the `if (env.KILOCHAT_API_TOKEN && env.KILOCHAT_BASE_URL)` block at lines 357–367 — add the typing registration after delete:
 
 ```ts
-    registerKiloChatSendRoute(honoApp, kiloChatOpts);
-    registerKiloChatEditRoute(honoApp, kiloChatOpts);
-    registerKiloChatDeleteRoute(honoApp, kiloChatOpts);
-    registerKiloChatTypingRoute(honoApp, kiloChatOpts);
+registerKiloChatSendRoute(honoApp, kiloChatOpts);
+registerKiloChatEditRoute(honoApp, kiloChatOpts);
+registerKiloChatDeleteRoute(honoApp, kiloChatOpts);
+registerKiloChatTypingRoute(honoApp, kiloChatOpts);
 ```
 
 - [ ] **Step 6: Re-run the controller test suite**
@@ -273,6 +274,7 @@ git commit -m "feat(kiloclaw): controller typing proxy for kilo-chat"
 ## Task 2: Plugin client — add `sendTyping`
 
 **Files:**
+
 - Modify: `services/kiloclaw/plugins/kilo-chat/src/client.ts`
 - Modify: `services/kiloclaw/plugins/kilo-chat/src/client.test.ts`
 
@@ -339,30 +341,30 @@ export type KiloChatClient = {
 Inside `createKiloChatClient`, after `deleteMessage`:
 
 ```ts
-  async function sendTyping(params: SendTypingParams): Promise<void> {
-    const response = await fetchImpl(`${base}/_kilo/kilo-chat/typing`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ conversationId: params.conversationId }),
-    });
-    if (!response.ok) {
-      throw new Error(
-        `kilo-chat: controller /typing responded ${response.status}: ${await response.text()}`
-      );
-    }
-    void response.body?.cancel();
+async function sendTyping(params: SendTypingParams): Promise<void> {
+  const response = await fetchImpl(`${base}/_kilo/kilo-chat/typing`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ conversationId: params.conversationId }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `kilo-chat: controller /typing responded ${response.status}: ${await response.text()}`
+    );
   }
+  void response.body?.cancel();
+}
 ```
 
 Update the returned object:
 
 ```ts
-  return {
-    createMessage,
-    editMessage,
-    deleteMessage,
-    sendTyping,
-  };
+return {
+  createMessage,
+  editMessage,
+  deleteMessage,
+  sendTyping,
+};
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -387,6 +389,7 @@ git commit -m "feat(kiloclaw): kilo-chat client sendTyping"
 This is the load-bearing change. We replace `recordInboundSessionAndDispatchReply` (which doesn't expose `typing`) with the three primitive calls Telegram uses.
 
 **Files:**
+
 - Modify: `services/kiloclaw/plugins/kilo-chat/src/webhook.ts`
 - Modify: `services/kiloclaw/plugins/kilo-chat/src/webhook.test.ts`
 
@@ -473,54 +476,53 @@ import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/plugin-entry';
 Replace the body of `dispatchInbound` (lines ~143–235). Keep the existing route-resolution + envelope-building + `ctxPayload` + `client` + `wiring` blocks (lines ~147–206) verbatim. Replace **only** the `try { await recordInboundSessionAndDispatchReply({ … }); … } catch { … }` block at the bottom with:
 
 ```ts
+try {
+  await channelRuntime.session.recordInboundSession({
+    storePath,
+    sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
+    ctx: ctxPayload,
+    onRecordError: err => console.error('[kilo-chat] recordInboundSession:', err),
+  });
+
+  const { onModelSelected, ...replyPipeline } = createChannelReplyPipeline({
+    cfg,
+    agentId: route.agentId,
+    channel: 'kilo-chat',
+    accountId: '',
+    typing: {
+      start: () => client.sendTyping({ conversationId: payload.conversationId }),
+      onStartError: err => console.warn('[kilo-chat] typing start failed:', err),
+    },
+  });
+
+  const deliver = createNormalizedOutboundDeliverer(wiring.deliver);
+
+  await channelRuntime.reply.dispatchReplyWithBufferedBlockDispatcher({
+    ctx: ctxPayload,
+    cfg,
+    dispatcherOptions: {
+      ...replyPipeline,
+      deliver,
+      onError: (err, info) => console.error(`[kilo-chat] dispatchReply (${info.kind}):`, err),
+    },
+    replyOptions: {
+      ...wiring.replyOptions,
+      onModelSelected,
+    },
+  });
+  await wiring.finalize();
+} catch (err) {
   try {
-    await channelRuntime.session.recordInboundSession({
-      storePath,
-      sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
-      ctx: ctxPayload,
-      onRecordError: err => console.error('[kilo-chat] recordInboundSession:', err),
-    });
-
-    const { onModelSelected, ...replyPipeline } = createChannelReplyPipeline({
-      cfg,
-      agentId: route.agentId,
-      channel: 'kilo-chat',
-      accountId: '',
-      typing: {
-        start: () => client.sendTyping({ conversationId: payload.conversationId }),
-        onStartError: err =>
-          console.warn('[kilo-chat] typing start failed:', err),
-      },
-    });
-
-    const deliver = createNormalizedOutboundDeliverer(wiring.deliver);
-
-    await channelRuntime.reply.dispatchReplyWithBufferedBlockDispatcher({
-      ctx: ctxPayload,
-      cfg,
-      dispatcherOptions: {
-        ...replyPipeline,
-        deliver,
-        onError: (err, info) =>
-          console.error(`[kilo-chat] dispatchReply (${info.kind}):`, err),
-      },
-      replyOptions: {
-        ...wiring.replyOptions,
-        onModelSelected,
-      },
-    });
-    await wiring.finalize();
-  } catch (err) {
-    try {
-      await wiring.finalize(err);
-    } catch {
-      // best-effort cleanup; do not let finalize errors mask the original dispatch error
-    }
-    throw err;
+    await wiring.finalize(err);
+  } catch {
+    // best-effort cleanup; do not let finalize errors mask the original dispatch error
   }
+  throw err;
+}
 ```
 
 Three things to double-check while editing:
+
 1. The `client` const created at line ~197 must stay in scope (the typing `start` closure references it).
 2. `wiring.replyOptions` already supplies `onPartialReply`. We must spread it so `onModelSelected` overrides nothing else accidentally.
 3. The `accountId: ''` matches the value passed elsewhere in the file (kilo-chat is single-account).
@@ -555,6 +557,7 @@ git commit -m "feat(kiloclaw): kilo-chat typing indicator via SDK pipeline"
 ## Task 4: Documentation
 
 **Files:**
+
 - Modify: `services/kiloclaw/plugins/kilo-chat/README.md`
 
 - [ ] **Step 1: Document the new outbound action**
@@ -610,6 +613,7 @@ Edit PR #2361 description: append a section under "Outbound" listing the new `/v
 ## Self-review notes
 
 **Spec coverage:**
+
 - Wire shape A → Task 1 (controller route) + Task 2 (client method)
 - Telegram-equivalent start trigger → Task 3 (`createChannelReplyPipeline({ typing })`)
 - Inter-block re-fire → Task 3 (free from SDK; no extra code)
@@ -618,9 +622,11 @@ Edit PR #2361 description: append a section under "Outbound" listing the new `/v
 - Concurrency-acceptable → no per-conversation locking added; matches stated assumption
 
 **Type consistency:**
+
 - `KiloChatClient.sendTyping` signature `(p: SendTypingParams) => Promise<void>` is consistent across client.ts, client.test.ts, and the closure in webhook.ts.
 - `KILOCHAT_BASE_URL`, `KILOCLAW_SANDBOX_ID`, and `OPENCLAW_GATEWAY_TOKEN` env names match existing usages elsewhere in the file.
 
 **Open verification items the executing engineer must confirm before writing tests in Task 3, Step 2:**
+
 - Read `services/kiloclaw/plugins/kilo-chat/src/webhook.test.ts` to learn the existing harness shape (helper names, how `api` is stubbed). Adapt the new test snippets to match.
 - Read `~/Projects/openclaw/src/auto-reply/reply/reply-dispatcher.ts` lines 220–230 to confirm `dispatcherOptions.typingCallbacks` is the exact field name on the dispatcher options shape.

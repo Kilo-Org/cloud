@@ -12,7 +12,6 @@ import type {
   SandboxId as ServiceSandboxId,
   SessionId as ServiceSessionId,
   SessionContext,
-  ExecutionSession,
 } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { ExecutionPlan, ExecutionResult } from './types.js';
@@ -23,13 +22,7 @@ import { updateGitRemoteToken } from '../workspace.js';
 import { WrapperClient, type WrapperPromptOptions } from '../kilo/wrapper-client.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { normalizeAgentMode } from '../schema.js';
-import { createR2Client } from '@kilocode/worker-utils';
-import {
-  deriveAttachmentService,
-  downloadImagesToSandbox,
-  inferMimeType,
-} from '../utils/image-download.js';
-import { assertR2AttachmentDownloadConfigured, type ImageFilePart } from './image-prompt-parts.js';
+import { buildImagePromptParts, downloadImagePromptParts } from './image-prompt-parts.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -144,7 +137,13 @@ export class ExecutionOrchestrator {
     }
 
     // 6. Download images from R2 to sandbox if provided
-    const fileParts = await this.downloadImages(plan, prepared.session);
+    const fileParts = await downloadImagePromptParts({
+      env: this.deps.env,
+      session: prepared.session,
+      userId: plan.userId,
+      images: plan.images,
+      createdOnPlatform: this.getCreatedOnPlatform(plan),
+    });
 
     // 7. Send prompt with execution binding (async - returns messageId immediately)
     const ingestUrl = this.deps.getIngestUrl(sessionId, userId);
@@ -174,7 +173,7 @@ export class ExecutionOrchestrator {
     };
 
     if (fileParts.length > 0) {
-      promptOptions.parts = [{ type: 'text', text: prompt }, ...fileParts];
+      promptOptions.parts = buildImagePromptParts(prompt, fileParts);
     } else {
       promptOptions.prompt = prompt;
     }
@@ -407,68 +406,6 @@ export class ExecutionOrchestrator {
         error
       );
     }
-  }
-
-  /**
-   * Download images from R2 to the sandbox and return file parts for the prompt.
-   * Returns an empty array when there are no images.
-   */
-  private async downloadImages(
-    plan: ExecutionPlan,
-    session: ExecutionSession
-  ): Promise<ImageFilePart[]> {
-    if (!plan.images) return [];
-
-    const env = this.deps.env;
-
-    if (
-      !env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID ||
-      !env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY ||
-      !env.R2_ENDPOINT ||
-      !env.R2_ATTACHMENTS_BUCKET
-    ) {
-      logger.warn('Image attachments requested but R2 download config is incomplete', {
-        hasAccessKeyId: Boolean(env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID),
-        hasSecretAccessKey: Boolean(env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY),
-        hasEndpoint: Boolean(env.R2_ENDPOINT),
-        hasBucket: Boolean(env.R2_ATTACHMENTS_BUCKET),
-      });
-    }
-
-    assertR2AttachmentDownloadConfigured(env);
-
-    const r2Client = createR2Client({
-      accessKeyId: env.R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID,
-      secretAccessKey: env.R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY,
-      endpoint: env.R2_ENDPOINT,
-    });
-
-    const attachmentService = deriveAttachmentService(this.getCreatedOnPlatform(plan));
-    const { localPaths, errors } = await downloadImagesToSandbox(
-      r2Client,
-      env.R2_ATTACHMENTS_BUCKET,
-      session,
-      plan.userId,
-      attachmentService,
-      plan.images
-    );
-
-    if (errors.length > 0) {
-      logger
-        .withFields({ errorCount: errors.length, attachmentService })
-        .warn('Image attachment download failed');
-      throw ExecutionError.workspaceSetupFailed('Failed to download image attachments');
-    }
-
-    return localPaths.map((localPath, i) => {
-      const filename = plan.images?.files[i] ?? localPath.split('/').pop() ?? 'image';
-      return {
-        type: 'file' as const,
-        mime: inferMimeType(filename),
-        url: `file://${localPath}`,
-        filename,
-      };
-    });
   }
 
   private getCreatedOnPlatform(plan: ExecutionPlan): string | undefined {

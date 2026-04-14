@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { assertR2AttachmentDownloadConfigured } from './image-prompt-parts.js';
+import {
+  assertR2AttachmentDownloadConfigured,
+  buildImageFileParts,
+  buildImagePromptParts,
+} from './image-prompt-parts.js';
 import { ExecutionError } from './errors.js';
+import type { Images } from '../router/schemas.js';
 import type { Env } from '../types.js';
 
 const createEnv = (overrides: Partial<Env> = {}): Env =>
@@ -11,6 +16,46 @@ const createEnv = (overrides: Partial<Env> = {}): Env =>
     R2_ATTACHMENTS_BUCKET: 'attachments',
     ...overrides,
   }) as Env;
+
+const images = {
+  path: '00000000-0000-4000-8000-000000000000',
+  files: ['11111111-1111-4111-8111-111111111111.png', '22222222-2222-4222-8222-222222222222.jpeg'],
+} satisfies Images;
+
+describe('buildImageFileParts', () => {
+  it('maps downloaded image paths to file prompt parts using original filenames', () => {
+    expect(buildImageFileParts(images, ['/tmp/first.png', '/tmp/second.jpeg'])).toEqual([
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: 'file:///tmp/first.png',
+        filename: '11111111-1111-4111-8111-111111111111.png',
+      },
+      {
+        type: 'file',
+        mime: 'image/jpeg',
+        url: 'file:///tmp/second.jpeg',
+        filename: '22222222-2222-4222-8222-222222222222.jpeg',
+      },
+    ]);
+  });
+});
+
+describe('buildImagePromptParts', () => {
+  it('prepends the text prompt before image file parts', () => {
+    const fileParts = buildImageFileParts(images, ['/tmp/first.png']);
+
+    expect(buildImagePromptParts('Describe this image', fileParts)).toEqual([
+      { type: 'text', text: 'Describe this image' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: 'file:///tmp/first.png',
+        filename: '11111111-1111-4111-8111-111111111111.png',
+      },
+    ]);
+  });
+});
 
 describe('assertR2AttachmentDownloadConfigured', () => {
   it('throws a retryable user-visible error when R2 download config is incomplete', () => {
@@ -27,9 +72,10 @@ describe('assertR2AttachmentDownloadConfigured', () => {
       expect.fail('Expected missing R2 config to throw');
     } catch (error) {
       expect(error).toBeInstanceOf(ExecutionError);
-      expect((error as ExecutionError).code).toBe('WORKSPACE_SETUP_FAILED');
-      expect((error as ExecutionError).retryable).toBe(true);
-      expect((error as ExecutionError).message).toBe(
+      if (!(error instanceof ExecutionError)) throw error;
+      expect(error.code).toBe('WORKSPACE_SETUP_FAILED');
+      expect(error.retryable).toBe(true);
+      expect(error.message).toBe(
         'Image attachments were requested, but R2 attachment download is not configured'
       );
     }

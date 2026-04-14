@@ -140,24 +140,3 @@ export function buildAttachArgs(localPaths: string[]): string {
   if (localPaths.length === 0) return '';
   return localPaths.map(p => `--attach=${p}`).join(' ');
 }
-
-const MIME_TYPES: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.svg': 'image/svg+xml',
-  '.bmp': 'image/bmp',
-  '.pdf': 'application/pdf',
-};
-
-/**
- * Infer MIME type from a filename extension.
- */
-export function inferMimeType(filename: string): string {
-  const dotIndex = filename.lastIndexOf('.');
-  if (dotIndex === -1) return 'application/octet-stream';
-  const ext = filename.slice(dotIndex).toLowerCase();
-  return MIME_TYPES[ext] ?? 'application/octet-stream';
-}

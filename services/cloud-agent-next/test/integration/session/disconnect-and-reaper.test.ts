@@ -60,8 +60,8 @@ describe('Disconnect handling & reaper', () => {
         status: 'running',
       });
 
-      // Set a heartbeat old enough to be stale (>90s threshold)
-      const staleHeartbeat = now - 200_000;
+      // Set a heartbeat old enough to be stale under default and configured thresholds.
+      const staleHeartbeat = now - 11 * 60 * 1000;
       await instance.updateExecutionHeartbeat(excId, staleHeartbeat);
 
       // Run the alarm (reaper)
@@ -190,7 +190,7 @@ describe('Disconnect handling & reaper', () => {
         status: 'running',
       });
 
-      // Set a recent heartbeat (10 seconds ago — well within 90s threshold)
+      // Set a recent heartbeat (10 seconds ago — well within stale thresholds)
       await instance.updateExecutionHeartbeat(excId, now - 10_000);
 
       // Run the alarm (reaper)
@@ -562,8 +562,8 @@ describe('Disconnect handling & reaper', () => {
         status: 'running',
       });
 
-      // Stale heartbeat — exceeds the 90s threshold
-      await instance.updateExecutionHeartbeat(excId, now - 200_000);
+      // Stale heartbeat — exceeds default and configured thresholds.
+      await instance.updateExecutionHeartbeat(excId, now - 11 * 60 * 1000);
 
       // First alarm: should mark execution as failed and insert error event
       await instance.alarm();
@@ -626,8 +626,8 @@ describe('Disconnect handling & reaper', () => {
         status: 'running',
       });
 
-      // Stale heartbeat
-      await instance.updateExecutionHeartbeat(excId, now - 200_000);
+      // Stale heartbeat — exceeds default and configured thresholds.
+      await instance.updateExecutionHeartbeat(excId, now - 11 * 60 * 1000);
 
       // Set the interrupt flag before the reaper runs
       await instance.requestInterrupt();

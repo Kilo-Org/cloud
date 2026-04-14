@@ -10,12 +10,8 @@ function createFile(size: number, type = 'image/png') {
 }
 
 describe('buildImageUploadPath', () => {
-  it('keeps app-builder image paths unchanged by default', () => {
+  it('uses the message UUID as the image path', () => {
     expect(buildImageUploadPath('message-uuid')).toBe('message-uuid');
-  });
-
-  it('prefixes image paths when configured', () => {
-    expect(buildImageUploadPath('message-uuid', 'cloud-agent')).toBe('cloud-agent/message-uuid');
   });
 });
 

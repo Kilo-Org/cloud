@@ -74,8 +74,8 @@ export function validateImageFileSize(
   return null;
 }
 
-export function buildImageUploadPath(messageUuid: string, pathPrefix?: string): string {
-  return pathPrefix ? `${pathPrefix}/${messageUuid}` : messageUuid;
+export function buildImageUploadPath(messageUuid: string): string {
+  return messageUuid;
 }
 
 type UploadUrlInput = {
@@ -95,7 +95,6 @@ export type UseImageUploadOptions = {
   maxFileSizeBytes?: number;
   allowedTypes?: readonly string[];
   resizeImages?: ImageResizeOptions;
-  pathPrefix?: string;
   onImagesChange?: (images: ImageFile[]) => void;
   /** Override the default app-builder upload mutations. */
   getUploadUrl?: {
@@ -244,7 +243,6 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
     maxFileSizeBytes = APP_BUILDER_IMAGE_MAX_SIZE_BYTES,
     allowedTypes = APP_BUILDER_IMAGE_ALLOWED_TYPES,
     resizeImages,
-    pathPrefix,
     onImagesChange,
     getUploadUrl,
   } = options;
@@ -529,10 +527,10 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
     if (completedFilenames.length === 0) return undefined;
 
     return {
-      path: buildImageUploadPath(messageUuid, pathPrefix),
+      path: buildImageUploadPath(messageUuid),
       files: completedFilenames,
     };
-  }, [messageUuid, pathPrefix]);
+  }, [messageUuid]);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();

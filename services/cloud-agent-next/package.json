@@ -22,7 +22,8 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.workers.config.ts",
     "test:integration:watch": "vitest --config vitest.workers.config.ts",
-    "test:all": "vitest run && vitest run --config vitest.workers.config.ts",
+    "test:wrapper": "pnpm -C wrapper run test",
+    "test:all": "vitest run && vitest run --config vitest.workers.config.ts && pnpm run test:wrapper",
     "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck"
   },
   "dependencies": {

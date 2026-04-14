@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "bun run build.ts",
+    "test": "bun test src",
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {

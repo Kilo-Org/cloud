@@ -4,6 +4,7 @@ process.env.KILOCLAW_INTERNAL_API_SECRET ||= 'test-secret';
 import { describe, expect, it } from '@jest/globals';
 import { db } from '@/lib/drizzle';
 import {
+  cancelCliRun,
   createCliRun,
   getCliRunInitiatedBy,
   markCliRunCancelled,
@@ -46,6 +47,46 @@ async function getRunStatus(runId: string) {
 
   return row;
 }
+
+describe('cancelCliRun', () => {
+  it('does not cancel the controller run when its timestamp belongs to a different stored run', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'stale running row',
+      startedAt: '2026-04-12T12:00:00.000Z',
+      initiatedByAdminId: null,
+    });
+    const cancelControllerRun = jest.fn(async () => ({ ok: true }));
+
+    await expect(
+      cancelCliRun({
+        runId,
+        userId: user.id,
+        instanceId,
+        workerInstanceId: 'ki_current',
+        getControllerStatus: async () => ({
+          hasRun: true,
+          status: 'running',
+          output: null,
+          exitCode: null,
+          startedAt: '2026-04-12T12:05:00.000Z',
+          completedAt: null,
+          prompt: 'newer run',
+        }),
+        cancelControllerRun,
+      })
+    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false });
+
+    expect(cancelControllerRun).not.toHaveBeenCalled();
+    await expect(getRunStatus(runId)).resolves.toEqual({
+      status: 'running',
+      completed_at: null,
+    });
+  });
+});
 
 describe('markCliRunCancelled', () => {
   it('does not cancel an instance-scoped run when instanceId is null', async () => {

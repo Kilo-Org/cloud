@@ -155,6 +155,14 @@ export async function cancelCliRun(params: {
   userId: string;
   instanceId: string | null;
   workerInstanceId?: string;
+  getControllerStatus?: (
+    userId: string,
+    workerInstanceId: string | undefined
+  ) => Promise<KiloCliRunStatusResponse>;
+  cancelControllerRun?: (
+    userId: string,
+    workerInstanceId: string | undefined
+  ) => Promise<{ ok: boolean }>;
 }): Promise<CancelCliRunResult> {
   const [row] = await db
     .select()
@@ -174,8 +182,29 @@ export async function cancelCliRun(params: {
     params.workerInstanceId ??
     (row.instance_id ? await resolveWorkerInstanceId(row.instance_id) : undefined);
 
-  const client = new KiloClawInternalClient();
-  const result = await client.cancelKiloCliRun(params.userId, effectiveWorkerInstanceId);
+  const client =
+    params.getControllerStatus && params.cancelControllerRun
+      ? undefined
+      : new KiloClawInternalClient();
+  const getControllerStatus =
+    params.getControllerStatus ??
+    ((userId: string, workerInstanceId: string | undefined) => {
+      if (!client) throw new Error('KiloClaw internal client is not available');
+      return client.getKiloCliRunStatus(userId, workerInstanceId);
+    });
+  const cancelControllerRun =
+    params.cancelControllerRun ??
+    ((userId: string, workerInstanceId: string | undefined) => {
+      if (!client) throw new Error('KiloClaw internal client is not available');
+      return client.cancelKiloCliRun(userId, workerInstanceId);
+    });
+
+  const controllerStatus = await getControllerStatus(params.userId, effectiveWorkerInstanceId);
+  if (!isControllerStatusForRun(row, controllerStatus)) {
+    return { ok: true, runFound: true, cancelled: false };
+  }
+
+  const result = await cancelControllerRun(params.userId, effectiveWorkerInstanceId);
 
   if (result.ok) {
     await markCliRunCancelled({

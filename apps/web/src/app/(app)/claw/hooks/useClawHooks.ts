@@ -10,6 +10,7 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+
 import { useTRPC } from '@/lib/trpc/utils';
 import { useClawContext } from '../components/ClawContext';
 
@@ -34,26 +35,68 @@ export function useClawConfig() {
 
 // ── Disk usage ──────────────────────────────────────────────────
 
-export function useClawDiskUsage(enabled: boolean) {
-  const trpc = useTRPC();
-  const { organizationId } = useClawContext();
+type DiskUsageQueryOptions<TData = unknown> = {
+  queryKey: readonly unknown[];
+  queryFn?: () => Promise<TData>;
+  enabled?: boolean;
+  refetchInterval?: number;
+};
 
-  const personal = useQuery({
+type DiskUsageTrpc = {
+  kiloclaw: {
+    getDiskUsage: {
+      queryOptions: (
+        input: undefined,
+        options: { refetchInterval: number }
+      ) => DiskUsageQueryOptions<{ data: { disk_used_bytes: number; disk_total_bytes: number }[] }>;
+    };
+  };
+  organizations: {
+    kiloclaw: {
+      getDiskUsage: {
+        queryOptions: (
+          input: { organizationId: string },
+          options: { refetchInterval: number }
+        ) => DiskUsageQueryOptions<{
+          data: { disk_used_bytes: number; disk_total_bytes: number }[];
+        }>;
+      };
+    };
+  };
+};
+
+export function getClawDiskUsageQueryOptions(
+  trpc: DiskUsageTrpc,
+  organizationId: string | undefined,
+  enabled: boolean
+) {
+  const personal = {
     ...trpc.kiloclaw.getDiskUsage.queryOptions(undefined, {
       refetchInterval: 60_000,
     }),
     enabled: enabled && !organizationId,
-  });
+  };
 
-  const org = useQuery({
+  const org = {
     ...trpc.organizations.kiloclaw.getDiskUsage.queryOptions(
       { organizationId: organizationId ?? '' },
       { refetchInterval: 60_000 }
     ),
     enabled: enabled && !!organizationId,
-  });
+  };
 
-  return organizationId ? org : personal;
+  return { personal, org, active: organizationId ? org : personal };
+}
+
+export function useClawDiskUsage(enabled: boolean) {
+  const trpc = useTRPC();
+  const { organizationId } = useClawContext();
+  const { personal, org } = getClawDiskUsageQueryOptions(trpc, organizationId, enabled);
+
+  const personalQuery = useQuery(personal);
+  const orgQuery = useQuery(org);
+
+  return organizationId ? orgQuery : personalQuery;
 }
 
 // ── Controller version ──────────────────────────────────────────

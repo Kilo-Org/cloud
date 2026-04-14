@@ -17,6 +17,7 @@ import {
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
+import { sentryLogger } from '@/lib/utils.server';
 import { db } from '@/lib/drizzle';
 import {
   kiloclaw_version_pins,
@@ -211,6 +212,8 @@ function sanitizeKiloCodeConfigResponse(
   };
 }
 
+const logDiskUsageError = sentryLogger('organization-kiloclaw-disk-usage', 'error');
+
 // ── Router ─────────────────────────────────────────────────────────
 
 export const organizationKiloclawRouter = createTRPCRouter({
@@ -307,10 +310,16 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     try {
       return await queryDiskUsage(instance.sandboxId);
-    } catch {
+    } catch (error) {
+      logDiskUsageError('Failed to fetch organization disk usage', {
+        error,
+        organizationId: input.organizationId,
+        sandboxId: instance.sandboxId,
+      });
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to fetch disk usage',
+        cause: error,
       });
     }
   }),

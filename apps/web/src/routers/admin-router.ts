@@ -15,8 +15,6 @@ import {
   kiloclaw_earlybird_purchases,
   kiloclaw_email_log,
   kiloclaw_instances,
-  microdollar_usage_metadata,
-  http_ip,
 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
@@ -182,18 +180,6 @@ const GetKiloClawStateSchema = z.object({
   userId: z.string(),
 });
 
-const IpClustersListSchema = z.object({
-  threshold: z.number().int().min(2).max(100).default(3),
-  days: z.number().int().min(1).max(14).default(7),
-  limit: z.number().int().min(1).max(200).default(100),
-});
-
-const IpClusterAccountsSchema = z.object({
-  httpIpId: z.number().int(),
-  days: z.number().int().min(1).max(14).default(7),
-  limit: z.number().int().min(1).max(500).default(200),
-});
-
 const UpdateKiloClawTrialEndAtSchema = z.object({
   userId: z.string(),
   subscriptionId: z.string(),
@@ -207,135 +193,6 @@ const CancelKiloClawSubscriptionSchema = z.object({
 });
 
 export const adminRouter = createTRPCRouter({
-  ipClusters: createTRPCRouter({
-    list: adminProcedure.input(IpClustersListSchema).query(async ({ input }) => {
-      const accountCount = sql<number>`count(distinct ${microdollar_usage.kilo_user_id})::int`.as(
-        'account_count'
-      );
-      const requestCount = sql<number>`count(*)::int`.as('request_count');
-      const clusterSubquery = db
-        .select({
-          httpIpId: microdollar_usage_metadata.http_ip_id,
-          accountCount,
-          requestCount,
-        })
-        .from(microdollar_usage)
-        .innerJoin(
-          microdollar_usage_metadata,
-          eq(microdollar_usage.id, microdollar_usage_metadata.id)
-        )
-        .where(sql`${microdollar_usage.created_at} >= now() - (${input.days} * interval '1 day')`)
-        .groupBy(microdollar_usage_metadata.http_ip_id)
-        .having(sql`count(distinct ${microdollar_usage.kilo_user_id}) >= ${input.threshold}`)
-        .orderBy(desc(accountCount), desc(requestCount))
-        .limit(input.limit)
-        .as('ip_clusters');
-
-      const rows = await db
-        .select({
-          httpIpId: clusterSubquery.httpIpId,
-          ip: http_ip.http_ip,
-          accountCount: clusterSubquery.accountCount,
-          requestCount: clusterSubquery.requestCount,
-        })
-        .from(clusterSubquery)
-        .innerJoin(http_ip, eq(clusterSubquery.httpIpId, http_ip.http_ip_id))
-        .orderBy(desc(clusterSubquery.accountCount), desc(clusterSubquery.requestCount));
-
-      return {
-        clusters: rows.flatMap(r =>
-          r.httpIpId != null
-            ? [
-                {
-                  httpIpId: r.httpIpId,
-                  ip: r.ip,
-                  accountCount: r.accountCount ?? 0,
-                  requestCount: r.requestCount ?? 0,
-                },
-              ]
-            : []
-        ),
-        threshold: input.threshold,
-        days: input.days,
-      };
-    }),
-    accounts: adminProcedure.input(IpClusterAccountsSchema).query(async ({ input }) => {
-      const rows = await db
-        .selectDistinct({
-          accountId: microdollar_usage.kilo_user_id,
-        })
-        .from(microdollar_usage)
-        .innerJoin(
-          microdollar_usage_metadata,
-          eq(microdollar_usage.id, microdollar_usage_metadata.id)
-        )
-        .where(
-          and(
-            eq(microdollar_usage_metadata.http_ip_id, input.httpIpId),
-            sql`${microdollar_usage.created_at} >= now() - (${input.days} * interval '1 day')`
-          )
-        )
-        .orderBy(asc(microdollar_usage.kilo_user_id))
-        .limit(input.limit);
-
-      return {
-        accountIds: rows.map(row => row.accountId),
-      };
-    }),
-    seedTestData: adminProcedure.mutation(async () => {
-      if (process.env.NODE_ENV !== 'development') {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'This endpoint is only available in development mode',
-        });
-      }
-
-      // Create two test IPs
-      const [ip1] = await db
-        .insert(http_ip)
-        .values({ http_ip: `10.99.1.${Date.now() % 256}` })
-        .returning({ id: http_ip.http_ip_id });
-      const [ip2] = await db
-        .insert(http_ip)
-        .values({ http_ip: `10.99.2.${Date.now() % 256}` })
-        .returning({ id: http_ip.http_ip_id });
-
-      if (!ip1 || !ip2)
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to create test IPs',
-        });
-
-      // Cluster 1: 3 distinct accounts sharing IP1
-      // Cluster 2: 7 distinct accounts sharing IP2
-      const clusterConfigs = [
-        { ipId: ip1.id, accountCount: 3 },
-        { ipId: ip2.id, accountCount: 7 },
-      ];
-
-      for (const { ipId, accountCount } of clusterConfigs) {
-        for (let i = 0; i < accountCount; i++) {
-          const usageId = crypto.randomUUID();
-          await db.insert(microdollar_usage).values({
-            id: usageId,
-            kilo_user_id: `test-ip-cluster-user-${ipId}-${i}`,
-            cost: 1000,
-            input_tokens: 100,
-            output_tokens: 50,
-            cache_write_tokens: 0,
-            cache_hit_tokens: 0,
-          });
-          await db.insert(microdollar_usage_metadata).values({
-            id: usageId,
-            message_id: `test-msg-${usageId}`,
-            http_ip_id: ipId,
-          });
-        }
-      }
-
-      return { success: true, message: 'Seeded 2 IP clusters (3 accounts + 7 accounts)' };
-    }),
-  }),
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({
     getKilocodeOpenPullRequestCounts: adminProcedure.query(async () => {

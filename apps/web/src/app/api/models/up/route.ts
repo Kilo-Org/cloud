@@ -9,6 +9,7 @@ const HEALTH_CHECK_KEY = 'kilo-models-health-check';
 
 type ModelHealthMetrics = {
   healthy: boolean;
+  monitored: boolean;
   currentRequests: number;
   previousRequests: number;
   baselineRequests: number;
@@ -76,7 +77,9 @@ export async function GET(
     anchorTime = parsed;
   }
 
-  const monitoredModels = (await getMonitoredModels()).filter(m => !HEALTH_CHECK_EXCLUSIONS.has(m));
+  const allPreferredModels = await getMonitoredModels();
+  const monitoredModels = allPreferredModels.filter(m => !HEALTH_CHECK_EXCLUSIONS.has(m));
+  const nonMonitoredModels = allPreferredModels.filter(m => HEALTH_CHECK_EXCLUSIONS.has(m));
 
   try {
     const queryStartTime = Date.now();
@@ -112,7 +115,7 @@ export async function GET(
             created_at >= ${ref} - INTERVAL '2 hours'
             AND created_at <= ${ref}
             AND has_error = false
-            AND requested_model IN (${sql.join(monitoredModels, sql`, `)})
+            AND requested_model IN (${sql.join(allPreferredModels, sql`, `)})
           GROUP BY requested_model
         )
         SELECT
@@ -139,20 +142,25 @@ export async function GET(
           ? Math.round(((currentRequests - baselineRequests) / baselineRequests) * 100)
           : 0;
       const absoluteDrop = currentRequests - baselineRequests;
+      const isMonitored = !HEALTH_CHECK_EXCLUSIONS.has(row.requested_model);
 
+      // Non-monitored models are always reported healthy — they can't trigger alerts.
       // Per-model health: unhealthy when the baseline had enough distinct organic
       // users AND the model shows a significant traffic drop.
-      const healthy = !(
-        uniqueUsersBaseline >= MIN_UNIQUE_USERS_FOR_ALERT &&
-        ((baselineRequests > HIGH_BASELINE && percentChange < -90) ||
-          (baselineRequests > LOW_BASELINE &&
-            baselineRequests < HIGH_BASELINE &&
-            currentRequests === 0 &&
-            previousRequests === 0))
-      );
+      const healthy =
+        !isMonitored ||
+        !(
+          uniqueUsersBaseline >= MIN_UNIQUE_USERS_FOR_ALERT &&
+          ((baselineRequests > HIGH_BASELINE && percentChange < -90) ||
+            (baselineRequests > LOW_BASELINE &&
+              baselineRequests < HIGH_BASELINE &&
+              currentRequests === 0 &&
+              previousRequests === 0))
+        );
 
       models[row.requested_model] = {
         healthy,
+        monitored: isMonitored,
         currentRequests,
         previousRequests,
         baselineRequests,
@@ -168,6 +176,22 @@ export async function GET(
       if (!models[requested_model]) {
         models[requested_model] = {
           healthy: true,
+          monitored: true,
+          currentRequests: 0,
+          previousRequests: 0,
+          baselineRequests: 0,
+          percentChange: 0,
+          absoluteDrop: 0,
+          uniqueUsersCurrent: 0,
+          uniqueUsersBaseline: 0,
+        };
+      }
+    }
+    for (const requested_model of nonMonitoredModels) {
+      if (!models[requested_model]) {
+        models[requested_model] = {
+          healthy: true,
+          monitored: false,
           currentRequests: 0,
           previousRequests: 0,
           baselineRequests: 0,
@@ -180,7 +204,8 @@ export async function GET(
     }
 
     const queryExecutionTimeMs = Date.now() - queryStartTime;
-    const hasSignificantDrop = Object.values(models).some(m => !m.healthy);
+    // Only monitored models affect the top-level health status
+    const hasSignificantDrop = Object.values(models).some(m => m.monitored && !m.healthy);
     const status = hasSignificantDrop ? 503 : 200;
 
     return NextResponse.json(
@@ -197,7 +222,7 @@ export async function GET(
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'models/up', source: 'model_health_check' },
-      extra: { monitoredModels },
+      extra: { monitoredModels, nonMonitoredModels },
     });
 
     // Fail open: a query timeout or DB error is not evidence of a model being down.

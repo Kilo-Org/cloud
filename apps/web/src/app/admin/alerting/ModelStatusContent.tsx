@@ -75,7 +75,8 @@ function StatusDot({
     );
   }
 
-  const color = metrics.healthy ? 'bg-green-500' : 'bg-red-500';
+  const noTraffic = metrics.currentRequests === 0 && metrics.baselineRequests === 0;
+  const color = noTraffic ? 'bg-gray-300' : metrics.healthy ? 'bg-green-500' : 'bg-red-500';
 
   const time = format(new Date(timestamp), 'HH:mm');
 
@@ -90,10 +91,16 @@ function StatusDot({
         <TooltipContent side="top" className="text-xs">
           <div className="space-y-0.5">
             <div className="font-medium">{time}</div>
-            <div>Current: {metrics.currentRequests} reqs</div>
-            <div>Baseline: {metrics.baselineRequests} reqs</div>
-            <div>Change: {metrics.percentChange}%</div>
-            <div>Users (current): {metrics.uniqueUsersCurrent}</div>
+            {noTraffic ? (
+              <div>No traffic in this window</div>
+            ) : (
+              <>
+                <div>Current: {metrics.currentRequests} reqs</div>
+                <div>Baseline: {metrics.baselineRequests} reqs</div>
+                <div>Change: {metrics.percentChange}%</div>
+                <div>Users (current): {metrics.uniqueUsersCurrent}</div>
+              </>
+            )}
           </div>
         </TooltipContent>
       </Tooltip>

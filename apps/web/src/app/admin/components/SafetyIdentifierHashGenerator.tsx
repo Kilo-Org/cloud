@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -15,12 +15,17 @@ async function computeKilologHash(id: string): Promise<string> {
 export function SafetyIdentifierHashGenerator() {
   const [id, setId] = useState('');
   const [hash, setHash] = useState('');
+  // Tracks the latest invocation so stale async results from earlier keystrokes are discarded.
+  const generation = useRef(0);
 
   async function handleChange(value: string) {
     setId(value);
+    const gen = ++generation.current;
     if (value.trim()) {
       const computed = await computeKilologHash(value.trim());
-      setHash(computed);
+      if (gen === generation.current) {
+        setHash(computed);
+      }
     } else {
       setHash('');
     }

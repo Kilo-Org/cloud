@@ -7,6 +7,7 @@ import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertingContent } from '@/app/admin/alerting/AlertingContent';
 import { TtfbAlertingContent } from '@/app/admin/alerting-ttfb/TtfbAlertingContent';
+import { ModelStatusContent } from '@/app/admin/alerting/ModelStatusContent';
 
 const VALID_TABS: readonly string[] = ['error-rate', 'ttfb', 'model-status'];
 type Tab = 'error-rate' | 'ttfb' | 'model-status';
@@ -67,7 +68,7 @@ export default function AdminAlertingPage() {
             <TtfbAlertingContent />
           </TabsContent>
           <TabsContent value="model-status" className="mt-4">
-            <p>Under construction</p>
+            <ModelStatusContent />
           </TabsContent>
         </Tabs>
       </div>

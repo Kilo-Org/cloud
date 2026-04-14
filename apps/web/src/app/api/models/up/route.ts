@@ -55,10 +55,28 @@ export async function GET(
     return NextResponse.json({ healthy: false }, { status: 401 });
   }
 
+  // Optional `at` parameter: ISO 8601 timestamp to anchor the query window.
+  // When omitted the query uses NOW(). Must be within the last 24 hours.
+  const atParam = searchParams.get('at');
+  let anchorTime: Date | null = null;
+  if (atParam) {
+    const parsed = new Date(atParam);
+    if (Number.isNaN(parsed.getTime())) {
+      return NextResponse.json({ healthy: false }, { status: 400 });
+    }
+    const ageMs = Date.now() - parsed.getTime();
+    if (ageMs < 0 || ageMs > 24 * 60 * 60 * 1000) {
+      return NextResponse.json({ healthy: false }, { status: 400 });
+    }
+    anchorTime = parsed;
+  }
+
   const monitoredModels = await getMonitoredModels();
 
   try {
     const queryStartTime = Date.now();
+    // When an anchor time is provided, replace NOW() with the fixed timestamp.
+    const ref = anchorTime ? sql`${anchorTime.toISOString()}::timestamptz` : sql`NOW()`;
     const result = await db.transaction(async tx => {
       await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${STATEMENT_TIMEOUT_MS}'`));
       return tx.execute<{
@@ -72,19 +90,22 @@ export async function GET(
         WITH all_periods AS (
           SELECT
             requested_model,
-            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '15 minutes') AS current_requests,
-            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 minutes'
-                             AND created_at < NOW() - INTERVAL '15 minutes') AS previous_requests,
-            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '2 hours'
-                             AND created_at < NOW() - INTERVAL '30 minutes') / 6.0 AS avg_baseline,
-            COUNT(DISTINCT kilo_user_id) FILTER (WHERE created_at >= NOW() - INTERVAL '15 minutes')
+            COUNT(*) FILTER (WHERE created_at >= ${ref} - INTERVAL '15 minutes'
+                                  AND created_at <= ${ref}) AS current_requests,
+            COUNT(*) FILTER (WHERE created_at >= ${ref} - INTERVAL '30 minutes'
+                             AND created_at < ${ref} - INTERVAL '15 minutes') AS previous_requests,
+            COUNT(*) FILTER (WHERE created_at >= ${ref} - INTERVAL '2 hours'
+                             AND created_at < ${ref} - INTERVAL '30 minutes') / 6.0 AS avg_baseline,
+            COUNT(DISTINCT kilo_user_id) FILTER (WHERE created_at >= ${ref} - INTERVAL '15 minutes'
+                                                       AND created_at <= ${ref})
               AS unique_users_current,
-            COUNT(DISTINCT kilo_user_id) FILTER (WHERE created_at >= NOW() - INTERVAL '2 hours'
-                                                  AND created_at < NOW() - INTERVAL '30 minutes')
+            COUNT(DISTINCT kilo_user_id) FILTER (WHERE created_at >= ${ref} - INTERVAL '2 hours'
+                                                  AND created_at < ${ref} - INTERVAL '30 minutes')
               AS unique_users_baseline
           FROM ${microdollar_usage}
           WHERE
-            created_at >= NOW() - INTERVAL '2 hours'
+            created_at >= ${ref} - INTERVAL '2 hours'
+            AND created_at <= ${ref}
             AND has_error = false
             AND requested_model IN (${sql.join(monitoredModels, sql`, `)})
           GROUP BY requested_model
@@ -167,7 +188,7 @@ export async function GET(
         healthy: !hasSignificantDrop,
         models,
         metadata: {
-          timestamp: new Date().toISOString(),
+          timestamp: (anchorTime ?? new Date()).toISOString(),
           queryExecutionTimeMs,
         },
       },

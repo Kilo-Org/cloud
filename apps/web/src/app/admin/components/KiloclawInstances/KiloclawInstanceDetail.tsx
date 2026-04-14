@@ -24,6 +24,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
+import { formatBytes, formatUptime, formatVolumeUsage } from '@/lib/kiloclaw/instance-display';
 import {
   Select,
   SelectContent,
@@ -106,35 +107,6 @@ function formatEpochRelativeTime(epoch: number | null): string {
   return formatDistanceToNow(new Date(epoch), { addSuffix: true });
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / 1024 ** i;
-  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
-
-/** Both values must be present, finite, non-negative, and total > 0 (safe percentage). */
-function formatVolumeUsageLine(used: number | null | undefined, total: number | null | undefined) {
-  if (
-    used == null ||
-    total == null ||
-    !Number.isFinite(used) ||
-    !Number.isFinite(total) ||
-    used < 0 ||
-    total <= 0
-  ) {
-    return '—';
-  }
-  const raw = (used / total) * 100;
-  const pct = raw % 1 === 0 ? raw.toFixed(0) : (Math.round(raw * 10) / 10).toFixed(1);
-  return (
-    <span>
-      {formatBytes(used)} used / {formatBytes(total)} total ({pct}%)
-    </span>
-  );
-}
-
 function useControllerTelemetryDiskUsage(sandboxId: string) {
   return useQuery<AnalyticsEngineResponse<ControllerTelemetryRow>>({
     queryKey: ['kiloclaw-controller-telemetry', 'disk-usage', sandboxId],
@@ -150,14 +122,6 @@ function useControllerTelemetryDiskUsage(sandboxId: string) {
     enabled: !!sandboxId,
     refetchInterval: 60_000,
   });
-}
-
-function formatUptime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const hours = Math.floor(mins / 60);
-  const remMins = mins % 60;
-  if (hours > 0) return `${hours}h ${remMins}m`;
-  return `${mins}m`;
 }
 
 type DetailPageWrapperProps = {
@@ -1843,7 +1807,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             <div className="flex items-center gap-2">
               <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />
               <DetailField label="Volume Usage">
-                {formatVolumeUsageLine(diskUsed, diskTotal)}
+                {formatVolumeUsage(diskUsed, diskTotal, 'used-total')}
               </DetailField>
             </div>
           </CardContent>

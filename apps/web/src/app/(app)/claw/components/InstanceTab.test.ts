@@ -5,8 +5,8 @@ import {
   formatVolumeUsage,
   getVolumeUsagePercent,
   getVolumeBarColor,
-  diskUsageQueryKey,
-} from './InstanceTab';
+} from '@/lib/kiloclaw/instance-display';
+import { diskUsageQueryKey } from './InstanceTab';
 
 describe('formatUptime', () => {
   test.each([

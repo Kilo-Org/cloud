@@ -88,6 +88,7 @@ export class ConversationDO extends DurableObject<Env> {
     for (const [connId, writer] of this.sseClients) {
       writer.write(bytes).catch(() => {
         this.sseClients.delete(connId);
+        writer.close().catch(() => {});
       });
     }
   }
@@ -301,32 +302,24 @@ export class ConversationDO extends DurableObject<Env> {
           .orderBy(asc(messages.id))
           .all();
 
+        // On reconnect, client has never seen these messages. Always replay as
+        // message.created (with latest content/version), except deleted messages
+        // which replay as message.deleted so the client can remove them.
         const replayEvents = missed.map(row => {
           if (row.deleted === 1) {
             return formatSseEvent('message.deleted', { messageId: row.id }, row.id);
-          } else if (row.updated_at !== null) {
-            return formatSseEvent(
-              'message.updated',
-              {
-                messageId: row.id,
-                content: JSON.parse(row.content) as Array<{ type: string; [key: string]: unknown }>,
-                version: row.version,
-              },
-              row.id
-            );
-          } else {
-            return formatSseEvent(
-              'message.created',
-              {
-                messageId: row.id,
-                senderId: row.sender_id,
-                content: JSON.parse(row.content) as Array<{ type: string; [key: string]: unknown }>,
-                version: row.version,
-                inReplyToMessageId: row.in_reply_to_message_id,
-              },
-              row.id
-            );
           }
+          return formatSseEvent(
+            'message.created',
+            {
+              messageId: row.id,
+              senderId: row.sender_id,
+              content: JSON.parse(row.content) as Array<{ type: string; [key: string]: unknown }>,
+              version: row.version,
+              inReplyToMessageId: row.in_reply_to_message_id,
+            },
+            row.id
+          );
         });
 
         if (replayEvents.length > 0) {
@@ -384,6 +377,7 @@ export class ConversationDO extends DurableObject<Env> {
     for (const [connId, writer] of this.sseClients) {
       writer.write(ping).catch(() => {
         this.sseClients.delete(connId);
+        writer.close().catch(() => {});
       });
     }
     if (this.sseClients.size > 0) {

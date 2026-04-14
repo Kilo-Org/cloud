@@ -36,7 +36,6 @@ export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: Auth
     }
 
     const callerId = c.get('callerId');
-    const callerKind = c.get('callerKind');
     const { conversationId, content, inReplyToMessageId } = body.data;
 
     const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
@@ -57,23 +56,21 @@ export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: Auth
 
     const { messageId, version } = result;
 
-    // Enqueue webhook for each bot member (when caller is not a bot, or when there are bot members)
+    // Enqueue webhook for each bot member that isn't the sender
     const botMembers = await convStub.getBotMembersExcluding(callerId);
-    if (callerKind !== 'bot' || botMembers.length > 0) {
-      for (const bot of botMembers) {
-        const sendPromise = c.env.WEBHOOK_QUEUE.send({
-          event: 'message.created',
-          conversationId,
-          messageId,
-          senderId: callerId,
-          botId: bot.id,
-        });
-        try {
-          c.executionCtx.waitUntil(sendPromise);
-        } catch {
-          // executionCtx may not be available in some contexts (e.g. tests)
-          // fall through; queue send already initiated
-        }
+    for (const _bot of botMembers) {
+      const sendPromise = c.env.WEBHOOK_QUEUE.send({
+        conversationId,
+        messageId,
+        from: callerId,
+        content,
+        sentAt: new Date().toISOString(),
+      });
+      try {
+        c.executionCtx.waitUntil(sendPromise);
+      } catch {
+        // executionCtx may not be available in some contexts (e.g. tests)
+        // fall through; queue send already initiated
       }
     }
 

@@ -6,6 +6,15 @@ export type AuthContext = {
   callerKind: 'user' | 'bot';
 };
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const encoder = new TextEncoder();
+  const bufA = encoder.encode(a);
+  const bufB = encoder.encode(b);
+  if (bufA.byteLength !== bufB.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(bufA, bufB);
+}
+
 export const authMiddleware = createMiddleware<{
   Bindings: Env;
   Variables: AuthContext;
@@ -15,9 +24,9 @@ export const authMiddleware = createMiddleware<{
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
-  // Try API key auth first (cheap string comparison)
+  // Try API key auth first (constant-time comparison)
   const apiKey = await c.env.KILOCHAT_API_KEY.get();
-  if (apiKey && token === apiKey) {
+  if (apiKey && timingSafeEqual(token, apiKey)) {
     const sandboxId = c.req.header('x-kilo-sandbox-id');
     if (!sandboxId) {
       return c.json({ error: 'Unauthorized' }, 401);

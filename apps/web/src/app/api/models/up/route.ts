@@ -52,6 +52,19 @@ const STATEMENT_TIMEOUT_MS = 10_000;
 // Useful for preview models with inconsistent traffic that cause false alerts.
 const HEALTH_CHECK_EXCLUSIONS = new Set(['google/gemini-3.1-pro-preview']);
 
+function emptyMetrics(): Omit<ModelHealthMetrics, 'monitored'> {
+  return {
+    healthy: true,
+    currentRequests: 0,
+    previousRequests: 0,
+    baselineRequests: 0,
+    percentChange: 0,
+    absoluteDrop: 0,
+    uniqueUsersCurrent: 0,
+    uniqueUsersBaseline: 0,
+  };
+}
+
 export async function GET(
   request: Request
 ): Promise<NextResponse<HealthResponse | HealthResponseError>> {
@@ -172,33 +185,11 @@ export async function GET(
     });
 
     // Ensure all preferred models are in the response (even if no data)
-    for (const requested_model of monitoredModels) {
-      if (!models[requested_model]) {
-        models[requested_model] = {
-          healthy: true,
-          monitored: true,
-          currentRequests: 0,
-          previousRequests: 0,
-          baselineRequests: 0,
-          percentChange: 0,
-          absoluteDrop: 0,
-          uniqueUsersCurrent: 0,
-          uniqueUsersBaseline: 0,
-        };
-      }
-    }
-    for (const requested_model of nonMonitoredModels) {
-      if (!models[requested_model]) {
-        models[requested_model] = {
-          healthy: true,
-          monitored: false,
-          currentRequests: 0,
-          previousRequests: 0,
-          baselineRequests: 0,
-          percentChange: 0,
-          absoluteDrop: 0,
-          uniqueUsersCurrent: 0,
-          uniqueUsersBaseline: 0,
+    for (const model of allPreferredModels) {
+      if (!models[model]) {
+        models[model] = {
+          ...emptyMetrics(),
+          monitored: !HEALTH_CHECK_EXCLUSIONS.has(model),
         };
       }
     }

@@ -77,7 +77,7 @@ function getVolumeUsagePercent(used: number | null, total: number | null): numbe
 function getVolumeBarColor(percent: number | null): string {
   if (percent === null) return 'bg-emerald-500';
   if (percent >= 90) return 'bg-red-500';
-  if (percent > 75) return 'bg-amber-500';
+  if (percent >= 75) return 'bg-amber-500';
   return 'bg-emerald-500';
 }
 

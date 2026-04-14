@@ -123,7 +123,6 @@ export async function GET(
     });
 
     const models: Record<string, ModelHealthMetrics> = {};
-    let hasSignificantDrop = false;
 
     result.rows.forEach(row => {
       const currentRequests = parseInt(row.current_requests, 10);
@@ -139,20 +138,17 @@ export async function GET(
 
       // Per-model health: unhealthy when the baseline had enough distinct organic
       // users AND the model shows a significant traffic drop.
-      const modelUnhealthy =
+      const healthy = !(
         uniqueUsersBaseline >= MIN_UNIQUE_USERS_FOR_ALERT &&
         ((baselineRequests > HIGH_BASELINE && percentChange < -90) ||
           (baselineRequests > LOW_BASELINE &&
             baselineRequests < HIGH_BASELINE &&
             currentRequests === 0 &&
-            previousRequests === 0));
-
-      if (modelUnhealthy) {
-        hasSignificantDrop = true;
-      }
+            previousRequests === 0))
+      );
 
       models[row.requested_model] = {
-        healthy: !modelUnhealthy,
+        healthy,
         currentRequests,
         previousRequests,
         baselineRequests,
@@ -164,7 +160,7 @@ export async function GET(
     });
 
     // Ensure all preferred models are in the response (even if no data)
-    monitoredModels.forEach(requested_model => {
+    for (const requested_model of monitoredModels) {
       if (!models[requested_model]) {
         models[requested_model] = {
           healthy: true,
@@ -177,9 +173,10 @@ export async function GET(
           uniqueUsersBaseline: 0,
         };
       }
-    });
+    }
 
     const queryExecutionTimeMs = Date.now() - queryStartTime;
+    const hasSignificantDrop = Object.values(models).some(m => !m.healthy);
     const status = hasSignificantDrop ? 503 : 200;
 
     return NextResponse.json(

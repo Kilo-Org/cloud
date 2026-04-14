@@ -30,13 +30,31 @@ export const AuditFinding = z.object({
 });
 export type AuditFinding = z.infer<typeof AuditFinding>;
 
+/**
+ * Semver regex (major.minor.patch with optional prerelease + build metadata).
+ * Matches the format used by `@kilocode/cli` and other kilocode packages —
+ * the plugin MUST send `source.pluginVersion` in this shape so the server
+ * can parse it consistently for observability and any future version-based
+ * branching. We don't yet branch on the version, but requiring the format
+ * up front gives us a clean foundation.
+ */
+const SEMVER_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[\w.-]+)?(?:\+[\w.-]+)?$/;
+const SemverString = z
+  .string()
+  .regex(SEMVER_REGEX, 'Must be a semver version string (e.g. "1.2.3")');
+
 export const SecurityAdvisorRequestSchema = z.object({
   apiVersion: z.literal('2026-04-01'),
 
   source: z.object({
     platform: SourcePlatform,
     method: SourceMethod,
-    pluginVersion: z.string().optional(),
+    // Plugin package semver — required from 0.1.0 onwards. Server logs and
+    // persists this to `security_advisor_scans.plugin_version` for every
+    // request; future versions may branch on it.
+    pluginVersion: SemverString,
+    // OpenClaw host version — optional because non-plugin callers (webhook,
+    // cloud-agent) may not know it.
     openclawVersion: z.string().optional(),
   }),
 

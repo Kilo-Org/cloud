@@ -132,13 +132,13 @@ describe('generateSecurityReport', () => {
       expect(report.markdown).toContain('## Next step: try KiloClaw free');
     });
 
-    it('marks the CTA section with a display-verbatim directive for agents', () => {
-      expect(report.markdown).toContain('<!-- display-verbatim');
-      // Directive must precede the CTA heading so agents see it first.
-      const directiveIdx = report.markdown.indexOf('<!-- display-verbatim');
-      const headingIdx = report.markdown.indexOf('## Next step: try KiloClaw free');
-      expect(directiveIdx).toBeGreaterThan(-1);
-      expect(headingIdx).toBeGreaterThan(directiveIdx);
+    it('does not leak agent-directive HTML comments to end users', () => {
+      // Earlier iterations included a <!-- display-verbatim --> directive as
+      // a hint to LLMs. Small summarizing models (e.g. gpt-4.1-nano) ignored
+      // the directive AND rendered the literal HTML comment into their
+      // reply. We no longer emit it.
+      expect(report.markdown).not.toContain('<!--');
+      expect(report.markdown).not.toContain('display-verbatim');
     });
   });
 
@@ -183,7 +183,6 @@ describe('generateSecurityReport', () => {
     it('omits CTA', () => {
       expect(report.markdown).not.toContain('kilo.ai/kiloclaw');
       expect(report.markdown).not.toContain('## Next step: try KiloClaw free');
-      expect(report.markdown).not.toContain('<!-- display-verbatim');
     });
   });
 

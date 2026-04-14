@@ -153,6 +153,28 @@ describe('POST /api/security-advisor/analyze', () => {
     expect(data.error.code).toBe('invalid_payload');
   });
 
+  it('returns a readable zod error in the invalid_payload message, not [object Object]', async () => {
+    // Regression guard: the error formatter uses
+    //   JSON.stringify(z.treeifyError(parseResult.error))
+    // inside a template literal. Before this fix it was
+    //   ${z.treeifyError(parseResult.error)}
+    // which produced "Invalid request body: [object Object]" — genuinely
+    // unusable for debugging. If someone drops the JSON.stringify() call,
+    // this test fails.
+    setUserAuth();
+    const { POST } = await import('./route');
+
+    const response = await POST(
+      makeRequest({ apiVersion: '2026-04-01', source: { platform: 'bad' } }) as never
+    );
+    const data = await response.json();
+    expect(data.error.code).toBe('invalid_payload');
+    expect(typeof data.error.message).toBe('string');
+    expect(data.error.message).not.toContain('[object Object]');
+    // Should surface some field-level info from the zod tree output.
+    expect(data.error.message.length).toBeGreaterThan(30);
+  });
+
   it('returns 200 with structured report for valid request', async () => {
     setUserAuth();
     setRateLimitAllowed();
@@ -191,7 +213,7 @@ describe('POST /api/security-advisor/analyze', () => {
 
     const kiloClawBody = {
       ...VALID_BODY,
-      source: { platform: 'kiloclaw', method: 'plugin' },
+      source: { platform: 'kiloclaw', method: 'plugin', pluginVersion: '1.0.0' },
     };
     const response = await POST(makeRequest(kiloClawBody) as never);
     const data = await response.json();

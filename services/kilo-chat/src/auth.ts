@@ -24,7 +24,7 @@ export const authMiddleware = createMiddleware<{
   }
 
   // Try API key auth first (constant-time comparison)
-  const apiKey = await c.env.KILOCHAT_API_KEY.get();
+  const apiKey = await c.env.KILOCHAT_API_TOKEN.get();
   if (apiKey && timingSafeEqual(token, apiKey)) {
     const sandboxId = c.req.header('x-kilo-sandbox-id');
     if (!sandboxId) {

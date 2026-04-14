@@ -5,7 +5,7 @@ import { authMiddleware } from '../auth';
 import type { AuthContext } from '../auth';
 
 type MockEnv = {
-  KILOCHAT_API_KEY: { get: () => Promise<string> };
+  KILOCHAT_API_TOKEN: { get: () => Promise<string> };
   NEXTAUTH_SECRET: { get: () => Promise<string> };
 };
 
@@ -20,7 +20,7 @@ function makeApp(_env: MockEnv) {
 }
 
 const defaultEnv: MockEnv = {
-  KILOCHAT_API_KEY: { get: async () => TEST_API_KEY },
+  KILOCHAT_API_TOKEN: { get: async () => TEST_API_KEY },
   NEXTAUTH_SECRET: { get: async () => TEST_JWT_SECRET },
 };
 

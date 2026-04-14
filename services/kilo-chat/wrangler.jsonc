@@ -45,9 +45,9 @@
       "secret_name": "KILOCHAT_WEBHOOK_SECRET"
     },
     {
-      "binding": "KILOCHAT_API_KEY",
+      "binding": "KILOCHAT_API_TOKEN",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "KILOCHAT_API_KEY"
+      "secret_name": "KILOCHAT_API_TOKEN"
     },
     {
       "binding": "NEXTAUTH_SECRET",

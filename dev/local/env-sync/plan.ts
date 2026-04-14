@@ -13,6 +13,7 @@ import type {
   KeyChange,
   SecretStoreBinding,
   SecretStoreWarning,
+  SecretStoreAutoCreate,
   ConsistencyWarning,
   EnvLocalAutoCreate,
 } from './types';
@@ -133,39 +134,103 @@ function detectWranglerEnv(repoRoot: string, workerDir: string): string | undefi
 }
 
 // ---------------------------------------------------------------------------
-// Wrangler config: extract secrets_store_secrets bindings
+// Wrangler config: extract vars and secrets_store_secrets bindings
 // ---------------------------------------------------------------------------
 
-function extractSecretsStoreBindings(repoRoot: string, workerDir: string): SecretStoreBinding[] {
+type JsonObject = Record<string, unknown>;
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readWranglerConfig(repoRoot: string, workerDir: string): JsonObject | undefined {
   const wranglerPath = path.join(repoRoot, workerDir, 'wrangler.jsonc');
-  if (!fs.existsSync(wranglerPath)) return [];
+  if (!fs.existsSync(wranglerPath)) return undefined;
 
   try {
-    const config = parseJsonc(fs.readFileSync(wranglerPath, 'utf-8')) as Record<string, unknown>;
-
-    const envName = detectWranglerEnv(repoRoot, workerDir);
-
-    // Check the env-specific config first, fall back to top-level
-    let secretsSection: unknown;
-    if (envName && config.env) {
-      const envConfig = (config.env as Record<string, unknown>)[envName];
-      if (envConfig && typeof envConfig === 'object') {
-        secretsSection = (envConfig as Record<string, unknown>).secrets_store_secrets;
-      }
-    }
-    if (!secretsSection) {
-      secretsSection = config.secrets_store_secrets;
-    }
-
-    if (!Array.isArray(secretsSection)) return [];
-    return secretsSection.map((s: { binding: string; store_id: string; secret_name: string }) => ({
-      binding: s.binding,
-      store_id: s.store_id,
-      secret_name: s.secret_name,
-    }));
+    const config = parseJsonc(fs.readFileSync(wranglerPath, 'utf-8'));
+    return isJsonObject(config) ? config : undefined;
   } catch {
-    return [];
+    return undefined;
   }
+}
+
+function getWranglerEnvConfig(
+  config: JsonObject,
+  envName: string | undefined
+): JsonObject | undefined {
+  if (!envName) return undefined;
+  const envSection = config.env;
+  if (!isJsonObject(envSection)) return undefined;
+  const envConfig = envSection[envName];
+  return isJsonObject(envConfig) ? envConfig : undefined;
+}
+
+function hasOwnKey(obj: JsonObject, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function getWranglerSection(config: JsonObject, envName: string | undefined, key: string): unknown {
+  const envConfig = getWranglerEnvConfig(config, envName);
+  if (envConfig && hasOwnKey(envConfig, key)) return envConfig[key];
+  return config[key];
+}
+
+function extractWranglerVars(repoRoot: string, workerDir: string): Map<string, string> {
+  const config = readWranglerConfig(repoRoot, workerDir);
+  if (!config) return new Map();
+
+  const envName = detectWranglerEnv(repoRoot, workerDir);
+  const varsSection = getWranglerSection(config, envName, 'vars');
+  if (!isJsonObject(varsSection)) return new Map();
+
+  const vars = new Map<string, string>();
+  for (const [key, value] of Object.entries(varsSection)) {
+    if (typeof value === 'string') {
+      vars.set(key, value);
+    } else if (typeof value === 'number' || typeof value === 'boolean') {
+      vars.set(key, String(value));
+    }
+  }
+  return vars;
+}
+
+function isProvidedByWranglerVars(
+  entry: ExampleEntry,
+  envLocal: Map<string, string>,
+  wranglerVars: Map<string, string>
+): boolean {
+  return (
+    entry.annotation.type === 'passthrough' &&
+    !envLocal.has(entry.key) &&
+    wranglerVars.has(entry.key)
+  );
+}
+
+function extractSecretsStoreBindings(repoRoot: string, workerDir: string): SecretStoreBinding[] {
+  const config = readWranglerConfig(repoRoot, workerDir);
+  if (!config) return [];
+
+  const envName = detectWranglerEnv(repoRoot, workerDir);
+  const secretsSection = getWranglerSection(config, envName, 'secrets_store_secrets');
+  if (!Array.isArray(secretsSection)) return [];
+
+  const bindings: SecretStoreBinding[] = [];
+  for (const secret of secretsSection) {
+    if (!isJsonObject(secret)) continue;
+    const binding = secret.binding;
+    const storeId = secret.store_id;
+    const secretName = secret.secret_name;
+    if (
+      typeof binding !== 'string' ||
+      typeof storeId !== 'string' ||
+      typeof secretName !== 'string'
+    ) {
+      continue;
+    }
+    bindings.push({ binding, store_id: storeId, secret_name: secretName });
+  }
+  return bindings;
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +305,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     const exampleContent = fs.readFileSync(examplePath, 'utf-8');
     const entries = parseExampleFile(exampleContent);
     const serviceUsesLanIp = dirUsesLanIp.get(workerDir) ?? false;
+    const wranglerVars = extractWranglerVars(repoRoot, workerDir);
     const devVarsPath = path.join(repoRoot, workerDir, '.dev.vars');
 
     let existingContent: string | null = null;
@@ -260,6 +326,10 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     let shouldCreateFlyToken = false;
 
     for (const entry of entries) {
+      if (isProvidedByWranglerVars(entry, envLocal, wranglerVars)) {
+        continue;
+      }
+
       const { value, resolved, source } = resolveAnnotatedValue(
         entry.key,
         entry,
@@ -267,6 +337,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
         lanIp,
         serviceUsesLanIp
       );
+
       resolvedVars.set(entry.key, value);
       resolvedSources.set(entry.key, source);
 
@@ -326,13 +397,14 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       missingValues = unresolvedKeys;
     }
 
-    if (isNew || keyChanges.length > 0 || missingValues.length > 0) {
+    const shouldCreateFile = isNew && resolvedVars.size > 0;
+    if (shouldCreateFile || keyChanges.length > 0 || missingValues.length > 0) {
       devVarsChanges.push({
         workerDir,
-        isNew,
+        isNew: shouldCreateFile,
         keyChanges,
         missingValues,
-        newFileContent: isNew ? generateDevVars(resolvedVars) : undefined,
+        newFileContent: shouldCreateFile ? generateDevVars(resolvedVars) : undefined,
       });
     }
   }

@@ -150,6 +150,14 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** R2 endpoint for S3-compatible API access (presigned URL generation) */
+  R2_ENDPOINT?: string;
+  /** R2 read-only access key ID for downloading image attachments */
+  R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID?: string;
+  /** R2 read-only secret access key for downloading image attachments */
+  R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY?: string;
+  /** R2 bucket name for image attachments */
+  R2_ATTACHMENTS_BUCKET?: string;
 };
 
 /** tRPC context passed to all procedures */

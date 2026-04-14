@@ -1,6 +1,6 @@
 'use client';
 
-import { TriangleAlert, Zap } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
@@ -33,11 +33,6 @@ export function ClawInstanceOverview({ status }: { status: KiloClawDashboardStat
 
   const { data: isServiceDegraded } = useClawServiceDegraded();
 
-  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-  const instanceYoung =
-    status.provisionedAt !== null && Date.now() - status.provisionedAt < SEVEN_DAYS_MS;
-  const configServiceNudgeVisible = instanceYoung;
-
   return (
     <>
       {isServiceDegraded && (
@@ -58,31 +53,6 @@ export function ClawInstanceOverview({ status }: { status: KiloClawDashboardStat
             </span>
           </AlertDescription>
         </Alert>
-      )}
-
-      {configServiceNudgeVisible && !organizationId && (
-        <div className="border-violet-500/30 bg-violet-500/10 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <Zap className="text-violet-400 mt-0.5 h-5 w-5 shrink-0" />
-            <div>
-              <p className="text-violet-400 text-sm font-semibold">
-                Go from inbox chaos to an AI executive assistant - in one hour.
-              </p>
-              <p className="text-muted-foreground mt-0.5 text-sm">
-                A KiloClaw expert configures your email, calendar, and messaging live on a call.
-                Includes <b>2 months free</b> hosting.
-              </p>
-            </div>
-          </div>
-          <a
-            href="https://kilo.ai/kiloclaw/config-service"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-violet-500 text-white hover:bg-violet-500/90 inline-flex shrink-0 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
-          >
-            Book your session
-          </a>
-        </div>
       )}
 
       <Card>

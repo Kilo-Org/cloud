@@ -2,20 +2,55 @@
 
 Docker image that guides users through connecting their Google account to KiloClaw.
 
-## What it does
+## Modes
 
-1. Validates the user's session token (JWT)
-2. Signs into gcloud, creates/selects a GCP project, enables Google APIs
-3. Guides user through creating a Desktop OAuth client in Google Cloud Console
-4. Runs a local OAuth flow to obtain refresh tokens
-5. Encrypts credentials with the worker's public key
-6. POSTs the encrypted bundle to the KiloClaw worker
+### Solo (default)
 
-## Usage
+For individual users doing the full setup themselves — creates a GCP project, enables APIs, sets up OAuth, authorizes Google Workspace access, and uploads credentials.
 
 ```bash
 docker run -it ghcr.io/kilo-org/google-setup --token="YOUR_SESSION_JWT"
 ```
+
+### Admin
+
+For org admins who set up GCP infra once, then share credentials with members. Creates the project, enables APIs, configures OAuth, sets up Pub/Sub push infra, and grants member permissions.
+
+```bash
+docker run -it ghcr.io/kilo-org/google-setup --admin
+```
+
+After setup, the admin shares the member command (printed at the end) with org members.
+
+### Member
+
+For org members whose admin has already set up the GCP project and OAuth client. Authorizes the member's Google account and uploads credentials.
+
+```bash
+docker run -it ghcr.io/kilo-org/google-setup \
+  --token="YOUR_SESSION_JWT" \
+  --client-id="ADMIN_PROVIDED_CLIENT_ID" \
+  --client-secret="ADMIN_PROVIDED_CLIENT_SECRET" \
+  --project-id="ADMIN_PROVIDED_PROJECT_ID" \
+  --instance-id="ORG_INSTANCE_ID"
+```
+
+`--instance-id` is the KiloClaw instance ID of the organization (visible in the Kilo web app). Without it, credentials upload to the member's personal instance instead of the org instance.
+
+## Additional flags
+
+| Flag                            | Description                                                                |
+| ------------------------------- | -------------------------------------------------------------------------- |
+| `--token=<jwt>`                 | Session JWT from kilo.ai (required for solo and member modes)              |
+| `--instance-id=<uuid>`          | Target a specific org instance                                             |
+| `--worker-url=<url>`            | Override the kiloclaw worker URL (default: `https://claw.kilosessions.ai`) |
+| `--gmail-push-worker-url=<url>` | Override the Gmail push worker URL                                         |
+| `--client-id=<id>`              | OAuth client ID (member mode)                                              |
+| `--client-secret=<secret>`      | OAuth client secret (member mode)                                          |
+| `--project-id=<pid>`            | GCP project ID (member mode)                                               |
+| `--admin`                       | Run in admin mode                                                          |
+
+## Local development
 
 For local development against a local worker:
 

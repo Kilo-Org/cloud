@@ -21,6 +21,7 @@ import {
 } from 'openclaw/plugin-sdk/provider-web-search';
 
 const KILO_EXA_PROVIDER_ID = 'kilo-exa';
+const KILOCLAW_CUSTOMIZER_PLUGIN_ID = 'kiloclaw-customizer';
 const DEFAULT_KILO_API_ORIGIN = 'https://api.kilo.ai';
 const EXA_SEARCH_TYPES = ['auto', 'neural', 'fast', 'deep', 'deep-reasoning', 'instant'] as const;
 const EXA_FRESHNESS_VALUES = ['day', 'week', 'month', 'year'] as const;
@@ -64,6 +65,53 @@ type ErrorPayload = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function resolveCustomizerWebSearchConfig(
+  config:
+    | {
+        plugins?: {
+          entries?: Record<string, unknown>;
+        };
+      }
+    | undefined
+): Record<string, unknown> | undefined {
+  const pluginEntry = config?.plugins?.entries?.[KILOCLAW_CUSTOMIZER_PLUGIN_ID];
+  if (!isRecord(pluginEntry)) {
+    return undefined;
+  }
+  const pluginConfig = isRecord(pluginEntry.config) ? pluginEntry.config : undefined;
+  return isRecord(pluginConfig?.webSearch) ? pluginConfig.webSearch : undefined;
+}
+
+function setCustomizerWebSearchEnabled(
+  config: {
+    plugins?: {
+      entries?: Record<string, unknown>;
+    };
+  },
+  enabled: boolean
+): void {
+  const existingEntries = config.plugins?.entries;
+  const entries = isRecord(existingEntries) ? existingEntries : {};
+  const existingEntry = entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID];
+  const pluginEntry = isRecord(existingEntry) ? existingEntry : {};
+  const existingPluginConfig = pluginEntry.config;
+  const pluginConfig = isRecord(existingPluginConfig) ? existingPluginConfig : {};
+  const existingWebSearch = pluginConfig.webSearch;
+  const webSearch = isRecord(existingWebSearch) ? existingWebSearch : {};
+
+  webSearch.enabled = enabled;
+  pluginConfig.webSearch = webSearch;
+  pluginEntry.config = pluginConfig;
+
+  config.plugins = {
+    ...(config.plugins ?? {}),
+    entries: {
+      ...entries,
+      [KILOCLAW_CUSTOMIZER_PLUGIN_ID]: pluginEntry,
+    },
+  };
 }
 
 function parsePositiveInteger(value: unknown): number | undefined {
@@ -658,11 +706,20 @@ export function createKiloExaWebSearchProvider(): WebSearchProviderPlugin {
       getScopedCredentialValue(searchConfig, KILO_EXA_PROVIDER_ID),
     setCredentialValue: (searchConfigTarget, value) =>
       setScopedCredentialValue(searchConfigTarget, KILO_EXA_PROVIDER_ID, value),
-    applySelectionConfig: config => enablePluginInConfig(config, 'kiloclaw-customizer').config,
-    createTool: ctx =>
-      createKiloExaToolDefinition(
+    applySelectionConfig: config => {
+      const next = enablePluginInConfig(config, KILOCLAW_CUSTOMIZER_PLUGIN_ID).config;
+      setCustomizerWebSearchEnabled(next, true);
+      return next;
+    },
+    createTool: ctx => {
+      const pluginWebSearchConfig = resolveCustomizerWebSearchConfig(ctx.config);
+      if (pluginWebSearchConfig?.enabled === false) {
+        return null;
+      }
+      return createKiloExaToolDefinition(
         isSearchConfigRecord(ctx.searchConfig) ? ctx.searchConfig : undefined
-      ),
+      );
+    },
   };
 }
 

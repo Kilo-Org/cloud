@@ -13,6 +13,12 @@ export type ActiveKiloClawInstance = {
   name: string | null;
 };
 
+export type EnsureActiveInstanceResult = {
+  instance: ActiveKiloClawInstance;
+  /** True when this call inserted a new row (not returned an existing one). */
+  created: boolean;
+};
+
 /**
  * Returns true if this instance row uses the instance-keyed identity scheme
  * (ki_ sandboxId prefix, DO keyed by instanceId). Legacy rows have
@@ -64,7 +70,7 @@ type EnsureActiveInstanceOpts = {
 export async function ensureActiveInstance(
   userId: string,
   opts?: EnsureActiveInstanceOpts
-): Promise<ActiveKiloClawInstance> {
+): Promise<EnsureActiveInstanceResult> {
   const selectFields = {
     id: kiloclaw_instances.id,
     userId: kiloclaw_instances.user_id,
@@ -93,7 +99,7 @@ export async function ensureActiveInstance(
       throw new Error('Failed to create org instance row');
     }
 
-    return row;
+    return { instance: row, created: true };
   }
 
   // Personal flow: return existing active row if present.
@@ -103,7 +109,7 @@ export async function ensureActiveInstance(
   // orphan (no DO created for it). The window is milliseconds on a user-
   // initiated action already deduplicated by the frontend's useMutation.
   const existing = await getActiveInstance(userId);
-  if (existing) return existing;
+  if (existing) return { instance: existing, created: false };
 
   // No active row — create a new instance-keyed row.
   // sandboxId = sandboxIdFromInstanceId(uuid) ensures DB and DO identity match.
@@ -123,7 +129,7 @@ export async function ensureActiveInstance(
     throw new Error('Failed to create personal instance row');
   }
 
-  return row;
+  return { instance: row, created: true };
 }
 
 /**

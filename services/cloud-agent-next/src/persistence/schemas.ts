@@ -16,12 +16,27 @@ export const CallbackTargetSchema = z.object({
  * Defined here to avoid circular dependency with router/schemas.ts.
  * Images are stored in R2 at path: {bucket}/{userId}/{path}/{filename}
  */
+const imageMessageUuidSchema = z
+  .string()
+  .uuid()
+  .describe('Bare message upload UUID; service prefix is derived by the worker');
+
+const imageFilenameSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(png|jpg|jpeg|webp|gif)$/,
+    'Image filename must be a UUID with extension png, jpg, jpeg, webp, or gif'
+  );
+
 export const ImagesSchema = z.object({
-  path: z.string().min(1).describe('R2 path prefix under the user ID'),
+  path: imageMessageUuidSchema,
   files: z
-    .array(z.string().min(1))
+    .array(imageFilenameSchema)
     .min(1)
-    .describe('Ordered array of specific filenames to download'),
+    .max(5)
+    .describe('Ordered array of specific UUID image filenames to download'),
 });
 export type Images = z.infer<typeof ImagesSchema>;
 

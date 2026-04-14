@@ -19,9 +19,10 @@ import { ExecutionError } from './errors.js';
 import { SessionService, type PreparedSession } from '../session-service.js';
 import { logger } from '../logger.js';
 import { updateGitRemoteToken } from '../workspace.js';
-import { WrapperClient } from '../kilo/wrapper-client.js';
+import { WrapperClient, type WrapperPromptOptions } from '../kilo/wrapper-client.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { normalizeAgentMode } from '../schema.js';
+import { buildImagePromptParts, downloadImagePromptParts } from './image-prompt-parts.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -135,7 +136,16 @@ export class ExecutionOrchestrator {
       logger.warn('Failed to record kilo server activity');
     }
 
-    // 6. Send prompt with execution binding (async - returns messageId immediately)
+    // 6. Download images from R2 to sandbox if provided
+    const fileParts = await downloadImagePromptParts({
+      env: this.deps.env,
+      session: prepared.session,
+      userId: plan.userId,
+      images: plan.images,
+      createdOnPlatform: this.getCreatedOnPlatform(plan),
+    });
+
+    // 7. Send prompt with execution binding (async - returns messageId immediately)
     const ingestUrl = this.deps.getIngestUrl(sessionId, userId);
     const ingestToken = executionId;
     const kilocodeToken = this.getKilocodeToken(plan);
@@ -150,17 +160,26 @@ export class ExecutionOrchestrator {
 
     // Normalize mode to internal mode (e.g., 'architect' -> 'plan', 'orchestrator' -> 'code')
     const normalizedMode = normalizeAgentMode(mode);
+
+    // Build prompt options, using parts when images are attached
+    const promptOptions: WrapperPromptOptions = {
+      messageId: plan.messageId,
+      model: wrapper.model,
+      variant: wrapper.variant,
+      agent: normalizedMode,
+      autoCommit: wrapper.autoCommit,
+      condenseOnComplete: wrapper.condenseOnComplete,
+      execution,
+    };
+
+    if (fileParts.length > 0) {
+      promptOptions.parts = buildImagePromptParts(prompt, fileParts);
+    } else {
+      promptOptions.prompt = prompt;
+    }
+
     try {
-      const result = await wrapperClient.prompt({
-        prompt,
-        messageId: plan.messageId,
-        model: wrapper.model,
-        variant: wrapper.variant,
-        agent: normalizedMode,
-        autoCommit: wrapper.autoCommit,
-        condenseOnComplete: wrapper.condenseOnComplete,
-        execution,
-      });
+      const result = await wrapperClient.prompt(promptOptions);
       if (result.messageId) {
         logger.withFields({ messageId: result.messageId }).info('Prompt sent to wrapper');
       } else {
@@ -387,6 +406,20 @@ export class ExecutionOrchestrator {
         error
       );
     }
+  }
+
+  private getCreatedOnPlatform(plan: ExecutionPlan): string | undefined {
+    if (plan.workspace.shouldPrepare) {
+      return (
+        plan.workspace.initContext.createdOnPlatform ??
+        plan.workspace.existingMetadata?.createdOnPlatform
+      );
+    }
+
+    return (
+      plan.workspace.resumeContext.createdOnPlatform ??
+      plan.workspace.existingMetadata?.createdOnPlatform
+    );
   }
 
   /**

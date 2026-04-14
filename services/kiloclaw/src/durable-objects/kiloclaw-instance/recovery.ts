@@ -12,7 +12,7 @@ import {
   storageUpdate,
   syncProviderStateForStorage,
 } from './state';
-import { buildUserEnvVars, resolveImageRef } from './config';
+import { buildUserEnvVars, resolveRuntimeImageRef } from './config';
 import * as gateway from './gateway';
 import * as flyMachines from './fly-machines';
 import { buildFlyMachineConfig } from './fly-machines';
@@ -393,7 +393,7 @@ export async function runUnexpectedStopRecoveryInBackground(
       await runtime.persist({ pendingRecoveryVolumeId: recoveryVolumeId });
     }
 
-    const { envVars, minSecretsVersion } = await buildUserEnvVars(env, ctx, state);
+    const { envVars, bootstrapEnv, minSecretsVersion } = await buildUserEnvVars(env, ctx, state);
     const identity = {
       userId: state.userId,
       sandboxId: state.sandboxId,
@@ -403,8 +403,9 @@ export async function runUnexpectedStopRecoveryInBackground(
       devCreator: env.WORKER_ENV === 'development' ? (env.DEV_CREATOR ?? null) : null,
     };
     const runtimeSpec = buildRuntimeSpec(
-      resolveImageRef(state, env),
+      resolveRuntimeImageRef(state, env),
       envVars,
+      bootstrapEnv,
       state.machineSize,
       identity
     );

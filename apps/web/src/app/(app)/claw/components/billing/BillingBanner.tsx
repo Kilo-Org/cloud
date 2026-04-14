@@ -96,14 +96,16 @@ function getBannerContent(state: ClawBannerState, billing: ClawBillingStatus) {
     case 'trial_ending_very_soon':
       return {
         title: `Free Trial Ending Very Soon — ${pluralizeDays(billing.trial?.daysRemaining)} left`,
-        message: 'Your KiloClaw will be stopped when the trial ends. Subscribe to keep it running.',
+        message:
+          "Your KiloClaw will be stopped when the trial ends. You won't be charged automatically — subscribe to keep it running.",
         cta: 'Subscribe Now',
         action: 'subscribe' as const,
       };
     case 'trial_expires_today':
       return {
         title: 'Free Trial Ends Today',
-        message: 'Your KiloClaw will be stopped at the end of today. Subscribe now.',
+        message:
+          "Your KiloClaw will be stopped at the end of today. You won't be charged automatically — subscribe now to keep it running.",
         cta: 'Subscribe Now',
         action: 'subscribe' as const,
       };

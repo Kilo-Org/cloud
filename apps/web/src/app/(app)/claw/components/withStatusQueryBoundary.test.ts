@@ -7,6 +7,10 @@ import { withStatusQueryBoundary } from '@/app/(app)/claw/components';
 const baseStatus: KiloClawDashboardStatus = {
   userId: 'user-1',
   sandboxId: 'sandbox-1',
+  provider: 'fly',
+  runtimeId: 'machine-1',
+  storageId: 'vol-1',
+  region: 'iad',
   name: null,
   status: 'running',
   provisionedAt: 1,

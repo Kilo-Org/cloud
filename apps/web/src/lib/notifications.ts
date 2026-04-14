@@ -175,7 +175,7 @@ async function generateAutoTopUpNotification(
       id: 'auto-top-up-dec-19',
       title: 'New: Auto Top-Ups',
       message:
-        "Set your top-up amount once—we'll automatically add credits when you drop below $5. First 200 users to trigger it get $20 bonus credits.",
+        "Set your top-up amount once—we'll automatically add credits when you drop below $5.",
       action: {
         actionText: 'Enable Auto Top-Ups',
         actionURL: 'https://app.kilo.ai/credits',

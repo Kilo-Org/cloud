@@ -3,6 +3,7 @@ import {
   type PersistedState,
   type ProviderState,
   type FlyProviderState,
+  type DockerLocalProviderState,
 } from '../../schemas/instance-config';
 import type { InstanceMutableState } from './types';
 
@@ -74,7 +75,63 @@ export function applyProviderState(
 
   if (providerState.provider === 'fly') {
     hydrateFlyLegacyFieldsFromProviderState(s);
+    return;
   }
+
+  s.flyAppName = null;
+  s.flyMachineId = null;
+  s.flyVolumeId = null;
+  s.flyRegion = null;
+}
+
+export function getDockerLocalProviderState(
+  source: Pick<InstanceMutableState, 'providerState'>
+): DockerLocalProviderState {
+  if (source.providerState?.provider === 'docker-local') {
+    return source.providerState;
+  }
+  return {
+    provider: 'docker-local',
+    containerName: null,
+    volumeName: null,
+    hostPort: null,
+  };
+}
+
+export function getRuntimeId(
+  source: Pick<InstanceMutableState, 'providerState' | 'flyMachineId'>
+): string | null {
+  if (source.providerState?.provider === 'fly') {
+    return source.providerState.machineId;
+  }
+  if (source.providerState?.provider === 'docker-local') {
+    return source.providerState.containerName;
+  }
+  return source.flyMachineId;
+}
+
+export function getStorageId(
+  source: Pick<InstanceMutableState, 'providerState' | 'flyVolumeId'>
+): string | null {
+  if (source.providerState?.provider === 'fly') {
+    return source.providerState.volumeId;
+  }
+  if (source.providerState?.provider === 'docker-local') {
+    return source.providerState.volumeName;
+  }
+  return source.flyVolumeId;
+}
+
+export function getProviderRegion(
+  source: Pick<InstanceMutableState, 'providerState' | 'flyRegion'>
+): string | null {
+  if (source.providerState?.provider === 'fly') {
+    return source.providerState.region;
+  }
+  if (source.providerState?.provider === 'docker-local') {
+    return null;
+  }
+  return source.flyRegion;
 }
 
 export function syncProviderStateForStorage(
@@ -93,8 +150,6 @@ export function syncProviderStateForStorage(
   // `providerState`; writes to legacy Fly fields should only happen alongside a
   // follow-up `persist()` call so this helper can mirror them.
   const nextProvider = patch.provider ?? s.provider;
-  if (nextProvider !== 'fly') return patch;
-
   const explicitProviderState = patch.providerState;
   if (explicitProviderState) {
     applyProviderState(s, explicitProviderState);
@@ -110,8 +165,15 @@ export function syncProviderStateForStorage(
     }
     return {
       ...patch,
+      provider: explicitProviderState.provider,
+      flyAppName: null,
+      flyMachineId: null,
+      flyVolumeId: null,
+      flyRegion: null,
     };
   }
+
+  if (nextProvider !== 'fly') return patch;
 
   const touchesFlyLegacyFields =
     'flyAppName' in patch ||
@@ -182,6 +244,8 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
       } else {
         s.providerState = buildFlyProviderState(s);
       }
+    } else if (s.providerState) {
+      applyProviderState(s, s.providerState);
     }
     s.machineSize = d.machineSize;
     s.healthCheckFailCount = d.healthCheckFailCount;
@@ -224,8 +288,6 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     // Legacy instances pre-dating this field treat absence as already-sent
     // to avoid spurious emails after deploy.
     s.instanceReadyEmailSent = 'instanceReadyEmailSent' in raw ? d.instanceReadyEmailSent : true;
-    s.diskUsedBytes = d.diskUsedBytes;
-    s.diskTotalBytes = d.diskTotalBytes;
     s.customSecretMeta = d.customSecretMeta;
     s.streamChatApiKey = d.streamChatApiKey;
     s.streamChatBotUserId = d.streamChatBotUserId;
@@ -311,8 +373,6 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.preRestoreStatus = null;
   s.pendingRestoreVolumeId = null;
   s.instanceReadyEmailSent = false;
-  s.diskUsedBytes = null;
-  s.diskTotalBytes = null;
   s.streamChatApiKey = null;
   s.streamChatBotUserId = null;
   s.streamChatBotUserToken = null;
@@ -391,8 +451,6 @@ export function createMutableState(): InstanceMutableState {
     preRestoreStatus: null,
     pendingRestoreVolumeId: null,
     instanceReadyEmailSent: false,
-    diskUsedBytes: null,
-    diskTotalBytes: null,
     customSecretMeta: null,
     streamChatApiKey: null,
     streamChatBotUserId: null,

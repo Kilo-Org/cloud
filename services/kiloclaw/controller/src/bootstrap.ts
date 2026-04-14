@@ -253,14 +253,9 @@ export function applyFeatureFlags(env: EnvLike, deps: BootstrapDeps = defaultDep
 
 // ---- Step 4: Hooks token ----
 
-/**
- * Generate a random hooks token for Gmail push via gog.
- * Only generated when KILOCLAW_GOG_CONFIG_TARBALL is present.
- */
+/** Generate a per-boot random hooks token for local gateway hook delivery. */
 export function generateHooksToken(env: EnvLike): void {
-  if (env.KILOCLAW_GOG_CONFIG_TARBALL) {
-    env.KILOCLAW_HOOKS_TOKEN = crypto.randomBytes(32).toString('hex');
-  }
+  env.KILOCLAW_HOOKS_TOKEN = crypto.randomBytes(32).toString('hex');
 }
 
 export function formatBotIdentityMarkdown(env: EnvLike): string {

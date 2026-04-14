@@ -36,7 +36,9 @@ import {
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
   baseAnswerPermissionNextSchema,
+  cloudAgentGetImageUploadUrlSchema,
 } from '../cloud-agent-next-schemas';
+import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
@@ -56,6 +58,10 @@ const SendMessageInput = baseSendMessageNextSchema.extend({
 });
 
 const InterruptSessionInput = baseInterruptSessionNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const ImageUploadUrlInput = cloudAgentGetImageUploadUrlSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -249,6 +255,22 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         rethrowAsPaymentRequired(error);
         throw error;
       }
+    }),
+
+  /**
+   * Generate a presigned URL for uploading an image attachment.
+   */
+  getImageUploadUrl: organizationMemberMutationProcedure
+    .input(ImageUploadUrlInput)
+    .mutation(async ({ ctx, input }) => {
+      return generateImageUploadUrl({
+        service: 'cloud-agent',
+        userId: ctx.user.id,
+        messageUuid: input.messageUuid,
+        imageId: input.imageId,
+        contentType: input.contentType,
+        contentLength: input.contentLength,
+      });
     }),
 
   /**

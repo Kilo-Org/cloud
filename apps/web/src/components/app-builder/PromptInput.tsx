@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useImageUpload } from '@/hooks/useImageUpload';
-import { ImagePreviewStrip } from '@/components/app-builder/ImagePreviewStrip';
+import { ImagePreviewStrip } from '@/components/shared/ImagePreviewStrip';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { Images } from '@/lib/images-schema';
 

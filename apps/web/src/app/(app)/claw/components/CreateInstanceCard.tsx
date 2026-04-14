@@ -79,7 +79,7 @@ export function CreateInstanceCardView({
               'Setting up...'
             ) : (
               <span className="inline-flex items-center gap-1">
-                Try For Free
+                Get Started
                 <ChevronRight className="h-5 w-5" />
               </span>
             )}

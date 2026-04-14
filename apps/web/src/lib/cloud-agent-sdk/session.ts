@@ -6,6 +6,7 @@
  * CLI live, or CLI historical transport.
  */
 import type { QuestionInfo } from '@/types/opencode.gen';
+import type { Images } from '@/lib/images-schema';
 import type { NormalizedEvent } from './normalizer';
 import { createChatProcessor } from './chat-processor';
 import { createServiceState } from './service-state';
@@ -54,6 +55,7 @@ type CloudAgentSessionSendInput = {
   model?: string;
   variant?: string;
   messageId?: string;
+  images?: Images;
 };
 
 type CloudAgentSessionAnswerInput = {

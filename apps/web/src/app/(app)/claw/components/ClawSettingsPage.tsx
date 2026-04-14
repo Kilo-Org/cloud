@@ -8,6 +8,7 @@ import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
 import { ClawContextProvider, useClawContext } from './ClawContext';
+import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawInstanceOverview } from './ClawInstanceOverview';
 import { SettingsTab } from './SettingsTab';
 import { BillingWrapper } from './billing/BillingWrapper';
@@ -137,6 +138,7 @@ function ClawSettingsWithStatus({
   if (!status || status.status === null) return null;
   const settingsContent = (
     <div className="flex flex-col gap-6">
+      <ClawConfigServiceBanner status={status} />
       <ClawInstanceOverview status={status} />
       <ClawSettingsInner status={status} organizationName={organizationName} />
     </div>

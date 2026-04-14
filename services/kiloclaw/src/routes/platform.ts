@@ -33,9 +33,10 @@ import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
-import { assertImplementedProvider } from '../providers';
+import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
-import { resolveDoKeyForUser } from '../lib/instance-routing';
+import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
+import { getInstanceById, getWorkerDb } from '../db';
 
 const GmailHistoryIdSchema = z.object({
   userId: z.string().min(1),
@@ -479,7 +480,7 @@ platform.post('/provision', async c => {
   let provision;
   try {
     if (provider) {
-      assertImplementedProvider(provider);
+      assertAvailableProvider(c.env, provider);
     }
     provision = await withResolvedDORetry(
       c.env,
@@ -1710,6 +1711,138 @@ platform.get('/stream-chat-credentials', async c => {
   }
 });
 
+const MAX_INBOUND_EMAIL_TITLE_SLUG_LENGTH = 80;
+
+const InboundEmailSchema = z.object({
+  instanceId: z.string().uuid(),
+  messageId: z.string().trim().min(1).max(512),
+  from: z.string().trim().min(1).max(512),
+  to: z.string().trim().min(1).max(512),
+  subject: z.string().max(1_000),
+  text: z.string().min(1).max(32_000),
+  receivedAt: z.string().datetime(),
+});
+
+function inboundEmailTitleSlug(subject: string): string {
+  const slug = subject
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_INBOUND_EMAIL_TITLE_SLUG_LENGTH)
+    .replace(/-+$/g, '');
+
+  return slug || 'no-subject';
+}
+
+function inboundEmailSessionKey(subject: string, receivedAt: string): string {
+  return `inbound-email:${receivedAt.slice(0, 10)}-${inboundEmailTitleSlug(subject)}`;
+}
+
+async function resolveInboundEmailDoKey(
+  env: AppEnv['Bindings'],
+  instance: { id: string; userId: string; sandboxId: string; orgId: string | null }
+): Promise<string> {
+  const ownerKey = instance.orgId ? `org:${instance.orgId}` : `user:${instance.userId}`;
+  try {
+    const registryStub = env.KILOCLAW_REGISTRY.get(env.KILOCLAW_REGISTRY.idFromName(ownerKey));
+    const doKey = await registryStub.resolveDoKey(ownerKey, instance.id);
+    if (doKey) return doKey;
+  } catch (err) {
+    console.warn(
+      '[platform] inbound-email registry lookup failed, falling back to instance identity',
+      {
+        instanceId: instance.id,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    );
+  }
+  return doKeyFromActiveInstance(instance);
+}
+
+// POST /api/platform/inbound-email
+// Deliver a Cloudflare Email Routing message to an instance's OpenClaw hook endpoint.
+platform.post('/inbound-email', async c => {
+  const result = await parseBody(c, InboundEmailSchema);
+  if ('error' in result) return result.error;
+
+  const delivery = result.data;
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    return jsonError('Database is not configured', 503);
+  }
+  if (!c.env.GATEWAY_TOKEN_SECRET) {
+    return jsonError('GATEWAY_TOKEN_SECRET is not configured', 503);
+  }
+
+  try {
+    const instance = await getInstanceById(getWorkerDb(connectionString), delivery.instanceId);
+    if (!instance) {
+      return jsonError('Instance not found', 404);
+    }
+    c.set('userId', instance.userId);
+
+    const doKey = await resolveInboundEmailDoKey(c.env, instance);
+    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+    const status = await stub.getStatus();
+
+    if (status.status !== 'running') {
+      return jsonError('Instance is not running', 503);
+    }
+    if (!status.sandboxId) {
+      return jsonError('Instance has no sandboxId', 500);
+    }
+
+    const routingTarget = await stub.getRoutingTarget();
+    if (!routingTarget) {
+      return jsonError('Instance not routable', 503);
+    }
+
+    const gatewayToken = await deriveGatewayToken(status.sandboxId, c.env.GATEWAY_TOKEN_SECRET);
+    const response = await fetch(`${routingTarget.origin}/_kilo/hooks/email`, {
+      method: 'POST',
+      headers: {
+        ...routingTarget.headers,
+        authorization: `Bearer ${gatewayToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sessionKey: inboundEmailSessionKey(delivery.subject, delivery.receivedAt),
+        messageId: delivery.messageId,
+        from: delivery.from,
+        to: delivery.to,
+        subject: delivery.subject,
+        text: delivery.text,
+        receivedAt: delivery.receivedAt,
+      }),
+    });
+
+    if (response.ok) {
+      writeEvent(c.env, {
+        event: 'instance.webhook_chat_message_sent',
+        delivery: 'http',
+        route: '/api/platform/inbound-email',
+        userId: instance.userId,
+        instanceId: instance.id,
+      });
+      return c.json({ success: true }, 202);
+    }
+
+    const error = await response.text().catch(() => '');
+    console.error('[platform] inbound email controller delivery failed', {
+      instanceId: instance.id,
+      status: response.status,
+      error: error.slice(0, 500),
+    });
+
+    const responseStatus = response.status >= 400 && response.status < 600 ? response.status : 502;
+    return jsonError('Inbound email delivery failed', responseStatus);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'inbound-email');
+    return jsonError(message, status);
+  }
+});
+
 // POST /api/platform/send-chat-message
 // Send a message to a KiloClaw instance's Stream Chat channel as the human user.
 // The OpenClaw bot picks it up and responds as if the user typed it.
@@ -2171,6 +2304,7 @@ platform.post('/publish-image-version', async c => {
 
 import { FLY_REGIONS_KV_KEY, parseRegions, ALL_VALID_REGIONS } from '../durable-objects/regions';
 import { DEFAULT_FLY_REGION } from '../config';
+import { FLY_API_BASE } from '../fly/client';
 
 const UpdateRegionsSchema = z.object({
   regions: z
@@ -2255,7 +2389,7 @@ platform.post('/destroy-fly-machine', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  const url = `https://api.machines.dev/v1/apps/${appName}/machines/${machineId}?force=true`;
+  const url = `${FLY_API_BASE}/v1/apps/${appName}/machines/${machineId}?force=true`;
   try {
     const resp = await fetch(url, {
       method: 'DELETE',
@@ -2329,7 +2463,7 @@ platform.post('/extend-volume', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  const url = `https://api.machines.dev/v1/apps/${appName}/volumes/${volumeId}/extend`;
+  const url = `${FLY_API_BASE}/v1/apps/${appName}/volumes/${volumeId}/extend`;
   try {
     const resp = await fetch(url, {
       method: 'PUT',

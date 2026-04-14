@@ -24,6 +24,11 @@ RUN GOARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "amd64") \
   && chmod +x /usr/local/bin/gog
 
 WORKDIR /app
-COPY setup.mjs ./
+COPY setup.mjs admin-setup.mjs shared.mjs ./
 
-ENTRYPOINT ["node", "setup.mjs"]
+# Route --admin to admin-setup.mjs, everything else to setup.mjs
+ENTRYPOINT ["/bin/sh", "-c", "\
+  for arg in \"$@\"; do \
+    case \"$arg\" in --admin) exec node admin-setup.mjs \"$@\";; esac; \
+  done; \
+  exec node setup.mjs \"$@\"", "--"]

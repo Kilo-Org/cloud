@@ -25,4 +25,5 @@ export const gpt_oss_20b_free_model: KiloExclusiveModel = {
   internal_id: 'openai/gpt-oss-20b',
   inference_provider: null,
   pricing: null,
+  exclusive_to: [],
 };

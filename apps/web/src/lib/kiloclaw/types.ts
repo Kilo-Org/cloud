@@ -130,6 +130,9 @@ export type MachineSize = {
   cpu_kind?: 'shared' | 'performance';
 };
 
+// Keep in sync with services/kiloclaw/src/schemas/instance-config.ts ProviderIdSchema.
+export type KiloClawProviderId = 'fly' | 'docker-local' | 'northflank';
+
 /** Response from POST /api/platform/restore-volume-snapshot */
 export type RestoreVolumeSnapshotResponse = {
   acknowledged: boolean;
@@ -140,6 +143,10 @@ export type RestoreVolumeSnapshotResponse = {
 export type PlatformStatusResponse = {
   userId: string | null;
   sandboxId: string | null;
+  provider: KiloClawProviderId | null;
+  runtimeId: string | null;
+  storageId: string | null;
+  region: string | null;
   status:
     | 'provisioned'
     | 'starting'
@@ -196,7 +203,6 @@ export type RegistryEntriesResponse = {
 /** Response from GET /api/platform/debug-status (internal/admin only). */
 export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   orgId: string | null;
-  provider: 'fly' | 'northflank' | 'aws' | 'k8s';
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
   pendingPostgresMarkOnFinalize: boolean;
@@ -219,8 +225,6 @@ export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   restoreStartedAt: string | null;
   pendingRestoreVolumeId: string | null;
   instanceReadyEmailSent: boolean;
-  diskUsedBytes: number | null;
-  diskTotalBytes: number | null;
 };
 
 export type CleanupRecoveryPreviousVolumeResponse = {

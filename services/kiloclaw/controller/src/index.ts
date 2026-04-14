@@ -24,6 +24,7 @@ import {
   registerKiloChatDeleteRoute,
   registerKiloChatTypingRoute,
 } from './routes/kilo-chat';
+import { registerInboundEmailRoute } from './routes/inbound-email';
 import { registerFileRoutes } from './routes/files';
 import { registerKiloCliRunRoutes } from './routes/kilo-cli-run';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
@@ -39,6 +40,7 @@ import { collectProductTelemetry } from './product-telemetry';
 export type RuntimeConfig = {
   port: number;
   expectedToken: string;
+  hooksToken: string;
   requireProxyToken: boolean;
   gatewayArgs: string[];
   wsIdleTimeoutMs: number;
@@ -80,10 +82,15 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
   if (!expectedToken) {
     throw new Error('OPENCLAW_GATEWAY_TOKEN is required');
   }
+  const hooksToken = env.KILOCLAW_HOOKS_TOKEN;
+  if (!hooksToken) {
+    throw new Error('KILOCLAW_HOOKS_TOKEN is required');
+  }
 
   return {
     port: Number(env.PORT ?? 18789),
     expectedToken,
+    hooksToken,
     requireProxyToken: parseBoolean(env.REQUIRE_PROXY_TOKEN),
     gatewayArgs: parseGatewayArgs(env.KILOCLAW_GATEWAY_ARGS),
     wsIdleTimeoutMs: parsePositiveInt(
@@ -367,6 +374,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     registerKiloChatDeleteRoute(honoApp, kiloChatOpts);
     registerKiloChatTypingRoute(honoApp, kiloChatOpts);
   }
+  registerInboundEmailRoute(honoApp, supervisor, config.expectedToken, config.hooksToken);
   registerFileRoutes(honoApp, config.expectedToken, '/root/.openclaw');
   registerKiloCliRunRoutes(honoApp, config.expectedToken);
   honoApp.all(

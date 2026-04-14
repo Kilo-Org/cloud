@@ -33,6 +33,19 @@ const testAppName = 'acct-abc123def456';
 const testMachineId = 'd8901e123456';
 const testUserId = 'test-target-user-id';
 
+function flyDebugStatus(overrides: Record<string, unknown> = {}) {
+  return {
+    provider: 'fly',
+    runtimeId: testMachineId,
+    storageId: 'vol-test',
+    region: 'iad',
+    flyAppName: testAppName,
+    flyMachineId: testMachineId,
+    status: 'running',
+    ...overrides,
+  };
+}
+
 beforeAll(async () => {
   regularUser = await insertTestUser({
     google_user_email: 'regular-destroy-machine@example.com',
@@ -80,11 +93,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   });
 
   it('destroys the Fly machine when appName/machineId match DO state', async () => {
-    mockGetDebugStatus.mockResolvedValue({
-      flyAppName: testAppName,
-      flyMachineId: testMachineId,
-      status: 'running',
-    });
+    mockGetDebugStatus.mockResolvedValue(flyDebugStatus());
     mockDestroyFlyMachine.mockResolvedValue({ ok: true });
 
     const caller = await createCallerForUser(adminUser.id);
@@ -105,11 +114,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   });
 
   it('throws BAD_REQUEST when appName does not match DO state', async () => {
-    mockGetDebugStatus.mockResolvedValue({
-      flyAppName: 'acct-different',
-      flyMachineId: testMachineId,
-      status: 'running',
-    });
+    mockGetDebugStatus.mockResolvedValue(flyDebugStatus({ flyAppName: 'acct-different' }));
 
     const caller = await createCallerForUser(adminUser.id);
     await expect(
@@ -124,11 +129,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   });
 
   it('throws BAD_REQUEST when machineId does not match DO state', async () => {
-    mockGetDebugStatus.mockResolvedValue({
-      flyAppName: testAppName,
-      flyMachineId: 'differentmachineid',
-      status: 'running',
-    });
+    mockGetDebugStatus.mockResolvedValue(flyDebugStatus({ flyMachineId: 'differentmachineid' }));
 
     const caller = await createCallerForUser(adminUser.id);
     await expect(
@@ -143,11 +144,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   });
 
   it('writes an audit log on success', async () => {
-    mockGetDebugStatus.mockResolvedValue({
-      flyAppName: testAppName,
-      flyMachineId: testMachineId,
-      status: 'running',
-    });
+    mockGetDebugStatus.mockResolvedValue(flyDebugStatus());
     mockDestroyFlyMachine.mockResolvedValue({ ok: true });
 
     const caller = await createCallerForUser(adminUser.id);
@@ -176,11 +173,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   });
 
   it('wraps generic errors as INTERNAL_SERVER_ERROR', async () => {
-    mockGetDebugStatus.mockResolvedValue({
-      flyAppName: testAppName,
-      flyMachineId: testMachineId,
-      status: 'running',
-    });
+    mockGetDebugStatus.mockResolvedValue(flyDebugStatus());
     mockDestroyFlyMachine.mockRejectedValue(new Error('Fly API timeout'));
 
     const caller = await createCallerForUser(adminUser.id);
@@ -199,11 +192,7 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
       KiloClawApiError: new (statusCode: number, responseBody: string) => any;
     }>('@/lib/kiloclaw/kiloclaw-internal-client');
 
-    mockGetDebugStatus.mockResolvedValue({
-      flyAppName: testAppName,
-      flyMachineId: testMachineId,
-      status: 'running',
-    });
+    mockGetDebugStatus.mockResolvedValue(flyDebugStatus());
     mockDestroyFlyMachine.mockRejectedValue(
       new KiloClawApiError(404, JSON.stringify({ error: 'machine not found' }))
     );

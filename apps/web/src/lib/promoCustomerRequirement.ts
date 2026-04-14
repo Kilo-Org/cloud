@@ -53,6 +53,14 @@ export const has_githubAuthAndWelcomeCredits: CustomerRequirement = async custom
   return has_stytchApprovedOrHoldOrPayment(customerInfo);
 };
 
+export function created_before(cutoff: Date): SyncCustomerRequirement {
+  return customerInfo =>
+    verifyOrError(
+      new Date(customerInfo.user.created_at) < cutoff,
+      'Your account was created after the eligibility cutoff date for this promotion.'
+    );
+}
+
 export const has_githubAuth: CustomerRequirement = async customerInfo => {
   const has_github_auth = await db.query.user_auth_provider.findFirst({
     where: and(

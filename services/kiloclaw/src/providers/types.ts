@@ -31,6 +31,7 @@ export type ProviderCapabilities = Record<ProviderCapability, boolean>;
 export type RuntimeSpec = {
   imageRef: string;
   env: Record<string, string>;
+  bootstrapEnv: Record<string, string>;
   machineSize: MachineSize | null;
   rootMountPath: '/root';
   controllerPort: number;
@@ -39,7 +40,7 @@ export type RuntimeSpec = {
 };
 
 export type ProviderObservation = {
-  runtimeState?: 'starting' | 'running' | 'stopped' | 'failed';
+  runtimeState?: 'starting' | 'running' | 'stopped' | 'failed' | 'missing';
   machineSize?: MachineSize | null;
 };
 
@@ -75,6 +76,10 @@ export type RestartRuntimeArgs = ProviderContext & {
   onProviderResult?: (result: ProviderResult) => Promise<void>;
 };
 
+export type DestroyRuntimeArgs = ProviderContext;
+
+export type DestroyStorageArgs = ProviderContext;
+
 export type InstanceProviderAdapter = {
   readonly id: ProviderId;
   readonly capabilities: ProviderCapabilities;
@@ -84,4 +89,7 @@ export type InstanceProviderAdapter = {
   startRuntime(args: StartRuntimeArgs): Promise<ProviderResult>;
   stopRuntime(args: StopRuntimeArgs): Promise<ProviderResult>;
   restartRuntime(args: RestartRuntimeArgs): Promise<ProviderResult>;
+  inspectRuntime(args: ProviderContext): Promise<ProviderResult>;
+  destroyRuntime(args: DestroyRuntimeArgs): Promise<ProviderResult>;
+  destroyStorage(args: DestroyStorageArgs): Promise<ProviderResult>;
 };

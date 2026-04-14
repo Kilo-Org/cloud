@@ -1,11 +1,11 @@
 'use client';
 
 import type { KeyboardEvent } from 'react';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Button as UIButton } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover';
 import { Command, CommandList, CommandItem, CommandEmpty } from '@/components/ui/command';
-import { Send, Square } from 'lucide-react';
+import { Send, Square, Paperclip, Upload } from 'lucide-react';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import { cn } from '@/lib/utils';
 import { BrowseCommandsDialog } from './BrowseCommandsDialog';
@@ -13,15 +13,21 @@ import { ModeCombobox, NEXT_MODE_OPTIONS } from '@/components/shared/ModeCombobo
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
+import { ImagePreviewStrip } from '@/components/shared/ImagePreviewStrip';
+import { useImageUpload, type UseImageUploadOptions } from '@/hooks/useImageUpload';
+import { CLOUD_AGENT_IMAGE_MAX_COUNT } from '@/lib/cloud-agent/constants';
+import type { Images } from '@/lib/images-schema';
 import type { AgentMode } from './types';
 
 type ChatInputProps = {
-  onSend: (message: string) => void;
+  onSend: (message: string, images?: Images) => Promise<boolean>;
   onStop?: () => void;
   disabled?: boolean;
   isStreaming?: boolean;
   placeholder?: string;
   slashCommands?: SlashCommand[];
+  /** Options passed to useImageUpload. */
+  imageUploadOptions: UseImageUploadOptions;
   /** Current mode for the toolbar */
   mode?: AgentMode;
   /** Current model for the toolbar */
@@ -64,20 +70,33 @@ export function ChatInput({
   availableVariants = [],
   showToolbar = false,
   initialValue,
+  imageUploadOptions,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const valueRef = useRef('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const setInputValue = useCallback((nextValue: string) => {
+    valueRef.current = nextValue;
+    setValue(nextValue);
+  }, []);
+
+  const imageUpload = useImageUpload(imageUploadOptions);
+  const maxImages = imageUploadOptions.maxImages ?? CLOUD_AGENT_IMAGE_MAX_COUNT;
+  const isImageLimitReached = imageUpload.images.length >= maxImages;
 
   // Restore text into the textarea when initialValue changes (e.g. after a failed send).
   // Treats undefined as "no opinion" (skip), but empty string actively clears the field.
   useEffect(() => {
-    if (initialValue !== undefined) {
-      setValue(initialValue);
-      textareaRef.current?.focus();
-    }
-  }, [initialValue]);
+    if (initialValue === undefined) return;
+    if (initialValue !== '' && valueRef.current !== '') return;
+
+    setInputValue(initialValue);
+    textareaRef.current?.focus();
+  }, [initialValue, setInputValue]);
 
   // Filter commands based on current input
   const filteredCommands = useMemo(() => {
@@ -115,17 +134,39 @@ export function ChatInput({
     textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
   }, [value]);
 
+  const sendMessage = useCallback(
+    async (message: string) => {
+      const trimmed = message.trim();
+      if (!trimmed || disabled) return false;
+      if (imageUpload.hasUploadingImages) return false;
+
+      const imagesData = imageUpload.getImagesData();
+      const submittedImageIds = imageUpload.images.map(image => image.id);
+
+      setInputValue('');
+      submittedImageIds.forEach(imageUpload.removeImage);
+      setShowAutocomplete(false);
+
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+
+      const accepted = await onSend(trimmed, imagesData);
+      if (!accepted) {
+        if (valueRef.current === '') {
+          setInputValue(trimmed);
+          textareaRef.current?.focus();
+        }
+        return false;
+      }
+
+      return true;
+    },
+    [disabled, imageUpload, onSend, setInputValue]
+  );
+
   const handleSend = () => {
-    const trimmed = value.trim();
-    if (!trimmed || disabled) return;
-
-    onSend(trimmed);
-    setValue('');
-    setShowAutocomplete(false);
-
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
+    void sendMessage(value);
   };
 
   const handleStop = () => {
@@ -140,15 +181,10 @@ export function ChatInput({
     setSelectedIndex(0);
 
     if (autoSend) {
-      // Send immediately
-      onSend(expansion);
-      setValue('');
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
+      void sendMessage(expansion);
     } else {
       // Just fill the input for editing
-      setValue(expansion);
+      setInputValue(expansion);
       // Force height recalculation for expanded text
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -210,6 +246,19 @@ export function ChatInput({
     }
   };
 
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const files = Array.from(e.clipboardData.items)
+        .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+        .map(item => item.getAsFile())
+        .filter((f): f is File => f !== null);
+      if (files.length > 0) {
+        imageUpload.addFiles(files);
+      }
+    },
+    [imageUpload]
+  );
+
   // Check if toolbar should be rendered (has callbacks and options)
   const hasToolbar = showToolbar && onModeChange && onModelChange && modelOptions.length > 0;
 
@@ -217,18 +266,55 @@ export function ChatInput({
     <div className="px-[max(1rem,calc(50%_-_27rem))] py-3 md:py-4">
       <div
         className={cn(
-          'overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
-          disabled && !isStreaming && 'opacity-60'
+          'relative overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
+          disabled && !isStreaming && 'opacity-60',
+          imageUpload.isDragging && 'border-transparent focus-within:ring-0'
         )}
+        {...imageUpload.dragHandlers}
       >
+        {imageUpload.isDragging && (
+          <div
+            className={cn(
+              'absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed backdrop-blur-[2px]',
+              isImageLimitReached
+                ? 'border-amber-500/60 bg-amber-500/10'
+                : 'border-primary/60 bg-primary/5'
+            )}
+          >
+            <div
+              className={cn(
+                'flex items-center gap-2 text-sm font-medium',
+                isImageLimitReached ? 'text-amber-400' : 'text-primary'
+              )}
+            >
+              <Upload className="h-4 w-4" />
+              {isImageLimitReached ? `Maximum ${maxImages} images attached` : 'Drop images here'}
+            </div>
+          </div>
+        )}
+        {/* Hidden file input for image selection */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          multiple
+          className="hidden"
+          onChange={e => {
+            if (e.target.files) {
+              imageUpload.addFiles(e.target.files);
+              e.target.value = '';
+            }
+          }}
+        />
         {/* Textarea with slash command autocomplete */}
         <Popover open={showAutocomplete} onOpenChange={handleOpenChange}>
           <PopoverAnchor asChild>
             <textarea
               ref={textareaRef}
               value={value}
-              onChange={e => setValue(e.target.value)}
+              onChange={e => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder={placeholder}
               disabled={disabled}
               className="max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-base focus:ring-0 focus:outline-none md:text-sm"
@@ -279,6 +365,16 @@ export function ChatInput({
             </Command>
           </PopoverContent>
         </Popover>
+
+        {imageUpload.images.length > 0 && (
+          <div className="px-3 pb-1">
+            <ImagePreviewStrip
+              images={imageUpload.images}
+              onRemove={imageUpload.removeImage}
+              size="compact"
+            />
+          </div>
+        )}
 
         {/* Toolbar below textarea */}
         <div className="flex min-w-0 items-center gap-2 overflow-hidden px-3 py-1.5">
@@ -335,6 +431,19 @@ export function ChatInput({
             </div>
           )}
           <div className="flex-1" />
+          {!isStreaming && (
+            <UIButton
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled}
+              className="h-8 w-8 rounded-lg"
+              title="Attach images"
+            >
+              <Paperclip className="h-4 w-4" />
+            </UIButton>
+          )}
           {isStreaming ? (
             <UIButton
               type="button"
@@ -352,7 +461,7 @@ export function ChatInput({
               variant="primary"
               size="icon"
               onClick={handleSend}
-              disabled={disabled || !value.trim()}
+              disabled={disabled || !value.trim() || imageUpload.hasUploadingImages}
               className="h-8 w-8 rounded-lg"
             >
               <Send className="h-4 w-4" />

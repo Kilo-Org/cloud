@@ -2,6 +2,12 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 import { controller } from './controller';
 import { deriveGatewayToken } from '../auth/gateway-token';
 
+type AnalyticsEngineDataPoint = {
+  blobs: string[];
+  doubles: number[];
+  indexes: string[];
+};
+
 vi.mock('cloudflare:workers', () => ({
   waitUntil: (p: Promise<unknown>) => p,
 }));
@@ -30,7 +36,7 @@ const sandboxId = 'dXNlci0x';
 function makeEnv(options?: {
   gatewayTokenSecret?: string;
   kilocodeApiKey?: string;
-  writeDataPoint?: (payload: unknown) => void;
+  writeDataPoint?: (payload: AnalyticsEngineDataPoint) => void;
   posthogKey?: string;
   hyperdriveConnectionString?: string;
   workerEnv?: string;
@@ -47,7 +53,6 @@ function makeEnv(options?: {
     botVibe: 'Dry wit',
     botEmoji: '🤖',
   });
-  const recordDiskStats = vi.fn().mockResolvedValue(undefined);
   const tryMarkInstanceReady =
     options?.tryMarkInstanceReady ??
     vi.fn().mockResolvedValue({ shouldNotify: false, userId: null });
@@ -58,7 +63,7 @@ function makeEnv(options?: {
     INTERNAL_API_SECRET: options?.internalApiSecret,
     KILOCLAW_INSTANCE: {
       idFromName: (userId: string) => userId,
-      get: () => ({ getConfig, getStatus, recordDiskStats, tryMarkInstanceReady }),
+      get: () => ({ getConfig, getStatus, tryMarkInstanceReady }),
     },
     KILOCLAW_CONTROLLER_AE: options?.writeDataPoint
       ? {
@@ -114,6 +119,17 @@ async function makeAuthHeaders(targetSandboxId = sandboxId) {
   };
 }
 
+function analyticsEvents(writeDataPoint: Mock): AnalyticsEngineDataPoint[] {
+  const calls = writeDataPoint.mock.calls as [AnalyticsEngineDataPoint][];
+  return calls.map(([call]) => call);
+}
+
+function firstAnalyticsEvent(writeDataPoint: Mock): AnalyticsEngineDataPoint {
+  const [call] = analyticsEvents(writeDataPoint);
+  expect(call).toBeDefined();
+  return call;
+}
+
 describe('POST /checkin', () => {
   it('returns 401 when required auth headers are missing', async () => {
     const response = await controller.request(
@@ -148,7 +164,7 @@ describe('POST /checkin', () => {
   });
 
   it('returns 204 and writes AE datapoint when both tokens are valid', async () => {
-    const writeDataPoint = vi.fn();
+    const writeDataPoint = vi.fn<(payload: AnalyticsEngineDataPoint) => void>();
     const env = makeEnv({ writeDataPoint });
     const headers = await makeAuthHeaders();
 
@@ -160,6 +176,99 @@ describe('POST /checkin', () => {
 
     expect(response.status).toBe(204);
     expect(writeDataPoint).toHaveBeenCalledTimes(1);
+
+    const call = firstAnalyticsEvent(writeDataPoint);
+    expect(call.doubles).toHaveLength(8);
+    expect(call.doubles[6]).toBe(0);
+    expect(call.doubles[7]).toBe(0);
+  });
+
+  it('writes disk usage doubles when disk stats are present', async () => {
+    const writeDataPoint = vi.fn<(payload: AnalyticsEngineDataPoint) => void>();
+    const env = makeEnv({ writeDataPoint });
+    const headers = await makeAuthHeaders();
+
+    const response = await controller.request(
+      '/checkin',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(makeBody({ diskUsedBytes: 1024000, diskTotalBytes: 5368709120 })),
+      },
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(writeDataPoint).toHaveBeenCalledTimes(1);
+
+    const call = firstAnalyticsEvent(writeDataPoint);
+    expect(call.doubles).toHaveLength(8);
+    expect(call.doubles[6]).toBe(1024000);
+    expect(call.doubles[7]).toBe(5368709120);
+  });
+
+  it('normalizes null disk usage doubles to zero', async () => {
+    const writeDataPoint = vi.fn<(payload: AnalyticsEngineDataPoint) => void>();
+    const env = makeEnv({ writeDataPoint });
+    const headers = await makeAuthHeaders();
+
+    const response = await controller.request(
+      '/checkin',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(makeBody({ diskUsedBytes: null, diskTotalBytes: null })),
+      },
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(writeDataPoint).toHaveBeenCalledTimes(1);
+
+    const call = firstAnalyticsEvent(writeDataPoint);
+    expect(call.doubles).toHaveLength(8);
+    expect(call.doubles[6]).toBe(0);
+    expect(call.doubles[7]).toBe(0);
+  });
+
+  it('clamps negative disk usage doubles to zero', async () => {
+    const writeDataPoint = vi.fn<(payload: AnalyticsEngineDataPoint) => void>();
+    const env = makeEnv({ writeDataPoint });
+    const headers = await makeAuthHeaders();
+
+    const response = await controller.request(
+      '/checkin',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(makeBody({ diskUsedBytes: -1, diskTotalBytes: -1 })),
+      },
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(writeDataPoint).toHaveBeenCalledTimes(1);
+
+    const call = firstAnalyticsEvent(writeDataPoint);
+    expect(call.doubles).toHaveLength(8);
+    expect(call.doubles[6]).toBe(0);
+    expect(call.doubles[7]).toBe(0);
+  });
+
+  it('still returns 204 when AE write throws', async () => {
+    const writeDataPoint = vi
+      .fn<(payload: AnalyticsEngineDataPoint) => Promise<void>>()
+      .mockRejectedValue(new Error('AE error'));
+    const env = makeEnv({ writeDataPoint });
+    const headers = await makeAuthHeaders();
+
+    const response = await controller.request(
+      '/checkin',
+      { method: 'POST', headers, body: JSON.stringify(makeBody()) },
+      env
+    );
+
+    expect(response.status).toBe(204);
   });
 
   it('does not call PostHog when productTelemetry is absent', async () => {

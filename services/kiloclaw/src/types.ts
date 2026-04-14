@@ -24,6 +24,7 @@ export type KiloClawEnv = {
   INTERNAL_API_SECRET?: string;
   GATEWAY_TOKEN_SECRET?: string;
   WORKER_ENV?: string; // e.g. 'production' or 'development' -- for JWT env validation
+  KILOCLAW_DEFAULT_PROVIDER?: string;
 
   // KiloCode provider configuration
   KILOCODE_API_BASE_URL?: string;
@@ -45,6 +46,9 @@ export type KiloClawEnv = {
   FLY_IMAGE_TAG?: string;
   FLY_IMAGE_DIGEST?: string;
   OPENCLAW_VERSION?: string;
+  DOCKER_LOCAL_API_BASE?: string;
+  DOCKER_LOCAL_IMAGE?: string;
+  DOCKER_LOCAL_PORT_RANGE?: string;
 
   // Developer identity (development only, auto-populated by dev-start from `fly auth whoami`)
   DEV_CREATOR?: string;

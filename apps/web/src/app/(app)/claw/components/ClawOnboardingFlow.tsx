@@ -17,6 +17,7 @@ import { BotIdentityStep } from './BotIdentityStep';
 import { ChannelPairingStep } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawContextProvider, useClawContext } from './ClawContext';
+import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { CreateInstanceCard } from './CreateInstanceCard';
 import { PermissionStep } from './PermissionStep';
@@ -55,11 +56,13 @@ export function ClawOnboardingFlow({
   mode,
   organizationId,
   onCreateFlowStarted,
+  onCreateFlowFailed,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   organizationId?: string;
   onCreateFlowStarted?: () => void;
+  onCreateFlowFailed?: () => void;
 }) {
   return (
     <ClawContextProvider organizationId={organizationId}>
@@ -67,6 +70,7 @@ export function ClawOnboardingFlow({
         status={status}
         mode={mode}
         onCreateFlowStarted={onCreateFlowStarted}
+        onCreateFlowFailed={onCreateFlowFailed}
       />
     </ClawContextProvider>
   );
@@ -76,10 +80,12 @@ function ClawOnboardingFlowInner({
   status,
   mode,
   onCreateFlowStarted,
+  onCreateFlowFailed,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   onCreateFlowStarted?: () => void;
+  onCreateFlowFailed?: () => void;
 }) {
   const { organizationId } = useClawContext();
 
@@ -98,6 +104,7 @@ function ClawOnboardingFlowInner({
     !!organizationId && isRunning
   );
   const { data: gatewayStatus } = organizationId ? orgGateway : personalGateway;
+  const instanceRunning = isRunning && gatewayStatus?.state === 'running';
 
   const { data: isServiceDegraded } = useClawServiceDegraded();
   const posthog = usePostHog();
@@ -107,16 +114,19 @@ function ClawOnboardingFlowInner({
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
-  const [createProvisioningStarted, setCreateProvisioningStarted] = useState(false);
+  const [createSetupStarted, setCreateSetupStarted] = useState(false);
   const hasPairingStep = selectedChannelId === 'telegram' || selectedChannelId === 'discord';
   const hasCapturedIdentityView = useRef(false);
   const hasCapturedDoneView = useRef(false);
 
+  const createSetupActive =
+    mode === 'create-first' && (createSetupStarted || instanceStatus !== null);
+
   useEffect(() => {
-    if (mode !== 'create-first' || !instanceStatus || hasCapturedIdentityView.current) return;
+    if (!createSetupActive || hasCapturedIdentityView.current) return;
     hasCapturedIdentityView.current = true;
     posthog?.capture('claw_setup_identity_viewed');
-  }, [instanceStatus, mode, posthog]);
+  }, [createSetupActive, posthog]);
 
   useEffect(() => {
     if (mode !== 'post-provisioning' || !postProvisioningReady || hasCapturedDoneView.current) {
@@ -126,19 +136,26 @@ function ClawOnboardingFlowInner({
     posthog?.capture('claw_setup_done_viewed');
   }, [mode, postProvisioningReady, posthog]);
 
-  const handleCreateFlowStarted = useCallback(() => {
-    setCreateProvisioningStarted(true);
+  const resetWizardSelections = useCallback(() => {
     setOnboardingStep('identity');
     setSelectedPreset(null);
     setBotIdentity(null);
     setChannelTokens(null);
     setSelectedChannelId(null);
+  }, []);
+
+  const handleCreateFlowStarted = useCallback(() => {
+    setCreateSetupStarted(true);
+    resetWizardSelections();
     onCreateFlowStarted?.();
-  }, [onCreateFlowStarted]);
+  }, [onCreateFlowStarted, resetWizardSelections]);
 
   const handleCreateFlowFailed = useCallback(() => {
-    setCreateProvisioningStarted(false);
-  }, []);
+    setCreateSetupStarted(false);
+    hasCapturedIdentityView.current = false;
+    resetWizardSelections();
+    onCreateFlowFailed?.();
+  }, [onCreateFlowFailed, resetWizardSelections]);
 
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
 
@@ -173,6 +190,8 @@ function ClawOnboardingFlowInner({
         </Alert>
       )}
 
+      <ClawConfigServiceBanner status={status} />
+
       <MaybeBillingWrapper skip={!!organizationId} hideBanners>
         {mode === 'post-provisioning' ? (
           postProvisioningReady ? (
@@ -184,19 +203,15 @@ function ClawOnboardingFlowInner({
           ) : (
             <ProvisioningStepView />
           )
-        ) : !instanceStatus ? (
-          createProvisioningStarted ? (
-            <ProvisioningStepView />
-          ) : (
-            <CreateInstanceCard
-              mutations={mutations}
-              onProvisionStart={handleCreateFlowStarted}
-              onProvisionFailed={handleCreateFlowFailed}
-            />
-          )
+        ) : !instanceStatus && !createSetupStarted ? (
+          <CreateInstanceCard
+            mutations={mutations}
+            onProvisionStart={handleCreateFlowStarted}
+            onProvisionFailed={handleCreateFlowFailed}
+          />
         ) : onboardingStep === 'identity' ? (
           <BotIdentityStep
-            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
+            instanceRunning={instanceRunning}
             onContinue={identity => {
               posthog?.capture('claw_setup_identity_completed', {
                 bot_name_is_custom: identity.botName !== 'KiloClaw',
@@ -210,7 +225,7 @@ function ClawOnboardingFlowInner({
           />
         ) : onboardingStep === 'permissions' ? (
           <PermissionStep
-            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
+            instanceRunning={instanceRunning}
             onSelect={preset => {
               posthog?.capture('claw_setup_permissions_completed', { preset });
               posthog?.capture('claw_setup_channels_viewed');
@@ -220,7 +235,7 @@ function ClawOnboardingFlowInner({
           />
         ) : onboardingStep === 'channels' ? (
           <ChannelSelectionStepView
-            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
+            instanceRunning={instanceRunning}
             onSelect={(channelId, tokens) => {
               posthog?.capture('claw_setup_channels_completed', {
                 channel: channelId,
@@ -247,7 +262,7 @@ function ClawOnboardingFlowInner({
             preset={selectedPreset}
             channelTokens={channelTokens}
             botIdentity={botIdentity}
-            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
+            instanceRunning={instanceRunning}
             mutations={mutations}
             totalSteps={hasPairingStep ? 6 : 5}
             onComplete={() => {

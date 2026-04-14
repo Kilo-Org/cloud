@@ -770,8 +770,9 @@ export function SettingsTab({
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
   const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
   const exaSearchConfigured =
-    kiloExaSearchMode === 'kilo-proxy' ||
-    (supportsExaSearchUi && kiloExaSearchMode === null && !braveSearchConfigured);
+    supportsExaSearchUi && (kiloExaSearchMode === 'kilo-proxy' || kiloExaSearchMode === null);
+  const exaSearchDisplayMode =
+    supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
 
@@ -1002,7 +1003,7 @@ export function SettingsTab({
                   actionRowInlineExtra={
                     supportsExaSearchUi &&
                     braveSearchConfigured &&
-                    kiloExaSearchMode === 'kilo-proxy' ? (
+                    exaSearchConfigured ? (
                       <Button
                         variant="link"
                         size="sm"
@@ -1030,7 +1031,7 @@ export function SettingsTab({
                     ) : undefined
                   }
                   saveConfirmation={
-                    supportsExaSearchUi && kiloExaSearchMode === 'kilo-proxy'
+                    supportsExaSearchUi && exaSearchConfigured
                       ? {
                           title: 'Enable Brave Search?',
                           description:
@@ -1043,7 +1044,7 @@ export function SettingsTab({
               ))}
             {supportsExaSearchUi && (
               <ExaSearchEntrySection
-                mode={kiloExaSearchMode}
+                mode={exaSearchDisplayMode}
                 configured={exaSearchConfigured}
                 braveConfigured={braveSearchConfigured}
                 mutations={mutations}

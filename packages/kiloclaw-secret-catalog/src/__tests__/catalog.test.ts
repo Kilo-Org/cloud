@@ -569,7 +569,6 @@ describe('Secret Catalog', () => {
     it('returns false for internal sensitive env vars', () => {
       expect(isCustomSecretEnvVar('KILOCLAW_GOG_CONFIG_TARBALL')).toBe(false);
     });
-
   });
 
   describe('custom secret constants', () => {

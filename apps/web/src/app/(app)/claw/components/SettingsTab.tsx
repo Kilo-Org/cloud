@@ -1001,9 +1001,7 @@ export function SettingsTab({
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
                   actionRowInlineExtra={
-                    supportsExaSearchUi &&
-                    braveSearchConfigured &&
-                    exaSearchConfigured ? (
+                    supportsExaSearchUi && braveSearchConfigured && exaSearchConfigured ? (
                       <Button
                         variant="link"
                         size="sm"

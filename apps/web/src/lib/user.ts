@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { createTimer } from '@/lib/timer';
 import PostHogClient from '@/lib/posthog';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
@@ -144,14 +144,34 @@ function getSignupIpExemptions(): Set<string> {
   );
 }
 
+/**
+ * Derive a stable int32 from an IP string for use as a pg_advisory_xact_lock key.
+ * Uses a simple FNV-1a hash truncated to 32 bits, paired with a fixed namespace.
+ */
+function ipToAdvisoryLockKey(ip: string): [number, number] {
+  const SIGNUP_LOCK_NAMESPACE = 0x5347_4e55; // "SGNU"
+  let hash = 0x811c_9dc5; // FNV offset basis
+  for (let i = 0; i < ip.length; i++) {
+    hash ^= ip.charCodeAt(i);
+    hash = (hash * 0x01000193) | 0; // FNV prime, keep 32-bit
+  }
+  return [SIGNUP_LOCK_NAMESPACE, hash];
+}
+
 async function checkSignupIpRateLimit(
-  signupIp: string | null
+  signupIp: string | null,
+  tx: DrizzleTransaction
 ): Promise<Result<null, AuthErrorType>> {
   if (!signupIp || getSignupIpExemptions().has(signupIp)) return successResult(null);
 
+  // Acquire a transaction-scoped advisory lock keyed by IP so concurrent
+  // signups from the same address are serialized.
+  const [ns, key] = ipToAdvisoryLockKey(signupIp);
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(${ns}, ${key})`);
+
   const maxSignups = getMaxSignupsPerIp24h();
   const windowStart = new Date(Date.now() - signupsPerIpWindowMs).toISOString();
-  const [result] = await db
+  const [result] = await tx
     .select({ count: count() })
     .from(kilocode_users)
     .where(
@@ -364,9 +384,6 @@ export async function createOrUpdateUser(
     throw new Error('Abuser warning: turnstile guid reuse detected ' + turnstile_guid);
 
   const signupIp = getSignupIp(requestHeaders);
-  const signupRateLimitResult = await checkSignupIpRateLimit(signupIp);
-  if (!signupRateLimitResult.success) return signupRateLimitResult;
-
   const newUserId = turnstile_guid ?? randomUUID();
 
   // New user creation path
@@ -391,7 +408,13 @@ export async function createOrUpdateUser(
     email_domain: extractEmailDomain(args.google_user_email),
   } satisfies typeof kilocode_users.$inferInsert;
 
-  const savedUser = await db.transaction(async tx => {
+  type TxResult = Result<{ user: User }, AuthErrorType>;
+  const txResult: TxResult = await db.transaction(async tx => {
+    // Check the per-IP rate limit inside the transaction with an advisory
+    // lock so concurrent signups from the same IP are serialized.
+    const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
+    if (!signupRateLimitResult.success) return signupRateLimitResult;
+
     const [savedUser] = await tx.insert(kilocode_users).values(newUser).returning();
     assert(savedUser, 'Failed to save new user');
 
@@ -416,8 +439,11 @@ export async function createOrUpdateUser(
       });
     }
 
-    return savedUser;
+    return successResult({ user: savedUser });
   });
+
+  if (!txResult.success) return txResult;
+  const savedUser = txResult.user;
 
   fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);
 

@@ -677,6 +677,7 @@ const authOptions: NextAuthOptions = {
             'ACCOUNT-ALREADY-LINKED',
             'PROVIDER-ALREADY-LINKED',
             'DIFFERENT-OAUTH',
+            'SIGNUP-RATE-LIMITED',
           ];
 
           // Only log unexpected errors to Sentry

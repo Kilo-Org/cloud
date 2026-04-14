@@ -15,5 +15,8 @@
     "typescript": "catalog:",
     "vitest": "^4.1.0",
     "wrangler": "catalog:"
+  },
+  "dependencies": {
+    "postal-mime": "^2.7.4"
   }
 }

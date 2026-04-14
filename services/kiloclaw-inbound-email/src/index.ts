@@ -12,8 +12,8 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-async function streamToText(stream: ReadableStream): Promise<string> {
-  return await new Response(stream).text();
+async function streamToArrayBuffer(stream: ReadableStream): Promise<ArrayBuffer> {
+  return await new Response(stream).arrayBuffer();
 }
 
 async function buildQueueMessage(
@@ -32,8 +32,8 @@ async function buildQueueMessage(
     return null;
   }
 
-  const raw = await streamToText(message.raw);
-  const parsed = parseRawEmail(raw);
+  const raw = await streamToArrayBuffer(message.raw);
+  const parsed = await parseRawEmail(raw);
   const maxTextChars = parsePositiveInt(env.MAX_EMAIL_TEXT_CHARS, DEFAULT_MAX_EMAIL_TEXT_CHARS);
   const messageId = parsed.messageId ?? (await stableMessageId(raw));
 

@@ -1534,7 +1534,14 @@ export const kiloclawRouter = createTRPCRouter({
     if (!instance) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'No active instance' });
     }
-    return queryDiskUsage(instance.sandboxId);
+    try {
+      return await queryDiskUsage(instance.sandboxId);
+    } catch {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch disk usage',
+      });
+    }
   }),
 
   renameInstance: baseProcedure

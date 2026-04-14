@@ -305,7 +305,14 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   getDiskUsage: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
-    return queryDiskUsage(instance.sandboxId);
+    try {
+      return await queryDiskUsage(instance.sandboxId);
+    } catch {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch disk usage',
+      });
+    }
   }),
 
   renameInstance: organizationMemberMutationProcedure

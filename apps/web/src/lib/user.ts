@@ -1,4 +1,4 @@
-import { createStripeCustomer } from '@/lib/stripe-client';
+import { createStripeCustomer, deleteStripeCustomer } from '@/lib/stripe-client';
 import { randomUUID } from 'crypto';
 import { createTimer } from '@/lib/timer';
 import PostHogClient from '@/lib/posthog';
@@ -385,62 +385,86 @@ export async function createOrUpdateUser(
   const signupIp = getSignupIp(requestHeaders);
   const newUserId = turnstile_guid ?? randomUUID();
 
-  type TxResult = Result<{ user: User }, AuthErrorType>;
-  const txResult: TxResult = await db.transaction(async tx => {
-    // Check the per-IP rate limit inside the transaction with an advisory
-    // lock so concurrent signups from the same IP are serialized.
-    const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
-    if (!signupRateLimitResult.success) return signupRateLimitResult;
-
-    // Create the Stripe customer after the rate limit check passes to avoid
-    // orphaned Stripe customers for rejected signups.
-    const stripeCustomer = await createStripeCustomer({
-      email: args.google_user_email,
-      name: args.google_user_name,
-      metadata: { kiloUserId: newUserId },
-    });
-
-    const newUser = {
-      id: newUserId,
-      google_user_email: args.google_user_email,
-      google_user_name: args.google_user_name,
-      google_user_image_url: args.google_user_image_url,
-      hosted_domain: args.hosted_domain,
-      is_admin: shouldBeAdmin(args.google_user_email, args.hosted_domain),
-      stripe_customer_id: stripeCustomer.id,
-      signup_ip: signupIp,
-      openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
-      vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
-    } satisfies typeof kilocode_users.$inferInsert;
-
-    const [savedUser] = await tx.insert(kilocode_users).values(newUser).returning();
-    assert(savedUser, 'Failed to save new user');
-
-    await tx.insert(user_auth_provider).values({
-      kilo_user_id: savedUser.id,
-      provider: args.provider,
-      provider_account_id: args.provider_account_id,
-      avatar_url: args.google_user_image_url,
-      email: args.google_user_email,
-      display_name: args.display_name ?? null,
-      hosted_domain: args.hosted_domain,
-    });
-
-    if (affiliateTrackingId?.trim()) {
-      await recordAffiliateAttributionAndQueueParentEvent({
-        database: tx,
-        userId: savedUser.id,
-        provider: 'impact',
-        trackingId: affiliateTrackingId,
-        customerEmail: savedUser.google_user_email,
-        eventDate: new Date(savedUser.created_at),
-      });
-    }
-
-    return successResult({ user: savedUser });
+  // New user creation path — Stripe customer is created before the DB
+  // transaction because stripe_customer_id is NOT NULL. If the transaction
+  // fails (rate limit, constraint violation, etc.) we clean up the Stripe
+  // customer to prevent orphans.
+  const stripeCustomer = await createStripeCustomer({
+    email: args.google_user_email,
+    name: args.google_user_name,
+    metadata: { kiloUserId: newUserId },
   });
 
-  if (!txResult.success) return txResult;
+  const newUser = {
+    id: newUserId,
+    google_user_email: args.google_user_email,
+    google_user_name: args.google_user_name,
+    google_user_image_url: args.google_user_image_url,
+    hosted_domain: args.hosted_domain,
+    is_admin: shouldBeAdmin(args.google_user_email, args.hosted_domain),
+    stripe_customer_id: stripeCustomer.id,
+    signup_ip: signupIp,
+    openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
+    vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
+  } satisfies typeof kilocode_users.$inferInsert;
+
+  type TxResult = Result<{ user: User }, AuthErrorType>;
+  let txResult: TxResult;
+  try {
+    txResult = await db.transaction(async tx => {
+      // Check the per-IP rate limit inside the transaction with an advisory
+      // lock so concurrent signups from the same IP are serialized.
+      const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
+      if (!signupRateLimitResult.success) return signupRateLimitResult;
+
+      const [inserted] = await tx.insert(kilocode_users).values(newUser).returning();
+      assert(inserted, 'Failed to save new user');
+
+      await tx.insert(user_auth_provider).values({
+        kilo_user_id: inserted.id,
+        provider: args.provider,
+        provider_account_id: args.provider_account_id,
+        avatar_url: args.google_user_image_url,
+        email: args.google_user_email,
+        display_name: args.display_name ?? null,
+        hosted_domain: args.hosted_domain,
+      });
+
+      if (affiliateTrackingId?.trim()) {
+        await recordAffiliateAttributionAndQueueParentEvent({
+          database: tx,
+          userId: inserted.id,
+          provider: 'impact',
+          trackingId: affiliateTrackingId,
+          customerEmail: inserted.google_user_email,
+          eventDate: new Date(inserted.created_at),
+        });
+      }
+
+      return successResult({ user: inserted });
+    });
+  } catch (error) {
+    // Clean up the Stripe customer if the DB transaction threw
+    deleteStripeCustomer(stripeCustomer.id).catch(cleanupErr =>
+      captureException(cleanupErr, {
+        tags: { source: 'signup-stripe-cleanup' },
+        extra: { stripeCustomerId: stripeCustomer.id, originalError: String(error) },
+      })
+    );
+    throw error;
+  }
+
+  // Clean up the Stripe customer if the transaction returned a failure
+  // (e.g. rate limit rejection) without throwing.
+  if (!txResult.success) {
+    deleteStripeCustomer(stripeCustomer.id).catch(cleanupErr =>
+      captureException(cleanupErr, {
+        tags: { source: 'signup-stripe-cleanup' },
+        extra: { stripeCustomerId: stripeCustomer.id, error: txResult.error },
+      })
+    );
+    return txResult;
+  }
   const savedUser = txResult.user;
 
   fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);

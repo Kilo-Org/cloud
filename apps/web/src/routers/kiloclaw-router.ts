@@ -2203,12 +2203,18 @@ export const kiloclawRouter = createTRPCRouter({
         );
       } catch (err) {
         if (err instanceof KiloClawApiError) {
-          const { code } = getKiloClawApiErrorPayload(err);
+          const { code, message } = getKiloClawApiErrorPayload(err);
           if (code === 'controller_route_unavailable') {
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',
               message: 'Instance needs redeploy to support recovery',
               cause: new UpstreamApiError('controller_route_unavailable'),
+            });
+          }
+          if (err.statusCode === 409) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: message ?? 'Instance is busy',
             });
           }
         }

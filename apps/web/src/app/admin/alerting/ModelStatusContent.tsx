@@ -193,86 +193,70 @@ export function ModelStatusContent() {
       ) : monitoredModels.length === 0 && nonMonitoredModels.length === 0 ? (
         <div className="text-muted-foreground py-8 text-center">No monitored models found.</div>
       ) : (
-        <div className="flex flex-col gap-y-6">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="sticky left-0 z-10 bg-background min-w-[200px]">
-                    Model
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="sticky left-0 z-10 bg-background min-w-[200px]">
+                  Model
+                </TableHead>
+                {snapshotsReversed.map(ts => (
+                  <TableHead key={ts} className="text-center min-w-[50px] px-1">
+                    <span className="text-xs">{format(new Date(ts), 'HH:mm')}</span>
                   </TableHead>
-                  {snapshotsReversed.map(ts => (
-                    <TableHead key={ts} className="text-center min-w-[50px] px-1">
-                      <span className="text-xs">{format(new Date(ts), 'HH:mm')}</span>
-                    </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {monitoredModels.map(model => (
+                <TableRow key={model}>
+                  <TableCell className="sticky left-0 z-10 bg-background font-mono text-xs">
+                    {model}
+                  </TableCell>
+                  {queriesReversed.map((q, i) => (
+                    <TableCell key={snapshotsReversed[i]} className="px-1">
+                      <StatusDot metrics={q.data?.models[model]} timestamp={snapshotsReversed[i]} />
+                    </TableCell>
                   ))}
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {monitoredModels.map(model => (
-                  <TableRow key={model}>
-                    <TableCell className="sticky left-0 z-10 bg-background font-mono text-xs">
-                      {model}
-                    </TableCell>
-                    {queriesReversed.map((q, i) => (
-                      <TableCell key={snapshotsReversed[i]} className="px-1">
-                        <StatusDot
-                          metrics={q.data?.models[model]}
-                          timestamp={snapshotsReversed[i]}
-                        />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
 
-          {nonMonitoredModels.length > 0 && (
-            <div className="flex flex-col gap-y-2">
-              <div className="flex items-center gap-2">
-                <h3 className="text-muted-foreground text-sm font-medium">
-                  Non-Monitored (informational only)
-                </h3>
-                <span className="text-muted-foreground/60 text-xs">
-                  Traffic data shown but excluded from health alerting
-                </span>
-              </div>
-              <div className="overflow-x-auto opacity-75">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="sticky left-0 z-10 bg-background min-w-[200px]">
-                        Model
-                      </TableHead>
-                      {snapshotsReversed.map(ts => (
-                        <TableHead key={ts} className="text-center min-w-[50px] px-1">
-                          <span className="text-xs">{format(new Date(ts), 'HH:mm')}</span>
-                        </TableHead>
+              {nonMonitoredModels.length > 0 && (
+                <>
+                  <TableRow>
+                    <TableCell
+                      colSpan={snapshotsReversed.length + 1}
+                      className="sticky left-0 z-10 bg-background pt-6 pb-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-sm font-medium">
+                          Non-Monitored
+                        </span>
+                        <span className="text-muted-foreground/60 text-xs">
+                          Traffic data shown but excluded from health alerting
+                        </span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {nonMonitoredModels.map(model => (
+                    <TableRow key={model} className="opacity-75">
+                      <TableCell className="sticky left-0 z-10 bg-background font-mono text-xs">
+                        {model}
+                      </TableCell>
+                      {queriesReversed.map((q, i) => (
+                        <TableCell key={snapshotsReversed[i]} className="px-1">
+                          <StatusDot
+                            metrics={q.data?.models[model]}
+                            timestamp={snapshotsReversed[i]}
+                          />
+                        </TableCell>
                       ))}
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {nonMonitoredModels.map(model => (
-                      <TableRow key={model}>
-                        <TableCell className="sticky left-0 z-10 bg-background font-mono text-xs">
-                          {model}
-                        </TableCell>
-                        {queriesReversed.map((q, i) => (
-                          <TableCell key={snapshotsReversed[i]} className="px-1">
-                            <StatusDot
-                              metrics={q.data?.models[model]}
-                              timestamp={snapshotsReversed[i]}
-                            />
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
+                  ))}
+                </>
+              )}
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>

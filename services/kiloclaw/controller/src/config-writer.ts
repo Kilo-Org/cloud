@@ -66,7 +66,7 @@ const INBOUND_EMAIL_HOOK_MAPPING = {
   action: 'agent',
   wakeMode: 'now',
   name: 'Inbound Email',
-  sessionKey: 'inbound-email:{{payload.messageId}}',
+  sessionKey: '{{payload.sessionKey}}',
   messageTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
   deliver: false,
 };

@@ -1711,6 +1711,8 @@ platform.get('/stream-chat-credentials', async c => {
   }
 });
 
+const MAX_INBOUND_EMAIL_TITLE_SLUG_LENGTH = 80;
+
 const InboundEmailSchema = z.object({
   instanceId: z.string().uuid(),
   messageId: z.string().trim().min(1).max(512),
@@ -1720,6 +1722,22 @@ const InboundEmailSchema = z.object({
   text: z.string().min(1).max(32_000),
   receivedAt: z.string().datetime(),
 });
+
+function inboundEmailTitleSlug(subject: string): string {
+  const slug = subject
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_INBOUND_EMAIL_TITLE_SLUG_LENGTH)
+    .replace(/-+$/g, '');
+
+  return slug || 'no-subject';
+}
+
+function inboundEmailSessionKey(subject: string, receivedAt: string): string {
+  return `hooks:email:${receivedAt.slice(0, 10)}-${inboundEmailTitleSlug(subject)}`;
+}
 
 async function resolveInboundEmailDoKey(
   env: AppEnv['Bindings'],
@@ -1789,6 +1807,7 @@ platform.post('/inbound-email', async c => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
+        sessionKey: inboundEmailSessionKey(delivery.subject, delivery.receivedAt),
         messageId: delivery.messageId,
         from: delivery.from,
         to: delivery.to,

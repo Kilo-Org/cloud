@@ -719,7 +719,7 @@ describe('generateBaseConfig', () => {
       action: 'agent',
       wakeMode: 'now',
       name: 'Inbound Email',
-      sessionKey: 'hook:webhook:{{payload.messageId}}',
+      sessionKey: '{{payload.sessionKey}}',
       messageTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
       deliver: false,
     });

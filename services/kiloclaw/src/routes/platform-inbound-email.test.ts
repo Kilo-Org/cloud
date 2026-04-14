@@ -123,8 +123,55 @@ describe('POST /inbound-email', () => {
     );
     expect(JSON.parse(init?.body as string)).toEqual(
       expect.objectContaining({
+        sessionKey: 'inbound-email:2026-04-13-hello',
         messageId: '<msg-1@example.com>',
         text: 'Email body',
+      })
+    );
+  });
+
+  it('sanitizes subject punctuation in the readable session key', async () => {
+    const { env } = makeEnv();
+
+    const response = await platform.request(
+      '/inbound-email',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: deliveryBody({ subject: 'Re: Hello, World! (Part 2)' }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(202);
+    const mockFetch = vi.mocked(fetch);
+    const [, init] = mockFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).toEqual(
+      expect.objectContaining({
+        sessionKey: 'inbound-email:2026-04-13-re-hello-world-part-2',
+      })
+    );
+  });
+
+  it('uses a readable fallback session key for blank subjects', async () => {
+    const { env } = makeEnv();
+
+    const response = await platform.request(
+      '/inbound-email',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: deliveryBody({ subject: '   ' }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(202);
+    const mockFetch = vi.mocked(fetch);
+    const [, init] = mockFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).toEqual(
+      expect.objectContaining({
+        sessionKey: 'inbound-email:2026-04-13-no-subject',
       })
     );
   });

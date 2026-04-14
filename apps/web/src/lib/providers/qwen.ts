@@ -37,4 +37,5 @@ export const qwen36_plus_model: KiloExclusiveModel = {
       );
     },
   },
+  exclusive_to: [],
 };

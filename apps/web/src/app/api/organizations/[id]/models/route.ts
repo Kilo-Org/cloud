@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
-import { isExcludedForFeature } from '@/lib/models';
+import { filterByFeature } from '@/lib/models';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const organizationId = (await params).id;
@@ -10,9 +10,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   return handleTRPCRequest<OpenRouterModelsResponse>(request, async caller => {
     const result = await caller.organizations.settings.listAvailableModels({ organizationId });
-    return {
-      ...result,
-      data: result.data.filter(m => !isExcludedForFeature(m.id, feature)),
-    };
+    return { ...result, data: filterByFeature(result.data, feature) };
   });
 }

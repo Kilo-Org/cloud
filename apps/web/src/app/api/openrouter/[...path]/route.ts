@@ -26,6 +26,7 @@ import {
   isExcludedForFeature,
   isKiloExclusiveFreeModel,
   isKiloStealthModel,
+  kiloExclusiveModels,
 } from '@/lib/models';
 import {
   accountForMicrodollarUsage,
@@ -234,7 +235,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     console.warn(
       `Model ${originalModelIdLowerCased} is not available for feature ${feature}; rejecting.`
     );
-    return featureExclusiveModelResponse();
+    const exclusiveTo =
+      kiloExclusiveModels.find(m => m.public_id === originalModelIdLowerCased)?.exclusive_to ?? [];
+    return featureExclusiveModelResponse(exclusiveTo);
   }
 
   // Extract IP for all requests (needed for free model rate limiting)

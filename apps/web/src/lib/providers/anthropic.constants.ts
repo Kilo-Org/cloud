@@ -20,4 +20,5 @@ export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
   flags: ['reasoning', 'vision'],
   inference_provider: null,
   pricing: null,
+  exclusive_to: [],
 };

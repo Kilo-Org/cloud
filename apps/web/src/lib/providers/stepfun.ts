@@ -17,4 +17,5 @@ export const stepfun_35_flash_free_model: KiloExclusiveModel = {
   internal_id: 'stepfun/step-3.5-flash',
   inference_provider: null,
   pricing: null,
+  exclusive_to: [],
 };

@@ -31,8 +31,8 @@ export type KiloExclusiveModel = {
   internal_id: string;
   inference_provider: OpenRouterInferenceProviderId | null;
   pricing: Pricing | null;
-  /** If set, only requests from these features are allowed to use this model. */
-  exclusive_to?: ReadonlyArray<FeatureValue>;
+  /** Features allowed to use this model. Empty array means no restriction. */
+  exclusive_to: ReadonlyArray<FeatureValue>;
 };
 
 function formatPricePerMillionAsPerToken(price: number): string;

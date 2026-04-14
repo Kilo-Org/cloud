@@ -8,7 +8,7 @@ import { getDirectByokModelsForUser } from '@/lib/providers/direct-byok';
 import { unstable_cache } from 'next/cache';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
-import { isExcludedForFeature } from '@/lib/models';
+import { filterByFeature } from '@/lib/models';
 
 const getDirectByokModels = unstable_cache(
   (userId: string) => getDirectByokModelsForUser(userId),
@@ -41,7 +41,7 @@ export async function GET(
     if (result) {
       return NextResponse.json({
         ...result,
-        data: result.data.filter(m => !isExcludedForFeature(m.id, feature)),
+        data: filterByFeature(result.data, feature),
       });
     }
 
@@ -50,10 +50,7 @@ export async function GET(
       return NextResponse.json(data);
     }
     const byokModels = auth?.user ? await getDirectByokModels(auth.user.id) : [];
-    const allModels = data.data
-      .concat(byokModels)
-      .filter(m => !isExcludedForFeature(m.id, feature));
-    return NextResponse.json({ data: allModels });
+    return NextResponse.json({ data: filterByFeature(data.data.concat(byokModels), feature) });
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'openrouter/models' },

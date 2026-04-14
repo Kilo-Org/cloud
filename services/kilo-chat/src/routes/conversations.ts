@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { z } from 'zod';
-import { ulid } from '../lib/ulid';
+import { ulid } from 'ulid';
 import type { AuthContext } from '../auth';
 
 const createConversationSchema = z.object({

@@ -4,7 +4,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, lt, gt, desc, ne, and, asc } from 'drizzle-orm';
 import { conversation, members, messages } from '../db/conversation-schema';
 import migrations from '../../drizzle/conversation/migrations';
-import { ulid } from '../lib/ulid';
+import { monotonicFactory } from 'ulid';
 import { SSE_PING, formatSseEvent } from '../lib/sse';
 
 export type InitializeParams = {
@@ -72,6 +72,7 @@ export type DeleteMessageResult = { ok: true } | { ok: false; error: string };
 
 export class ConversationDO extends DurableObject<Env> {
   private db;
+  private nextUlid = monotonicFactory();
   private sseClients = new Map<string, WritableStreamDefaultWriter>();
   private encoder = new TextEncoder();
 
@@ -150,7 +151,7 @@ export class ConversationDO extends DurableObject<Env> {
       return { ok: false, error: `Sender ${params.senderId} is not a member of this conversation` };
     }
 
-    const messageId = ulid();
+    const messageId = this.nextUlid();
 
     this.db
       .insert(messages)

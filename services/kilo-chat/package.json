@@ -27,6 +27,7 @@
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
+    "ulid": "3.0.1",
     "zod": "catalog:"
   }
 }

@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 type ModelHealthMetrics = {
   healthy: boolean;
+  monitored: boolean;
   currentRequests: number;
   previousRequests: number;
   baselineRequests: number;
@@ -128,16 +129,24 @@ export function ModelStatusContent() {
     })),
   });
 
-  const allModels = useMemo(() => {
-    const modelSet = new Set<string>();
+  const { monitoredModels, nonMonitoredModels } = useMemo(() => {
+    const monitored = new Set<string>();
+    const nonMonitored = new Set<string>();
     for (const q of queries) {
       if (q.data?.models) {
-        for (const model of Object.keys(q.data.models)) {
-          modelSet.add(model);
+        for (const [model, metrics] of Object.entries(q.data.models)) {
+          if (metrics.monitored === false) {
+            nonMonitored.add(model);
+          } else {
+            monitored.add(model);
+          }
         }
       }
     }
-    return [...modelSet].sort();
+    return {
+      monitoredModels: [...monitored].sort(),
+      nonMonitoredModels: [...nonMonitored].sort(),
+    };
   }, [queries]);
 
   const isLoading = queries.some(q => q.isLoading);
@@ -181,7 +190,7 @@ export function ModelStatusContent() {
 
       {isLoading ? (
         <div className="text-muted-foreground py-8 text-center">Loading model status...</div>
-      ) : allModels.length === 0 ? (
+      ) : monitoredModels.length === 0 && nonMonitoredModels.length === 0 ? (
         <div className="text-muted-foreground py-8 text-center">No monitored models found.</div>
       ) : (
         <div className="overflow-x-auto">
@@ -199,7 +208,7 @@ export function ModelStatusContent() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {allModels.map(model => (
+              {monitoredModels.map(model => (
                 <TableRow key={model}>
                   <TableCell className="sticky left-0 z-10 bg-background font-mono text-xs">
                     {model}
@@ -211,6 +220,41 @@ export function ModelStatusContent() {
                   ))}
                 </TableRow>
               ))}
+
+              {nonMonitoredModels.length > 0 && (
+                <>
+                  <TableRow>
+                    <TableCell
+                      colSpan={snapshotsReversed.length + 1}
+                      className="sticky left-0 z-10 bg-background pt-6 pb-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-sm font-medium">
+                          Non-Monitored
+                        </span>
+                        <span className="text-muted-foreground/60 text-xs">
+                          Traffic data shown but excluded from health alerting
+                        </span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {nonMonitoredModels.map(model => (
+                    <TableRow key={model} className="opacity-75">
+                      <TableCell className="sticky left-0 z-10 bg-background font-mono text-xs">
+                        {model}
+                      </TableCell>
+                      {queriesReversed.map((q, i) => (
+                        <TableCell key={snapshotsReversed[i]} className="px-1">
+                          <StatusDot
+                            metrics={q.data?.models[model]}
+                            timestamp={snapshotsReversed[i]}
+                          />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </>
+              )}
             </TableBody>
           </Table>
         </div>

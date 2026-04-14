@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Activity, HardDrive, Loader2 } from 'lucide-react';
+import { Activity, Clock, HardDrive, Loader2, RotateCcw, TimerReset } from 'lucide-react';
 import type { AnalyticsEngineResponse, ControllerTelemetryRow } from '@/lib/kiloclaw/disk-usage';
 import type { KiloClawDashboardStatus, GatewayProcessStatusResponse } from '@/lib/kiloclaw/types';
 import { Badge } from '@/components/ui/badge';
@@ -66,7 +66,12 @@ function formatVolumeUsage(used: number | null, total: number | null): string {
   if (used === null || total === null) return '—';
   const raw = (used / total) * 100;
   const pct = raw % 1 === 0 ? raw.toFixed(0) : (Math.round(raw * 10) / 10).toFixed(1);
-  return `${formatBytes(used)} / ${formatBytes(total)} (${pct}%)`;
+  return `${formatBytes(used)} of ${formatBytes(total)} (${pct}%)`;
+}
+
+function getVolumeUsagePercent(used: number | null, total: number | null): number | null {
+  if (used === null || total === null || total <= 0) return null;
+  return Math.max(0, Math.min(100, (used / total) * 100));
 }
 
 function useDiskUsage(enabled: boolean) {
@@ -102,6 +107,7 @@ export function InstanceTab({
     diskUsageRow && diskUsageRow.disk_used_bytes > 0 ? diskUsageRow.disk_used_bytes : null;
   const diskTotal =
     diskUsageRow && diskUsageRow.disk_total_bytes > 0 ? diskUsageRow.disk_total_bytes : null;
+  const diskUsagePercent = getVolumeUsagePercent(diskUsed, diskTotal);
 
   if (!isRunning) {
     return (
@@ -136,38 +142,69 @@ export function InstanceTab({
   const stateStyle = GATEWAY_STATE_STYLES[gatewayStatus.state];
 
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-6">
-      <div>
-        <p className="text-muted-foreground mb-1.5 text-xs">State</p>
-        <Badge variant="outline" className={stateStyle.className}>
-          <Activity className="mr-1 h-3 w-3" />
-          {stateStyle.label}
-        </Badge>
-      </div>
-      <div>
-        <p className="text-muted-foreground mb-1.5 text-xs">Uptime</p>
-        <p className="text-foreground text-sm font-medium">{formatUptime(gatewayStatus.uptime)}</p>
-      </div>
-      <div>
-        <p className="text-muted-foreground mb-1.5 text-xs">Restarts</p>
-        <p className="text-foreground text-sm font-medium">{gatewayStatus.restarts}</p>
-      </div>
-      <div>
-        <p className="text-muted-foreground mb-1.5 text-xs">Last Exit</p>
-        <p className="text-muted-foreground text-sm font-medium">
-          {gatewayStatus.lastExit ? formatLastExit(gatewayStatus.lastExit) : '—'}
+    <div className="grid gap-4 lg:grid-cols-3">
+      <div className="rounded-lg border bg-muted/30 p-4">
+        <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">State</p>
+        <div className="mt-2">
+          <Badge variant="outline" className={stateStyle.className}>
+            <Activity className="mr-1 h-3 w-3" />
+            {stateStyle.label}
+          </Badge>
+        </div>
+        <p className="text-muted-foreground mt-5 text-xs font-medium uppercase tracking-wide">Uptime</p>
+        <p className="text-foreground mt-2 text-lg font-semibold leading-none">
+          {formatUptime(gatewayStatus.uptime)}
         </p>
       </div>
-      <div>
-        <p className="text-muted-foreground mb-1.5 text-xs">Provisioned</p>
-        <p className="text-foreground text-sm font-medium">{formatTs(status.provisionedAt)}</p>
-      </div>
-      <div>
-        <p className="text-muted-foreground mb-1.5 text-xs">Volume Usage</p>
-        <p className="text-foreground inline-flex items-center gap-1 text-sm font-medium">
-          <HardDrive className="h-3.5 w-3.5" />
+
+      <div className="rounded-lg border p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <HardDrive className="text-muted-foreground h-4 w-4" />
+          <p className="text-foreground text-sm font-medium">Volume Usage</p>
+        </div>
+        <p className="text-foreground text-sm font-semibold">
           {formatVolumeUsage(diskUsed, diskTotal)}
         </p>
+        <div className="bg-muted mt-3 h-2 overflow-hidden rounded-full">
+          <div
+            className="h-full rounded-full bg-emerald-500 transition-all"
+            style={{ width: `${diskUsagePercent ?? 0}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-lg border p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <TimerReset className="text-muted-foreground h-4 w-4" />
+          <p className="text-foreground text-sm font-medium">Lifecycle</p>
+        </div>
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-muted-foreground inline-flex items-center gap-2">
+              <RotateCcw className="h-3.5 w-3.5" />
+              Restarts
+            </span>
+            <span className="text-foreground font-medium">{gatewayStatus.restarts}</span>
+          </div>
+          <div className="flex items-start justify-between gap-3 text-sm">
+            <span className="text-muted-foreground inline-flex shrink-0 items-center gap-2">
+              <TimerReset className="h-3.5 w-3.5" />
+              Last Exit
+            </span>
+            <span className="text-muted-foreground min-w-0 text-right font-medium break-words">
+              {gatewayStatus.lastExit ? formatLastExit(gatewayStatus.lastExit) : '—'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-muted-foreground inline-flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5" />
+              Provisioned
+            </span>
+            <span className="text-foreground min-w-0 truncate text-right font-medium">
+              {formatTs(status.provisionedAt)}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

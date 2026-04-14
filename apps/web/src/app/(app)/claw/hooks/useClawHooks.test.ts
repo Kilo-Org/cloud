@@ -34,26 +34,18 @@ describe('getClawDiskUsageQueryOptions', () => {
   });
 });
 
-type DiskUsageQueryOptions = {
-  refetchInterval: number;
-};
-
-type DiskUsageQueryResult = DiskUsageQueryOptions & {
-  queryKey: string[];
-};
-
 type DiskUsageTrpc = Parameters<typeof getClawDiskUsageQueryOptions>[0];
 
-function createDiskUsageTrpc(): DiskUsageTrpc {
+function createDiskUsageTrpc() {
   const personalQueryOptions = jest.fn(
-    (_input: undefined, options: DiskUsageQueryOptions): DiskUsageQueryResult => ({
-      queryKey: ['personalDiskUsage'],
+    (_input: undefined, options: { refetchInterval: number }) => ({
+      queryKey: ['personalDiskUsage'] as const,
       ...options,
     })
   );
   const orgQueryOptions = jest.fn(
-    (input: { organizationId: string }, options: DiskUsageQueryOptions): DiskUsageQueryResult => ({
-      queryKey: ['orgDiskUsage', input.organizationId],
+    (input: { organizationId: string }, options: { refetchInterval: number }) => ({
+      queryKey: ['orgDiskUsage', input.organizationId] as const,
       ...options,
     })
   );
@@ -61,5 +53,5 @@ function createDiskUsageTrpc(): DiskUsageTrpc {
   return {
     kiloclaw: { getDiskUsage: { queryOptions: personalQueryOptions } },
     organizations: { kiloclaw: { getDiskUsage: { queryOptions: orgQueryOptions } } },
-  } satisfies DiskUsageTrpc;
+  } as unknown as DiskUsageTrpc;
 }

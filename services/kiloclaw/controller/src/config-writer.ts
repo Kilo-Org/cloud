@@ -310,13 +310,18 @@ export function generateBaseConfig(
     typeof searchProvider === 'string' && searchProvider.trim().length > 0;
 
   const kiloExaSearchMode = resolveKiloExaSearchMode(env.KILO_EXA_SEARCH_MODE);
-  if (kiloExaSearchMode === 'kilo-proxy') {
+  const shouldForceExa = kiloExaSearchMode === 'kilo-proxy';
+  const shouldAutoAssignExa = kiloExaSearchMode === 'unset' && !hasExplicitSearchProvider;
+  if (shouldForceExa || shouldAutoAssignExa) {
     customizerWebSearchConfig.enabled = true;
     config.tools = config.tools ?? {};
     config.tools.web = config.tools.web ?? {};
     config.tools.web.search = config.tools.web.search ?? {};
     config.tools.web.search.enabled = true;
     config.tools.web.search.provider = KILO_EXA_PROVIDER_ID;
+    if (shouldAutoAssignExa) {
+      console.log('[config-writer] Auto-assigned web search provider to kilo-exa (mode=unset)');
+    }
   } else if (kiloExaSearchMode === 'disabled') {
     customizerWebSearchConfig.enabled = false;
 
@@ -336,14 +341,6 @@ export function generateBaseConfig(
   } else if (hasExplicitSearchProvider) {
     customizerWebSearchConfig.enabled =
       config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID;
-  } else {
-    customizerWebSearchConfig.enabled = true;
-    config.tools = config.tools ?? {};
-    config.tools.web = config.tools.web ?? {};
-    config.tools.web.search = config.tools.web.search ?? {};
-    config.tools.web.search.enabled = true;
-    config.tools.web.search.provider = KILO_EXA_PROVIDER_ID;
-    console.log('[config-writer] Auto-assigned web search provider to kilo-exa (mode=unset)');
   }
 
   customizerPluginConfig.webSearch = customizerWebSearchConfig;

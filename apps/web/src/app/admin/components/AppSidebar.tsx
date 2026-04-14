@@ -24,6 +24,7 @@ import {
   Network,
   RefreshCw,
   KeyRound,
+  ChevronRight,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -40,9 +41,14 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 type MenuItem = {
   title: (session: Session | null) => string;
@@ -191,16 +197,6 @@ const analyticsObservabilityItems: MenuItem[] = [
     icon: () => <UserX />,
   },
   {
-    title: () => 'Alerting',
-    url: '/admin/alerting',
-    icon: () => <Bell />,
-  },
-  {
-    title: () => 'Alerting (TTFB)',
-    url: '/admin/alerting-ttfb',
-    icon: () => <Bell />,
-  },
-  {
     title: () => 'API Request Log',
     url: '/admin/api-request-log',
     icon: () => <Database />,
@@ -226,11 +222,19 @@ const menuSections: MenuSection[] = [
   },
 ];
 
+const alertingSubItems = [
+  { title: 'Alerting', url: '/admin/alerting' },
+  { title: 'Alerting (TTFB)', url: '/admin/alerting-ttfb' },
+  { title: 'Model Status', url: '/admin/model-status' },
+];
+
 export function AppSidebar({
   children,
   ...props
 }: { children: React.ReactNode } & React.ComponentProps<typeof Sidebar>) {
   const session = useSession();
+  const pathname = usePathname();
+  const alertingActive = alertingSubItems.some(item => pathname.startsWith(item.url));
 
   return (
     <Sidebar {...props}>
@@ -268,6 +272,32 @@ export function AppSidebar({
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
+                {section.label === 'Analytics & Observability' && (
+                  <Collapsible defaultOpen={alertingActive} className="group/collapsible">
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton>
+                          <Bell />
+                          <span>Alerting</span>
+                          <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {alertingSubItems.map(sub => (
+                            <SidebarMenuSubItem key={sub.url}>
+                              <SidebarMenuSubButton asChild isActive={pathname.startsWith(sub.url)}>
+                                <a href={sub.url}>
+                                  <span>{sub.title}</span>
+                                </a>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

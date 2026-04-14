@@ -204,6 +204,18 @@ export async function cancelCliRun(params: {
     return { ok: true, runFound: true, cancelled: false };
   }
 
+  // The controller already reached a terminal state for this run — persist it
+  // instead of issuing a cancel that the controller would reject.
+  if (controllerStatus.status !== 'running') {
+    await persistCliRunControllerStatus({
+      runId: params.runId,
+      userId: params.userId,
+      instanceId: row.instance_id,
+      controllerStatus,
+    });
+    return { ok: true, runFound: true, cancelled: false };
+  }
+
   const result = await cancelControllerRun(params.userId, effectiveWorkerInstanceId);
 
   if (result.ok) {

@@ -49,6 +49,45 @@ async function getRunStatus(runId: string) {
 }
 
 describe('cancelCliRun', () => {
+  it('persists terminal controller status without calling cancel when the run already finished', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'run that completed before cancel',
+      startedAt,
+      initiatedByAdminId: null,
+    });
+    const cancelControllerRun = jest.fn(async () => ({ ok: true }));
+
+    await expect(
+      cancelCliRun({
+        runId,
+        userId: user.id,
+        instanceId,
+        workerInstanceId: 'ki_current',
+        getControllerStatus: async () => ({
+          hasRun: true,
+          status: 'completed',
+          output: 'done',
+          exitCode: 0,
+          startedAt,
+          completedAt: '2026-04-12T12:01:00.000Z',
+          prompt: 'run that completed before cancel',
+        }),
+        cancelControllerRun,
+      })
+    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false });
+
+    expect(cancelControllerRun).not.toHaveBeenCalled();
+    await expect(getRunStatus(runId)).resolves.toEqual({
+      status: 'completed',
+      completed_at: '2026-04-12T12:01:00.000Z',
+    });
+  });
+
   it('does not cancel the controller run when its timestamp belongs to a different stored run', async () => {
     const user = await insertTestUser();
     const instanceId = await createTestInstance(user.id);

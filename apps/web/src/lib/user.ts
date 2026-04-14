@@ -385,32 +385,33 @@ export async function createOrUpdateUser(
   const signupIp = getSignupIp(requestHeaders);
   const newUserId = turnstile_guid ?? randomUUID();
 
-  // New user creation path
-  const stripeCustomer = await createStripeCustomer({
-    email: args.google_user_email,
-    name: args.google_user_name,
-    metadata: { kiloUserId: newUserId },
-  });
-
-  const newUser = {
-    id: newUserId,
-    google_user_email: args.google_user_email,
-    google_user_name: args.google_user_name,
-    google_user_image_url: args.google_user_image_url,
-    hosted_domain: args.hosted_domain,
-    is_admin: shouldBeAdmin(args.google_user_email, args.hosted_domain),
-    stripe_customer_id: stripeCustomer.id,
-    signup_ip: signupIp,
-    openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
-    vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
-  } satisfies typeof kilocode_users.$inferInsert;
-
   type TxResult = Result<{ user: User }, AuthErrorType>;
   const txResult: TxResult = await db.transaction(async tx => {
     // Check the per-IP rate limit inside the transaction with an advisory
     // lock so concurrent signups from the same IP are serialized.
     const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
     if (!signupRateLimitResult.success) return signupRateLimitResult;
+
+    // Create the Stripe customer after the rate limit check passes to avoid
+    // orphaned Stripe customers for rejected signups.
+    const stripeCustomer = await createStripeCustomer({
+      email: args.google_user_email,
+      name: args.google_user_name,
+      metadata: { kiloUserId: newUserId },
+    });
+
+    const newUser = {
+      id: newUserId,
+      google_user_email: args.google_user_email,
+      google_user_name: args.google_user_name,
+      google_user_image_url: args.google_user_image_url,
+      hosted_domain: args.hosted_domain,
+      is_admin: shouldBeAdmin(args.google_user_email, args.hosted_domain),
+      stripe_customer_id: stripeCustomer.id,
+      signup_ip: signupIp,
+      openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
+      vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
+    } satisfies typeof kilocode_users.$inferInsert;
 
     const [savedUser] = await tx.insert(kilocode_users).values(newUser).returning();
     assert(savedUser, 'Failed to save new user');

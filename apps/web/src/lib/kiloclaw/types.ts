@@ -131,7 +131,7 @@ export type MachineSize = {
 };
 
 // Keep in sync with services/kiloclaw/src/schemas/instance-config.ts ProviderIdSchema.
-export type KiloClawProviderId = 'fly' | 'docker-local' | 'northflank' | 'aws' | 'k8s';
+export type KiloClawProviderId = 'fly' | 'docker-local' | 'northflank';
 
 /** Response from POST /api/platform/restore-volume-snapshot */
 export type RestoreVolumeSnapshotResponse = {

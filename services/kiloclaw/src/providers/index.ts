@@ -19,8 +19,6 @@ export function assertImplementedProvider(provider: ProviderId): void {
     case 'docker-local':
       return;
     case 'northflank':
-    case 'aws':
-    case 'k8s':
       throw notImplementedProviderError(provider);
   }
 }
@@ -58,8 +56,6 @@ export function getProviderAdapter(
     case 'docker-local':
       return dockerLocalProviderAdapter;
     case 'northflank':
-    case 'aws':
-    case 'k8s':
       throw notImplementedProviderError(state.provider);
   }
 }

@@ -121,7 +121,7 @@ describe('sanitizeError: explicit provider support errors', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           userId: 'user-1',
-          provider: 'k8s',
+          provider: 'northflank',
         }),
       },
       env
@@ -129,7 +129,7 @@ describe('sanitizeError: explicit provider support errors', () => {
 
     expect(resp.status).toBe(501);
     expect(await jsonBody(resp)).toEqual({
-      error: 'Provider k8s is not implemented yet',
+      error: 'Provider northflank is not implemented yet',
     });
     expect(provision).not.toHaveBeenCalled();
   });

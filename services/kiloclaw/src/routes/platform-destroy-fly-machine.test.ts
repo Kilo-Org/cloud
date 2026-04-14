@@ -226,7 +226,7 @@ describe('POST /destroy-fly-machine', () => {
   it('returns 400 when direct machine destroy is unsupported for the active provider', async () => {
     const { env, getProviderMetadata } = makeEnv();
     getProviderMetadata.mockResolvedValueOnce({
-      provider: 'k8s',
+      provider: 'northflank',
       capabilities: {
         volumeSnapshots: false,
         candidateVolumes: false,
@@ -245,7 +245,7 @@ describe('POST /destroy-fly-machine', () => {
 
     expect(resp.status).toBe(400);
     expect(await jsonBody(resp)).toEqual({
-      error: 'destroy-fly-machine is not supported for provider k8s',
+      error: 'destroy-fly-machine is not supported for provider northflank',
     });
     expect(fetchSpy).not.toHaveBeenCalled();
   });

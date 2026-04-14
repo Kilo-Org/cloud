@@ -5436,8 +5436,8 @@ describe('provision: auto-start after fresh provision', () => {
   it('does not leave the hot DO on an unsupported provider after failed provision', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
 
-    await expect(instance.provision('user-1', {}, { provider: 'k8s' })).rejects.toThrow(
-      'Provider k8s is not implemented yet'
+    await expect(instance.provision('user-1', {}, { provider: 'northflank' })).rejects.toThrow(
+      'Provider northflank is not implemented yet'
     );
 
     expect(storage._store.get('userId')).toBeUndefined();

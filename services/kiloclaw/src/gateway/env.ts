@@ -213,7 +213,9 @@ export async function buildEnvVars(
   sensitive.OPENCLAW_GATEWAY_TOKEN = await deriveGatewayToken(sandboxId, gatewayTokenSecret);
   plainEnv.KILOCLAW_SANDBOX_ID = sandboxId;
   plainEnv.AUTO_APPROVE_DEVICES = 'true';
-  plainEnv.KILO_EXA_SEARCH_MODE = userConfig?.kiloExaSearchMode ?? 'disabled';
+  if (userConfig?.kiloExaSearchMode != null) {
+    plainEnv.KILO_EXA_SEARCH_MODE = userConfig.kiloExaSearchMode;
+  }
 
   // User-selected exec permissions preset (non-sensitive, survives restarts).
   if (userConfig?.execSecurity) plainEnv.KILOCLAW_EXEC_SECURITY = userConfig.execSecurity;

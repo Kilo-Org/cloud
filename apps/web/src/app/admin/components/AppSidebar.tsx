@@ -5,7 +5,6 @@ import {
   Users,
   DollarSign,
   Building2,
-  ShieldAlert,
   Shield,
   Ban,
   Database,
@@ -65,11 +64,6 @@ const userManagementItems: MenuItem[] = [
     title: () => 'Organizations',
     url: '/admin/organizations',
     icon: () => <Building2 />,
-  },
-  {
-    title: () => 'Abuse',
-    url: '/admin/abuse',
-    icon: () => <ShieldAlert />,
   },
   {
     title: () => 'Bulk Block',

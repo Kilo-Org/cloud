@@ -3,7 +3,7 @@ import type { FraudFingerprintLookupResponse } from 'stytch';
 import { Client, envs } from 'stytch';
 import { db } from '@/lib/drizzle';
 import type { User } from '@kilocode/db/schema';
-import { stytch_fingerprints } from '@kilocode/db/schema';
+import { kilocode_users, stytch_fingerprints } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { getFraudDetectionHeaders } from './utils';
 import { captureException } from '@sentry/nextjs';
@@ -22,11 +22,14 @@ const client = new Client({
   env: NEXT_PUBLIC_STYTCH_PROJECT_ENV === 'test' ? envs.test : envs.live,
 });
 
+export type StytchStatus = boolean | 'blocked' | null;
+
 export const getStytchStatus = async (
   user: User,
   telemetryId: string | null,
   headers: Headers
-): Promise<boolean | null> => {
+): Promise<StytchStatus> => {
+  if (user.blocked_reason) return 'blocked';
   if (user.has_validation_stytch !== null) return user.has_validation_stytch;
   if (!telemetryId) return null;
 
@@ -48,8 +51,13 @@ export const getStytchStatus = async (
   if (!fingerprintData) {
     return null; //404
   }
-  const { kilo_free_tier_allowed } = await saveFingerprints(user, fingerprintData, headers);
+  const { stytch_blocked, kilo_free_tier_allowed } = await saveFingerprints(
+    user,
+    fingerprintData,
+    headers
+  );
 
+  if (stytch_blocked) return 'blocked';
   return kilo_free_tier_allowed;
 };
 
@@ -111,10 +119,13 @@ export async function saveFingerprints(
     );
   }
 
+  const stytch_blocked = !inDevModeAndStytchPassEmail && verdict.action === 'BLOCK';
+
   const kilo_free_tier_allowed = inDevModeAndStytchFailEmail
     ? false
     : inDevModeAndStytchPassEmail ||
-      (verdict.action === 'ALLOW' &&
+      (!stytch_blocked &&
+        verdict.action === 'ALLOW' &&
         !(await isKnownFingerprintOfOtherUser(user.id, fingerprints.visitor_fingerprint)) &&
         !(await domainIsRestrictedFromStytchFreeCredits(user)));
 
@@ -134,6 +145,19 @@ export async function saveFingerprints(
   if (process.env.NODE_ENV !== 'test')
     console.log('SECURITY: saving fingerprint:', stytchFingerprint);
   await db.insert(stytch_fingerprints).values(stytchFingerprint);
+
+  if (stytch_blocked) {
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'stytch-block' })
+      .where(eq(kilocode_users.id, user.id));
+    if (process.env.NODE_ENV !== 'test')
+      console.log('SECURITY: blocking user due to Stytch BLOCK verdict:', {
+        kiloUserId: user.id,
+        email: user.google_user_email,
+        reasons: verdict.reasons,
+      });
+  }
 
   await updateStytchValidation(user, {
     ...user,
@@ -170,7 +194,7 @@ export async function saveFingerprints(
     });
   }
 
-  return { kilo_free_tier_allowed };
+  return { kilo_free_tier_allowed, stytch_blocked };
 }
 
 /**

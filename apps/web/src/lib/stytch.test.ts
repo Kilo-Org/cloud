@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { insertTestUser } from '../tests/helpers/user.helper';
 import { db } from './drizzle';
-import { stytch_fingerprints, credit_transactions } from '@kilocode/db/schema';
+import { kilocode_users, stytch_fingerprints, credit_transactions } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { FraudFingerprintLookupResponse } from 'stytch';
 
@@ -163,6 +163,72 @@ describe('Stytch Fingerprint Functions', () => {
       });
 
       expect(savedFingerprint?.kilo_free_tier_allowed).toBe(false);
+    });
+
+    test('should block user when verdict is BLOCK', async () => {
+      const user = await insertTestUser();
+      const fingerprintData = {
+        ...createMockFingerprintData(),
+        verdict: {
+          action: 'BLOCK',
+          detected_device_type: 'desktop',
+          is_authentic_device: false,
+          reasons: ['suspicious_activity'],
+          verdict_reason_overrides: [],
+        },
+      };
+      const headers = createMockHeaders();
+
+      const result = await saveFingerprints(user, fingerprintData, headers);
+
+      expect(result.stytch_blocked).toBe(true);
+      expect(result.kilo_free_tier_allowed).toBe(false);
+
+      const updatedUser = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(updatedUser?.blocked_reason).toBe('stytch-block');
+    });
+
+    test('should not block user when verdict is CHALLENGE', async () => {
+      const user = await insertTestUser();
+      const fingerprintData = {
+        ...createMockFingerprintData(),
+        verdict: {
+          action: 'CHALLENGE',
+          detected_device_type: 'desktop',
+          is_authentic_device: true,
+          reasons: ['unknown_device'],
+          verdict_reason_overrides: [],
+        },
+      };
+      const headers = createMockHeaders();
+
+      const result = await saveFingerprints(user, fingerprintData, headers);
+
+      expect(result.stytch_blocked).toBe(false);
+      expect(result.kilo_free_tier_allowed).toBe(false);
+
+      const updatedUser = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(updatedUser?.blocked_reason).toBeNull();
+    });
+
+    test('should not block user when verdict is ALLOW', async () => {
+      const user = await insertTestUser();
+      const fingerprintData = createMockFingerprintData();
+      const headers = createMockHeaders();
+
+      const result = await saveFingerprints(user, fingerprintData, headers);
+
+      expect(result.stytch_blocked).toBe(false);
+      expect(result.kilo_free_tier_allowed).toBe(true);
+
+      const updatedUser = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(updatedUser?.blocked_reason).toBeNull();
     });
 
     test('should set kilo_free_tier_allowed to false when fingerprint belongs to other user', async () => {

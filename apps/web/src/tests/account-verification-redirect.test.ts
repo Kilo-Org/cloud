@@ -36,7 +36,10 @@ jest.mock('@/lib/user.server', () => ({
   getUserFromAuthOrRedirect: (...args: [string?]) => mockGetUserFromAuthOrRedirect(...args),
 }));
 
-const mockGetStytchStatus = jest.fn<Promise<boolean | null>, [User, string | null, Headers]>();
+const mockGetStytchStatus = jest.fn<
+  Promise<boolean | 'blocked' | null>,
+  [User, string | null, Headers]
+>();
 const mockHandleSignupPromotion = jest.fn<Promise<void>, [User, boolean]>();
 jest.mock('@/lib/stytch', () => ({
   getStytchStatus: (...args: [User, string | null, Headers]) => mockGetStytchStatus(...args),
@@ -273,6 +276,43 @@ describe('account-verification redirect logic', () => {
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
       expect(mockRedirect).toHaveBeenCalledWith('/get-started');
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // Case: stytchStatus is 'blocked' — user should be blocked
+  // ---------------------------------------------------------------
+  describe('when stytchStatus is blocked', () => {
+    it('should redirect to /account-blocked', async () => {
+      const user = makeUser({ customer_source: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue('blocked');
+
+      await renderPage();
+
+      expect(mockRedirect).toHaveBeenCalledTimes(1);
+      expect(mockRedirect).toHaveBeenCalledWith('/account-blocked');
+    });
+
+    it('should redirect to /account-blocked regardless of callbackPath', async () => {
+      const user = makeUser({ customer_source: 'Google search' });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue('blocked');
+
+      await renderPage({ callbackPath: '/get-started' });
+
+      expect(mockRedirect).toHaveBeenCalledTimes(1);
+      expect(mockRedirect).toHaveBeenCalledWith('/account-blocked');
+    });
+
+    it('should not call handleSignupPromotion when blocked', async () => {
+      const user = makeUser({ customer_source: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue('blocked');
+
+      await renderPage();
+
+      expect(mockHandleSignupPromotion).not.toHaveBeenCalled();
     });
   });
 

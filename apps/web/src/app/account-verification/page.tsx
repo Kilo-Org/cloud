@@ -16,6 +16,10 @@ export default async function AccountVerificationPage({ searchParams }: AppPageP
   const telemetry_id = typeof params.telemetry_id === 'string' ? params.telemetry_id : null;
   const stytchStatus = await getStytchStatus(user, telemetry_id, await headers());
 
+  if (stytchStatus === 'blocked') {
+    redirect('/account-blocked');
+  }
+
   await handleSignupPromotion(user, stytchStatus || false);
 
   if (stytchStatus !== null) {

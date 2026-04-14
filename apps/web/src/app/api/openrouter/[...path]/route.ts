@@ -495,6 +495,45 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     userByok
   );
 
+  // Pre-request abuse enforcement (zero-wait, fail-open).
+  // The classifyPromise was started ~120 lines ago, so it has had time to resolve during
+  // auth checks, balance checks, and request preparation. We only enforce if the result is
+  // already available — no added latency for any request. If the classification hasn't
+  // resolved yet, proceed normally (fail-open).
+  let abuseRetryAfterSeconds: number | undefined;
+  {
+    const preClassifyResult = await Promise.race([
+      classifyPromise,
+      new Promise<null>(resolve => setTimeout(resolve, 0)),
+    ]);
+
+    if (preClassifyResult && preClassifyResult.verdict !== 'ALLOW') {
+      const metadata = preClassifyResult.action_metadata;
+
+      console.log('[Abuse] Enforcing verdict:', {
+        verdict: preClassifyResult.verdict,
+        risk_score: preClassifyResult.risk_score,
+        signals: preClassifyResult.signals,
+        kilo_user_id: user.id,
+        requested_model: originalModelIdLowerCased,
+        model_override: metadata?.model_override,
+        retry_after_seconds: metadata?.retry_after_seconds,
+      });
+
+      // Model downgrade: silently route to a cheaper model
+      if (metadata?.model_override) {
+        requestBodyParsed.body.model = metadata.model_override;
+      }
+
+      // Artificial delay + Retry-After header (capped at 5s)
+      const delaySec = metadata?.retry_after_seconds;
+      if (delaySec && delaySec > 0) {
+        abuseRetryAfterSeconds = Math.min(delaySec, 5);
+        await new Promise(resolve => setTimeout(resolve, abuseRetryAfterSeconds! * 1000));
+      }
+    }
+  }
+
   let response: Response;
   if (requestBodyParsed.kind === 'chat_completions' && provider.id === 'martian') {
     response = await grokCodeFastOptimizedRequest(
@@ -599,6 +638,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     request: requestBodyParsed,
   });
 
+  let finalResponse: NextResponseType<unknown>;
   {
     const errorResponse = await makeErrorReadable({
       requestedModel: originalModelIdLowerCased,
@@ -606,28 +646,50 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       response,
       isUserByok: !!userByok,
     });
+
     if (errorResponse) {
-      return errorResponse;
+      finalResponse = errorResponse;
+    } else {
+      const isFreeModelRequiringCostRemoval =
+        (provider.id === 'openrouter' || provider.id === 'vercel') &&
+        isKiloExclusiveFreeModel(originalModelIdLowerCased);
+      const isStealthModelRequiringNameRemoval =
+        provider.id !== 'martian' && isKiloStealthModel(originalModelIdLowerCased);
+
+      if (
+        (isFreeModelRequiringCostRemoval || isStealthModelRequiringNameRemoval) &&
+        requestBodyParsed.kind === 'chat_completions'
+      ) {
+        finalResponse = await rewriteFreeModelResponse_ChatCompletions(
+          response,
+          originalModelIdLowerCased
+        );
+      } else if (
+        (isFreeModelRequiringCostRemoval || isStealthModelRequiringNameRemoval) &&
+        requestBodyParsed.kind === 'responses'
+      ) {
+        finalResponse = await rewriteFreeModelResponse_Responses(
+          response,
+          originalModelIdLowerCased
+        );
+      } else if (
+        (isFreeModelRequiringCostRemoval || isStealthModelRequiringNameRemoval) &&
+        requestBodyParsed.kind === 'messages'
+      ) {
+        finalResponse = await rewriteFreeModelResponse_Messages(
+          response,
+          originalModelIdLowerCased
+        );
+      } else {
+        finalResponse = wrapInSafeNextResponse(response);
+      }
     }
   }
 
-  const isFreeModelRequiringCostRemoval =
-    (provider.id === 'openrouter' || provider.id === 'vercel') &&
-    isKiloExclusiveFreeModel(originalModelIdLowerCased);
-  const isStealthModelRequiringNameRemoval =
-    provider.id !== 'martian' && isKiloStealthModel(originalModelIdLowerCased);
-
-  if (isFreeModelRequiringCostRemoval || isStealthModelRequiringNameRemoval) {
-    if (requestBodyParsed.kind === 'chat_completions') {
-      return rewriteFreeModelResponse_ChatCompletions(response, originalModelIdLowerCased);
-    }
-    if (requestBodyParsed.kind === 'responses') {
-      return rewriteFreeModelResponse_Responses(response, originalModelIdLowerCased);
-    }
-    if (requestBodyParsed.kind === 'messages') {
-      return rewriteFreeModelResponse_Messages(response, originalModelIdLowerCased);
-    }
+  // Add Retry-After header for abuse-classified requests to signal the client to slow down
+  if (abuseRetryAfterSeconds) {
+    finalResponse.headers.set('Retry-After', String(abuseRetryAfterSeconds));
   }
 
-  return wrapInSafeNextResponse(response);
+  return finalResponse;
 }

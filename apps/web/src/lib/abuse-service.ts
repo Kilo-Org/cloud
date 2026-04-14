@@ -302,7 +302,8 @@ async function fetchAbuseService<T>(
  * Classify a request for potential abuse.
  * This is called before proxying requests to detect fraudulent activity.
  *
- * Currently logs the response only; does not take action.
+ * Non-ALLOW verdicts are enforced by the gateway: model downgrade,
+ * artificial delay, and Retry-After headers (zero-wait, fail-open).
  *
  * @param payload - Request details to classify
  * @returns Classification response or null if service unavailable

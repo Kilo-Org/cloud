@@ -9,7 +9,7 @@
  * the actual network request to the correct tRPC route.
  */
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryFunction, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { AnalyticsEngineResponse, ControllerTelemetryRow } from '@/lib/kiloclaw/disk-usage';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -38,7 +38,7 @@ export function useClawConfig() {
 
 type DiskUsageQueryOptions<TData = unknown> = {
   queryKey: readonly unknown[];
-  queryFn?: () => Promise<TData>;
+  queryFn?: QueryFunction<TData, readonly unknown[]>;
   enabled?: boolean;
   refetchInterval?: number;
 };

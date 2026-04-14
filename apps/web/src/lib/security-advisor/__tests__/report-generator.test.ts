@@ -129,6 +129,16 @@ describe('generateSecurityReport', () => {
 
     it('includes CTA for non-KiloClaw users', () => {
       expect(report.markdown).toContain('kilo.ai/kiloclaw');
+      expect(report.markdown).toContain('## Next step: try KiloClaw free');
+    });
+
+    it('marks the CTA section with a display-verbatim directive for agents', () => {
+      expect(report.markdown).toContain('<!-- display-verbatim');
+      // Directive must precede the CTA heading so agents see it first.
+      const directiveIdx = report.markdown.indexOf('<!-- display-verbatim');
+      const headingIdx = report.markdown.indexOf('## Next step: try KiloClaw free');
+      expect(directiveIdx).toBeGreaterThan(-1);
+      expect(headingIdx).toBeGreaterThan(directiveIdx);
     });
   });
 
@@ -172,6 +182,8 @@ describe('generateSecurityReport', () => {
 
     it('omits CTA', () => {
       expect(report.markdown).not.toContain('kilo.ai/kiloclaw');
+      expect(report.markdown).not.toContain('## Next step: try KiloClaw free');
+      expect(report.markdown).not.toContain('<!-- display-verbatim');
     });
   });
 

@@ -133,4 +133,4 @@ export type KiloClawComparisonEntry = z.infer<typeof KiloClawComparisonEntry>;
 // --- Constants ---
 
 export const API_VERSION = '2026-04-01' as const;
-export const RATE_LIMIT_PER_DAY = 5;
+export const RATE_LIMIT_PER_DAY = 50;

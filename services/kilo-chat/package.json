@@ -10,7 +10,9 @@
     "cf-typegen": "wrangler types",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/kilo-chat/src",
-    "db:generate": "drizzle-kit generate"
+    "db:generate:conversation": "drizzle-kit generate --config drizzle-conversation.config.ts",
+    "db:generate:membership": "drizzle-kit generate --config drizzle-membership.config.ts",
+    "db:generate": "pnpm db:generate:conversation && pnpm db:generate:membership"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.21",

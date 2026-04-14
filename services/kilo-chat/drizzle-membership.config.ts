@@ -1,7 +1,7 @@
 import { defineConfig } from 'drizzle-kit';
 export default defineConfig({
-  out: './drizzle',
-  schema: './src/db/*.ts',
+  out: './drizzle/membership',
+  schema: './src/db/membership-schema.ts',
   dialect: 'sqlite',
   driver: 'durable-sqlite',
 });

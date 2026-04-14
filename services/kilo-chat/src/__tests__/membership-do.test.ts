@@ -47,8 +47,16 @@ describe('MembershipDO', () => {
 
   it('lists conversations sorted by lastMessageId descending', async () => {
     const stub = getStub('user-4');
-    await stub.addConversation({ conversationId: 'conv-a', conversationTitle: null, joinedAt: 1000 });
-    await stub.addConversation({ conversationId: 'conv-b', conversationTitle: null, joinedAt: 2000 });
+    await stub.addConversation({
+      conversationId: 'conv-a',
+      conversationTitle: null,
+      joinedAt: 1000,
+    });
+    await stub.addConversation({
+      conversationId: 'conv-b',
+      conversationTitle: null,
+      joinedAt: 2000,
+    });
     await stub.updateLastMessageId('conv-a', '01ZZZZZ');
     await stub.updateLastMessageId('conv-b', '01AAAAA');
     const result = await stub.listConversations();
@@ -58,7 +66,11 @@ describe('MembershipDO', () => {
 
   it('removes a conversation', async () => {
     const stub = getStub('user-5');
-    await stub.addConversation({ conversationId: 'conv-1', conversationTitle: null, joinedAt: 1000 });
+    await stub.addConversation({
+      conversationId: 'conv-1',
+      conversationTitle: null,
+      joinedAt: 1000,
+    });
     await stub.removeConversation('conv-1');
     const result = await stub.listConversations();
     expect(result).toEqual([]);

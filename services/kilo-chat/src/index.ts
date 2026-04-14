@@ -2,6 +2,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
 
 export { MembershipDO } from './do/membership-do';
+export { ConversationDO } from './do/conversation-do';
 
 const app = new Hono<{ Bindings: Env }>();
 

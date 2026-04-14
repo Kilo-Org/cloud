@@ -64,9 +64,6 @@ export class MembershipDO extends DurableObject<Env> {
   }
 
   removeConversation(conversationId: string): void {
-    this.db
-      .delete(conversations)
-      .where(eq(conversations.conversation_id, conversationId))
-      .run();
+    this.db.delete(conversations).where(eq(conversations.conversation_id, conversationId)).run();
   }
 }

@@ -15,9 +15,7 @@ const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 function makeApp(env: MockEnv) {
   const app = new Hono<{ Bindings: MockEnv; Variables: AuthContext }>();
   app.use('*', authMiddleware);
-  app.get('/test', c =>
-    c.json({ callerId: c.get('callerId'), callerKind: c.get('callerKind') }),
-  );
+  app.get('/test', c => c.json({ callerId: c.get('callerId'), callerKind: c.get('callerKind') }));
   return app;
 }
 
@@ -45,7 +43,7 @@ describe('authMiddleware', () => {
           'x-kilo-sandbox-id': 'sandbox-abc123',
         },
       },
-      defaultEnv,
+      defaultEnv
     );
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -64,7 +62,7 @@ describe('authMiddleware', () => {
           authorization: `Bearer ${TEST_API_KEY}`,
         },
       },
-      defaultEnv,
+      defaultEnv
     );
     expect(res.status).toBe(401);
     const body = await res.json();
@@ -81,7 +79,7 @@ describe('authMiddleware', () => {
           'x-kilo-sandbox-id': 'sandbox-abc123',
         },
       },
-      defaultEnv,
+      defaultEnv
     );
     expect(res.status).toBe(401);
     const body = await res.json();
@@ -104,7 +102,7 @@ describe('authMiddleware', () => {
           authorization: `Bearer ${token}`,
         },
       },
-      defaultEnv,
+      defaultEnv
     );
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -130,7 +128,7 @@ describe('authMiddleware', () => {
           authorization: `Bearer ${token}`,
         },
       },
-      defaultEnv,
+      defaultEnv
     );
     expect(res.status).toBe(401);
     const body = await res.json();

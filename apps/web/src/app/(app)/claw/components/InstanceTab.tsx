@@ -6,6 +6,7 @@ import type { AnalyticsEngineResponse, ControllerTelemetryRow } from '@/lib/kilo
 import type { KiloClawDashboardStatus, GatewayProcessStatusResponse } from '@/lib/kiloclaw/types';
 import { Badge } from '@/components/ui/badge';
 import { formatTs } from './time';
+import { useClawContext } from './ClawContext';
 
 const GATEWAY_STATE_STYLES: Record<
   GatewayProcessStatusResponse['state'],
@@ -37,7 +38,7 @@ const GATEWAY_STATE_STYLES: Record<
   },
 };
 
-function formatUptime(seconds: number): string {
+export function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
@@ -54,7 +55,7 @@ function formatLastExit(lastExit: NonNullable<GatewayProcessStatusResponse['last
   return `exit ${code} / ${signal} at ${timeStr}`;
 }
 
-function formatBytes(bytes: number): string {
+export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
@@ -62,28 +63,32 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-function formatVolumeUsage(used: number | null, total: number | null): string {
+export function formatVolumeUsage(used: number | null, total: number | null): string {
   if (used === null || total === null) return '—';
   const raw = (used / total) * 100;
   const pct = raw % 1 === 0 ? raw.toFixed(0) : (Math.round(raw * 10) / 10).toFixed(1);
   return `${formatBytes(used)} of ${formatBytes(total)} (${pct}%)`;
 }
 
-function getVolumeUsagePercent(used: number | null, total: number | null): number | null {
+export function getVolumeUsagePercent(used: number | null, total: number | null): number | null {
   if (used === null || total === null || total <= 0) return null;
   return Math.max(0, Math.min(100, (used / total) * 100));
 }
 
-function getVolumeBarColor(percent: number | null): string {
+export function getVolumeBarColor(percent: number | null): string {
   if (percent === null) return 'bg-emerald-500';
   if (percent >= 90) return 'bg-red-500';
   if (percent >= 75) return 'bg-amber-500';
   return 'bg-emerald-500';
 }
 
-function useDiskUsage(enabled: boolean) {
+export function diskUsageQueryKey(organizationId: string | undefined) {
+  return ['kiloclaw', 'disk-usage', organizationId ?? 'personal'] as const;
+}
+
+function useDiskUsage(enabled: boolean, organizationId: string | undefined) {
   return useQuery<AnalyticsEngineResponse<ControllerTelemetryRow>>({
-    queryKey: ['kiloclaw', 'disk-usage'],
+    queryKey: diskUsageQueryKey(organizationId),
     queryFn: async () => {
       const response = await fetch('/api/kiloclaw/disk-usage');
       if (!response.ok) {
@@ -107,8 +112,9 @@ export function InstanceTab({
   gatewayLoading: boolean;
   gatewayError: { message: string; data?: { code?: string } | null } | null;
 }) {
+  const { organizationId } = useClawContext();
   const isRunning = status.status === 'running';
-  const diskUsage = useDiskUsage(isRunning);
+  const diskUsage = useDiskUsage(isRunning, organizationId);
   const diskUsageRow = diskUsage.data?.data?.[0];
   const diskUsed =
     diskUsageRow && diskUsageRow.disk_used_bytes > 0 ? diskUsageRow.disk_used_bytes : null;

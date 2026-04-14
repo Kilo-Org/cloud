@@ -6,26 +6,22 @@ import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getDirectByokModelsForUser } from '@/lib/providers/direct-byok';
 import { unstable_cache } from 'next/cache';
+import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
+import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
+import { filterByFeature } from '@/lib/models';
 
-const getDirectByokModelsForUser_cached = unstable_cache(
+const getDirectByokModels = unstable_cache(
   (userId: string) => getDirectByokModelsForUser(userId),
   undefined,
   { revalidate: 60 }
 );
 
-async function getDirectByokModels() {
+async function tryGetUserFromAuth() {
   try {
-    const { user } = await getUserFromAuth({ adminOnly: false });
-    if (user) {
-      console.debug('[getDirectByokModels] authenticated request, fetching direct byok models');
-      return await getDirectByokModelsForUser_cached(user.id);
-    } else {
-      console.debug('[getDirectByokModels] anonymous request, no direct byok models');
-      return [];
-    }
+    return await getUserFromAuth({ adminOnly: false });
   } catch (e) {
-    console.debug('[getDirectByokModels] error, database unavailable?', e);
-    return [];
+    console.error('[tryGetUserFromAuth] failed to get user from auth', e);
+    return { user: null, organizationId: null };
   }
 }
 
@@ -34,18 +30,34 @@ async function getDirectByokModels() {
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
 export async function GET(
-  _request: NextRequest
-): Promise<NextResponse<{ error: string; message: string } | OpenRouterModelsResponse>> {
+  request: NextRequest
+): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
+  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
+  const auth = await tryGetUserFromAuth();
   try {
+    const result = auth?.organizationId
+      ? await getAvailableModelsForOrganization(auth.organizationId)
+      : null;
+    if (result) {
+      return NextResponse.json({
+        ...result,
+        data: filterByFeature(result.data, feature),
+      });
+    }
+
     const data = await getEnhancedOpenRouterModels();
-    return NextResponse.json(
-      Array.isArray(data.data) ? { data: data.data.concat(await getDirectByokModels()) } : data
-    );
+    if (!Array.isArray(data.data)) {
+      return NextResponse.json(data);
+    }
+    const byokModels = auth?.user ? await getDirectByokModels(auth.user.id) : [];
+    return NextResponse.json({ data: filterByFeature(data.data.concat(byokModels), feature) });
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'openrouter/models' },
       extra: {
         action: 'fetching_models',
+        userId: auth?.user?.id,
+        organizationId: auth?.organizationId,
       },
     });
     return NextResponse.json(

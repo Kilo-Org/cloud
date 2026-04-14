@@ -63,8 +63,10 @@ type ExecutionBinding = {
 
 type PromptBody = {
   prompt?: string;
-  /** Message parts - only text parts are supported */
-  parts?: Array<{ type: 'text'; text: string }>;
+  /** Message parts - text or file (with local file:// URL) */
+  parts?: Array<
+    { type: 'text'; text: string } | { type: 'file'; mime: string; url: string; filename?: string }
+  >;
   model?: { providerID?: string; modelID: string };
   variant?: string;
   agent?: string;
@@ -262,7 +264,7 @@ function createPromptHandler(config: ServerConfig, deps: ServerDependencies) {
     if (!body.prompt && !body.parts) {
       return errorResponse('INVALID_REQUEST', 'Either prompt or parts is required', 400);
     }
-    const messageId = body.messageId ?? state.nextMessageId();
+    const messageId = body.messageId;
 
     // Set per-turn config on the lifecycle manager
     deps.setPerTurnConfig({
@@ -300,7 +302,9 @@ function createPromptHandler(config: ServerConfig, deps: ServerDependencies) {
         system: body.system,
         tools: body.tools,
       });
-      logToFile(`job/prompt: sent messageId=${messageId}`);
+      logToFile(
+        messageId !== undefined ? `job/prompt: sent messageId=${messageId}` : 'job/prompt: sent'
+      );
     } catch (error) {
       state.setActive(false);
       const msg = error instanceof Error ? error.message : String(error);
@@ -308,7 +312,9 @@ function createPromptHandler(config: ServerConfig, deps: ServerDependencies) {
       return errorResponse('SEND_ERROR', `Failed to send prompt: ${msg}`, 500);
     }
 
-    return jsonResponse({ status: 'sent', messageId });
+    return jsonResponse(
+      messageId !== undefined ? { status: 'sent', messageId } : { status: 'sent' }
+    );
   };
 }
 

@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { StatusBadge } from '@/components/kiloclaw/status-badge';
 import { Text } from '@/components/ui/text';
-import { type InstanceStatus } from '@/lib/hooks/use-kiloclaw';
+import { type InstanceStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type InstanceRowProps = {

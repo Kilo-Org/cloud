@@ -324,6 +324,7 @@ update the `find` command in the workflow's "Compute source content hash" step t
 | `Dockerfile`                      | Base image, apt packages, npm versions                  |
 | `controller/`                     | Compiled to `kiloclaw-controller.js` (entrypoint)       |
 | `container/`                      | Runtime assets (e.g. `TOOLS.md`) staged outside `/root` |
+| `plugins/kiloclaw-customizer/`    | KiloClaw customizer plugin package installed in image   |
 | `openclaw-pairing-list.js`        | Helper script used at runtime by controller             |
 | `openclaw-device-pairing-list.js` | Helper script used at runtime by controller             |
 | `skills/`                         | Custom skills copied to `/root/clawd/skills/`           |

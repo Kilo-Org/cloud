@@ -17,8 +17,11 @@ import type {
   GoogleCredentials,
   MachineSize,
   CustomSecretMeta,
+  ProviderId,
+  ProviderState,
+  KiloExaSearchMode,
 } from '../../schemas/instance-config';
-import { DEFAULT_INSTANCE_FEATURES } from '../../schemas/instance-config';
+import { DEFAULT_INSTANCE_FEATURES, ProviderStateSchema } from '../../schemas/instance-config';
 import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
 import * as fly from '../../fly/client';
 import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '../../auth/sandbox-id';
@@ -30,10 +33,10 @@ import { resolveLatestVersion, resolveVersionByTag } from '../../lib/image-versi
 import { lookupCatalogVersion } from '../../lib/catalog-registration';
 import { ImageVariantSchema } from '../../schemas/image-version';
 import {
-  STARTUP_TIMEOUT_SECONDS,
-  DEFAULT_VOLUME_SIZE_GB,
   LIVE_CHECK_THROTTLE_MS,
   OPENCLAW_BUILTIN_DEFAULT_MODEL,
+  RESTARTING_TIMEOUT_MS,
+  STARTING_TIMEOUT_MS,
 } from '../../config';
 import {
   SECRET_CATALOG,
@@ -43,22 +46,30 @@ import {
   MAX_CUSTOM_SECRETS,
   type SecretFieldKey,
 } from '@kilocode/kiloclaw-secret-catalog';
-import { parseRegions, prepareRegions, resolveRegions } from '../regions';
 import * as regionHelpers from '../regions';
-import { buildMachineConfig, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
+import { buildRuntimeSpec } from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
 
 // Domain modules
 import type { InstanceMutableState, InstanceStatus, DestroyResult } from './types';
-import { getAppKey, getFlyConfig } from './types';
-import { createMutableState, loadState, storageUpdate } from './state';
+import { getFlyConfig } from './types';
+import {
+  applyProviderState,
+  createMutableState,
+  getFlyProviderState,
+  getProviderRegion,
+  getRuntimeId,
+  getStorageId,
+  loadState,
+  storageUpdate,
+  syncProviderStateForStorage,
+} from './state';
 import { nextAlarmTime, doLog, doError, doWarn, toLoggable, createReconcileContext } from './log';
 import { attemptMetadataRecovery } from './reconcile';
-import { resolveImageTag, getRegistryApp, buildUserEnvVars } from './config';
+import { buildUserEnvVars, resolveImageTag, resolveRuntimeImageRef } from './config';
 import * as gateway from './gateway';
 import * as pairing from './pairing';
 import * as kiloCliRun from './kilo-cli-run';
-import * as flyMachines from './fly-machines';
 import {
   reconcileWithFly,
   syncStatusFromLiveCheck,
@@ -69,6 +80,7 @@ import {
   markRestartSuccessful,
 } from './reconcile';
 import { restoreFromPostgres, markDestroyedInPostgresHelper } from './postgres';
+import { legacyDoKeysForIdentity } from '../../lib/instance-routing';
 import {
   beginUnexpectedStopRecovery,
   cleanupPendingRecoveryVolumeIfNeeded,
@@ -86,6 +98,12 @@ import {
 } from '../../stream-chat/client';
 import { writeEvent } from '../../utils/analytics';
 import type { KiloClawEventData, KiloClawEventName } from '../../utils/analytics';
+import { getProviderAdapter, resolveDefaultProvider } from '../../providers';
+import type {
+  ProviderCapabilities,
+  ProviderResult,
+  ProviderRoutingTarget,
+} from '../../providers/types';
 
 // Re-export extracted helpers so existing consumers don't break.
 export {
@@ -103,6 +121,7 @@ export { METADATA_KEY_USER_ID } from '../machine-config';
 const CHANNEL_ENV_VARS = new Set(
   SECRET_CATALOG.filter(e => e.category === 'channel').flatMap(e => e.fields.map(f => f.envVar))
 );
+const BRAVE_SEARCH_FIELD_KEY = 'braveSearchApiKey';
 
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private s: InstanceMutableState = createMutableState();
@@ -114,7 +133,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   private async persist(patch: Partial<PersistedState>): Promise<void> {
-    await this.ctx.storage.put(storageUpdate(patch));
+    await this.ctx.storage.put(storageUpdate(syncProviderStateForStorage(this.s, patch)));
   }
 
   private async scheduleAlarm(): Promise<void> {
@@ -140,6 +159,264 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    */
   private buildUserEnvVars() {
     return buildUserEnvVars(this.env, this.ctx, this.s);
+  }
+
+  private provider() {
+    return getProviderAdapter(this.env, this.s);
+  }
+
+  private applyProviderResult(result: ProviderResult): void {
+    applyProviderState(this.s, result.providerState);
+    if (result.corePatch?.machineSize !== undefined) {
+      this.s.machineSize = result.corePatch.machineSize;
+    }
+    if (result.corePatch?.restartUpdateSent !== undefined) {
+      this.s.restartUpdateSent = result.corePatch.restartUpdateSent;
+    }
+  }
+
+  private async persistProviderResult(result: ProviderResult): Promise<void> {
+    this.applyProviderResult(result);
+    await this.persist({
+      provider: result.providerState.provider,
+      providerState: result.providerState,
+      ...(result.corePatch ?? {}),
+    });
+  }
+
+  private async persistProviderResultWithPatch(
+    result: ProviderResult,
+    patch: Partial<PersistedState>
+  ): Promise<void> {
+    this.applyProviderResult(result);
+    await this.persist({
+      provider: result.providerState.provider,
+      providerState: result.providerState,
+      ...(result.corePatch ?? {}),
+      ...patch,
+    });
+  }
+
+  private async retryNonFlyDestroy(): Promise<void> {
+    if (this.s.provider === 'fly') {
+      throw new Error('retryNonFlyDestroy should not be used for Fly providers');
+    }
+
+    if (this.s.pendingDestroyMachineId) {
+      try {
+        const result = await this.provider().destroyRuntime({
+          env: this.env,
+          state: this.s,
+        });
+        this.s.pendingDestroyMachineId = null;
+        await this.persistProviderResultWithPatch(result, {
+          pendingDestroyMachineId: null,
+        });
+      } catch (err) {
+        doWarn(this.s, 'Non-Fly runtime destroy failed, alarm will retry', {
+          provider: this.s.provider,
+          runtimeId: this.s.pendingDestroyMachineId,
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    if (this.s.pendingDestroyVolumeId) {
+      try {
+        const result = await this.provider().destroyStorage({
+          env: this.env,
+          state: this.s,
+        });
+        this.s.pendingDestroyVolumeId = null;
+        await this.persistProviderResultWithPatch(result, {
+          pendingDestroyVolumeId: null,
+        });
+      } catch (err) {
+        doWarn(this.s, 'Non-Fly storage destroy failed, alarm will retry', {
+          provider: this.s.provider,
+          storageId: this.s.pendingDestroyVolumeId,
+          error: toLoggable(err),
+        });
+      }
+    }
+  }
+
+  private async markStartFailedFromProvider(message: string): Promise<void> {
+    const now = Date.now();
+    this.s.status = 'stopped';
+    this.s.startingAt = null;
+    this.s.lastStoppedAt = now;
+    this.s.lastStartErrorMessage = message;
+    this.s.lastStartErrorAt = now;
+    await this.persist({
+      status: 'stopped',
+      startingAt: null,
+      lastStoppedAt: now,
+      lastStartErrorMessage: message,
+      lastStartErrorAt: now,
+    });
+  }
+
+  private async markRestartFailedFromProvider(message: string): Promise<void> {
+    const now = Date.now();
+    this.s.status = 'stopped';
+    this.s.startingAt = null;
+    this.s.restartingAt = null;
+    this.s.restartUpdateSent = false;
+    this.s.lastStoppedAt = now;
+    this.s.lastRestartErrorMessage = message;
+    this.s.lastRestartErrorAt = now;
+    await this.persist({
+      status: 'stopped',
+      startingAt: null,
+      restartingAt: null,
+      restartUpdateSent: false,
+      lastStoppedAt: now,
+      lastRestartErrorMessage: message,
+      lastRestartErrorAt: now,
+    });
+  }
+
+  private async markNonFlyRunningFromProvider(reason: 'start' | 'runtime'): Promise<void> {
+    const startingAt = this.s.startingAt;
+    this.s.status = 'running';
+    this.s.startingAt = null;
+    this.s.restartingAt = null;
+    this.s.restartUpdateSent = false;
+    if (this.s.lastStartedAt === null) {
+      this.s.lastStartedAt = Date.now();
+    }
+    this.s.healthCheckFailCount = 0;
+    this.s.lastStartErrorMessage = null;
+    this.s.lastStartErrorAt = null;
+    this.s.lastRestartErrorMessage = null;
+    this.s.lastRestartErrorAt = null;
+    await this.persist({
+      status: 'running',
+      startingAt: null,
+      restartingAt: null,
+      restartUpdateSent: false,
+      lastStartedAt: this.s.lastStartedAt,
+      healthCheckFailCount: 0,
+      lastStartErrorMessage: null,
+      lastStartErrorAt: null,
+      lastRestartErrorMessage: null,
+      lastRestartErrorAt: null,
+    });
+
+    if (reason === 'start') {
+      this.emitEvent({
+        event: 'instance.started',
+        status: 'running',
+        durationMs: startingAt ? Date.now() - startingAt : undefined,
+      });
+    }
+  }
+
+  private async reconcileNonFlyRuntimeFromAlarm(): Promise<void> {
+    if (this.s.provider === 'fly') {
+      throw new Error('reconcileNonFlyRuntimeFromAlarm should not be used for Fly providers');
+    }
+
+    if (!['starting', 'restarting', 'running'].includes(this.s.status ?? '')) {
+      return;
+    }
+
+    const result = await this.provider().inspectRuntime({
+      env: this.env,
+      state: this.s,
+    });
+    await this.persistProviderResult(result);
+    const runtimeState = result.observation?.runtimeState ?? 'missing';
+
+    if (runtimeState === 'running') {
+      if (this.s.status === 'restarting') {
+        await markRestartSuccessful(
+          this.ctx,
+          this.s,
+          createReconcileContext(this.s, this.env, 'alarm_non_fly')
+        );
+      } else if (this.s.status === 'starting') {
+        await this.markNonFlyRunningFromProvider('start');
+      }
+      return;
+    }
+
+    if (this.s.status === 'starting') {
+      const timedOut =
+        this.s.startingAt !== null && Date.now() - this.s.startingAt > STARTING_TIMEOUT_MS;
+      if (timedOut || runtimeState === 'failed') {
+        const message = `Provider ${this.s.provider} runtime ${runtimeState} during start`;
+        await this.markStartFailedFromProvider(message);
+        this.emitProvisioningFailed('provider_runtime_not_running', message);
+        return;
+      }
+      return;
+    }
+
+    if (this.s.status === 'restarting') {
+      const timedOut =
+        this.s.restartingAt !== null && Date.now() - this.s.restartingAt > RESTARTING_TIMEOUT_MS;
+      if (timedOut || runtimeState === 'failed' || runtimeState === 'missing') {
+        await this.markRestartFailedFromProvider(
+          `Provider ${this.s.provider} runtime ${runtimeState} during restart`
+        );
+        return;
+      }
+      return;
+    }
+
+    if (this.s.status === 'running' && runtimeState !== 'starting') {
+      const now = Date.now();
+      this.s.status = 'stopped';
+      this.s.lastStoppedAt = now;
+      await this.persist({
+        status: 'stopped',
+        lastStoppedAt: now,
+      });
+      this.emitEvent({
+        event: 'instance.stopped',
+        status: 'stopped',
+        label: `provider_runtime_${runtimeState}`,
+      });
+    }
+  }
+
+  async getRoutingTarget(): Promise<ProviderRoutingTarget | null> {
+    await this.loadState();
+
+    if (
+      this.s.status === 'destroying' ||
+      this.s.status === 'restoring' ||
+      this.s.status === 'recovering'
+    ) {
+      return null;
+    }
+
+    try {
+      return await this.provider().getRoutingTarget({
+        env: this.env,
+        state: this.s,
+      });
+    } catch (err) {
+      doWarn(this.s, 'getRoutingTarget failed, returning null', {
+        provider: this.s.provider,
+        error: toLoggable(err),
+      });
+      return null;
+    }
+  }
+
+  async getProviderMetadata(): Promise<{
+    provider: ProviderId;
+    capabilities: ProviderCapabilities;
+  }> {
+    await this.loadState();
+
+    return {
+      provider: this.s.provider,
+      capabilities: this.provider().capabilities,
+    };
   }
 
   /**
@@ -230,7 +507,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async provision(
     userId: string,
     config: InstanceConfig,
-    opts?: { orgId?: string | null; instanceId?: string }
+    opts?: { orgId?: string | null; instanceId?: string; provider?: ProviderId }
   ): Promise<{ sandboxId: string }> {
     const provisionStart = performance.now();
     await this.loadState();
@@ -251,49 +528,36 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       ? sandboxIdFromInstanceId(opts.instanceId)
       : sandboxIdFromUserId(userId);
     const isNew = !this.s.status;
-
-    // Ensure Fly App exists on first provision.
-    // Instance-keyed DOs (ki_ sandboxId) get their own app (inst-{hash}).
-    // Legacy DOs keep their user-scoped app (acct-{hash}).
-    if (isNew && !this.s.flyAppName) {
-      this.s.orgId = opts?.orgId ?? null;
-      const appKey = getAppKey({ userId, sandboxId });
-      const appStub = this.env.KILOCLAW_APP.get(this.env.KILOCLAW_APP.idFromName(appKey));
-      const { appName } = await appStub.ensureApp(appKey);
-      this.s.flyAppName = appName;
-      await this.persist({ flyAppName: appName });
-      console.log('[DO] Fly App ensured:', appName, 'key:', appKey);
-    }
-
-    // Create Fly Volume on first provision.
-    if (isNew && !this.s.flyVolumeId) {
-      const flyConfig = getFlyConfig(this.env, this.s);
-      const regions = config.region
-        ? prepareRegions(parseRegions(config.region))
-        : await resolveRegions(this.env.KV_CLAW_CACHE, this.env.FLY_REGION);
-      const guest = guestFromSize(config.machineSize ?? null);
-      const volume = await fly.createVolumeWithFallback(
-        flyConfig,
-        {
-          name: volumeNameFromSandboxId(sandboxId),
-          size_gb: DEFAULT_VOLUME_SIZE_GB,
-          compute: guest,
-        },
-        regions,
-        {
-          onCapacityError: failedRegion => {
-            void regionHelpers.evictCapacityRegionFromKV(
-              this.env.KV_CLAW_CACHE,
-              this.env,
-              failedRegion
-            );
-          },
-        }
+    if (!isNew && opts?.provider && opts.provider !== this.s.provider) {
+      throw Object.assign(
+        new Error(`Cannot change provider from ${this.s.provider} to ${opts.provider}`),
+        { status: 409 }
       );
-      this.s.flyVolumeId = volume.id;
-      this.s.flyRegion = volume.region;
-      console.log('[DO] Created Fly Volume:', volume.id, 'region:', volume.region);
     }
+    const providerId =
+      opts?.provider ?? (isNew ? resolveDefaultProvider(this.env) : this.s.provider);
+    const orgId = opts?.orgId ?? null;
+    const provider = getProviderAdapter(this.env, { provider: providerId });
+    const provisioningState = {
+      ...this.s,
+      userId,
+      sandboxId,
+      provider: providerId,
+      orgId,
+    } satisfies InstanceMutableState;
+
+    const provisioning = await provider.ensureProvisioningResources({
+      env: this.env,
+      state: provisioningState,
+      orgId,
+      machineSize: config.machineSize ?? null,
+      region: config.region,
+    });
+    this.s.userId = userId;
+    this.s.sandboxId = sandboxId;
+    this.s.provider = providerId;
+    this.s.orgId = orgId;
+    await this.persistProviderResult(provisioning);
 
     // Resolve the image version for this provision.
     console.debug('[DO] provision: pinnedImageTag from config:', config.pinnedImageTag ?? 'none');
@@ -375,12 +639,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       userId,
       sandboxId,
       orgId: opts?.orgId ?? null,
+      provider: this.s.provider,
       status: (this.s.status ?? 'provisioned') satisfies InstanceStatus,
       envVars: config.envVars ?? null,
       encryptedSecrets: config.encryptedSecrets ?? null,
       kilocodeApiKey: config.kilocodeApiKey ?? null,
       kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
       kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
+      kiloExaSearchMode: config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null,
       channels: config.channels ?? null,
       machineSize: config.machineSize ?? this.s.machineSize ?? null,
     } satisfies Partial<PersistedState>;
@@ -397,28 +663,35 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     const update = isNew
-      ? storageUpdate({
-          ...configFields,
-          ...versionFields,
-          instanceFeatures: this.s.instanceFeatures,
-          provisionedAt: Date.now(),
-          lastStartedAt: null,
-          lastStoppedAt: null,
-          flyAppName: this.s.flyAppName,
-          flyMachineId: this.s.flyMachineId,
-          flyVolumeId: this.s.flyVolumeId,
-          flyRegion: this.s.flyRegion,
-          healthCheckFailCount: 0,
-          pendingDestroyMachineId: null,
-          pendingDestroyVolumeId: null,
-          pendingPostgresMarkOnFinalize: false,
-          instanceReadyEmailSent: false,
-        })
-      : storageUpdate({
-          ...configFields,
-          ...versionFields,
-          instanceFeatures: this.s.instanceFeatures,
-        });
+      ? syncProviderStateForStorage(
+          this.s,
+          storageUpdate({
+            ...configFields,
+            ...versionFields,
+            instanceFeatures: this.s.instanceFeatures,
+            provisionedAt: Date.now(),
+            lastStartedAt: null,
+            lastStoppedAt: null,
+            flyAppName: this.s.flyAppName,
+            flyMachineId: this.s.flyMachineId,
+            flyVolumeId: this.s.flyVolumeId,
+            flyRegion: this.s.flyRegion,
+            providerState: this.s.providerState,
+            healthCheckFailCount: 0,
+            pendingDestroyMachineId: null,
+            pendingDestroyVolumeId: null,
+            pendingPostgresMarkOnFinalize: false,
+            instanceReadyEmailSent: false,
+          })
+        )
+      : syncProviderStateForStorage(
+          this.s,
+          storageUpdate({
+            ...configFields,
+            ...versionFields,
+            instanceFeatures: this.s.instanceFeatures,
+          })
+        );
 
     await this.ctx.storage.put(update);
 
@@ -431,6 +704,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.kilocodeApiKey = config.kilocodeApiKey ?? null;
     this.s.kilocodeApiKeyExpiresAt = config.kilocodeApiKeyExpiresAt ?? null;
     this.s.kilocodeDefaultModel = config.kilocodeDefaultModel ?? null;
+    this.s.kiloExaSearchMode = config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null;
     this.s.channels = config.channels ?? null;
     this.s.machineSize = config.machineSize ?? this.s.machineSize ?? null;
     if (isNew) {
@@ -571,6 +845,27 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return {
       execSecurity: this.s.execSecurity,
       execAsk: this.s.execAsk,
+    };
+  }
+
+  async updateWebSearchConfig(patch: {
+    exaMode?: KiloExaSearchMode | null;
+  }): Promise<{ exaMode: KiloExaSearchMode | null }> {
+    await this.loadState();
+
+    const pending: Partial<PersistedState> = {};
+
+    if (patch.exaMode !== undefined) {
+      this.s.kiloExaSearchMode = patch.exaMode;
+      pending.kiloExaSearchMode = this.s.kiloExaSearchMode;
+    }
+
+    if (Object.keys(pending).length > 0) {
+      await this.ctx.storage.put(storageUpdate(pending));
+    }
+
+    return {
+      exaMode: this.s.kiloExaSearchMode,
     };
   }
 
@@ -790,10 +1085,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const hasMeta = Object.keys(currentMeta).length > 0;
     this.s.customSecretMeta = hasMeta ? currentMeta : null;
 
+    if (patch[BRAVE_SEARCH_FIELD_KEY] && this.s.kiloExaSearchMode !== 'disabled') {
+      this.s.kiloExaSearchMode = 'disabled';
+    }
+
     await this.ctx.storage.put({
       channels: this.s.channels,
       encryptedSecrets: this.s.encryptedSecrets,
       customSecretMeta: this.s.customSecretMeta,
+      kiloExaSearchMode: this.s.kiloExaSearchMode,
     });
 
     return { configured };
@@ -1026,81 +1326,119 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
     }
 
-    const flyConfig = getFlyConfig(this.env, this.s);
+    const isFlyProvider = this.s.provider === 'fly';
+    if (isFlyProvider) {
+      const flyConfig = getFlyConfig(this.env, this.s);
 
-    // If the DO has identity but lost its machine ID, try to recover it
-    // from Fly metadata before creating a duplicate machine.
-    // Skip recovery when the machine was intentionally destroyed for a volume swap
-    // (snapshot restore or reassociation). Both paths set previousVolumeId and clear
-    // flyMachineId in the same persist call, leaving status === 'stopped'. This triple
-    // condition is only true immediately after an intentional destroy — once start()
-    // creates a new machine, flyMachineId is no longer null and this won't match.
-    const machineIntentionallyDestroyed =
-      !this.s.flyMachineId && this.s.previousVolumeId !== null && this.s.status === 'stopped';
-    if (!this.s.flyMachineId && !machineIntentionallyDestroyed) {
-      const recovered = await attemptMetadataRecovery(
-        flyConfig,
-        this.ctx,
-        this.s,
-        createReconcileContext(this.s, this.env, 'start_recovery'),
-        options?.skipCooldown
-      );
-      if (!recovered && !this.s.flyMachineId) {
-        throw new Error(
-          'Metadata recovery failed; aborting start to avoid creating a duplicate machine'
+      // If the DO has identity but lost its machine ID, try to recover it
+      // from Fly metadata before creating a duplicate machine.
+      // Skip recovery when the machine was intentionally destroyed for a volume swap
+      // (snapshot restore or reassociation). Both paths set previousVolumeId and clear
+      // flyMachineId in the same persist call, leaving status === 'stopped'. This triple
+      // condition is only true immediately after an intentional destroy — once start()
+      // creates a new machine, flyMachineId is no longer null and this won't match.
+      const machineIntentionallyDestroyed =
+        !this.s.flyMachineId && this.s.previousVolumeId !== null && this.s.status === 'stopped';
+      if (!this.s.flyMachineId && !machineIntentionallyDestroyed) {
+        const recovered = await attemptMetadataRecovery(
+          flyConfig,
+          this.ctx,
+          this.s,
+          createReconcileContext(this.s, this.env, 'start_recovery'),
+          options?.skipCooldown
         );
-      }
-    }
-
-    await flyMachines.ensureVolume(flyConfig, this.ctx, this.s, this.env, 'start');
-
-    // Verify volume region matches cached flyRegion
-    if (this.s.flyVolumeId) {
-      try {
-        const volume = await fly.getVolume(flyConfig, this.s.flyVolumeId);
-        if (volume.region !== this.s.flyRegion) {
-          doWarn(this.s, 'flyRegion drift detected', {
-            cachedRegion: this.s.flyRegion,
-            actualRegion: volume.region,
-          });
-          this.s.flyRegion = volume.region;
-          await this.persist({ flyRegion: volume.region });
-        }
-      } catch (err) {
-        if (fly.isFlyNotFound(err)) {
-          doWarn(this.s, 'Volume not found during region check, clearing');
-          this.s.flyVolumeId = null;
-          this.s.flyRegion = null;
-          await this.persist({ flyVolumeId: null, flyRegion: null });
-          await flyMachines.ensureVolume(flyConfig, this.ctx, this.s, this.env, 'start');
-        }
-      }
-    }
-
-    // If running, verify machine is actually alive
-    if (this.s.status === 'running' && this.s.flyMachineId) {
-      try {
-        const machine = await fly.getMachine(flyConfig, this.s.flyMachineId);
-        if (machine.state === 'started') {
-          await reconcileMachineMount(
-            flyConfig,
-            this.ctx,
-            this.s,
-            machine,
-            createReconcileContext(this.s, this.env, 'start')
+        if (!recovered && !this.s.flyMachineId) {
+          throw new Error(
+            'Metadata recovery failed; aborting start to avoid creating a duplicate machine'
           );
-          console.log('[DO] Machine already running, mount verified');
-          await this.scheduleAlarm();
-          return { started: false };
         }
-        console.log('[DO] Status is running but machine state is:', machine.state, '-- restarting');
-      } catch (err) {
-        console.log('[DO] Failed to get machine state, will recreate:', err);
       }
+
+      await this.persistProviderResult(
+        await this.provider().ensureStorage({
+          env: this.env,
+          state: this.s,
+          reason: 'start',
+        })
+      );
+
+      // Verify volume region matches cached flyRegion
+      let flyState = getFlyProviderState(this.s);
+      if (flyState.volumeId) {
+        try {
+          const volume = await fly.getVolume(flyConfig, flyState.volumeId);
+          if (volume.region !== flyState.region) {
+            doWarn(this.s, 'flyRegion drift detected', {
+              cachedRegion: flyState.region,
+              actualRegion: volume.region,
+            });
+            flyState = {
+              ...flyState,
+              region: volume.region,
+            };
+            await this.persistProviderResult({ providerState: flyState });
+          }
+        } catch (err) {
+          if (fly.isFlyNotFound(err)) {
+            doWarn(this.s, 'Volume not found during region check, clearing');
+            await this.persistProviderResult({
+              providerState: {
+                ...flyState,
+                volumeId: null,
+                region: null,
+              },
+            });
+            await this.persistProviderResult(
+              await this.provider().ensureStorage({
+                env: this.env,
+                state: this.s,
+                reason: 'start',
+              })
+            );
+          }
+        }
+      }
+
+      // If running, verify machine is actually alive
+      if (this.s.status === 'running' && this.s.flyMachineId) {
+        try {
+          const machine = await fly.getMachine(flyConfig, this.s.flyMachineId);
+          if (machine.state === 'started') {
+            await reconcileMachineMount(
+              flyConfig,
+              this.ctx,
+              this.s,
+              machine,
+              createReconcileContext(this.s, this.env, 'start')
+            );
+            console.log('[DO] Machine already running, mount verified');
+            await this.scheduleAlarm();
+            return { started: false };
+          }
+          console.log(
+            '[DO] Status is running but machine state is:',
+            machine.state,
+            '-- restarting'
+          );
+        } catch (err) {
+          console.log('[DO] Failed to get machine state, will recreate:', err);
+        }
+      }
+    } else {
+      await this.persistProviderResult(
+        await this.provider().ensureStorage({
+          env: this.env,
+          state: this.s,
+          reason: 'start',
+        })
+      );
     }
 
-    const { envVars, minSecretsVersion } = await buildUserEnvVars(this.env, this.ctx, this.s);
-    const guest = guestFromSize(this.s.machineSize);
+    const { envVars, bootstrapEnv, minSecretsVersion } = await buildUserEnvVars(
+      this.env,
+      this.ctx,
+      this.s
+    );
     const imageTag = resolveImageTag(this.s, this.env);
     console.log(
       '[DO] startGateway: deploying with imageTag:',
@@ -1118,86 +1456,46 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       imageVariant: this.s.imageVariant,
       devCreator: this.env.WORKER_ENV === 'development' ? (this.env.DEV_CREATOR ?? null) : null,
     };
-    const machineConfig = buildMachineConfig(
-      getRegistryApp(this.env),
-      imageTag,
+    const runtimeSpec = buildRuntimeSpec(
+      resolveRuntimeImageRef(this.s, this.env),
       envVars,
-      guest,
-      this.s.flyVolumeId,
+      bootstrapEnv,
+      this.s.machineSize,
       identity
     );
 
-    try {
-      if (this.s.flyMachineId) {
-        await flyMachines.startExistingMachine(
-          flyConfig,
-          this.ctx,
-          this.s,
-          machineConfig,
-          minSecretsVersion,
-          this.env.FLY_REGION
-        );
-      } else {
-        await flyMachines.createNewMachine(
-          flyConfig,
-          this.ctx,
-          this.s,
-          machineConfig,
-          minSecretsVersion,
-          this.env.FLY_REGION
-        );
+    const startResult = await this.provider().startRuntime({
+      env: this.env,
+      state: this.s,
+      runtimeSpec,
+      minSecretsVersion,
+      preferredRegion: this.env.FLY_REGION,
+      onProviderResult: result => this.persistProviderResult(result),
+      onCapacityRecovery: async err => {
+        const code = err instanceof fly.FlyApiError ? err.status : 0;
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        this.emitStartCapacityRecovery(errorMessage, this.capacityRecoveryLabel(err));
+        doError(this.s, 'Insufficient resources, replacing stranded volume', {
+          statusCode: code,
+          region: this.s.flyRegion ?? 'unknown',
+        });
+
+        if (code === 403 && this.s.flyRegion) {
+          await regionHelpers.evictCapacityRegionFromKV(
+            this.env.KV_CLAW_CACHE,
+            this.env,
+            this.s.flyRegion
+          );
+        }
+      },
+    });
+    await this.persistProviderResult(startResult);
+
+    if (getRuntimeId(this.s)) {
+      const healthy = await gateway.waitForHealthy(this.s, this.env);
+      if (!healthy) {
+        console.warn('[DO] start: gateway health probe timed out, proceeding with running status');
       }
-    } catch (err) {
-      if (!fly.isFlyInsufficientResources(err)) throw err;
-
-      const code = err instanceof fly.FlyApiError ? err.status : 0;
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      this.emitStartCapacityRecovery(errorMessage, this.capacityRecoveryLabel(err));
-      doError(this.s, 'Insufficient resources, replacing stranded volume', {
-        statusCode: code,
-        region: this.s.flyRegion ?? 'unknown',
-      });
-
-      // Evict the current region from KV so future provisions avoid it.
-      // Only on 403 (org quota exceeded) — 409 (host memory) is transient.
-      // createVolumeWithFallback already evicts on volume-creation failures,
-      // but machine-creation 403s bypass that path.
-      if (code === 403 && this.s.flyRegion) {
-        await regionHelpers.evictCapacityRegionFromKV(
-          this.env.KV_CLAW_CACHE,
-          this.env,
-          this.s.flyRegion
-        );
-      }
-
-      await flyMachines.replaceStrandedVolume(
-        flyConfig,
-        this.ctx,
-        this.s,
-        this.env,
-        `start_${code}_recovery`
-      );
-
-      const retryConfig = buildMachineConfig(
-        getRegistryApp(this.env),
-        imageTag,
-        envVars,
-        guest,
-        this.s.flyVolumeId,
-        identity
-      );
-      await flyMachines.createNewMachine(
-        flyConfig,
-        this.ctx,
-        this.s,
-        retryConfig,
-        minSecretsVersion,
-        this.env.FLY_REGION
-      );
-    }
-
-    if (this.s.flyMachineId) {
-      await gateway.waitForHealthy(this.s, this.env, flyConfig.appName, this.s.flyMachineId);
     }
 
     // Re-check status directly from storage: if the instance was destroyed while
@@ -1240,7 +1538,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Non-blocking start: immediately persists status='starting', schedules a fast
    * alarm, then fires start() in the background via waitUntil.
    * Used by provision() so the RPC call returns quickly instead of waiting for
-   * the full Fly startup sequence (which can take up to ~60 s).
+   * the full runtime startup sequence.
    */
   async startAsync(userId?: string): Promise<void> {
     await this.loadState();
@@ -1272,28 +1570,60 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         // Read from storage rather than this.s — waitUntil runs after the
         // originating request context completes and other handlers may have
         // mutated in-memory state in the interim.
-        const storedMachineId = await this.ctx.storage.get('flyMachineId');
-        const currentStatus = await this.ctx.storage.get('status');
-        if (!storedMachineId && currentStatus !== 'destroying') {
+        const storedEntries = await this.ctx.storage.get([
+          'providerState',
+          'flyMachineId',
+          'status',
+        ]);
+        const rawProviderState = storedEntries.get('providerState');
+        const parsedProviderState = ProviderStateSchema.safeParse(rawProviderState);
+        const storedProviderState: ProviderState | null = parsedProviderState.success
+          ? parsedProviderState.data
+          : null;
+        const storedFlyMachineId = storedEntries.get('flyMachineId');
+        const storedFlyMachineIdValue =
+          typeof storedFlyMachineId === 'string' ? storedFlyMachineId : null;
+        const currentStatus = storedEntries.get('status');
+        const storedRuntimeId = getRuntimeId({
+          providerState: storedProviderState,
+          flyMachineId: storedFlyMachineIdValue,
+        });
+        const storedProviderId =
+          storedProviderState?.provider ?? (storedFlyMachineIdValue ? 'fly' : null);
+        let providerStillOwnsRunningRuntime = false;
+        if (currentStatus !== 'destroying' && storedProviderId === 'fly') {
+          providerStillOwnsRunningRuntime = Boolean(storedRuntimeId || storedFlyMachineIdValue);
+        } else if (storedProviderState && currentStatus !== 'destroying') {
+          try {
+            const inspected = await getProviderAdapter(this.env, {
+              provider: storedProviderState.provider,
+            }).inspectRuntime({
+              env: this.env,
+              state: {
+                ...this.s,
+                provider: storedProviderState.provider,
+                providerState: storedProviderState,
+                flyMachineId: storedFlyMachineIdValue,
+              },
+            });
+            providerStillOwnsRunningRuntime =
+              inspected.observation?.runtimeState === 'running' ||
+              inspected.observation?.runtimeState === 'starting';
+          } catch (inspectErr) {
+            doWarn(this.s, 'startAsync: failed to inspect runtime after start failure', {
+              error: toLoggable(inspectErr),
+            });
+          }
+        }
+
+        if (!providerStillOwnsRunningRuntime && currentStatus !== 'destroying') {
           // start() threw before persisting a machine ID. Reconcile cannot
           // distinguish this from "still in progress", so write the terminal
           // state explicitly to avoid the 5-min stuck window.
           // Skip if destroy() has taken ownership — writing 'stopped' would
           // clobber the 'destroying' state and strand cleanup.
-          const now = Date.now();
           const errorMessage = err instanceof Error ? err.message : String(err);
-          this.s.status = 'stopped';
-          this.s.startingAt = null;
-          this.s.lastStoppedAt = now;
-          this.s.lastStartErrorMessage = errorMessage;
-          this.s.lastStartErrorAt = now;
-          await this.persist({
-            status: 'stopped',
-            startingAt: null,
-            lastStoppedAt: now,
-            lastStartErrorMessage: errorMessage,
-            lastStartErrorAt: now,
-          });
+          await this.markStartFailedFromProvider(errorMessage);
           this.emitProvisioningFailed('no_machine_created', errorMessage);
         }
         // If storedMachineId exists the machine was created — reconcileStarting
@@ -1324,11 +1654,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
 
-    if (this.s.flyMachineId) {
-      const flyConfig = getFlyConfig(this.env, this.s);
+    if (getRuntimeId(this.s)) {
       try {
-        await fly.stopMachineAndWait(flyConfig, this.s.flyMachineId);
+        await this.persistProviderResult(
+          await this.provider().stopRuntime({
+            env: this.env,
+            state: this.s,
+          })
+        );
       } catch (err) {
+        // Non-Fly adapters own provider-specific "already gone" handling; this
+        // guard is for Fly APIs that can surface a machine 404 during stop.
         if (!fly.isFlyNotFound(err)) {
           throw err;
         }
@@ -1366,9 +1702,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
+    const runtimeId = getRuntimeId(this.s);
+    const storageId = getStorageId(this.s);
 
-    this.s.pendingDestroyMachineId = this.s.flyMachineId;
-    this.s.pendingDestroyVolumeId = this.s.flyVolumeId;
+    this.s.pendingDestroyMachineId = runtimeId;
+    this.s.pendingDestroyVolumeId = storageId;
     this.s.status = 'destroying';
 
     await this.persist({
@@ -1399,10 +1737,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
-    const flyConfig = getFlyConfig(this.env, this.s);
     const destroyRctx = createReconcileContext(this.s, this.env, 'destroy');
-    await tryDeleteMachine(flyConfig, this.ctx, this.s, destroyRctx);
-    await tryDeleteVolume(flyConfig, this.ctx, this.s, destroyRctx);
+    if (this.s.provider === 'fly') {
+      const flyConfig = getFlyConfig(this.env, this.s);
+      await tryDeleteMachine(flyConfig, this.ctx, this.s, destroyRctx);
+      await tryDeleteVolume(flyConfig, this.ctx, this.s, destroyRctx);
+    } else {
+      await this.retryNonFlyDestroy();
+    }
 
     // Capture identity before finalization wipes state
     const preDestroyUserId = this.s.userId;
@@ -1440,22 +1782,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
               instanceId: registryInstanceId,
             });
           } else {
-            // Legacy: find active entry by doKey=userId
+            const legacyDoKeys = legacyDoKeysForIdentity(preDestroyUserId, preDestroySandboxId);
             const entries = await registryStub.listInstances(registryKey);
-            const legacyEntry = entries.find(e => e.doKey === preDestroyUserId);
+            const legacyEntry = entries.find(e => legacyDoKeys.includes(e.doKey));
             if (legacyEntry) {
               await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
               console.log('[DO] Registry entry destroyed on finalization (legacy):', {
                 registryKey,
                 instanceId: legacyEntry.instanceId,
-                doKey: preDestroyUserId,
+                doKeysTried: legacyDoKeys,
+                matchedDoKey: legacyEntry.doKey,
               });
             } else {
               console.log(
                 '[DO] Registry cleanup: no active entry found (already cleaned or never existed):',
                 {
                   registryKey,
-                  doKey: preDestroyUserId,
+                  doKeysTried: legacyDoKeys,
                   activeEntryCount: entries.length,
                 }
               );
@@ -1486,6 +1829,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     userId: string | null;
     sandboxId: string | null;
     orgId: string | null;
+    provider: ProviderId;
+    runtimeId: string | null;
+    storageId: string | null;
+    region: string | null;
     status: InstanceStatus | null;
     provisionedAt: number | null;
     lastStartedAt: number | null;
@@ -1515,6 +1862,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     if (
       this.s.status === 'running' &&
+      this.s.provider === 'fly' &&
       this.s.flyMachineId &&
       (this.s.lastLiveCheckAt === null ||
         Date.now() - this.s.lastLiveCheckAt >= LIVE_CHECK_THROTTLE_MS)
@@ -1527,6 +1875,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       userId: this.s.userId,
       sandboxId: this.s.sandboxId,
       orgId: this.s.orgId,
+      provider: this.s.provider,
+      runtimeId: getRuntimeId(this.s),
+      storageId: getStorageId(this.s),
+      region: getProviderRegion(this.s),
       status: this.s.status,
       provisionedAt: this.s.provisionedAt,
       lastStartedAt: this.s.lastStartedAt,
@@ -1592,6 +1944,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     userId: string | null;
     sandboxId: string | null;
     orgId: string | null;
+    provider: ProviderId;
+    runtimeId: string | null;
+    storageId: string | null;
+    region: string | null;
     status: InstanceStatus | null;
     provisionedAt: number | null;
     lastStartedAt: number | null;
@@ -1634,8 +1990,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     restoreStartedAt: string | null;
     pendingRestoreVolumeId: string | null;
     instanceReadyEmailSent: boolean;
-    diskUsedBytes: number | null;
-    diskTotalBytes: number | null;
   }> {
     await this.loadState();
     const alarmScheduledAt = await this.ctx.storage.getAlarm();
@@ -1644,6 +1998,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       userId: this.s.userId,
       sandboxId: this.s.sandboxId,
       orgId: this.s.orgId,
+      provider: this.s.provider,
+      runtimeId: getRuntimeId(this.s),
+      storageId: getStorageId(this.s),
+      region: getProviderRegion(this.s),
       status: this.s.status,
       provisionedAt: this.s.provisionedAt,
       lastStartedAt: this.s.lastStartedAt,
@@ -1688,8 +2046,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       restoreStartedAt: this.s.restoreStartedAt,
       pendingRestoreVolumeId: this.s.pendingRestoreVolumeId,
       instanceReadyEmailSent: this.s.instanceReadyEmailSent,
-      diskUsedBytes: this.s.diskUsedBytes,
-      diskTotalBytes: this.s.diskTotalBytes,
     };
   }
 
@@ -1701,6 +2057,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeApiKey: this.s.kilocodeApiKey ?? undefined,
       kilocodeApiKeyExpiresAt: this.s.kilocodeApiKeyExpiresAt ?? undefined,
       kilocodeDefaultModel: this.s.kilocodeDefaultModel ?? undefined,
+      webSearch: this.s.kiloExaSearchMode
+        ? {
+            exaMode: this.s.kiloExaSearchMode,
+          }
+        : undefined,
       channels: this.s.channels ?? undefined,
       machineSize: this.s.machineSize ?? undefined,
       customSecretMeta: this.s.customSecretMeta ?? undefined,
@@ -1727,17 +2088,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     return { shouldNotify: true, userId: this.s.userId };
-  }
-
-  /** Persist disk usage from controller checkin, or clear when the pair is missing/null. */
-  async recordDiskStats(usedBytes: number | null, totalBytes: number | null): Promise<void> {
-    await this.loadState();
-    this.s.diskUsedBytes = usedBytes;
-    this.s.diskTotalBytes = totalBytes;
-    await this.persist({
-      diskUsedBytes: this.s.diskUsedBytes,
-      diskTotalBytes: this.s.diskTotalBytes,
-    });
   }
 
   async listVolumeSnapshots(): Promise<FlyVolumeSnapshot[]> {
@@ -1847,6 +2197,40 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       newVolumeId,
       newRegion: volume.region,
     };
+  }
+
+  // ── Machine resize (admin) ─────────────────────────────────────────
+
+  async resizeMachine(newSize: MachineSize): Promise<{
+    previousSize: MachineSize | null;
+    newSize: MachineSize;
+  }> {
+    await this.loadState();
+
+    if (!this.s.userId) {
+      throw new Error('Instance is not provisioned');
+    }
+    if (this.s.status === 'destroying') {
+      throw new Error('Cannot resize: instance is being destroyed');
+    }
+    if (this.s.status === 'restoring') {
+      throw new Error('Cannot resize: instance is restoring from snapshot');
+    }
+    if (this.s.status === 'recovering') {
+      throw new Error('Cannot resize: instance is recovering from an unexpected stop');
+    }
+
+    const previousSize = this.s.machineSize;
+
+    this.s.machineSize = newSize;
+    await this.persist({ machineSize: newSize });
+
+    console.log(
+      `[admin-machine-resize] userId=${this.s.userId} ` +
+        `previous=${JSON.stringify(previousSize)} new=${JSON.stringify(newSize)}`
+    );
+
+    return { previousSize, newSize };
   }
 
   // ── Snapshot restore (admin) ───────────────────────────────────────
@@ -2134,7 +2518,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }): Promise<{ success: boolean; error?: string }> {
     await this.loadState();
 
-    if (!this.s.flyMachineId) {
+    if (!getRuntimeId(this.s)) {
       return { success: false, error: 'No machine exists' };
     }
 
@@ -2162,6 +2546,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
 
     try {
+      if (this.s.provider !== 'fly' && options?.imageTag) {
+        return {
+          success: false,
+          error: `Provider ${this.s.provider} does not support image tag overrides`,
+        };
+      }
+
       if (options?.imageTag) {
         if (options.imageTag === 'latest') {
           const variant = 'default';
@@ -2186,10 +2577,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         });
       }
 
-      const flyConfig = getFlyConfig(this.env, this.s);
-
       // Backfill machineSize from live machine for legacy instances
-      if (this.s.machineSize === null && this.s.flyMachineId) {
+      if (this.s.provider === 'fly' && this.s.machineSize === null && this.s.flyMachineId) {
+        const flyConfig = getFlyConfig(this.env, this.s);
         const machine = await fly.getMachine(flyConfig, this.s.flyMachineId);
         if (machine.config?.guest) {
           const { cpus, memory_mb, cpu_kind } = machine.config.guest;
@@ -2246,7 +2636,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         return;
       }
 
-      if (!this.s.flyMachineId) {
+      if (!getRuntimeId(this.s)) {
         throw new Error('No machine exists');
       }
 
@@ -2284,10 +2674,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         }
       }
 
-      const flyConfig = getFlyConfig(this.env, this.s);
-
-      const { envVars, minSecretsVersion } = await buildUserEnvVars(this.env, this.ctx, this.s);
-      const guest = guestFromSize(this.s.machineSize);
+      const { envVars, bootstrapEnv, minSecretsVersion } = await buildUserEnvVars(
+        this.env,
+        this.ctx,
+        this.s
+      );
       const imageTag = resolveImageTag(this.s, this.env);
       doLog(this.s, 'restartMachine: deploying update', {
         imageTag,
@@ -2301,48 +2692,32 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         imageVariant: this.s.imageVariant,
         devCreator: this.env.WORKER_ENV === 'development' ? (this.env.DEV_CREATOR ?? null) : null,
       };
-      const machineConfig = buildMachineConfig(
-        getRegistryApp(this.env),
-        imageTag,
+      const runtimeSpec = buildRuntimeSpec(
+        resolveRuntimeImageRef(this.s, this.env),
         envVars,
-        guest,
-        this.s.flyVolumeId,
+        bootstrapEnv,
+        this.s.machineSize,
         identity
       );
 
-      // updateMachine on a running machine triggers a restart with the new
-      // config. On a stopped machine it applies the config without starting,
-      // so we explicitly start afterward.
-      const updated = await fly.updateMachine(flyConfig, this.s.flyMachineId, machineConfig, {
+      const restart = await this.provider().restartRuntime({
+        env: this.env,
+        state: this.s,
+        runtimeSpec,
         minSecretsVersion,
+        onProviderResult: async result => {
+          const currentStatus = await this.ctx.storage.get('status');
+          if (currentStatus !== 'restarting') return;
+          await this.persistProviderResult(result);
+        },
       });
-
-      // Check ownership before writing — destroy() may have cleared storage.
-      const midStatus = await this.ctx.storage.get('status');
-      if (midStatus !== 'restarting') return;
-
-      this.s.restartUpdateSent = true;
-      await this.ctx.storage.put(storageUpdate({ restartUpdateSent: true }));
-
-      // Check if the machine needs an explicit start (e.g. was stopped).
-      const machine = await fly.getMachine(flyConfig, this.s.flyMachineId);
-      if (machine.state === 'stopped' || machine.state === 'created') {
-        doLog(this.s, 'restartMachine: machine not running after update, starting explicitly', {
-          flyState: machine.state,
-        });
-        await fly.startMachine(flyConfig, this.s.flyMachineId);
+      await this.persistProviderResult(restart);
+      const healthy = await gateway.waitForHealthy(this.s, this.env);
+      if (!healthy) {
+        console.warn(
+          '[DO] restartMachine: gateway health probe timed out, proceeding with running status'
+        );
       }
-
-      // Pass the updated instance_id so waitForState waits for the new
-      // version, not a stale pre-update started state.
-      await fly.waitForState(
-        flyConfig,
-        this.s.flyMachineId,
-        'started',
-        STARTUP_TIMEOUT_SECONDS,
-        updated.instance_id
-      );
-      await gateway.waitForHealthy(this.s, this.env, flyConfig.appName, this.s.flyMachineId);
 
       // Final ownership check before persisting success.
       const preSuccessStatus = await this.ctx.storage.get('status');
@@ -2378,7 +2753,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       // ran concurrently, storage may have been wiped — writing here would
       // recreate partial state on a destroyed instance.
       const postStatus = await this.ctx.storage.get('status');
-      if (postStatus === 'restarting') {
+      if (postStatus === 'restarting' && !isExpectedTimeout) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         this.s.lastRestartErrorMessage = errorMessage;
         this.s.lastRestartErrorAt = Date.now();
@@ -2438,6 +2813,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     );
 
     try {
+      if (this.s.provider !== 'fly') {
+        if (this.s.status === 'destroying') {
+          await this.retryNonFlyDestroy();
+          await finalizeDestroyIfComplete(
+            this.ctx,
+            this.s,
+            createReconcileContext(this.s, this.env, 'alarm_destroy'),
+            (userId, sandboxId) =>
+              markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
+          );
+        } else {
+          await this.reconcileNonFlyRuntimeFromAlarm();
+        }
+        if (this.s.status) {
+          await this.scheduleAlarm();
+        }
+        return;
+      }
+
       const flyConfig = getFlyConfig(this.env, this.s);
       const reconcileResult = await reconcileWithFly(
         flyConfig,
@@ -2496,7 +2890,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         return;
       }
     } catch (err) {
-      doError(this.s, 'reconcileWithFly failed', {
+      doError(this.s, 'alarm reconcile failed', {
         error: toLoggable(err),
       });
     }

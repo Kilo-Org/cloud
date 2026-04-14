@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { BeadEventTimeline } from '@/components/gastown/ActivityFeed';
 import { useTerminalBar } from '@/components/gastown/TerminalBarContext';
@@ -19,6 +19,7 @@ import {
   Activity,
   ChevronRight,
   MessageSquare,
+  RotateCcw,
 } from 'lucide-react';
 
 const ROLE_ICONS: Record<string, typeof Bot> = {
@@ -63,6 +64,7 @@ export function AgentPanel({
   close: () => void;
 }) {
   const trpc = useGastownTRPC();
+  const queryClient = useQueryClient();
   const { openAgentTab } = useTerminalBar();
 
   const agentsQuery = useQuery(trpc.gastown.listAgents.queryOptions({ rigId }));
@@ -70,6 +72,14 @@ export function AgentPanel({
     ...trpc.gastown.listBeads.queryOptions({ rigId }),
     refetchInterval: 8_000,
   });
+
+  const resetMutation = useMutation(
+    trpc.gastown.resetAgentDispatchAttempts.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries(trpc.gastown.listAgents.queryOptions({ rigId }));
+      },
+    })
+  );
 
   const agent = (agentsQuery.data ?? []).find(a => a.id === agentId);
   const relatedBeads = (beadsQuery.data ?? []).filter(b => b.assignee_agent_bead_id === agentId);
@@ -146,7 +156,28 @@ export function AgentPanel({
           label="Created"
           value={format(new Date(agent.created_at), 'MMM d, HH:mm')}
         />
-        <MetaCell icon={Zap} label="Dispatch Attempts" value={String(agent.dispatch_attempts)} />
+        {/* Dispatch Attempts with Reset button */}
+        <div className="border-r border-b border-white/[0.04] px-4 py-3 [&:nth-child(2n)]:border-r-0">
+          <div className="flex items-center gap-1 text-[10px] text-white/30">
+            <Zap className="size-3" />
+            Dispatch Attempts
+          </div>
+          <div className="mt-0.5 flex items-center gap-2">
+            <span className="text-sm text-white/75">{agent.dispatch_attempts}</span>
+            {agent.dispatch_attempts > 0 && (
+              <button
+                onClick={() => resetMutation.mutate({ rigId, agentId: agent.id })}
+                disabled={resetMutation.isPending}
+                title="Reset dispatch attempts to 0"
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-300 ring-1 ring-amber-400/30 transition-colors hover:bg-amber-400/10 disabled:opacity-50"
+              >
+                <RotateCcw className="size-2.5" />
+                Reset
+              </button>
+            )}
+            {resetMutation.isError && <span className="text-[10px] text-red-400">Failed</span>}
+          </div>
+        </div>
         <MetaCell
           icon={Activity}
           label="Last Active"

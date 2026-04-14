@@ -3,7 +3,7 @@
 #
 # Most values below are working defaults. The script auto-manages:
 #   NEXTAUTH_SECRET, INTERNAL_API_SECRET  (synced from Vercel)
-#   FLY_API_TOKEN                         (auto-created/refreshed)
+#   FLY_API_TOKEN                         (auto-created once in .env.local)
 #   KILOCODE_API_BASE_URL                 (set from tunnel URL)
 #
 # Values you may need to set manually:
@@ -23,10 +23,19 @@ INTERNAL_API_SECRET=dev-internal-secret
 # Auth (static defaults — these work as-is for local dev)
 # HMAC secret for deriving per-sandbox gateway tokens (machine authentication)
 GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw
+# Default provider for new provisions in local dev. Use "fly" or "docker-local".
+KILOCLAW_DEFAULT_PROVIDER=fly
 # Override WORKER_ENV to "development" for local development.
 # Production default is set in wrangler.jsonc. This selects the development
 # Fly app naming prefix ("dev-") for per-user app creation.
 WORKER_ENV=development
+
+# Docker-local demo provider (wrangler dev only).
+# Expose the Docker socket over loopback first:
+#   socat TCP-LISTEN:23750,bind=127.0.0.1,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock
+DOCKER_LOCAL_API_BASE=http://127.0.0.1:23750
+DOCKER_LOCAL_IMAGE=kiloclaw:local
+DOCKER_LOCAL_PORT_RANGE=45000-45999
 
 # Auto-populated by dev-start from `fly auth whoami`.
 # Tags Fly machines with developer identity for cleanup.
@@ -44,8 +53,9 @@ BACKEND_API_URL=http://localhost:3000
 # KILOCODE_API_BASE_URL=https://<tunnel>.trycloudflare.com/api/gateway/
 
 # Fly.io Machines API
-# Token is auto-created/refreshed by the dev-start script.
-# @exec fly auth token
+# Token is auto-created once in .env.local by `pnpm dev:env` using
+# `fly tokens create org <FLY_ORG_SLUG>`, then synced here.
+# @from FLY_API_TOKEN
 FLY_API_TOKEN=
 # Fly org slug. The dev-start script reads this value for token creation.
 # Use "kilo-dev" for Kilo team members, or "personal" for your own Fly account.

@@ -109,6 +109,61 @@ describe('trimPayload', () => {
       expect(attachment.source.text.start).toBe(0);
       expect(attachment.source.text.end).toBe(100);
     });
+
+    it('strips top-level tool completed attachments and truncates output', () => {
+      const largeOutput = 'x'.repeat(20_000);
+      const data = {
+        event: 'message.part.updated',
+        part: {
+          type: 'tool',
+          state: {
+            status: 'completed',
+            output: largeOutput,
+            attachments: [
+              {
+                type: 'file',
+                url: 'data:image/png;base64,top-level-tool',
+                name: 'screenshot.png',
+                source: {
+                  text: { value: 'large content', start: 0, end: 100 },
+                  type: 'file',
+                  path: '/foo',
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      const result = trimPayload('kilocode', data) as {
+        part: {
+          state: {
+            output: string;
+            attachments: Array<{
+              url: string;
+              name: string;
+              source: {
+                text: { value: string; start: number; end: number };
+                type: string;
+                path: string;
+              };
+            }>;
+          };
+        };
+      };
+
+      const attachment = result.part.state.attachments[0];
+      expect(result.part.state.output).toEqual(
+        largeOutput.slice(0, MAX_TOOL_OUTPUT_LENGTH) + '\n\n[…truncated]'
+      );
+      expect(attachment.url).toBe('');
+      expect(attachment.source.text.value).toBe('');
+      expect(attachment.name).toBe('screenshot.png');
+      expect(attachment.source.type).toBe('file');
+      expect(attachment.source.path).toBe('/foo');
+      expect(attachment.source.text.start).toBe(0);
+      expect(attachment.source.text.end).toBe(100);
+    });
   });
 
   describe('message.part.updated — tool pending', () => {
@@ -241,6 +296,70 @@ describe('trimPayload', () => {
 
       expect(result.properties.part.url).toBe('');
       expect(result.properties.part.name).toBe('image.png');
+    });
+
+    it('strips top-level url and source.text.value', () => {
+      const data = {
+        event: 'message.part.updated',
+        part: {
+          type: 'file',
+          url: 'data:image/png;base64,top-level',
+          name: 'image.png',
+          source: {
+            text: { value: 'top level file content', start: 0, end: 50 },
+            type: 'file',
+            path: '/foo',
+          },
+        },
+      };
+
+      const result = trimPayload('kilocode', data) as {
+        part: {
+          url: string;
+          name: string;
+          source: {
+            text: { value: string; start: number; end: number };
+            type: string;
+            path: string;
+          };
+        };
+      };
+
+      expect(result.part.url).toBe('');
+      expect(result.part.source.text.value).toBe('');
+      expect(result.part.name).toBe('image.png');
+      expect(result.part.source.type).toBe('file');
+      expect(result.part.source.path).toBe('/foo');
+      expect(result.part.source.text.start).toBe(0);
+      expect(result.part.source.text.end).toBe(50);
+    });
+
+    it('strips both top-level and properties file parts', () => {
+      const data = {
+        event: 'message.part.updated',
+        part: {
+          type: 'file',
+          url: 'data:image/png;base64,top-level',
+          source: { text: { value: 'top level file content' } },
+        },
+        properties: {
+          part: {
+            type: 'file',
+            url: 'data:image/png;base64,properties',
+            source: { text: { value: 'properties file content' } },
+          },
+        },
+      };
+
+      const result = trimPayload('kilocode', data) as {
+        part: { url: string; source: { text: { value: string } } };
+        properties: { part: { url: string; source: { text: { value: string } } } };
+      };
+
+      expect(result.part.url).toBe('');
+      expect(result.part.source.text.value).toBe('');
+      expect(result.properties.part.url).toBe('');
+      expect(result.properties.part.source.text.value).toBe('');
     });
   });
 

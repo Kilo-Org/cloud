@@ -14,13 +14,16 @@ import { usePathname } from 'next/navigation';
 type MenuItem = {
   title: string;
   icon: React.ElementType;
-  url: string;
+  url?: string;
+  onClick?: () => void;
+  isActive?: boolean;
+  suffixIcon?: React.ElementType;
   className?: string;
 };
 
 type SidebarMenuListProps = {
   items: MenuItem[];
-  label?: string;
+  label?: string | null;
   allUrls?: string[];
 };
 
@@ -30,38 +33,60 @@ export default function SidebarMenuList({
   allUrls,
 }: SidebarMenuListProps) {
   const pathname = usePathname();
-  const urlsToCheck = allUrls ?? items.map(i => i.url);
+  const urlsToCheck = allUrls ?? items.flatMap(i => (i.url ? [i.url] : []));
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel className="text-muted-foreground font-medium">{label}</SidebarGroupLabel>
+      {label && (
+        <SidebarGroupLabel className="text-muted-foreground font-medium">{label}</SidebarGroupLabel>
+      )}
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map(item => {
-            const matchesPrefix = pathname === item.url || pathname.startsWith(item.url + '/');
+            const itemUrl = item.url;
+            const matchesPrefix = itemUrl
+              ? pathname === itemUrl || pathname.startsWith(itemUrl + '/')
+              : false;
             const hasMoreSpecificMatch =
               matchesPrefix &&
+              itemUrl &&
               urlsToCheck.some(
                 url =>
-                  url !== item.url &&
-                  url.length > item.url.length &&
+                  url !== itemUrl &&
+                  url.length > itemUrl.length &&
                   (pathname === url || pathname.startsWith(url + '/'))
               );
-            const isActive = matchesPrefix && !hasMoreSpecificMatch;
+            const isActive = item.isActive ?? (matchesPrefix && !hasMoreSpecificMatch);
+            const content = (
+              <>
+                <item.icon className="h-4 w-4" />
+                <span>{item.title}</span>
+                {item.suffixIcon && <item.suffixIcon className="ml-auto h-4 w-4" />}
+              </>
+            );
+
             return (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild>
-                  <Link
-                    href={item.url}
-                    prefetch={false}
-                    className={`flex items-center gap-3 transition-colors ${
-                      isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''
-                    } ${item.className || ''}`}
+                {item.url ? (
+                  <SidebarMenuButton asChild isActive={isActive}>
+                    <Link
+                      href={item.url}
+                      prefetch={false}
+                      className={`flex items-center gap-3 transition-colors ${item.className || ''}`}
+                    >
+                      {content}
+                    </Link>
+                  </SidebarMenuButton>
+                ) : (
+                  <SidebarMenuButton
+                    type="button"
+                    onClick={item.onClick}
+                    isActive={isActive}
+                    className={`flex cursor-pointer items-center gap-3 transition-colors ${item.className || ''}`}
                   >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
+                    {content}
+                  </SidebarMenuButton>
+                )}
               </SidebarMenuItem>
             );
           })}

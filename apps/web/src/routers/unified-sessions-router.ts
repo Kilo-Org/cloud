@@ -24,6 +24,8 @@ type UnifiedSession = {
   last_model: string | null;
   git_branch: string | null;
   parent_session_id: string | null;
+  status: string | null;
+  status_updated_at: string | null;
   source: 'v1' | 'v2';
 };
 
@@ -160,6 +162,8 @@ function v1Columns(): SQL {
     ${cliSessions.last_model} AS last_model,
     NULL AS git_branch,
     ${cliSessions.parent_session_id}::text AS parent_session_id,
+    NULL AS status,
+    NULL AS status_updated_at,
     'v1' AS source`;
 }
 
@@ -179,6 +183,8 @@ function v2Columns(): SQL {
     NULL AS last_model,
     ${cli_sessions_v2.git_branch} AS git_branch,
     ${cli_sessions_v2.parent_session_id} AS parent_session_id,
+    ${cli_sessions_v2.status} AS status,
+    ${cli_sessions_v2.status_updated_at} AS status_updated_at,
     'v2' AS source`;
 }
 

@@ -1,17 +1,21 @@
 import { MessageSquare } from 'lucide-react-native';
 import { ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useLocalSearchParams } from 'expo-router';
 
 import { EmptyState } from '@/components/empty-state';
 import { SettingsCard } from '@/components/kiloclaw/settings-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useKiloClawChannelCatalog, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { useKiloClawChannelCatalog, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
 
 export default function ChannelsScreen() {
-  const catalogQuery = useKiloClawChannelCatalog();
-  const mutations = useKiloClawMutations();
+  const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
+  const { organizationId } = useInstanceContext(instanceId);
+  const catalogQuery = useKiloClawChannelCatalog(organizationId);
+  const mutations = useKiloClawMutations(organizationId);
 
   const isLoading = catalogQuery.isPending;
 

@@ -2,14 +2,6 @@ import { addCacheBreakpoints } from '@/lib/providers/openrouter/request-helpers'
 import type { GatewayRequest } from '@/lib/providers/openrouter/types';
 import { normalizeToolCallIds } from '@/lib/tool-calling';
 
-export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
-
-export const CLAUDE_SONNET_CURRENT_MODEL_NAME = 'Claude Sonnet 4.6';
-
-export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.6';
-
-export const CLAUDE_OPUS_CURRENT_MODEL_NAME = 'Claude Opus 4.6';
-
 export function isAnthropicModel(requestedModel: string) {
   return requestedModel.startsWith('anthropic/');
 }

@@ -166,7 +166,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
 
   const openCancelDialog = (subscriptionId: string, status: string) => {
     setCancelSubscriptionId(subscriptionId);
-    setCancelMode(status === 'past_due' ? 'immediate' : 'period_end');
+    setCancelMode(status === 'past_due' || status === 'trialing' ? 'immediate' : 'period_end');
     setCancelDialogOpen(true);
   };
 
@@ -217,16 +217,14 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                   : `${subscriptions.length} subscription${subscriptions.length !== 1 ? 's' : ''}`}
               </CardDescription>
             </div>
-            <div className="flex items-center gap-3">
-              {data?.activeInstanceId && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={`/admin/kiloclaw/${data.activeInstanceId}`}>
-                    <ExternalLink className="mr-1 h-3 w-3" />
-                    View Instance
-                  </Link>
-                </Button>
-              )}
-            </div>
+            {data?.activeInstanceId && !subscriptions.some(s => s.instance) && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/admin/kiloclaw/${data.activeInstanceId}`}>
+                  <ExternalLink className="mr-1 h-3 w-3" />
+                  View Instance
+                </Link>
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -299,6 +297,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                   !sub.cancel_at_period_end;
                 const canImmediateCancel =
                   (sub.status === 'active' || sub.status === 'past_due') && sub.plan !== 'trial';
+                const canCancelTrial = sub.status === 'trialing';
 
                 return (
                   <div
@@ -333,7 +332,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                           <Button variant="outline" size="sm" asChild>
                             <Link href={`/admin/kiloclaw/${sub.instance.id}`}>
                               <ExternalLink className="mr-1 h-3 w-3" />
-                              {sub.instance.name ?? 'Instance'}
+                              View Instance
                             </Link>
                           </Button>
                         )}
@@ -364,6 +363,16 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                             onClick={() => openCancelDialog(sub.id, sub.status)}
                           >
                             Cancel Immediately
+                          </Button>
+                        )}
+                        {canCancelTrial && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-red-500/30 text-red-400 hover:bg-red-950/30"
+                            onClick={() => openCancelDialog(sub.id, sub.status)}
+                          >
+                            Cancel Trial
                           </Button>
                         )}
                       </div>
@@ -464,17 +473,27 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancel KiloClaw Subscription</DialogTitle>
+            <DialogTitle>
+              {cancelingSubscription?.status === 'trialing'
+                ? 'Cancel KiloClaw Trial'
+                : 'Cancel KiloClaw Subscription'}
+            </DialogTitle>
             <DialogDescription>
-              This will cancel the subscription for this user. No refund will be issued.
-              {cancelingSubscription?.stripe_subscription_id
-                ? ' This is a Stripe-funded subscription — Stripe will be updated.'
-                : ' This is a credit-funded subscription — only the local database will be updated.'}
+              {cancelingSubscription?.status === 'trialing'
+                ? 'This will immediately cancel the trial for this user. The trial end date will be set to now and access will be revoked.'
+                : cancelingSubscription?.stripe_subscription_id
+                  ? 'This will cancel the subscription for this user. No refund will be issued. This is a Stripe-funded subscription — Stripe will be updated.'
+                  : 'This will cancel the subscription for this user. No refund will be issued. This is a credit-funded subscription — only the local database will be updated.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-4">
             <Label>Cancellation timing</Label>
-            {cancelingSubscription?.status === 'past_due' ? (
+            {cancelingSubscription?.status === 'trialing' ? (
+              <p className="text-muted-foreground text-xs">
+                Trial subscriptions can only be canceled immediately. Access ends now. The lifecycle
+                will suspend/stop the instance on its next run.
+              </p>
+            ) : cancelingSubscription?.status === 'past_due' ? (
               <p className="text-muted-foreground text-xs">
                 Past-due subscriptions can only be canceled immediately. No refund. Local access
                 ends now. The lifecycle will suspend/stop the instance on its next run.
@@ -514,9 +533,11 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
             >
               {cancelSubscription.isPending
                 ? 'Canceling...'
-                : cancelMode === 'immediate'
-                  ? 'Cancel Immediately'
-                  : 'Cancel at Period End'}
+                : cancelingSubscription?.status === 'trialing'
+                  ? 'Cancel Trial'
+                  : cancelMode === 'immediate'
+                    ? 'Cancel Immediately'
+                    : 'Cancel at Period End'}
             </Button>
           </DialogFooter>
         </DialogContent>

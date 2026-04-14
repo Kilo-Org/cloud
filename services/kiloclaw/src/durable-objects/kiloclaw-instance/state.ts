@@ -1,4 +1,10 @@
-import { PersistedStateSchema, type PersistedState } from '../../schemas/instance-config';
+import {
+  PersistedStateSchema,
+  type PersistedState,
+  type ProviderState,
+  type FlyProviderState,
+  type DockerLocalProviderState,
+} from '../../schemas/instance-config';
 import type { InstanceMutableState } from './types';
 
 /**
@@ -12,6 +18,187 @@ export const STORAGE_KEYS = Object.keys(PersistedStateSchema.shape);
  */
 export function storageUpdate(update: Partial<PersistedState>): Partial<PersistedState> {
   return update;
+}
+
+export function buildFlyProviderState(
+  source: Pick<InstanceMutableState, 'flyAppName' | 'flyMachineId' | 'flyVolumeId' | 'flyRegion'>
+): FlyProviderState {
+  return {
+    provider: 'fly',
+    appName: source.flyAppName,
+    machineId: source.flyMachineId,
+    volumeId: source.flyVolumeId,
+    region: source.flyRegion,
+  };
+}
+
+export function getFlyProviderState(
+  source: Pick<
+    InstanceMutableState,
+    'providerState' | 'flyAppName' | 'flyMachineId' | 'flyVolumeId' | 'flyRegion'
+  >
+): FlyProviderState {
+  if (
+    source.providerState?.provider === 'fly' &&
+    source.providerState.appName === source.flyAppName &&
+    source.providerState.machineId === source.flyMachineId &&
+    source.providerState.volumeId === source.flyVolumeId &&
+    source.providerState.region === source.flyRegion
+  ) {
+    return source.providerState;
+  }
+  return buildFlyProviderState(source);
+}
+
+export function hydrateFlyLegacyFieldsFromProviderState(
+  s: Pick<
+    InstanceMutableState,
+    'flyAppName' | 'flyMachineId' | 'flyVolumeId' | 'flyRegion' | 'providerState'
+  >
+): void {
+  if (s.providerState?.provider !== 'fly') return;
+  s.flyAppName = s.providerState.appName;
+  s.flyMachineId = s.providerState.machineId;
+  s.flyVolumeId = s.providerState.volumeId;
+  s.flyRegion = s.providerState.region;
+}
+
+export function applyProviderState(
+  s: Pick<
+    InstanceMutableState,
+    'provider' | 'providerState' | 'flyAppName' | 'flyMachineId' | 'flyVolumeId' | 'flyRegion'
+  >,
+  providerState: ProviderState
+): void {
+  s.provider = providerState.provider;
+  s.providerState = providerState;
+
+  if (providerState.provider === 'fly') {
+    hydrateFlyLegacyFieldsFromProviderState(s);
+    return;
+  }
+
+  s.flyAppName = null;
+  s.flyMachineId = null;
+  s.flyVolumeId = null;
+  s.flyRegion = null;
+}
+
+export function getDockerLocalProviderState(
+  source: Pick<InstanceMutableState, 'providerState'>
+): DockerLocalProviderState {
+  if (source.providerState?.provider === 'docker-local') {
+    return source.providerState;
+  }
+  return {
+    provider: 'docker-local',
+    containerName: null,
+    volumeName: null,
+    hostPort: null,
+  };
+}
+
+export function getRuntimeId(
+  source: Pick<InstanceMutableState, 'providerState' | 'flyMachineId'>
+): string | null {
+  if (source.providerState?.provider === 'fly') {
+    return source.providerState.machineId;
+  }
+  if (source.providerState?.provider === 'docker-local') {
+    return source.providerState.containerName;
+  }
+  return source.flyMachineId;
+}
+
+export function getStorageId(
+  source: Pick<InstanceMutableState, 'providerState' | 'flyVolumeId'>
+): string | null {
+  if (source.providerState?.provider === 'fly') {
+    return source.providerState.volumeId;
+  }
+  if (source.providerState?.provider === 'docker-local') {
+    return source.providerState.volumeName;
+  }
+  return source.flyVolumeId;
+}
+
+export function getProviderRegion(
+  source: Pick<InstanceMutableState, 'providerState' | 'flyRegion'>
+): string | null {
+  if (source.providerState?.provider === 'fly') {
+    return source.providerState.region;
+  }
+  if (source.providerState?.provider === 'docker-local') {
+    return null;
+  }
+  return source.flyRegion;
+}
+
+export function syncProviderStateForStorage(
+  s: Pick<
+    InstanceMutableState,
+    'provider' | 'providerState' | 'flyAppName' | 'flyMachineId' | 'flyVolumeId' | 'flyRegion'
+  >,
+  patch: Partial<PersistedState>
+): Partial<PersistedState> {
+  // Intentionally mutates `s` as well as returning a storage patch.
+  // Callers must use both effects together: the in-memory state stays aligned
+  // with legacy/provider field mirroring, and the returned patch is what gets
+  // persisted to storage.
+  // Temporary compatibility bridge while legacy Fly fields still exist in the
+  // persisted schema. New provider-aware code should prefer writing
+  // `providerState`; writes to legacy Fly fields should only happen alongside a
+  // follow-up `persist()` call so this helper can mirror them.
+  const nextProvider = patch.provider ?? s.provider;
+  const explicitProviderState = patch.providerState;
+  if (explicitProviderState) {
+    applyProviderState(s, explicitProviderState);
+    if (explicitProviderState.provider === 'fly') {
+      return {
+        ...patch,
+        provider: 'fly',
+        flyAppName: explicitProviderState.appName,
+        flyMachineId: explicitProviderState.machineId,
+        flyVolumeId: explicitProviderState.volumeId,
+        flyRegion: explicitProviderState.region,
+      };
+    }
+    return {
+      ...patch,
+      provider: explicitProviderState.provider,
+      flyAppName: null,
+      flyMachineId: null,
+      flyVolumeId: null,
+      flyRegion: null,
+    };
+  }
+
+  if (nextProvider !== 'fly') return patch;
+
+  const touchesFlyLegacyFields =
+    'flyAppName' in patch ||
+    'flyMachineId' in patch ||
+    'flyVolumeId' in patch ||
+    'flyRegion' in patch ||
+    'provider' in patch;
+
+  if (!touchesFlyLegacyFields) return patch;
+
+  const nextState: ProviderState = {
+    provider: 'fly',
+    appName: 'flyAppName' in patch ? (patch.flyAppName ?? null) : s.flyAppName,
+    machineId: 'flyMachineId' in patch ? (patch.flyMachineId ?? null) : s.flyMachineId,
+    volumeId: 'flyVolumeId' in patch ? (patch.flyVolumeId ?? null) : s.flyVolumeId,
+    region: 'flyRegion' in patch ? (patch.flyRegion ?? null) : s.flyRegion,
+  };
+
+  applyProviderState(s, nextState);
+
+  return {
+    ...patch,
+    provider: 'fly',
+    providerState: nextState,
+  };
 }
 
 /**
@@ -30,12 +217,15 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.userId = d.userId || null;
     s.sandboxId = d.sandboxId || null;
     s.orgId = d.orgId;
+    s.provider = d.provider;
+    s.providerState = d.providerState;
     s.status = d.userId ? d.status : null;
     s.envVars = d.envVars;
     s.encryptedSecrets = d.encryptedSecrets;
     s.kilocodeApiKey = d.kilocodeApiKey;
     s.kilocodeApiKeyExpiresAt = d.kilocodeApiKeyExpiresAt;
     s.kilocodeDefaultModel = d.kilocodeDefaultModel;
+    s.kiloExaSearchMode = d.kiloExaSearchMode;
     s.channels = d.channels;
     s.googleCredentials = d.googleCredentials;
     s.provisionedAt = d.provisionedAt;
@@ -49,6 +239,15 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.flyMachineId = d.flyMachineId;
     s.flyVolumeId = d.flyVolumeId;
     s.flyRegion = d.flyRegion;
+    if (s.provider === 'fly') {
+      if (s.providerState?.provider === 'fly') {
+        hydrateFlyLegacyFieldsFromProviderState(s);
+      } else {
+        s.providerState = buildFlyProviderState(s);
+      }
+    } else if (s.providerState) {
+      applyProviderState(s, s.providerState);
+    }
     s.machineSize = d.machineSize;
     s.healthCheckFailCount = d.healthCheckFailCount;
     s.pendingDestroyMachineId = d.pendingDestroyMachineId;
@@ -90,8 +289,6 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     // Legacy instances pre-dating this field treat absence as already-sent
     // to avoid spurious emails after deploy.
     s.instanceReadyEmailSent = 'instanceReadyEmailSent' in raw ? d.instanceReadyEmailSent : true;
-    s.diskUsedBytes = d.diskUsedBytes;
-    s.diskTotalBytes = d.diskTotalBytes;
     s.customSecretMeta = d.customSecretMeta;
     s.streamChatApiKey = d.streamChatApiKey;
     s.streamChatBotUserId = d.streamChatBotUserId;
@@ -117,12 +314,15 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.userId = null;
   s.sandboxId = null;
   s.orgId = null;
+  s.provider = 'fly';
+  s.providerState = null;
   s.status = null;
   s.envVars = null;
   s.encryptedSecrets = null;
   s.kilocodeApiKey = null;
   s.kilocodeApiKeyExpiresAt = null;
   s.kilocodeDefaultModel = null;
+  s.kiloExaSearchMode = null;
   s.channels = null;
   s.googleCredentials = null;
   s.provisionedAt = null;
@@ -175,8 +375,6 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.preRestoreStatus = null;
   s.pendingRestoreVolumeId = null;
   s.instanceReadyEmailSent = false;
-  s.diskUsedBytes = null;
-  s.diskTotalBytes = null;
   s.streamChatApiKey = null;
   s.streamChatBotUserId = null;
   s.streamChatBotUserToken = null;
@@ -195,12 +393,15 @@ export function createMutableState(): InstanceMutableState {
     userId: null,
     sandboxId: null,
     orgId: null,
+    provider: 'fly',
+    providerState: null,
     status: null,
     envVars: null,
     encryptedSecrets: null,
     kilocodeApiKey: null,
     kilocodeApiKeyExpiresAt: null,
     kilocodeDefaultModel: null,
+    kiloExaSearchMode: null,
     channels: null,
     googleCredentials: null,
     provisionedAt: null,
@@ -253,8 +454,6 @@ export function createMutableState(): InstanceMutableState {
     preRestoreStatus: null,
     pendingRestoreVolumeId: null,
     instanceReadyEmailSent: false,
-    diskUsedBytes: null,
-    diskTotalBytes: null,
     customSecretMeta: null,
     streamChatApiKey: null,
     streamChatBotUserId: null,

@@ -7,7 +7,10 @@ import { toast } from 'sonner-native';
 import { CATALOG_ICONS } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { type useKiloClawMutations, type useKiloClawSecretCatalog } from '@/lib/hooks/use-kiloclaw';
+import {
+  type useKiloClawMutations,
+  type useKiloClawSecretCatalog,
+} from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type CatalogItem = NonNullable<ReturnType<typeof useKiloClawSecretCatalog>['data']>[number];

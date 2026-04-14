@@ -355,6 +355,17 @@ async function ensureSDKServer(
     const port = nextPort++;
     console.log(`${MANAGER_LOG} Starting SDK server on port ${port} for ${workdir}`);
 
+    // Keys that must persist on process.env after the SDK server starts.
+    // KILO_CONFIG_CONTENT / OPENCODE_CONFIG_CONTENT carry the kilo provider
+    // auth config (including organizationId) and must survive the snapshot
+    // restore so extractOrganizationId() and subsequent model hot-swaps can
+    // read them. GASTOWN_ORGANIZATION_ID is the standalone org ID env var.
+    const PERSIST_ENV_KEYS = new Set([
+      'KILO_CONFIG_CONTENT',
+      'OPENCODE_CONFIG_CONTENT',
+      'GASTOWN_ORGANIZATION_ID',
+    ]);
+
     const envSnapshot: Record<string, string | undefined> = {};
     for (const key of Object.keys(env)) {
       envSnapshot[key] = process.env[key];
@@ -378,6 +389,8 @@ async function ensureSDKServer(
     } finally {
       process.chdir(prevCwd);
       for (const [key, prev] of Object.entries(envSnapshot)) {
+        // Never restore keys that must persist — keep the value we set above.
+        if (PERSIST_ENV_KEYS.has(key)) continue;
         if (prev === undefined) {
           delete process.env[key];
         } else {
@@ -814,6 +827,7 @@ export async function startAgent(
     gastownSessionToken: request.envVars?.GASTOWN_SESSION_TOKEN ?? null,
     completionCallbackUrl: request.envVars?.GASTOWN_COMPLETION_CALLBACK_URL ?? null,
     model: request.model ?? null,
+    organizationId: request.organizationId ?? null,
     startupEnv: env,
     startupRequest: request,
     startupAbortController,
@@ -1103,26 +1117,20 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
 }
 
 /**
- * Update the model for a running agent by restarting its SDK server with
- * new KILO_CONFIG_CONTENT. The kilo serve child process reads the model
- * from KILO_CONFIG_CONTENT at startup (highest config precedence after
- * enterprise managed config), so the only reliable way to change it is
- * to restart the server process.
+ * Extract the organizationId from durable agent state or process.env.
  *
- * The agent's session is re-created on the new server. The session history
- * is persisted on disk by kilo serve, so it survives the restart.
- *
- * @param model OpenRouter-style model ID (e.g. "anthropic/claude-sonnet-4.6")
- * @param smallModel Optional small model in the same format
+ * Resolution order (most → least reliable):
+ * 1. Agent's `organizationId` field — set at startup from StartAgentRequest,
+ *    survives process.env restores and model hot-swaps.
+ * 2. GASTOWN_ORGANIZATION_ID env var — set by control-server on /agents/start
+ *    and updated on every PATCH /model via X-Town-Config.
+ * 3. KILO_CONFIG_CONTENT — legacy fallback, may be absent after env restore.
  */
-/**
- * Extract the organizationId from the current KILO_CONFIG_CONTENT env var.
- * The org ID is embedded as `provider.kilo.options.kilocodeOrganizationId`
- * by `buildKiloConfigContent` at agent startup.
- */
-function extractOrganizationId(): string | undefined {
-  // Primary source: standalone env var set by control-server on /agents/start
-  // and updated on every PATCH /model via X-Town-Config.
+function extractOrganizationId(agent?: ManagedAgent): string | undefined {
+  // Primary source: durable field on the agent object
+  if (agent?.organizationId) return agent.organizationId;
+
+  // Secondary: standalone env var
   const envOrgId = process.env.GASTOWN_ORGANIZATION_ID;
   if (envOrgId) return envOrgId;
 
@@ -1181,8 +1189,23 @@ export async function updateAgentModel(
     `${MANAGER_LOG} updateAgentModel: restarting SDK server for agent ${agentId} with model=${model}`
   );
 
-  // 1. Preserve organizationId from the current config before we replace it
-  const organizationId = extractOrganizationId();
+  // 1. Resolve the organizationId, preferring the freshly-updated process.env
+  //    value over the cached agent field. The PATCH /model handler sets
+  //    process.env.GASTOWN_ORGANIZATION_ID before calling updateAgentModel, so
+  //    the env var is always at least as current as agent.organizationId and
+  //    may carry a brand-new org context that hasn't been written to the agent
+  //    record yet.
+  const organizationId =
+    process.env.GASTOWN_ORGANIZATION_ID || agent.organizationId || extractOrganizationId();
+
+  // Keep both the agent's durable field and the startupEnv snapshot in sync
+  // so that (a) future hot-swaps see the new value and (b) syncRegistry()
+  // serialises the updated org context, preventing boot hydration from
+  // reviving agents with the stale org after a container restart.
+  if (organizationId) {
+    agent.organizationId = organizationId;
+    agent.startupEnv = { ...agent.startupEnv, GASTOWN_ORGANIZATION_ID: organizationId };
+  }
 
   // 2. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env
   //    so the next createKilo() spawns kilo serve with fresh config.
@@ -1221,6 +1244,7 @@ export async function updateAgentModel(
     'GASTOWN_GIT_AUTHOR_EMAIL',
     'GASTOWN_DISABLE_AI_COAUTHOR',
     'KILOCODE_TOKEN',
+    'GASTOWN_ORGANIZATION_ID',
   ]);
   const hotSwapEnv: Record<string, string> = {};
   for (const [key, value] of Object.entries(agent.startupEnv)) {
@@ -1231,6 +1255,13 @@ export async function updateAgentModel(
       continue;
     }
     hotSwapEnv[key] = value;
+  }
+  // Inject live values for LIVE_ENV_KEYS that were absent from startupEnv
+  // (e.g. GASTOWN_ORGANIZATION_ID added after initial dispatch).
+  for (const key of LIVE_ENV_KEYS) {
+    if (key in hotSwapEnv) continue;
+    const live = process.env[key];
+    if (live) hotSwapEnv[key] = live;
   }
 
   // Re-derive GH_TOKEN from live values using the same priority chain

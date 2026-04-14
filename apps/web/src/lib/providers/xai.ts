@@ -9,10 +9,12 @@ export const grok_code_fast_1_optimized_free_model: KiloExclusiveModel = {
   context_length: 256_000,
   max_completion_tokens: 10_000,
   status: 'public',
-  flags: ['free', 'reasoning', 'prompt_cache'],
+  flags: ['reasoning'],
   gateway: 'martian',
   internal_id: 'x-ai/grok-code-fast-1:optimized',
   inference_provider: 'stealth',
+  pricing: null,
+  exclusive_to: [],
 };
 
 export function isXaiModel(requestedModel: string) {

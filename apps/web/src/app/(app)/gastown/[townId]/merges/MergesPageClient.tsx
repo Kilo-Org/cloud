@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { GitMerge, AlertCircle, Loader2, Activity, Server } from 'lucide-react';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import {
   Select,
   SelectContent,
@@ -44,8 +45,9 @@ export function MergesPageClient({ townId }: { townId: string }) {
   return (
     <div className="flex h-full flex-col">
       {/* Page header */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-3">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-2">
+          <SidebarTrigger className="-ml-3" />
           <GitMerge className="size-4 text-[color:oklch(95%_0.15_108_/_0.6)]" />
           <h1 className="text-lg font-semibold tracking-tight text-white/90">Merge Queue</h1>
           {totalAttention > 0 && (

@@ -4,10 +4,12 @@ import { PageLayout } from '@/components/PageLayout';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { ClawConfigServiceBannerWithStatus } from '../components/ClawConfigServiceBanner';
 
 export default function EarlybirdPage() {
   return (
     <PageLayout title="">
+      <ClawConfigServiceBannerWithStatus className="mx-auto w-full max-w-[1140px]" />
       <div className="flex justify-center pt-8">
         <Card className="group border-brand-primary/20 relative max-w-2xl overflow-hidden">
           <div className="bg-brand-primary/10 absolute top-0 right-0 h-40 w-40 translate-x-10 -translate-y-10 rounded-full blur-2xl" />

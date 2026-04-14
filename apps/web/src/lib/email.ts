@@ -31,6 +31,7 @@ export const subjects = {
   clawEarlybirdExpiresTomorrow: 'Your KiloClaw Earlybird Access Expires Tomorrow',
   clawInstanceReady: 'Your KiloClaw Instance Is Ready',
   clawCreditRenewalFailed: 'Action Required: KiloClaw Hosting Renewal Failed',
+  clawComplementaryInferenceEnded: 'Your Free AI Inference Period Has Ended',
   accountDeletionRequest: 'Kilo: Account Deletion Request Received',
 } as const;
 

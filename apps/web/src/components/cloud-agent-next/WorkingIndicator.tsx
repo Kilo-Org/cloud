@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { StoredMessage } from './types';
 import { isAssistantMessage } from './types';
 import { computeStatus } from './computeStatus';
-import { StatusSpinner } from './StatusSpinner';
+import { StatusSpinner } from '@/components/shared/StatusSpinner';
 
 type WorkingIndicatorProps = {
   messages: StoredMessage[];

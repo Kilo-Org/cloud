@@ -8,27 +8,7 @@ on:
       worker:
         description: 'Worker folder to deploy (e.g. services/app-builder)'
         required: true
-        type: choice
-        options:
-          - services/cloud-agent
-          - services/cloud-agent-next
-          - services/ai-attribution
-          - services/app-builder
-          - services/auto-fix-infra
-          - services/auto-triage-infra
-          - services/code-review-infra
-          - services/db-proxy
-          - services/deploy-infra/builder
-          - services/deploy-infra/dispatcher
-          - services/git-token-service
-          - services/gmail-push
-          - services/images-mcp
-          - services/kiloclaw-billing
-          - services/o11y
-          - services/security-auto-analysis
-          - services/security-sync
-          - services/session-ingest
-          - services/webhook-agent-ingest
+        type: string
 
 permissions:
   contents: read
@@ -84,38 +64,45 @@ jobs:
       - name: Find changed workers
         id: set-matrix
         run: |
-          # All deployable workers (folders containing wrangler.jsonc).
-          # kiloclaw is excluded — it has a custom Docker-based deploy in deploy-production.yml.
-          # builder-docker-container is excluded — it is a build artifact, not a deployable worker.
+          # Auto-discover all deployable workers (folders containing wrangler.jsonc)
+          # and exclude workers that have their own deploy pipelines.
           #
           # Diff against the SHA before the push so that multi-commit pushes
           # (e.g. a merge commit that squashes several commits) don't miss workers
           # that were only touched in earlier commits of the same push.
           BASE_SHA="${{ github.event.before }}"
-          WORKERS=(
-            services/cloud-agent
-            services/cloud-agent-next
-            services/ai-attribution
-            services/app-builder
-            services/auto-fix-infra
-            services/auto-triage-infra
-            services/code-review-infra
-            services/db-proxy
-            services/deploy-infra/builder
-            services/deploy-infra/dispatcher
-            services/git-token-service
-            services/gmail-push
-            services/images-mcp
-            services/kiloclaw-billing
-            services/o11y
-            services/security-auto-analysis
-            services/security-sync
-            services/session-ingest
-            services/webhook-agent-ingest
+
+          # Workers excluded from this workflow (they have custom deploy pipelines):
+          EXCLUDED=(
+            services/kiloclaw  # Docker-based deploy in deploy-production.yml
+            services/gastown   # Deployed separately
+            services/deploy-infra/builder-docker-container/container-files  # Build artifact template, not a deployable worker
           )
 
-          CHANGED=()
+          # Discover all workers with a wrangler.jsonc
+          WORKERS=()
+          while IFS= read -r cfg; do
+            dir=$(dirname "$cfg")
+            WORKERS+=("$dir")
+          done < <(find services -name "wrangler.jsonc" -not -path "*/node_modules/*" | sort)
+
+          # Filter out excluded workers
+          DEPLOYABLE=()
           for dir in "${WORKERS[@]}"; do
+            skip=false
+            for excluded in "${EXCLUDED[@]}"; do
+              if [[ "$dir" == "$excluded" ]]; then
+                skip=true
+                break
+              fi
+            done
+            if [[ "$skip" == false ]]; then
+              DEPLOYABLE+=("$dir")
+            fi
+          done
+
+          CHANGED=()
+          for dir in "${DEPLOYABLE[@]}"; do
             if git diff --name-only "$BASE_SHA" HEAD -- "$dir/" | grep -q .; then
               CHANGED+=("$dir")
             fi

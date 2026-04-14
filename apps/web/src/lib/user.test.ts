@@ -4,6 +4,7 @@ import {
   payment_methods,
   kilocode_users,
   user_affiliate_attributions,
+  user_affiliate_events,
   user_auth_provider,
   credit_transactions,
   kilo_pass_subscriptions,
@@ -36,6 +37,7 @@ import {
   kiloclaw_cli_runs,
   bot_requests,
   kiloclaw_admin_audit_logs,
+  user_push_tokens,
   security_advisor_scans,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
@@ -57,6 +59,7 @@ describe('User', () => {
   afterEach(async () => {
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
+    await db.delete(user_affiliate_events);
     await db.delete(payment_methods);
     await db.delete(kilo_pass_issuance_items);
     await db.delete(kilo_pass_issuances);
@@ -170,6 +173,59 @@ describe('User', () => {
           .select({ count: count() })
           .from(user_affiliate_attributions)
           .where(eq(user_affiliate_attributions.user_id, user2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete affiliate events for the user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(user_affiliate_events).values([
+        {
+          user_id: user1.id,
+          provider: 'impact',
+          event_type: 'signup',
+          dedupe_key: `affiliate:impact:signup:${user1.id}`,
+          delivery_state: 'queued',
+          payload_json: {
+            trackingId: 'impact-user-1',
+            customerId: user1.id,
+            customerEmailHash: 'hash-1',
+            orderId: 'IR_AN_64_TS',
+            eventDate: new Date().toISOString(),
+          },
+        },
+        {
+          user_id: user2.id,
+          provider: 'impact',
+          event_type: 'signup',
+          dedupe_key: `affiliate:impact:signup:${user2.id}`,
+          delivery_state: 'queued',
+          payload_json: {
+            trackingId: 'impact-user-2',
+            customerId: user2.id,
+            customerEmailHash: 'hash-2',
+            orderId: 'IR_AN_64_TS',
+            eventDate: new Date().toISOString(),
+          },
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(user_affiliate_events)
+          .where(eq(user_affiliate_events.user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(user_affiliate_events)
+          .where(eq(user_affiliate_events.user_id, user2.id))
           .then(r => r[0].count)
       ).toBe(1);
     });
@@ -696,6 +752,23 @@ describe('User', () => {
       expect(feedback).toHaveLength(1);
       expect(feedback[0].kilo_user_id).toBeNull();
       expect(feedback[0].feedback_text).toBe('Cloud agent is great!');
+    });
+
+    it('should delete user_push_tokens', async () => {
+      const user = await insertTestUser();
+      await db.insert(user_push_tokens).values({
+        user_id: user.id,
+        token: 'ExponentPushToken[test-token-123]',
+        platform: 'ios',
+      });
+
+      await softDeleteUser(user.id);
+
+      const tokens = await db
+        .select()
+        .from(user_push_tokens)
+        .where(eq(user_push_tokens.user_id, user.id));
+      expect(tokens).toHaveLength(0);
     });
 
     it('should nullify free_model_usage FK', async () => {

@@ -29,10 +29,13 @@ const SIDEBAR_WIDTH_MOBILE = '18rem';
 const SIDEBAR_WIDTH_ICON = '3rem';
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
 
+type SidebarOpenValue = boolean | ((open: boolean) => boolean);
+
 type SidebarContextProps = {
   state: 'expanded' | 'collapsed';
   open: boolean;
-  setOpen: (open: boolean) => void;
+  setOpen: (open: SidebarOpenValue) => void;
+  setOpenTransient: (open: SidebarOpenValue) => void;
   openMobile: boolean;
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
@@ -70,19 +73,27 @@ function SidebarProvider({
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
-  const setOpen = React.useCallback(
-    (value: boolean | ((value: boolean) => boolean)) => {
+  const setOpenTransient = React.useCallback(
+    (value: SidebarOpenValue) => {
       const openState = typeof value === 'function' ? value(open) : value;
       if (setOpenProp) {
         setOpenProp(openState);
       } else {
         _setOpen(openState);
       }
+    },
+    [setOpenProp, open]
+  );
+
+  const setOpen = React.useCallback(
+    (value: SidebarOpenValue) => {
+      const openState = typeof value === 'function' ? value(open) : value;
+      setOpenTransient(openState);
 
       // This sets the cookie to keep the sidebar state.
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
     },
-    [setOpenProp, open]
+    [open, setOpenTransient]
   );
 
   // Helper to toggle the sidebar.
@@ -112,12 +123,13 @@ function SidebarProvider({
       state,
       open,
       setOpen,
+      setOpenTransient,
       isMobile,
       openMobile,
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, setOpenTransient, isMobile, openMobile, setOpenMobile, toggleSidebar]
   );
 
   return (

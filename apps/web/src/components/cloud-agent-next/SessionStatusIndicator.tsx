@@ -1,6 +1,6 @@
 import { AlertCircle, Check } from 'lucide-react';
 import type { SessionStatusIndicator as SessionStatusIndicatorType } from '@/lib/cloud-agent-sdk';
-import { StatusSpinner } from './StatusSpinner';
+import { StatusSpinner } from '@/components/shared/StatusSpinner';
 
 export function SessionStatusIndicator({ indicator }: { indicator: SessionStatusIndicatorType }) {
   return (

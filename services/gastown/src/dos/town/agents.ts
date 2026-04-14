@@ -574,6 +574,7 @@ export function touchAgent(
             WHEN ${agent_metadata.columns.status} = 'idle' THEN 'working'
             ELSE ${agent_metadata.columns.status}
           END,
+          ${agent_metadata.columns.dispatch_attempts} = 0,
           ${agent_metadata.columns.last_event_type} = COALESCE(?, ${agent_metadata.columns.last_event_type}),
           ${agent_metadata.columns.last_event_at} = COALESCE(?, ${agent_metadata.columns.last_event_at}),
           ${agent_metadata.columns.active_tools} = COALESCE(?, ${agent_metadata.columns.active_tools})

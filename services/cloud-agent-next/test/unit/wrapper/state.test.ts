@@ -87,30 +87,12 @@ describe('WrapperState', () => {
         expect(state.getLastError()).toBeNull();
       });
 
-      it('resets message counter on start', () => {
-        state.startJob(createJobContext({ executionId: 'exc_first' }));
-        state.nextMessageId(); // counter = 1
-        state.nextMessageId(); // counter = 2
-
-        // Clear job and start new one
-        state.clearJob();
-        state.startJob(createJobContext({ executionId: 'exc_second' }));
-
-        // Counter should be reset
-        const messageId = state.nextMessageId();
-        expect(messageId).toBe('msg_second_1');
-      });
-
       it('is idempotent for same executionId', () => {
         const context = createJobContext({ executionId: 'exc_same' });
         state.startJob(context);
-        state.nextMessageId(); // counter = 1
 
-        // Re-start with same executionId should not reset counter
         state.startJob(context);
 
-        // Counter should NOT be reset for idempotent call
-        // (This is the current behavior - idempotent returns early)
         expect(state.currentJob).toEqual(context);
       });
 
@@ -160,17 +142,6 @@ describe('WrapperState', () => {
         expect(state.isActive).toBe(false);
         expect(state.isIdle).toBe(true);
       });
-
-      it('resets message counter', () => {
-        state.startJob(createJobContext({ executionId: 'exc_test' }));
-        state.nextMessageId();
-        state.nextMessageId();
-
-        state.clearJob();
-        state.startJob(createJobContext({ executionId: 'exc_new' }));
-
-        expect(state.nextMessageId()).toBe('msg_new_1');
-      });
     });
   });
 
@@ -209,54 +180,6 @@ describe('WrapperState', () => {
       state.setActive(false);
       state.setActive(false);
       expect(state.isIdle).toBe(true);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Message ID Generation
-  // -------------------------------------------------------------------------
-
-  describe('message ID generation', () => {
-    it('throws when no job context', () => {
-      expect(() => state.nextMessageId()).toThrow(/No job context/);
-    });
-
-    it('generates sequential IDs', () => {
-      state.startJob(createJobContext({ executionId: 'exc_test' }));
-
-      expect(state.nextMessageId()).toBe('msg_test_1');
-      expect(state.nextMessageId()).toBe('msg_test_2');
-      expect(state.nextMessageId()).toBe('msg_test_3');
-    });
-
-    it('strips exec_ prefix', () => {
-      state.startJob(createJobContext({ executionId: 'exec_abc123' }));
-
-      expect(state.nextMessageId()).toBe('msg_abc123_1');
-    });
-
-    it('strips execution_ prefix', () => {
-      state.startJob(createJobContext({ executionId: 'execution_def456' }));
-
-      expect(state.nextMessageId()).toBe('msg_def456_1');
-    });
-
-    it('strips msg_ prefix', () => {
-      state.startJob(createJobContext({ executionId: 'msg_ghi789' }));
-
-      expect(state.nextMessageId()).toBe('msg_ghi789_1');
-    });
-
-    it('strips exc_ prefix', () => {
-      state.startJob(createJobContext({ executionId: 'exc_ghi789' }));
-
-      expect(state.nextMessageId()).toBe('msg_ghi789_1');
-    });
-
-    it('handles executionId without prefix', () => {
-      state.startJob(createJobContext({ executionId: 'custom-id-123' }));
-
-      expect(state.nextMessageId()).toBe('msg_custom-id-123_1');
     });
   });
 

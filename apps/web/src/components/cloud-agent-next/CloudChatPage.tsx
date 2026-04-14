@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { ArrowDown, GitBranch } from 'lucide-react';
 
@@ -24,11 +24,19 @@ import { isMessageStreaming } from './types';
 import { useOrganizationModels } from './hooks/useOrganizationModels';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
+import {
+  CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
+  CLOUD_AGENT_IMAGE_MAX_COUNT,
+  CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX,
+  CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
+  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
+} from '@/lib/cloud-agent/constants';
 
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import type { AgentMode } from './types';
 import type { StoredMessage } from '@/lib/cloud-agent-sdk';
+import type { Images } from '@/lib/images-schema';
 
 // ---------------------------------------------------------------------------
 // Static messages — memoized, never re-renders during streaming
@@ -92,6 +100,12 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
+  const { mutateAsync: personalUploadUrl } = useMutation(
+    trpc.cloudAgentNext.getImageUploadUrl.mutationOptions()
+  );
+  const { mutateAsync: orgUploadUrl } = useMutation(
+    trpc.organizations.cloudAgentNext.getImageUploadUrl.mutationOptions()
+  );
   // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId');
   useEffect(() => {
@@ -120,6 +134,8 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
+
+  const [imageMessageUuid, setImageMessageUuid] = useState(() => crypto.randomUUID());
 
   // -- Organization models --------------------------------------------------
   const { modelOptions, isLoadingModels } = useOrganizationModels(organizationId);
@@ -166,7 +182,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
       });
     });
     return () => cancelAnimationFrame(autoScrollFrameRef.current);
-  }, [dynamicMessages, chatUI.shouldAutoScroll]);
+  }, [staticMessages, dynamicMessages, chatUI.shouldAutoScroll]);
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -202,13 +218,18 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   // -- Handlers -------------------------------------------------------------
   const handleSendMessage = useCallback(
-    (prompt: string) => {
-      void manager.send({
+    async (prompt: string, images?: Images) => {
+      const accepted = await manager.send({
         prompt,
         mode: sessionConfig?.mode ?? 'code',
         model: sessionConfig?.model ?? '',
         variant: sessionConfig?.variant ?? undefined,
+        images,
       });
+      if (accepted) {
+        setImageMessageUuid(crypto.randomUUID());
+      }
+      return accepted;
     },
     [manager, sessionConfig]
   );
@@ -292,6 +313,20 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
         ? 'Wrapping up…'
         : 'Ask anything…';
 
+  const sessionActions = (
+    <ChatHeader
+      cloudAgentSessionId={sessionId ?? 'Starting session…'}
+      kiloSessionId={sessionIdFromParams ?? undefined}
+      organizationId={organizationId}
+      repository={sessionConfig?.repository ?? ''}
+      model={sessionConfig?.model}
+      modelDisplayName={modelDisplayName}
+      totalCost={totalCost}
+      soundEnabled={soundEnabled}
+      onToggleSound={handleToggleSound}
+    />
+  );
+
   // -- Render ---------------------------------------------------------------
   return (
     <QuestionContextProvider
@@ -318,28 +353,17 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
             <>
               {showLoadingIndicator && <div className="bg-primary h-0.5 w-full animate-pulse" />}
 
-              <div className="relative min-h-0 flex-1">
-                {/* Mobile sidebar toggle — floating top-left */}
-                <MobileSidebarToggle />
+              <div className="flex shrink-0 items-center justify-between border-b px-3 py-2 lg:hidden">
+                <MobileSidebarToggle variant="inline" label="Sessions" />
+                {sessionActions}
+              </div>
 
-                {/* Session action buttons — floating top-right */}
-                <div className="absolute right-3 top-2 z-10">
-                  <ChatHeader
-                    cloudAgentSessionId={sessionId ?? 'Starting session…'}
-                    kiloSessionId={sessionIdFromParams ?? undefined}
-                    organizationId={organizationId}
-                    repository={sessionConfig?.repository ?? ''}
-                    model={sessionConfig?.model}
-                    modelDisplayName={modelDisplayName}
-                    totalCost={totalCost}
-                    soundEnabled={soundEnabled}
-                    onToggleSound={handleToggleSound}
-                  />
-                </div>
+              <div className="relative min-h-0 flex-1">
+                <div className="absolute right-3 top-2 z-10 hidden lg:block">{sessionActions}</div>
 
                 <div
                   ref={scrollContainerRef}
-                  className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-12 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                  className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 lg:pt-12 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                   onScroll={handleScroll}
                 >
                   <StaticMessages messages={staticMessages} getChildMessages={getChildMessages} />
@@ -409,6 +433,19 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                       availableVariants={availableVariants}
                       showToolbar={Boolean(sessionIdFromParams)}
                       initialValue={failedPrompt ?? undefined}
+                      imageUploadOptions={{
+                        messageUuid: imageMessageUuid,
+                        organizationId,
+                        maxImages: CLOUD_AGENT_IMAGE_MAX_COUNT,
+                        maxOriginalFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
+                        maxFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
+                        allowedTypes: CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
+                        resizeImages: { maxDimensionPx: CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX },
+                        getUploadUrl: {
+                          personal: personalUploadUrl,
+                          organization: orgUploadUrl,
+                        },
+                      }}
                     />
                     {sessionConfig?.repository && (
                       <div className="text-muted-foreground flex items-center gap-1.5 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">

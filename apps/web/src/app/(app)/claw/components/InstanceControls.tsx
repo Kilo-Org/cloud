@@ -33,10 +33,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
+import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { RunDoctorDialog } from './RunDoctorDialog';
 import { StartKiloCliRunDialog } from './StartKiloCliRunDialog';
 import { AnimatedDots } from './AnimatedDots';
+import { OpenClawButton } from './OpenClawButton';
 
 const VOLUME_SIZE_GB = 10;
 // Default machine spec fallback (matches kiloclaw DEFAULT_MACHINE_GUEST)
@@ -55,14 +57,17 @@ export function InstanceControls({
   onRedeploySuccess,
   upgradeRequested,
   onUpgradeHandled,
+  gatewayReady,
 }: {
   status: KiloClawDashboardStatus;
   mutations: ClawMutations;
   onRedeploySuccess?: () => void;
   upgradeRequested?: boolean;
   onUpgradeHandled?: () => void;
+  gatewayReady?: boolean;
 }) {
   const posthog = usePostHog();
+  const gatewayUrl = useGatewayUrl(status);
   const isRunning = status.status === 'running';
   const isProvisioned = status.status === 'provisioned';
   const isStarting = status.status === 'starting';
@@ -71,6 +76,7 @@ export function InstanceControls({
   const isStopped = status.status === 'stopped';
   const isStartable = isStopped || isProvisioned;
   const isDestroying = status.status === 'destroying';
+  const isFlyProvider = status.provider === 'fly';
   // Auto-start runs only on fresh provision (status=provisioned), not re-provision
   const isAutoStarting = isProvisioned && mutations.provision.isPending;
   const [isEditingName, setIsEditingName] = useState(false);
@@ -108,7 +114,8 @@ export function InstanceControls({
     setManuallyDismissed(true);
   }, [dismissKey]);
 
-  const showUpgradeBanner = updateAvailable && !isDismissedInStorage && !manuallyDismissed;
+  const showUpgradeBanner =
+    isFlyProvider && updateAvailable && !isDismissedInStorage && !manuallyDismissed;
 
   const handleSaveName = () => {
     const trimmed = nameValue.trim();
@@ -130,12 +137,13 @@ export function InstanceControls({
   // with "upgrade" preselected, then immediately reset via onUpgradeHandled.
   // Safe for single-click flows; won't re-fire if already true (no state change).
   useEffect(() => {
-    if (upgradeRequested) {
+    if (!upgradeRequested) return;
+    if (isFlyProvider) {
       setRedeployMode('upgrade');
       setConfirmRedeploy(true);
-      onUpgradeHandled?.();
     }
-  }, [upgradeRequested, onUpgradeHandled]);
+    onUpgradeHandled?.();
+  }, [upgradeRequested, isFlyProvider, onUpgradeHandled]);
 
   return (
     <div>
@@ -240,6 +248,12 @@ export function InstanceControls({
         </Banner>
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <OpenClawButton
+          canShow={isRunning && !!gatewayReady}
+          gatewayUrl={gatewayUrl}
+          label="Open Control UI"
+          className="h-8 px-3 text-xs"
+        />
         <Button
           size="sm"
           variant="outline"
@@ -298,7 +312,7 @@ export function InstanceControls({
           className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
           disabled={
             (!isRunning && !isStopped) ||
-            !status.flyMachineId ||
+            !status.runtimeId ||
             mutations.restartMachine.isPending ||
             isDestroying ||
             isStarting ||
@@ -312,7 +326,7 @@ export function InstanceControls({
           }}
         >
           <RotateCw className="h-4 w-4" />
-          Redeploy or Upgrade
+          {isFlyProvider ? 'Redeploy or Upgrade' : 'Redeploy'}
         </Button>
         <Button
           size="sm"
@@ -384,10 +398,10 @@ export function InstanceControls({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Redeploy or Upgrade</DialogTitle>
+            <DialogTitle>{isFlyProvider ? 'Redeploy or Upgrade' : 'Redeploy'}</DialogTitle>
             <DialogDescription>
-              This will stop the machine, rebuild environment variables and secrets, and restart it.
-              The machine will be briefly offline.
+              This will stop the runtime, rebuild environment variables and secrets, and restart it.
+              The runtime will be briefly offline.
             </DialogDescription>
           </DialogHeader>
           <RadioGroup
@@ -406,16 +420,18 @@ export function InstanceControls({
                 </span>
               </Label>
             </div>
-            <div className="flex items-start gap-3">
-              <RadioGroupItem value="upgrade" id="upgrade" className="mt-0.5" />
-              <Label htmlFor="upgrade" className="block cursor-pointer leading-tight">
-                <span className="text-foreground text-sm font-medium">Upgrade to latest</span>
-                <span className="text-muted-foreground mt-0.5 block text-xs">
-                  Upgrade to the latest supported KiloClaw version, redeploy and apply pending
-                  config changes.
-                </span>
-              </Label>
-            </div>
+            {isFlyProvider && (
+              <div className="flex items-start gap-3">
+                <RadioGroupItem value="upgrade" id="upgrade" className="mt-0.5" />
+                <Label htmlFor="upgrade" className="block cursor-pointer leading-tight">
+                  <span className="text-foreground text-sm font-medium">Upgrade to latest</span>
+                  <span className="text-muted-foreground mt-0.5 block text-xs">
+                    Upgrade to the latest supported KiloClaw version, redeploy and apply pending
+                    config changes.
+                  </span>
+                </Label>
+              </div>
+            )}
           </RadioGroup>
           <DialogFooter>
             <Button

@@ -8,6 +8,7 @@ const statusStyles: Record<string, string> = {
   unpaid: 'bg-red-500/10 text-red-300 border-red-500/20',
   paused: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
   suspended: 'bg-red-500/10 text-red-300 border-red-500/20',
+  pending_cancellation: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
   canceled: 'bg-muted text-muted-foreground border-border',
   cancelled: 'bg-muted text-muted-foreground border-border',
   ended: 'bg-muted text-muted-foreground border-border',
@@ -16,6 +17,7 @@ const statusStyles: Record<string, string> = {
 };
 
 function formatStatusLabel(status: string): string {
+  if (status === 'pending_cancellation') return 'Cancellation Scheduled';
   return status.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
 }
 

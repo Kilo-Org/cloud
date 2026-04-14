@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { type InstanceStatus, type useKiloClawMutations } from '@/lib/hooks/use-kiloclaw';
+import { type InstanceStatus, type useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type InstanceControlsProps = {
@@ -25,7 +25,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       {
         text: 'Start',
         onPress: () => {
-          mutations.start.mutate();
+          mutations.start.mutate(undefined);
         },
       },
     ]);
@@ -38,7 +38,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
         text: 'Stop',
         style: 'destructive',
         onPress: () => {
-          mutations.stop.mutate();
+          mutations.stop.mutate(undefined);
         },
       },
     ]);
@@ -50,7 +50,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       {
         text: 'Restart',
         onPress: () => {
-          mutations.restartOpenClaw.mutate();
+          mutations.restartOpenClaw.mutate(undefined);
         },
       },
     ]);
@@ -62,7 +62,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       {
         text: 'Redeploy',
         onPress: () => {
-          mutations.restartMachine.mutate();
+          mutations.restartMachine.mutate(undefined);
         },
       },
     ]);

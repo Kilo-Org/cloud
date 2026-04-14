@@ -10,6 +10,11 @@ import {
 } from '../../config';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
 
+type LoggableInstanceContext = Pick<
+  InstanceMutableState,
+  'userId' | 'sandboxId' | 'flyMachineId' | 'flyRegion' | 'flyAppName'
+>;
+
 /**
  * Structured reconciliation logging — emits a JSON line tagged for
  * log-based observability.
@@ -129,7 +134,7 @@ function serializeDetails(details: Record<string, unknown>): Record<string, unkn
 /**
  * Extract the 5 standard context fields from InstanceMutableState.
  */
-function instanceContext(state: InstanceMutableState): Record<string, unknown> {
+function instanceContext(state: LoggableInstanceContext): Record<string, unknown> {
   return {
     userId: state.userId,
     sandboxId: state.sandboxId,
@@ -147,7 +152,7 @@ function instanceContext(state: InstanceMutableState): Record<string, unknown> {
 function emitStructuredLog(
   logFn: (...args: unknown[]) => void,
   level: 'info' | 'error' | 'warn',
-  state: InstanceMutableState,
+  state: LoggableInstanceContext,
   message: string,
   details: Record<string, unknown>
 ): void {
@@ -173,7 +178,7 @@ function emitStructuredLog(
  * take precedence over caller details to prevent accidental shadowing.
  */
 export function doLog(
-  state: InstanceMutableState,
+  state: LoggableInstanceContext,
   message: string,
   details: Record<string, unknown> = {}
 ): void {
@@ -185,7 +190,7 @@ export function doLog(
  * take precedence over caller details to prevent accidental shadowing.
  */
 export function doError(
-  state: InstanceMutableState,
+  state: LoggableInstanceContext,
   message: string,
   details: Record<string, unknown> = {}
 ): void {
@@ -197,7 +202,7 @@ export function doError(
  * take precedence over caller details to prevent accidental shadowing.
  */
 export function doWarn(
-  state: InstanceMutableState,
+  state: LoggableInstanceContext,
   message: string,
   details: Record<string, unknown> = {}
 ): void {

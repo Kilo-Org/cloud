@@ -2,7 +2,7 @@ import { Bug, Sparkles } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { type useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw';
+import { type useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw-queries';
 import { cn } from '@/lib/utils';
 
 type ChangelogEntry = NonNullable<ReturnType<typeof useKiloClawChangelog>['data']>[number];

@@ -7,7 +7,7 @@ import { syncOpenRouterModels } from '@/lib/model-stats/sync-openrouter';
 import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
 import { CRON_SECRET } from '@/lib/config.server';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { getMonitoredModels } from '@/lib/models';
+import { getMonitoredModels } from '@/lib/monitored-models';
 
 const BETTERSTACK_HEARTBEAT_URL =
   'https://uptime.betterstack.com/api/v1/heartbeat/1zuL4cAH8Ui6JF9j8M3L8oAD';

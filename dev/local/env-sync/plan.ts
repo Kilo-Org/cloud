@@ -13,7 +13,9 @@ import type {
   KeyChange,
   SecretStoreBinding,
   SecretStoreWarning,
+  SecretStoreAutoCreate,
   ConsistencyWarning,
+  EnvLocalAutoCreate,
 } from './types';
 import {
   parseEnvFile,
@@ -23,6 +25,22 @@ import {
   parseJsonc,
   generateDevVars,
 } from './parse';
+
+// ---------------------------------------------------------------------------
+// Auto-created local secrets
+// ---------------------------------------------------------------------------
+
+const FLY_TOKEN_ENV_KEY = 'FLY_API_TOKEN';
+const FLY_ORG_SLUG_ENV_KEY = 'FLY_ORG_SLUG';
+const DEFAULT_FLY_ORG_SLUG = 'kilo-dev';
+
+function createFlyTokenAutoCreate(flyOrgSlug: string): EnvLocalAutoCreate {
+  return {
+    key: FLY_TOKEN_ENV_KEY,
+    command: 'fly',
+    args: ['tokens', 'create', 'org', flyOrgSlug],
+  };
+}
 
 // ---------------------------------------------------------------------------
 // LAN IP detection
@@ -116,39 +134,103 @@ function detectWranglerEnv(repoRoot: string, workerDir: string): string | undefi
 }
 
 // ---------------------------------------------------------------------------
-// Wrangler config: extract secrets_store_secrets bindings
+// Wrangler config: extract vars and secrets_store_secrets bindings
 // ---------------------------------------------------------------------------
 
-function extractSecretsStoreBindings(repoRoot: string, workerDir: string): SecretStoreBinding[] {
+type JsonObject = Record<string, unknown>;
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readWranglerConfig(repoRoot: string, workerDir: string): JsonObject | undefined {
   const wranglerPath = path.join(repoRoot, workerDir, 'wrangler.jsonc');
-  if (!fs.existsSync(wranglerPath)) return [];
+  if (!fs.existsSync(wranglerPath)) return undefined;
 
   try {
-    const config = parseJsonc(fs.readFileSync(wranglerPath, 'utf-8')) as Record<string, unknown>;
-
-    const envName = detectWranglerEnv(repoRoot, workerDir);
-
-    // Check the env-specific config first, fall back to top-level
-    let secretsSection: unknown;
-    if (envName && config.env) {
-      const envConfig = (config.env as Record<string, unknown>)[envName];
-      if (envConfig && typeof envConfig === 'object') {
-        secretsSection = (envConfig as Record<string, unknown>).secrets_store_secrets;
-      }
-    }
-    if (!secretsSection) {
-      secretsSection = config.secrets_store_secrets;
-    }
-
-    if (!Array.isArray(secretsSection)) return [];
-    return secretsSection.map((s: { binding: string; store_id: string; secret_name: string }) => ({
-      binding: s.binding,
-      store_id: s.store_id,
-      secret_name: s.secret_name,
-    }));
+    const config = parseJsonc(fs.readFileSync(wranglerPath, 'utf-8'));
+    return isJsonObject(config) ? config : undefined;
   } catch {
-    return [];
+    return undefined;
   }
+}
+
+function getWranglerEnvConfig(
+  config: JsonObject,
+  envName: string | undefined
+): JsonObject | undefined {
+  if (!envName) return undefined;
+  const envSection = config.env;
+  if (!isJsonObject(envSection)) return undefined;
+  const envConfig = envSection[envName];
+  return isJsonObject(envConfig) ? envConfig : undefined;
+}
+
+function hasOwnKey(obj: JsonObject, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function getWranglerSection(config: JsonObject, envName: string | undefined, key: string): unknown {
+  const envConfig = getWranglerEnvConfig(config, envName);
+  if (envConfig && hasOwnKey(envConfig, key)) return envConfig[key];
+  return config[key];
+}
+
+function extractWranglerVars(repoRoot: string, workerDir: string): Map<string, string> {
+  const config = readWranglerConfig(repoRoot, workerDir);
+  if (!config) return new Map();
+
+  const envName = detectWranglerEnv(repoRoot, workerDir);
+  const varsSection = getWranglerSection(config, envName, 'vars');
+  if (!isJsonObject(varsSection)) return new Map();
+
+  const vars = new Map<string, string>();
+  for (const [key, value] of Object.entries(varsSection)) {
+    if (typeof value === 'string') {
+      vars.set(key, value);
+    } else if (typeof value === 'number' || typeof value === 'boolean') {
+      vars.set(key, String(value));
+    }
+  }
+  return vars;
+}
+
+function isProvidedByWranglerVars(
+  entry: ExampleEntry,
+  envLocal: Map<string, string>,
+  wranglerVars: Map<string, string>
+): boolean {
+  return (
+    entry.annotation.type === 'passthrough' &&
+    !envLocal.has(entry.key) &&
+    wranglerVars.has(entry.key)
+  );
+}
+
+function extractSecretsStoreBindings(repoRoot: string, workerDir: string): SecretStoreBinding[] {
+  const config = readWranglerConfig(repoRoot, workerDir);
+  if (!config) return [];
+
+  const envName = detectWranglerEnv(repoRoot, workerDir);
+  const secretsSection = getWranglerSection(config, envName, 'secrets_store_secrets');
+  if (!Array.isArray(secretsSection)) return [];
+
+  const bindings: SecretStoreBinding[] = [];
+  for (const secret of secretsSection) {
+    if (!isJsonObject(secret)) continue;
+    const binding = secret.binding;
+    const storeId = secret.store_id;
+    const secretName = secret.secret_name;
+    if (
+      typeof binding !== 'string' ||
+      typeof storeId !== 'string' ||
+      typeof secretName !== 'string'
+    ) {
+      continue;
+    }
+    bindings.push({ binding, store_id: storeId, secret_name: secretName });
+  }
+  return bindings;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +257,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       lanIp: undefined,
       devVarsChanges: [],
       envDevLocalChanges: [],
+      envLocalAutoCreates: [],
       secretStoreWarnings: [],
       secretStoreAutoCreates: [],
       consistencyWarnings: [],
@@ -210,6 +293,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
 
   // --- .dev.vars changes ---
   const devVarsChanges: DevVarsFileChange[] = [];
+  const envLocalAutoCreates: EnvLocalAutoCreate[] = [];
   const execWarnings: ExecWarning[] = [];
   const allResolvedEntries = new Map<
     string,
@@ -221,20 +305,49 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     const exampleContent = fs.readFileSync(examplePath, 'utf-8');
     const entries = parseExampleFile(exampleContent);
     const serviceUsesLanIp = dirUsesLanIp.get(workerDir) ?? false;
+    const wranglerVars = extractWranglerVars(repoRoot, workerDir);
+    const devVarsPath = path.join(repoRoot, workerDir, '.dev.vars');
+
+    let existingContent: string | null = null;
+    try {
+      existingContent = fs.readFileSync(devVarsPath, 'utf-8');
+    } catch {
+      // File doesn't exist yet
+    }
+    const oldVars =
+      existingContent !== null ? parseEnvFile(existingContent) : new Map<string, string>();
 
     const resolvedVars = new Map<string, string>();
+    const resolvedSources = new Map<
+      string,
+      'env-local' | 'generated' | 'exec' | 'default' | 'missing'
+    >();
     const unresolvedKeys: string[] = [];
+    let shouldCreateFlyToken = false;
 
     for (const entry of entries) {
-      const { value, resolved } = resolveAnnotatedValue(
+      if (isProvidedByWranglerVars(entry, envLocal, wranglerVars)) {
+        continue;
+      }
+
+      const { value, resolved, source } = resolveAnnotatedValue(
         entry.key,
         entry,
         envLocal,
         lanIp,
         serviceUsesLanIp
       );
+
       resolvedVars.set(entry.key, value);
-      if (!resolved) {
+      resolvedSources.set(entry.key, source);
+
+      const autoCreatesFlyToken =
+        entry.key === FLY_TOKEN_ENV_KEY && !envLocal.get(FLY_TOKEN_ENV_KEY);
+      if (autoCreatesFlyToken) {
+        shouldCreateFlyToken = true;
+      }
+
+      if (!resolved && !autoCreatesFlyToken) {
         unresolvedKeys.push(entry.key);
         if (entry.annotation.type === 'exec') {
           execWarnings.push({
@@ -247,23 +360,24 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       }
     }
 
-    allResolvedEntries.set(workerDir, { vars: resolvedVars, entries });
-
-    const devVarsPath = path.join(repoRoot, workerDir, '.dev.vars');
-
-    let existingContent: string | null = null;
-    try {
-      existingContent = fs.readFileSync(devVarsPath, 'utf-8');
-    } catch {
-      // File doesn't exist yet
+    if (
+      shouldCreateFlyToken &&
+      !envLocalAutoCreates.some(create => create.key === FLY_TOKEN_ENV_KEY)
+    ) {
+      const flyOrgSlug =
+        oldVars.get(FLY_ORG_SLUG_ENV_KEY) ||
+        resolvedVars.get(FLY_ORG_SLUG_ENV_KEY) ||
+        DEFAULT_FLY_ORG_SLUG;
+      envLocalAutoCreates.push(createFlyTokenAutoCreate(flyOrgSlug));
     }
+
+    allResolvedEntries.set(workerDir, { vars: resolvedVars, entries });
 
     const isNew = existingContent === null;
     const keyChanges: KeyChange[] = [];
     let missingValues: string[];
 
     if (existingContent !== null) {
-      const oldVars = parseEnvFile(existingContent);
       // Only report keys as missing if the existing .dev.vars also lacks a value.
       // Keys that couldn't be resolved but already have a value in .dev.vars are
       // kept as-is — skip them from both missing warnings and key change diffs.
@@ -272,6 +386,9 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       for (const [key, newVal] of resolvedVars) {
         if (unresolvedSet.has(key)) continue;
         const oldVal = oldVars.get(key);
+        const source = resolvedSources.get(key);
+        if (key === FLY_TOKEN_ENV_KEY && shouldCreateFlyToken) continue;
+        if (oldVal && source === 'default') continue;
         if (oldVal !== newVal) {
           keyChanges.push({ key, oldValue: oldVal, newValue: newVal });
         }
@@ -280,13 +397,14 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       missingValues = unresolvedKeys;
     }
 
-    if (isNew || keyChanges.length > 0 || missingValues.length > 0) {
+    const shouldCreateFile = isNew && resolvedVars.size > 0;
+    if (shouldCreateFile || keyChanges.length > 0 || missingValues.length > 0) {
       devVarsChanges.push({
         workerDir,
-        isNew,
+        isNew: shouldCreateFile,
         keyChanges,
         missingValues,
-        newFileContent: isNew ? generateDevVars(resolvedVars) : undefined,
+        newFileContent: shouldCreateFile ? generateDevVars(resolvedVars) : undefined,
       });
     }
   }
@@ -409,6 +527,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     lanIp,
     devVarsChanges,
     envDevLocalChanges,
+    envLocalAutoCreates,
     secretStoreWarnings,
     secretStoreAutoCreates,
     consistencyWarnings,

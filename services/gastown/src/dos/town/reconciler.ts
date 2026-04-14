@@ -25,14 +25,16 @@ import {
   AGENT_GC_RETENTION_MS,
   TRIAGE_LABEL_LIKE,
 } from './patrol';
-import { DISPATCH_COOLDOWN_MS, MAX_DISPATCH_ATTEMPTS } from './scheduling';
+import { MAX_DISPATCH_ATTEMPTS } from './scheduling';
 import * as reviewQueue from './review-queue';
 import * as agents from './agents';
 import * as beadOps from './beads';
 import { getRig } from './rigs';
+import { resolveRigConfig } from './config';
 import { PR_POLL_INTERVAL_MS } from './actions';
 import type { Action } from './actions';
 import type { TownEventRecord } from '../../db/tables/town-events.table';
+import type { TownConfig } from '../../types';
 
 const LOG = '[reconciler]';
 
@@ -119,10 +121,11 @@ function staleMs(timestamp: string | null, thresholdMs: number): boolean {
  *   attempt 5+:  30 min
  */
 function getDispatchCooldownMs(dispatchAttempts: number): number {
-  if (dispatchAttempts <= 2) return DISPATCH_COOLDOWN_MS; // 2 min
-  if (dispatchAttempts === 3) return 5 * 60_000; // 5 min
-  if (dispatchAttempts === 4) return 10 * 60_000; // 10 min
-  return 30 * 60_000; // 30 min
+  if (dispatchAttempts <= 1) return 30_000; // 30 sec
+  if (dispatchAttempts === 2) return 60_000; // 1 min
+  if (dispatchAttempts === 3) return 2 * 60_000; // 2 min
+  if (dispatchAttempts === 4) return 5 * 60_000; // 5 min
+  return 10 * 60_000; // 10 min
 }
 
 // ── Row schemas for queries ─────────────────────────────────────────
@@ -461,15 +464,13 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
 
 export function reconcile(
   sql: SqlStorage,
-  opts?: { draining?: boolean; refineryCodeReview?: boolean }
+  opts?: { draining?: boolean; townConfig?: TownConfig }
 ): Action[] {
   const draining = opts?.draining ?? false;
   const actions: Action[] = [];
   actions.push(...reconcileAgents(sql, { draining }));
-  actions.push(...reconcileBeads(sql, { draining }));
-  actions.push(
-    ...reconcileReviewQueue(sql, { draining, refineryCodeReview: opts?.refineryCodeReview })
-  );
+  actions.push(...reconcileBeads(sql, { draining, townConfig: opts?.townConfig }));
+  actions.push(...reconcileReviewQueue(sql, { draining, townConfig: opts?.townConfig }));
   actions.push(...reconcileConvoys(sql));
   actions.push(...reconcileGUPP(sql, { draining }));
   actions.push(...reconcileGC(sql));
@@ -547,6 +548,32 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
         reason: 'working agent has no hook (gt_done already completed)',
       });
     }
+  }
+
+  // Auto-reset dispatch_attempts after 30-minute cooldown
+  const staleAgents = AgentRow.array().parse([
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${agent_metadata.bead_id}, ${agent_metadata.role},
+               ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
+               ${agent_metadata.dispatch_attempts},
+               ${agent_metadata.last_activity_at},
+               b.${beads.columns.rig_id}
+        FROM ${agent_metadata}
+        LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
+        WHERE ${agent_metadata.dispatch_attempts} >= ?
+          AND ${agent_metadata.last_activity_at} < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes')
+      `,
+      [MAX_DISPATCH_ATTEMPTS]
+    ),
+  ]);
+
+  for (const agent of staleAgents) {
+    actions.push({
+      type: 'reset_agent_dispatch_attempts',
+      agent_id: agent.bead_id,
+    });
   }
 
   // Idle agents hooked to terminal beads — clean up stale hooks
@@ -639,9 +666,22 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
 // reconcileBeads — handle unassigned beads, lost agents, stale reviews
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
+export function reconcileBeads(
+  sql: SqlStorage,
+  opts?: { draining?: boolean; townConfig?: TownConfig }
+): Action[] {
   const draining = opts?.draining ?? false;
   const actions: Action[] = [];
+
+  // Resolve per-rig max_dispatch_attempts, falling back to the module default.
+  const rigMaxDispatchAttempts = (rigId: string | null): number => {
+    if (!rigId || !opts?.townConfig) return MAX_DISPATCH_ATTEMPTS;
+    const rig = getRig(sql, rigId);
+    return (
+      resolveRigConfig(opts.townConfig, rig?.config ?? null).max_dispatch_attempts ??
+      MAX_DISPATCH_ATTEMPTS
+    );
+  };
 
   // Town-level circuit breaker: if too many dispatch failures in the
   // window, skip all dispatch_agent actions and escalate to mayor.
@@ -694,7 +734,7 @@ export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): 
     }
 
     // Per-bead dispatch cap: fail the bead if it exhausted all attempts
-    if (bead.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
+    if (bead.dispatch_attempts >= rigMaxDispatchAttempts(bead.rig_id)) {
       actions.push({
         type: 'transition_bead',
         bead_id: bead.bead_id,
@@ -1049,14 +1089,31 @@ export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): 
 
 export function reconcileReviewQueue(
   sql: SqlStorage,
-  opts?: { draining?: boolean; refineryCodeReview?: boolean }
+  opts?: { draining?: boolean; townConfig?: TownConfig }
 ): Action[] {
   const draining = opts?.draining ?? false;
-  const refineryCodeReview = opts?.refineryCodeReview ?? true;
   const actions: Action[] = [];
 
   // Town-level circuit breaker
   const circuitBreakerOpen = checkDispatchCircuitBreaker(sql).length > 0;
+
+  // Resolve per-rig code_review setting. Falls back to town default when
+  // townConfig is not provided (e.g. in tests or debug replay).
+  const rigCodeReview = (rigId: string): boolean => {
+    if (!opts?.townConfig) return true;
+    const rig = getRig(sql, rigId);
+    return resolveRigConfig(opts.townConfig, rig?.config ?? null).code_review;
+  };
+
+  // Resolve per-rig max_dispatch_attempts, falling back to the module default.
+  const rigMaxDispatchAttempts = (rigId: string | null): number => {
+    if (!rigId || !opts?.townConfig) return MAX_DISPATCH_ATTEMPTS;
+    const rig = getRig(sql, rigId);
+    return (
+      resolveRigConfig(opts.townConfig, rig?.config ?? null).max_dispatch_attempts ??
+      MAX_DISPATCH_ATTEMPTS
+    );
+  };
 
   // Get all MR beads that need attention
   const mrBeads = MrBeadRow.array().parse([
@@ -1156,10 +1213,11 @@ export function reconcileReviewQueue(
 
     // Rule 4: PR-strategy MR beads orphaned (refinery dispatched then died, stale >30min)
     // Only in_progress — open beads are just waiting for the refinery to pop them.
-    // Skip when refinery code review is disabled: poll_pr keeps the bead alive via
-    // updated_at touches, and no refinery is expected to be working on it.
+    // Skip when refinery code review is disabled for this rig: poll_pr keeps the
+    // bead alive via updated_at touches, and no refinery is expected to be working.
     if (
-      refineryCodeReview &&
+      mr.rig_id &&
+      rigCodeReview(mr.rig_id) &&
       mr.status === 'in_progress' &&
       mr.pr_url &&
       staleMs(mr.updated_at, ORPHANED_PR_REVIEW_TIMEOUT_MS)
@@ -1178,13 +1236,33 @@ export function reconcileReviewQueue(
     }
   }
 
-  // When refinery code review is disabled:
-  //  - MR beads WITH pr_url → fast-track to in_progress for poll_pr
-  //  - MR beads WITHOUT pr_url → fail them and reopen the source bead
+  // Per-rig: when refinery code review is disabled for a rig:
+  //  - MR beads for that rig WITH pr_url → fast-track to in_progress for poll_pr
+  //  - MR beads for that rig WITHOUT pr_url → fail them and reopen the source bead
   //    (the polecat was supposed to create the PR via merge_strategy=pr
   //    but didn't provide one — retry the source bead)
-  if (!refineryCodeReview) {
-    // Fast-track: open MR beads with pr_url → in_progress
+  // Collect all rigs that have open MR beads so we can apply per-rig logic.
+  const rigsWithAnyOpenMrs = z
+    .object({ rig_id: z.string() })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT DISTINCT b.${beads.columns.rig_id}
+          FROM ${beads} b
+          WHERE b.${beads.columns.type} = 'merge_request'
+            AND b.${beads.columns.status} = 'open'
+            AND b.${beads.columns.rig_id} IS NOT NULL
+        `,
+        []
+      ),
+    ]);
+
+  for (const { rig_id } of rigsWithAnyOpenMrs) {
+    if (rigCodeReview(rig_id)) continue;
+
+    // Fast-track: open MR beads with pr_url → in_progress (skip refinery review)
     const openMrsWithPr = z
       .object({ bead_id: z.string() })
       .array()
@@ -1198,6 +1276,7 @@ export function reconcileReviewQueue(
               ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
             WHERE b.${beads.columns.type} = 'merge_request'
               AND b.${beads.columns.status} = 'open'
+              AND b.${beads.columns.rig_id} = ?
               AND rm.${review_metadata.columns.pr_url} IS NOT NULL
               AND NOT EXISTS (
                 SELECT 1
@@ -1208,7 +1287,7 @@ export function reconcileReviewQueue(
                   AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
               )
           `,
-          []
+          [rig_id]
         ),
       ]);
     for (const { bead_id } of openMrsWithPr) {
@@ -1243,6 +1322,7 @@ export function reconcileReviewQueue(
               AND bd.${bead_dependencies.columns.dependency_type} = 'tracks'
             WHERE b.${beads.columns.type} = 'merge_request'
               AND b.${beads.columns.status} = 'open'
+              AND b.${beads.columns.rig_id} = ?
               AND rm.${review_metadata.columns.pr_url} IS NULL
               AND NOT EXISTS (
                 SELECT 1
@@ -1253,7 +1333,7 @@ export function reconcileReviewQueue(
                   AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
               )
           `,
-          []
+          [rig_id]
         ),
       ]);
     for (const { bead_id, source_bead_id } of orphanedMrs) {
@@ -1279,30 +1359,15 @@ export function reconcileReviewQueue(
   }
 
   // Rules 5-6: Refinery dispatch for open MR beads.
-  // When code_review=true: dispatches for all open MR beads.
-  // When code_review=false: only dispatches for convoy review-and-merge
+  // When code_review=true for a rig: dispatches for all open MR beads in that rig.
+  // When code_review=false for a rig: only dispatches for convoy review-and-merge
   // MR beads (the fast-track above already moved ordinary MR beads to
   // in_progress as actions, but those haven't been applied to SQL yet —
   // so we must filter here to avoid re-dispatching them).
   {
     // Rule 5: Pop open MR bead for idle refinery
     // Get all rigs that have open MR beads needing the refinery.
-    // When code_review=false, only dispatch the refinery for convoy
-    // review-and-merge MR beads (refinery does combined review+merge).
-    // MR beads WITH a pr_url are handled by the fast-track → poll_pr.
-    // MR beads WITHOUT a pr_url when merge_strategy=pr are orphaned
-    // (polecat should have created the PR) — Rule 2 handles them.
-    const refineryNeededFilter = refineryCodeReview
-      ? ''
-      : /* sql */ `
-          AND EXISTS (
-            SELECT 1
-            FROM ${beads} parent
-            JOIN ${convoy_metadata} cm
-              ON cm.${convoy_metadata.columns.bead_id} = parent.${beads.columns.bead_id}
-            WHERE parent.${beads.columns.bead_id} = b.${beads.columns.parent_bead_id}
-              AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
-          )`;
+    // All rigs with open MRs are candidates; per-rig code_review is checked inside the loop.
     const rigsWithOpenMrs = z
       .object({ rig_id: z.string() })
       .array()
@@ -1315,13 +1380,29 @@ export function reconcileReviewQueue(
         WHERE b.${beads.columns.type} = 'merge_request'
           AND b.${beads.columns.status} = 'open'
           AND b.${beads.columns.rig_id} IS NOT NULL
-          ${refineryNeededFilter}
       `,
           []
         ),
       ]);
 
     for (const { rig_id } of rigsWithOpenMrs) {
+      // When code_review=false, only dispatch the refinery for convoy
+      // review-and-merge MR beads (refinery does combined review+merge).
+      // MR beads WITH a pr_url are handled by the fast-track → poll_pr.
+      // MR beads WITHOUT a pr_url when merge_strategy=pr are orphaned
+      // (polecat should have created the PR) — Rule 2 handles them.
+      const refineryNeededFilter = rigCodeReview(rig_id)
+        ? ''
+        : /* sql */ `
+            AND EXISTS (
+              SELECT 1
+              FROM ${beads} outer_parent
+              JOIN ${convoy_metadata} cm
+                ON cm.${convoy_metadata.columns.bead_id} = outer_parent.${beads.columns.bead_id}
+              WHERE outer_parent.${beads.columns.bead_id} = ${beads.parent_bead_id}
+                AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+            )`;
+
       // Check if rig already has an in_progress MR that needs the refinery.
       // PR-strategy MR beads (pr_url IS NOT NULL) don't need the refinery —
       // the merge is handled by the user/CI via the PR. Only direct-strategy
@@ -1375,12 +1456,12 @@ export function reconcileReviewQueue(
             sql,
             /* sql */ `
           SELECT ${beads.bead_id}
-          FROM ${beads} b
-          WHERE b.${beads.columns.type} = 'merge_request'
-            AND b.${beads.columns.status} = 'open'
-            AND b.${beads.columns.rig_id} = ?
+          FROM ${beads}
+          WHERE ${beads.type} = 'merge_request'
+            AND ${beads.status} = 'open'
+            AND ${beads.rig_id} = ?
             ${refineryNeededFilter}
-          ORDER BY b.${beads.columns.created_at} ASC
+          ORDER BY ${beads.created_at} ASC
           LIMIT 1
         `,
             [rig_id]
@@ -1499,9 +1580,11 @@ export function reconcileReviewQueue(
         continue;
       }
 
+      const rigId = mr.rig_id ?? ref.rig_id ?? null;
+
       // Per-bead dispatch cap — check before cooldown so max-attempt MR
       // beads are failed immediately rather than waiting for the cooldown.
-      if (mr.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
+      if (mr.dispatch_attempts >= rigMaxDispatchAttempts(rigId)) {
         actions.push({
           type: 'transition_bead',
           bead_id: ref.current_hook_bead_id,
@@ -1531,7 +1614,7 @@ export function reconcileReviewQueue(
         type: 'dispatch_agent',
         agent_id: ref.bead_id,
         bead_id: ref.current_hook_bead_id,
-        rig_id: mr.rig_id ?? ref.rig_id ?? '',
+        rig_id: rigId ?? '',
       });
     }
   } // end Rules 5–6 block

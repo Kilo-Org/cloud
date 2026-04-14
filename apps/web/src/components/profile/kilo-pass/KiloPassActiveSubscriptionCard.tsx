@@ -57,12 +57,30 @@ function RenewInfoRow() {
   const rows = computeRenewInfoRowModel({
     subscription,
     isPendingCancellation: Boolean(view.pendingCancellation),
+    isPaused: subscription.status === 'paused',
+    resumesAtIso: subscription.resumesAt,
     scheduledChange: scheduledChange ?? null,
   });
 
   if (rows.length === 0) return null;
 
   return rows.map(row => {
+    if (row.kind === 'paused_until') {
+      const dateLabel = formatIsoDateString_UsaDateOnlyFormat(row.resumesAtIso);
+      return (
+        <div
+          key={`paused_until:${row.resumesAtIso}`}
+          className="bg-muted/20 border-border/60 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
+        >
+          <div className="flex items-start gap-2">
+            <Calendar className="mt-0.5 h-4 w-4 text-white/40" />
+            <div className="text-muted-foreground">Paused until</div>
+          </div>
+          <span className="text-muted-foreground">{dateLabel}</span>
+        </div>
+      );
+    }
+
     const dateLabel = formatIsoDateString_UsaDateOnlyFormat(row.refillAtIso);
 
     if (row.kind === 'active_until') {
@@ -256,7 +274,7 @@ function NextBillingDateRow() {
   const nextBillingDateLabel = view.dates.nextBillingDateLabel;
 
   if (subscription.cadence !== KiloPassCadence.Yearly || !nextBillingDateLabel) return null;
-  if (view.pendingCancellation) return null;
+  if (view.pendingCancellation || subscription.status === 'paused') return null;
 
   const changeTierLabel = scheduledChange?.toTier ? getTierName(scheduledChange.toTier) : null;
   const changeCadenceLabel = scheduledChange?.toCadence
@@ -315,6 +333,15 @@ function BottomClarification() {
   const expiresAtLabel = expiresAt ? formatIsoDateString_UsaDateOnlyFormat(expiresAt) : null;
 
   if (subscription.cadence !== KiloPassCadence.Monthly) return null;
+
+  if (subscription.status === 'paused') {
+    return (
+      <div className="text-muted-foreground text-xs">
+        Unused paid credits never expire. Free bonus credits are not renewed while your subscription
+        is paused; monthly credits resume when the subscription resumes.
+      </div>
+    );
+  }
 
   return (
     <div className="text-muted-foreground text-xs">

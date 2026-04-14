@@ -1,7 +1,8 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import type { Sidebar } from '@/components/ui/sidebar';
+import { useSidebar, type Sidebar } from '@/components/ui/sidebar';
 import { useUrlOrganizationId } from '@/hooks/useUrlOrganizationId';
 import PersonalAppSidebar from './PersonalAppSidebar';
 import OrganizationAppSidebar from './OrganizationAppSidebar';
@@ -21,9 +22,41 @@ function extractOrgGastownTownId(pathname: string): { orgId: string; townId: str
   return match ? { orgId: match[1], townId: match[2] } : null;
 }
 
+function isKiloClawNewPath(pathname: string): boolean {
+  return pathname === '/claw/new' || new RegExp(`^/organizations/${UUID}/claw/new$`).test(pathname);
+}
+
 export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const currentOrgId = useUrlOrganizationId();
   const pathname = usePathname();
+  const { open, setOpenMobile, setOpenTransient } = useSidebar();
+  const previousSidebarOpen = useRef<boolean | null>(null);
+  const currentSidebarOpen = useRef(open);
+  const sidebarActions = useRef({ setOpenMobile, setOpenTransient });
+
+  useEffect(() => {
+    currentSidebarOpen.current = open;
+  }, [open]);
+
+  useEffect(() => {
+    sidebarActions.current = { setOpenMobile, setOpenTransient };
+  }, [setOpenMobile, setOpenTransient]);
+
+  useEffect(() => {
+    if (isKiloClawNewPath(pathname)) {
+      if (previousSidebarOpen.current === null) {
+        previousSidebarOpen.current = currentSidebarOpen.current;
+      }
+      sidebarActions.current.setOpenTransient(false);
+      sidebarActions.current.setOpenMobile(false);
+      return;
+    }
+
+    if (previousSidebarOpen.current !== null) {
+      sidebarActions.current.setOpenTransient(previousSidebarOpen.current);
+      previousSidebarOpen.current = null;
+    }
+  }, [pathname]);
 
   // Personal gastown town — show the town-specific sidebar
   const gastownTownId = extractGastownTownId(pathname);

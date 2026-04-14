@@ -287,11 +287,18 @@ async function applyMetadataChanges(
   const gitBranch = mergedChanges.has('gitBranch')
     ? (mergedChanges.get('gitBranch') ?? null)
     : undefined;
+  const status = mergedChanges.has('status') ? (mergedChanges.get('status') ?? null) : undefined;
 
   const updates: Partial<
     Pick<
       typeof cli_sessions_v2.$inferInsert,
-      'title' | 'created_on_platform' | 'organization_id' | 'git_url' | 'git_branch'
+      | 'title'
+      | 'created_on_platform'
+      | 'organization_id'
+      | 'git_url'
+      | 'git_branch'
+      | 'status'
+      | 'status_updated_at'
     >
   > = {};
   if (title !== undefined) updates.title = title;
@@ -299,6 +306,10 @@ async function applyMetadataChanges(
   if (orgId !== undefined) updates.organization_id = orgId;
   if (gitUrl !== undefined) updates.git_url = gitUrl;
   if (gitBranch !== undefined) updates.git_branch = gitBranch;
+  if (status !== undefined) {
+    updates.status = status;
+    updates.status_updated_at = new Date().toISOString();
+  }
 
   if (Object.keys(updates).length > 0) {
     await db

@@ -18,6 +18,8 @@ type PlatformDefinition = {
   name: string;
   description: string;
   enabled: boolean;
+  /** Hide from new installs — only show when already installed */
+  hiddenUnlessInstalled?: boolean;
   personalRoute?: string;
   orgRoute?: (organizationId: string) => string;
 };
@@ -54,6 +56,7 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
     description:
       'Create PRs, debug code, ask questions about your repos, etc. directly from Discord',
     enabled: true,
+    hiddenUnlessInstalled: true,
     personalRoute: '/integrations/discord',
     orgRoute: organizationId => `/organizations/${organizationId}/integrations/discord`,
   },
@@ -82,7 +85,12 @@ export function buildPlatforms(
   installations: InstallationStatus,
   organizationId?: string
 ): Platform[] {
-  return PLATFORM_DEFINITIONS.map(def => ({
+  return PLATFORM_DEFINITIONS.filter(def => {
+    if (def.hiddenUnlessInstalled) {
+      return installations[def.id as keyof InstallationStatus]?.installed === true;
+    }
+    return true;
+  }).map(def => ({
     id: def.id,
     name: def.name,
     description: def.description,

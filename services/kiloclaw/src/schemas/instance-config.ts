@@ -16,7 +16,7 @@ export const EncryptedEnvelopeSchema = z.object({
   version: z.literal(1),
 });
 
-const MachineSizeSchema = z.object({
+export const MachineSizeSchema = z.object({
   cpus: z.number().int().min(1).max(8),
   memory_mb: z.number().int().min(256).max(16384),
   cpu_kind: z.enum(['shared', 'performance']).optional(),
@@ -55,12 +55,47 @@ export const CustomSecretMetaSchema = z.object({
 
 export type CustomSecretMeta = z.infer<typeof CustomSecretMetaSchema>;
 
+// Keep in sync with apps/web/src/lib/kiloclaw/types.ts KiloClawProviderId.
+export const ProviderIdSchema = z.enum(['fly', 'docker-local', 'northflank']);
+export type ProviderId = z.infer<typeof ProviderIdSchema>;
+
+export const FlyProviderStateSchema = z.object({
+  provider: z.literal('fly'),
+  appName: z.string().nullable().default(null),
+  machineId: z.string().nullable().default(null),
+  volumeId: z.string().nullable().default(null),
+  region: z.string().nullable().default(null),
+});
+
+export const DockerLocalProviderStateSchema = z.object({
+  provider: z.literal('docker-local'),
+  containerName: z.string().nullable().default(null),
+  volumeName: z.string().nullable().default(null),
+  hostPort: z.number().int().nullable().default(null),
+});
+
+export const ProviderStateSchema = z.discriminatedUnion('provider', [
+  FlyProviderStateSchema,
+  DockerLocalProviderStateSchema,
+]);
+export type FlyProviderState = z.infer<typeof FlyProviderStateSchema>;
+export type DockerLocalProviderState = z.infer<typeof DockerLocalProviderStateSchema>;
+export type ProviderState = z.infer<typeof ProviderStateSchema>;
+
+export const KiloExaSearchModeSchema = z.enum(['kilo-proxy', 'disabled']);
+export type KiloExaSearchMode = z.infer<typeof KiloExaSearchModeSchema>;
+
 export const InstanceConfigSchema = z.object({
   envVars: z.record(envVarNameSchema, z.string()).optional(),
   encryptedSecrets: z.record(envVarNameSchema, EncryptedEnvelopeSchema).optional(),
   kilocodeApiKey: z.string().nullable().optional(),
   kilocodeApiKeyExpiresAt: z.string().nullable().optional(),
   kilocodeDefaultModel: z.string().nullable().optional(),
+  webSearch: z
+    .object({
+      exaMode: KiloExaSearchModeSchema.optional(),
+    })
+    .optional(),
   // TODO: Legacy hardcoded channel storage. Kept for backward compat with
   // existing DO state and the decryptChannelTokens/buildEnvVars startup path.
   // Migrate to read from encryptedSecrets via catalog, then remove.
@@ -128,6 +163,7 @@ export const ProvisionRequestSchema = z.object({
   instanceId: z.string().uuid().optional(),
   /** Optional org ID — null/absent means personal instance. */
   orgId: z.string().uuid().nullable().optional(),
+  provider: ProviderIdSchema.optional(),
   ...InstanceConfigSchema.omit({ googleCredentials: true }).shape,
 });
 
@@ -154,6 +190,8 @@ export const PersistedStateSchema = z.object({
   sandboxId: z.string().default(''),
   /** Organization ID — null for personal instances, set for org instances. */
   orgId: z.string().nullable().default(null),
+  provider: ProviderIdSchema.default('fly'),
+  providerState: ProviderStateSchema.nullable().default(null),
   status: z
     .enum([
       'provisioned',
@@ -171,6 +209,7 @@ export const PersistedStateSchema = z.object({
   kilocodeApiKey: z.string().nullable().default(null),
   kilocodeApiKeyExpiresAt: z.string().nullable().default(null),
   kilocodeDefaultModel: z.string().nullable().default(null),
+  kiloExaSearchMode: KiloExaSearchModeSchema.nullable().default(null),
   channels: z
     .object({
       telegramBotToken: EncryptedEnvelopeSchema.optional(),
@@ -271,9 +310,6 @@ export const PersistedStateSchema = z.object({
   // Tracks whether the "instance ready" email has been sent for this provision lifecycle.
   // Set to true on first low-load checkin; reset on DO wipe (destroy + re-provision).
   instanceReadyEmailSent: z.boolean().default(false),
-  // Disk usage reported by the controller checkin.
-  diskUsedBytes: z.number().int().nullable().default(null),
-  diskTotalBytes: z.number().int().nullable().default(null),
   // Metadata for custom (non-catalog) secrets: env var name → { configPath? }.
   // configPath is a JSON dot-notation path for patching into openclaw.json at boot.
   customSecretMeta: z.record(z.string(), CustomSecretMetaSchema).nullable().default(null),

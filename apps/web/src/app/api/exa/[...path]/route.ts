@@ -99,17 +99,34 @@ export async function POST(request: NextRequest) {
   // Record cost asynchronously after sending the response
   const cloned = response.clone();
   after(async () => {
-    const body: unknown = await cloned.json();
-    const costDollars = extractCostDollars(body);
-    if (costDollars !== undefined && costDollars > 0 && response.status < 400) {
-      const costMicrodollars = Math.round(costDollars * 1_000_000);
-      await recordExaUsage({
-        userId: user.id,
-        organizationId,
-        path: exaPath,
-        costMicrodollars,
-        chargedToBalance: isPaidRequest,
-        freeAllowanceMicrodollars: allowance,
+    if (response.status >= 400) {
+      return;
+    }
+
+    try {
+      const body: unknown = await cloned.json();
+      const costDollars = extractCostDollars(body);
+      if (costDollars !== undefined && costDollars > 0) {
+        const costMicrodollars = Math.round(costDollars * 1_000_000);
+        await recordExaUsage({
+          userId: user.id,
+          organizationId,
+          path: exaPath,
+          costMicrodollars,
+          chargedToBalance: isPaidRequest,
+          freeAllowanceMicrodollars: allowance,
+        });
+      }
+    } catch (error) {
+      captureException(error, {
+        tags: {
+          route: '/api/exa/[...path]',
+          exaPath,
+        },
+        extra: {
+          userId: user.id,
+          responseStatus: response.status,
+        },
       });
     }
   });

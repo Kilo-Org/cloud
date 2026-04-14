@@ -1,4 +1,4 @@
-import type { StreamEventType } from './protocol.js';
+export type TrimPayloadStreamEventType = string;
 
 export const MAX_TOOL_OUTPUT_LENGTH = 10_000;
 export const MAX_RAW_INPUT_LENGTH = 10_000;
@@ -47,33 +47,36 @@ function trimToolPending(state: Record<string, unknown>): Record<string, unknown
   return out;
 }
 
-function trimPartUpdated(properties: Record<string, unknown>): Record<string, unknown> {
-  const part = properties.part;
-  if (!isRecord(part)) return properties;
-
+function trimPart(part: Record<string, unknown>): Record<string, unknown> {
   const partType = part.type;
 
   if (partType === 'step-start' || partType === 'step-finish' || partType === 'snapshot') {
-    return { ...properties, part: { ...part, snapshot: undefined } };
+    return { ...part, snapshot: undefined };
   }
 
   if (partType === 'file') {
-    return { ...properties, part: stripFilePartFields(part) };
+    return stripFilePartFields(part);
   }
 
   if (partType === 'tool') {
     const state = part.state;
-    if (!isRecord(state)) return properties;
+    if (!isRecord(state)) return part;
 
     if (state.status === 'completed') {
-      return { ...properties, part: { ...part, state: trimToolCompleted(state) } };
+      return { ...part, state: trimToolCompleted(state) };
     }
     if (state.status === 'pending') {
-      return { ...properties, part: { ...part, state: trimToolPending(state) } };
+      return { ...part, state: trimToolPending(state) };
     }
   }
 
-  return properties;
+  return part;
+}
+
+function trimPartUpdated(properties: Record<string, unknown>): Record<string, unknown> {
+  const part = properties.part;
+  if (!isRecord(part)) return properties;
+  return { ...properties, part: trimPart(part) };
 }
 
 function trimSessionUpdated(properties: Record<string, unknown>): Record<string, unknown> {
@@ -97,8 +100,10 @@ function trimKilocodeData(data: Record<string, unknown>): Record<string, unknown
 
   if (eventName === 'message.part.updated') {
     const properties = data.properties;
-    if (!isRecord(properties)) return data;
-    return { ...data, properties: trimPartUpdated(properties) };
+    const part = data.part;
+    const trimmedData = isRecord(part) ? { ...data, part: trimPart(part) } : data;
+    if (!isRecord(properties)) return trimmedData;
+    return { ...trimmedData, properties: trimPartUpdated(properties) };
   }
 
   if (eventName === 'session.updated') {
@@ -116,7 +121,7 @@ function trimOutputData(data: Record<string, unknown>): Record<string, unknown> 
   return { ...data, content: truncate(content, MAX_STDOUT_LENGTH) };
 }
 
-export function trimPayload(streamEventType: StreamEventType, data: unknown): unknown {
+export function trimPayload(streamEventType: TrimPayloadStreamEventType, data: unknown): unknown {
   if (!isRecord(data)) return data;
 
   if (streamEventType === 'kilocode') {

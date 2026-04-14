@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { render, Box, Text, useInput, useApp, useStdout } from 'ink';
 import { execSync } from 'node:child_process';
+import * as path from 'node:path';
 import {
   getService,
   getGroups,
@@ -12,12 +13,16 @@ import {
 import type { ServiceGroup } from './services';
 import { getSessionName, killSession } from './tmux';
 import {
+  findRepoRoot,
   probePort,
   startServiceInTmux,
   stopServiceInTmux,
   restartServiceInTmux,
   showServiceInTmux,
   showGroupInTmux,
+  readEnvValue,
+  readEnvMtime,
+  waitForEnvValueChange,
 } from './runner';
 
 // ---------------------------------------------------------------------------
@@ -47,11 +52,15 @@ const REFRESH_MS = 2000;
 const STARTING_GRACE_MS = 30_000;
 const START_DELAY_MS = 300;
 const SIDEBAR_WIDTH = 40;
+const CAPTURE_TIMEOUT_MS = 30_000;
 
 // Resolved once at module level
 const sessionName = getSessionName();
+const repoRoot = findRepoRoot();
+const kiloclawDevVarsPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
 const alwaysOnGroupIds = new Set(getAlwaysOnGroupIds());
 const groupsById = new Map(getGroups().map(g => [g.id, g]));
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 // ---------------------------------------------------------------------------
 // Sidebar item list builder
@@ -367,52 +376,152 @@ function Dashboard({
       if (togglingRef.current) return;
       togglingRef.current = true;
 
-      // Resolve transitive group-level deps (e.g. app-builder → cloud-agent)
-      const allGroupIds = resolveGroupTransitiveDeps([groupId]);
-      const allNeeded = resolveGroups(allGroupIds);
-      const toStart = allNeeded.filter(name => !runningServices.has(name));
+      void (async () => {
+        try {
+          // Resolve transitive group-level deps (e.g. app-builder → cloud-agent)
+          const allGroupIds = resolveGroupTransitiveDeps([groupId]);
+          const allNeeded = resolveGroups(allGroupIds);
+          const toStart = allNeeded.filter(name => !runningServices.has(name));
 
-      // Start services with staggered delays
-      let delay = 0;
-      for (const name of toStart) {
-        setTimeout(() => {
-          try {
-            startServiceInTmux(sessionName, name);
-          } catch {
-            // tmux command failed
-          }
-        }, delay);
-        delay += START_DELAY_MS;
-      }
+          const gatedStarts: string[] = [];
+          const immediateStarts: string[] = [];
+          const shouldWaitForKiloclawTunnel =
+            toStart.includes('kiloclaw') && toStart.includes('kiloclaw-tunnel');
 
-      // Update state after last service started
-      setTimeout(() => {
-        setRunningServices(prev => {
-          const next = new Set(prev);
-          for (const name of toStart) next.add(name);
-          return next;
-        });
-        setStatuses(prev => {
-          const next = new Map(prev);
           for (const name of toStart) {
-            if (!next.has(name)) next.set(name, 'starting');
+            const dependsOnKiloclaw = getService(name).dependsOn.includes('kiloclaw');
+            if (shouldWaitForKiloclawTunnel && (name === 'kiloclaw' || dependsOnKiloclaw)) {
+              gatedStarts.push(name);
+            } else {
+              immediateStarts.push(name);
+            }
           }
-          return next;
-        });
-        setEnabledGroups(prev => {
-          const next = new Set(prev);
-          for (const id of allGroupIds) next.add(id);
-          return next;
-        });
-        // Reset starting grace for newly started services
-        startTimeRef.current = Date.now();
-        togglingRef.current = false;
 
-        // Show the group in multi-pane view
-        const groupServices = getGroupServiceNames(groupId);
-        const running = groupServices.filter(n => runningServices.has(n) || toStart.includes(n));
-        doShowGroup(groupId, running, viewedRef);
-      }, delay + 100);
+          const oldTunnelValue = shouldWaitForKiloclawTunnel
+            ? readEnvValue(kiloclawDevVarsPath, 'KILOCODE_API_BASE_URL')
+            : undefined;
+          const oldTunnelMtime = shouldWaitForKiloclawTunnel
+            ? readEnvMtime(kiloclawDevVarsPath)
+            : undefined;
+
+          const startedNow: string[] = [];
+          for (const name of immediateStarts) {
+            try {
+              startServiceInTmux(sessionName, name);
+              startedNow.push(name);
+            } catch {
+              // tmux command failed
+            }
+            await sleep(START_DELAY_MS);
+          }
+
+          const nextRunningServices = new Set(runningServices);
+          for (const name of startedNow) nextRunningServices.add(name);
+
+          setRunningServices(prev => {
+            const next = new Set(prev);
+            for (const name of startedNow) next.add(name);
+            return next;
+          });
+          setStatuses(prev => {
+            const next = new Map(prev);
+            for (const name of startedNow) {
+              if (!next.has(name)) next.set(name, 'starting');
+            }
+            return next;
+          });
+          setEnabledGroups(prev => {
+            const next = new Set(prev);
+            for (const id of allGroupIds) next.add(id);
+            return next;
+          });
+
+          if (startedNow.length > 0) {
+            // Reset starting grace for newly started services
+            startTimeRef.current = Date.now();
+          }
+
+          // Show the group in multi-pane view
+          const running = getGroupServiceNames(groupId).filter(n => nextRunningServices.has(n));
+          doShowGroup(groupId, running, viewedRef);
+
+          // Phase 1 is complete; keep UI responsive while tunnel gate runs in background.
+          togglingRef.current = false;
+
+          if (!shouldWaitForKiloclawTunnel || gatedStarts.length === 0) {
+            return;
+          }
+
+          const kiloclawTunnelCaptured = await waitForEnvValueChange(
+            kiloclawDevVarsPath,
+            'KILOCODE_API_BASE_URL',
+            oldTunnelValue,
+            CAPTURE_TIMEOUT_MS,
+            oldTunnelMtime
+          );
+
+          if (!kiloclawTunnelCaptured) {
+            console.warn(
+              'Tunnel URL not captured after 30s - kiloclaw services are waiting for tunnel readiness'
+            );
+            return;
+          }
+
+          if (!mouseStateRef.current.enabledGroups.has(groupId)) {
+            return;
+          }
+
+          const startedAfterCapture: string[] = [];
+          const runningAtCapture = new Set(mouseStateRef.current.runningServices);
+          for (const name of gatedStarts) {
+            if (runningAtCapture.has(name)) {
+              continue;
+            }
+            try {
+              startServiceInTmux(sessionName, name);
+              startedAfterCapture.push(name);
+            } catch {
+              // tmux command failed
+            }
+            await sleep(START_DELAY_MS);
+          }
+
+          if (startedAfterCapture.length === 0) {
+            return;
+          }
+
+          const runningAfterCapture = new Set(runningAtCapture);
+          for (const name of startedAfterCapture) runningAfterCapture.add(name);
+
+          setRunningServices(prev => {
+            const next = new Set(prev);
+            for (const name of startedAfterCapture) next.add(name);
+            return next;
+          });
+          setStatuses(prev => {
+            const next = new Map(prev);
+            for (const name of startedAfterCapture) {
+              if (!next.has(name)) next.set(name, 'starting');
+            }
+            return next;
+          });
+
+          // Only update the pane layout when this group is still in view.
+          const viewed = viewedRef.current;
+          if (viewed && viewed.kind === 'group' && viewed.groupId === groupId) {
+            const updatedRunning = getGroupServiceNames(groupId).filter(n =>
+              runningAfterCapture.has(n)
+            );
+            doShowGroup(groupId, updatedRunning, viewedRef);
+          }
+
+          startTimeRef.current = Date.now();
+        } finally {
+          if (togglingRef.current) {
+            togglingRef.current = false;
+          }
+        }
+      })();
     },
     [runningServices]
   );

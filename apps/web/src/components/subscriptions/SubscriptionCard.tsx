@@ -12,10 +12,12 @@ export function SubscriptionCard({
   status,
   price,
   billingDate,
+  billingDateLabel = 'Renews at',
   paymentMethod,
   href,
   isTerminal = false,
   warningTone,
+  statusNote,
 }: {
   icon: ReactNode;
   title: string;
@@ -23,10 +25,12 @@ export function SubscriptionCard({
   status: string;
   price: string;
   billingDate: string;
+  billingDateLabel?: string;
   paymentMethod: string;
   href: string;
   isTerminal?: boolean;
   warningTone?: 'warning' | 'info';
+  statusNote?: string | null;
 }) {
   return (
     <Link href={href} className="block">
@@ -52,12 +56,23 @@ export function SubscriptionCard({
                 />
               </div>
               <p className="text-muted-foreground text-sm">{subtitle}</p>
+              {statusNote ? (
+                <p
+                  className={cn(
+                    'text-sm font-medium',
+                    warningTone === 'warning' ? 'text-amber-300' : 'text-blue-300'
+                  )}
+                >
+                  {statusNote}
+                </p>
+              ) : null}
               <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-sm">
                 <div>
                   <span className="text-foreground font-medium">Price:</span> {price}
                 </div>
                 <div>
-                  <span className="text-foreground font-medium">Renews at:</span> {billingDate}
+                  <span className="text-foreground font-medium">{billingDateLabel}:</span>{' '}
+                  {billingDate}
                 </div>
                 <div>
                   <span className="text-foreground font-medium">Payment:</span> {paymentMethod}

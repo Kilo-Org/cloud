@@ -60,8 +60,8 @@ describe('Disconnect handling & reaper', () => {
         status: 'running',
       });
 
-      // Set a heartbeat old enough to be stale (>90s threshold)
-      const staleHeartbeat = now - 200_000;
+      // Set a heartbeat old enough to be stale under default and configured thresholds.
+      const staleHeartbeat = now - 11 * 60 * 1000;
       await instance.updateExecutionHeartbeat(excId, staleHeartbeat);
 
       // Run the alarm (reaper)
@@ -190,7 +190,7 @@ describe('Disconnect handling & reaper', () => {
         status: 'running',
       });
 
-      // Set a recent heartbeat (10 seconds ago — well within 90s threshold)
+      // Set a recent heartbeat (10 seconds ago — well within stale thresholds)
       await instance.updateExecutionHeartbeat(excId, now - 10_000);
 
       // Run the alarm (reaper)
@@ -245,7 +245,7 @@ describe('Disconnect handling & reaper', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Fix 5: Dynamic alarm scheduling — 2-min interval when active, 5-min idle
+  // Fix 5: Dynamic alarm scheduling — 2-min interval when active, 1-hour idle
   // ---------------------------------------------------------------------------
 
   it('alarm schedules 2-minute interval when an active execution exists', async () => {
@@ -298,7 +298,7 @@ describe('Disconnect handling & reaper', () => {
     expect(delta).toBeLessThanOrEqual(125_000);
   });
 
-  it('alarm schedules 5-minute interval when no active execution exists', async () => {
+  it('alarm schedules 1-hour interval when no active execution exists', async () => {
     const userId = 'user_alarm_2';
     const sessionId = 'agent_alarm_2';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -324,12 +324,12 @@ describe('Disconnect handling & reaper', () => {
       return { nextAlarm, now };
     });
 
-    // 5-minute default interval = 300_000 ms
+    // 1-hour idle interval = 3_600_000 ms
     expect(result.nextAlarm).toBeDefined();
     const delta = (result.nextAlarm as number) - result.now;
     // Allow ± 5s for clock drift
-    expect(delta).toBeGreaterThanOrEqual(295_000);
-    expect(delta).toBeLessThanOrEqual(305_000);
+    expect(delta).toBeGreaterThanOrEqual(3_595_000);
+    expect(delta).toBeLessThanOrEqual(3_605_000);
   });
 
   // ---------------------------------------------------------------------------
@@ -562,8 +562,8 @@ describe('Disconnect handling & reaper', () => {
         status: 'running',
       });
 
-      // Stale heartbeat — exceeds the 90s threshold
-      await instance.updateExecutionHeartbeat(excId, now - 200_000);
+      // Stale heartbeat — exceeds default and configured thresholds.
+      await instance.updateExecutionHeartbeat(excId, now - 11 * 60 * 1000);
 
       // First alarm: should mark execution as failed and insert error event
       await instance.alarm();
@@ -626,8 +626,8 @@ describe('Disconnect handling & reaper', () => {
         status: 'running',
       });
 
-      // Stale heartbeat
-      await instance.updateExecutionHeartbeat(excId, now - 200_000);
+      // Stale heartbeat — exceeds default and configured thresholds.
+      await instance.updateExecutionHeartbeat(excId, now - 11 * 60 * 1000);
 
       // Set the interrupt flag before the reaper runs
       await instance.requestInterrupt();

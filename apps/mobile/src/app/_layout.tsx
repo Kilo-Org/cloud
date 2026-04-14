@@ -1,10 +1,11 @@
 import '../global.css';
 
+import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { isRunningInExpoGo } from 'expo';
-import { Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
+import { type Href, Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
@@ -15,7 +16,12 @@ import { Toaster } from 'sonner-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { initAppsFlyer } from '@/lib/appsflyer';
-import { ContextProvider, useAppContext } from '@/lib/context/context-context';
+import {
+  checkInitialNotification,
+  getPendingNotificationLink,
+  setupNotificationHandler,
+  setupNotificationResponseHandler,
+} from '@/lib/notifications';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
@@ -52,17 +58,17 @@ Sentry.init({
 });
 
 void SplashScreen.preventAutoHideAsync();
+setupNotificationHandler();
+checkInitialNotification();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading } = useAuth();
-  const { context, isLoading: contextLoading } = useAppContext();
   const { updateRequired, isChecking: updateChecking } = useForceUpdate();
   const segments = useSegments();
   const router = useRouter();
 
-  const isLoading = authLoading || contextLoading || updateChecking;
+  const isLoading = authLoading || updateChecking;
   const inAuthGroup = segments[0] === '(auth)';
-  const inContextGroup = segments[0] === '(context)';
   const inForceUpdate = segments[0] === 'force-update';
 
   useEffect(() => {
@@ -91,38 +97,25 @@ function RootLayoutNav() {
       } else {
         router.replace('/(auth)/login');
       }
-    } else if (!context) {
-      if (inContextGroup) {
-        void SplashScreen.hideAsync();
-      } else {
-        router.replace('/(context)/select');
-      }
-    } else if (inAuthGroup || inContextGroup) {
+    } else if (inAuthGroup) {
       router.replace('/(app)');
     } else {
       void SplashScreen.hideAsync();
+      // Navigate to pending notification deep link (cold start / background tap)
+      const pendingLink = getPendingNotificationLink();
+      if (pendingLink) {
+        router.push(pendingLink as Href);
+      }
     }
-  }, [
-    token,
-    context,
-    isLoading,
-    updateRequired,
-    inAuthGroup,
-    inContextGroup,
-    inForceUpdate,
-    router,
-  ]);
+  }, [token, isLoading, updateRequired, inAuthGroup, inForceUpdate, router]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;
   const needsAuth = !token && !inAuthGroup;
-  const needsContext = token != null && !context && !inContextGroup;
-  const needsAppRedirect =
-    (token != null && context != null && (inAuthGroup || inContextGroup)) || inForceUpdate;
+  const needsAppRedirect = token != null && inAuthGroup;
 
   const needsRedirect =
-    !isLoading &&
-    (needsForceUpdate || (!showingForceUpdate && (needsAuth || needsContext || needsAppRedirect)));
+    !isLoading && (needsForceUpdate || (!showingForceUpdate && (needsAuth || needsAppRedirect)));
 
   // Always keep Slot mounted so Expo Router's navigation tree stays
   // initialised — returning null unmounts it and breaks router.replace.
@@ -159,17 +152,26 @@ function RootLayout() {
     void startAppsFlyer();
   }, []);
 
+  useEffect(() => {
+    const subscription = setupNotificationResponseHandler();
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   return (
     <GestureHandlerRootView className="flex-1">
       <StatusBar style="auto" />
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <ContextProvider>
-              <RootLayoutNav />
-              <Toaster />
-              <PortalHost />
-            </ContextProvider>
+            <ActionSheetProvider>
+              <>
+                <RootLayoutNav />
+                <Toaster />
+                <PortalHost />
+              </>
+            </ActionSheetProvider>
           </AuthProvider>
         </QueryClientProvider>
       </TRPCProvider>

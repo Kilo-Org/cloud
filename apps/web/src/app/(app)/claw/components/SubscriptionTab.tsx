@@ -44,8 +44,8 @@ export function SubscriptionTab() {
             <p className="text-foreground text-sm font-medium">No active subscription</p>
             <p className="text-muted-foreground mt-1 text-sm">
               {trialDays != null
-                ? `Your free trial has ${trialDays} ${trialDays === 1 ? 'day' : 'days'} remaining. Subscribe to keep your instance running.`
-                : 'Subscribe to a hosting plan to keep your instance running.'}
+                ? `Your free trial has ${trialDays} ${trialDays === 1 ? 'day' : 'days'} remaining. You won't be charged automatically — subscribe to keep your instance running.`
+                : "Subscribe to a hosting plan to keep your instance running. You won't be charged automatically."}
             </p>
           </div>
           <Button variant="primary" onClick={() => setShowPlanDialog(true)}>

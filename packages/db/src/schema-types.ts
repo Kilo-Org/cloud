@@ -162,8 +162,29 @@ export const AffiliateProvider = {
 
 export type AffiliateProvider = (typeof AffiliateProvider)[keyof typeof AffiliateProvider];
 
+export const AffiliateEventType = {
+  Signup: 'signup',
+  TrialStart: 'trial_start',
+  TrialEnd: 'trial_end',
+  Sale: 'sale',
+} as const;
+
+export type AffiliateEventType = (typeof AffiliateEventType)[keyof typeof AffiliateEventType];
+
+export const AffiliateEventDeliveryState = {
+  Queued: 'queued',
+  Blocked: 'blocked',
+  Sending: 'sending',
+  Delivered: 'delivered',
+  Failed: 'failed',
+} as const;
+
+export type AffiliateEventDeliveryState =
+  (typeof AffiliateEventDeliveryState)[keyof typeof AffiliateEventDeliveryState];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
+  'kiloclaw.volume.extend',
   'kiloclaw.volume.reassociate',
   'kiloclaw.snapshot.restore',
   'kiloclaw.recovery.cleanup_retained_volume',
@@ -178,11 +199,23 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.config.restore',
   'kiloclaw.doctor.run',
   'kiloclaw.machine.destroy_fly',
+  'kiloclaw.machine.resize',
   'kiloclaw.subscription.bulk_trial_grant',
   'kiloclaw.subscription.admin_cancel',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
+
+// --- ContributorChampion enums ---
+
+export const ContributorChampionTier = {
+  Contributor: 'contributor',
+  Ambassador: 'ambassador',
+  Champion: 'champion',
+} as const;
+
+export type ContributorChampionTier =
+  (typeof ContributorChampionTier)[keyof typeof ContributorChampionTier];
 
 // =============================================================================
 // B. Type-Only Definitions (used in $type<T>())
@@ -872,6 +905,20 @@ export const OpenCodeSettingsSchema = z.object({
 
 export type OpenCodeSettings = z.infer<typeof OpenCodeSettingsSchema>;
 
+export const OpenClawApiAdapterSchema = z.enum([
+  'openai-completions',
+  'openai-responses',
+  'anthropic-messages',
+]);
+
+export type OpenClawApiAdapter = z.infer<typeof OpenClawApiAdapterSchema>;
+
+export const OpenClawModelSettingsSchema = z.object({
+  api_adapter: OpenClawApiAdapterSchema.optional(),
+});
+
+export type OpenClawModelSettings = z.infer<typeof OpenClawModelSettingsSchema>;
+
 export const InterleavedFormatSchema = z.enum(['reasoning_content', 'think']);
 
 export type InterleavedFormat = z.infer<typeof InterleavedFormatSchema>;
@@ -906,11 +953,13 @@ export const CustomLlmDefinitionSchema = z
     organization_ids: z.array(z.string()),
     supports_image_input: z.boolean().optional(),
     add_cache_breakpoints: z.boolean().optional(),
+    inject_reasoning_into_content: z.boolean().optional(),
     reasoning_summary: z.enum(['auto', 'concise', 'detailed']).optional(),
     extra_headers: CustomLlmExtraHeadersSchema.optional(),
     extra_body: CustomLlmExtraBodySchema.optional(),
     remove_from_body: z.array(z.string()).optional(),
     opencode_settings: OpenCodeSettingsSchema.optional(),
+    openclaw_settings: OpenClawModelSettingsSchema.optional(),
     pricing: CustomLlmPricingSchema.optional(),
   })
   .strict();

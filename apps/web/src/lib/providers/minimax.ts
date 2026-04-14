@@ -8,10 +8,12 @@ export const minimax_m25_free_model: KiloExclusiveModel = {
   context_length: 204800,
   max_completion_tokens: 131072,
   status: 'hidden', // usable through kilo-auto/free
-  flags: ['free', 'reasoning', 'prompt_cache'],
+  flags: ['reasoning'],
   gateway: 'openrouter',
   internal_id: 'minimax/minimax-m2.5',
   inference_provider: null,
+  pricing: null,
+  exclusive_to: [],
 };
 
 export function isMinimaxModel(model: string) {

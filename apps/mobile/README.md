@@ -10,6 +10,7 @@ Generally speaking, you only need a new dev build if making dependency/native ch
 
 1. obtain Expo access
 2. `pnpx eas-cli login -b`
+3. obtain Apple access (developer)
 
 ### Android
 

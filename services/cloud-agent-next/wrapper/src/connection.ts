@@ -19,6 +19,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+export function trimIngestEvent(event: IngestEvent): IngestEvent {
+  return {
+    ...event,
+    data: trimPayload(event.streamEventType, event.data),
+  };
+}
+
 /**
  * Type guard for session.idle events.
  * Kilo server sends: {type: "session.idle", properties: {sessionID: "..."}}
@@ -444,18 +451,31 @@ export function createConnectionManager(
             continue;
           }
 
+          // Auto-approve permission requests so the kilo server never stalls
+          // waiting for a human response that will never come.
+          if (eventType === 'permission.asked') {
+            const permId = typeof properties.id === 'string' ? properties.id : undefined;
+            if (permId) {
+              logToFile(`auto-approving permission ${permId} (${String(properties.permission)})`);
+              config.kiloClient.answerPermission(permId, 'always').catch(err => {
+                logToFile(
+                  `failed to auto-approve permission ${permId}: ${err instanceof Error ? err.message : String(err)}`
+                );
+              });
+            }
+            callbacks.onSseEvent?.();
+            continue;
+          }
+
           // Build and forward ingest event
-          const ingestEvent: IngestEvent = {
+          const untrimmedIngestEvent: IngestEvent = {
             streamEventType: 'kilocode',
             data: { ...properties, event: eventType, type: eventType, properties },
             timestamp: new Date().toISOString(),
           };
 
-          const trimmed: IngestEvent = {
-            ...ingestEvent,
-            data: trimPayload(ingestEvent.streamEventType, ingestEvent.data),
-          };
-          sendToIngest(trimmed);
+          const ingestEvent = trimIngestEvent(untrimmedIngestEvent);
+          sendToIngest(ingestEvent);
           callbacks.onSseEvent?.();
 
           // Track the last root-session assistant message ID for autocommit association

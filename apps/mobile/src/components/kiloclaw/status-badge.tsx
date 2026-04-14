@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { type GatewayState, type InstanceStatus } from '@/lib/hooks/use-kiloclaw';
+import { type GatewayState, type InstanceStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { cn } from '@/lib/utils';
 type StatusValue = InstanceStatus | GatewayState | null | undefined;
 

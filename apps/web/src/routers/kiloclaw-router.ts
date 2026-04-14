@@ -32,6 +32,7 @@ import {
   kiloclaw_cli_runs,
   cloud_agent_webhook_triggers,
   credit_transactions,
+  organizations,
 } from '@kilocode/db/schema';
 import { and, eq, ne, desc, isNotNull, isNull, inArray, sql, like, or } from 'drizzle-orm';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
@@ -40,6 +41,7 @@ import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kilo
 import {
   ensureActiveInstance,
   getActiveInstance,
+  listAllActiveInstances,
   markActiveInstanceDestroyed,
   markInstanceDestroyedById,
   renameInstance,
@@ -56,6 +58,7 @@ import {
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
+import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
 import {
   getStripePriceIdForClawPlan,
@@ -83,7 +86,7 @@ import {
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
-import { trackTrialStart } from '@/lib/impact';
+import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 
 /**
  * Error codes whose messages may contain raw internal details (e.g. filesystem
@@ -191,9 +194,9 @@ async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKilo
     return active;
   }
 
-  const newInstance = await ensureActiveInstance(userId);
-  await adoptOrphanedSubscription(userId, newInstance.id);
-  return newInstance;
+  const { instance } = await ensureActiveInstance(userId);
+  await adoptOrphanedSubscription(userId, instance.id);
+  return instance;
 }
 
 type PersonalBillingInstanceRow = {
@@ -400,6 +403,10 @@ const updateKiloCodeConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
 });
 
+const patchWebSearchConfigSchema = z.object({
+  exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
+});
+
 const patchChannelsSchema = z.object({
   telegramBotToken: z.string().nullable().optional(),
   discordBotToken: z.string().nullable().optional(),
@@ -455,6 +462,44 @@ type KiloCodeConfigPublicResponse = Pick<
   'kilocodeApiKeyExpiresAt' | 'kilocodeDefaultModel'
 >;
 
+function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDashboardStatus {
+  return {
+    userId,
+    sandboxId: null,
+    provider: null,
+    runtimeId: null,
+    storageId: null,
+    region: null,
+    status: null,
+    provisionedAt: null,
+    lastStartedAt: null,
+    lastStoppedAt: null,
+    envVarCount: 0,
+    secretCount: 0,
+    channelCount: 0,
+    flyAppName: null,
+    flyMachineId: null,
+    flyVolumeId: null,
+    flyRegion: null,
+    machineSize: null,
+    openclawVersion: null,
+    imageVariant: null,
+    trackedImageTag: null,
+    trackedImageDigest: null,
+    googleConnected: false,
+    gmailNotificationsEnabled: false,
+    execSecurity: null,
+    execAsk: null,
+    botName: null,
+    botNature: null,
+    botVibe: null,
+    botEmoji: null,
+    workerUrl,
+    name: null,
+    instanceId: null,
+  } satisfies KiloClawDashboardStatus;
+}
+
 function sanitizeKiloCodeConfigResponse(
   response: KiloCodeConfigResponse
 ): KiloCodeConfigPublicResponse {
@@ -466,13 +511,18 @@ function sanitizeKiloCodeConfigResponse(
 
 async function provisionInstance(
   user: Parameters<typeof generateApiToken>[0],
-  input: z.infer<typeof updateConfigSchema>
+  input: z.infer<typeof updateConfigSchema>,
+  /** The exact row ID that ensureProvisionAccess created (if any).
+   *  Null when the access check returned an existing row or skipped
+   *  row creation (earlybird path). */
+  instanceIdCreatedByAccessCheck: string | null
 ) {
-  // Remember which row existed before so we can detect whether
-  // ensureActiveInstance created a new one for this attempt.
-  const preExistingRow = await getActiveInstance(user.id);
-  const instanceRow = await ensureActiveInstance(user.id);
-  const rowIsNew = !preExistingRow || preExistingRow.id !== instanceRow.id;
+  const { instance: instanceRow, created: createdHere } = await ensureActiveInstance(user.id);
+  // Track the exact row ID this request created. Under concurrent
+  // provisions, two requests may each create a row but then converge on
+  // the oldest one via getActiveInstance. Only clean up instanceRow if
+  // it's the same row this request actually inserted.
+  const createdRowId = instanceIdCreatedByAccessCheck ?? (createdHere ? instanceRow.id : null);
 
   const encryptedSecrets = input.secrets
     ? Object.fromEntries(
@@ -510,9 +560,11 @@ async function provisionInstance(
       workerInstanceId(instanceRow) ? { instanceId: instanceRow.id } : undefined
     );
   } catch (error) {
-    // Only clean up the exact row this attempt created. Target by primary
-    // key so a concurrent request's row is never affected.
-    if (rowIsNew) {
+    // Only clean up if this request created the row AND it's the row
+    // we actually tried to provision. Under concurrent inserts, the
+    // row we created may differ from instanceRow (which converges on
+    // the oldest active row). Never destroy a row another request owns.
+    if (createdRowId && createdRowId === instanceRow.id) {
       await markInstanceDestroyedById(instanceRow.id).catch(cleanupErr => {
         console.error(
           '[kiloclaw] Failed to clean up instance row after provision error:',
@@ -619,7 +671,10 @@ async function fetchKiloClawServiceDegraded(): Promise<boolean> {
  * Earlybird is checked first so earlybird purchasers never get an accidental
  * trial row, and expired earlybird users cannot regain access by provisioning.
  */
-async function ensureProvisionAccess(userId: string, userEmail: string): Promise<void> {
+async function ensureProvisionAccess(
+  userId: string,
+  userEmail: string
+): Promise<{ createdInstanceId: string | null }> {
   // Check earlybird before anything else — active earlybird grants access,
   // expired earlybird must not fall through to the trial bootstrap.
   const [earlybird] = await db
@@ -628,7 +683,9 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
     .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
     .limit(1);
   if (earlybird) {
-    if (new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > new Date()) return;
+    if (new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > new Date()) {
+      return { createdInstanceId: null };
+    }
     // Expired earlybird — fall through to subscription check, but must not
     // auto-create a trial (spec: user must manually subscribe).
   }
@@ -636,7 +693,8 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
   // Ensure the instance row exists so we can check/link subscriptions.
   // ensureActiveInstance is idempotent; the subsequent call in provisionInstance
   // will be a no-op.
-  const instance = await ensureActiveInstance(userId);
+  const { instance, created } = await ensureActiveInstance(userId);
+  const createdInstanceId = created ? instance.id : null;
 
   // Adopt any orphaned subscription (instance_id = NULL) onto this instance
   // before checking access.  This covers the case where a user destroyed their
@@ -688,23 +746,26 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
       });
 
       void (async () => {
-        const attribution = await getAffiliateAttribution(userId, 'impact');
-        if (!attribution) return;
-
-        await trackTrialStart({
-          clickId: attribution.tracking_id,
-          customerId: userId,
-          customerEmail: userEmail,
+        await enqueueAffiliateEventForUser({
+          userId,
+          provider: 'impact',
+          eventType: 'trial_start',
+          dedupeKey: buildAffiliateEventDedupeKey({
+            provider: 'impact',
+            eventType: 'trial_start',
+            entityId: inserted.id,
+          }),
           eventDate: now,
+          orderId: IMPACT_ORDER_ID_MACRO,
         });
       })().catch(error => {
-        sentryLogger('kiloclaw-impact', 'warning')('Impact trial start tracking failed', {
+        sentryLogger('affiliate-events', 'warning')('Affiliate trial start enqueue failed', {
           user_id: userId,
           error: error instanceof Error ? error.message : String(error),
         });
       });
     }
-    return;
+    return { createdInstanceId };
   }
 
   // Access check: check the subscription on this specific instance.
@@ -735,7 +796,7 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
         !!instanceSub.trial_ends_at &&
         new Date(instanceSub.trial_ends_at) > new Date());
 
-    if (hasAccess) return;
+    if (hasAccess) return { createdInstanceId };
   }
 
   throw new TRPCError({
@@ -1394,20 +1455,76 @@ export const kiloclawRouter = createTRPCRouter({
     return client.getLatestVersion();
   }),
 
+  /**
+   * List all active KiloClaw instances for the user across all contexts
+   * (personal + every org they belong to). Returns lightweight metadata
+   * with live status for each instance.
+   */
+  listAllInstances: baseProcedure.query(async ({ ctx }) => {
+    const instances = await listAllActiveInstances(ctx.user.id);
+    if (instances.length === 0) return [];
+
+    // Build org name map for instances that belong to organizations
+    const orgIds = [
+      ...new Set(instances.map(i => i.organizationId).filter((id): id is string => id !== null)),
+    ];
+    const orgNameMap = new Map<string, string>();
+    if (orgIds.length > 0) {
+      const orgs = await db
+        .select({ id: organizations.id, name: organizations.name })
+        .from(organizations)
+        .where(inArray(organizations.id, orgIds));
+      for (const org of orgs) {
+        orgNameMap.set(org.id, org.name);
+      }
+    }
+
+    // Fetch live status from each instance's worker in parallel
+    const client = new KiloClawInternalClient();
+    const results = await Promise.all(
+      instances.map(async instance => {
+        let status: string | null = null;
+        try {
+          const workerStatus = await client.getStatus(ctx.user.id, workerInstanceId(instance));
+          status = workerStatus.status;
+        } catch {
+          // Worker unreachable — show as null (unknown)
+        }
+        return {
+          id: instance.id,
+          sandboxId: instance.sandboxId,
+          name: instance.name,
+          organizationId: instance.organizationId,
+          organizationName: instance.organizationId
+            ? (orgNameMap.get(instance.organizationId) ?? null)
+            : null,
+          status,
+        };
+      })
+    );
+
+    return results;
+  }),
+
   getStatus: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
+    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
+
+    if (!instance) {
+      return createNoInstanceStatus(ctx.user.id, workerUrl);
+    }
+
     const client = new KiloClawInternalClient();
     const status = await client.getStatus(ctx.user.id, workerInstanceId(instance));
-    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
 
     return {
       ...status,
-      name: instance?.name ?? null,
+      name: instance.name ?? null,
       workerUrl,
       // Only expose instanceId for instance-keyed instances (ki_ sandboxId).
       // Legacy instances use userId-keyed DOs — returning their row UUID would
       // cause the frontend/gateway to resolve the wrong DO.
-      instanceId: workerInstanceId(instance) ? (instance?.id ?? null) : null,
+      instanceId: workerInstanceId(instance) ? instance.id : null,
     } satisfies KiloClawDashboardStatus;
   }),
 
@@ -1642,8 +1759,11 @@ export const kiloclawRouter = createTRPCRouter({
 
   // Explicit lifecycle APIs
   provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
-    return provisionInstance(ctx.user, input);
+    const { createdInstanceId } = await ensureProvisionAccess(
+      ctx.user.id,
+      ctx.user.google_user_email
+    );
+    return provisionInstance(ctx.user, input, createdInstanceId);
   }),
 
   patchConfig: clawAccessProcedure
@@ -1655,8 +1775,11 @@ export const kiloclawRouter = createTRPCRouter({
   // Backward-compatible alias — uses the same trial-bootstrap flow as provision
   // so first-time callers can create a trial row (clawAccessProcedure would reject them).
   updateConfig: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
-    return provisionInstance(ctx.user, input);
+    const { createdInstanceId } = await ensureProvisionAccess(
+      ctx.user.id,
+      ctx.user.google_user_email
+    );
+    return provisionInstance(ctx.user, input, createdInstanceId);
   }),
 
   updateKiloCodeConfig: clawAccessProcedure
@@ -1681,6 +1804,14 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       return client.patchExecPreset(ctx.user.id, input, workerInstanceId(instance));
+    }),
+
+  patchWebSearchConfig: clawAccessProcedure
+    .input(patchWebSearchConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return client.patchWebSearchConfig(ctx.user.id, input, workerInstanceId(instance));
     }),
 
   patchBotIdentity: clawAccessProcedure
@@ -1829,6 +1960,8 @@ export const kiloclawRouter = createTRPCRouter({
       })),
       helpText: entry.helpText,
       helpUrl: entry.helpUrl,
+      guideText: entry.guideText,
+      guideUrl: entry.guideUrl,
       allFieldsRequired: entry.allFieldsRequired ?? false,
     }));
   }),
@@ -1858,6 +1991,8 @@ export const kiloclawRouter = createTRPCRouter({
       })),
       helpText: entry.helpText,
       helpUrl: entry.helpUrl,
+      guideText: entry.guideText,
+      guideUrl: entry.guideUrl,
       allFieldsRequired: entry.allFieldsRequired ?? false,
     }));
   }),
@@ -3050,14 +3185,14 @@ export const kiloclawRouter = createTRPCRouter({
             type: 'kiloclaw',
             plan: input.plan,
             kiloUserId: ctx.user.id,
-            impactClickId: attribution?.tracking_id ?? '',
+            affiliateTrackingId: attribution?.tracking_id ?? '',
           },
         },
         metadata: {
           type: 'kiloclaw',
           plan: input.plan,
           kiloUserId: ctx.user.id,
-          impactClickId: attribution?.tracking_id ?? '',
+          affiliateTrackingId: attribution?.tracking_id ?? '',
         },
       });
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { Settings } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -18,11 +18,11 @@ import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
-import { showCancelFlow } from '@/lib/churnkey/loader';
+import { useTRPC } from '@/lib/trpc/utils';
 
 import { getTierName } from './utils';
 import { useKiloPassSubscriptionInfo } from './useKiloPassSubscriptionInfo';
+import { useKiloPassChurnkeyCancelFlow } from './useKiloPassChurnkeyCancelFlow';
 import {
   getCadenceLabel,
   UpdateFooter,
@@ -39,8 +39,12 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const { isOpen, onClose } = props;
   const { subscription, view, actions } = useKiloPassSubscriptionInfo();
   const trpc = useTRPC();
-  const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
+  const { openCancelFlow, isOpeningCancelFlow } = useKiloPassChurnkeyCancelFlow({
+    stripeSubscriptionId: subscription.stripeSubscriptionId,
+    fallbackCancelSubscription: actions.cancelSubscription,
+    onBeforeOpen: onClose,
+  });
 
   const scheduledChangeQuery = useQuery({
     ...trpc.kiloPass.getScheduledChange.queryOptions(),
@@ -82,7 +86,10 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
     cancelScheduledChange.isPending || isCancelingPendingChangeUntilRefetch;
 
   const isMutating =
-    scheduleChange.isPending || isCancelingPendingChange || actions.isCancelingSubscription;
+    scheduleChange.isPending ||
+    isCancelingPendingChange ||
+    actions.isCancelingSubscription ||
+    isOpeningCancelFlow;
 
   const isSameSelection =
     targetTier === subscription.tier && targetCadence === subscription.cadence;
@@ -250,41 +257,6 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const pendingChange = Boolean(scheduledChange);
   const showUpdatePanel = panel === 'update' && !pendingChange;
 
-  const handleOpenCancelFlow = useCallback(async () => {
-    try {
-      const { hash, customerId } = await trpcClient.kiloPass.getChurnkeyAuthHash.query();
-      onClose();
-
-      await showCancelFlow({
-        authHash: hash,
-        customerId,
-        stripeSubscriptionId: subscription.stripeSubscriptionId,
-        onCancel: async () => {
-          await trpcClient.kiloPass.cancelSubscription.mutate();
-          toast('Cancellation scheduled');
-          void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
-          void queryClient.invalidateQueries({
-            queryKey: trpc.kiloPass.getScheduledChange.queryKey(),
-          });
-        },
-        onClose: () => {
-          // Also invalidate on close to catch discount-accepted or other state changes
-          void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
-          void queryClient.invalidateQueries({
-            queryKey: trpc.kiloPass.getScheduledChange.queryKey(),
-          });
-        },
-      });
-    } catch (error) {
-      // If Churnkey SDK fails to load, fall back to direct cancellation
-      const message = error instanceof Error ? error.message : 'Failed to open cancel flow';
-      toast.error(message);
-      if (window.confirm('Are you sure you want to cancel your Kilo Pass subscription?')) {
-        actions.cancelSubscription();
-      }
-    }
-  }, [actions, onClose, queryClient, subscription.stripeSubscriptionId, trpc, trpcClient]);
-
   return (
     <Dialog
       open={isOpen}
@@ -337,9 +309,10 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
             cancelAction={cancelAction}
             onResumeSubscription={actions.resumeCancelledSubscription}
             onResumePausedSubscription={actions.resumePausedSubscription}
-            onOpenCancelSubscription={handleOpenCancelFlow}
+            onOpenCancelSubscription={openCancelFlow}
             isResumingSubscription={actions.isResumingSubscription}
             isCancelingSubscription={actions.isCancelingSubscription}
+            isOpeningCancelFlow={isOpeningCancelFlow}
           />
         )}
 

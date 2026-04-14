@@ -25,6 +25,7 @@ import { CreateKilocodeOrgButton } from '@/components/dev/CreateKilocodeOrgButto
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { UserProfileCard } from '@/components/profile/UserProfileCard';
 import { ProfileKiloClawBanner } from '@/components/profile/ProfileKiloClawBanner';
+import { getContributorChampionProfileBadgeForUser } from '@/lib/contributor-champions/service';
 
 export default async function ProfilePage({ searchParams }: AppPageProps) {
   const user = await getUserFromAuthOrRedirect('/users/sign_in');
@@ -40,6 +41,9 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
 
   const { ideName, logoSrc } = getExtensionUrl(params, await cookies());
   const orgs = customerInfo.hasOrganizations ? await getUserOrganizationsWithSeats(user.id) : [];
+  const contributorChampionBadge = await getContributorChampionProfileBadgeForUser({
+    userId: user.id,
+  });
 
   const remainingCreditsText = customerInfo.hasOrganizations
     ? 'Remaining Personal Credits'
@@ -59,6 +63,7 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
               linkedinUrl={user.linkedin_url ?? null}
               githubUrl={user.github_url ?? null}
               githubOAuthDisplayName={githubOAuthDisplayName}
+              contributorChampionTier={contributorChampionBadge?.tier ?? null}
             />
           </CardContent>
         </Card>

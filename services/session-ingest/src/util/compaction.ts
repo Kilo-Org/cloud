@@ -24,6 +24,8 @@ export function getItemIdentity(item: SessionDataItem): {
       return { item_id: 'session_open', item_type: 'session_open' };
     case 'session_close':
       return { item_id: 'session_close', item_type: 'session_close' };
+    case 'session_status':
+      return { item_id: 'session_status', item_type: 'session_status' };
     default:
       throw new Error(`Unknown item type: ${String((item as SessionDataItem)['type'])}`);
   }

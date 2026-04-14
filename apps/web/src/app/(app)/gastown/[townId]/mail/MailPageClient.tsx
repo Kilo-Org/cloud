@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { Mail } from 'lucide-react';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import { formatDistanceToNow } from 'date-fns';
 
 export function MailPageClient({ townId }: { townId: string }) {
@@ -17,8 +18,9 @@ export function MailPageClient({ townId }: { townId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-3">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-2">
+          <SidebarTrigger className="-ml-3" />
           <Mail className="size-4 text-[color:oklch(95%_0.15_108_/_0.6)]" />
           <h1 className="text-lg font-semibold tracking-tight text-white/90">Mail</h1>
           <span className="ml-1 font-mono text-xs text-white/30">{mailEvents.length}</span>

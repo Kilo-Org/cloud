@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { getInitialsFromName } from '@/lib/utils';
 import { Mail, Linkedin, Github, Edit } from 'lucide-react';
 import { EditProfileDialog } from './EditProfileDialog';
+import type { ContributorChampionTier } from '@kilocode/db/schema-types';
 
 type UserProfileCardProps = {
   name: string;
@@ -13,7 +15,14 @@ type UserProfileCardProps = {
   linkedinUrl: string | null;
   githubUrl: string | null;
   githubOAuthDisplayName: string | null;
+  contributorChampionTier: ContributorChampionTier | null;
 };
+
+function formatContributorChampionTier(tier: ContributorChampionTier): string {
+  if (tier === 'champion') return 'Champion';
+  if (tier === 'ambassador') return 'Ambassador';
+  return 'Contributor';
+}
 
 export function UserProfileCard({
   name,
@@ -22,6 +31,7 @@ export function UserProfileCard({
   linkedinUrl,
   githubUrl,
   githubOAuthDisplayName,
+  contributorChampionTier,
 }: UserProfileCardProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
@@ -45,6 +55,13 @@ export function UserProfileCard({
               <Mail className="mr-1.5 h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{email}</span>
             </p>
+            {contributorChampionTier ? (
+              <div className="mt-2">
+                <Badge variant="secondary-outline">
+                  Contributor Champions: {formatContributorChampionTier(contributorChampionTier)}
+                </Badge>
+              </div>
+            ) : null}
             <div className="mt-2 flex flex-col gap-1">
               <ProfileLink
                 icon={<Linkedin className="mr-1.5 h-3.5 w-3.5" />}

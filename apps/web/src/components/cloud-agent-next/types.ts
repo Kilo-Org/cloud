@@ -368,6 +368,8 @@ export type StoredSession = {
   createdOnPlatform?: string | null;
   /** Git branch name, shown separately from repository in the sidebar */
   branch?: string | null;
+  sessionStatus?: string | null;
+  sessionStatusUpdatedAt?: string | null;
 };
 
 // ============================================================================

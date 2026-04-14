@@ -55,10 +55,52 @@ const ONBOARD_FLAGS = [
   '--skip-health',
 ] as const;
 
+const KILOCLAW_CUSTOMIZER_PLUGIN_ID = 'kiloclaw-customizer';
+const KILOCLAW_CUSTOMIZER_PLUGIN_PATH = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
+const KILO_EXA_PROVIDER_ID = 'kilo-exa';
+
+type KiloExaSearchMode = 'kilo-proxy' | 'disabled';
+
+type KiloExaSearchModeState = KiloExaSearchMode | 'unset';
+
+function resolveKiloExaSearchMode(value: string | undefined): KiloExaSearchModeState {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === 'kilo-proxy') {
+    return 'kilo-proxy';
+  }
+  if (normalized === 'disabled') {
+    return 'disabled';
+  }
+  if (normalized === undefined || normalized === '') {
+    return 'unset';
+  }
+  console.warn(`Unknown KILO_EXA_SEARCH_MODE value "${value}"; treating as "disabled"`);
+  return 'disabled';
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ConfigObject = Record<string, any>;
 
 type EnvLike = Record<string, string | undefined>;
+
+function migrateWakeHookTemplate(mapping: ConfigObject): ConfigObject {
+  if (mapping.action === 'wake' && typeof mapping.messageTemplate === 'string') {
+    mapping.textTemplate = mapping.messageTemplate;
+    delete mapping.messageTemplate;
+  }
+  return mapping;
+}
+
+const INBOUND_EMAIL_HOOK_MAPPING = {
+  id: 'cloudflare-email-inbound',
+  match: { path: 'email' },
+  action: 'wake',
+  wakeMode: 'now',
+  name: 'Inbound Email',
+  sessionKey: '{{payload.sessionKey}}',
+  textTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+  deliver: false,
+};
 
 type ExecFileOptions = { env?: NodeJS.ProcessEnv; stdio?: 'inherit' | 'pipe' };
 
@@ -222,9 +264,10 @@ export function generateBaseConfig(
     delete config.agents.defaults.models;
   }
 
-  // Tool profile: on fresh install (or explicit config restore), override the
-  // onboard default "messaging" with "full" so agents have all tools. On
-  // subsequent boots, leave the user's choice untouched.
+  // Tool profile: on fresh install, override the onboard default "messaging"
+  // with "full" so agents have all tools. Also backfill to "full" when the
+  // profile field is missing. On subsequent boots, leave user's explicit
+  // profile choice untouched.
   config.tools = config.tools ?? {};
   if (env.KILOCLAW_FRESH_INSTALL === 'true' || !config.tools.profile) {
     config.tools.profile = 'full';
@@ -251,6 +294,65 @@ export function generateBaseConfig(
   config.browser.enabled = true;
   config.browser.headless = true;
   config.browser.noSandbox = true;
+
+  // KiloClaw customizer plugin
+  // Always load/enable this plugin so KiloClaw identity behavior is consistent
+  // across first boot and subsequent restarts.
+  config.plugins = config.plugins ?? {};
+  config.plugins.load = config.plugins.load ?? {};
+  config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
+    ? config.plugins.load.paths
+    : [];
+  if (!(config.plugins.load.paths as string[]).includes(KILOCLAW_CUSTOMIZER_PLUGIN_PATH)) {
+    (config.plugins.load.paths as string[]).push(KILOCLAW_CUSTOMIZER_PLUGIN_PATH);
+  }
+  config.plugins.entries = config.plugins.entries ?? {};
+  config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID] =
+    config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID] ?? {};
+  config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID].enabled = true;
+
+  const customizerPluginConfig = config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID].config ?? {};
+  const customizerWebSearchConfig = customizerPluginConfig.webSearch ?? {};
+  const searchProvider = config.tools?.web?.search?.provider;
+  const hasExplicitSearchProvider =
+    typeof searchProvider === 'string' && searchProvider.trim().length > 0;
+
+  const kiloExaSearchMode = resolveKiloExaSearchMode(env.KILO_EXA_SEARCH_MODE);
+  const shouldForceExa = kiloExaSearchMode === 'kilo-proxy';
+  const shouldAutoAssignExa = kiloExaSearchMode === 'unset' && !hasExplicitSearchProvider;
+  if (shouldForceExa || shouldAutoAssignExa) {
+    customizerWebSearchConfig.enabled = true;
+    config.tools = config.tools ?? {};
+    config.tools.web = config.tools.web ?? {};
+    config.tools.web.search = config.tools.web.search ?? {};
+    config.tools.web.search.enabled = true;
+    config.tools.web.search.provider = KILO_EXA_PROVIDER_ID;
+    if (shouldAutoAssignExa) {
+      console.log('[config-writer] Auto-assigned web search provider to kilo-exa (mode=unset)');
+    }
+  } else if (kiloExaSearchMode === 'disabled') {
+    customizerWebSearchConfig.enabled = false;
+
+    const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
+    if (
+      braveConfigured &&
+      (!hasExplicitSearchProvider || config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID)
+    ) {
+      config.tools = config.tools ?? {};
+      config.tools.web = config.tools.web ?? {};
+      config.tools.web.search = config.tools.web.search ?? {};
+      config.tools.web.search.enabled = true;
+      config.tools.web.search.provider = 'brave';
+    } else if (config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID) {
+      delete config.tools.web.search.provider;
+    }
+  } else if (hasExplicitSearchProvider) {
+    customizerWebSearchConfig.enabled =
+      config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID;
+  }
+
+  customizerPluginConfig.webSearch = customizerWebSearchConfig;
+  config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID].config = customizerPluginConfig;
 
   // Telegram
   if (env.TELEGRAM_BOT_TOKEN) {
@@ -333,21 +435,37 @@ export function generateBaseConfig(
     config.plugins.entries[scEntry].enabled = true;
   }
 
-  // Webhook hooks configuration (required for Gmail push notifications via gog).
-  // hooks.token authenticates incoming hook requests from gog's --hook-token.
-  // The gmail preset maps gog's gmailHookPayload into OpenClaw's expected format.
+  // Webhook hooks configuration for controller-mediated inbound events.
+  // hooks.token stays local to the machine; external Workers authenticate to
+  // controller endpoints with the gateway token instead.
   if (env.KILOCLAW_HOOKS_TOKEN) {
     config.hooks = config.hooks ?? {};
     config.hooks.enabled = true;
     config.hooks.token = env.KILOCLAW_HOOKS_TOKEN;
-    config.hooks.presets = config.hooks.presets ?? [];
-    if (!Array.isArray(config.hooks.presets)) {
-      config.hooks.presets = [];
+    config.hooks.path = '/hooks';
+
+    config.hooks.mappings = Array.isArray(config.hooks.mappings)
+      ? config.hooks.mappings.map((mapping: ConfigObject) => migrateWakeHookTemplate(mapping))
+      : [];
+    const existingEmailMappingIndex = config.hooks.mappings.findIndex(
+      (mapping: ConfigObject) => mapping.id === INBOUND_EMAIL_HOOK_MAPPING.id
+    );
+    if (existingEmailMappingIndex === -1) {
+      config.hooks.mappings.push(INBOUND_EMAIL_HOOK_MAPPING);
+    } else {
+      config.hooks.mappings[existingEmailMappingIndex] = INBOUND_EMAIL_HOOK_MAPPING;
     }
-    if (!(config.hooks.presets as string[]).includes('gmail')) {
-      (config.hooks.presets as string[]).push('gmail');
+
+    if (env.KILOCLAW_GOG_CONFIG_TARBALL) {
+      config.hooks.presets = config.hooks.presets ?? [];
+      if (!Array.isArray(config.hooks.presets)) {
+        config.hooks.presets = [];
+      }
+      if (!(config.hooks.presets as string[]).includes('gmail')) {
+        (config.hooks.presets as string[]).push('gmail');
+      }
     }
-    console.log('Hooks enabled with gmail preset (dedicated token)');
+    console.log('Hooks enabled with inbound email mapping (dedicated token)');
   }
 
   // Custom secret config path patching — set decrypted secret values at
@@ -547,16 +665,11 @@ export function writeBaseConfig(
     console.log('Onboard completed, patching config...');
 
     // 4. Patch the fresh onboard config with env-var-derived fields.
-    // writeBaseConfig is called for both fresh installs (bootstrap onboard path)
-    // and config restores (/_kilo/config/restore). In both cases, tools.profile
-    // should be forced to 'full' — the onboard default 'messaging' leaves agents
-    // without shell/file/web tools.
-    const prevFreshInstall = env.KILOCLAW_FRESH_INSTALL;
-    env.KILOCLAW_FRESH_INSTALL = 'true';
     const config = generateBaseConfig(env, tmpPath, deps);
-    // Restore the original value so callers that set it before calling us
-    // (like bootstrap's runOnboardOrDoctor) don't get surprised.
-    env.KILOCLAW_FRESH_INSTALL = prevFreshInstall;
+    // Restore flow should still force full tools profile even when
+    // KILOCLAW_FRESH_INSTALL is not set.
+    config.tools = config.tools ?? {};
+    config.tools.profile = 'full';
 
     // 5. Serialize and validate roundtrip
     const serialized = JSON.stringify(config, null, 2);

@@ -87,6 +87,7 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
     case 'clawTrialEndingSoon':
       return { days_remaining: '5', claw_url: `${NEXTAUTH_URL}/claw` };
     case 'clawTrialExpiresTomorrow':
+    case 'clawInstanceReady':
     case 'clawInstanceDestroyed':
       return { claw_url: `${NEXTAUTH_URL}/claw` };
     case 'clawSuspendedTrial':
@@ -100,6 +101,8 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return {
         destruction_date: formatDate(new Date(Date.now() + 2 * 86_400_000)),
         claw_url: `${NEXTAUTH_URL}/claw`,
+        instance_label: 'Research Claw',
+        instance_id_short: '11111111',
       };
     case 'clawEarlybirdEndingSoon':
       return { days_remaining: '14', expiry_date: '2026-09-26', claw_url: `${NEXTAUTH_URL}/claw` };
@@ -107,6 +110,10 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return { expiry_date: '2026-09-26', claw_url: `${NEXTAUTH_URL}/claw` };
     case 'clawCreditRenewalFailed':
       return { claw_url: `${NEXTAUTH_URL}/claw` };
+    case 'clawComplementaryInferenceEnded':
+      return { claw_url: `${NEXTAUTH_URL}/claw` };
+    case 'accountDeletionRequest':
+      return { email: 'user@example.com' };
   }
   throw new Error(`Unknown template: ${template}`);
 }

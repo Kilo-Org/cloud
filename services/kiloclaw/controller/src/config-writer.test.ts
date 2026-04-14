@@ -137,6 +137,143 @@ describe('generateBaseConfig', () => {
     expect(config.tools.profile).toBe('full');
   });
 
+  it('preserves existing web search provider on non-fresh boot', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'brave',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('brave');
+  });
+
+  it('auto-assigns kilo-exa when provider is missing and mode is unset', () => {
+    const existing = JSON.stringify({ tools: { web: { search: {} } } });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
+  it('auto-assigns kilo-exa even when web search was explicitly disabled but provider is missing', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            enabled: false,
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
+  it('preserves explicit kilo-exa provider when mode is unset', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'kilo-exa',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
+  it('selects kilo-exa provider when KILO_EXA_SEARCH_MODE=kilo-proxy', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILO_EXA_SEARCH_MODE: 'kilo-proxy' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
+  it('switches to brave when Exa is disabled and BRAVE_API_KEY is configured', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'kilo-exa',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      KILO_EXA_SEARCH_MODE: 'disabled',
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('brave');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(false);
+  });
+
+  it('preserves explicit non-Exa provider when Exa is disabled and BRAVE_API_KEY is configured', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'perplexity',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      KILO_EXA_SEARCH_MODE: 'disabled',
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('perplexity');
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(false);
+  });
+
+  it('clears kilo-exa provider when Exa is disabled and Brave is not configured', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'kilo-exa',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      KILO_EXA_SEARCH_MODE: 'disabled',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBeUndefined();
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(false);
+  });
+
   it('defaults tool profile to full when not previously set', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
@@ -433,6 +570,33 @@ describe('generateBaseConfig', () => {
     ]);
   });
 
+  it('always configures the KiloClaw customizer plugin', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.plugins.entries['kiloclaw-customizer'].enabled).toBe(true);
+    expect(config.plugins.load.paths).toContain(
+      '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'
+    );
+  });
+
+  it('does not duplicate KiloClaw customizer plugin path on repeated generateBaseConfig calls', () => {
+    const existing = JSON.stringify({
+      plugins: {
+        load: {
+          paths: ['/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'],
+        },
+        entries: { 'kiloclaw-customizer': { enabled: true } },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    const pluginPath = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
+    const paths = config.plugins.load.paths as string[];
+    expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
+  });
+
   it('configures Telegram channel', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv(), TELEGRAM_BOT_TOKEN: 'tg-token-123' };
@@ -661,13 +825,80 @@ describe('generateBaseConfig', () => {
     expect(config.channels.telegram.dmPolicy).toBe('pairing');
   });
 
-  it('configures hooks when KILOCLAW_HOOKS_TOKEN is set', () => {
+  it('configures inbound email hooks when KILOCLAW_HOOKS_TOKEN is set', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'test-hooks-token' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
     expect(config.hooks.enabled).toBe(true);
     expect(config.hooks.token).toBe('test-hooks-token');
+    expect(config.hooks.path).toBe('/hooks');
+    expect(config.hooks.presets).toBeUndefined();
+    expect(config.hooks.mappings).toContainEqual({
+      id: 'cloudflare-email-inbound',
+      match: { path: 'email' },
+      action: 'wake',
+      wakeMode: 'now',
+      name: 'Inbound Email',
+      sessionKey: '{{payload.sessionKey}}',
+      textTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+      deliver: false,
+    });
+  });
+
+  it('migrates wake hook messageTemplate to textTemplate', () => {
+    const existing = JSON.stringify({
+      hooks: {
+        mappings: [
+          {
+            id: 'cloudflare-email-inbound',
+            match: { path: 'email' },
+            action: 'wake',
+            wakeMode: 'now',
+            name: 'Inbound Email',
+            sessionKey: '{{payload.sessionKey}}',
+            messageTemplate: 'old template',
+            deliver: false,
+          },
+          {
+            id: 'custom-wake',
+            action: 'wake',
+            messageTemplate: 'custom template',
+          },
+        ],
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'test-hooks-token' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.hooks.mappings).toContainEqual({
+      id: 'cloudflare-email-inbound',
+      match: { path: 'email' },
+      action: 'wake',
+      wakeMode: 'now',
+      name: 'Inbound Email',
+      sessionKey: '{{payload.sessionKey}}',
+      textTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+      deliver: false,
+    });
+    expect(config.hooks.mappings).toContainEqual({
+      id: 'custom-wake',
+      action: 'wake',
+      textTemplate: 'custom template',
+    });
+    expect(JSON.stringify(config.hooks.mappings)).not.toContain('messageTemplate');
+  });
+
+  it('adds gmail preset when Gog credentials are configured', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_HOOKS_TOKEN: 'test-hooks-token',
+      KILOCLAW_GOG_CONFIG_TARBALL: 'tarball',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
     expect(config.hooks.presets).toContain('gmail');
   });
 
@@ -683,7 +914,11 @@ describe('generateBaseConfig', () => {
       hooks: { enabled: true, token: 'old-token', presets: ['gmail'] },
     });
     const { deps } = fakeDeps(existing);
-    const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'new-token' };
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_HOOKS_TOKEN: 'new-token',
+      KILOCLAW_GOG_CONFIG_TARBALL: 'tarball',
+    };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
     expect(config.hooks.presets).toEqual(['gmail']);
@@ -912,6 +1147,18 @@ describe('writeBaseConfig', () => {
 
     const config = JSON.parse(written[0].data);
     expect(config.tools.profile).toBe('full');
+  });
+
+  it('auto-assigns Exa web search provider on restore path when provider is missing', () => {
+    const { deps, written } = fakeDeps();
+    const env = minimalEnv();
+    delete env.KILOCLAW_FRESH_INSTALL;
+
+    writeBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    const config = JSON.parse(written[0].data);
+    expect(config.tools?.web?.search?.provider).toBe('kilo-exa');
+    expect(config.tools?.web?.search?.enabled).toBe(true);
   });
 
   it('throws if KILOCODE_API_KEY is missing', () => {

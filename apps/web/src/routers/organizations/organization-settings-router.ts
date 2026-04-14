@@ -1,8 +1,7 @@
 import { getOrganizationById, updateOrganizationSettings } from '@/lib/organizations/organizations';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import type {
-  OpenRouterModel,
   OpenRouterModelsResponse,
+  OrganizationSettings,
 } from '@/lib/organizations/organization-types';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
@@ -13,11 +12,9 @@ import {
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
-import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
-import { listAvailableCustomLlms } from '@/lib/custom-llm/listAvailableCustomLlms';
-import { getDirectByokModelsForOrganization } from '@/lib/providers/direct-byok';
+import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
+import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 
 /**
  * Allowlist of organization IDs that are allowed to modify experimental settings
@@ -145,43 +142,14 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { organizationId } = input;
 
-      const organization = await getOrganizationById(organizationId);
-      if (!organization) {
+      const result = await getAvailableModelsForOrganization(organizationId);
+      if (!result) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Organization not found',
         });
       }
-
-      let deniedModels: string[] | undefined;
-      let deniedProviders: string[] | undefined;
-
-      if (organization.plan === 'enterprise') {
-        deniedModels = organization.settings?.model_deny_list;
-        deniedProviders = organization.settings?.provider_deny_list;
-      }
-
-      const responseData = await getEnhancedOpenRouterModels();
-
-      let filteredModels = responseData.data;
-      if (deniedModels?.length || deniedProviders?.length) {
-        const isAllowed = createAllowPredicateFromDenyList(deniedModels, deniedProviders);
-        const models: OpenRouterModel[] = [];
-        for (const model of responseData.data) {
-          if (await isAllowed(model.id)) {
-            models.push(model);
-          }
-        }
-        filteredModels = models;
-      }
-
-      filteredModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
-      filteredModels.push(...(await listAvailableCustomLlms(organizationId)));
-
-      return {
-        ...responseData,
-        data: filteredModels,
-      };
+      return result;
     }),
 
   updateAllowLists: organizationBillingMutationProcedure

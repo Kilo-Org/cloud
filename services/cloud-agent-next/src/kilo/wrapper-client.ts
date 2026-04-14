@@ -49,7 +49,9 @@ export type EnsureWrapperOptions = {
 
 export type WrapperPromptOptions = {
   prompt?: string;
-  parts?: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
+  parts?: Array<
+    { type: 'text'; text: string } | { type: 'file'; mime: string; url: string; filename?: string }
+  >;
   model?: { providerID?: string; modelID: string };
   variant?: string;
   agent?: string;
@@ -334,6 +336,7 @@ export class WrapperClient {
       `WRAPPER_PORT=${this.port}`,
       `WORKSPACE_PATH=${workspacePath}`,
       `WRAPPER_LOG_PATH=${wrapperLogPath}`,
+      `KILO_SESSION_RETRY_LIMIT=5`,
     ];
     const argParts = [`--user-id ${this.shellQuote(userId)}`];
     if (sessionId) {
@@ -554,13 +557,13 @@ export class WrapperClient {
    * Send a prompt to the wrapper.
    * Opens connection if idle, tracks in inflight.
    */
-  async prompt(options: WrapperPromptOptions): Promise<{ messageId: string }> {
+  async prompt(options: WrapperPromptOptions): Promise<{ messageId?: string }> {
     const response = await this.request<{
       status: string;
-      messageId: string;
+      messageId?: string;
     }>('POST', '/job/prompt', options);
 
-    return { messageId: response.messageId };
+    return response.messageId !== undefined ? { messageId: response.messageId } : {};
   }
 
   // ---------------------------------------------------------------------------

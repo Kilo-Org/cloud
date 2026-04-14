@@ -51,6 +51,12 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
       reason: z.enum(['completed', 'error', 'interrupted']),
     }),
   }),
+  z.object({
+    type: z.literal('session_status'),
+    data: z.object({
+      status: z.enum(['idle', 'busy', 'question', 'permission', 'retry']),
+    }),
+  }),
 ]);
 
 export type SessionDataItem = z.infer<typeof SessionItemSchema>;

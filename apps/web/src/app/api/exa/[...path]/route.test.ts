@@ -46,10 +46,14 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
-function makeRequest(path: string, body: unknown = { query: 'test' }) {
+function makeRequest(
+  path: string,
+  body: unknown = { query: 'test' },
+  headers: Record<string, string> = {}
+) {
   return new Request(`http://localhost:3000/api/exa${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
 }
@@ -224,6 +228,22 @@ describe('POST /api/exa/[...path]', () => {
 
       expect(response.status).toBe(429);
     });
+
+    it.each([401, 402, 403])('passes through upstream status %s', async status => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(
+        new Response(JSON.stringify({ error: 'upstream failure' }), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest('/search') as never);
+
+      expect(response.status).toBe(status);
+      expect(await response.json()).toEqual({ error: 'upstream failure' });
+    });
   });
 
   describe('monthly allowance', () => {
@@ -270,7 +290,7 @@ describe('POST /api/exa/[...path]', () => {
       expect(mockedFetch).not.toHaveBeenCalled();
     });
 
-    it('passes organizationId from auth to balance check', async () => {
+    it('passes organizationId from auth/header to balance check', async () => {
       const orgId = 'org-456';
       setUserAuth('user-123', orgId);
       mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
@@ -278,7 +298,9 @@ describe('POST /api/exa/[...path]', () => {
       mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [] }));
 
       const { POST } = await import('./route');
-      await POST(makeRequest('/search') as never);
+      await POST(
+        makeRequest('/search', { query: 'test' }, { 'X-KiloCode-OrganizationId': orgId }) as never
+      );
 
       expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledWith(
         orgId,
@@ -385,6 +407,23 @@ describe('POST /api/exa/[...path]', () => {
       await POST(makeRequest('/search') as never);
       await flushAfterCallbacks();
 
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+    });
+
+    it('handles malformed upstream JSON without throwing or recording usage', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(
+        new Response('not-json', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest('/search') as never);
+
+      expect(response.status).toBe(200);
+      await expect(flushAfterCallbacks()).resolves.toBeUndefined();
       expect(mockedRecordExaUsage).not.toHaveBeenCalled();
     });
   });

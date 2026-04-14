@@ -10,7 +10,9 @@ import {
 } from '@/components/ui/breadcrumb';
 
 export function AppTopbar() {
-  const { title, icon, extras } = usePageTitle();
+  const { title, icon, extras, hideTopbar } = usePageTitle();
+
+  if (hideTopbar) return null;
 
   return (
     <header className="bg-background sticky top-0 z-10 h-14 shrink-0 border-b flex items-center">
@@ -19,16 +21,16 @@ export function AppTopbar() {
       </div>
 
       {title && (
-        <div className="flex h-full items-center gap-2">
-          {icon}
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbPage>{title}</BreadcrumbPage>
+        <div className="flex h-full min-w-0 flex-1 items-center gap-2 pr-3">
+          {icon && <div className="shrink-0">{icon}</div>}
+          <Breadcrumb className="min-w-0">
+            <BreadcrumbList className="flex-nowrap">
+              <BreadcrumbItem className="min-w-0">
+                <BreadcrumbPage className="block truncate">{title}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          {extras}
+          {extras && <div className="shrink-0">{extras}</div>}
         </div>
       )}
     </header>

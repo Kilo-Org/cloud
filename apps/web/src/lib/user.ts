@@ -12,6 +12,7 @@ import {
   payment_methods,
   kilocode_users,
   user_affiliate_attributions,
+  user_affiliate_events,
   user_admin_notes,
   user_auth_provider,
   kilo_pass_subscriptions,
@@ -57,8 +58,12 @@ import {
   kiloclaw_email_log,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
+  user_push_tokens,
+  contributor_champion_events,
+  contributor_champion_memberships,
+  contributor_champion_contributors,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, sql, or } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
@@ -73,11 +78,9 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/providerHash';
-import { trackSignUp } from '@/lib/impact';
-import { sentryLogger } from '@/lib/utils.server';
+import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
 
 const workos = new WorkOS(WORKOS_API_KEY);
-const logImpactWarning = sentryLogger('impact-user', 'warning');
 
 /**
  * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
@@ -214,7 +217,7 @@ export async function createOrUpdateUser(
   turnstile_guid: UUID | undefined,
   autoLinkToExistingUser: boolean = false,
   requestHeaders?: Headers,
-  impactClickId?: string | null
+  affiliateTrackingId?: string | null
 ): Promise<Result<{ user: User; isNew: boolean }, AuthErrorType>> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
@@ -342,17 +345,15 @@ export async function createOrUpdateUser(
       hosted_domain: args.hosted_domain,
     });
 
-    if (impactClickId?.trim()) {
-      await tx
-        .insert(user_affiliate_attributions)
-        .values({
-          user_id: savedUser.id,
-          provider: 'impact',
-          tracking_id: impactClickId.trim(),
-        })
-        .onConflictDoNothing({
-          target: [user_affiliate_attributions.user_id, user_affiliate_attributions.provider],
-        });
+    if (affiliateTrackingId?.trim()) {
+      await recordAffiliateAttributionAndQueueParentEvent({
+        database: tx,
+        userId: savedUser.id,
+        provider: 'impact',
+        trackingId: affiliateTrackingId,
+        customerEmail: savedUser.google_user_email,
+        eventDate: new Date(savedUser.created_at),
+      });
     }
 
     return savedUser;
@@ -385,20 +386,6 @@ export async function createOrUpdateUser(
 
   // Set up user identification via user ID
   posthogClient.alias({ distinctId: savedUser.google_user_email, alias: savedUser.id });
-
-  if (impactClickId?.trim()) {
-    void trackSignUp({
-      clickId: impactClickId,
-      customerId: savedUser.id,
-      customerEmail: savedUser.google_user_email,
-      eventDate: new Date(),
-    }).catch(error => {
-      logImpactWarning('Impact signup tracking failed', {
-        user_id: savedUser.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
-  }
 
   await tryVerifyDiscordGuildMembership(args.provider, args.provider_account_id, savedUser.id);
 
@@ -590,6 +577,7 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(user_affiliate_attributions)
       .where(eq(user_affiliate_attributions.user_id, userId));
+    await tx.delete(user_affiliate_events).where(eq(user_affiliate_events.user_id, userId));
     await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
     await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
 
@@ -661,6 +649,7 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(kiloclaw_email_log).where(eq(kiloclaw_email_log.user_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
     await tx.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, userId));
+    await tx.delete(user_push_tokens).where(eq(user_push_tokens.user_id, userId));
     await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
     await tx
       .delete(kilo_pass_scheduled_changes)
@@ -718,6 +707,45 @@ export async function softDeleteUser(userId: string) {
         http_x_vercel_ja4_digest: null,
       })
       .where(eq(payment_methods.user_id, userId));
+
+    // Contributor champions: anonymize email PII and nullify user link
+    // Clear events linked through membership
+    await tx
+      .update(contributor_champion_events)
+      .set({ github_author_email: null })
+      .where(
+        sql`${contributor_champion_events.contributor_id} IN (
+          SELECT m.contributor_id FROM contributor_champion_memberships m
+          WHERE m.linked_kilo_user_id = ${userId}
+        )`
+      );
+    // Also clear events matched by email directly (covers un-enrolled contributors).
+    // Use originalEmail captured before the user row was anonymized — the subquery
+    // would resolve to the already-overwritten deleted+<id>@deleted.invalid address.
+    await tx
+      .update(contributor_champion_events)
+      .set({ github_author_email: null })
+      .where(
+        sql`lower(${contributor_champion_events.github_author_email}) = lower(${originalEmail})`
+      );
+    await tx
+      .update(contributor_champion_memberships)
+      .set({ linked_kilo_user_id: null })
+      .where(eq(contributor_champion_memberships.linked_kilo_user_id, userId));
+    // Clear manual_email for manually-enrolled contributors linked to this user
+    // (either by exact email match OR via membership link)
+    await tx
+      .update(contributor_champion_contributors)
+      .set({ manual_email: null })
+      .where(
+        or(
+          sql`lower(${contributor_champion_contributors.manual_email}) = lower(${originalEmail})`,
+          sql`${contributor_champion_contributors.id} IN (
+            SELECT m.contributor_id FROM contributor_champion_memberships m
+            WHERE m.linked_kilo_user_id = ${userId}
+          )`
+        )
+      );
 
     // ── 4. Nullify FK references ─────────────────────────────────────────
     await tx

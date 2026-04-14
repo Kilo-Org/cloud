@@ -20,7 +20,7 @@ export async function GET() {
       ? await getActiveOrgInstance(user.id, organizationId)
       : await getActiveInstance(user.id);
 
-    // No org instance → 404 so the frontend renders CreateInstanceCard.
+    // No org instance → 404 so the frontend renders setup entry points.
     // Without this guard workerInstanceId(null) → undefined → the worker
     // queries the personal DO, leaking personal status into the org context.
     if (organizationId && !instance) {

@@ -28,6 +28,7 @@ import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-rou
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
+import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
 import { adminGastownRouter } from '@/routers/admin/gastown-router';
@@ -814,10 +815,15 @@ export const adminRouter = createTRPCRouter({
           }
         } else {
           // mode === 'immediate'
-          if (subscription.status !== 'active' && subscription.status !== 'past_due') {
+          if (
+            subscription.status !== 'active' &&
+            subscription.status !== 'past_due' &&
+            subscription.status !== 'trialing'
+          ) {
             throw new TRPCError({
               code: 'BAD_REQUEST',
-              message: 'Only active or past-due subscriptions can be immediately canceled',
+              message:
+                'Only active, past-due, or trialing subscriptions can be immediately canceled',
             });
           }
 
@@ -866,6 +872,8 @@ export const adminRouter = createTRPCRouter({
               scheduled_by: null,
               current_period_end: now,
               credit_renewal_at: now,
+              // For trialing subscriptions, also end the trial immediately
+              ...(subscription.status === 'trialing' ? { trial_ends_at: now } : {}),
             })
             .where(eq(kiloclaw_subscriptions.id, subscription.id));
         }
@@ -1546,6 +1554,7 @@ export const adminRouter = createTRPCRouter({
   kiloclawRegions: adminKiloclawRegionsRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
+  contributorChampions: contributorChampionsRouter,
   bulkUserCredits: bulkUserCreditsRouter,
   emailTesting: emailTestingRouter,
   botRequests: adminBotRequestsRouter,

@@ -126,6 +126,32 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         platform_integration_id: string | null;
         created_at: string;
         updated_at: string;
+        config?:
+          | {
+              default_model?: string | undefined;
+              role_models?:
+                | {
+                    polecat?: string | undefined;
+                    refinery?: string | undefined;
+                  }
+                | undefined;
+              review_mode?: 'rework' | 'comments' | undefined;
+              code_review?: boolean | undefined;
+              auto_resolve_pr_feedback?: boolean | undefined;
+              auto_merge_delay_minutes?: number | null | undefined;
+              merge_strategy?: 'direct' | 'pr' | undefined;
+              convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
+              custom_instructions?:
+                | {
+                    polecat?: string | undefined;
+                    refinery?: string | undefined;
+                  }
+                | undefined;
+              git_push_flags?: string | undefined;
+              max_concurrent_polecats?: number | undefined;
+              max_dispatch_attempts?: number | undefined;
+            }
+          | undefined;
         agents: {
           id: string;
           rig_id: string | null;
@@ -166,6 +192,38 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           closed_at: string | null;
         }[];
       };
+      meta: object;
+    }>;
+    updateRigConfig: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        rigId: string;
+        townId?: string | undefined;
+        config: {
+          default_model?: string | undefined;
+          role_models?:
+            | {
+                polecat?: string | undefined;
+                refinery?: string | undefined;
+              }
+            | undefined;
+          review_mode?: 'rework' | 'comments' | undefined;
+          code_review?: boolean | undefined;
+          auto_resolve_pr_feedback?: boolean | undefined;
+          auto_merge_delay_minutes?: number | null | undefined;
+          merge_strategy?: 'direct' | 'pr' | undefined;
+          convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
+          custom_instructions?:
+            | {
+                polecat?: string | undefined;
+                refinery?: string | undefined;
+              }
+            | undefined;
+          git_push_flags?: string | undefined;
+          max_concurrent_polecats?: number | undefined;
+          max_dispatch_attempts?: number | undefined;
+        };
+      };
+      output: void;
       meta: object;
     }>;
     deleteRig: import('@trpc/server').TRPCMutationProcedure<{
@@ -279,6 +337,15 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       meta: object;
     }>;
     deleteAgent: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        rigId: string;
+        agentId: string;
+        townId?: string | undefined;
+      };
+      output: void;
+      meta: object;
+    }>;
+    resetAgentDispatchAttempts: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         rigId: string;
         agentId: string;
@@ -1458,6 +1525,32 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             platform_integration_id: string | null;
             created_at: string;
             updated_at: string;
+            config?:
+              | {
+                  default_model?: string | undefined;
+                  role_models?:
+                    | {
+                        polecat?: string | undefined;
+                        refinery?: string | undefined;
+                      }
+                    | undefined;
+                  review_mode?: 'rework' | 'comments' | undefined;
+                  code_review?: boolean | undefined;
+                  auto_resolve_pr_feedback?: boolean | undefined;
+                  auto_merge_delay_minutes?: number | null | undefined;
+                  merge_strategy?: 'direct' | 'pr' | undefined;
+                  convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
+                  custom_instructions?:
+                    | {
+                        polecat?: string | undefined;
+                        refinery?: string | undefined;
+                      }
+                    | undefined;
+                  git_push_flags?: string | undefined;
+                  max_concurrent_polecats?: number | undefined;
+                  max_dispatch_attempts?: number | undefined;
+                }
+              | undefined;
             agents: {
               id: string;
               rig_id: string | null;
@@ -1498,6 +1591,38 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               closed_at: string | null;
             }[];
           };
+          meta: object;
+        }>;
+        updateRigConfig: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            rigId: string;
+            townId?: string | undefined;
+            config: {
+              default_model?: string | undefined;
+              role_models?:
+                | {
+                    polecat?: string | undefined;
+                    refinery?: string | undefined;
+                  }
+                | undefined;
+              review_mode?: 'rework' | 'comments' | undefined;
+              code_review?: boolean | undefined;
+              auto_resolve_pr_feedback?: boolean | undefined;
+              auto_merge_delay_minutes?: number | null | undefined;
+              merge_strategy?: 'direct' | 'pr' | undefined;
+              convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
+              custom_instructions?:
+                | {
+                    polecat?: string | undefined;
+                    refinery?: string | undefined;
+                  }
+                | undefined;
+              git_push_flags?: string | undefined;
+              max_concurrent_polecats?: number | undefined;
+              max_dispatch_attempts?: number | undefined;
+            };
+          };
+          output: void;
           meta: object;
         }>;
         deleteRig: import('@trpc/server').TRPCMutationProcedure<{
@@ -1611,6 +1736,15 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           meta: object;
         }>;
         deleteAgent: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            rigId: string;
+            agentId: string;
+            townId?: string | undefined;
+          };
+          output: void;
+          meta: object;
+        }>;
+        resetAgentDispatchAttempts: import('@trpc/server').TRPCMutationProcedure<{
           input: {
             rigId: string;
             agentId: string;

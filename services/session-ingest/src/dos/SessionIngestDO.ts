@@ -15,6 +15,7 @@ import {
   extractNormalizedParentIdFromItem,
   extractNormalizedPlatformFromItem,
   extractNormalizedTitleFromItem,
+  extractStatusFromItem,
 } from './session-ingest-extractors';
 import {
   computeSessionMetrics,
@@ -33,7 +34,14 @@ type IngestMetaKey =
   | 'metricsEmitted'
   | 'deleted';
 
-type ExtractableMetaKey = 'title' | 'parentId' | 'platform' | 'orgId' | 'gitUrl' | 'gitBranch';
+type ExtractableMetaKey =
+  | 'title'
+  | 'parentId'
+  | 'platform'
+  | 'orgId'
+  | 'gitUrl'
+  | 'gitBranch'
+  | 'status';
 
 function writeIngestMetaIfChanged(
   db: DrizzleSqliteDODatabase,
@@ -68,6 +76,7 @@ const INGEST_META_EXTRACTORS: Array<{
   { key: 'orgId', extract: extractNormalizedOrgIdFromItem },
   { key: 'gitUrl', extract: extractNormalizedGitUrlFromItem },
   { key: 'gitBranch', extract: extractNormalizedGitBranchFromItem },
+  { key: 'status', extract: extractStatusFromItem },
 ];
 
 type Changes = Array<{ name: ExtractableMetaKey; value: string | null }>;
@@ -124,6 +133,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       orgId: undefined,
       gitUrl: undefined,
       gitBranch: undefined,
+      status: undefined,
     };
 
     let hasSessionOpen = false;

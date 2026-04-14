@@ -350,7 +350,7 @@ function createAccountInfo(
   return accountInfo;
 }
 
-async function getImpactClickIdFromAuthFlow(): Promise<string | null> {
+async function getAffiliateTrackingIdFromAuthFlow(): Promise<string | null> {
   const cookieStore = await cookies();
 
   // Prefer im_ref from the callback URL (explicitly passed through the auth flow)
@@ -653,8 +653,8 @@ const authOptions: NextAuthOptions = {
         // For email (magic link) auth, we auto-link to existing users since magic link
         // is verified by email ownership
         const autoLinkToExistingUser = isEmailAuth || isFakeLogin;
-        const impactClickId =
-          !isAccountLinking && !isFakeLogin ? await getImpactClickIdFromAuthFlow() : null;
+        const affiliateTrackingId =
+          !isAccountLinking && !isFakeLogin ? await getAffiliateTrackingIdFromAuthFlow() : null;
         const result =
           isAccountLinking && linkingSession
             ? whenOk(
@@ -666,7 +666,7 @@ const authOptions: NextAuthOptions = {
                 verifiedToken?.guid,
                 autoLinkToExistingUser,
                 requestHeaders,
-                impactClickId
+                affiliateTrackingId
               );
 
         if (result.success === false) {

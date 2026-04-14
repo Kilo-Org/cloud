@@ -3,11 +3,29 @@
 // native IR_<campaignId> UTT cookie.
 export const IMPACT_CLICK_ID_COOKIE = 'impact_click_id';
 
-// Marker cookie scoped to the app so we only run the fallback capture path once
-// after recovering the click ID from the shared parent-domain cookie.
-export const IMPACT_TRACKED_CLICK_ID_COOKIE = 'impact_tracked_click_id';
+// Marker cookie scoped to app.kilo.ai so the app only dedupes against values it
+// wrote itself, not against the marketing site's visit-event dedupe marker.
+export const IMPACT_APP_TRACKED_CLICK_ID_COOKIE = 'impact_app_tracked_click_id';
 
 export const IMPACT_SIGNUP_FALLBACK_MAX_ACCOUNT_AGE_MS = 30 * 60 * 1000;
+
+export function resolveImpactAffiliateTrackingId(params: {
+  imRefParam: string | null;
+  sharedImpactCookieValue: string | null;
+  appTrackedImpactCookieValue: string | null;
+}) {
+  const impactCookieValue = params.imRefParam
+    ? null
+    : params.sharedImpactCookieValue &&
+        params.sharedImpactCookieValue !== params.appTrackedImpactCookieValue
+      ? params.sharedImpactCookieValue
+      : null;
+
+  return {
+    affiliateTrackingId: params.imRefParam || impactCookieValue,
+    impactCookieValue,
+  };
+}
 
 export function shouldTrackImpactSignupFallback(params: {
   isNewUser?: boolean;

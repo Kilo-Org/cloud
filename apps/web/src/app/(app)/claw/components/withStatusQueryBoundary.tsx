@@ -17,22 +17,20 @@ function formatError(error: unknown): string {
   return 'Unknown error';
 }
 
-type SetupProps = {
-  isNewSetup: boolean;
-  onNewSetupChange: (v: boolean) => void;
-};
-
 type WithStatusProp = {
   status: KiloClawDashboardStatus | undefined;
   organizationId?: string;
-} & SetupProps;
+};
 
-export function withStatusQueryBoundary(Component: ComponentType<WithStatusProp>) {
-  return function StatusBoundary({
-    statusQuery,
-    organizationId,
-    ...setupProps
-  }: { statusQuery: StatusQueryLike; organizationId?: string } & SetupProps) {
+export function withStatusQueryBoundary<P extends WithStatusProp>(Component: ComponentType<P>) {
+  return function StatusBoundary(
+    props: Omit<P, keyof WithStatusProp> & {
+      statusQuery: StatusQueryLike;
+      organizationId?: string;
+    }
+  ) {
+    const { statusQuery, organizationId, ...componentPropsWithoutStatus } = props;
+
     if (statusQuery.isLoading) {
       return (
         <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -57,6 +55,12 @@ export function withStatusQueryBoundary(Component: ComponentType<WithStatusProp>
       );
     }
 
-    return <Component status={statusQuery.data} organizationId={organizationId} {...setupProps} />;
+    const componentProps = {
+      ...componentPropsWithoutStatus,
+      status: statusQuery.data,
+      organizationId,
+    } as unknown as P;
+
+    return <Component {...componentProps} />;
   };
 }

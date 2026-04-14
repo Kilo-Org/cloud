@@ -7,6 +7,10 @@ import { withStatusQueryBoundary } from '@/app/(app)/claw/components';
 const baseStatus: KiloClawDashboardStatus = {
   userId: 'user-1',
   sandboxId: 'sandbox-1',
+  provider: 'fly',
+  runtimeId: 'machine-1',
+  storageId: 'vol-1',
+  region: 'iad',
   name: null,
   status: 'running',
   provisionedAt: 1,
@@ -36,25 +40,15 @@ const baseStatus: KiloClawDashboardStatus = {
   instanceId: null,
 };
 
-const noop = () => {};
-
-const setupProps = { isNewSetup: false, onNewSetupChange: noop };
-
 describe('withStatusQueryBoundary', () => {
   test('renders loading state when query is loading', () => {
     const Wrapped = withStatusQueryBoundary(
-      ({
-        status,
-      }: {
-        status: KiloClawDashboardStatus | undefined;
-        isNewSetup: boolean;
-        onNewSetupChange: (v: boolean) => void;
-      }) => createElement('div', null, status?.status || 'none')
+      ({ status }: { status: KiloClawDashboardStatus | undefined }) =>
+        createElement('div', null, status?.status || 'none')
     );
 
     const html = renderToStaticMarkup(
       createElement(Wrapped, {
-        ...setupProps,
         statusQuery: {
           data: undefined,
           isLoading: true,
@@ -68,18 +62,12 @@ describe('withStatusQueryBoundary', () => {
 
   test('renders error state when query has an error', () => {
     const Wrapped = withStatusQueryBoundary(
-      ({
-        status,
-      }: {
-        status: KiloClawDashboardStatus | undefined;
-        isNewSetup: boolean;
-        onNewSetupChange: (v: boolean) => void;
-      }) => createElement('div', null, status?.status || 'none')
+      ({ status }: { status: KiloClawDashboardStatus | undefined }) =>
+        createElement('div', null, status?.status || 'none')
     );
 
     const html = renderToStaticMarkup(
       createElement(Wrapped, {
-        ...setupProps,
         statusQuery: {
           data: undefined,
           isLoading: false,
@@ -94,18 +82,12 @@ describe('withStatusQueryBoundary', () => {
 
   test('renders wrapped component when query is resolved', () => {
     const Wrapped = withStatusQueryBoundary(
-      ({
-        status,
-      }: {
-        status: KiloClawDashboardStatus | undefined;
-        isNewSetup: boolean;
-        onNewSetupChange: (v: boolean) => void;
-      }) => createElement('div', null, `status:${status?.status || 'none'}`)
+      ({ status }: { status: KiloClawDashboardStatus | undefined }) =>
+        createElement('div', null, `status:${status?.status || 'none'}`)
     );
 
     const html = renderToStaticMarkup(
       createElement(Wrapped, {
-        ...setupProps,
         statusQuery: {
           data: baseStatus,
           isLoading: false,

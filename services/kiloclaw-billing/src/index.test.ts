@@ -36,6 +36,9 @@ function createEnv(): { env: BillingWorkerEnv; send: ReturnType<typeof vi.fn> } 
         fetch: vi.fn(),
       },
       KILOCODE_BACKEND_BASE_URL: 'https://app.kilo.ai',
+      STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
+      STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
+      STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
       INTERNAL_API_SECRET: 'next-secret',
       KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
     },
@@ -74,6 +77,7 @@ describe('kiloclaw billing worker handler', () => {
       sweep3_instance_destruction: 0,
       sweep4_past_due_cleanup: 0,
       sweep5_intro_schedules_repaired: 0,
+      complementary_inference_ended_emails: 0,
       emails_sent: 0,
       emails_skipped: 0,
       errors: 0,
@@ -150,7 +154,7 @@ describe('kiloclaw billing worker handler', () => {
     const message = {
       body: {
         runId: '11111111-1111-4111-8111-111111111111',
-        sweep: 'earlybird_warning',
+        sweep: 'complementary_inference_ended',
       },
       attempts: 1,
       ack: vi.fn(),
@@ -174,7 +178,7 @@ describe('kiloclaw billing worker handler', () => {
         billingFlow: 'kiloclaw_lifecycle',
         billingComponent: 'worker',
         billingRunId: '11111111-1111-4111-8111-111111111111',
-        billingSweep: 'earlybird_warning',
+        billingSweep: 'complementary_inference_ended',
         billingAttempt: 1,
       })
     );

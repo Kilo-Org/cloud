@@ -229,6 +229,15 @@ describe('WrapperClient', () => {
       expect(result.messageId).toBe('msg_generated_1');
     });
 
+    it('allows prompt responses without messageId', async () => {
+      const session = createMockSession(createSuccessResponse({ status: 'sent' }));
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      const result = await client.prompt({ prompt: 'Hello, world!' });
+
+      expect(result.messageId).toBeUndefined();
+    });
+
     it('sends prompt text', async () => {
       const session = createMockSession(
         createSuccessResponse({ status: 'sent', messageId: 'msg_1' })
@@ -276,6 +285,36 @@ describe('WrapperClient', () => {
 
       const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(execCall).toContain('"variant":"high"');
+    });
+
+    it('preserves file parts in request body', async () => {
+      const session = createMockSession(
+        createSuccessResponse({ status: 'sent', messageId: 'msg_files' })
+      );
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.prompt({
+        parts: [
+          { type: 'text', text: 'Describe these images' },
+          {
+            type: 'file',
+            mime: 'image/png',
+            url: 'file:///tmp/first.png',
+            filename: 'first.png',
+          },
+          {
+            type: 'file',
+            mime: 'image/jpeg',
+            url: 'file:///tmp/second.jpg',
+            filename: 'second.jpg',
+          },
+        ],
+      });
+
+      const execCall = (session.exec as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(execCall).toContain(
+        '"parts":[{"type":"text","text":"Describe these images"},{"type":"file","mime":"image/png","url":"file:///tmp/first.png","filename":"first.png"},{"type":"file","mime":"image/jpeg","url":"file:///tmp/second.jpg","filename":"second.jpg"}]'
+      );
     });
 
     it('throws WrapperNoJobError when no job started', async () => {
@@ -871,7 +910,7 @@ describe('WrapperClient', () => {
 
       expect(session.startProcess).toHaveBeenCalledWith(
         expect.stringMatching(
-          /^WRAPPER_PORT=5000 WORKSPACE_PATH=\/workspace\/test WRAPPER_LOG_PATH=\/tmp\/kilocode-wrapper-test-session-\d+\.log bun run '\.\/wrapper'\\''s folder\/wrapper\.js; touch \/tmp\/pwned' --agent-session test-session --user-id 'test-user'$/
+          /^WRAPPER_PORT=5000 WORKSPACE_PATH=\/workspace\/test WRAPPER_LOG_PATH=\/tmp\/kilocode-wrapper-test-session-\d+\.log KILO_SESSION_RETRY_LIMIT=5 bun run '\.\/wrapper'\\''s folder\/wrapper\.js; touch \/tmp\/pwned' --agent-session test-session --user-id 'test-user'$/
         ),
         expect.objectContaining({ cwd: '/workspace' })
       );

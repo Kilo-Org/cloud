@@ -11,22 +11,96 @@ import {
 } from '@/lib/app-builder/constants';
 import type { Images } from '@/lib/images-schema';
 
-// Types
 export type ImageFile = {
   id: string;
   file: File;
   previewUrl: string;
-  status: 'pending' | 'uploading' | 'complete' | 'error';
+  status: 'processing' | 'pending' | 'uploading' | 'complete' | 'error';
   progress: number;
   r2Key?: string;
   error?: string;
 };
 
+export type UploadUrlResult = {
+  signedUrl: string;
+  key: string;
+  expiresAt: string;
+};
+
+type ImageAllowedType = (typeof APP_BUILDER_IMAGE_ALLOWED_TYPES)[number];
+
+type ImageResizeOptions = {
+  maxDimensionPx: number;
+  quality?: number;
+};
+
+type ResizeDimensions = {
+  width: number;
+  height: number;
+};
+
+export function isAllowedImageType(
+  contentType: string,
+  allowedTypes: readonly string[] = APP_BUILDER_IMAGE_ALLOWED_TYPES
+): contentType is ImageAllowedType {
+  return allowedTypes.some(allowedType => allowedType === contentType);
+}
+
+export function calculateResizeDimensions(
+  width: number,
+  height: number,
+  maxDimensionPx: number
+): ResizeDimensions {
+  const longestSide = Math.max(width, height);
+  if (longestSide <= maxDimensionPx) {
+    return { width, height };
+  }
+
+  const scale = maxDimensionPx / longestSide;
+  return {
+    width: Math.round(width * scale),
+    height: Math.round(height * scale),
+  };
+}
+
+export function validateImageFileSize(
+  file: File,
+  maxSizeBytes: number,
+  label = 'File'
+): string | null {
+  if (file.size > maxSizeBytes) {
+    return `${label} too large: ${formatFileSize(file.size)}. Maximum: ${formatFileSize(maxSizeBytes)}`;
+  }
+  return null;
+}
+
+export function buildImageUploadPath(messageUuid: string): string {
+  return messageUuid;
+}
+
+type UploadUrlInput = {
+  messageUuid: string;
+  imageId: string;
+  contentType: ImageAllowedType;
+  contentLength: number;
+};
+
+type OrgUploadUrlInput = UploadUrlInput & { organizationId: string };
+
 export type UseImageUploadOptions = {
   messageUuid: string;
   organizationId?: string;
   maxImages?: number;
+  maxOriginalFileSizeBytes?: number;
+  maxFileSizeBytes?: number;
+  allowedTypes?: readonly string[];
+  resizeImages?: ImageResizeOptions;
   onImagesChange?: (images: ImageFile[]) => void;
+  /** Override the default app-builder upload mutations. */
+  getUploadUrl?: {
+    personal: (input: UploadUrlInput) => Promise<UploadUrlResult>;
+    organization: (input: OrgUploadUrlInput) => Promise<UploadUrlResult>;
+  };
 };
 
 export type UseImageUploadReturn = {
@@ -37,7 +111,6 @@ export type UseImageUploadReturn = {
   hasUploadingImages: boolean;
   getImagesData: () => Images | undefined;
 
-  // For drag-and-drop
   isDragging: boolean;
   dragHandlers: {
     onDragEnter: (e: React.DragEvent) => void;
@@ -47,10 +120,7 @@ export type UseImageUploadReturn = {
   };
 };
 
-// Module-level maps to track active XHR requests for cancellation
 const activeUploads = new Map<string, XMLHttpRequest>();
-
-// Set to track images that have started uploading (prevents duplicate uploads)
 const uploadingIds = new Set<string>();
 
 function formatFileSize(bytes: number): string {
@@ -63,10 +133,106 @@ function getCompletedImageFilenames(images: ImageFile[]): string[] {
   return images
     .filter((img): img is ImageFile & { r2Key: string } => img.status === 'complete' && !!img.r2Key)
     .map(img => {
-      // r2Key is like "userId/app-builder/messageUuid/filename.ext" — extract the filename
       const parts = img.r2Key.split('/');
       return parts[parts.length - 1];
     });
+}
+
+function validateImageFileType(file: File, allowedTypes: readonly string[]): string | null {
+  if (!isAllowedImageType(file.type, allowedTypes)) {
+    return `Invalid file type: ${file.type}. Allowed: ${allowedTypes.join(', ')}`;
+  }
+  return null;
+}
+
+async function blobFromCanvas(
+  canvas: HTMLCanvasElement,
+  contentType: string,
+  quality?: number
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      blob => {
+        if (blob) {
+          resolve(blob);
+          return;
+        }
+        reject(new Error('Could not resize image'));
+      },
+      contentType,
+      quality
+    );
+  });
+}
+
+async function resizeImageFile(file: File, resizeImages?: ImageResizeOptions): Promise<File> {
+  if (!resizeImages || file.type === 'image/gif') {
+    return file;
+  }
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error('Could not read image for resizing');
+  }
+
+  try {
+    const dimensions = calculateResizeDimensions(
+      bitmap.width,
+      bitmap.height,
+      resizeImages.maxDimensionPx
+    );
+    if (dimensions.width === bitmap.width && dimensions.height === bitmap.height) {
+      return file;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('Could not resize image');
+    }
+
+    context.drawImage(bitmap, 0, 0, dimensions.width, dimensions.height);
+    const blob = await blobFromCanvas(canvas, file.type, resizeImages.quality);
+    return new File([blob], file.name, { type: file.type, lastModified: file.lastModified });
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function preprocessImageFile(
+  file: File,
+  options: {
+    allowedTypes: readonly string[];
+    maxOriginalFileSizeBytes: number;
+    maxFileSizeBytes: number;
+    resizeImages?: ImageResizeOptions;
+  }
+): Promise<File> {
+  const typeError = validateImageFileType(file, options.allowedTypes);
+  if (typeError) {
+    throw new Error(typeError);
+  }
+
+  const originalSizeError = validateImageFileSize(
+    file,
+    options.maxOriginalFileSizeBytes,
+    'Original file'
+  );
+  if (originalSizeError) {
+    throw new Error(originalSizeError);
+  }
+
+  const resizedFile = await resizeImageFile(file, options.resizeImages);
+  const finalSizeError = validateImageFileSize(resizedFile, options.maxFileSizeBytes, 'Final file');
+  if (finalSizeError) {
+    throw new Error(`${finalSizeError}. Try a smaller image.`);
+  }
+
+  return resizedFile;
 }
 
 export function useImageUpload(options: UseImageUploadOptions): UseImageUploadReturn {
@@ -74,18 +240,24 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
     messageUuid,
     organizationId,
     maxImages = APP_BUILDER_IMAGE_MAX_COUNT,
+    maxFileSizeBytes = APP_BUILDER_IMAGE_MAX_SIZE_BYTES,
+    allowedTypes = APP_BUILDER_IMAGE_ALLOWED_TYPES,
+    resizeImages,
     onImagesChange,
+    getUploadUrl,
   } = options;
+  const maxOriginalFileSizeBytes = options.maxOriginalFileSizeBytes ?? maxFileSizeBytes;
 
   const [images, setImages] = useState<ImageFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
   const imagesRef = useRef(images);
+  const isMountedRef = useRef(true);
+  const cancelledProcessingIdsRef = useRef(new Set<string>());
   imagesRef.current = images;
 
   const trpc = useTRPC();
 
-  // Choose mutation based on context
   const { mutateAsync: personalMutateAsync } = useMutation(
     trpc.appBuilder.getImageUploadUrl.mutationOptions()
   );
@@ -93,27 +265,41 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
     trpc.organizations.appBuilder.getImageUploadUrl.mutationOptions()
   );
 
-  // Notify parent of images changes
+  const getPresignedUrl = useCallback(
+    async (input: UploadUrlInput): Promise<UploadUrlResult> => {
+      if (getUploadUrl) {
+        return organizationId
+          ? getUploadUrl.organization({ ...input, organizationId })
+          : getUploadUrl.personal(input);
+      }
+      return organizationId
+        ? orgMutateAsync({ ...input, organizationId })
+        : personalMutateAsync(input);
+    },
+    [getUploadUrl, organizationId, orgMutateAsync, personalMutateAsync]
+  );
+
   useEffect(() => {
     onImagesChange?.(images);
   }, [images, onImagesChange]);
 
-  // Cleanup blob URLs on unmount
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       imagesRef.current.forEach(img => {
         URL.revokeObjectURL(img.previewUrl);
       });
     };
   }, []);
 
-  // Auto-remove errored images after 3 seconds
   useEffect(() => {
     const erroredImages = images.filter(img => img.status === 'error');
     if (erroredImages.length === 0) return;
 
     const timeouts = erroredImages.map(img => {
       return setTimeout(() => {
+        URL.revokeObjectURL(img.previewUrl);
         setImages(current => current.filter(i => i.id !== img.id));
       }, 3000);
     });
@@ -123,23 +309,8 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
     };
   }, [images]);
 
-  const validateFile = useCallback((file: File): string | null => {
-    if (
-      !APP_BUILDER_IMAGE_ALLOWED_TYPES.includes(
-        file.type as (typeof APP_BUILDER_IMAGE_ALLOWED_TYPES)[number]
-      )
-    ) {
-      return `Invalid file type: ${file.type}. Allowed: PNG, JPEG, WebP, GIF`;
-    }
-    if (file.size > APP_BUILDER_IMAGE_MAX_SIZE_BYTES) {
-      return `File too large: ${formatFileSize(file.size)}. Maximum: ${formatFileSize(APP_BUILDER_IMAGE_MAX_SIZE_BYTES)}`;
-    }
-    return null;
-  }, []);
-
   const uploadImage = useCallback(
     async (imageFile: ImageFile) => {
-      // Prevent duplicate uploads - check and mark as uploading atomically
       if (uploadingIds.has(imageFile.id)) {
         return;
       }
@@ -152,24 +323,21 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
       };
 
       try {
-        // Update status to uploading
         updateImage({ status: 'uploading', progress: 0 });
 
-        // Get presigned URL from backend - use separate calls for type safety
-        const baseInput = {
+        const contentType = imageFile.file.type;
+        if (!isAllowedImageType(contentType, allowedTypes)) {
+          throw new Error(`Invalid file type: ${contentType}`);
+        }
+        const result = await getPresignedUrl({
           messageUuid,
           imageId: imageFile.id,
-          contentType: imageFile.file.type as (typeof APP_BUILDER_IMAGE_ALLOWED_TYPES)[number],
+          contentType,
           contentLength: imageFile.file.size,
-        };
-
-        const result = organizationId
-          ? await orgMutateAsync({ ...baseInput, organizationId })
-          : await personalMutateAsync(baseInput);
+        });
 
         const { signedUrl, key } = result;
 
-        // Upload to R2 using XMLHttpRequest for progress tracking
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           activeUploads.set(imageFile.id, xhr);
@@ -205,12 +373,10 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
           xhr.send(imageFile.file);
         });
 
-        // Mark as complete
         updateImage({ status: 'complete', progress: 100, r2Key: key });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Upload failed';
 
-        // Don't show toast for cancelled uploads
         if (errorMessage !== 'Upload cancelled') {
           toast.error(`Failed to upload image: ${errorMessage}`);
         }
@@ -220,10 +386,9 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
         uploadingIds.delete(imageFile.id);
       }
     },
-    [messageUuid, organizationId, orgMutateAsync, personalMutateAsync]
+    [messageUuid, getPresignedUrl, allowedTypes]
   );
 
-  // Start uploads for pending images
   useEffect(() => {
     const pendingImages = images.filter(img => img.status === 'pending');
     pendingImages.forEach(img => {
@@ -249,57 +414,104 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
         );
       }
 
-      const newImages: ImageFile[] = [];
-      for (const file of filesToAdd) {
-        const validationError = validateFile(file);
-        if (validationError) {
-          toast.error(validationError);
-          continue;
+      const processingImages = filesToAdd.map(file => ({
+        id: crypto.randomUUID(),
+        file,
+        previewUrl: URL.createObjectURL(file),
+        status: 'processing' as const,
+        progress: 0,
+      }));
+
+      if (processingImages.length === 0) {
+        return;
+      }
+
+      setImages(current => [...current, ...processingImages]);
+
+      processingImages.forEach((processingImage, index) => {
+        const originalFile = filesToAdd[index];
+        if (!originalFile) {
+          return;
         }
 
-        newImages.push({
-          id: crypto.randomUUID(),
-          file,
-          previewUrl: URL.createObjectURL(file),
-          status: 'pending',
-          progress: 0,
-        });
-      }
+        void preprocessImageFile(originalFile, {
+          allowedTypes,
+          maxOriginalFileSizeBytes,
+          maxFileSizeBytes,
+          resizeImages,
+        })
+          .then(finalFile => {
+            if (
+              !isMountedRef.current ||
+              cancelledProcessingIdsRef.current.has(processingImage.id)
+            ) {
+              cancelledProcessingIdsRef.current.delete(processingImage.id);
+              return;
+            }
 
-      if (newImages.length > 0) {
-        setImages(current => [...current, ...newImages]);
-      }
+            const previewUrl = URL.createObjectURL(finalFile);
+            URL.revokeObjectURL(processingImage.previewUrl);
+            setImages(current =>
+              current.map(img =>
+                img.id === processingImage.id
+                  ? { ...img, file: finalFile, previewUrl, status: 'pending' }
+                  : img
+              )
+            );
+          })
+          .catch(error => {
+            if (
+              !isMountedRef.current ||
+              cancelledProcessingIdsRef.current.has(processingImage.id)
+            ) {
+              cancelledProcessingIdsRef.current.delete(processingImage.id);
+              return;
+            }
+
+            const errorMessage = error instanceof Error ? error.message : 'Could not process image';
+            toast.error(errorMessage);
+            setImages(current =>
+              current.map(img =>
+                img.id === processingImage.id
+                  ? { ...img, status: 'error', error: errorMessage }
+                  : img
+              )
+            );
+          });
+      });
     },
-    [maxImages, validateFile]
+    [maxImages, allowedTypes, maxOriginalFileSizeBytes, maxFileSizeBytes, resizeImages]
   );
 
   const removeImage = useCallback((imageId: string) => {
     const image = imagesRef.current.find(img => img.id === imageId);
     if (!image) return;
 
-    // Cancel in-progress upload if any
+    if (image.status === 'processing') {
+      cancelledProcessingIdsRef.current.add(imageId);
+    }
+
     const xhr = activeUploads.get(imageId);
     if (xhr) {
       xhr.abort();
       activeUploads.delete(imageId);
     }
 
-    // Revoke blob URL
     URL.revokeObjectURL(image.previewUrl);
-
-    // Remove from state
     setImages(current => current.filter(img => img.id !== imageId));
   }, []);
 
   const clearImages = useCallback(() => {
-    // Cancel all in-progress uploads
     imagesRef.current.forEach(img => {
+      if (img.status === 'processing') {
+        cancelledProcessingIdsRef.current.add(img.id);
+      }
+
       const xhr = activeUploads.get(img.id);
       if (xhr) {
         xhr.abort();
         activeUploads.delete(img.id);
       }
-      // Revoke blob URL
       URL.revokeObjectURL(img.previewUrl);
     });
 
@@ -307,7 +519,7 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
   }, []);
 
   const hasUploadingImages = images.some(
-    img => img.status === 'uploading' || img.status === 'pending'
+    img => img.status === 'processing' || img.status === 'uploading' || img.status === 'pending'
   );
 
   const getImagesData = useCallback((): Images | undefined => {
@@ -315,12 +527,11 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
     if (completedFilenames.length === 0) return undefined;
 
     return {
-      path: messageUuid,
+      path: buildImageUploadPath(messageUuid),
       files: completedFilenames,
     };
   }, [messageUuid]);
 
-  // Drag and drop handlers
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();

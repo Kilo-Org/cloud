@@ -2,7 +2,7 @@ import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { custom_llm2 } from '@kilocode/db/schema';
 import { CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
@@ -24,7 +24,7 @@ const DeleteCustomLlmSchema = z.object({
 
 export const adminCustomLlmRouter = createTRPCRouter({
   list: adminProcedure.query(async () => {
-    const rows = await db.select().from(custom_llm2);
+    const rows = await db.select().from(custom_llm2).orderBy(asc(custom_llm2.public_id));
     return { items: rows };
   }),
 

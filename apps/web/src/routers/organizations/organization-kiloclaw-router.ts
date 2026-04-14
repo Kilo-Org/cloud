@@ -22,6 +22,7 @@ import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   kiloclaw_cli_runs,
+  kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
@@ -249,13 +250,17 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
 
     // No org instance → return a "no instance" sentinel so the frontend
-    // renders CreateInstanceCard. Without this guard, workerInstanceId(null)
+    // renders setup entry points. Without this guard, workerInstanceId(null)
     // → undefined → the worker queries the personal DO, leaking personal
     // instance status into the org context.
     if (!instance) {
       return {
         userId: ctx.user.id,
         sandboxId: null,
+        provider: null,
+        runtimeId: null,
+        storageId: null,
+        region: null,
         status: null,
         provisionedAt: null,
         lastStartedAt: null,
@@ -327,7 +332,9 @@ export const organizationKiloclawRouter = createTRPCRouter({
         });
       }
 
-      const instanceRow = await ensureActiveInstance(ctx.user.id, { orgId: input.organizationId });
+      const { instance: instanceRow } = await ensureActiveInstance(ctx.user.id, {
+        orgId: input.organizationId,
+      });
 
       const encryptedSecrets = input.secrets
         ? Object.fromEntries(
@@ -376,6 +383,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
         return result;
       } catch (error) {
+        // Org provision always creates a new row, so always clean up on failure.
         await markInstanceDestroyedById(instanceRow.id).catch(cleanupErr => {
           console.error(
             '[kiloclaw-org] Failed to clean up instance row after provision error:',
@@ -448,14 +456,31 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id, instance.id);
     const client = new KiloClawInternalClient();
+    let result: Awaited<ReturnType<KiloClawInternalClient['destroy']>>;
     try {
-      return await client.destroy(ctx.user.id, workerInstanceId(instance));
+      result = await client.destroy(ctx.user.id, workerInstanceId(instance));
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);
       }
       throw error;
     }
+
+    try {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ destruction_deadline: null })
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.user_id, ctx.user.id),
+            eq(kiloclaw_subscriptions.instance_id, instance.id)
+          )
+        );
+    } catch (cleanupError) {
+      console.error('[organization-kiloclaw] Post-destroy cleanup failed:', cleanupError);
+    }
+
+    return result;
   }),
 
   // ── Config ────────────────────────────────────────────────────
@@ -645,6 +670,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
       })),
       helpText: entry.helpText,
       helpUrl: entry.helpUrl,
+      guideText: entry.guideText,
+      guideUrl: entry.guideUrl,
       allFieldsRequired: entry.allFieldsRequired ?? false,
     }));
   }),
@@ -672,6 +699,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
       })),
       helpText: entry.helpText,
       helpUrl: entry.helpUrl,
+      guideText: entry.guideText,
+      guideUrl: entry.guideUrl,
       allFieldsRequired: entry.allFieldsRequired ?? false,
     }));
   }),

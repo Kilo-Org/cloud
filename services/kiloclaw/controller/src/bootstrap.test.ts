@@ -409,10 +409,8 @@ describe('applyFeatureFlags', () => {
 // ---- generateHooksToken ----
 
 describe('generateHooksToken', () => {
-  it('generates token when KILOCLAW_GOG_CONFIG_TARBALL is set', () => {
-    const env: Record<string, string | undefined> = {
-      KILOCLAW_GOG_CONFIG_TARBALL: 'some-base64-tarball',
-    };
+  it('generates token for every boot', () => {
+    const env: Record<string, string | undefined> = {};
 
     generateHooksToken(env);
 
@@ -420,12 +418,13 @@ describe('generateHooksToken', () => {
     expect(env.KILOCLAW_HOOKS_TOKEN).toHaveLength(64); // 32 bytes = 64 hex chars
   });
 
-  it('does not generate token when tarball is absent', () => {
-    const env: Record<string, string | undefined> = {};
+  it('replaces any existing token with a fresh value', () => {
+    const env: Record<string, string | undefined> = { KILOCLAW_HOOKS_TOKEN: 'old-token' };
 
     generateHooksToken(env);
 
-    expect(env.KILOCLAW_HOOKS_TOKEN).toBeUndefined();
+    expect(env.KILOCLAW_HOOKS_TOKEN).not.toBe('old-token');
+    expect(env.KILOCLAW_HOOKS_TOKEN).toHaveLength(64);
   });
 });
 

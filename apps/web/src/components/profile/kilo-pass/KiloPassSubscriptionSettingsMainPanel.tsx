@@ -22,6 +22,7 @@ type MainPanelProps = {
   onOpenCancelSubscription: () => void;
   isResumingSubscription: boolean;
   isCancelingSubscription: boolean;
+  isOpeningCancelFlow: boolean;
 };
 
 export function MainPanel(props: MainPanelProps) {
@@ -41,6 +42,7 @@ export function MainPanel(props: MainPanelProps) {
     onOpenCancelSubscription,
     isResumingSubscription,
     isCancelingSubscription,
+    isOpeningCancelFlow,
   } = props;
 
   return (
@@ -102,11 +104,23 @@ export function MainPanel(props: MainPanelProps) {
       ) : cancelAction ? (
         <Button
           variant="destructive"
-          className="w-full justify-center"
+          className="w-full justify-center gap-2"
           onClick={onOpenCancelSubscription}
-          disabled={isCancelingSubscription}
+          disabled={isOpeningCancelFlow || isCancelingSubscription}
         >
-          {cancelAction.label}
+          {isOpeningCancelFlow ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Opening cancellation flow
+            </>
+          ) : isCancelingSubscription ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Canceling subscription
+            </>
+          ) : (
+            cancelAction.label
+          )}
         </Button>
       ) : null}
     </div>

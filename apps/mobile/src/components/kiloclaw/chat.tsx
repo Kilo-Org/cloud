@@ -1,29 +1,83 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
-import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, View } from 'react-native';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type Href, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image'; // eslint-disable-line no-restricted-imports -- raw expo-image needed for Stream Chat SDK ImageComponent prop
-import { Settings } from 'lucide-react-native';
+import * as Notifications from 'expo-notifications';
 import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
+import { toast } from 'sonner-native';
 
+import { KiloClawMessageAvatar } from '@/components/kiloclaw/chat-avatar';
+import { ChatPlaceholder } from '@/components/kiloclaw/chat-placeholder';
+import { ChatHeader, ChatShell } from '@/components/kiloclaw/chat-shell';
 import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
+import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
-import { ScreenHeader } from '@/components/screen-header';
-import { Text } from '@/components/ui/text';
-import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw-queries';
+import { type NotificationData, setActiveChatInstance } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
 
 type KiloClawChatProps = {
   instanceId: string;
   name: string;
   enabled: boolean;
+  organizationId?: string | null;
 };
 
-export function KiloClawChat({ instanceId, name, enabled }: Readonly<KiloClawChatProps>) {
-  const { data: creds, isLoading, error } = useStreamChatCredentials(enabled);
+export function KiloClawChat({
+  instanceId,
+  name,
+  enabled,
+  organizationId,
+}: Readonly<KiloClawChatProps>) {
+  const { data: creds, isLoading, error } = useStreamChatCredentials(organizationId, enabled);
+  const trpc = useTRPC();
+
+  const { mutate: markChatRead } = useMutation(
+    trpc.user.markChatRead.mutationOptions({
+      onSuccess: ({ badgeCount }) => {
+        void Notifications.setBadgeCountAsync(badgeCount);
+      },
+      onError: (err: { message: string }) => {
+        toast.error(err.message || 'Failed to update badge count');
+      },
+    })
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      setActiveChatInstance(instanceId);
+      markChatRead({ channelId: instanceId });
+
+      // If a notification for this chat arrives while the screen is already open it is
+      // visually suppressed, but the DO still incremented the server-side count. Clear
+      // it immediately so the badge never drifts above 0 while the user is reading.
+      const subscription = Notifications.addNotificationReceivedListener(notification => {
+        const data = notification.request.content.data as NotificationData | undefined;
+        if (data?.type === 'chat' && data.instanceId === instanceId) {
+          markChatRead({ channelId: instanceId });
+        }
+      });
+
+      // Also clear when the app returns to the foreground while this chat is focused.
+      // Notifications received in the background do not fire the listener above, and
+      // useFocusEffect does not re-run on app resume (focus is a navigation concept,
+      // not an app-state one), so without this the badge stays stuck after backgrounding.
+      const appStateSubscription = AppState.addEventListener('change', nextAppState => {
+        if (nextAppState === 'active') {
+          markChatRead({ channelId: instanceId });
+        }
+      });
+
+      return () => {
+        setActiveChatInstance(null);
+        subscription.remove();
+        appStateSubscription.remove();
+      };
+    }, [instanceId, markChatRead])
+  );
 
   if (!enabled) {
     return (
@@ -66,73 +120,8 @@ export function KiloClawChat({ instanceId, name, enabled }: Readonly<KiloClawCha
       apiKey={creds.apiKey}
       userId={creds.userId}
       channelId={creds.channelId}
+      organizationId={organizationId}
     />
-  );
-}
-
-// ─── Internal components ────────────────────────────────────────────────────
-
-function ChatShell({
-  instanceId,
-  name,
-  children,
-}: {
-  instanceId: string;
-  name: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View className="flex-1 bg-background">
-      <ChatHeader instanceId={instanceId} title={name} />
-      {children}
-    </View>
-  );
-}
-
-function ChatHeader({
-  instanceId,
-  title,
-  botOnline,
-}: {
-  instanceId: string;
-  title: string;
-  botOnline?: boolean;
-}) {
-  const router = useRouter();
-  const colors = useThemeColors();
-
-  const settingsButton = (
-    <Pressable
-      onPress={() => {
-        router.push(`/(app)/(tabs)/(1_kiloclaw)/${instanceId}/dashboard` as Href);
-      }}
-      hitSlop={12}
-      accessibilityLabel="Settings"
-      className="active:opacity-70"
-    >
-      <Settings size={20} color={colors.foreground} />
-    </Pressable>
-  );
-
-  return (
-    <ScreenHeader
-      title={title}
-      headerRight={
-        <View className="flex-row items-center gap-3">
-          {botOnline !== undefined && <BotStatusIndicator online={botOnline} />}
-          {settingsButton}
-        </View>
-      }
-    />
-  );
-}
-
-function BotStatusIndicator({ online }: { online: boolean }) {
-  return (
-    <View className="flex-row items-center gap-1.5">
-      <View className={`h-2 w-2 rounded-full ${online ? 'bg-emerald-400' : 'bg-neutral-500'}`} />
-      <Text className="text-xs text-muted-foreground">{online ? 'Online' : 'Offline'}</Text>
-    </View>
   );
 }
 
@@ -142,12 +131,14 @@ function StreamChatUI({
   apiKey,
   userId,
   channelId,
+  organizationId,
 }: {
   instanceId: string;
   name: string;
   apiKey: string;
   userId: string;
   channelId: string;
+  organizationId?: string | null;
 }) {
   const { bottom } = useSafeAreaInsets();
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -155,18 +146,19 @@ function StreamChatUI({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Stable token provider — stream-chat calls this when the current token expires.
   const tokenProvider = useCallback(async () => {
-    const creds = await queryClient.fetchQuery(
-      trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
-        staleTime: 0,
-      })
-    );
+    const opts = organizationId
+      ? trpc.organizations.kiloclaw.getStreamChatCredentials.queryOptions(
+          { organizationId },
+          { staleTime: 0 }
+        )
+      : trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, { staleTime: 0 });
+    const creds = await queryClient.fetchQuery(opts);
     if (!creds?.userToken) {
       throw new Error('Failed to fetch Stream Chat credentials');
     }
     return creds.userToken;
-  }, [queryClient, trpc]);
+  }, [queryClient, trpc, organizationId]);
 
   const [client, setClient] = useState<StreamChat | null>(null);
   const [channel, setChannel] = useState<StreamChannel | null>(null);
@@ -190,8 +182,7 @@ function StreamChatUI({
         await chatClient.connectUser({ id: userId }, tokenProvider);
         const ch = chatClient.channel('messaging', channelId);
         await ch.watch({ presence: true });
-        // cancelled may change across awaits above
-        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- cancelled can change across awaits
         if (!cancelled) {
           setClient(chatClient);
           setChannel(ch);
@@ -211,6 +202,25 @@ function StreamChatUI({
       setChannel(null);
     };
   }, [apiKey, userId, channelId, tokenProvider]);
+
+  // Gracefully close/reopen the websocket on background/foreground.
+  // This preserves the client and channel state (no disconnect/reconnect).
+  const appState = useRef(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (client) {
+        if (appState.current === 'active' && /inactive|background/.exec(nextAppState)) {
+          void client.closeConnection();
+        } else if (/inactive|background/.exec(appState.current) && nextAppState === 'active') {
+          void client.openConnection();
+        }
+      }
+      appState.current = nextAppState;
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [client]);
 
   // Bot presence tracking
   const sandboxId = channelId.replace(/^default-/, '');
@@ -248,21 +258,18 @@ function StreamChatUI({
         <OverlayProvider value={{ style: chatTheme }}>
           {/* eslint-disable-next-line typescript-eslint/no-unsafe-assignment -- expo-image is API-compatible with RN Image */}
           <Chat client={client} style={chatTheme} ImageComponent={ExpoImage as never}>
-            <Channel channel={channel} keyboardVerticalOffset={headerHeight}>
+            <Channel
+              channel={channel}
+              keyboardVerticalOffset={headerHeight}
+              MessageAvatar={KiloClawMessageAvatar}
+            >
+              <NotificationPrompt enabled={Boolean(channel)} />
               <MessageList />
               <MessageInput />
             </Channel>
           </Chat>
         </OverlayProvider>
       </View>
-    </View>
-  );
-}
-
-function ChatPlaceholder({ message }: { message: string }) {
-  return (
-    <View className="flex-1 items-center justify-center px-6">
-      <Text className="text-sm text-muted-foreground text-center">{message}</Text>
     </View>
   );
 }

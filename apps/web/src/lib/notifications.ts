@@ -11,7 +11,7 @@ import { subDays } from 'date-fns';
 import { hasReceivedPromotion } from '@/lib/promotionalCredits';
 
 import { fromMicrodollars } from '@/lib/utils';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
+import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
 
 /** Pre-fetched data shared across notification generators to avoid duplicate DB queries. */
 type NotificationContext = {
@@ -175,7 +175,7 @@ async function generateAutoTopUpNotification(
       id: 'auto-top-up-dec-19',
       title: 'New: Auto Top-Ups',
       message:
-        "Set your top-up amount once—we'll automatically add credits when you drop below $5. First 200 users to trigger it get $20 bonus credits.",
+        "Set your top-up amount once—we'll automatically add credits when you drop below $5.",
       action: {
         actionText: 'Enable Auto Top-Ups',
         actionURL: 'https://app.kilo.ai/credits',

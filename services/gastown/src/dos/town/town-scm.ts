@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import type { TownConfig } from '../../types';
 import type { PRFeedbackCheckResult } from './actions';
-import { GitHubPRStatusSchema, GitLabMRStatusSchema } from '../../util/platform-pr.util';
+import {
+  GitHubPRStatusSchema,
+  GitLabMRStatusSchema,
+  parseGitUrl,
+} from '../../util/platform-pr.util';
 import { writeEvent } from '../../util/analytics.util';
 
 const TOWN_LOG = '[town-scm]';
@@ -10,17 +14,23 @@ export type SCMContext = {
   env: Env;
   townId: string;
   getTownConfig: () => Promise<TownConfig>;
+  /**
+   * Rig-level platform integration ID. When provided, it is tried as a
+   * fallback after town-level git_auth so that rigs authenticated solely
+   * through a rig-scoped GitHub App installation can still resolve a token.
+   */
+  platformIntegrationId?: string;
 };
 
 /**
  * Resolve a GitHub API token from the town config.
- * Fallback chain: github_token → github_cli_pat → platform integration (GitHub App).
+ * Fallback chain: github_token → github_cli_pat → town platform integration → rig platform integration.
  */
 export async function resolveGitHubToken(ctx: SCMContext): Promise<string | null> {
   const townConfig = await ctx.getTownConfig();
   let token = townConfig.git_auth?.github_token ?? townConfig.github_cli_pat;
   if (!token) {
-    const integrationId = townConfig.git_auth?.platform_integration_id;
+    const integrationId = townConfig.git_auth?.platform_integration_id ?? ctx.platformIntegrationId;
     if (integrationId && ctx.env.GIT_TOKEN_SERVICE) {
       try {
         token = await ctx.env.GIT_TOKEN_SERVICE.getToken(integrationId);
@@ -476,4 +486,92 @@ export async function mergePR(ctx: SCMContext, prUrl: string): Promise<boolean> 
 
   console.warn(`${TOWN_LOG} mergePR: all merge methods rejected for ${prUrl}`);
   return false;
+}
+
+/**
+ * Create the convoy feature branch on the remote GitHub repository so that it
+ * exists before any polecat tries to open a PR targeting it.
+ *
+ * The branch is created at the current tip of the rig's default branch.
+ * If the branch already exists (HTTP 422) the call is treated as a no-op.
+ * If no GitHub token is available, the error is logged and the function
+ * returns without throwing — convoy creation continues, but branch creation
+ * is skipped.
+ */
+export async function createConvoyBranch(
+  ctx: SCMContext,
+  opts: {
+    gitUrl: string;
+    defaultBranch: string;
+    featureBranch: string;
+  }
+): Promise<void> {
+  const token = await resolveGitHubToken(ctx);
+  if (!token) {
+    console.warn(
+      `${TOWN_LOG} createConvoyBranch: no GitHub token available — skipping branch creation for ${opts.featureBranch}`
+    );
+    return;
+  }
+
+  const coords = parseGitUrl(opts.gitUrl);
+  if (!coords || coords.platform !== 'github') {
+    // Non-GitHub repos or unparseable URLs: skip silently (GitLab uses a
+    // different flow; nothing breaks if the branch doesn't pre-exist there).
+    return;
+  }
+
+  const { owner, repo } = coords;
+  const apiBase = `https://api.github.com/repos/${owner}/${repo}`;
+  const headers = {
+    Authorization: `token ${token}`,
+    Accept: 'application/vnd.github.v3+json',
+    'User-Agent': 'Gastown/1.0',
+    'Content-Type': 'application/json',
+  };
+
+  // 1. Resolve the SHA at the tip of the default branch.
+  const refRes = await fetch(`${apiBase}/git/ref/heads/${opts.defaultBranch}`, { headers });
+  if (!refRes.ok) {
+    const text = await refRes.text().catch(() => '(unreadable)');
+    console.warn(
+      `${TOWN_LOG} createConvoyBranch: failed to resolve default branch SHA (${refRes.status}): ${text.slice(0, 200)}`
+    );
+    return;
+  }
+
+  const refJson = await refRes.json().catch(() => null);
+  const shaResult = z.object({ object: z.object({ sha: z.string() }) }).safeParse(refJson);
+  if (!shaResult.success) {
+    console.warn(`${TOWN_LOG} createConvoyBranch: unexpected ref response shape`);
+    return;
+  }
+  const sha = shaResult.data.object.sha;
+
+  // 2. Create the convoy feature branch pointing at that SHA.
+  const createRes = await fetch(`${apiBase}/git/refs`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ ref: `refs/heads/${opts.featureBranch}`, sha }),
+  });
+
+  if (createRes.ok) {
+    console.log(
+      `${TOWN_LOG} createConvoyBranch: created ${opts.featureBranch} at ${sha.slice(0, 8)} in ${owner}/${repo}`
+    );
+    return;
+  }
+
+  if (createRes.status === 422) {
+    // Branch already exists — idempotent, treat as success.
+    console.log(
+      `${TOWN_LOG} createConvoyBranch: branch ${opts.featureBranch} already exists in ${owner}/${repo} — skipping`
+    );
+    return;
+  }
+
+  const errText = await createRes.text().catch(() => '(unreadable)');
+  console.warn(
+    `${TOWN_LOG} createConvoyBranch: GitHub API returned ${createRes.status} when creating ${opts.featureBranch}: ${errText.slice(0, 200)}`
+  );
 }

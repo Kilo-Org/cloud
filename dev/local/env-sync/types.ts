@@ -23,6 +23,12 @@ type EnvDevLocalChange = {
   newValue: string;
 };
 
+type EnvLocalAutoCreate = {
+  key: string;
+  command: string;
+  args: string[];
+};
+
 type SecretStoreBinding = {
   binding: string;
   store_id: string;
@@ -56,6 +62,7 @@ type EnvSyncPlan = {
   lanIp: string | undefined;
   devVarsChanges: DevVarsFileChange[];
   envDevLocalChanges: EnvDevLocalChange[];
+  envLocalAutoCreates: EnvLocalAutoCreate[];
   secretStoreWarnings: SecretStoreWarning[];
   secretStoreAutoCreates: SecretStoreAutoCreate[];
   consistencyWarnings: ConsistencyWarning[];
@@ -101,6 +108,7 @@ export type {
   KeyChange,
   DevVarsFileChange,
   EnvDevLocalChange,
+  EnvLocalAutoCreate,
   SecretStoreBinding,
   SecretStoreWarning,
   SecretStoreAutoCreate,

@@ -12,6 +12,7 @@ import {
 } from '@kilocode/db/schema';
 import { processTopUp } from '@/lib/credits';
 import { autoResumeIfSuspended } from '@/lib/kiloclaw/instance-lifecycle';
+import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 import {
   computeUsageTriggeredMonthlyBonusDecision,
   maybeIssueKiloPassBonusFromUsageThreshold,
@@ -26,6 +27,11 @@ import {
 import { computeIssueMonth } from '@/lib/kilo-pass/issuance';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { sentryLogger } from '@/lib/utils.server';
+import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
+import {
+  getStripePriceIdForClawPlan,
+  getStripePriceIdForClawPlanIntro,
+} from '@/lib/kiloclaw/stripe-price-ids.server';
 
 const logInfo = sentryLogger('kiloclaw-credit-billing', 'info');
 const logWarning = sentryLogger('kiloclaw-credit-billing', 'warning');
@@ -39,6 +45,58 @@ export const KILOCLAW_PLAN_COST_MICRODOLLARS = {
 // First-month discount for new standard-plan credit enrollments (matches
 // the Stripe-configured intro price). See spec Credit Enrollment rule 3.
 export const KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS = 4_000_000; // $4
+
+function getKiloClawAffiliateItemCategory(plan: 'commit' | 'standard'): string {
+  return `kiloclaw-${plan}`;
+}
+
+function getKiloClawAffiliateItemName(plan: 'commit' | 'standard'): string {
+  return plan === 'commit' ? 'KiloClaw Commit Plan' : 'KiloClaw Standard Plan';
+}
+
+async function enqueueCreditEnrollmentAffiliateEvents(params: {
+  userId: string;
+  plan: 'commit' | 'standard';
+  saleEntityId: string;
+  saleOrderId: string;
+  saleAmountMicrodollars: number;
+  eventDate: Date;
+  saleItemSku: string;
+  trialEndEntityId?: string;
+}): Promise<void> {
+  if (params.trialEndEntityId) {
+    await enqueueAffiliateEventForUser({
+      userId: params.userId,
+      provider: 'impact',
+      eventType: 'trial_end',
+      dedupeKey: buildAffiliateEventDedupeKey({
+        provider: 'impact',
+        eventType: 'trial_end',
+        entityId: params.trialEndEntityId,
+      }),
+      eventDate: params.eventDate,
+      orderId: IMPACT_ORDER_ID_MACRO,
+    });
+  }
+
+  await enqueueAffiliateEventForUser({
+    userId: params.userId,
+    provider: 'impact',
+    eventType: 'sale',
+    dedupeKey: buildAffiliateEventDedupeKey({
+      provider: 'impact',
+      eventType: 'sale',
+      entityId: params.saleEntityId,
+    }),
+    eventDate: params.eventDate,
+    orderId: params.saleOrderId,
+    amount: params.saleAmountMicrodollars / 1_000_000,
+    currencyCode: 'usd',
+    itemCategory: getKiloClawAffiliateItemCategory(params.plan),
+    itemName: getKiloClawAffiliateItemName(params.plan),
+    itemSku: params.saleItemSku,
+  });
+}
 
 /**
  * Project the pending Kilo Pass bonus microdollars that would be awarded
@@ -390,6 +448,10 @@ export async function enrollWithCredits(params: {
     plan === 'standard' && !hadPaidSubscription
       ? KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS
       : KILOCLAW_PLAN_COST_MICRODOLLARS[plan];
+  const saleItemSku =
+    plan === 'standard' && !hadPaidSubscription
+      ? getStripePriceIdForClawPlanIntro('standard')
+      : getStripePriceIdForClawPlan(plan);
 
   // Step 1: Read current state
   const [user] = await db
@@ -409,6 +471,7 @@ export async function enrollWithCredits(params: {
 
   const [existingSub] = await db
     .select({
+      id: kiloclaw_subscriptions.id,
       status: kiloclaw_subscriptions.status,
       suspended_at: kiloclaw_subscriptions.suspended_at,
     })
@@ -457,6 +520,10 @@ export async function enrollWithCredits(params: {
       ? `kiloclaw-subscription-commit:${instanceId}`
       : `kiloclaw-subscription:${instanceId}`;
   const deductionCategory = `${categoryPrefix}:${periodKey}`;
+  const saleDedupeKeyEntityId = deductionCategory;
+
+  let deductionWasDuplicate = false;
+  const trialEndEntityId = existingSub?.status === 'trialing' ? existingSub.id : undefined;
 
   await db.transaction(async tx => {
     // 5a: Insert negative credit transaction with period-encoded idempotency key
@@ -483,7 +550,8 @@ export async function enrollWithCredits(params: {
         instanceId,
         deductionCategory,
       });
-      throw new Error('Enrollment already processed for this billing period.');
+      deductionWasDuplicate = true;
+      return;
     }
 
     // 5b: Atomically increment microdollars_used so the deduction counts
@@ -535,7 +603,42 @@ export async function enrollWithCredits(params: {
           cancel_at_period_end: false,
         },
       });
+
+    await enqueueCreditEnrollmentAffiliateEvents({
+      userId,
+      plan,
+      saleEntityId: saleDedupeKeyEntityId,
+      saleOrderId: deductionCategory,
+      saleAmountMicrodollars: costMicrodollars,
+      eventDate: now,
+      saleItemSku,
+      trialEndEntityId,
+    });
   });
+
+  if (deductionWasDuplicate) {
+    try {
+      await enqueueCreditEnrollmentAffiliateEvents({
+        userId,
+        plan,
+        saleEntityId: saleDedupeKeyEntityId,
+        saleOrderId: deductionCategory,
+        saleAmountMicrodollars: costMicrodollars,
+        eventDate: now,
+        saleItemSku,
+        trialEndEntityId,
+      });
+    } catch (error) {
+      logWarning('Affiliate enqueue recovery failed after duplicate credit enrollment', {
+        user_id: userId,
+        instanceId,
+        deductionCategory,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    throw new Error('Enrollment already processed for this billing period.');
+  }
 
   // Step 4: Post-transaction bonus evaluation (spec rule 6)
   try {

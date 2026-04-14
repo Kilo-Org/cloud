@@ -103,6 +103,8 @@ describe('database schema', () => {
       KiloClawScheduledBy: ['auto', 'user'],
       KiloClawSubscriptionStatus: ['trialing', 'active', 'past_due', 'canceled', 'unpaid'],
       AffiliateProvider: ['impact'],
+      AffiliateEventType: ['signup', 'trial_start', 'trial_end', 'sale'],
+      AffiliateEventDeliveryState: ['queued', 'blocked', 'sending', 'delivered', 'failed'],
     };
 
     const actualEnumValues: Record<string, string[]> = {};

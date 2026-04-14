@@ -330,6 +330,47 @@ export const TownConfigSchema = z.object({
 
 export type TownConfig = z.infer<typeof TownConfigSchema>;
 
+// -- Rig Override Configuration --
+
+export const RigOverrideConfigSchema = z.object({
+  // Model overrides (override townConfig.default_model / role_models)
+  default_model: z.string().optional(),
+  role_models: z
+    .object({
+      polecat: z.string().optional(),
+      refinery: z.string().optional(),
+    })
+    .optional(),
+
+  // Review behavior
+  review_mode: z.enum(['rework', 'comments']).optional(),
+  /** false = skip refinery entirely */
+  code_review: z.boolean().optional(),
+  auto_resolve_pr_feedback: z.boolean().optional(),
+  auto_merge_delay_minutes: z.number().int().min(0).nullable().optional(),
+
+  // Merge strategy
+  merge_strategy: z.enum(['direct', 'pr']).optional(),
+  convoy_merge_mode: z.enum(['review-then-land', 'review-and-merge']).optional(),
+
+  // Custom instructions
+  custom_instructions: z
+    .object({
+      polecat: z.string().optional(),
+      refinery: z.string().optional(),
+    })
+    .optional(),
+
+  // Git
+  git_push_flags: z.string().optional(),
+
+  // Agent limits
+  max_concurrent_polecats: z.number().int().positive().optional(),
+  max_dispatch_attempts: z.number().int().positive().optional(),
+});
+
+export type RigOverrideConfig = z.infer<typeof RigOverrideConfigSchema>;
+
 /**
  * Partial update schema — all fields optional, NO defaults.
  * TownConfigSchema.partial() can't be used here because Zod still fires

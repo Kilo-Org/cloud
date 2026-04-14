@@ -22,7 +22,7 @@ const LOG = '[scheduling]';
 
 // ── Constants ──────────────────────────────────────────────────────────
 
-export const DISPATCH_COOLDOWN_MS = 2 * 60_000; // 2 min
+export const DISPATCH_COOLDOWN_MS = 30_000; // 30 sec
 export const MAX_DISPATCH_ATTEMPTS = 5;
 
 // ── Context passed by the Town DO ──────────────────────────────────────
@@ -124,6 +124,8 @@ export async function dispatchAgent(
       [timestamp, bead.bead_id]
     );
 
+    const rigRecord = rigs.getRig(ctx.sql, rigId);
+
     const started = await dispatch.startAgentInContainer(ctx.env, ctx.storage, {
       townId: ctx.townId,
       rigId,
@@ -140,6 +142,7 @@ export async function dispatchAgent(
       defaultBranch: rigConfig.defaultBranch,
       kilocodeToken,
       townConfig,
+      rigOverride: rigRecord?.config ?? null,
       platformIntegrationId: rigConfig.platformIntegrationId,
       convoyFeatureBranch: convoyFeatureBranch ?? undefined,
       systemPromptOverride: options?.systemPromptOverride,
@@ -286,10 +289,22 @@ export function hasActiveWork(sql: SqlStorage): boolean {
       [patrol.TRIAGE_LABEL_LIKE]
     ),
   ];
+  // Open issue beads with a rig (eligible for dispatch by reconcileBeads Rule 1)
+  // but not yet assigned to any agent. Without this check, the alarm drops to
+  // idle cadence after a container restart when agents lose their hooks and
+  // beads revert to open+unassigned, delaying dispatch by up to 5 minutes.
+  const unassignedIssueRows = [
+    ...query(
+      sql,
+      /* sql */ `SELECT COUNT(*) as cnt FROM ${beads} WHERE ${beads.type} = 'issue' AND ${beads.status} = 'open' AND ${beads.rig_id} IS NOT NULL AND ${beads.assignee_agent_bead_id} IS NULL`,
+      []
+    ),
+  ];
   return (
     Number(activeAgentRows[0]?.cnt ?? 0) > 0 ||
     Number(pendingBeadRows[0]?.cnt ?? 0) > 0 ||
     Number(pendingReviewRows[0]?.cnt ?? 0) > 0 ||
-    Number(pendingTriageRows[0]?.cnt ?? 0) > 0
+    Number(pendingTriageRows[0]?.cnt ?? 0) > 0 ||
+    Number(unassignedIssueRows[0]?.cnt ?? 0) > 0
   );
 }

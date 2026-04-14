@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RigOverrideConfigSchema } from '../types';
 
 /**
  * Wraps a Zod schema in z.any().pipe(schema) so the TS input type is `any`
@@ -164,6 +165,7 @@ export const RigDetailOutput = z.object({
   platform_integration_id: z.string().nullable().optional().default(null),
   created_at: z.string(),
   updated_at: z.string(),
+  config: RigOverrideConfigSchema.optional(),
   agents: z.array(AgentOutput),
   beads: z.array(BeadOutput),
 });

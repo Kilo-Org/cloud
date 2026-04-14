@@ -38,6 +38,14 @@ export type KiloCodeConfigResponse = {
   kilocodeDefaultModel: string | null;
 };
 
+export type WebSearchConfigPatchInput = {
+  exaMode?: 'kilo-proxy' | 'disabled' | null;
+};
+
+export type WebSearchConfigPatchResponse = {
+  exaMode: 'kilo-proxy' | 'disabled' | null;
+};
+
 export type BotIdentityPatchInput = {
   botName?: string | null;
   botNature?: string | null;
@@ -130,6 +138,9 @@ export type MachineSize = {
   cpu_kind?: 'shared' | 'performance';
 };
 
+// Keep in sync with services/kiloclaw/src/schemas/instance-config.ts ProviderIdSchema.
+export type KiloClawProviderId = 'fly' | 'docker-local' | 'northflank';
+
 /** Response from POST /api/platform/restore-volume-snapshot */
 export type RestoreVolumeSnapshotResponse = {
   acknowledged: boolean;
@@ -140,6 +151,10 @@ export type RestoreVolumeSnapshotResponse = {
 export type PlatformStatusResponse = {
   userId: string | null;
   sandboxId: string | null;
+  provider: KiloClawProviderId | null;
+  runtimeId: string | null;
+  storageId: string | null;
+  region: string | null;
   status:
     | 'provisioned'
     | 'starting'
@@ -218,8 +233,6 @@ export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   restoreStartedAt: string | null;
   pendingRestoreVolumeId: string | null;
   instanceReadyEmailSent: boolean;
-  diskUsedBytes: number | null;
-  diskTotalBytes: number | null;
 };
 
 export type CleanupRecoveryPreviousVolumeResponse = {
@@ -252,6 +265,8 @@ export type UserConfigResponse = {
   kilocodeApiKeyExpiresAt?: string | null;
   /** Per catalog entry ID → whether all fields for that entry are configured. */
   configuredSecrets: Record<string, boolean>;
+  /** Search mode selected for Kilo-integrated Exa. */
+  kiloExaSearchMode: 'kilo-proxy' | 'disabled' | null;
   /** Env var names of user-defined custom (non-catalog) secrets. */
   customSecretKeys: string[];
   /** Metadata for custom secrets (config paths, etc.). */
@@ -370,6 +385,12 @@ export type ReassociateVolumeResponse = {
   previousVolumeId: string | null;
   newVolumeId: string;
   newRegion: string;
+};
+
+/** Response from POST /api/platform/resize-machine */
+export type ResizeMachineResponse = {
+  previousSize: { cpus: number; memory_mb: number; cpu_kind?: string } | null;
+  newSize: { cpus: number; memory_mb: number; cpu_kind?: string };
 };
 
 /** Response from GET /api/platform/regions */

@@ -16,6 +16,7 @@ export type ChatCompletionMessageParam =
 export interface ChatCompletionSystemMessageParam {
   role: 'system';
   content: string | Array<ChatCompletionContentPartText>;
+  cache_control?: OpenRouterCacheControl;
 }
 
 export interface ChatCompletionUserMessageParam {

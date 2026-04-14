@@ -13,6 +13,12 @@ export type ActiveKiloClawInstance = {
   name: string | null;
 };
 
+export type EnsureActiveInstanceResult = {
+  instance: ActiveKiloClawInstance;
+  /** True when this call inserted a new row (not returned an existing one). */
+  created: boolean;
+};
+
 /**
  * Returns true if this instance row uses the instance-keyed identity scheme
  * (ki_ sandboxId prefix, DO keyed by instanceId). Legacy rows have
@@ -64,7 +70,7 @@ type EnsureActiveInstanceOpts = {
 export async function ensureActiveInstance(
   userId: string,
   opts?: EnsureActiveInstanceOpts
-): Promise<ActiveKiloClawInstance> {
+): Promise<EnsureActiveInstanceResult> {
   const selectFields = {
     id: kiloclaw_instances.id,
     userId: kiloclaw_instances.user_id,
@@ -93,7 +99,7 @@ export async function ensureActiveInstance(
       throw new Error('Failed to create org instance row');
     }
 
-    return row;
+    return { instance: row, created: true };
   }
 
   // Personal flow: return existing active row if present.
@@ -103,7 +109,7 @@ export async function ensureActiveInstance(
   // orphan (no DO created for it). The window is milliseconds on a user-
   // initiated action already deduplicated by the frontend's useMutation.
   const existing = await getActiveInstance(userId);
-  if (existing) return existing;
+  if (existing) return { instance: existing, created: false };
 
   // No active row — create a new instance-keyed row.
   // sandboxId = sandboxIdFromInstanceId(uuid) ensures DB and DO identity match.
@@ -123,7 +129,7 @@ export async function ensureActiveInstance(
     throw new Error('Failed to create personal instance row');
   }
 
-  return row;
+  return { instance: row, created: true };
 }
 
 /**
@@ -267,6 +273,40 @@ export async function getActiveOrgInstance(
     .limit(1);
 
   return row ?? null;
+}
+
+/**
+ * List all active instances for a user across all contexts (personal + orgs).
+ * Used by the mobile "all claws" screen.
+ *
+ * Rows are ordered by created_at ASC so the oldest (canonical) row per context
+ * comes first. We then deduplicate: for personal instances and for each org,
+ * only the oldest row is kept — matching the semantics of getActiveInstance /
+ * getActiveOrgInstance which use LIMIT 1 + ORDER BY created_at.
+ */
+export async function listAllActiveInstances(userId: string): Promise<ActiveKiloClawInstance[]> {
+  const rows = await db
+    .select({
+      id: kiloclaw_instances.id,
+      userId: kiloclaw_instances.user_id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+      organizationId: kiloclaw_instances.organization_id,
+      name: kiloclaw_instances.name,
+    })
+    .from(kiloclaw_instances)
+    .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
+    .orderBy(kiloclaw_instances.created_at);
+
+  // Deduplicate: keep only the oldest row per context (personal = null orgId,
+  // org = specific orgId). Race conditions in ensureActiveInstance can leave
+  // orphan personal rows; getActiveInstance already handles this with LIMIT 1.
+  const seen = new Set<string>();
+  return rows.filter(row => {
+    const key = row.organizationId ?? 'personal';
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**

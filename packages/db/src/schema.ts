@@ -43,6 +43,8 @@ import {
   KiloClawSubscriptionStatus,
   KiloClawPaymentSource,
   AffiliateProvider,
+  AffiliateEventType,
+  AffiliateEventDeliveryState,
 } from './schema-types';
 import type { CustomLlmDefinition, KiloClawAdminAuditAction } from './schema-types';
 import type {
@@ -66,6 +68,7 @@ import type {
   StripeSubscriptionStatus,
   StoredModel,
   GatewayApiKind,
+  ContributorChampionTier,
 } from './schema-types';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 
@@ -110,7 +113,23 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
   AffiliateProvider,
+  AffiliateEventType,
+  AffiliateEventDeliveryState,
 } as const;
+
+export type AffiliateEventPayloadJson = {
+  trackingId: string | null;
+  customerId: string | null;
+  customerEmailHash: string | null;
+  orderId: string;
+  eventDate: string;
+  amount?: number | null;
+  currencyCode?: string | null;
+  itemCategory?: string | null;
+  itemName?: string | null;
+  itemSku?: string | null;
+  promoCode?: string | null;
+};
 
 export const credit_transactions = pgTable(
   'credit_transactions',
@@ -247,6 +266,62 @@ export const user_affiliate_attributions = pgTable(
 );
 
 export type UserAffiliateAttribution = typeof user_affiliate_attributions.$inferSelect;
+
+export const user_affiliate_events = pgTable(
+  'user_affiliate_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    provider: text().notNull().$type<AffiliateProvider>(),
+    event_type: text().notNull().$type<AffiliateEventType>(),
+    dedupe_key: text().notNull(),
+    parent_event_id: uuid(),
+    delivery_state: text()
+      .notNull()
+      .$type<AffiliateEventDeliveryState>()
+      .default(AffiliateEventDeliveryState.Queued),
+    payload_json: jsonb().$type<AffiliateEventPayloadJson>().notNull(),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    foreignKey({
+      columns: [table.parent_event_id],
+      foreignColumns: [table.id],
+      name: 'user_affiliate_events_parent_event_id_fk',
+    })
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    unique('UQ_user_affiliate_events_dedupe_key').on(table.dedupe_key),
+    index('IDX_user_affiliate_events_claim_path').on(
+      table.delivery_state,
+      sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+      table.created_at,
+      table.id
+    ),
+    index('IDX_user_affiliate_events_parent_event_id').on(table.parent_event_id),
+    enumCheck('user_affiliate_events_provider_check', table.provider, AffiliateProvider),
+    enumCheck('user_affiliate_events_event_type_check', table.event_type, AffiliateEventType),
+    enumCheck(
+      'user_affiliate_events_delivery_state_check',
+      table.delivery_state,
+      AffiliateEventDeliveryState
+    ),
+    check(
+      'user_affiliate_events_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type UserAffiliateEvent = typeof user_affiliate_events.$inferSelect;
 
 export const kilo_pass_subscriptions = pgTable(
   'kilo_pass_subscriptions',
@@ -2131,6 +2206,128 @@ export type NewModelStats = typeof modelStats.$inferInsert;
 
 export const MODELS_BY_PROVIDER_ADMIN_URL = '/admin/sync-providers';
 
+export const contributor_champion_contributors = pgTable(
+  'contributor_champion_contributors',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    github_login: text().notNull(),
+    github_profile_url: text().notNull(),
+    github_user_id: bigint({ mode: 'number' }),
+    first_contribution_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_contribution_at: timestamp({ withTimezone: true, mode: 'string' }),
+    all_time_contributions: integer().notNull().default(0),
+    manual_email: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_contributor_champion_contributors_github_login').on(table.github_login),
+    index('IDX_contributor_champion_contributors_last_contribution_at').on(
+      table.last_contribution_at
+    ),
+    index('IDX_contributor_champion_contributors_manual_email').on(table.manual_email),
+  ]
+);
+
+export type ContributorChampionContributor = typeof contributor_champion_contributors.$inferSelect;
+
+export const contributor_champion_events = pgTable(
+  'contributor_champion_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    contributor_id: uuid()
+      .notNull()
+      .references(() => contributor_champion_contributors.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    repo_full_name: text().notNull(),
+    github_pr_number: integer().notNull(),
+    github_pr_url: text().notNull(),
+    github_pr_title: text().notNull(),
+    github_author_login: text().notNull(),
+    github_author_email: text(),
+    merged_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_contributor_champion_events_repo_pr').on(
+      table.repo_full_name,
+      table.github_pr_number
+    ),
+    index('IDX_contributor_champion_events_contributor_id').on(table.contributor_id),
+    index('IDX_contributor_champion_events_merged_at').on(table.merged_at),
+    index('IDX_contributor_champion_events_author_email').on(table.github_author_email),
+  ]
+);
+
+export type ContributorChampionEvent = typeof contributor_champion_events.$inferSelect;
+
+export const contributor_champion_memberships = pgTable(
+  'contributor_champion_memberships',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    contributor_id: uuid()
+      .notNull()
+      .references(() => contributor_champion_contributors.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    selected_tier: text().$type<ContributorChampionTier>(),
+    enrolled_tier: text().$type<ContributorChampionTier>(),
+    enrolled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    credit_amount_microdollars: bigint({ mode: 'number' }).default(0).notNull(),
+    credits_last_granted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    linked_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_contributor_champion_memberships_contributor_id').on(table.contributor_id),
+    check(
+      'contributor_champion_memberships_selected_tier_check',
+      sql`${table.selected_tier} IS NULL OR ${table.selected_tier} IN ('contributor', 'ambassador', 'champion')`
+    ),
+    check(
+      'contributor_champion_memberships_enrolled_tier_check',
+      sql`${table.enrolled_tier} IS NULL OR ${table.enrolled_tier} IN ('contributor', 'ambassador', 'champion')`
+    ),
+    index('IDX_contributor_champion_memberships_credits_due')
+      .on(table.credits_last_granted_at)
+      .where(sql`${table.enrolled_tier} IS NOT NULL AND ${table.credit_amount_microdollars} > 0`),
+    index('IDX_contributor_champion_memberships_linked_kilo_user_id').on(table.linked_kilo_user_id),
+  ]
+);
+
+export type ContributorChampionMembership = typeof contributor_champion_memberships.$inferSelect;
+
+export const contributor_champion_sync_state = pgTable('contributor_champion_sync_state', {
+  repo_full_name: text().primaryKey().notNull(),
+  last_merged_at: timestamp({ withTimezone: true, mode: 'string' }),
+  last_synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
+export type ContributorChampionSyncState = typeof contributor_champion_sync_state.$inferSelect;
+
 export const modelsByProvider = pgTable('models_by_provider', {
   id: serial().notNull().primaryKey(),
   data: jsonb('data').$type<NormalizedOpenRouterResponse>().notNull(),
@@ -2325,6 +2522,8 @@ export const cli_sessions_v2 = pgTable(
     created_on_platform: text().notNull().default('unknown'),
     git_url: text(),
     git_branch: text(),
+    status: text(),
+    status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -3817,6 +4016,35 @@ export const kiloclaw_cli_runs = pgTable(
 export type KiloClawCliRun = typeof kiloclaw_cli_runs.$inferSelect;
 export type NewKiloClawCliRun = typeof kiloclaw_cli_runs.$inferInsert;
 
+// ─── Push Notification Tokens ────────────────────────────────────────
+
+export const user_push_tokens = pgTable(
+  'user_push_tokens',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    token: text().notNull(),
+    platform: text().$type<'ios' | 'android'>().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_user_push_tokens_token').on(table.token),
+    index('IDX_user_push_tokens_user_id').on(table.user_id),
+  ]
+);
+
+export type UserPushToken = typeof user_push_tokens.$inferSelect;
+export type NewUserPushToken = typeof user_push_tokens.$inferInsert;
+
 // ============ EXA USAGE TRACKING ============
 // Pre-aggregated monthly counter (hot path) + per-request audit log (partitioned)
 
@@ -3909,4 +4137,30 @@ export const security_advisor_scans = pgTable(
 );
 
 export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
+
+// ============ CHANNEL BADGE COUNTS ============
+// Per-user per-channel unread notification counts for mobile app badge display.
+// (user_id, channel_id) is the composite PK — one row per user per chat channel.
+// Keyed by channel rather than instance to support multiple channels per instance
+// in future. The notification service increments badge_count on each push and sums
+// across all channels to get the total badge count to include in the push payload.
+// The mobile client resets a channel's count (to 0) when the user views that chat.
+
+export const channel_badge_counts = pgTable(
+  'channel_badge_counts',
+  {
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    channel_id: text().notNull(),
+    badge_count: integer().notNull().default(0),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [primaryKey({ columns: [table.user_id, table.channel_id] })]
+);
+
+export type ChannelBadgeCount = typeof channel_badge_counts.$inferSelect;
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;

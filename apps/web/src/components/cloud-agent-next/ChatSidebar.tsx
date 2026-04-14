@@ -12,6 +12,10 @@ import {
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TimeAgo } from '@/components/shared/TimeAgo';
+import {
+  getSessionActivityIndicatorKind,
+  SessionStatusIndicator,
+} from '@/components/shared/SessionStatusIndicator';
 import { usePathname, useRouter } from 'next/navigation';
 import { isToday, isYesterday, startOfDay, differenceInCalendarDays, format } from 'date-fns';
 import type { StoredSession } from './types';
@@ -166,6 +170,11 @@ function SessionRow({
   };
 
   const isV2 = session.sessionId.startsWith('ses_');
+  const sessionActivityIndicatorKind = getSessionActivityIndicatorKind(
+    session.sessionStatus ?? null,
+    session.sessionStatusUpdatedAt ?? null
+  );
+  const shouldReplaceTime = isLive || sessionActivityIndicatorKind !== null;
 
   return (
     <div
@@ -178,11 +187,6 @@ function SessionRow({
       )}
     >
       <div className="flex items-center gap-2 px-3 py-2">
-        {isLive && (
-          <span className="relative shrink-0">
-            <span className="block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
-          </span>
-        )}
         {isEditing ? (
           <input
             ref={inputRef}
@@ -196,9 +200,25 @@ function SessionRow({
           <>
             <span className="line-clamp-1 min-w-0 flex-1 leading-snug">{session.prompt}</span>
             <span className="relative shrink-0">
-              <span className={cn('text-muted-foreground text-xs', showActions && 'invisible')}>
-                <TimeAgo timestamp={session.updatedAt} compact />
-              </span>
+              {shouldReplaceTime ? (
+                <span
+                  className={cn(
+                    'flex h-4 w-4 items-center justify-center',
+                    showActions && 'invisible'
+                  )}
+                >
+                  {sessionActivityIndicatorKind ? (
+                    <SessionStatusIndicator
+                      status={session.sessionStatus ?? null}
+                      statusUpdatedAt={session.sessionStatusUpdatedAt ?? null}
+                    />
+                  ) : null}
+                </span>
+              ) : (
+                <span className={cn('text-muted-foreground text-xs', showActions && 'invisible')}>
+                  <TimeAgo timestamp={session.updatedAt} compact />
+                </span>
+              )}
               {(onDeleteSession || onStartRename) && (
                 <span
                   className={cn(
@@ -507,24 +527,32 @@ export function ChatSidebar({
                 <div className="text-muted-foreground px-2 pt-2 pb-1 text-[11px] font-semibold tracking-wider uppercase">
                   Remote
                 </div>
-                {liveOnlySessions.map(activeS => (
-                  <div
-                    key={activeS.id}
-                    onClick={() => handleSessionClick(activeS.id)}
-                    className={cn(
-                      'group hover:bg-accent flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
-                      activeS.id === currentSessionId && 'bg-accent font-medium'
-                    )}
-                  >
-                    <span className="relative shrink-0">
-                      <span className="block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
-                    </span>
-                    <span className="line-clamp-1 min-w-0 flex-1 leading-snug">
-                      {activeS.title}
-                    </span>
-                    <span className="text-muted-foreground shrink-0 text-xs">{activeS.status}</span>
-                  </div>
-                ))}
+                {liveOnlySessions.map(activeS => {
+                  const activityIndicatorKind = getSessionActivityIndicatorKind(
+                    activeS.status,
+                    null
+                  );
+
+                  return (
+                    <div
+                      key={activeS.id}
+                      onClick={() => handleSessionClick(activeS.id)}
+                      className={cn(
+                        'group hover:bg-accent flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
+                        activeS.id === currentSessionId && 'bg-accent font-medium'
+                      )}
+                    >
+                      <span className="line-clamp-1 min-w-0 flex-1 leading-snug">
+                        {activeS.title}
+                      </span>
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                        {activityIndicatorKind ? (
+                          <SessionStatusIndicator status={activeS.status} statusUpdatedAt={null} />
+                        ) : null}
+                      </span>
+                    </div>
+                  );
+                })}
               </>
             )}
 

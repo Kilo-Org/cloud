@@ -20,8 +20,10 @@ export const gpt_oss_20b_free_model: KiloExclusiveModel = {
   context_length: 131072,
   max_completion_tokens: 32768,
   status: 'hidden', // usable through kilo-auto
-  flags: ['free', 'reasoning'],
+  flags: ['reasoning'],
   gateway: 'openrouter',
   internal_id: 'openai/gpt-oss-20b',
   inference_provider: null,
+  pricing: null,
+  exclusive_to: [],
 };

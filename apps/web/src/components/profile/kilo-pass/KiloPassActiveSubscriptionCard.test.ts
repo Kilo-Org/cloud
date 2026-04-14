@@ -64,8 +64,12 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
       });
 
       expect(rows).toHaveLength(1);
-      expect(rows[0]?.kind).toBe('active_until');
-      expect(rows[0]?.changeSuffix).toBe('');
+      const row = rows[0];
+      expect(row?.kind).toBe('active_until');
+      if (row?.kind !== 'active_until') {
+        throw new Error('expected active_until');
+      }
+      expect(row.changeSuffix).toBe('');
     });
 
     test('yearly pending cancellation: active_until uses nextBillingAt (yearly period end)', () => {
@@ -102,8 +106,55 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
       });
 
       expect(rows).toHaveLength(1);
-      expect(rows[0]?.kind).toBe('active_until');
-      expect(rows[0]?.refillAtIso).toBe('2026-12-31T00:00:00Z');
+      const row = rows[0];
+      expect(row?.kind).toBe('active_until');
+      if (row?.kind !== 'active_until') {
+        throw new Error('expected active_until');
+      }
+      expect(row.refillAtIso).toBe('2026-12-31T00:00:00Z');
+    });
+
+    test('returns paused_until and suppresses renewal rows when paused', () => {
+      const rows = computeRenewInfoRowModel({
+        subscription: buildSubscription({
+          cadence: KiloPassCadence.Monthly,
+          tier: KiloPassTier.Tier19,
+          refillAt: '2026-05-10T00:00:00Z',
+          nextBillingAt: '2026-05-10T00:00:00Z',
+        }),
+        isPendingCancellation: false,
+        isPaused: true,
+        resumesAtIso: '2026-06-10T00:00:00Z',
+        scheduledChange: null,
+        nowIso: '2026-04-10T00:00:00Z',
+      });
+
+      expect(rows).toEqual([{ kind: 'paused_until', resumesAtIso: '2026-06-10T00:00:00Z' }]);
+    });
+
+    test('returns active_until when paused and pending cancellation', () => {
+      const rows = computeRenewInfoRowModel({
+        subscription: buildSubscription({
+          cadence: KiloPassCadence.Monthly,
+          tier: KiloPassTier.Tier19,
+          refillAt: '2026-05-10T00:00:00Z',
+          nextBillingAt: '2026-05-10T00:00:00Z',
+        }),
+        isPendingCancellation: true,
+        isPaused: true,
+        resumesAtIso: '2026-06-10T00:00:00Z',
+        scheduledChange: null,
+        nowIso: '2026-04-10T00:00:00Z',
+      });
+
+      expect(rows).toEqual([
+        {
+          kind: 'active_until',
+          refillAtIso: '2026-05-10T00:00:00Z',
+          refillsInDays: 30,
+          changeSuffix: '',
+        },
+      ]);
     });
 
     test('applies scheduled change to next renew when yearly and effectiveAt matches refillAt', () => {

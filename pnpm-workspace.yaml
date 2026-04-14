@@ -24,6 +24,7 @@ catalog:
   hono: ^4.12.7
   jose: ^6.2.1
   jsonwebtoken: ^9.0.3
+  stream-chat: ^9.38.0
   stripe: ^19.3.0
   typescript: ^5.9.3
   workers-tagged-logger: ^1.0.0

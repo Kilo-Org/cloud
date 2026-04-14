@@ -12,6 +12,7 @@ import {
 } from '@/lib/constants';
 import { promoCategoriesOld } from '@/lib/promoCreditCategoriesOld';
 import {
+  created_before,
   has_githubAuth,
   has_githubAuthAndWelcomeCredits,
   has_holdOrPayment,
@@ -319,6 +320,12 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     description: 'Custom credit grant for organization',
     is_idempotent: false,
   },
+  {
+    credit_category: 'contributor-champion-credits',
+    description: 'Contributor Champion monthly credits',
+    is_idempotent: false,
+    expiry_hours: 30 * 24,
+  },
 ];
 
 /**
@@ -331,6 +338,16 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
  * 2. Copy the encrypted value and use in encrypted_credit_category
  */
 const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCategoryConfig[] = [
+  {
+    encrypted_credit_category: 'CobZxuHxiuCy3AhW/ObaOQ==:oVLeCsiu4IDqCXzUqliNUg==:IxCjLOrL8EPkWRNw',
+    description: 'Friday promo',
+    expiry_hours: 60 * 24,
+    amount_usd: 5,
+    is_user_selfservicable: true,
+    total_redemptions_allowed: 5_000,
+    is_idempotent: true,
+    promotion_ends_at: new Date('2026-04-17T23:59:59Z'),
+  },
   {
     encrypted_credit_category: 'DMAB+J9SP5P7rxN19iajXg==:l+/sU/o65wg/imvGdNPCTg==:SlcbjsV0',
     description: 'GitHub incentive',
@@ -693,6 +710,27 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     promotion_ends_at: new Date('2026-04-30'),
     description: 'Miami ClawCon Credits',
     total_redemptions_allowed: 1050,
+  },
+  {
+    encrypted_credit_category:
+      'vJgJcT7c/a9FMk3NKVsbgA==:21MktBLukQU8qyUX4OHDQA==:PPkWdB0MzOPAynfY/5Cla2c=',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 9,
+    promotion_ends_at: new Date('2026-04-30'),
+    total_redemptions_allowed: 563,
+  },
+  {
+    encrypted_credit_category:
+      'uUuur9I2iZOBVuFT12Qesw==:nzwZRYrw5yNyIceuzIlFIA==:2gJR8oVMRq6ka1mEQ0U=',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 10,
+    description: 'Free AI Inference KiloClaw email',
+    promotion_ends_at: new Date('2026-04-22'),
+    total_redemptions_allowed: 4175,
+    expiry_hours: 7 * 24,
+    customer_requirement: created_before(new Date('2026-04-11')),
   },
 ];
 

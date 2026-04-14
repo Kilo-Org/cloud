@@ -11,7 +11,11 @@ export type OpenRouterUsage = {
   completion_tokens: number;
   completion_tokens_details: { reasoning_tokens: number };
   prompt_tokens: number;
-  prompt_tokens_details: { cached_tokens: number };
+  prompt_tokens_details: {
+    cached_tokens: number;
+    cache_write_tokens?: number; // OpenRouter
+    cache_creation_input_tokens?: number; // Alibaba
+  };
   total_tokens: number;
 }; //ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
 

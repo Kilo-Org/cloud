@@ -63,6 +63,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
+import { stripAnsi } from '@/lib/stripAnsi';
+import { DetailField, formatAbsoluteTime, formatRelativeTime, parseTimestamp } from './shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { AdminFileEditor } from './AdminFileEditor';
@@ -75,27 +77,6 @@ import {
   type KiloclawAllEventRow,
 } from '@/app/admin/api/kiloclaw-analytics/hooks';
 import type { AnalyticsEngineResponse, ControllerTelemetryRow } from '@/lib/kiloclaw/disk-usage';
-
-function parseTimestamp(timestamp: string): Date {
-  const normalized = timestamp.includes('T') ? timestamp : timestamp.replace(' ', 'T');
-  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
-  const parsed = new Date(hasTimezone ? normalized : `${normalized}Z`);
-
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed;
-  }
-
-  return new Date(timestamp);
-}
-
-function formatRelativeTime(timestamp: string | null): string {
-  if (!timestamp) return '—';
-  return formatDistanceToNow(parseTimestamp(timestamp), { addSuffix: true });
-}
-
-function formatAbsoluteTime(timestamp: string): string {
-  return parseTimestamp(timestamp).toLocaleString();
-}
 
 function formatEpochTime(epoch: number | null): string {
   if (epoch === null) return '—';
@@ -166,15 +147,6 @@ function StatusBadge({ status }: { status: string | null }) {
     default:
       return <Badge variant="outline">Unknown</Badge>;
   }
-}
-
-function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-muted-foreground text-xs">{label}</div>
-      <div className="text-sm">{children}</div>
-    </div>
-  );
 }
 
 function CopySshCommandButton({
@@ -1179,12 +1151,6 @@ function InstanceEventsCard({
       </CardContent>
     </Card>
   );
-}
-
-/** Strip ANSI escape codes so raw terminal output can render in a browser &lt;pre&gt;. */
-function stripAnsi(raw: string): string {
-  // eslint-disable-next-line no-control-regex
-  return raw.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
 }
 
 export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {

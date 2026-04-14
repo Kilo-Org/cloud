@@ -318,6 +318,38 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
     expect(row.completed_at).toBeNull();
   });
 
+  it('marks a running DB row failed when the controller no longer has the run', async () => {
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: false,
+      status: null,
+      output: null,
+      exitCode: null,
+      startedAt: null,
+      completedAt: null,
+      prompt: null,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.getKiloCliRunStatus({
+      userId: cliRunUser.id,
+      instanceId: cliRunInstanceId,
+      runId: cliRunId,
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.output).toContain('controller no longer has an active CLI run');
+    expect(result.completedAt).not.toBeNull();
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, cliRunId));
+
+    expect(row.status).toBe('failed');
+    expect(row.output).toContain('controller no longer has an active CLI run');
+    expect(row.completed_at).not.toBeNull();
+  });
+
   it('writes start audit metadata with runId and stores the initiating admin id', async () => {
     const startKiloCliRun = jest.fn().mockResolvedValue({
       startedAt: '2026-04-08T12:10:00.000Z',

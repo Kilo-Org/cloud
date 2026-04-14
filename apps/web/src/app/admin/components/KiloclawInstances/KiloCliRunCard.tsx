@@ -38,7 +38,11 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
     )
   );
 
-  const selectedRunId = runId ?? selectCurrentCliRun(latestRuns?.runs, instanceId)?.id ?? null;
+  const runningRun = latestRuns?.runs.find(
+    run => run.instance_id === instanceId && run.status === 'running'
+  );
+  const selectedRunId =
+    runningRun?.id ?? runId ?? selectCurrentCliRun(latestRuns?.runs, instanceId)?.id ?? null;
 
   const {
     data: runStatus,
@@ -57,7 +61,7 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
     refetchInterval: query => (query?.state?.data?.status === 'running' ? 3000 : false),
   });
 
-  const isRunning = runStatus?.status === 'running';
+  const isRunning = runningRun !== undefined || runStatus?.status === 'running';
   const isUserRun = runStatus?.initiatedBy === 'user';
 
   const { mutateAsync: startRun, isPending: isStarting } = useMutation(

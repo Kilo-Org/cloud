@@ -87,6 +87,9 @@ export type CliRunStatusResult = KiloCliRunStatusResponse & {
   initiatedBy: 'admin' | 'user' | null;
 };
 
+const LOST_CONTROLLER_RUN_OUTPUT =
+  '[run state unavailable: controller no longer has an active CLI run for this record]';
+
 export async function markCliRunCancelled(params: CancelCliRunParams): Promise<void> {
   await db
     .update(kiloclaw_cli_runs)
@@ -228,6 +231,33 @@ export async function getCliRunStatus(params: {
     params.userId,
     effectiveWorkerInstanceId
   );
+
+  if (!controllerStatus.hasRun) {
+    const completedAt = new Date().toISOString();
+    const output = row.output ?? LOST_CONTROLLER_RUN_OUTPUT;
+    await persistCliRunControllerStatus({
+      runId: params.runId,
+      userId: params.userId,
+      instanceId: row.instance_id,
+      controllerStatus: {
+        status: 'failed',
+        exitCode: row.exit_code,
+        output,
+        completedAt,
+      },
+    });
+
+    return {
+      hasRun: true,
+      status: 'failed',
+      output,
+      exitCode: row.exit_code,
+      startedAt: row.started_at,
+      completedAt,
+      prompt: row.prompt,
+      initiatedBy: getCliRunInitiatedBy(row),
+    };
+  }
 
   if (!isControllerStatusForRun(row, controllerStatus)) {
     return {

@@ -768,8 +768,11 @@ export function SettingsTab({
 
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
-  const braveSearchEnabled =
-    (configuredSecrets['brave-search'] ?? false) && kiloExaSearchMode !== 'kilo-proxy';
+  const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
+  const exaSearchConfigured =
+    kiloExaSearchMode === 'kilo-proxy' ||
+    (supportsExaSearchUi && kiloExaSearchMode === null && !braveSearchConfigured);
+  const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
 
   function handleSave() {
@@ -998,7 +1001,7 @@ export function SettingsTab({
                   isDirty={dirtySecrets.has(entry.id)}
                   actionRowInlineExtra={
                     supportsExaSearchUi &&
-                    configuredSecrets['brave-search'] &&
+                    braveSearchConfigured &&
                     kiloExaSearchMode === 'kilo-proxy' ? (
                       <Button
                         variant="link"
@@ -1041,8 +1044,8 @@ export function SettingsTab({
             {supportsExaSearchUi && (
               <ExaSearchEntrySection
                 mode={kiloExaSearchMode}
-                configured={kiloExaSearchMode === 'kilo-proxy'}
-                braveConfigured={configuredSecrets['brave-search'] ?? false}
+                configured={exaSearchConfigured}
+                braveConfigured={braveSearchConfigured}
                 mutations={mutations}
                 onSecretsChanged={onSecretsChanged}
                 isDirty={dirtySecrets.has('kilo-exa-search')}

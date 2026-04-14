@@ -88,7 +88,7 @@ export function ExaSearchEntrySection({
   }
 
   function handleSave() {
-    if (braveConfigured && (selection === 'disabled' || selection === 'enabled')) {
+    if (braveConfigured) {
       setPendingConfirmSelection(selection);
       return;
     }

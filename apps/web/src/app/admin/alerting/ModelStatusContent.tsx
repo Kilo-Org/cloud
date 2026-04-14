@@ -35,7 +35,7 @@ type HealthSnapshot = {
 };
 
 const SNAPSHOT_INTERVAL_MINUTES = 30;
-const SNAPSHOT_COUNT = 13; // now + 12 historical (6 hours)
+const SNAPSHOT_COUNT = 25; // now + 24 historical (12 hours)
 
 function buildTimestamps(now: Date): string[] {
   const timestamps: string[] = [];
@@ -150,7 +150,7 @@ export function ModelStatusContent() {
   return (
     <div className="flex w-full flex-col gap-y-4">
       <p className="text-muted-foreground">
-        Model health status over the last 6 hours, sampled every 30 minutes. Each dot shows whether
+        Model health status over the last 12 hours, sampled every 30 minutes. Each dot shows whether
         the model had healthy traffic at that point in time.
       </p>
 

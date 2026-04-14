@@ -11,6 +11,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { AnalyticsEngineResponse, ControllerTelemetryRow } from '@/lib/kiloclaw/disk-usage';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useClawContext } from '../components/ClawContext';
 
@@ -42,25 +43,22 @@ type DiskUsageQueryOptions<TData = unknown> = {
   refetchInterval?: number;
 };
 
+type DiskUsageQueryOptionsFactory<TInput, TData> = {
+  queryOptions: <TOptions extends { refetchInterval: number }>(
+    input: TInput,
+    options: TOptions
+  ) => DiskUsageQueryOptions<TData>;
+};
+
+type DiskUsageResponse = AnalyticsEngineResponse<ControllerTelemetryRow>;
+
 type DiskUsageTrpc = {
   kiloclaw: {
-    getDiskUsage: {
-      queryOptions: (
-        input: undefined,
-        options: { refetchInterval: number }
-      ) => DiskUsageQueryOptions<{ data: { disk_used_bytes: number; disk_total_bytes: number }[] }>;
-    };
+    getDiskUsage: DiskUsageQueryOptionsFactory<undefined, DiskUsageResponse>;
   };
   organizations: {
     kiloclaw: {
-      getDiskUsage: {
-        queryOptions: (
-          input: { organizationId: string },
-          options: { refetchInterval: number }
-        ) => DiskUsageQueryOptions<{
-          data: { disk_used_bytes: number; disk_total_bytes: number }[];
-        }>;
-      };
+      getDiskUsage: DiskUsageQueryOptionsFactory<{ organizationId: string }, DiskUsageResponse>;
     };
   };
 };
@@ -93,8 +91,8 @@ export function useClawDiskUsage(enabled: boolean) {
   const { organizationId } = useClawContext();
   const { personal, org } = getClawDiskUsageQueryOptions(trpc, organizationId, enabled);
 
-  const personalQuery = useQuery(personal);
-  const orgQuery = useQuery(org);
+  const personalQuery = useQuery<AnalyticsEngineResponse<ControllerTelemetryRow>>(personal);
+  const orgQuery = useQuery<AnalyticsEngineResponse<ControllerTelemetryRow>>(org);
 
   return organizationId ? orgQuery : personalQuery;
 }

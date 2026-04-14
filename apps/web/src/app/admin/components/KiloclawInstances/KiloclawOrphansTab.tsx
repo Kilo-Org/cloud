@@ -149,9 +149,11 @@ export function KiloclawOrphansTab() {
     toDatetimeLocalInput(subDays(new Date(), 7))
   );
   const [createdBeforeInput, setCreatedBeforeInput] = useState(toDatetimeLocalInput(new Date()));
-  const [scanResult, setScanResult] = useState<{ orphans: OrphanRow[]; scanned: number } | null>(
-    null
-  );
+  const [scanResult, setScanResult] = useState<{
+    orphans: OrphanRow[];
+    scanned: number;
+    capped: boolean;
+  } | null>(null);
   const [selectedSandboxId, setSelectedSandboxId] = useState<string | null>(null);
   const [destroyTarget, setDestroyTarget] = useState<OrphanRow | null>(null);
 
@@ -289,6 +291,15 @@ export function KiloclawOrphansTab() {
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {scanResult?.capped && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Results capped at 1000 rows. Narrow the date range to scan all matching instances.
+              </AlertDescription>
+            </Alert>
           )}
         </CardContent>
       </Card>

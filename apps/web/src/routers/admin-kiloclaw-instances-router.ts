@@ -1339,6 +1339,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
   detectOrphans: adminProcedure.input(DetectOrphansSchema).mutation(async ({ input }) => {
     // 1. Fetch all active (non-destroyed) instances created within the date range.
+    //    Cap at 1000 to avoid excessively long fan-outs; the UI shows when capped.
+    const MAX_SCAN = 1000;
     const instances = await db
       .select({
         id: kiloclaw_instances.id,
@@ -1357,10 +1359,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           lte(kiloclaw_instances.created_at, input.createdBefore)
         )
       )
-      .orderBy(desc(kiloclaw_instances.created_at));
+      .orderBy(desc(kiloclaw_instances.created_at))
+      .limit(MAX_SCAN + 1);
 
-    if (instances.length === 0) {
-      return { orphans: [], scanned: 0 };
+    const capped = instances.length > MAX_SCAN;
+    const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
+
+    if (toScan.length === 0) {
+      return { orphans: [], scanned: 0, capped: false };
     }
 
     // 2. Fan out getDebugStatus calls with concurrency limit.
@@ -1379,8 +1385,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
     const orphans: OrphanResult[] = [];
 
-    for (let i = 0; i < instances.length; i += CONCURRENCY) {
-      const batch = instances.slice(i, i + CONCURRENCY);
+    for (let i = 0; i < toScan.length; i += CONCURRENCY) {
+      const batch = toScan.slice(i, i + CONCURRENCY);
       const results = await Promise.allSettled(
         batch.map(async instance => {
           const instId = instance.sandbox_id.startsWith('ki_') ? instance.id : undefined;
@@ -1389,7 +1395,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         })
       );
 
-      for (const result of results) {
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
         if (result.status === 'fulfilled') {
           const { instance, status } = result.value;
           // A null/undefined status means the DO has never been provisioned.
@@ -1407,7 +1414,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         } else {
           // If the status call itself failed, flag it as a potential orphan
           // with the error — the admin can investigate.
-          const instance = batch[results.indexOf(result)];
+          const instance = batch[j];
           if (instance) {
             orphans.push({
               id: instance.id,
@@ -1424,7 +1431,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }
 
-    return { orphans, scanned: instances.length };
+    return { orphans, scanned: toScan.length, capped };
   }),
 
   destroyOrphan: adminProcedure
@@ -1447,6 +1454,18 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
       if (instance.destroyed_at !== null) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Instance is already destroyed' });
+      }
+
+      // Verify the instance is actually an orphan — the DO should have no state.
+      // If it does, the admin should use the standard destroy flow instead.
+      const client = new KiloClawInternalClient();
+      const instId = instance.sandbox_id.startsWith('ki_') ? instance.id : undefined;
+      const workerStatus = await client.getDebugStatus(instance.user_id, instId);
+      if (workerStatus?.status) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Instance has active DO state (status: ${workerStatus.status}) — use the standard destroy flow instead`,
+        });
       }
 
       console.log(

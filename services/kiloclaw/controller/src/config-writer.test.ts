@@ -720,9 +720,53 @@ describe('generateBaseConfig', () => {
       wakeMode: 'now',
       name: 'Inbound Email',
       sessionKey: '{{payload.sessionKey}}',
-      messageTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+      textTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
       deliver: false,
     });
+  });
+
+  it('migrates wake hook messageTemplate to textTemplate', () => {
+    const existing = JSON.stringify({
+      hooks: {
+        mappings: [
+          {
+            id: 'cloudflare-email-inbound',
+            match: { path: 'email' },
+            action: 'wake',
+            wakeMode: 'now',
+            name: 'Inbound Email',
+            sessionKey: '{{payload.sessionKey}}',
+            messageTemplate: 'old template',
+            deliver: false,
+          },
+          {
+            id: 'custom-wake',
+            action: 'wake',
+            messageTemplate: 'custom template',
+          },
+        ],
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'test-hooks-token' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.hooks.mappings).toContainEqual({
+      id: 'cloudflare-email-inbound',
+      match: { path: 'email' },
+      action: 'wake',
+      wakeMode: 'now',
+      name: 'Inbound Email',
+      sessionKey: '{{payload.sessionKey}}',
+      textTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+      deliver: false,
+    });
+    expect(config.hooks.mappings).toContainEqual({
+      id: 'custom-wake',
+      action: 'wake',
+      textTemplate: 'custom template',
+    });
+    expect(JSON.stringify(config.hooks.mappings)).not.toContain('messageTemplate');
   });
 
   it('adds gmail preset when Gog credentials are configured', () => {

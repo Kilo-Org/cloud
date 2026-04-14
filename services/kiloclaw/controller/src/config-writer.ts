@@ -60,6 +60,14 @@ type ConfigObject = Record<string, any>;
 
 type EnvLike = Record<string, string | undefined>;
 
+function migrateWakeHookTemplate(mapping: ConfigObject): ConfigObject {
+  if (mapping.action === 'wake' && typeof mapping.messageTemplate === 'string') {
+    mapping.textTemplate = mapping.messageTemplate;
+    delete mapping.messageTemplate;
+  }
+  return mapping;
+}
+
 const INBOUND_EMAIL_HOOK_MAPPING = {
   id: 'cloudflare-email-inbound',
   match: { path: 'email' },
@@ -67,7 +75,7 @@ const INBOUND_EMAIL_HOOK_MAPPING = {
   wakeMode: 'now',
   name: 'Inbound Email',
   sessionKey: '{{payload.sessionKey}}',
-  messageTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+  textTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
   deliver: false,
 };
 
@@ -371,7 +379,9 @@ export function generateBaseConfig(
     config.hooks.token = env.KILOCLAW_HOOKS_TOKEN;
     config.hooks.path = '/hooks';
 
-    config.hooks.mappings = Array.isArray(config.hooks.mappings) ? config.hooks.mappings : [];
+    config.hooks.mappings = Array.isArray(config.hooks.mappings)
+      ? config.hooks.mappings.map((mapping: ConfigObject) => migrateWakeHookTemplate(mapping))
+      : [];
     const existingEmailMappingIndex = config.hooks.mappings.findIndex(
       (mapping: ConfigObject) => mapping.id === INBOUND_EMAIL_HOOK_MAPPING.id
     );

@@ -26,6 +26,11 @@ export function SafetyIdentifierHashGenerator() {
 
   return (
     <div className="bg-background rounded-lg border p-6 space-y-4">
+      <p className="text-muted-foreground text-sm">
+        Generates the hashed ID used in the <code>users</code> and <code>organizations</code>{' '}
+        allowlists in <code>handleRequestLogging.ts</code>. Paste a user or organization ID to get
+        the hash that can be added to those lists to enable request logging for that entity.
+      </p>
       <div className="space-y-2">
         <Label htmlFor="hash-id-input">ID (user ID or organization ID)</Label>
         <Input

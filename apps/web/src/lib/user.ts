@@ -63,7 +63,7 @@ import {
   contributor_champion_memberships,
   contributor_champion_contributors,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, isNotNull, sql, or } from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
@@ -115,6 +115,58 @@ export async function findUserByStripeCustomerId(
 const posthogClient = PostHogClient();
 if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
   posthogClient.debug();
+}
+
+const DEFAULT_MAX_SIGNUPS_PER_IP_24H = 5;
+const signupsPerIpWindowMs = 24 * 60 * 60 * 1000;
+
+function getSignupIp(requestHeaders?: Headers): string | null {
+  const forwardedFor = requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim();
+  return forwardedFor || requestHeaders?.get('x-real-ip')?.trim() || null;
+}
+
+function getMaxSignupsPerIp24h(): number {
+  const configured = process.env.MAX_SIGNUPS_PER_IP_24H;
+  if (!configured) return DEFAULT_MAX_SIGNUPS_PER_IP_24H;
+
+  const parsed = Number.parseInt(configured, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_MAX_SIGNUPS_PER_IP_24H;
+  return parsed;
+}
+
+function getSignupIpExemptions(): Set<string> {
+  return new Set(
+    (process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS ?? '')
+      .split(',')
+      .map(ip => ip.trim())
+      .filter(ip => ip.length > 0)
+  );
+}
+
+async function checkSignupIpRateLimit(
+  signupIp: string | null
+): Promise<Result<null, AuthErrorType>> {
+  if (!signupIp || getSignupIpExemptions().has(signupIp)) return successResult(null);
+
+  const maxSignups = getMaxSignupsPerIp24h();
+  const windowStart = new Date(Date.now() - signupsPerIpWindowMs).toISOString();
+  const [result] = await db
+    .select({ count: count() })
+    .from(kilocode_users)
+    .where(
+      and(eq(kilocode_users.signup_ip, signupIp), gte(kilocode_users.created_at, windowStart))
+    );
+
+  const existingAccounts = result?.count ?? 0;
+  if (existingAccounts < maxSignups) return successResult(null);
+
+  console.warn('[auth] Signup rejected due to per-IP rate limit', {
+    ip_address: signupIp,
+    existing_accounts_24h: existingAccounts,
+    max_signups_per_ip_24h: maxSignups,
+  });
+
+  return failureResult('SIGNUP-RATE-LIMITED');
 }
 
 /**
@@ -310,6 +362,10 @@ export async function createOrUpdateUser(
   if (turnstile_guid && (await findUserById(turnstile_guid)))
     throw new Error('Abuser warning: turnstile guid reuse detected ' + turnstile_guid);
 
+  const signupIp = getSignupIp(requestHeaders);
+  const signupRateLimitResult = await checkSignupIpRateLimit(signupIp);
+  if (!signupRateLimitResult.success) return signupRateLimitResult;
+
   const newUserId = turnstile_guid ?? randomUUID();
 
   // New user creation path
@@ -327,6 +383,7 @@ export async function createOrUpdateUser(
     hosted_domain: args.hosted_domain,
     is_admin: shouldBeAdmin(args.google_user_email, args.hosted_domain),
     stripe_customer_id: stripeCustomer.id,
+    signup_ip: signupIp,
     openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
     vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
   } satisfies typeof kilocode_users.$inferInsert;
@@ -567,6 +624,7 @@ export async function softDeleteUser(userId: string) {
         cohorts: {},
         is_admin: false,
         customer_source: null,
+        signup_ip: null,
       })
       .where(eq(kilocode_users.id, userId));
 

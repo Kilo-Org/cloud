@@ -41,6 +41,16 @@ export function AuthErrorNotification({ error }: { error: string }) {
       </div>
     );
 
+  if (error === 'SIGNUP-RATE-LIMITED')
+    return (
+      <div data-error-notification>
+        <ErrorNotificationBox title="Too Many Signups">
+          Too many accounts have been created from this network recently. Please try again later or
+          contact support if you believe this is an error.
+        </ErrorNotificationBox>
+      </div>
+    );
+
   if (error === 'EMAIL-MUST-BE-LOWERCASE')
     return (
       <div data-error-notification>

@@ -41,7 +41,13 @@ import {
   security_advisor_scans,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
-import { softDeleteUser, SoftDeletePreconditionError, findUserById, findUsersByIds } from './user';
+import {
+  softDeleteUser,
+  SoftDeletePreconditionError,
+  findUserById,
+  findUsersByIds,
+  createOrUpdateUser,
+} from './user';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
@@ -53,6 +59,12 @@ import {
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
+
+jest.mock('@/lib/stripe-client', () => ({
+  createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
+    id: `cus_${metadata.kiloUserId}`,
+  })),
+}));
 
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
@@ -89,6 +101,89 @@ describe('User', () => {
     await db.delete(kilocode_users);
   });
 
+  describe('createOrUpdateUser', () => {
+    const originalMaxSignups = process.env.MAX_SIGNUPS_PER_IP_24H;
+    const originalExemptIps = process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS;
+
+    afterEach(() => {
+      if (originalMaxSignups === undefined) delete process.env.MAX_SIGNUPS_PER_IP_24H;
+      else process.env.MAX_SIGNUPS_PER_IP_24H = originalMaxSignups;
+
+      if (originalExemptIps === undefined) delete process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS;
+      else process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS = originalExemptIps;
+    });
+
+    it('stores the signup IP for new users', async () => {
+      const headers = new Headers({ 'x-forwarded-for': '203.0.113.25, 10.0.0.1' });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'signup-ip@example.com',
+          google_user_name: 'Signup IP',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-signup-ip',
+        },
+        undefined,
+        false,
+        headers
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.signup_ip).toBe('203.0.113.25');
+    });
+
+    it('rejects new signups after the per-IP threshold', async () => {
+      process.env.MAX_SIGNUPS_PER_IP_24H = '2';
+      const signupIp = '203.0.113.50';
+      await insertTestUser({ id: 'ip-limit-1', signup_ip: signupIp });
+      await insertTestUser({ id: 'ip-limit-2', signup_ip: signupIp });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'limited@example.com',
+          google_user_name: 'Limited User',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-limited',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-real-ip': signupIp })
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('SIGNUP-RATE-LIMITED');
+    });
+
+    it('skips rate limiting for exempt signup IPs', async () => {
+      process.env.MAX_SIGNUPS_PER_IP_24H = '1';
+      process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS = '198.51.100.7';
+      const signupIp = '198.51.100.7';
+      await insertTestUser({ id: 'ip-exempt-1', signup_ip: signupIp });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'exempt@example.com',
+          google_user_name: 'Exempt User',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-exempt',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': signupIp })
+      );
+
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe('softDeleteUser', () => {
     it('should anonymize the user row and preserve it', async () => {
       const user = await insertTestUser({
@@ -100,6 +195,7 @@ describe('User', () => {
         openrouter_upstream_safety_identifier: 'openrouter_upstream_safety_identifier',
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
+        signup_ip: '203.0.113.10',
         is_admin: true,
       });
 
@@ -121,6 +217,7 @@ describe('User', () => {
         'vercel_downstream_safety_identifier'
       );
       expect(softDeleted!.customer_source).toBeNull();
+      expect(softDeleted!.signup_ip).toBeNull();
       expect(softDeleted!.api_token_pepper).toBeNull();
       expect(softDeleted!.default_model).toBeNull();
       expect(softDeleted!.blocked_reason).toMatch(/^soft-deleted at \d{4}-\d{2}-\d{2}T/);

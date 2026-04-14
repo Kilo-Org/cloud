@@ -23,7 +23,7 @@ import { SignJWT } from 'jose';
 const BASE_URL = process.env.KILO_CHAT_URL ?? 'http://localhost:8802';
 const JWT_SECRET = process.env.NEXTAUTH_SECRET;
 const API_KEY = process.env.KILOCHAT_API_TOKEN;
-const SANDBOX_ID = process.env.SANDBOX_ID ?? 'test-sandbox';
+const SANDBOX_ID = process.env.SANDBOX_ID ?? 'e2e-test-sandbox';
 const TIMEOUT_MS = Number(process.env.TIMEOUT_MS ?? '30000');
 
 if (!JWT_SECRET) {

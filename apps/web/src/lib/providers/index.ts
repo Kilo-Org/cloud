@@ -262,7 +262,7 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
   }
   if (isZaiModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum['z-ai']];
+    return [OpenRouterInferenceProviderIdSchema.enum.novita];
   }
   if (isOpenAiOssModel(requestedModel)) {
     return [

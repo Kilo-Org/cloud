@@ -74,12 +74,36 @@ function StatusDot({
     );
   }
 
-  const isHealthy = metrics.currentRequests > 0 && metrics.percentChange > -90;
-  const isWarning = metrics.currentRequests > 0 && metrics.percentChange <= -50;
+  // No meaningful traffic in the observation window — treat as "no data"
+  const noTraffic = metrics.currentRequests === 0 && metrics.baselineRequests === 0;
+  if (noTraffic) {
+    return (
+      <TooltipProvider delayDuration={100}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex justify-center">
+              <div className="size-3 rounded-full bg-gray-300" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            <div className="space-y-0.5">
+              <div className="font-medium">{format(new Date(timestamp), 'HH:mm')}</div>
+              <div>No traffic in this window</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
-  const color = !isHealthy
+  // Down: current is zero but baseline had traffic, or >90% drop
+  const isDown = metrics.currentRequests === 0 || metrics.percentChange <= -90;
+  // Degraded: noticeable drop but not fully down
+  const isDegraded = !isDown && metrics.percentChange <= -50;
+
+  const color = isDown
     ? 'bg-red-500'
-    : isWarning
+    : isDegraded
       ? 'bg-yellow-500'
       : 'bg-green-500';
 

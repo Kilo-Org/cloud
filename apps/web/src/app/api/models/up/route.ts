@@ -47,7 +47,8 @@ const MIN_UNIQUE_USERS_FOR_ALERT = 20;
 // being down.
 const STATEMENT_TIMEOUT_MS = 10_000;
 
-// Models excluded from the health check but still preferred/recommended.
+// Models excluded from the top-level health status. They still get their
+// per-model health evaluated and returned, but can't trigger 503 responses.
 // Useful for preview models with inconsistent traffic that cause false alerts.
 const HEALTH_CHECK_EXCLUSIONS = new Set(['google/gemini-3.1-pro-preview']);
 
@@ -144,19 +145,18 @@ export async function GET(
       const absoluteDrop = currentRequests - baselineRequests;
       const isMonitored = !HEALTH_CHECK_EXCLUSIONS.has(row.requested_model);
 
-      // Non-monitored models are always reported healthy — they can't trigger alerts.
       // Per-model health: unhealthy when the baseline had enough distinct organic
       // users AND the model shows a significant traffic drop.
-      const healthy =
-        !isMonitored ||
-        !(
-          uniqueUsersBaseline >= MIN_UNIQUE_USERS_FOR_ALERT &&
-          ((baselineRequests > HIGH_BASELINE && percentChange < -90) ||
-            (baselineRequests > LOW_BASELINE &&
-              baselineRequests < HIGH_BASELINE &&
-              currentRequests === 0 &&
-              previousRequests === 0))
-        );
+      // Non-monitored models still get their real health status — they just
+      // don't affect the top-level healthy flag or trigger 503.
+      const healthy = !(
+        uniqueUsersBaseline >= MIN_UNIQUE_USERS_FOR_ALERT &&
+        ((baselineRequests > HIGH_BASELINE && percentChange < -90) ||
+          (baselineRequests > LOW_BASELINE &&
+            baselineRequests < HIGH_BASELINE &&
+            currentRequests === 0 &&
+            previousRequests === 0))
+      );
 
       models[row.requested_model] = {
         healthy,

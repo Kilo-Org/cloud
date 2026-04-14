@@ -67,6 +67,7 @@ jest.mock('@/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
     id: `cus_${metadata.kiloUserId}`,
   })),
+  deleteStripeCustomer: jest.fn(async () => {}),
 }));
 
 describe('User', () => {

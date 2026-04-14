@@ -239,6 +239,14 @@ export class ConversationDO extends DurableObject<Env> {
     return { ok: true, messageId: params.messageId, version: params.version };
   }
 
+  setTyping(memberId: string): { ok: true } | { ok: false; error: string } {
+    if (!this.isMember(memberId)) {
+      return { ok: false, error: 'Not a member' };
+    }
+    this.broadcast('typing', { memberId });
+    return { ok: true };
+  }
+
   deleteMessage(params: DeleteMessageParams): DeleteMessageResult {
     const row = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
     if (!row) {

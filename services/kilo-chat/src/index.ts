@@ -5,6 +5,7 @@ import type { AuthContext } from './auth';
 import { registerConversationRoutes } from './routes/conversations';
 import { registerMessageRoutes } from './routes/messages';
 import { registerEventsRoutes } from './routes/events';
+import { registerTypingRoutes } from './routes/typing';
 
 export { MembershipDO } from './do/membership-do';
 export { ConversationDO } from './do/conversation-do';
@@ -17,6 +18,7 @@ app.use('/v1/*', authMiddleware);
 registerConversationRoutes(app);
 registerMessageRoutes(app);
 registerEventsRoutes(app);
+registerTypingRoutes(app);
 
 export default class extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {

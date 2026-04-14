@@ -716,7 +716,7 @@ describe('generateBaseConfig', () => {
     expect(config.hooks.mappings).toContainEqual({
       id: 'cloudflare-email-inbound',
       match: { path: 'email' },
-      action: 'agent',
+      action: 'wake',
       wakeMode: 'now',
       name: 'Inbound Email',
       sessionKey: '{{payload.sessionKey}}',

@@ -1417,6 +1417,15 @@ describe('User', () => {
       expect(found).toBeUndefined();
     });
 
+    it('should find a user case-insensitively for Gmail local parts', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'Henk.Janssen@gmail.com',
+      });
+
+      const found = await findUserByNormalizedGmailEmail('henkjanssen@gmail.com');
+      expect(found?.id).toBe(user.id);
+    });
+
     it('should find exact match (same email with same dots)', async () => {
       const user = await insertTestUser({
         google_user_email: 'henk.janssen@gmail.com',

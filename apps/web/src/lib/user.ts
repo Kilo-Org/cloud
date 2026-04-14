@@ -211,7 +211,7 @@ export async function findUserByNormalizedGmailEmail(email: string): Promise<Use
   return await db.query.kilocode_users.findFirst({
     where: and(
       sql`lower(split_part(${kilocode_users.google_user_email}, '@', 2)) IN ('gmail.com', 'googlemail.com')`,
-      sql`replace(split_part(${kilocode_users.google_user_email}, '@', 1), '.', '') = ${localPart}`
+      sql`lower(replace(split_part(${kilocode_users.google_user_email}, '@', 1), '.', '')) = ${localPart}`
     ),
   });
 }
@@ -336,9 +336,40 @@ export async function createOrUpdateUser(
   // that are equivalent after dot-normalization (e.g. henk.janssen@ vs henkjanssen@gmail.com)
   const gmailDotVariantUser = await findUserByNormalizedGmailEmail(args.google_user_email);
   if (gmailDotVariantUser) {
-    // For magic link (autoLinkToExistingUser), link to the existing account since the
-    // dot-variant Gmail address delivers to the same inbox — the user proved ownership.
-    if (autoLinkToExistingUser) {
+    const existingProviders = await getUserAuthProviders(gmailDotVariantUser.id);
+    const hasThisProvider = existingProviders.some(p => p.provider === args.provider);
+
+    // If the existing account already has this provider, sign in directly
+    // (different provider_account_id for the same provider on a dot-variant address)
+    if (hasThisProvider) {
+      fireAuthEvent(gmailDotVariantUser, 'signin', args.provider, requestHeaders);
+      posthogClient.capture({
+        distinctId: gmailDotVariantUser.google_user_email,
+        event: 'user_signed_in_gmail_dot_variant',
+        properties: {
+          existing_email: gmailDotVariantUser.google_user_email,
+          new_email: args.google_user_email,
+          existing_id: gmailDotVariantUser.id,
+          provider: args.provider,
+        },
+      });
+      return successResult({ user: gmailDotVariantUser, isNew: false });
+    }
+
+    const onlyHasFakeLogin =
+      existingProviders.length === 1 && existingProviders[0].provider === 'fake-login';
+    const hasNoProviders = existingProviders.length === 0;
+    const isUpgradeProvider = args.provider === 'workos' || args.provider === 'fake-login';
+    const shouldLink =
+      onlyHasFakeLogin || (autoLinkToExistingUser && (hasNoProviders || isUpgradeProvider));
+
+    if (shouldLink) {
+      if (args.provider === 'workos' && !hasNoProviders) {
+        await db
+          .delete(user_auth_provider)
+          .where(eq(user_auth_provider.kilo_user_id, gmailDotVariantUser.id));
+      }
+
       const linkResult = await linkAccountToExistingUser(gmailDotVariantUser.id, args);
       if (!linkResult.success) {
         return { success: false, error: linkResult.error };
@@ -356,6 +387,7 @@ export async function createOrUpdateUser(
       });
       return successResult({ user: gmailDotVariantUser, isNew: false });
     }
+
     return failureResult('DIFFERENT-OAUTH');
   }
 

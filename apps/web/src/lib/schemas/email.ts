@@ -97,5 +97,5 @@ export function normalizeGmailAddress(email: string): string {
     return email.toLowerCase();
   }
 
-  return localPart.replaceAll('.', '') + '@' + domain;
+  return localPart.replaceAll('.', '').toLowerCase() + '@' + domain;
 }

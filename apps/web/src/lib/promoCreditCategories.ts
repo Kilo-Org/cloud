@@ -12,6 +12,7 @@ import {
 } from '@/lib/constants';
 import { promoCategoriesOld } from '@/lib/promoCreditCategoriesOld';
 import {
+  created_before,
   has_githubAuth,
   has_githubAuthAndWelcomeCredits,
   has_holdOrPayment,
@@ -729,6 +730,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     promotion_ends_at: new Date('2026-04-22'),
     total_redemptions_allowed: 4175,
     expiry_hours: 7 * 24,
+    customer_requirement: created_before(new Date('2026-04-11')),
   },
 ];
 

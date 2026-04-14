@@ -196,11 +196,6 @@ const analyticsObservabilityItems: MenuItem[] = [
     icon: () => <Bell />,
   },
   {
-    title: () => 'Alerting (TTFB)',
-    url: '/admin/alerting-ttfb',
-    icon: () => <Bell />,
-  },
-  {
     title: () => 'API Request Log',
     url: '/admin/api-request-log',
     icon: () => <Database />,

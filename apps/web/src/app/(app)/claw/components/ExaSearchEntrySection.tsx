@@ -53,9 +53,7 @@ export function ExaSearchEntrySection({
   isDirty: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [pendingConfirmSelection, setPendingConfirmSelection] = useState<ExaSelection | null>(
-    null
-  );
+  const [pendingConfirmSelection, setPendingConfirmSelection] = useState<ExaSelection | null>(null);
   const [selection, setSelection] = useState<ExaSelection>(() => selectionFromMode(mode));
   const [isSaving, setIsSaving] = useState(false);
 
@@ -144,7 +142,9 @@ export function ExaSearchEntrySection({
                 <Label className="text-xs">Status</Label>
                 <RadioGroup
                   value={selection}
-                  onValueChange={value => setSelection(value === 'enabled' ? 'enabled' : 'disabled')}
+                  onValueChange={value =>
+                    setSelection(value === 'enabled' ? 'enabled' : 'disabled')
+                  }
                   className="gap-2"
                 >
                   <label
@@ -215,7 +215,9 @@ export function ExaSearchEntrySection({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => commitSelection(pendingConfirmSelection === 'enabled' ? 'enabled' : 'disabled')}
+              onClick={() =>
+                commitSelection(pendingConfirmSelection === 'enabled' ? 'enabled' : 'disabled')
+              }
               disabled={isSaving}
             >
               {isSaving

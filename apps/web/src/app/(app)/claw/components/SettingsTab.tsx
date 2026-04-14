@@ -768,7 +768,8 @@ export function SettingsTab({
 
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
-  const braveSearchEnabled = (configuredSecrets['brave-search'] ?? false) && kiloExaSearchMode !== 'kilo-proxy';
+  const braveSearchEnabled =
+    (configuredSecrets['brave-search'] ?? false) && kiloExaSearchMode !== 'kilo-proxy';
   const toolEntries = getEntriesByCategory('tool');
 
   function handleSave() {

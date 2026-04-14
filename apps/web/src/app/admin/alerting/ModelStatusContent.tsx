@@ -69,14 +69,26 @@ function StatusDot({
 }) {
   if (!metrics) {
     return (
-      <div className="flex justify-center">
-        <div className="size-3 rounded-full bg-gray-300" title="No data" />
-      </div>
+      <TooltipProvider delayDuration={100}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex justify-center">
+              <div className="size-3 rounded-full border border-dashed border-gray-400" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            <div className="space-y-0.5">
+              <div className="font-medium">{format(new Date(timestamp), 'HH:mm')}</div>
+              <div>No data (query failed)</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     );
   }
 
   const noTraffic = metrics.currentRequests === 0 && metrics.baselineRequests === 0;
-  const color = noTraffic ? 'bg-gray-300' : metrics.healthy ? 'bg-green-500' : 'bg-red-500';
+  const color = noTraffic ? 'bg-gray-400' : metrics.healthy ? 'bg-green-500' : 'bg-red-500';
 
   const time = format(new Date(timestamp), 'HH:mm');
 
@@ -157,7 +169,11 @@ export function ModelStatusContent() {
           <span className="text-muted-foreground">Unhealthy</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="size-3 rounded-full bg-gray-300" />
+          <div className="size-3 rounded-full bg-gray-400" />
+          <span className="text-muted-foreground">No traffic</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="size-3 rounded-full border border-dashed border-gray-400" />
           <span className="text-muted-foreground">No data</span>
         </div>
       </div>

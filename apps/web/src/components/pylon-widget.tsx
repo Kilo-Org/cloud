@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import Script from 'next/script';
 import { z } from 'zod';
+import { useUser } from '@/hooks/useUser';
 
 const pylonIdentitySchema = z.object({
   email: z.string(),
@@ -24,11 +25,14 @@ async function fetchPylonIdentity(): Promise<PylonIdentity | null> {
 
 export function PylonWidget() {
   const appId = process.env.NEXT_PUBLIC_PYLON_APP_ID;
+  const { data: user } = useUser();
 
+  // Key by user.id so logout/login in the same tab can't serve a previous
+  // user's signed identity payload from cache.
   const { data: identity } = useQuery({
-    queryKey: ['pylon-identity'],
+    queryKey: ['pylon-identity', user?.id],
     queryFn: fetchPylonIdentity,
-    enabled: Boolean(appId),
+    enabled: Boolean(appId && user?.id),
     staleTime: 5 * 60 * 1000,
   });
 

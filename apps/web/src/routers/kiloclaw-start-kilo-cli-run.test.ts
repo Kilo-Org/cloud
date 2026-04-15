@@ -2,7 +2,7 @@ import { describe, expect, it, beforeAll, beforeEach, jest } from '@jest/globals
 import { db, cleanupDbForTest } from '@/lib/drizzle';
 import { kiloclaw_instances, kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
+import { createOrganization } from '@/lib/organizations/organizations';
 import type { User, Organization } from '@kilocode/db/schema';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────

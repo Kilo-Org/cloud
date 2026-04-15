@@ -45,7 +45,11 @@ import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
 
 /** Error codes whose messages may contain raw internal details. */
-const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed']);
+const UNSAFE_ERROR_CODES = new Set([
+  'config_read_failed',
+  'config_replace_failed',
+  'gateway_controller_error',
+]);
 
 function getKiloClawApiErrorPayload(err: KiloClawApiError): { message?: string; code?: string } {
   if (!err.responseBody) return {};

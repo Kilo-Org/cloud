@@ -263,7 +263,7 @@ describe('kiloclaw.getKiloCliRunStatus reconciliation', () => {
       status: 'completed',
       output: 'task done',
       exitCode: 0,
-      startedAt: run.startedAt,
+      startedAt: '2024-01-01T00:00:00.000Z',
       completedAt: '2024-01-01T00:05:00.000Z',
       prompt: 'test prompt',
     });
@@ -406,6 +406,39 @@ describe('kiloclaw.cancelKiloCliRun identity validation', () => {
     expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
   });
 
+  it('persists terminal status and rejects cancel when controller reports same run already completed', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createPersonalInstance(user.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'completed',
+      output: 'task done',
+      exitCode: 0,
+      startedAt: '2024-01-01T00:00:00.000Z',
+      completedAt: '2024-01-01T00:05:00.000Z',
+      prompt: 'test prompt',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.cancelKiloCliRun({ runId })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Kilo CLI run is no longer running',
+    });
+
+    expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('completed');
+    expect(dbRow.exit_code).toBe(0);
+    expect(Date.parse(dbRow.completed_at ?? '')).toBe(Date.parse('2024-01-01T00:05:00.000Z'));
+  });
+
   it('cancels successfully when controller matches the DB run', async () => {
     const startedAt = '2024-01-01T00:00:00.000+00:00';
     const instanceId = await createPersonalInstance(user.id);
@@ -417,7 +450,7 @@ describe('kiloclaw.cancelKiloCliRun identity validation', () => {
       status: 'running',
       output: 'in progress',
       exitCode: null,
-      startedAt: run.startedAt,
+      startedAt: '2024-01-01T00:00:00.000Z',
       completedAt: null,
       prompt: 'test prompt',
     });
@@ -608,7 +641,7 @@ describe('organizations.kiloclaw.getKiloCliRunStatus reconciliation', () => {
       status: 'completed',
       output: 'task done',
       exitCode: 0,
-      startedAt: run.startedAt,
+      startedAt: '2024-01-01T00:00:00.000Z',
       completedAt: '2024-01-01T00:05:00.000Z',
       prompt: 'test prompt',
     });
@@ -766,6 +799,41 @@ describe('organizations.kiloclaw.cancelKiloCliRun identity validation', () => {
     expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
   });
 
+  it('persists terminal status and rejects cancel when controller reports same run already completed', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createOrgInstance(user.id, org.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'completed',
+      output: 'task done',
+      exitCode: 0,
+      startedAt: '2024-01-01T00:00:00.000Z',
+      completedAt: '2024-01-01T00:05:00.000Z',
+      prompt: 'test prompt',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.cancelKiloCliRun({ organizationId: org.id, runId })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Kilo CLI run is no longer running',
+    });
+
+    expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('completed');
+    expect(dbRow.exit_code).toBe(0);
+    expect(Date.parse(dbRow.completed_at ?? '')).toBe(Date.parse('2024-01-01T00:05:00.000Z'));
+  });
+
   it('cancels successfully when controller matches the DB run', async () => {
     const startedAt = '2024-01-01T00:00:00.000+00:00';
     const instanceId = await createOrgInstance(user.id, org.id);
@@ -777,7 +845,7 @@ describe('organizations.kiloclaw.cancelKiloCliRun identity validation', () => {
       status: 'running',
       output: 'in progress',
       exitCode: null,
-      startedAt: run.startedAt,
+      startedAt: '2024-01-01T00:00:00.000Z',
       completedAt: null,
       prompt: 'test prompt',
     });

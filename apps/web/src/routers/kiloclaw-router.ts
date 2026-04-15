@@ -39,6 +39,7 @@ import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
+import { isControllerStatusForRun, persistCliRunControllerStatus } from '@/lib/kiloclaw/cli-runs';
 import { getInboundEmailAddressForInstance } from '@/lib/kiloclaw/inbound-email-alias';
 import {
   ensureActiveInstance,
@@ -2266,8 +2267,7 @@ export const kiloclawRouter = createTRPCRouter({
         workerInstanceId(instance)
       );
 
-      const controllerMatchesRow =
-        controllerStatus.hasRun && controllerStatus.startedAt === row.started_at;
+      const controllerMatchesRow = isControllerStatusForRun(row, controllerStatus);
 
       if (!controllerMatchesRow) {
         const completedAt = new Date().toISOString();
@@ -2356,7 +2356,7 @@ export const kiloclawRouter = createTRPCRouter({
         workerInstanceId(instance)
       );
 
-      if (!controllerStatus.hasRun || controllerStatus.startedAt !== run.started_at) {
+      if (!isControllerStatusForRun(run, controllerStatus)) {
         await db
           .update(kiloclaw_cli_runs)
           .set({
@@ -2376,6 +2376,20 @@ export const kiloclawRouter = createTRPCRouter({
         throw new TRPCError({
           code: 'CONFLICT',
           message: 'Kilo CLI run is no longer active on the controller',
+        });
+      }
+
+      if (controllerStatus.status !== 'running') {
+        await persistCliRunControllerStatus({
+          runId: input.runId,
+          userId: ctx.user.id,
+          instanceId: run.instance_id,
+          controllerStatus,
+        });
+
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Kilo CLI run is no longer running',
         });
       }
 

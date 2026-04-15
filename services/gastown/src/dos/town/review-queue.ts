@@ -541,6 +541,18 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
     return;
   }
 
+  // PR-conflict beads skip the review queue. The polecat rebased/resolved
+  // conflicts on the existing PR branch — the MR bead is still active and
+  // resumes polling on the next tick.
+  if (hookedBead?.labels.includes('gt:pr-conflict')) {
+    console.log(
+      `[review-queue] agentDone: pr-conflict bead ${agent.current_hook_bead_id} — closing directly (skip review)`
+    );
+    closeBead(sql, agent.current_hook_bead_id, agentId);
+    unhookBead(sql, agentId);
+    return;
+  }
+
   // PR-feedback beads (address review comments, fix CI) skip the review
   // queue. The polecat pushed commits to the existing PR branch — closing
   // the feedback bead unblocks the parent MR bead so poll_pr can re-check

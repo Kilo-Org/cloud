@@ -519,6 +519,30 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
     };
   }
 
+  // Build PR conflict context if the hooked bead is a conflict resolution request.
+  // This also fires for consolidated beads: gt:pr-feedback beads that have
+  // has_conflicts=true in their metadata (set by the reconciler when a conflict is
+  // detected on a PR that already has an active feedback bead).
+  let pr_conflict_context: PrimeContext['pr_conflict_context'] = null;
+  const isPureConflictBead = hookedBead?.labels.includes('gt:pr-conflict');
+  const isConsolidatedFeedbackBead =
+    hookedBead?.labels.includes('gt:pr-feedback') &&
+    hookedBead.metadata !== null &&
+    (hookedBead.metadata as Record<string, unknown>).has_conflicts === true;
+
+  if ((isPureConflictBead || isConsolidatedFeedbackBead) && hookedBead?.metadata) {
+    const meta = hookedBead.metadata as Record<string, unknown>;
+    pr_conflict_context = {
+      pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
+      branch: typeof meta.branch === 'string' ? meta.branch : null,
+      target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
+      conflict_details: typeof meta.conflict_details === 'string' ? meta.conflict_details : null,
+      // True when this is a consolidated bead: the polecat must also address review comments/CI
+      // after resolving the conflicts.
+      has_feedback: isConsolidatedFeedbackBead,
+    };
+  }
+
   return {
     agent,
     hooked_bead: hookedBead,
@@ -526,6 +550,7 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
     open_beads: openBeads,
     rework_context,
     pr_fixup_context,
+    pr_conflict_context,
   };
 }
 

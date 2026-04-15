@@ -96,6 +96,38 @@ When your hooked bead has the \`gt:pr-fixup\` label, you are fixing an existing 
 
 Do NOT create a new PR. Push to the existing branch.
 
+## PR Conflict Workflow
+
+When your hooked bead has the \`gt:pr-conflict\` label, OR when your \`gt:pr-feedback\` bead has \`pr_conflict_context\` with conflict data in your Gastown context, the PR has merge conflicts that must be resolved before it can be merged. **Check out the PR branch from \`pr_conflict_context.branch\` in your Gastown context.**
+
+1. Fetch and check out the conflicting branch:
+   \`\`\`
+   git fetch origin
+   git checkout <pr_conflict_context.branch>
+   \`\`\`
+2. Rebase onto the target branch to pick up the latest changes:
+   \`\`\`
+   git rebase origin/<pr_conflict_context.target_branch>
+   \`\`\`
+   Alternatively, merge if rebase is not suitable:
+   \`\`\`
+   git merge origin/<pr_conflict_context.target_branch>
+   \`\`\`
+3. Resolve any conflict markers in the affected files. Read \`pr_conflict_context.conflict_details\` for hints about which files are conflicted.
+4. After resolving all conflicts, complete the rebase/merge:
+   \`\`\`
+   git add <resolved-files>
+   git rebase --continue  # or: git commit (for merge)
+   \`\`\`
+5. Push the resolved branch (force-with-lease is safe here since you rebased):
+   \`\`\`
+   git push --force-with-lease origin <branch>
+   \`\`\`
+6. If \`pr_conflict_context.has_feedback\` is true, the bead also has review comments and/or CI failures to address. After resolving conflicts and pushing, address all feedback as described in the PR Feedback section below, then call gt_done.
+7. If \`has_feedback\` is false, call gt_done with the PR URL after pushing.
+
+Do NOT create a new PR. Push to the existing branch.
+
 ## Commit & Push Hygiene
 
 - Commit after every meaningful unit of work (new function, passing test, config change).

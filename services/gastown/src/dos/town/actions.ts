@@ -747,6 +747,39 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               return;
             }
 
+            // PR is open — if it previously had conflicts flagged, clear the flag now.
+            // Once the polecat resolves conflicts and the next poll succeeds, the
+            // has_conflicts flag on the MR bead metadata is stale and should be cleared.
+            const conflictFlagRows = z
+              .object({ has_conflicts: z.unknown() })
+              .array()
+              .parse([
+                ...query(
+                  sql,
+                  /* sql */ `
+                    SELECT json_extract(${beads.columns.metadata}, '$.has_conflicts') AS has_conflicts
+                    FROM ${beads}
+                    WHERE ${beads.bead_id} = ?
+                  `,
+                  [action.bead_id]
+                ),
+              ]);
+            if (conflictFlagRows[0]?.has_conflicts) {
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.metadata} = json_remove(
+                    COALESCE(${beads.columns.metadata}, '{}'),
+                    '$.has_conflicts'
+                  ),
+                  ${beads.columns.updated_at} = ?
+                  WHERE ${beads.bead_id} = ?
+                `,
+                [now(), action.bead_id]
+              );
+            }
+
             // PR is open — check for feedback and auto-merge if configured
             const townConfig = await ctx.getTownConfig();
             const refineryConfig = townConfig.refinery;

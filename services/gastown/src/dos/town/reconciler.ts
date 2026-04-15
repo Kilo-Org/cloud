@@ -461,6 +461,88 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       return;
     }
 
+    case 'pr_conflict_detected': {
+      const mrBeadId = typeof payload.mr_bead_id === 'string' ? payload.mr_bead_id : null;
+      if (!mrBeadId) {
+        console.warn(`${LOG} applyEvent: pr_conflict_detected missing mr_bead_id`);
+        return;
+      }
+
+      const mrBead = beadOps.getBead(sql, mrBeadId);
+      if (!mrBead || mrBead.status === 'closed' || mrBead.status === 'failed') return;
+
+      const prUrl = typeof payload.pr_url === 'string' ? payload.pr_url : '';
+      const branch = typeof payload.branch === 'string' ? payload.branch : '';
+      const targetBranch = typeof payload.target_branch === 'string' ? payload.target_branch : '';
+      const conflictDetails =
+        typeof payload.conflict_details === 'string' ? payload.conflict_details : null;
+
+      // Consolidation: if there is already an open gt:pr-feedback bead for this PR,
+      // update it with has_conflicts=true instead of creating a new gt:pr-conflict bead.
+      // This ensures one polecat handles everything (rebase + feedback + CI) in one pass.
+      const existingFeedbackBead = getExistingPrFeedbackBeadForPr(sql, mrBeadId);
+      if (existingFeedbackBead) {
+        console.log(
+          `${LOG} applyEvent: pr_conflict_detected — consolidating into existing feedback bead ${existingFeedbackBead}`
+        );
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.metadata} = json_set(
+              COALESCE(${beads.columns.metadata}, '{}'),
+              '$.has_conflicts', 1,
+              '$.target_branch', ?,
+              '$.conflict_details', ?
+            ),
+            ${beads.columns.updated_at} = ?
+            WHERE ${beads.bead_id} = ?
+          `,
+          [targetBranch, conflictDetails, new Date().toISOString(), existingFeedbackBead]
+        );
+        return;
+      }
+
+      // No existing feedback bead — create a new gt:pr-conflict bead.
+      // Check for an existing non-terminal conflict bead to prevent duplicates.
+      if (hasExistingPrConflictBead(sql, mrBeadId)) return;
+
+      const conflictBead = beadOps.createBead(sql, {
+        type: 'issue',
+        title: `Resolve merge conflicts on PR ${prUrl || branch}`,
+        body: conflictDetails ?? `PR has merge conflicts. Rebase onto ${targetBranch} to resolve.`,
+        rig_id: mrBead.rig_id ?? undefined,
+        parent_bead_id: mrBeadId,
+        labels: ['gt:pr-conflict'],
+        metadata: {
+          pr_conflict_for: mrBeadId,
+          pr_url: prUrl,
+          branch,
+          target_branch: targetBranch,
+          conflict_details: conflictDetails,
+        },
+      });
+
+      // Mark the MR bead as having conflicts so poll_pr can clear it once resolved.
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.metadata} = json_set(
+            COALESCE(${beads.columns.metadata}, '{}'),
+            '$.has_conflicts', 1
+          ),
+          ${beads.columns.updated_at} = ?
+          WHERE ${beads.bead_id} = ?
+        `,
+        [new Date().toISOString(), mrBeadId]
+      );
+
+      // Conflict bead blocks the MR bead (same pattern as feedback/rework beads)
+      beadOps.insertDependency(sql, mrBeadId, conflictBead.bead_id, 'blocks');
+      return;
+    }
+
     default: {
       console.warn(`${LOG} applyEvent: unknown event type: ${event.event_type}`);
     }
@@ -2175,6 +2257,55 @@ function hasExistingPrFeedbackBead(sql: SqlStorage, mrBeadId: string): boolean {
           AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
           AND fb.${beads.columns.labels} LIKE '%gt:pr-feedback%'
           AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
+        LIMIT 1
+      `,
+      [mrBeadId]
+    ),
+  ];
+  return rows.length > 0;
+}
+
+/**
+ * Return the bead_id of an existing open gt:pr-feedback bead blocking the given MR bead,
+ * or null if none exists. Used for consolidation: when conflicts are detected on a PR
+ * that already has an active feedback bead, we update that bead instead of creating a
+ * separate gt:pr-conflict bead.
+ */
+function getExistingPrFeedbackBeadForPr(sql: SqlStorage, mrBeadId: string): string | null {
+  const rows = z
+    .object({ bead_id: z.string() })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT fb.${beads.columns.bead_id}
+          FROM ${bead_dependencies} bd
+          INNER JOIN ${beads} fb ON fb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
+          WHERE bd.${bead_dependencies.columns.bead_id} = ?
+            AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
+            AND fb.${beads.columns.labels} LIKE '%gt:pr-feedback%'
+            AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
+          LIMIT 1
+        `,
+        [mrBeadId]
+      ),
+    ]);
+  return rows[0]?.bead_id ?? null;
+}
+
+/** Check if an MR bead has a non-terminal conflict bead (gt:pr-conflict) blocking it. */
+function hasExistingPrConflictBead(sql: SqlStorage, mrBeadId: string): boolean {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT 1 FROM ${bead_dependencies} bd
+        INNER JOIN ${beads} cb ON cb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
+        WHERE bd.${bead_dependencies.columns.bead_id} = ?
+          AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
+          AND cb.${beads.columns.labels} LIKE '%gt:pr-conflict%'
+          AND cb.${beads.columns.status} NOT IN ('closed', 'failed')
         LIMIT 1
       `,
       [mrBeadId]

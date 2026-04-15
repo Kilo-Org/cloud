@@ -262,6 +262,77 @@ describe('ConversationDO', () => {
     expect(botsExcludingAlice.every(b => b.kind === 'bot')).toBe(true);
   });
 
+  describe('addReaction / removeReaction', () => {
+    async function seed(convId: string) {
+      const stub = getStub(convId);
+      await stub.initialize({ ...BASE_PARAMS, id: convId });
+      const created = await stub.createMessage({
+        senderId: 'user-alice',
+        content: [{ type: 'text', text: 'msg' }],
+      });
+      if (!created.ok) throw new Error('seed failed');
+      return { stub, messageId: created.messageId };
+    }
+
+    it('addReaction on a fresh (message, member, emoji) returns { added: true, id }', async () => {
+      const { stub, messageId } = await seed('conv-rx-add-1');
+      const r = await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
+      expect('added' in r && r.added).toBe(true);
+      expect('id' in r ? r.id : '').toMatch(/^[0-9A-Z]{26}$/);
+    });
+
+    it('addReaction is idempotent for a live tuple (returns { added: false, id: original })', async () => {
+      const { stub, messageId } = await seed('conv-rx-add-2');
+      const first = await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
+      const second = await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
+      expect('added' in second && second.added).toBe(false);
+      expect('id' in second && 'id' in first && second.id).toBe('id' in first ? first.id : '');
+    });
+
+    it('removeReaction on a live tuple returns { removed: true, removed_id }', async () => {
+      const { stub, messageId } = await seed('conv-rx-rem-1');
+      await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
+      const r = await stub.removeReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
+      expect('removed' in r && r.removed).toBe(true);
+      if ('removed' in r && r.removed) {
+        expect(r.removed_id).toMatch(/^[0-9A-Z]{26}$/);
+      }
+    });
+
+    it('removeReaction is idempotent when the tuple is absent', async () => {
+      const { stub, messageId } = await seed('conv-rx-rem-2');
+      const r = await stub.removeReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
+      expect('removed' in r && r.removed).toBe(false);
+    });
+
+    it('add -> remove -> add re-activates the same row with a new id; removed_id cleared', async () => {
+      const { stub, messageId } = await seed('conv-rx-cycle');
+      const a1 = await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
+      await stub.removeReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
+      const a2 = await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
+      expect('added' in a2 && a2.added).toBe(true);
+      expect('id' in a2 && 'id' in a1 && a2.id !== a1.id).toBe(true);
+    });
+
+    it('rejects reactions on non-existent messages (FK)', async () => {
+      const stub = getStub('conv-rx-bad-msg');
+      await stub.initialize({ ...BASE_PARAMS, id: 'conv-rx-bad-msg' });
+      const result = await stub.addReaction({
+        messageId: '00000000000000000000000000',
+        memberId: 'user-alice',
+        emoji: '👍',
+      });
+      // Match the ok-pattern already in use in this file for constraint errors.
+      expect('added' in result ? result.added : false).toBe(false);
+    });
+
+    it('rejects reactions from non-member (FK)', async () => {
+      const { stub, messageId } = await seed('conv-rx-bad-mem');
+      const result = await stub.addReaction({ messageId, memberId: 'user-nonmember', emoji: '👍' });
+      expect('added' in result ? result.added : false).toBe(false);
+    });
+  });
+
   describe('schema constraints', () => {
     it('rejects a reply that points at a non-existent parent message (FK)', async () => {
       const stub = getStub('conv-fk-reply');

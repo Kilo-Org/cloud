@@ -1,8 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { eq, lt, gt, desc, ne, and, asc } from 'drizzle-orm';
-import { conversation, members, messages } from '../db/conversation-schema';
+import { eq, lt, gt, desc, ne, and, asc, sql } from 'drizzle-orm';
+import { conversation, members, messages, reactions } from '../db/conversation-schema';
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
 import { SSE_PING, formatSseEvent } from '../lib/sse';
@@ -69,6 +69,17 @@ export type DeleteMessageParams = {
 };
 
 export type DeleteMessageResult = { ok: true } | { ok: false; error: string };
+
+export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
+export type AddReactionResult =
+  | { added: true; id: string }
+  | { added: false; id: string }
+  | { ok: false; error: string };
+export type RemoveReactionParams = { messageId: string; memberId: string; emoji: string };
+export type RemoveReactionResult =
+  | { removed: true; removed_id: string }
+  | { removed: false }
+  | { ok: false; error: string };
 
 export class ConversationDO extends DurableObject<Env> {
   private db;
@@ -291,6 +302,118 @@ export class ConversationDO extends DurableObject<Env> {
     this.broadcast('message.deleted', { messageId: params.messageId }, params.messageId);
 
     return { ok: true };
+  }
+
+  addReaction(params: AddReactionParams): AddReactionResult {
+    try {
+      const existing = this.db
+        .select()
+        .from(reactions)
+        .where(
+          and(
+            eq(reactions.message_id, params.messageId),
+            eq(reactions.member_id, params.memberId),
+            eq(reactions.emoji, params.emoji)
+          )
+        )
+        .get();
+
+      const now = Date.now();
+
+      if (!existing) {
+        const id = this.nextUlid();
+        this.db
+          .insert(reactions)
+          .values({
+            message_id: params.messageId,
+            member_id: params.memberId,
+            emoji: params.emoji,
+            id,
+            added_at: now,
+            deleted_at: null,
+            removed_id: null,
+          })
+          .run();
+        this.broadcast(
+          'reaction.added',
+          { messageId: params.messageId, memberId: params.memberId, emoji: params.emoji, at: now },
+          id
+        );
+        return { added: true, id };
+      }
+
+      if (existing.deleted_at === null) {
+        return { added: false, id: existing.id };
+      }
+
+      // Dead row — re-activate.
+      const id = this.nextUlid();
+      this.db
+        .update(reactions)
+        .set({ id, added_at: now, deleted_at: null, removed_id: null })
+        .where(
+          and(
+            eq(reactions.message_id, params.messageId),
+            eq(reactions.member_id, params.memberId),
+            eq(reactions.emoji, params.emoji)
+          )
+        )
+        .run();
+      this.broadcast(
+        'reaction.added',
+        { messageId: params.messageId, memberId: params.memberId, emoji: params.emoji, at: now },
+        id
+      );
+      return { added: true, id };
+    } catch (err) {
+      if (err instanceof Error && /constraint/i.test(err.message)) {
+        return { ok: false, error: err.message };
+      }
+      throw err;
+    }
+  }
+
+  removeReaction(params: RemoveReactionParams): RemoveReactionResult {
+    try {
+      const live = this.db
+        .select()
+        .from(reactions)
+        .where(
+          and(
+            eq(reactions.message_id, params.messageId),
+            eq(reactions.member_id, params.memberId),
+            eq(reactions.emoji, params.emoji),
+            sql`${reactions.deleted_at} IS NULL`
+          )
+        )
+        .get();
+
+      if (!live) return { removed: false };
+
+      const removedId = this.nextUlid();
+      this.db
+        .update(reactions)
+        .set({ deleted_at: Date.now(), removed_id: removedId })
+        .where(
+          and(
+            eq(reactions.message_id, params.messageId),
+            eq(reactions.member_id, params.memberId),
+            eq(reactions.emoji, params.emoji)
+          )
+        )
+        .run();
+      this.broadcast(
+        'reaction.removed',
+        { messageId: params.messageId, memberId: params.memberId, emoji: params.emoji },
+        removedId
+      );
+      return { removed: true, removed_id: removedId };
+    } catch (err) {
+      if (err instanceof Error && /constraint/i.test(err.message)) {
+        return { ok: false, error: err.message };
+      }
+      throw err;
+    }
   }
 
   async fetch(request: Request): Promise<Response> {

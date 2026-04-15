@@ -4,53 +4,32 @@ import {
   selectPersonalKiloClawProvider,
 } from './provider-selection';
 
+const enabledNorthflankConfig = {
+  provider: 'northflank',
+  enabled: true,
+  personalTrafficPercent: 100,
+  organizationTrafficPercent: 100,
+} as const;
+
 const orgBase = {
   organizationId: 'org-1',
   userId: 'user-1',
-  rolloutAvailable: true,
+  northflankConfig: enabledNorthflankConfig,
 };
 
 const personalBase = {
   userId: 'user-1',
-  personalRolloutConfig: {
-    rolloutAvailable: true,
-    northflankEnabled: true,
-    northflankTrafficPercent: 100,
-  },
+  northflankConfig: enabledNorthflankConfig,
 };
 
 describe('KiloClaw provider selection', () => {
-  it('selects fly when rollout is unavailable', () => {
-    expect(
-      selectOrgKiloClawProvider({
-        ...orgBase,
-        rolloutAvailable: false,
-        organizationSettings: {
-          kiloclaw_northflank_enabled: true,
-          kiloclaw_northflank_traffic_percent: 100,
-        },
-      })
-    ).toBe('fly');
-
-    expect(
-      selectPersonalKiloClawProvider({
-        ...personalBase,
-        personalRolloutConfig: {
-          rolloutAvailable: false,
-          northflankEnabled: true,
-          northflankTrafficPercent: 100,
-        },
-      })
-    ).toBe('fly');
-  });
-
   it('selects fly when Northflank is disabled or set to zero percent', () => {
     expect(
       selectOrgKiloClawProvider({
         ...orgBase,
-        organizationSettings: {
-          kiloclaw_northflank_enabled: false,
-          kiloclaw_northflank_traffic_percent: 100,
+        northflankConfig: {
+          ...enabledNorthflankConfig,
+          enabled: false,
         },
       })
     ).toBe('fly');
@@ -58,26 +37,16 @@ describe('KiloClaw provider selection', () => {
     expect(
       selectPersonalKiloClawProvider({
         ...personalBase,
-        personalRolloutConfig: {
-          rolloutAvailable: true,
-          northflankEnabled: true,
-          northflankTrafficPercent: 0,
+        northflankConfig: {
+          ...enabledNorthflankConfig,
+          personalTrafficPercent: 0,
         },
       })
     ).toBe('fly');
   });
 
   it('selects northflank when enabled at 100 percent', () => {
-    expect(
-      selectOrgKiloClawProvider({
-        ...orgBase,
-        organizationSettings: {
-          kiloclaw_northflank_enabled: true,
-          kiloclaw_northflank_traffic_percent: 100,
-        },
-      })
-    ).toBe('northflank');
-
+    expect(selectOrgKiloClawProvider(orgBase)).toBe('northflank');
     expect(selectPersonalKiloClawProvider(personalBase)).toBe('northflank');
   });
 
@@ -88,9 +57,9 @@ describe('KiloClaw provider selection', () => {
     expect(
       selectOrgKiloClawProvider({
         ...orgBase,
-        organizationSettings: {
-          kiloclaw_northflank_enabled: true,
-          kiloclaw_northflank_traffic_percent: orgBucket + 1,
+        northflankConfig: {
+          ...enabledNorthflankConfig,
+          organizationTrafficPercent: orgBucket + 1,
         },
       })
     ).toBe('northflank');
@@ -98,10 +67,9 @@ describe('KiloClaw provider selection', () => {
     expect(
       selectPersonalKiloClawProvider({
         ...personalBase,
-        personalRolloutConfig: {
-          rolloutAvailable: true,
-          northflankEnabled: true,
-          northflankTrafficPercent: personalBucket + 1,
+        northflankConfig: {
+          ...enabledNorthflankConfig,
+          personalTrafficPercent: personalBucket + 1,
         },
       })
     ).toBe('northflank');

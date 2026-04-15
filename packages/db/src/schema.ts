@@ -3689,6 +3689,34 @@ export const kiloclaw_instances = pgTable(
 
 export type KiloClawInstance = typeof kiloclaw_instances.$inferSelect;
 
+export const kiloclaw_providers = pgTable(
+  'kiloclaw_providers',
+  {
+    provider: text().$type<KiloClawProvider>().primaryKey().notNull(),
+    enabled: boolean().notNull().default(false),
+    personal_traffic_percent: integer().notNull().default(0),
+    organization_traffic_percent: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    enumCheck('kiloclaw_providers_provider_check', table.provider, KiloClawProvider),
+    check(
+      'kiloclaw_providers_personal_traffic_percent_check',
+      sql`${table.personal_traffic_percent} >= 0 AND ${table.personal_traffic_percent} <= 100`
+    ),
+    check(
+      'kiloclaw_providers_organization_traffic_percent_check',
+      sql`${table.organization_traffic_percent} >= 0 AND ${table.organization_traffic_percent} <= 100`
+    ),
+  ]
+);
+
+export type KiloClawProviderConfig = typeof kiloclaw_providers.$inferSelect;
+
 // KiloClaw Admin Audit Log — tracks admin actions on KiloClaw instances
 export const kiloclaw_admin_audit_logs = pgTable(
   'kiloclaw_admin_audit_logs',

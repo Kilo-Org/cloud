@@ -1,6 +1,6 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { organizations, credit_transactions, organization_audit_logs } from '@kilocode/db/schema';
+import { organizations, credit_transactions } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
@@ -29,85 +29,6 @@ describe('organization admin router', () => {
 
   afterAll(async () => {
     await db.delete(organizations).where(eq(organizations.id, testOrganization.id));
-  });
-
-  describe('updateKiloClawNorthflankRollout', () => {
-    beforeEach(async () => {
-      await db
-        .update(organizations)
-        .set({ settings: {} })
-        .where(eq(organizations.id, testOrganization.id));
-      await db
-        .delete(organization_audit_logs)
-        .where(eq(organization_audit_logs.organization_id, testOrganization.id));
-    });
-
-    it('updates Northflank rollout settings and writes an audit log', async () => {
-      const caller = await createCallerForUser(adminUser.id);
-
-      await caller.organizations.admin.updateKiloClawNorthflankRollout({
-        organizationId: testOrganization.id,
-        kiloclaw_northflank_enabled: true,
-        kiloclaw_northflank_traffic_percent: 10,
-      });
-
-      const [updatedOrg] = await db
-        .select({ settings: organizations.settings })
-        .from(organizations)
-        .where(eq(organizations.id, testOrganization.id));
-
-      expect(updatedOrg).toBeDefined();
-      if (!updatedOrg) throw new Error('Expected organization row');
-      expect(updatedOrg.settings).toMatchObject({
-        kiloclaw_northflank_enabled: true,
-        kiloclaw_northflank_traffic_percent: 10,
-      });
-
-      const [auditLog] = await db
-        .select({ message: organization_audit_logs.message })
-        .from(organization_audit_logs)
-        .where(eq(organization_audit_logs.organization_id, testOrganization.id));
-
-      expect(auditLog).toBeDefined();
-      if (!auditLog) throw new Error('Expected audit log row');
-      expect(auditLog.message).toContain('KiloClaw Northflank enabled, traffic 10%');
-    });
-
-    it('returns not found for a missing organization', async () => {
-      const caller = await createCallerForUser(adminUser.id);
-
-      await expect(
-        caller.organizations.admin.updateKiloClawNorthflankRollout({
-          organizationId: '550e8400-e29b-41d4-a716-446655440099',
-          kiloclaw_northflank_enabled: true,
-          kiloclaw_northflank_traffic_percent: 10,
-        })
-      ).rejects.toThrow('Organization not found');
-    });
-
-    it('rejects invalid traffic percentages', async () => {
-      const caller = await createCallerForUser(adminUser.id);
-
-      await expect(
-        caller.organizations.admin.updateKiloClawNorthflankRollout({
-          organizationId: testOrganization.id,
-          kiloclaw_northflank_enabled: true,
-          kiloclaw_northflank_traffic_percent: 101,
-        })
-      ).rejects.toThrow();
-    });
-
-    it('rejects non-admin users', async () => {
-      const caller = await createCallerForUser(nonAdminUser.id);
-
-      await expect(
-        caller.organizations.admin.updateKiloClawNorthflankRollout({
-          organizationId: testOrganization.id,
-          kiloclaw_northflank_enabled: true,
-          kiloclaw_northflank_traffic_percent: 10,
-        })
-      ).rejects.toThrow();
-    });
   });
 
   describe('nullifyCredits', () => {

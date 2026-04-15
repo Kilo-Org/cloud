@@ -11,7 +11,6 @@ import { OrganizationAdminCreditNullify } from './OrganizationAdminCreditNullify
 import { OrganizationAdminCreatedBy } from './OrganizationAdminCreatedBy';
 import { OrganizationWorkOSCard } from './OrganizationWorkOSCard';
 import { OrganizationAdminWebhooks } from './OrganizationAdminWebhooks';
-import { OrganizationAdminKiloClawSettings } from './OrganizationAdminKiloClawSettings';
 import { OrganizationContextProvider } from '@/components/organizations/OrganizationContext';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
@@ -66,7 +65,6 @@ export function OrganizationAdminDashboard({ organizationId }: { organizationId:
                 <OrganizationAdminCreatedBy organizationId={organizationId} />
                 <OrganizationAdminCreditGrant organizationId={organizationId} />
                 <OrganizationAdminCreditNullify organizationId={organizationId} />
-                <OrganizationAdminKiloClawSettings organizationId={organizationId} />
                 <OrganizationWorkOSCard organizationId={organizationId} />
               </div>
               <div className="space-y-8 lg:col-span-2">

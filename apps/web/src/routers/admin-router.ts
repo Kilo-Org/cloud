@@ -53,6 +53,7 @@ import {
   microdollar_usage,
 } from '@kilocode/db/schema';
 import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
+import { KiloClawProvider } from '@kilocode/db/schema-types';
 import { fromMicrodollars } from '@/lib/utils';
 import { sum } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
@@ -70,6 +71,10 @@ import {
 } from '@/lib/kiloclaw/access-state';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import {
+  getKiloClawProviderRolloutConfig,
+  updateKiloClawProviderRolloutConfig,
+} from '@/lib/kiloclaw/provider-rollout-config';
 import {
   getKilocodeRepoOpenPullRequestCounts,
   getKilocodeRepoOpenPullRequestsSummary,
@@ -192,8 +197,29 @@ const CancelKiloClawSubscriptionSchema = z.object({
   mode: z.enum(['period_end', 'immediate']),
 });
 
+const KiloClawProviderRolloutInputSchema = z.object({
+  provider: z.literal(KiloClawProvider.Northflank),
+});
+
+const UpdateKiloClawProviderRolloutInputSchema = KiloClawProviderRolloutInputSchema.extend({
+  enabled: z.boolean(),
+  personalTrafficPercent: z.number().int().min(0).max(100),
+  organizationTrafficPercent: z.number().int().min(0).max(100),
+});
+
 export const adminRouter = createTRPCRouter({
   webhookTriggers: adminWebhookTriggersRouter,
+  kiloclawProviders: createTRPCRouter({
+    get: adminProcedure.input(KiloClawProviderRolloutInputSchema).query(async ({ input }) => {
+      return getKiloClawProviderRolloutConfig(input.provider);
+    }),
+
+    update: adminProcedure
+      .input(UpdateKiloClawProviderRolloutInputSchema)
+      .mutation(async ({ input }) => {
+        return updateKiloClawProviderRolloutConfig(input);
+      }),
+  }),
   github: createTRPCRouter({
     getKilocodeOpenPullRequestCounts: adminProcedure.query(async () => {
       return getKilocodeRepoOpenPullRequestCounts({ ttlMs: 2 * 60_000 });

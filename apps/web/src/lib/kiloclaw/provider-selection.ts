@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
-import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import type { KiloClawProviderId } from '@/lib/kiloclaw/types';
-import type { PersonalKiloClawProviderRolloutConfig } from '@/lib/kiloclaw/provider-rollout-config';
+import type { KiloClawProviderRolloutConfig } from '@/lib/kiloclaw/provider-rollout-config';
 
 function rolloutBucket(key: string): number {
   const digest = createHash('sha256').update(key).digest();
@@ -11,10 +10,9 @@ function rolloutBucket(key: string): number {
 function selectProviderFromRollout(params: {
   enabled: boolean;
   percent: number;
-  rolloutAvailable: boolean;
   key: string;
 }): KiloClawProviderId {
-  if (!params.rolloutAvailable || !params.enabled || params.percent <= 0) return 'fly';
+  if (!params.enabled || params.percent <= 0) return 'fly';
   if (params.percent >= 100) return 'northflank';
   return rolloutBucket(params.key) < params.percent ? 'northflank' : 'fly';
 }
@@ -22,25 +20,22 @@ function selectProviderFromRollout(params: {
 export function selectOrgKiloClawProvider(params: {
   organizationId: string;
   userId: string;
-  organizationSettings: OrganizationSettings | null | undefined;
-  rolloutAvailable: boolean;
+  northflankConfig: KiloClawProviderRolloutConfig;
 }): KiloClawProviderId {
   return selectProviderFromRollout({
-    enabled: params.organizationSettings?.kiloclaw_northflank_enabled === true,
-    percent: params.organizationSettings?.kiloclaw_northflank_traffic_percent ?? 0,
-    rolloutAvailable: params.rolloutAvailable,
+    enabled: params.northflankConfig.enabled,
+    percent: params.northflankConfig.organizationTrafficPercent,
     key: `org:${params.organizationId}:user:${params.userId}`,
   });
 }
 
 export function selectPersonalKiloClawProvider(params: {
   userId: string;
-  personalRolloutConfig: PersonalKiloClawProviderRolloutConfig;
+  northflankConfig: KiloClawProviderRolloutConfig;
 }): KiloClawProviderId {
   return selectProviderFromRollout({
-    enabled: params.personalRolloutConfig.northflankEnabled,
-    percent: params.personalRolloutConfig.northflankTrafficPercent,
-    rolloutAvailable: params.personalRolloutConfig.rolloutAvailable,
+    enabled: params.northflankConfig.enabled,
+    percent: params.northflankConfig.personalTrafficPercent,
     key: `personal:user:${params.userId}`,
   });
 }

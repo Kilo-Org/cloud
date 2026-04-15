@@ -17,14 +17,12 @@ import {
   getOrganizationById,
   addUserToOrganization,
   markOrganizationAsDeleted,
-  updateOrganizationSettings,
 } from '@/lib/organizations/organizations';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { findUserById } from '@/lib/user';
 import { TRPCError } from '@trpc/server';
 import { successResult } from '@/lib/maybe-result';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -71,12 +69,6 @@ const UpdateFreeTrialEndAtInputSchema = z.object({
 const UpdateSuppressTrialMessagingInputSchema = z.object({
   organizationId: z.uuid(),
   suppress_trial_messaging: z.boolean(),
-});
-
-const UpdateKiloClawNorthflankRolloutInputSchema = z.object({
-  organizationId: z.uuid(),
-  kiloclaw_northflank_enabled: z.boolean(),
-  kiloclaw_northflank_traffic_percent: z.number().int().min(0).max(100),
 });
 
 const AdminOrganizationDetailsSchema = z.object({
@@ -230,32 +222,6 @@ export const organizationAdminRouter = createTRPCRouter({
         .update(organizations)
         .set({ settings: updatedSettings })
         .where(eq(organizations.id, organizationId));
-
-      return successResult();
-    }),
-
-  updateKiloClawNorthflankRollout: adminProcedure
-    .input(UpdateKiloClawNorthflankRolloutInputSchema)
-    .mutation(async ({ input, ctx }) => {
-      const existingOrg = await getOrganizationById(input.organizationId);
-      if (!existingOrg) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-      }
-
-      await updateOrganizationSettings(input.organizationId, {
-        ...existingOrg.settings,
-        kiloclaw_northflank_enabled: input.kiloclaw_northflank_enabled,
-        kiloclaw_northflank_traffic_percent: input.kiloclaw_northflank_traffic_percent,
-      });
-
-      await createAuditLog({
-        action: 'organization.settings.change',
-        actor_email: ctx.user.google_user_email,
-        actor_id: ctx.user.id,
-        actor_name: ctx.user.google_user_name,
-        message: `[Admin] KiloClaw Northflank ${input.kiloclaw_northflank_enabled ? 'enabled' : 'disabled'}, traffic ${input.kiloclaw_northflank_traffic_percent}%`,
-        organization_id: input.organizationId,
-      });
 
       return successResult();
     }),

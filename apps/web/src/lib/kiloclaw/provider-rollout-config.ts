@@ -1,44 +1,100 @@
 import 'server-only';
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { db } from '@/lib/drizzle';
+import { kiloclaw_providers } from '@kilocode/db/schema';
+import {
+  KiloClawProvider,
+  type KiloClawProvider as KiloClawProviderId,
+} from '@kilocode/db/schema-types';
+import { eq } from 'drizzle-orm';
 
-export type PersonalKiloClawProviderRolloutConfig = {
-  rolloutAvailable: boolean;
-  northflankEnabled: boolean;
-  northflankTrafficPercent: number;
+export type KiloClawProviderRolloutConfig = {
+  provider: KiloClawProviderId;
+  enabled: boolean;
+  personalTrafficPercent: number;
+  organizationTrafficPercent: number;
 };
 
-function parseBooleanEnv(name: string, defaultValue: boolean): boolean {
-  const value = getEnvVariable(name);
-  if (value == null || value === '') return defaultValue;
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'true' || normalized === '1') return true;
-  if (normalized === 'false' || normalized === '0') return false;
-
-  throw new Error(`${name} must be true, false, 1, or 0`);
-}
-
-function parsePercentEnv(name: string, defaultValue: number): number {
-  const value = getEnvVariable(name);
-  if (value == null || value === '') return defaultValue;
-
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
-    throw new Error(`${name} must be an integer between 0 and 100`);
+function defaultKiloClawProviderRolloutConfig(
+  provider: KiloClawProviderId
+): KiloClawProviderRolloutConfig {
+  if (provider === KiloClawProvider.Fly) {
+    return {
+      provider,
+      enabled: true,
+      personalTrafficPercent: 100,
+      organizationTrafficPercent: 100,
+    };
   }
 
-  return parsed;
-}
-
-export function getKiloClawNorthflankRolloutAvailable(): boolean {
-  return parseBooleanEnv('KILOCLAW_NORTHFLANK_ROLLOUT_AVAILABLE', false);
-}
-
-export function getPersonalKiloClawProviderRolloutConfig(): PersonalKiloClawProviderRolloutConfig {
   return {
-    rolloutAvailable: getKiloClawNorthflankRolloutAvailable(),
-    northflankEnabled: parseBooleanEnv('KILOCLAW_PERSONAL_NORTHFLANK_ENABLED', false),
-    northflankTrafficPercent: parsePercentEnv('KILOCLAW_PERSONAL_NORTHFLANK_TRAFFIC_PERCENT', 0),
+    provider,
+    enabled: false,
+    personalTrafficPercent: 0,
+    organizationTrafficPercent: 0,
   };
+}
+
+function normalizeKiloClawProviderRolloutConfig(row: {
+  provider: KiloClawProviderId;
+  enabled: boolean;
+  personal_traffic_percent: number;
+  organization_traffic_percent: number;
+}): KiloClawProviderRolloutConfig {
+  return {
+    provider: row.provider,
+    enabled: row.enabled,
+    personalTrafficPercent: row.personal_traffic_percent,
+    organizationTrafficPercent: row.organization_traffic_percent,
+  };
+}
+
+export async function getKiloClawProviderRolloutConfig(
+  provider: KiloClawProviderId
+): Promise<KiloClawProviderRolloutConfig> {
+  const [row] = await db
+    .select({
+      provider: kiloclaw_providers.provider,
+      enabled: kiloclaw_providers.enabled,
+      personal_traffic_percent: kiloclaw_providers.personal_traffic_percent,
+      organization_traffic_percent: kiloclaw_providers.organization_traffic_percent,
+    })
+    .from(kiloclaw_providers)
+    .where(eq(kiloclaw_providers.provider, provider));
+
+  if (!row) return defaultKiloClawProviderRolloutConfig(provider);
+  return normalizeKiloClawProviderRolloutConfig(row);
+}
+
+export async function updateKiloClawProviderRolloutConfig(input: {
+  provider: KiloClawProviderId;
+  enabled: boolean;
+  personalTrafficPercent: number;
+  organizationTrafficPercent: number;
+}): Promise<KiloClawProviderRolloutConfig> {
+  const [row] = await db
+    .insert(kiloclaw_providers)
+    .values({
+      provider: input.provider,
+      enabled: input.enabled,
+      personal_traffic_percent: input.personalTrafficPercent,
+      organization_traffic_percent: input.organizationTrafficPercent,
+    })
+    .onConflictDoUpdate({
+      target: kiloclaw_providers.provider,
+      set: {
+        enabled: input.enabled,
+        personal_traffic_percent: input.personalTrafficPercent,
+        organization_traffic_percent: input.organizationTrafficPercent,
+      },
+    })
+    .returning({
+      provider: kiloclaw_providers.provider,
+      enabled: kiloclaw_providers.enabled,
+      personal_traffic_percent: kiloclaw_providers.personal_traffic_percent,
+      organization_traffic_percent: kiloclaw_providers.organization_traffic_percent,
+    });
+
+  if (!row) throw new Error('Failed to update KiloClaw provider rollout config');
+  return normalizeKiloClawProviderRolloutConfig(row);
 }

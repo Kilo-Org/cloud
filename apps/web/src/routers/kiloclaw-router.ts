@@ -66,9 +66,10 @@ import {
 } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
 import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
-import { getPersonalKiloClawProviderRolloutConfig } from '@/lib/kiloclaw/provider-rollout-config';
+import { getKiloClawProviderRolloutConfig } from '@/lib/kiloclaw/provider-rollout-config';
 import { selectPersonalKiloClawProvider } from '@/lib/kiloclaw/provider-selection';
 import type { KiloClawProviderId } from '@/lib/kiloclaw/types';
+import { KiloClawProvider } from '@kilocode/db/schema-types';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
@@ -190,10 +191,10 @@ async function adoptOrphanedSubscription(userId: string, activeInstanceId: strin
  * In both cases, attempts to adopt an orphaned subscription (instance_id =
  * NULL) onto the active instance via {@link adoptOrphanedSubscription}.
  */
-function selectPersonalProviderForUser(userId: string): KiloClawProviderId {
+async function selectPersonalProviderForUser(userId: string): Promise<KiloClawProviderId> {
   return selectPersonalKiloClawProvider({
     userId,
-    personalRolloutConfig: getPersonalKiloClawProviderRolloutConfig(),
+    northflankConfig: await getKiloClawProviderRolloutConfig(KiloClawProvider.Northflank),
   });
 }
 
@@ -205,7 +206,7 @@ async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKilo
   }
 
   const { instance } = await ensureActiveInstance(userId, {
-    provider: selectPersonalProviderForUser(userId),
+    provider: await selectPersonalProviderForUser(userId),
   });
   await adoptOrphanedSubscription(userId, instance.id);
   return instance;
@@ -1777,7 +1778,7 @@ export const kiloclawRouter = createTRPCRouter({
 
   // Explicit lifecycle APIs
   provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    const provider = selectPersonalProviderForUser(ctx.user.id);
+    const provider = await selectPersonalProviderForUser(ctx.user.id);
     const { createdInstanceId } = await ensureProvisionAccess(
       ctx.user.id,
       ctx.user.google_user_email,
@@ -1795,7 +1796,7 @@ export const kiloclawRouter = createTRPCRouter({
   // Backward-compatible alias — uses the same trial-bootstrap flow as provision
   // so first-time callers can create a trial row (clawAccessProcedure would reject them).
   updateConfig: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    const provider = selectPersonalProviderForUser(ctx.user.id);
+    const provider = await selectPersonalProviderForUser(ctx.user.id);
     const { createdInstanceId } = await ensureProvisionAccess(
       ctx.user.id,
       ctx.user.google_user_email,

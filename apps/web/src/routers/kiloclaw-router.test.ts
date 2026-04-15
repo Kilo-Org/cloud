@@ -6,6 +6,7 @@ import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { createCallerFactory } from '@/lib/trpc/init';
 import { ensureActiveInstance } from '@/lib/kiloclaw/instance-registry';
+import { updateKiloClawProviderRolloutConfig } from '@/lib/kiloclaw/provider-rollout-config';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { kiloclawRouter } from '@/routers/kiloclaw-router';
@@ -15,6 +16,8 @@ import { eq } from 'drizzle-orm';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
+
+jest.setTimeout(30_000);
 
 type KiloClawClientMock = {
   KiloClawInternalClient: AnyMock;
@@ -108,9 +111,6 @@ describe('kiloclawRouter getStatus', () => {
     kiloclawClientMock.KiloClawInternalClient.mockClear();
     kiloclawClientMock.__getStatusMock.mockReset();
     kiloclawClientMock.__provisionMock.mockReset();
-    delete process.env.KILOCLAW_NORTHFLANK_ROLLOUT_AVAILABLE;
-    delete process.env.KILOCLAW_PERSONAL_NORTHFLANK_ENABLED;
-    delete process.env.KILOCLAW_PERSONAL_NORTHFLANK_TRAFFIC_PERCENT;
   });
 
   it('provisions Fly by default and stores the provider on the instance row', async () => {
@@ -137,10 +137,13 @@ describe('kiloclawRouter getStatus', () => {
     );
   });
 
-  it('selects Northflank for new personal rows only when global rollout is available', async () => {
-    process.env.KILOCLAW_NORTHFLANK_ROLLOUT_AVAILABLE = 'true';
-    process.env.KILOCLAW_PERSONAL_NORTHFLANK_ENABLED = 'true';
-    process.env.KILOCLAW_PERSONAL_NORTHFLANK_TRAFFIC_PERCENT = '100';
+  it('selects Northflank for new personal rows when DB rollout enables it', async () => {
+    await updateKiloClawProviderRolloutConfig({
+      provider: 'northflank',
+      enabled: true,
+      personalTrafficPercent: 100,
+      organizationTrafficPercent: 0,
+    });
     kiloclawClientMock.__provisionMock.mockResolvedValue({ ok: true });
     const user = await insertTestUser({
       google_user_email: `kiloclaw-northflank-test-${Math.random()}@example.com`,

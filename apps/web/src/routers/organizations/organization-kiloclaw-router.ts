@@ -26,9 +26,9 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
-import { getKiloClawNorthflankRolloutAvailable } from '@/lib/kiloclaw/provider-rollout-config';
+import { getKiloClawProviderRolloutConfig } from '@/lib/kiloclaw/provider-rollout-config';
 import { selectOrgKiloClawProvider } from '@/lib/kiloclaw/provider-selection';
-import { getOrganizationById } from '@/lib/organizations/organizations';
+import { KiloClawProvider } from '@kilocode/db/schema-types';
 import {
   ensureActiveInstance,
   getActiveOrgInstance,
@@ -335,16 +335,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
         });
       }
 
-      const organization = await getOrganizationById(input.organizationId);
-      if (!organization) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-      }
-
       const provider = selectOrgKiloClawProvider({
         organizationId: input.organizationId,
         userId: ctx.user.id,
-        organizationSettings: organization.settings,
-        rolloutAvailable: getKiloClawNorthflankRolloutAvailable(),
+        northflankConfig: await getKiloClawProviderRolloutConfig(KiloClawProvider.Northflank),
       });
 
       const { instance: instanceRow } = await ensureActiveInstance(ctx.user.id, {

@@ -105,24 +105,6 @@ export function useAddMember(organizationId: string) {
   );
 }
 
-export function useUpdateKiloClawNorthflankRollout() {
-  const queryClient = useQueryClient();
-  const invalidate = useInvalidateAllOrganizationData();
-  const trpc = useTRPC();
-
-  return useMutation(
-    trpc.organizations.admin.updateKiloClawNorthflankRollout.mutationOptions({
-      onSuccess: (_data, variables) => {
-        void queryClient.invalidateQueries({
-          queryKey: ['organization', variables.organizationId],
-        });
-        void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
-        void invalidate();
-      },
-    })
-  );
-}
-
 export function useAdminOrganizationDetails(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(

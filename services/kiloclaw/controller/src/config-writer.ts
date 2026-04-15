@@ -437,21 +437,22 @@ export function generateBaseConfig(
     config.plugins.entries[scEntry].enabled = true;
   }
 
-  // Kilo Chat (pre-provisioned channel — no setup wizard).
-  // Require BOTH vars: KILOCHAT_BASE_URL is also required by the outbound route
-  // registered in the controller (index.ts). Without it the channel would be
-  // enabled in config but the route wouldn't exist, producing silent 404s.
+  // Kilo Chat (pre-provisioned channel — no setup wizard). Gated by a single
+  // operator-controlled worker-level toggle so rollout can be flipped
+  // independently of image deploys. The plugin's outbound path reaches
+  // kilo-chat via controller proxy → kiloclaw Worker → service binding, so
+  // nothing else needs to be provisioned per sandbox.
   //
-  // baseUrl is set here (and declared in the plugin's configSchema) even
-  // though the plugin never reads it: OpenClaw's isChannelConfigured gate uses
-  // hasMeaningfulChannelConfig, which only returns true when the channel
-  // section has a key other than `enabled`. Without that, the plugin loads in
-  // `setup-runtime` mode instead of `full`, and registerFull (which registers
-  // the webhook HTTP route) is never called.
-  if (env.KILOCHAT_API_TOKEN && env.KILOCHAT_BASE_URL) {
+  // reactionLevel is set here (and declared in the plugin's configSchema)
+  // even though the channel has no URL-style config: OpenClaw's
+  // isChannelConfigured gate uses hasMeaningfulChannelConfig, which only
+  // returns true when the channel section has a key other than `enabled`.
+  // Without one, the plugin loads in `setup-runtime` mode instead of `full`,
+  // and registerFull (which registers the webhook HTTP route) is never
+  // called.
+  if (env.KILOCHAT_ENABLED === 'true') {
     config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
     config.channels['kilo-chat'].enabled = true;
-    config.channels['kilo-chat'].baseUrl = env.KILOCHAT_BASE_URL;
     config.channels['kilo-chat'].reactionLevel = resolveReactionLevel(env.KILOCHAT_REACTION_LEVEL);
 
     config.plugins = config.plugins ?? {};

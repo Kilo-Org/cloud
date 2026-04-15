@@ -534,20 +534,23 @@ describe('buildEnvVars', () => {
 
   // ─── kilo-chat env passthrough ──────────────────────────────────────
 
-  it('places KILOCHAT_API_TOKEN into sensitive, KILOCHAT_BASE_URL into env', async () => {
+  it('forwards KILOCHAT_ENABLED and KILOCHAT_REACTION_LEVEL into plaintext env', async () => {
     const env = createMockEnv({
-      KILOCHAT_API_TOKEN: 'tok_secret',
-      KILOCHAT_BASE_URL: 'https://chat.example.test',
+      KILOCHAT_ENABLED: 'true',
+      KILOCHAT_REACTION_LEVEL: 'extensive',
     });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.sensitive.KILOCHAT_API_TOKEN).toBe('tok_secret');
-    expect(result.env.KILOCHAT_BASE_URL).toBe('https://chat.example.test');
+    expect(result.env.KILOCHAT_ENABLED).toBe('true');
+    expect(result.env.KILOCHAT_REACTION_LEVEL).toBe('extensive');
+    // No per-sandbox secret is pushed for kilo-chat — identity is the
+    // already-derived OPENCLAW_GATEWAY_TOKEN.
+    expect(result.sensitive.KILOCHAT_ENABLED).toBeUndefined();
   });
 
   it('omits kilo-chat env vars when not provided', async () => {
     const env = createMockEnv();
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
-    expect(result.sensitive.KILOCHAT_API_TOKEN).toBeUndefined();
-    expect(result.env.KILOCHAT_BASE_URL).toBeUndefined();
+    expect(result.env.KILOCHAT_ENABLED).toBeUndefined();
+    expect(result.env.KILOCHAT_REACTION_LEVEL).toBeUndefined();
   });
 });

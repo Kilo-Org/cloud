@@ -17,8 +17,8 @@ function makeApp(fetchImpl: typeof fetch) {
   registerKiloChatSendRoute(app, {
     expectedToken: TOKEN,
     sandboxId: SANDBOX_ID,
-    apiToken: 'api_token',
-    baseUrl: 'https://chat.example.test',
+    /* replaced by kiloclawBaseUrl */
+    kiloclawBaseUrl: 'https://claw.example.test',
     fetchImpl,
   });
   return app;
@@ -77,10 +77,10 @@ describe('POST /_kilo/kilo-chat/send', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(capturedUrl).toBe('https://chat.example.test/v1/messages');
+    expect(capturedUrl).toBe('https://claw.example.test/api/kilo-chat/sandboxes/sbx_test/messages');
     const headers = new Headers(capturedInit?.headers);
-    expect(headers.get('authorization')).toBe('Bearer api_token');
-    expect(headers.get('x-kilo-sandbox-id')).toBe(SANDBOX_ID);
+    expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
+    expect(headers.get('x-kilo-sandbox-id')).toBeNull();
     const body = JSON.parse((capturedInit?.body as string) ?? '{}');
     expect(body).toEqual({ conversationId: 'c1', text: 'hi' });
   });
@@ -107,8 +107,8 @@ function makeEditApp(fetchImpl: typeof fetch) {
   registerKiloChatEditRoute(app, {
     expectedToken: TOKEN,
     sandboxId: SANDBOX_ID,
-    apiToken: 'api_token',
-    baseUrl: 'https://chat.example.test',
+    /* replaced by kiloclawBaseUrl */
+    kiloclawBaseUrl: 'https://claw.example.test',
     fetchImpl,
   });
   return app;
@@ -152,11 +152,13 @@ describe('PATCH /_kilo/kilo-chat/messages/:id', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(capturedUrl).toBe('https://chat.example.test/v1/messages/m1');
+    expect(capturedUrl).toBe(
+      'https://claw.example.test/api/kilo-chat/sandboxes/sbx_test/messages/m1'
+    );
     expect(capturedInit?.method).toBe('PATCH');
     const headers = new Headers(capturedInit?.headers);
-    expect(headers.get('authorization')).toBe('Bearer api_token');
-    expect(headers.get('x-kilo-sandbox-id')).toBe(SANDBOX_ID);
+    expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
+    expect(headers.get('x-kilo-sandbox-id')).toBeNull();
     expect(JSON.parse((capturedInit?.body as string) ?? '{}')).toEqual({
       conversationId: 'c1',
       text: 'Hel',
@@ -187,8 +189,8 @@ function makeDeleteApp(fetchImpl: typeof fetch) {
   registerKiloChatDeleteRoute(app, {
     expectedToken: TOKEN,
     sandboxId: SANDBOX_ID,
-    apiToken: 'api_token',
-    baseUrl: 'https://chat.example.test',
+    /* replaced by kiloclawBaseUrl */
+    kiloclawBaseUrl: 'https://claw.example.test',
     fetchImpl,
   });
   return app;
@@ -223,11 +225,13 @@ describe('DELETE /_kilo/kilo-chat/messages/:id', () => {
       })
     );
     expect(res.status).toBe(204);
-    expect(capturedUrl).toBe('https://chat.example.test/v1/messages/m1');
+    expect(capturedUrl).toBe(
+      'https://claw.example.test/api/kilo-chat/sandboxes/sbx_test/messages/m1'
+    );
     expect(capturedInit?.method).toBe('DELETE');
     const headers = new Headers(capturedInit?.headers);
-    expect(headers.get('authorization')).toBe('Bearer api_token');
-    expect(headers.get('x-kilo-sandbox-id')).toBe(SANDBOX_ID);
+    expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
+    expect(headers.get('x-kilo-sandbox-id')).toBeNull();
   });
 });
 
@@ -236,8 +240,8 @@ function makeTypingApp(fetchImpl: typeof fetch) {
   registerKiloChatTypingRoute(app, {
     expectedToken: TOKEN,
     sandboxId: SANDBOX_ID,
-    apiToken: 'api_token',
-    baseUrl: 'https://chat.example.test',
+    /* replaced by kiloclawBaseUrl */
+    kiloclawBaseUrl: 'https://claw.example.test',
     fetchImpl,
   });
   return app;
@@ -271,7 +275,7 @@ describe('POST /_kilo/kilo-chat/typing', () => {
     expect(res.status).toBe(401);
   });
 
-  it('forwards to upstream /v1/conversations/:id/typing with sandbox id and api token', async () => {
+  it('forwards to kiloclaw worker typing path with gateway bearer', async () => {
     let capturedUrl = '';
     let capturedInit: RequestInit | undefined;
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
@@ -293,10 +297,12 @@ describe('POST /_kilo/kilo-chat/typing', () => {
     );
 
     expect(res.status).toBe(204);
-    expect(capturedUrl).toBe('https://chat.example.test/v1/conversations/c1/typing');
+    expect(capturedUrl).toBe(
+      'https://claw.example.test/api/kilo-chat/sandboxes/sbx_test/conversations/c1/typing'
+    );
     const headers = new Headers(capturedInit?.headers);
-    expect(headers.get('authorization')).toBe('Bearer api_token');
-    expect(headers.get('x-kilo-sandbox-id')).toBe(SANDBOX_ID);
+    expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
+    expect(headers.get('x-kilo-sandbox-id')).toBeNull();
     expect(capturedInit?.method).toBe('POST');
   });
 
@@ -317,7 +323,9 @@ describe('POST /_kilo/kilo-chat/typing', () => {
         },
       })
     );
-    expect(capturedUrl).toBe('https://chat.example.test/v1/conversations/a%20b%2Fc/typing');
+    expect(capturedUrl).toBe(
+      'https://claw.example.test/api/kilo-chat/sandboxes/sbx_test/conversations/a%20b%2Fc/typing'
+    );
   });
 
   it('rejects body missing conversationId with 400', async () => {
@@ -364,8 +372,8 @@ describe('POST /_kilo/kilo-chat/messages/:id/reactions', () => {
     registerKiloChatReactionPostRoute(app, {
       expectedToken: 'gw',
       sandboxId: 'sbx',
-      apiToken: 'api',
-      baseUrl: 'http://svc',
+      /* replaced */
+      kiloclawBaseUrl: 'http://svc',
       fetchImpl,
     });
 
@@ -377,10 +385,10 @@ describe('POST /_kilo/kilo-chat/messages/:id/reactions', () => {
       })
     );
     expect(res.status).toBe(201);
-    expect(calls[0].url).toBe('http://svc/v1/messages/MID/reactions');
+    expect(calls[0].url).toBe('http://svc/api/kilo-chat/sandboxes/sbx/messages/MID/reactions');
     const headers = calls[0].init.headers as Record<string, string>;
-    expect(headers.authorization).toBe('Bearer api');
-    expect(headers['x-kilo-sandbox-id']).toBe('sbx');
+    expect(headers.authorization).toBe('Bearer gw');
+    expect(headers['x-kilo-sandbox-id']).toBeUndefined();
     expect(calls[0].init.method).toBe('POST');
     expect(calls[0].init.body).toBe(JSON.stringify({ conversationId: 'C', emoji: '\u{1F44D}' }));
   });
@@ -392,8 +400,8 @@ describe('POST /_kilo/kilo-chat/messages/:id/reactions', () => {
     registerKiloChatReactionPostRoute(app, {
       expectedToken: 'gw',
       sandboxId: 's',
-      apiToken: 'a',
-      baseUrl: 'http://svc',
+      /* replaced */
+      kiloclawBaseUrl: 'http://svc',
       fetchImpl,
     });
     const res = await app.fetch(
@@ -411,8 +419,8 @@ describe('POST /_kilo/kilo-chat/messages/:id/reactions', () => {
     registerKiloChatReactionPostRoute(app, {
       expectedToken: 'gw',
       sandboxId: 's',
-      apiToken: 'a',
-      baseUrl: 'http://svc',
+      /* replaced */
+      kiloclawBaseUrl: 'http://svc',
       fetchImpl: (async () => new Response()) as typeof fetch,
     });
     const res = await app.fetch(
@@ -430,8 +438,8 @@ describe('POST /_kilo/kilo-chat/messages/:id/reactions', () => {
     registerKiloChatReactionPostRoute(app, {
       expectedToken: 'gw',
       sandboxId: 's',
-      apiToken: 'a',
-      baseUrl: 'http://svc',
+      /* replaced */
+      kiloclawBaseUrl: 'http://svc',
       fetchImpl: (async () => new Response()) as typeof fetch,
     });
     const res = await app.fetch(
@@ -457,8 +465,8 @@ describe('DELETE /_kilo/kilo-chat/messages/:id/reactions', () => {
     registerKiloChatReactionDeleteRoute(app, {
       expectedToken: 'gw',
       sandboxId: 'sbx',
-      apiToken: 'api',
-      baseUrl: 'http://svc',
+      /* replaced */
+      kiloclawBaseUrl: 'http://svc',
       fetchImpl,
     });
 
@@ -471,10 +479,10 @@ describe('DELETE /_kilo/kilo-chat/messages/:id/reactions', () => {
     );
     expect(res.status).toBe(204);
     expect(calls[0].init.method).toBe('DELETE');
-    expect(calls[0].url).toBe('http://svc/v1/messages/MID/reactions');
+    expect(calls[0].url).toBe('http://svc/api/kilo-chat/sandboxes/sbx/messages/MID/reactions');
     const headers = calls[0].init.headers as Record<string, string>;
-    expect(headers.authorization).toBe('Bearer api');
-    expect(headers['x-kilo-sandbox-id']).toBe('sbx');
+    expect(headers.authorization).toBe('Bearer gw');
+    expect(headers['x-kilo-sandbox-id']).toBeUndefined();
   });
 
   it('401 on missing bearer', async () => {
@@ -482,8 +490,8 @@ describe('DELETE /_kilo/kilo-chat/messages/:id/reactions', () => {
     registerKiloChatReactionDeleteRoute(app, {
       expectedToken: 'gw',
       sandboxId: 's',
-      apiToken: 'a',
-      baseUrl: 'http://svc',
+      /* replaced */
+      kiloclawBaseUrl: 'http://svc',
       fetchImpl: (async () => new Response()) as typeof fetch,
     });
     const res = await app.fetch(
@@ -499,8 +507,8 @@ describe('body size limits', () => {
     register(app, {
       expectedToken: TOKEN,
       sandboxId: SANDBOX_ID,
-      apiToken: 'api_token',
-      baseUrl: 'https://chat.example.test',
+      /* replaced by kiloclawBaseUrl */
+      kiloclawBaseUrl: 'https://claw.example.test',
       fetchImpl,
     });
     return app;

@@ -364,12 +364,20 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   registerPairingRoutes(honoApp, pairingCache, config.expectedToken);
   registerEnvRoutes(honoApp, supervisor, config.expectedToken);
   registerGmailPushRoute(honoApp, gmailWatchSupervisor ?? null, config.expectedToken);
-  if (env.KILOCHAT_API_TOKEN && env.KILOCHAT_BASE_URL) {
+  // kilo-chat channel: the controller forwards its own per-sandbox gateway
+  // token upstream to the kiloclaw CF Worker, which verifies it and
+  // dispatches via a trusted service binding to kilo-chat. No shared secret.
+  //
+  // Derive the worker origin from KILOCLAW_CHECKIN_URL (already set per
+  // machine) so we don't need a separate env var for the same origin.
+  const kiloclawBaseUrl = env.KILOCLAW_CHECKIN_URL
+    ? new URL(env.KILOCLAW_CHECKIN_URL).origin
+    : undefined;
+  if (env.KILOCLAW_SANDBOX_ID && kiloclawBaseUrl) {
     const kiloChatOpts = {
       expectedToken: config.expectedToken,
-      sandboxId: env.KILOCLAW_SANDBOX_ID ?? '',
-      apiToken: env.KILOCHAT_API_TOKEN,
-      baseUrl: env.KILOCHAT_BASE_URL,
+      sandboxId: env.KILOCLAW_SANDBOX_ID,
+      kiloclawBaseUrl,
     };
     registerKiloChatSendRoute(honoApp, kiloChatOpts);
     registerKiloChatEditRoute(honoApp, kiloChatOpts);

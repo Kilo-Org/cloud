@@ -6,14 +6,16 @@ export type AuthContext = {
   callerKind: 'user' | 'bot';
 };
 
-function timingSafeEqual(a: string, b: string): boolean {
-  const encoder = new TextEncoder();
-  const bufA = encoder.encode(a);
-  const bufB = encoder.encode(b);
-  if (bufA.byteLength !== bufB.byteLength) return false;
-  return crypto.subtle.timingSafeEqual(bufA, bufB);
-}
-
+/**
+ * Public HTTP auth for kilo-chat. Only humans authenticate over HTTP; their
+ * bearer is a Kilo JWT verified with NEXTAUTH_SECRET.
+ *
+ * Bots (kiloclaw sandboxes) do NOT come in here. They reach the bot surface
+ * exclusively via the kilo-chat WorkerEntrypoint's RPC methods, invoked from
+ * the kiloclaw CF Worker over a trusted service binding after kiloclaw has
+ * verified the caller's per-sandbox gateway token. There is no shared API
+ * token to leak and no `x-kilo-sandbox-id` header to spoof.
+ */
 export const authMiddleware = createMiddleware<{
   Bindings: Env;
   Variables: AuthContext;
@@ -23,19 +25,6 @@ export const authMiddleware = createMiddleware<{
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
-  // Try API key auth first (constant-time comparison)
-  const apiKey = await c.env.KILOCHAT_API_TOKEN.get();
-  if (apiKey && timingSafeEqual(token, apiKey)) {
-    const sandboxId = c.req.header('x-kilo-sandbox-id');
-    if (!sandboxId) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-    c.set('callerId', `bot:kiloclaw:${sandboxId}`);
-    c.set('callerKind', 'bot');
-    return next();
-  }
-
-  // Try JWT auth
   try {
     const jwtSecret = await c.env.NEXTAUTH_SECRET.get();
     if (!jwtSecret) {

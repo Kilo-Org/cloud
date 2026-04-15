@@ -5,11 +5,9 @@ import { authMiddleware } from '../auth';
 import type { AuthContext } from '../auth';
 
 type MockEnv = {
-  KILOCHAT_API_TOKEN: { get: () => Promise<string> };
   NEXTAUTH_SECRET: { get: () => Promise<string> };
 };
 
-const TEST_API_KEY = 'test-api-key';
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
 function makeApp(_env: MockEnv) {
@@ -20,118 +18,73 @@ function makeApp(_env: MockEnv) {
 }
 
 const defaultEnv: MockEnv = {
-  KILOCHAT_API_TOKEN: { get: async () => TEST_API_KEY },
   NEXTAUTH_SECRET: { get: async () => TEST_JWT_SECRET },
 };
 
 describe('authMiddleware', () => {
   it('returns 401 with no authorization header', async () => {
-    const app = makeApp(defaultEnv);
-    const res = await app.request('/test', {}, defaultEnv);
+    const res = await makeApp(defaultEnv).request('/test', {}, defaultEnv);
     expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(await res.json()).toEqual({ error: 'Unauthorized' });
   });
 
-  it('authenticates with valid API key + sandbox header', async () => {
-    const app = makeApp(defaultEnv);
-    const res = await app.request(
-      '/test',
-      {
-        headers: {
-          authorization: `Bearer ${TEST_API_KEY}`,
-          'x-kilo-sandbox-id': 'sandbox-abc123',
-        },
-      },
-      defaultEnv
-    );
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual({
-      callerId: 'bot:kiloclaw:sandbox-abc123',
-      callerKind: 'bot',
-    });
-  });
-
-  it('returns 401 with valid API key but missing sandbox header', async () => {
-    const app = makeApp(defaultEnv);
-    const res = await app.request(
-      '/test',
-      {
-        headers: {
-          authorization: `Bearer ${TEST_API_KEY}`,
-        },
-      },
-      defaultEnv
-    );
-    expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
-  });
-
-  it('returns 401 with wrong API key and no valid JWT', async () => {
-    const app = makeApp(defaultEnv);
-    const res = await app.request(
-      '/test',
-      {
-        headers: {
-          authorization: 'Bearer wrong-key',
-          'x-kilo-sandbox-id': 'sandbox-abc123',
-        },
-      },
-      defaultEnv
-    );
-    expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
-  });
-
-  it('authenticates with valid JWT and sets callerId + callerKind', async () => {
+  it('authenticates with a valid JWT and sets user identity', async () => {
     const { token } = await signKiloToken({
       userId: 'user-xyz-789',
       pepper: null,
       secret: TEST_JWT_SECRET,
       expiresInSeconds: 3600,
     });
-
-    const app = makeApp(defaultEnv);
-    const res = await app.request(
+    const res = await makeApp(defaultEnv).request(
       '/test',
-      {
-        headers: {
-          authorization: `Bearer ${token}`,
-        },
-      },
+      { headers: { authorization: `Bearer ${token}` } },
       defaultEnv
     );
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual({
+    expect(await res.json()).toEqual({
       callerId: 'user-xyz-789',
       callerKind: 'user',
     });
   });
 
-  it('returns 401 with expired JWT', async () => {
+  it('returns 401 with an expired JWT', async () => {
     const { token } = await signKiloToken({
       userId: 'user-xyz-789',
       pepper: null,
       secret: TEST_JWT_SECRET,
       expiresInSeconds: -1,
     });
+    const res = await makeApp(defaultEnv).request(
+      '/test',
+      { headers: { authorization: `Bearer ${token}` } },
+      defaultEnv
+    );
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Unauthorized' });
+  });
 
-    const app = makeApp(defaultEnv);
-    const res = await app.request(
+  it('does not accept arbitrary bearers as bots — there is no HTTP bot surface', async () => {
+    // Bots reach kilo-chat via service-binding RPC only; no HTTP path grants
+    // bot identity. Any non-JWT bearer must fail closed.
+    const res = await makeApp(defaultEnv).request(
+      '/test',
+      { headers: { authorization: 'Bearer not-a-jwt' } },
+      defaultEnv
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('ignores x-kilo-sandbox-id header entirely (legacy spoof surface is gone)', async () => {
+    const res = await makeApp(defaultEnv).request(
       '/test',
       {
         headers: {
-          authorization: `Bearer ${token}`,
+          authorization: 'Bearer some-value',
+          'x-kilo-sandbox-id': 'sandbox-B',
         },
       },
       defaultEnv
     );
     expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
   });
 });

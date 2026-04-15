@@ -1,10 +1,14 @@
 #!/usr/bin/env npx tsx
 /**
- * End-to-end test script for kilo-chat service.
+ * End-to-end test script for kilo-chat service (user-only HTTP flow).
+ *
+ * Bots no longer have a public HTTP surface on kilo-chat — they reach the
+ * service via service-binding RPC from the kiloclaw worker, not HTTP. This
+ * script exercises only the human-user HTTP path (JWT-authenticated).
  *
  * Prerequisites:
  *   1. kilo-chat running: cd services/kilo-chat && wrangler dev
- *   2. .dev.vars configured with KILOCHAT_API_TOKEN, NEXTAUTH_SECRET, etc.
+ *   2. .dev.vars configured with NEXTAUTH_SECRET, etc.
  *   3. (For full agent loop) kiloclaw running with kilo-chat plugin
  *
  * Usage:
@@ -13,8 +17,7 @@
  * Environment variables:
  *   KILO_CHAT_URL       - kilo-chat base URL (default: http://localhost:8802)
  *   NEXTAUTH_SECRET     - JWT signing secret (must match .dev.vars)
- *   KILOCHAT_API_TOKEN    - API key for bot auth (must match .dev.vars)
- *   SANDBOX_ID          - sandbox ID for the bot (default: test-sandbox)
+ *   SANDBOX_ID          - sandbox ID for the bot member (default: e2e-test-sandbox)
  *   TIMEOUT_MS          - how long to wait for agent response (default: 30000)
  */
 
@@ -22,7 +25,6 @@ import { SignJWT } from 'jose';
 
 const BASE_URL = process.env.KILO_CHAT_URL ?? 'http://localhost:8802';
 const JWT_SECRET = process.env.NEXTAUTH_SECRET;
-const API_KEY = process.env.KILOCHAT_API_TOKEN;
 const SANDBOX_ID = process.env.SANDBOX_ID ?? 'e2e-test-sandbox';
 const TIMEOUT_MS = Number(process.env.TIMEOUT_MS ?? '30000');
 
@@ -44,15 +46,6 @@ async function signUserToken(userId: string): Promise<string> {
     .setIssuedAt(now)
     .setExpirationTime(now + 3600)
     .sign(new TextEncoder().encode(JWT_SECRET));
-}
-
-function botHeaders(): Record<string, string> {
-  if (!API_KEY) throw new Error('KILOCHAT_API_TOKEN required for bot auth');
-  return {
-    authorization: `Bearer ${API_KEY}`,
-    'x-kilo-sandbox-id': SANDBOX_ID,
-    'content-type': 'application/json',
-  };
 }
 
 async function userHeaders(token: string): Promise<Record<string, string>> {

@@ -469,10 +469,6 @@ describe('Secret Catalog', () => {
       expect(INTERNAL_SENSITIVE_ENV_VARS.has('KILOCLAW_GOG_CONFIG_TARBALL')).toBe(true);
     });
 
-    it('contains Kilo Chat operator-provisioned tokens', () => {
-      expect(INTERNAL_SENSITIVE_ENV_VARS.has('KILOCHAT_API_TOKEN')).toBe(true);
-    });
-
     it('does not overlap with catalog-derived ALL_SECRET_ENV_VARS', () => {
       for (const envVar of INTERNAL_SENSITIVE_ENV_VARS) {
         expect(ALL_SECRET_ENV_VARS.has(envVar)).toBe(false);
@@ -533,7 +529,8 @@ describe('Secret Catalog', () => {
       expect(isValidCustomSecretKey('NEXTAUTH_SECRET')).toBe(false);
       expect(isValidCustomSecretKey('NODE_OPTIONS')).toBe(false);
       expect(isValidCustomSecretKey('STREAM_CHAT_API_KEY')).toBe(false);
-      expect(isValidCustomSecretKey('KILOCHAT_API_TOKEN')).toBe(false);
+      // KILOCHAT_ prefix is still reserved (DENIED_ENV_VAR_PREFIXES) even
+      // though no specific variable is set internally anymore.
       expect(isValidCustomSecretKey('KILOCHAT_ANYTHING')).toBe(false);
     });
 

@@ -764,20 +764,15 @@ describe('generateBaseConfig', () => {
 
   // ─── Kilo Chat ───────────────────────────────────────────────────────────
 
-  it('configures kilo-chat channel and plugin when both KILOCHAT_API_TOKEN and KILOCHAT_BASE_URL are set', () => {
+  it('configures kilo-chat channel and plugin when KILOCHAT_ENABLED=true', () => {
     const { deps } = fakeDeps();
-    const env = {
-      ...minimalEnv(),
-      KILOCHAT_API_TOKEN: 'tok',
-      KILOCHAT_BASE_URL: 'https://chat.example.test',
-    };
+    const env = { ...minimalEnv(), KILOCHAT_ENABLED: 'true' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
     expect(config.channels['kilo-chat'].enabled).toBe(true);
-    // baseUrl is required for OpenClaw's hasMeaningfulChannelConfig gate — see
-    // comment in config-writer.ts. Without a non-`enabled` key, registerFull
-    // (which registers the /plugins/kilo-chat/webhook route) is skipped.
-    expect(config.channels['kilo-chat'].baseUrl).toBe('https://chat.example.test');
+    // reactionLevel provides the non-`enabled` key required by OpenClaw's
+    // hasMeaningfulChannelConfig gate (see comment in config-writer.ts).
+    expect(config.channels['kilo-chat'].reactionLevel).toBe('minimal');
     expect(config.plugins.load.paths).toContain('/usr/local/lib/node_modules/@kiloclaw/kilo-chat');
     expect(config.plugins.entries['kilo-chat'].enabled).toBe(true);
   });
@@ -786,8 +781,7 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps();
     const env = {
       ...minimalEnv(),
-      KILOCHAT_API_TOKEN: 'tok',
-      KILOCHAT_BASE_URL: 'https://chat.example.test',
+      KILOCHAT_ENABLED: 'true',
       KILOCHAT_REACTION_LEVEL: 'extensive',
     };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
@@ -796,11 +790,7 @@ describe('generateBaseConfig', () => {
 
   it('defaults reactionLevel to minimal when KILOCHAT_REACTION_LEVEL is unset', () => {
     const { deps } = fakeDeps();
-    const env = {
-      ...minimalEnv(),
-      KILOCHAT_API_TOKEN: 'tok',
-      KILOCHAT_BASE_URL: 'https://chat.example.test',
-    };
+    const env = { ...minimalEnv(), KILOCHAT_ENABLED: 'true' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
     expect(config.channels['kilo-chat'].reactionLevel).toBe('minimal');
   });
@@ -809,8 +799,7 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps();
     const env = {
       ...minimalEnv(),
-      KILOCHAT_API_TOKEN: 'tok',
-      KILOCHAT_BASE_URL: 'https://chat.example.test',
+      KILOCHAT_ENABLED: 'true',
       KILOCHAT_REACTION_LEVEL: 'bogus',
     };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
@@ -822,8 +811,7 @@ describe('generateBaseConfig', () => {
       const { deps } = fakeDeps();
       const env = {
         ...minimalEnv(),
-        KILOCHAT_API_TOKEN: 'tok',
-        KILOCHAT_BASE_URL: 'https://chat.example.test',
+        KILOCHAT_ENABLED: 'true',
         KILOCHAT_REACTION_LEVEL: level,
       };
       const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
@@ -831,18 +819,16 @@ describe('generateBaseConfig', () => {
     }
   });
 
-  it('leaves kilo-chat channel unconfigured when KILOCHAT_API_TOKEN is missing', () => {
+  it('leaves kilo-chat channel unconfigured when KILOCHAT_ENABLED is missing', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
-
     expect(config.channels?.['kilo-chat']).toBeUndefined();
   });
 
-  it('leaves kilo-chat channel unconfigured when KILOCHAT_BASE_URL is missing (token-only is not enough)', () => {
+  it('leaves kilo-chat channel unconfigured when KILOCHAT_ENABLED is not "true"', () => {
     const { deps } = fakeDeps();
-    const env = { ...minimalEnv(), KILOCHAT_API_TOKEN: 'tok' };
+    const env = { ...minimalEnv(), KILOCHAT_ENABLED: 'false' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
-
     expect(config.channels?.['kilo-chat']).toBeUndefined();
   });
 

@@ -280,10 +280,6 @@ export const ALL_SECRET_ENV_VARS: ReadonlySet<string> = new Set(
  */
 export const INTERNAL_SENSITIVE_ENV_VARS: ReadonlySet<string> = new Set([
   'KILOCLAW_GOG_CONFIG_TARBALL',
-  // Kilo Chat — operator-provisioned, not user-configurable. Pushed from
-  // worker env via buildEnvVars; the KILOCHAT_ prefix is reserved in
-  // DENIED_ENV_VAR_PREFIXES to keep users from shadowing them.
-  'KILOCHAT_API_TOKEN',
 ]);
 
 /**

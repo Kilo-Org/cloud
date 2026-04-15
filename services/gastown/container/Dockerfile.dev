@@ -71,7 +71,7 @@ RUN git lfs install --system
 # pick either depending on the detected libc. bun:1-slim is Debian (glibc)
 # but the resolver sometimes misdetects; installing both is safe.
 # Also install pnpm — many projects use it as their package manager.
-RUN npm install -g @kilocode/cli @kilocode/cli-linux-arm64 @kilocode/cli-linux-arm64-musl pnpm && \
+RUN npm install -g @kilocode/cli@7.2.7 @kilocode/cli-linux-arm64@7.2.7 @kilocode/cli-linux-arm64-musl@7.2.7 @kilocode/plugin@7.2.7 pnpm && \
     ln -s "$(which kilo)" /usr/local/bin/opencode
 
 # Create non-root user for defense-in-depth

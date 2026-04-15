@@ -231,6 +231,11 @@ export const SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL = getEnvVariable(
   'SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL'
 );
 
+// Pylon chat widget (support chat on KiloClaw pages).
+// PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign
+// the user's email so the widget can verify the end user's identity.
+export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || '';
+
 // Pipe-delimited list of TLDs to block from new signups, each with a leading dot (e.g. ".shop|.top|.co.uk")
 const blacklistTldsEnv = getEnvVariable('BLACKLIST_TLDS');
 export const BLACKLIST_TLDS = blacklistTldsEnv

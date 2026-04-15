@@ -99,6 +99,7 @@ Business-rule specs live in `.specs/`. Before making **any** changes to a domain
 | Spec                                     | Governs                                                             |
 | ---------------------------------------- | ------------------------------------------------------------------- |
 | `.specs/kiloclaw-billing.md`             | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
+| `.specs/kiloclaw-datamodel.md`           | KiloClaw data model — instance/subscription tables, invariants      |
 | `.specs/kiloclaw-controller.md`          | KiloClaw controller/machine lifecycle, bootstrap, Docker image      |
 | `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management           |
 | `.specs/impact-affiliate-tracking.md`    | Impact.com affiliate conversion tracking                            |

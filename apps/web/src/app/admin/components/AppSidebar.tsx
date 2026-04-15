@@ -21,7 +21,6 @@ import {
   Upload,
   Bell,
   Network,
-  RefreshCw,
   KeyRound,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
@@ -152,14 +151,9 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <Network />,
   },
   {
-    title: () => 'Sync Providers',
-    url: '/admin/sync-providers',
-    icon: () => <RefreshCw />,
-  },
-  {
-    title: () => 'Custom LLMs',
-    url: '/admin/custom-llms',
-    icon: () => <Bot />,
+    title: () => 'Gateway',
+    url: '/admin/gateway',
+    icon: () => <Network />,
   },
 ];
 

@@ -12,9 +12,6 @@
  *                                                                        │ service binding
  *                                                                        ▼
  *                                                                    kilo-chat Worker
- *
- * No shared secret crosses the Fly→internet boundary. There's no more
- * KILOCHAT_API_TOKEN and the controller no longer sends x-kilo-sandbox-id.
  */
 
 import type { Context, Hono } from 'hono';
@@ -34,14 +31,9 @@ export type KiloChatRouteOptions = {
 const MAX_BODY_BYTES = 1 * 1024 * 1024;
 const MAX_SMALL_BODY_BYTES = 8 * 1024;
 
-function guardBodySize(c: Context, limit: number): Response | null {
-  const header = c.req.header('content-length');
-  if (!header) return null;
-  const n = Number(header);
-  if (!Number.isFinite(n) || n < 0) return null;
-  if (n > limit) return c.json({ error: 'Payload too large' }, 413);
-  return null;
-}
+// ──────────────────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────────────────
 
 function authorize(c: Context, options: KiloChatRouteOptions): Response | null {
   const token = getBearerToken(c.req.header('authorization'));
@@ -51,17 +43,73 @@ function authorize(c: Context, options: KiloChatRouteOptions): Response | null {
   return null;
 }
 
-/** Upstream URL for a given sandbox and suffix. */
 function upstreamUrl(options: KiloChatRouteOptions, suffix: string): string {
   return `${options.kiloclawBaseUrl}/api/kilo-chat/sandboxes/${encodeURIComponent(options.sandboxId)}${suffix}`;
 }
 
-/** Common outbound headers for all routes. */
 function outboundHeaders(options: KiloChatRouteOptions, contentType?: string): HeadersInit {
   return {
     'content-type': contentType ?? 'application/json',
     authorization: `Bearer ${options.expectedToken}`,
   };
+}
+
+/**
+ * Read the request body while enforcing a hard byte cap — streams the body
+ * with a running counter so a missing / lying `Content-Length` (chunked
+ * transfer, client omission) still can't push unbounded bytes into memory.
+ */
+async function readBodyWithLimit(
+  c: Context,
+  limit: number
+): Promise<{ ok: true; body: string } | { ok: false; response: Response }> {
+  // Early reject when the client is honest about an oversized body.
+  const header = c.req.header('content-length');
+  if (header) {
+    const n = Number(header);
+    if (Number.isFinite(n) && n > limit) {
+      return { ok: false, response: c.json({ error: 'Payload too large' }, 413) };
+    }
+  }
+
+  const stream = c.req.raw.body;
+  if (!stream) return { ok: true, body: '' };
+
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > limit) {
+          await reader.cancel().catch(() => {});
+          return { ok: false, response: c.json({ error: 'Payload too large' }, 413) };
+        }
+        chunks.push(value);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { ok: true, body: new TextDecoder().decode(merged) };
+}
+
+/**
+ * Pull a path parameter Hono has already matched. The route only fires when
+ * the param is present, so the `??` is a type-narrowing formality.
+ */
+function routeParam(c: Context, name: string): string {
+  return c.req.param(name) ?? '';
 }
 
 /** Pass through an upstream response verbatim (status + body + content-type). */
@@ -75,87 +123,110 @@ async function relay(upstream: Response): Promise<Response> {
   });
 }
 
-// ──────────────────────────────────────────────────────────────────────────
+/**
+ * Shared relay for routes that forward the plugin's body verbatim to the
+ * kiloclaw worker. The 5 body-forwarding routes (send / edit / delete /
+ * reaction add / reaction remove) are all this shape.
+ */
+async function relayBodyRoute(
+  c: Context,
+  options: KiloChatRouteOptions,
+  config: {
+    method: 'POST' | 'PATCH' | 'DELETE';
+    upstreamSuffix: (c: Context) => string;
+    bodyLimit: number;
+  }
+): Promise<Response> {
+  const unauthorized = authorize(c, options);
+  if (unauthorized) return unauthorized;
 
-const KILO_CHAT_SEND_PATH = '/_kilo/kilo-chat/send';
+  const read = await readBodyWithLimit(c, config.bodyLimit);
+  if (!read.ok) return read.response;
 
-export function registerKiloChatSendRoute(app: Hono, options: KiloChatRouteOptions): void {
   const fetchImpl = options.fetchImpl ?? fetch;
-  app.post(KILO_CHAT_SEND_PATH, async c => {
-    const unauthorized = authorize(c, options);
-    if (unauthorized) return unauthorized;
-    const oversized = guardBodySize(c, MAX_BODY_BYTES);
-    if (oversized) return oversized;
-
-    const rawBody = await c.req.text();
-    const upstream = await fetchImpl(upstreamUrl(options, '/messages'), {
-      method: 'POST',
-      headers: outboundHeaders(options, c.req.header('content-type')),
-      body: rawBody,
-    });
-    return relay(upstream);
+  const upstream = await fetchImpl(upstreamUrl(options, config.upstreamSuffix(c)), {
+    method: config.method,
+    headers: outboundHeaders(options, c.req.header('content-type')),
+    body: read.body || undefined,
   });
+  return relay(upstream);
 }
 
-const KILO_CHAT_EDIT_PATH = '/_kilo/kilo-chat/messages/:messageId';
+// ──────────────────────────────────────────────────────────────────────────
+// Route registrations
+// ──────────────────────────────────────────────────────────────────────────
+
+export function registerKiloChatSendRoute(app: Hono, options: KiloChatRouteOptions): void {
+  app.post('/_kilo/kilo-chat/send', c =>
+    relayBodyRoute(c, options, {
+      method: 'POST',
+      upstreamSuffix: () => '/messages',
+      bodyLimit: MAX_BODY_BYTES,
+    })
+  );
+}
 
 export function registerKiloChatEditRoute(app: Hono, options: KiloChatRouteOptions): void {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  app.patch(KILO_CHAT_EDIT_PATH, async c => {
-    const unauthorized = authorize(c, options);
-    if (unauthorized) return unauthorized;
-    const oversized = guardBodySize(c, MAX_BODY_BYTES);
-    if (oversized) return oversized;
-
-    const messageId = c.req.param('messageId');
-    const rawBody = await c.req.text();
-    const upstream = await fetchImpl(
-      upstreamUrl(options, `/messages/${encodeURIComponent(messageId)}`),
-      {
-        method: 'PATCH',
-        headers: outboundHeaders(options, c.req.header('content-type')),
-        body: rawBody,
-      }
-    );
-    return relay(upstream);
-  });
+  app.patch('/_kilo/kilo-chat/messages/:messageId', c =>
+    relayBodyRoute(c, options, {
+      method: 'PATCH',
+      upstreamSuffix: ctx => `/messages/${encodeURIComponent(routeParam(ctx, 'messageId'))}`,
+      bodyLimit: MAX_BODY_BYTES,
+    })
+  );
 }
 
 export function registerKiloChatDeleteRoute(app: Hono, options: KiloChatRouteOptions): void {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  app.delete(KILO_CHAT_EDIT_PATH, async c => {
-    const unauthorized = authorize(c, options);
-    if (unauthorized) return unauthorized;
-    const oversized = guardBodySize(c, MAX_SMALL_BODY_BYTES);
-    if (oversized) return oversized;
-
-    const messageId = c.req.param('messageId');
-    const rawBody = await c.req.text();
-    const upstream = await fetchImpl(
-      upstreamUrl(options, `/messages/${encodeURIComponent(messageId)}`),
-      {
-        method: 'DELETE',
-        headers: outboundHeaders(options, c.req.header('content-type')),
-        body: rawBody || undefined,
-      }
-    );
-    return relay(upstream);
-  });
+  app.delete('/_kilo/kilo-chat/messages/:messageId', c =>
+    relayBodyRoute(c, options, {
+      method: 'DELETE',
+      upstreamSuffix: ctx => `/messages/${encodeURIComponent(routeParam(ctx, 'messageId'))}`,
+      bodyLimit: MAX_SMALL_BODY_BYTES,
+    })
+  );
 }
 
-const KILO_CHAT_TYPING_PATH = '/_kilo/kilo-chat/typing';
+export function registerKiloChatReactionPostRoute(app: Hono, options: KiloChatRouteOptions): void {
+  app.post('/_kilo/kilo-chat/messages/:messageId/reactions', c =>
+    relayBodyRoute(c, options, {
+      method: 'POST',
+      upstreamSuffix: ctx =>
+        `/messages/${encodeURIComponent(routeParam(ctx, 'messageId'))}/reactions`,
+      bodyLimit: MAX_SMALL_BODY_BYTES,
+    })
+  );
+}
 
+export function registerKiloChatReactionDeleteRoute(
+  app: Hono,
+  options: KiloChatRouteOptions
+): void {
+  app.delete('/_kilo/kilo-chat/messages/:messageId/reactions', c =>
+    relayBodyRoute(c, options, {
+      method: 'DELETE',
+      upstreamSuffix: ctx =>
+        `/messages/${encodeURIComponent(routeParam(ctx, 'messageId'))}/reactions`,
+      bodyLimit: MAX_SMALL_BODY_BYTES,
+    })
+  );
+}
+
+/**
+ * Typing is the odd route: the controller parses the body to derive the
+ * upstream URL and forwards with no body of its own.
+ */
 export function registerKiloChatTypingRoute(app: Hono, options: KiloChatRouteOptions): void {
   const fetchImpl = options.fetchImpl ?? fetch;
-  app.post(KILO_CHAT_TYPING_PATH, async c => {
+  app.post('/_kilo/kilo-chat/typing', async c => {
     const unauthorized = authorize(c, options);
     if (unauthorized) return unauthorized;
-    const oversized = guardBodySize(c, MAX_SMALL_BODY_BYTES);
-    if (oversized) return oversized;
+
+    const read = await readBodyWithLimit(c, MAX_SMALL_BODY_BYTES);
+    if (!read.ok) return read.response;
 
     let body: { conversationId?: unknown };
     try {
-      body = (await c.req.json()) as { conversationId?: unknown };
+      body = JSON.parse(read.body) as { conversationId?: unknown };
     } catch {
       return c.json({ error: 'Invalid JSON' }, 400);
     }
@@ -167,55 +238,6 @@ export function registerKiloChatTypingRoute(app: Hono, options: KiloChatRouteOpt
     const upstream = await fetchImpl(
       upstreamUrl(options, `/conversations/${encodeURIComponent(conversationId)}/typing`),
       { method: 'POST', headers: outboundHeaders(options) }
-    );
-    return relay(upstream);
-  });
-}
-
-const KILO_CHAT_REACTIONS_PATH = '/_kilo/kilo-chat/messages/:messageId/reactions';
-
-export function registerKiloChatReactionPostRoute(app: Hono, options: KiloChatRouteOptions): void {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  app.post(KILO_CHAT_REACTIONS_PATH, async c => {
-    const unauthorized = authorize(c, options);
-    if (unauthorized) return unauthorized;
-    const oversized = guardBodySize(c, MAX_SMALL_BODY_BYTES);
-    if (oversized) return oversized;
-
-    const messageId = c.req.param('messageId');
-    const rawBody = await c.req.text();
-    const upstream = await fetchImpl(
-      upstreamUrl(options, `/messages/${encodeURIComponent(messageId)}/reactions`),
-      {
-        method: 'POST',
-        headers: outboundHeaders(options, c.req.header('content-type')),
-        body: rawBody,
-      }
-    );
-    return relay(upstream);
-  });
-}
-
-export function registerKiloChatReactionDeleteRoute(
-  app: Hono,
-  options: KiloChatRouteOptions
-): void {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  app.delete(KILO_CHAT_REACTIONS_PATH, async c => {
-    const unauthorized = authorize(c, options);
-    if (unauthorized) return unauthorized;
-    const oversized = guardBodySize(c, MAX_SMALL_BODY_BYTES);
-    if (oversized) return oversized;
-
-    const messageId = c.req.param('messageId');
-    const rawBody = await c.req.text();
-    const upstream = await fetchImpl(
-      upstreamUrl(options, `/messages/${encodeURIComponent(messageId)}/reactions`),
-      {
-        method: 'DELETE',
-        headers: outboundHeaders(options, c.req.header('content-type')),
-        body: rawBody || undefined,
-      }
     );
     return relay(upstream);
   });

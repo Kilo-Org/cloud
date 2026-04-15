@@ -639,10 +639,10 @@ function DestroyInstanceDialog({
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-sm font-medium">
+            <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
               <Label htmlFor="destroy-instance-confirmation">Type</Label>
-              <span className="bg-muted inline-flex items-center gap-1.5 rounded border border-border/50 py-0.5 pr-1 pl-2 select-text">
-                <code>{primaryConfirmation}</code>
+              <span className="bg-muted inline-flex min-w-0 max-w-full items-center gap-1.5 rounded border border-border/50 py-0.5 pr-1 pl-2 select-text">
+                <code className="break-all">{primaryConfirmation}</code>
                 <button
                   type="button"
                   className="text-muted-foreground hover:text-foreground inline-flex cursor-pointer items-center rounded p-0.5 transition-colors"

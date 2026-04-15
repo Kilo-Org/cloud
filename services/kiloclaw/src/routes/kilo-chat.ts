@@ -33,7 +33,9 @@ import { deriveGatewayToken } from '../auth/gateway-token';
 const sandboxIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'Invalid sandboxId');
 
 /** Extract and verify the per-sandbox gateway token, return the sandboxId. */
-async function authenticateSandbox(c: Context<AppEnv>): Promise<
+async function authenticateSandbox(
+  c: Context<AppEnv>
+): Promise<
   { ok: true; sandboxId: string } | { ok: false; status: 400 | 401 | 403 | 503; error: string }
 > {
   const sandboxParam = c.req.param('sandboxId');
@@ -42,9 +44,7 @@ async function authenticateSandbox(c: Context<AppEnv>): Promise<
   const sandboxId = parsed.data;
 
   const authHeader = c.req.header('authorization');
-  const bearer = authHeader?.toLowerCase().startsWith('bearer ')
-    ? authHeader.slice(7)
-    : undefined;
+  const bearer = authHeader?.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : undefined;
   if (!bearer) return { ok: false, status: 401, error: 'Unauthorized' };
 
   if (!c.env.GATEWAY_TOKEN_SECRET || !c.env.KILOCHAT) {
@@ -173,10 +173,7 @@ kiloChatProxy.patch('/sandboxes/:sandboxId/messages/:messageId', async c => {
     return c.json({ error: result.error }, 500);
   }
   if (result.conflict) {
-    return c.json(
-      { error: 'Conflict', messageId: result.messageId, version: result.version },
-      409
-    );
+    return c.json({ error: 'Conflict', messageId: result.messageId, version: result.version }, 409);
   }
   return c.json({ messageId: result.messageId, version: result.version });
 });

@@ -93,7 +93,9 @@ describe('/api/kilo-chat proxy — auth', () => {
 
   it('503 when GATEWAY_TOKEN_SECRET is missing', async () => {
     const bearer = await validBearer();
-    const env = { KILOCHAT: fakeKilochat() } as unknown as Parameters<typeof kiloChatProxy.fetch>[1];
+    const env = { KILOCHAT: fakeKilochat() } as unknown as Parameters<
+      typeof kiloChatProxy.fetch
+    >[1];
     const res = await kiloChatProxy.fetch(
       req('/sandboxes/sbx_test-1/messages', {
         method: 'POST',

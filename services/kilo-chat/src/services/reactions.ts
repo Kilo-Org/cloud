@@ -15,9 +15,7 @@ export async function addReactionFor(
   callerId: string,
   params: AddReactionParams
 ): Promise<AddReactionResult> {
-  const convStub = env.CONVERSATION_DO.get(
-    env.CONVERSATION_DO.idFromName(params.conversationId)
-  );
+  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId));
   if (!(await convStub.isMember(callerId))) {
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }
@@ -47,9 +45,7 @@ export async function removeReactionFor(
   callerId: string,
   params: RemoveReactionParams
 ): Promise<RemoveReactionResult> {
-  const convStub = env.CONVERSATION_DO.get(
-    env.CONVERSATION_DO.idFromName(params.conversationId)
-  );
+  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId));
   if (!(await convStub.isMember(callerId))) {
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }

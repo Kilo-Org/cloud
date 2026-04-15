@@ -1,9 +1,8 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { redisGet, redisSet } from '@/lib/redis';
+import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/constants';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-
-const REDIS_KEY = 'ai-gateway:vercel-routing-percentage';
 
 const StoredConfigSchema = z.object({
   vercel_routing_percentage: z.number().int().min(0).max(100).nullable(),
@@ -23,7 +22,7 @@ const DEFAULT_CONFIG: StoredConfig = {
 
 async function readConfig(): Promise<StoredConfig> {
   try {
-    const raw = await redisGet(REDIS_KEY);
+    const raw = await redisGet(VERCEL_ROUTING_REDIS_KEY);
     if (!raw) return DEFAULT_CONFIG;
     return StoredConfigSchema.parse(JSON.parse(raw));
   } catch {
@@ -49,7 +48,7 @@ export const adminGatewayConfigRouter = createTRPCRouter({
         updated_by: ctx.user.id,
         updated_by_email: ctx.user.google_user_email,
       };
-      const written = await redisSet(REDIS_KEY, JSON.stringify(config));
+      const written = await redisSet(VERCEL_ROUTING_REDIS_KEY, JSON.stringify(config));
       if (!written) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

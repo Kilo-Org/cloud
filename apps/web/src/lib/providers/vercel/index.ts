@@ -22,6 +22,7 @@ import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
+import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/constants';
 
 function getRandomNumberLessThan100(randomSeed: string) {
   return crypto.createHash('sha256').update(randomSeed).digest().readUInt32BE(0) % 100;
@@ -33,7 +34,7 @@ const RedisPercentageSchema = z.object({
 
 const getVercelRoutingPercentage = createCachedFetch(async () => {
   try {
-    const raw = await redisGet('ai-gateway:vercel-routing-percentage');
+    const raw = await redisGet(VERCEL_ROUTING_REDIS_KEY);
     if (raw) {
       const result = RedisPercentageSchema.safeParse(JSON.parse(raw));
       if (result.success) {

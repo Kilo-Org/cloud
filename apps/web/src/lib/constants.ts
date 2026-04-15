@@ -64,3 +64,5 @@ export const PROMOTION_MAX_REQUESTS = 10000;
 export const PROMOTION_WINDOW_HOURS = 24;
 
 export const EXA_MONTHLY_ALLOWANCE_MICRODOLLARS = 10_000_000;
+
+export const VERCEL_ROUTING_REDIS_KEY = 'ai-gateway:vercel-routing-percentage';

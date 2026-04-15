@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { stripAnsi } from '@/lib/stripAnsi';
 
 const PAGE_SIZE = 25;
 
@@ -63,12 +64,6 @@ function StatusBadge({ status }: { status: string }) {
     default:
       return <Badge variant="outline">{status}</Badge>;
   }
-}
-
-/** Strip ANSI escape codes for display in browser. */
-function stripAnsi(raw: string): string {
-  // eslint-disable-next-line no-control-regex
-  return raw.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
 }
 
 function formatDuration(start: string, end: string): string {

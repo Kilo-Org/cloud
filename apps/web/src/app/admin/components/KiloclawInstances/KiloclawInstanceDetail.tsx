@@ -63,6 +63,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
+import { stripAnsi } from '@/lib/stripAnsi';
+import { DetailField, formatAbsoluteTime, formatRelativeTime, parseTimestamp } from './shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { AdminFileEditor } from './AdminFileEditor';
@@ -75,27 +77,6 @@ import {
   type KiloclawAllEventRow,
 } from '@/app/admin/api/kiloclaw-analytics/hooks';
 import type { AnalyticsEngineResponse, ControllerTelemetryRow } from '@/lib/kiloclaw/disk-usage';
-
-function parseTimestamp(timestamp: string): Date {
-  const normalized = timestamp.includes('T') ? timestamp : timestamp.replace(' ', 'T');
-  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
-  const parsed = new Date(hasTimezone ? normalized : `${normalized}Z`);
-
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed;
-  }
-
-  return new Date(timestamp);
-}
-
-function formatRelativeTime(timestamp: string | null): string {
-  if (!timestamp) return '—';
-  return formatDistanceToNow(parseTimestamp(timestamp), { addSuffix: true });
-}
-
-function formatAbsoluteTime(timestamp: string): string {
-  return parseTimestamp(timestamp).toLocaleString();
-}
 
 function formatEpochTime(epoch: number | null): string {
   if (epoch === null) return '—';
@@ -166,15 +147,6 @@ function StatusBadge({ status }: { status: string | null }) {
     default:
       return <Badge variant="outline">Unknown</Badge>;
   }
-}
-
-function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-muted-foreground text-xs">{label}</div>
-      <div className="text-sm">{children}</div>
-    </div>
-  );
 }
 
 function CopySshCommandButton({
@@ -1181,12 +1153,6 @@ function InstanceEventsCard({
   );
 }
 
-/** Strip ANSI escape codes so raw terminal output can render in a browser &lt;pre&gt;. */
-function stripAnsi(raw: string): string {
-  // eslint-disable-next-line no-control-regex
-  return raw.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
-}
-
 export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -1206,6 +1172,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [restoreSnapshotId, setRestoreSnapshotId] = useState<string | null>(null);
   const [restoreReason, setRestoreReason] = useState('');
   const [cleanupRecoveryVolumeDialogOpen, setCleanupRecoveryVolumeDialogOpen] = useState(false);
+  const [inboundEmailCycleDialogOpen, setInboundEmailCycleDialogOpen] = useState(false);
   const [awaitingRestoreCompletion, setAwaitingRestoreCompletion] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -1678,6 +1645,35 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     })
   );
 
+  const cycleInboundEmailMutation = useMutation(
+    trpc.admin.kiloclawInstances.cycleInboundEmailAddress.mutationOptions({
+      onSuccess: result => {
+        toast.success(`New inbound email address: ${result.inboundEmailAddress}`);
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
+        });
+        setInboundEmailCycleDialogOpen(false);
+      },
+      onError: err => {
+        toast.error(`Failed to cycle inbound email address: ${err.message}`);
+      },
+    })
+  );
+
+  const setInboundEmailEnabledMutation = useMutation(
+    trpc.admin.kiloclawInstances.setInboundEmailEnabled.mutationOptions({
+      onSuccess: () => {
+        toast.success('Inbound email setting updated');
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Failed to update inbound email setting: ${err.message}`);
+      },
+    })
+  );
+
   if (isLoading) {
     return (
       <DetailPageWrapper subtitle={undefined}>
@@ -1867,6 +1863,114 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             </DetailField>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Inbound Email</CardTitle>
+                <CardDescription>Generated alias routing for this instance</CardDescription>
+              </div>
+              <Badge variant={data.inbound_email_enabled ? 'default' : 'secondary'}>
+                {data.inbound_email_enabled ? 'Enabled' : 'Disabled'}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              {data.inbound_email_address ? (
+                <code className="bg-muted text-foreground block truncate rounded px-2 py-1 text-xs">
+                  {data.inbound_email_address}
+                </code>
+              ) : (
+                <span className="text-muted-foreground text-sm">No active inbound email alias</span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!data.inbound_email_address}
+                onClick={() => {
+                  if (!data.inbound_email_address) return;
+                  void navigator.clipboard
+                    .writeText(data.inbound_email_address)
+                    .then(() => toast.success('Inbound email address copied'))
+                    .catch(() => toast.error('Failed to copy inbound email address'));
+                }}
+              >
+                <Copy className="mr-1 h-4 w-4" />
+                Copy
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!isActive || cycleInboundEmailMutation.isPending}
+                onClick={() => setInboundEmailCycleDialogOpen(true)}
+              >
+                {cycleInboundEmailMutation.isPending ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="mr-1 h-4 w-4" />
+                )}
+                Cycle Address
+              </Button>
+              <Button
+                size="sm"
+                variant={data.inbound_email_enabled ? 'destructive' : 'outline'}
+                disabled={!isActive || setInboundEmailEnabledMutation.isPending}
+                onClick={() =>
+                  setInboundEmailEnabledMutation.mutate({
+                    id: data.id,
+                    enabled: !data.inbound_email_enabled,
+                  })
+                }
+              >
+                {setInboundEmailEnabledMutation.isPending && (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                )}
+                {data.inbound_email_enabled ? 'Disable Inbound Email' : 'Enable Inbound Email'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Dialog
+          open={inboundEmailCycleDialogOpen}
+          onOpenChange={
+            cycleInboundEmailMutation.isPending ? () => {} : setInboundEmailCycleDialogOpen
+          }
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Cycle inbound email address?
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                This cannot be undone. The current address will stop working immediately and cannot
+                be reassigned later.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={cycleInboundEmailMutation.isPending}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                disabled={cycleInboundEmailMutation.isPending}
+                onClick={() => cycleInboundEmailMutation.mutate({ id: data.id })}
+              >
+                {cycleInboundEmailMutation.isPending && (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                )}
+                Cycle Address
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Registry Status */}
         {registryData?.registries.map(registry => (

@@ -1,5 +1,6 @@
 export type InboundEmailQueueMessage = {
   instanceId: string;
+  recipientAlias: string;
   messageId: string;
   from: string;
   to: string;

@@ -1,5 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('./recipient-db', () => ({ lookupInstanceIdByAlias: vi.fn() }));
+
 import { buildQueueMessage } from './index';
+import { lookupInstanceIdByAlias } from './recipient-db';
 import type { AppEnv } from './types';
 
 function rawStream(value: string): ReadableStream {
@@ -16,7 +20,7 @@ function makeEmail(overrides: Partial<ForwardableEmailMessage> = {}): Forwardabl
     'Message-ID: <msg-1@example.com>\r\nFrom: Ada <ada@example.com>\r\nSubject: Hello\r\n\r\nBody text';
   return {
     from: 'ada@example.com',
-    to: 'ki-11111111111141118111111111111111@kiloclaw.ai',
+    to: 'Amber-River-Quiet-Maple@kiloclaw.ai',
     headers: new Headers(),
     raw: rawStream(raw),
     rawSize: raw.length,
@@ -37,13 +41,25 @@ function makeEnv(overrides: Record<string, unknown> = {}): AppEnv {
 }
 
 describe('buildQueueMessage', () => {
-  it('builds queue messages from Cloudflare Email Routing messages', async () => {
+  beforeEach(() => {
+    vi.mocked(lookupInstanceIdByAlias).mockReset();
+    vi.mocked(lookupInstanceIdByAlias).mockResolvedValue('22222222-2222-4222-8222-222222222222');
+  });
+
+  it('builds queue messages for alias recipients', async () => {
+    vi.mocked(lookupInstanceIdByAlias).mockResolvedValue('22222222-2222-4222-8222-222222222222');
+
     const queueMessage = await buildQueueMessage(makeEmail(), makeEnv());
 
-    expect(queueMessage?.instanceId).toBe('11111111-1111-4111-8111-111111111111');
+    expect(lookupInstanceIdByAlias).toHaveBeenCalledWith(
+      expect.any(Object),
+      'amber-river-quiet-maple'
+    );
+    expect(queueMessage?.instanceId).toBe('22222222-2222-4222-8222-222222222222');
+    expect(queueMessage?.recipientAlias).toBe('amber-river-quiet-maple');
     expect(queueMessage?.messageId).toBe('<msg-1@example.com>');
     expect(queueMessage?.from).toBe('ada@example.com');
-    expect(queueMessage?.to).toBe('ki-11111111111141118111111111111111@kiloclaw.ai');
+    expect(queueMessage?.to).toBe('Amber-River-Quiet-Maple@kiloclaw.ai');
     expect(queueMessage?.subject).toBe('Hello');
     expect(queueMessage?.text).toBe('Body text');
     expect(typeof queueMessage?.receivedAt).toBe('string');
@@ -64,12 +80,14 @@ describe('buildQueueMessage', () => {
   });
 
   it('rejects invalid recipient addresses', async () => {
+    vi.mocked(lookupInstanceIdByAlias).mockResolvedValue(null);
     const setReject = vi.fn();
     const email = makeEmail({ to: 'hello@kiloclaw.ai', setReject });
 
     const queueMessage = await buildQueueMessage(email, makeEnv());
 
     expect(queueMessage).toBeNull();
+    expect(lookupInstanceIdByAlias).toHaveBeenCalledWith(expect.any(Object), 'hello');
     expect(setReject).toHaveBeenCalledWith('Address unavailable');
   });
 

@@ -56,6 +56,19 @@ async function fetchSnapshot(at: string | null): Promise<HealthSnapshot> {
   return res.json();
 }
 
+function formatChange(pct: number): string {
+  if (pct === 0) return '0%';
+  const sign = pct > 0 ? '+' : '';
+  return `${sign}${pct}%`;
+}
+
+function changeColor(pct: number): string {
+  if (pct === 0) return 'text-muted-foreground';
+  if (pct > 0) return 'text-green-600';
+  if (pct > -30) return 'text-yellow-600';
+  return 'text-red-600';
+}
+
 function StatusDot({
   metrics,
   timestamp,
@@ -68,8 +81,9 @@ function StatusDot({
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex justify-center">
+            <div className="flex flex-col items-center gap-0.5">
               <div className="size-3 rounded-full border border-dashed border-gray-400" />
+              <span className="text-muted-foreground text-[10px] leading-none">—</span>
             </div>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
@@ -92,8 +106,16 @@ function StatusDot({
     <TooltipProvider delayDuration={100}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center gap-0.5">
             <div className={cn('size-3 rounded-full', color)} />
+            <span
+              className={cn(
+                'text-[10px] leading-none',
+                noTraffic ? 'text-muted-foreground' : changeColor(metrics.percentChange)
+              )}
+            >
+              {noTraffic ? '—' : formatChange(metrics.percentChange)}
+            </span>
           </div>
         </TooltipTrigger>
         <TooltipContent side="top" className="text-xs">
@@ -201,7 +223,7 @@ export function ModelStatusContent() {
                   Model
                 </TableHead>
                 {snapshotsReversed.map(ts => (
-                  <TableHead key={ts} className="text-center min-w-[50px] px-1">
+                  <TableHead key={ts} className="text-center min-w-[55px] px-1">
                     <span className="text-xs">{format(new Date(ts), 'HH:mm')}</span>
                   </TableHead>
                 ))}

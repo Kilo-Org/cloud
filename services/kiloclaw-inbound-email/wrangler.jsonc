@@ -8,6 +8,13 @@
   "dev": { "port": 8810 },
   "observability": { "enabled": true },
   "placement": { "mode": "smart" },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
   "vars": {
     "INBOUND_EMAIL_DOMAIN": "kiloclaw.ai",
     "MAX_EMAIL_RAW_BYTES": "1048576",

@@ -451,9 +451,6 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     // gateway's lazy initialization, adding ~30-100s to the user's first
     // request. Once the gateway is warm and CPU has settled, the upgrade
     // runs safely in the background.
-    //
-    // TODO: Replace this timeout with a warm-up callback that fires after
-    // the gateway is confirmed ready (see gateway-warmup.ts).
     if (env.KILOCLAW_KILO_CLI === 'true') {
       const KILO_CLI_UPGRADE_DELAY_MS = 5 * 60 * 1000; // 5 minutes
       setTimeout(() => {

@@ -666,6 +666,86 @@ function DestroyInstanceDialog({
   );
 }
 
+function InboundEmailCard({
+  address,
+  enabled,
+  isCycling,
+  onCycle,
+}: {
+  address: string | null;
+  enabled: boolean;
+  isCycling: boolean;
+  onCycle: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [confirmCycle, setConfirmCycle] = useState(false);
+
+  function handleCopy() {
+    if (!address) return;
+    void navigator.clipboard
+      .writeText(address)
+      .then(() => toast.success('Inbound email address copied'))
+      .catch(() => toast.error('Failed to copy inbound email address'));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="rounded-lg border px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <Hash className="text-muted-foreground h-5 w-5 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Inbound Email</p>
+            <p className="text-muted-foreground text-xs">
+              {enabled
+                ? 'Send email to this address to message your agent.'
+                : 'Inbound email is disabled for this instance.'}
+            </p>
+          </div>
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          {address && enabled ? (
+            <code className="bg-muted text-foreground min-w-0 truncate rounded px-2 py-1 text-xs">
+              {address}
+            </code>
+          ) : (
+            <span className="text-muted-foreground text-xs">Unavailable</span>
+          )}
+          <Button variant="outline" size="sm" onClick={handleCopy} disabled={!address || !enabled}>
+            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+            Copy
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setConfirmCycle(true)}
+            disabled={!enabled || isCycling}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Cycle
+          </Button>
+        </div>
+      </div>
+      <ConfirmActionDialog
+        open={confirmCycle}
+        onOpenChange={setConfirmCycle}
+        title="Cycle inbound email address?"
+        description="This cannot be undone. The current address will stop working immediately and cannot be reassigned later."
+        confirmLabel="Cycle Address"
+        confirmIcon={<RotateCcw className="h-4 w-4" />}
+        isPending={isCycling}
+        pendingLabel="Cycling"
+        onConfirm={() => {
+          onCycle();
+          setConfirmCycle(false);
+        }}
+        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+      />
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // SettingsTab
 // ---------------------------------------------------------------------------
@@ -706,7 +786,6 @@ export function SettingsTab({
     variantsMatch,
     trackedVersion,
     runningVersion,
-    latestAvailableVersion,
     latestVersion,
     controllerVersion,
     isLoadingControllerVersion,
@@ -776,6 +855,13 @@ export function SettingsTab({
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
 
+  function handleCycleInboundEmailAddress() {
+    mutations.cycleInboundEmailAddress.mutate(undefined, {
+      onSuccess: data => toast.success(`New inbound email address: ${data.inboundEmailAddress}`),
+      onError: err => toast.error(`Failed to cycle inbound email address: ${err.message}`),
+    });
+  }
+
   function handleSave() {
     if (hasModelSelectionError) {
       toast.error(modelSelectionError);
@@ -825,6 +911,15 @@ export function SettingsTab({
         />
       </div>
 
+      {status.status !== null && (
+        <InboundEmailCard
+          address={status.inboundEmailAddress}
+          enabled={status.inboundEmailEnabled}
+          isCycling={mutations.cycleInboundEmailAddress.isPending}
+          onCycle={handleCycleInboundEmailAddress}
+        />
+      )}
+
       {/* ── Pairing Requests ── */}
       {isRunning && <PairingSection mutations={mutations} />}
 
@@ -870,8 +965,8 @@ export function SettingsTab({
                       <TooltipContent>
                         <p>
                           {catalogNewerThanImage
-                            ? `A newer OpenClaw version (${latestAvailableVersion}) is available — click to upgrade`
-                            : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available — click to upgrade`}
+                            ? 'A new version of KiloClaw is available. This update includes a new OpenClaw version. Click to upgrade.'
+                            : 'A new version of KiloClaw is available — click to upgrade.'}
                         </p>
                       </TooltipContent>
                     </Tooltip>

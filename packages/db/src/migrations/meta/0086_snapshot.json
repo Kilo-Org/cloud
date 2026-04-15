@@ -1,5 +1,5 @@
 {
-  "id": "ba39004e-8729-4715-b706-6632e14e37b4",
+  "id": "e23a0099-7b0d-4dd8-b10f-aed7da2859ff",
   "prevId": "6e806f7d-2a53-44e6-8605-c901cdc6cb2a",
   "version": "7",
   "dialect": "postgresql",
@@ -8810,6 +8810,61 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.kiloclaw_inbound_email_aliases": {
+      "name": "kiloclaw_inbound_email_aliases",
+      "schema": "",
+      "columns": {
+        "alias": {
+          "name": "alias",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "IDX_kiloclaw_inbound_email_aliases_instance_id": {
+          "name": "IDX_kiloclaw_inbound_email_aliases_instance_id",
+          "columns": [
+            {
+              "expression": "instance_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "kiloclaw_inbound_email_aliases_instance_id_kiloclaw_instances_id_fk": {
+          "name": "kiloclaw_inbound_email_aliases_instance_id_kiloclaw_instances_id_fk",
+          "tableFrom": "kiloclaw_inbound_email_aliases",
+          "tableTo": "kiloclaw_instances",
+          "columnsFrom": [
+            "instance_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.kiloclaw_instances": {
       "name": "kiloclaw_instances",
       "schema": "",
@@ -8832,13 +8887,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'fly'"
         },
         "organization_id": {
           "name": "organization_id",
@@ -8921,79 +8969,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "kiloclaw_instances_provider_check": {
-          "name": "kiloclaw_instances_provider_check",
-          "value": "\"kiloclaw_instances\".\"provider\" IN ('fly', 'docker-local', 'northflank')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.kiloclaw_providers": {
-      "name": "kiloclaw_providers",
-      "schema": "",
-      "columns": {
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "personal_traffic_percent": {
-          "name": "personal_traffic_percent",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "organization_traffic_percent": {
-          "name": "organization_traffic_percent",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "kiloclaw_providers_provider_check": {
-          "name": "kiloclaw_providers_provider_check",
-          "value": "\"kiloclaw_providers\".\"provider\" IN ('fly', 'docker-local', 'northflank')"
-        },
-        "kiloclaw_providers_personal_traffic_percent_check": {
-          "name": "kiloclaw_providers_personal_traffic_percent_check",
-          "value": "\"kiloclaw_providers\".\"personal_traffic_percent\" >= 0 AND \"kiloclaw_providers\".\"personal_traffic_percent\" <= 100"
-        },
-        "kiloclaw_providers_organization_traffic_percent_check": {
-          "name": "kiloclaw_providers_organization_traffic_percent_check",
-          "value": "\"kiloclaw_providers\".\"organization_traffic_percent\" >= 0 AND \"kiloclaw_providers\".\"organization_traffic_percent\" <= 100"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.kiloclaw_subscriptions": {

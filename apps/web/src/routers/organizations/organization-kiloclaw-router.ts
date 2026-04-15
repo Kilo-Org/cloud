@@ -17,6 +17,7 @@ import {
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
+import { sentryLogger } from '@/lib/utils.server';
 import { db } from '@/lib/drizzle';
 import {
   kiloclaw_version_pins,
@@ -29,6 +30,11 @@ import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kilo
 import { getKiloClawProviderRolloutConfig } from '@/lib/kiloclaw/provider-rollout-config';
 import { selectOrgKiloClawProvider } from '@/lib/kiloclaw/provider-selection';
 import { KiloClawProvider } from '@kilocode/db/schema-types';
+import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
+import {
+  cycleInboundEmailAddressForInstance,
+  getInboundEmailAddressForInstance,
+} from '@/lib/kiloclaw/inbound-email-alias';
 import {
   ensureActiveInstance,
   getActiveOrgInstance,
@@ -213,6 +219,8 @@ function sanitizeKiloCodeConfigResponse(
   };
 }
 
+const logDiskUsageError = sentryLogger('organization-kiloclaw-disk-usage', 'error');
+
 // ── Router ─────────────────────────────────────────────────────────
 
 export const organizationKiloclawRouter = createTRPCRouter({
@@ -291,18 +299,43 @@ export const organizationKiloclawRouter = createTRPCRouter({
         workerUrl,
         name: null,
         instanceId: null,
+        inboundEmailAddress: null,
+        inboundEmailEnabled: false,
       } satisfies KiloClawDashboardStatus;
     }
 
     const client = new KiloClawInternalClient();
-    const status = await client.getStatus(ctx.user.id, workerInstanceId(instance));
+    const [status, inboundEmailAddress] = await Promise.all([
+      client.getStatus(ctx.user.id, workerInstanceId(instance)),
+      getInboundEmailAddressForInstance(instance.id),
+    ]);
 
     return {
       ...status,
       name: instance.name ?? null,
       workerUrl,
       instanceId: instance.id,
+      inboundEmailAddress,
+      inboundEmailEnabled: instance.inboundEmailEnabled,
     } satisfies KiloClawDashboardStatus;
+  }),
+
+  getDiskUsage: organizationMemberProcedure.query(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+    try {
+      return await queryDiskUsage(instance.sandboxId);
+    } catch (error) {
+      logDiskUsageError('Failed to fetch organization disk usage', {
+        error,
+        organizationId: input.organizationId,
+        sandboxId: instance.sandboxId,
+      });
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch disk usage',
+        cause: error,
+      });
+    }
   }),
 
   renameInstance: organizationMemberMutationProcedure
@@ -317,6 +350,13 @@ export const organizationKiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code, message });
       }
     }),
+
+  cycleInboundEmailAddress: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+    return {
+      inboundEmailAddress: await cycleInboundEmailAddressForInstance(instance.id),
+    };
+  }),
 
   // ── Lifecycle ─────────────────────────────────────────────────
 

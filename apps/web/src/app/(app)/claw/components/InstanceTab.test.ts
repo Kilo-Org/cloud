@@ -6,7 +6,7 @@ import {
   getVolumeUsagePercent,
   getVolumeBarColor,
 } from '@/lib/kiloclaw/instance-display';
-import { diskUsageQueryKey, hasVolumeUsageData } from './InstanceTab';
+import { hasVolumeUsageData } from './InstanceTab';
 
 describe('formatUptime', () => {
   test.each([
@@ -72,20 +72,6 @@ describe('getVolumeBarColor', () => {
     [90, 'bg-red-500'],
   ] as const)('percent=%s → %s', (percent, expected) => {
     expect(getVolumeBarColor(percent)).toBe(expected);
-  });
-});
-
-describe('diskUsageQueryKey', () => {
-  test('scopes by organization ID', () => {
-    expect(diskUsageQueryKey('org-123')).toEqual(['kiloclaw', 'disk-usage', 'org-123']);
-  });
-
-  test('uses "personal" when no organization', () => {
-    expect(diskUsageQueryKey(undefined)).toEqual(['kiloclaw', 'disk-usage', 'personal']);
-  });
-
-  test('different orgs produce different keys', () => {
-    expect(diskUsageQueryKey('org-a')).not.toEqual(diskUsageQueryKey('org-b'));
   });
 });
 

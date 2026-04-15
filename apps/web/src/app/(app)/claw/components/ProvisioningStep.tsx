@@ -247,9 +247,7 @@ export function ProvisioningErrorView({ totalSteps = 5 }: { totalSteps?: number 
 
 /** Pure visual shell — extracted so Storybook can render it without wiring up mutations. */
 export function ProvisioningStepView({ totalSteps = 5 }: { totalSteps?: number }) {
-  const [phraseIndex, setPhraseIndex] = useState(() =>
-    Math.floor(Math.random() * PROVISIONING_PHRASES.length)
-  );
+  const [phraseIndex, setPhraseIndex] = useState(0);
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {

@@ -1,0 +1,2 @@
+ALTER TABLE "kiloclaw_cli_runs" ADD COLUMN "initiated_by_admin_id" text;--> statement-breakpoint
+ALTER TABLE "kiloclaw_cli_runs" ADD CONSTRAINT "kiloclaw_cli_runs_initiated_by_admin_id_kilocode_users_id_fk" FOREIGN KEY ("initiated_by_admin_id") REFERENCES "public"."kilocode_users"("id") ON DELETE set null ON UPDATE no action;

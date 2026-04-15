@@ -4,6 +4,32 @@ vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
 }));
 
+const { mockTimeoutWarn, mockTimeoutWithFields, mockTimeoutWithTags } = vi.hoisted(() => {
+  const warn = vi.fn();
+  const loggerChain = { warn, info: vi.fn(), error: vi.fn(), debug: vi.fn() };
+  const withFields = vi.fn(() => loggerChain);
+  const withTags = vi.fn(() => ({ ...loggerChain, withFields }));
+  return {
+    mockTimeoutWarn: warn,
+    mockTimeoutWithFields: withFields,
+    mockTimeoutWithTags: withTags,
+  };
+});
+
+vi.mock('./logger.js', () => ({
+  logger: {
+    setTags: vi.fn(),
+    withTags: mockTimeoutWithTags,
+    withFields: vi.fn(() => ({ warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() })),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+  WithLogTags: () => (_target: unknown, _propertyKey: string, descriptor: PropertyDescriptor) =>
+    descriptor,
+}));
+
 vi.mock('./workspace.js', () => {
   const setupWorkspace = vi.fn();
   const cloneGitHubRepo = vi.fn();
@@ -28,6 +54,8 @@ vi.mock('./workspace.js', () => {
     getKilocodeCliDir: (sessionHome: string) => `${sessionHome}/.kilocode/cli`,
     getKilocodeTasksDir: (sessionHome: string) => `${sessionHome}/.kilocode/cli/global/tasks`,
     getKilocodeLogsDir: (sessionHome: string) => `${sessionHome}/.kilocode/cli/logs`,
+    FAST_SANDBOX_COMMAND_TIMEOUT_MS: 30000,
+    GIT_COMMAND_TIMEOUT_MS: 120000,
   };
 });
 
@@ -45,6 +73,9 @@ import type { PersistenceEnv, CloudAgentSessionState } from './persistence/types
 describe('SessionService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTimeoutWarn.mockClear();
+    mockTimeoutWithFields.mockClear();
+    mockTimeoutWithTags.mockClear();
     (mockEnv.SESSION_INGEST as unknown as { fetch: ReturnType<typeof vi.fn> }).fetch = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ info: {}, messages: [] })));
@@ -169,7 +200,8 @@ describe('SessionService', () => {
       expect(mockManageBranch).not.toHaveBeenCalled();
       // Instead, session.exec should be called with git checkout -b
       expect(fakeSession.exec).toHaveBeenCalledWith(
-        expect.stringContaining(`git checkout -b 'session/${sessionId}'`)
+        expect.stringContaining(`git checkout -b 'session/${sessionId}'`),
+        expect.any(Object)
       );
       expect(result.context.sessionId).toBe(sessionId);
     });
@@ -393,6 +425,46 @@ describe('SessionService', () => {
       // Verify context includes repo info
       expect(result.context.githubRepo).toBe('facebook/react');
       expect(result.context.githubToken).toBe('test-token');
+    });
+
+    it('logs timeout during resume repo existence check', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockRejectedValueOnce(new Error('Command timeout after 30000ms')),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandbox = {
+        createSession: vi.fn().mockResolvedValue(fakeSession),
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+
+      const service = new SessionService();
+      await expect(
+        service.resume({
+          sandbox,
+          sandboxId: `${orgId}__${userId}`,
+          orgId,
+          userId,
+          sessionId,
+          kilocodeToken: 'test-token',
+          kilocodeModel: 'test-model',
+          env: mockEnv,
+        })
+      ).rejects.toThrow('Command timeout after 30000ms');
+
+      expect(mockTimeoutWithTags).toHaveBeenCalledWith({ logTag: 'sandbox-operation-timeout' });
+      expect(mockTimeoutWithFields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'session.resume.repoExists',
+          timeoutMs: 30000,
+          timeoutLayer: 'exec',
+          error: 'Command timeout after 30000ms',
+        })
+      );
+      expect(mockTimeoutWarn).toHaveBeenCalledWith('Sandbox operation timed out');
     });
 
     it('should use fresh githubToken from request instead of stale metadata token during reclone', async () => {
@@ -1886,7 +1958,10 @@ describe('SessionService', () => {
 
       // exec should only be called once for git checkout -b, not for setup commands
       expect(fakeSession.exec).toHaveBeenCalledTimes(1);
-      expect(fakeSession.exec).toHaveBeenCalledWith(expect.stringContaining('git checkout -b'));
+      expect(fakeSession.exec).toHaveBeenCalledWith(
+        expect.stringContaining('git checkout -b'),
+        expect.any(Object)
+      );
     });
   });
 
@@ -3502,7 +3577,8 @@ describe('SessionService', () => {
 
       // git checkout -b SHOULD be called to create session branch
       expect(fakeSession.exec).toHaveBeenCalledWith(
-        expect.stringContaining(`git checkout -b 'session/${sessionId}'`)
+        expect.stringContaining(`git checkout -b 'session/${sessionId}'`),
+        expect.any(Object)
       );
     });
 

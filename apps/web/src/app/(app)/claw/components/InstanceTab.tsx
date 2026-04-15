@@ -1,8 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { Activity, Clock, HardDrive, Loader2, RotateCcw, TimerReset } from 'lucide-react';
-import type { AnalyticsEngineResponse, ControllerTelemetryRow } from '@/lib/kiloclaw/disk-usage';
 import type { KiloClawDashboardStatus, GatewayProcessStatusResponse } from '@/lib/kiloclaw/types';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -12,7 +10,7 @@ import {
   getVolumeUsagePercent,
 } from '@/lib/kiloclaw/instance-display';
 import { formatTs } from './time';
-import { useClawContext } from './ClawContext';
+import { useClawDiskUsage } from '../hooks/useClawHooks';
 
 const GATEWAY_STATE_STYLES: Record<
   GatewayProcessStatusResponse['state'],
@@ -52,27 +50,8 @@ function formatLastExit(lastExit: NonNullable<GatewayProcessStatusResponse['last
   return `exit ${code} / ${signal} at ${timeStr}`;
 }
 
-export function diskUsageQueryKey(organizationId: string | undefined) {
-  return ['kiloclaw', 'disk-usage', organizationId ?? 'personal'] as const;
-}
-
 export function hasVolumeUsageData(diskUsed: number | null, diskTotal: number | null) {
   return diskUsed !== null && diskTotal !== null;
-}
-
-function useDiskUsage(enabled: boolean, organizationId: string | undefined) {
-  return useQuery<AnalyticsEngineResponse<ControllerTelemetryRow>>({
-    queryKey: diskUsageQueryKey(organizationId),
-    queryFn: async () => {
-      const response = await fetch('/api/kiloclaw/disk-usage');
-      if (!response.ok) {
-        throw new Error('Failed to fetch disk usage');
-      }
-      return response.json() as Promise<AnalyticsEngineResponse<ControllerTelemetryRow>>;
-    },
-    enabled,
-    refetchInterval: 60_000,
-  });
 }
 
 export function InstanceTab({
@@ -86,9 +65,8 @@ export function InstanceTab({
   gatewayLoading: boolean;
   gatewayError: { message: string; data?: { code?: string } | null } | null;
 }) {
-  const { organizationId } = useClawContext();
   const isRunning = status.status === 'running';
-  const diskUsage = useDiskUsage(isRunning, organizationId);
+  const diskUsage = useClawDiskUsage(isRunning);
   const diskUsageRow = diskUsage.data?.data?.[0];
   const diskUsed =
     diskUsageRow && diskUsageRow.disk_used_bytes > 0 ? diskUsageRow.disk_used_bytes : null;

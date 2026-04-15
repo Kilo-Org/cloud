@@ -26,7 +26,7 @@ The Kilo CLI (`kilo`) is an agentic coding assistant for the terminal, pre-confi
 
 - Interactive mode: `kilo`
 - Autonomous mode: `kilo run --auto "your task description"`
-- Config: `/root/.config/kilo/opencode.json` (customizable, persists across restarts)
+- Config: `/root/.config/kilo/kilo.json` (customizable, persists across restarts)
 - Shares your KiloCode API key and model access with OpenClaw
 
 **When the user is doing software development, engineering, or programming tasks:**

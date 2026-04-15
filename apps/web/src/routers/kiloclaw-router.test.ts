@@ -11,7 +11,11 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { kiloclawRouter } from '@/routers/kiloclaw-router';
 import type { User } from '@kilocode/db/schema';
-import { kiloclaw_instances } from '@kilocode/db/schema';
+import {
+  kiloclaw_inbound_email_aliases,
+  kiloclaw_inbound_email_reserved_aliases,
+  kiloclaw_instances,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +34,7 @@ type KiloClawRouterOutputs = inferRouterOutputs<typeof kiloclawRouter>;
 type KiloClawCaller = {
   provision(input: KiloClawRouterInputs['provision']): Promise<KiloClawRouterOutputs['provision']>;
   getStatus(): Promise<KiloClawRouterOutputs['getStatus']>;
+  cycleInboundEmailAddress(): Promise<KiloClawRouterOutputs['cycleInboundEmailAddress']>;
 };
 
 jest.mock('@/lib/stripe-client', () => {
@@ -212,7 +217,6 @@ describe('kiloclawRouter getStatus', () => {
       openclawVersion: null,
       imageVariant: null,
       trackedImageTag: null,
-      trackedImageDigest: null,
       googleConnected: false,
       gmailNotificationsEnabled: false,
       execSecurity: null,
@@ -224,6 +228,35 @@ describe('kiloclawRouter getStatus', () => {
       workerUrl: 'https://claw.kilo.ai',
       name: null,
       instanceId: null,
+      inboundEmailAddress: null,
+      inboundEmailEnabled: false,
     });
+  });
+
+  it('cycles the active inbound email address', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-cycle-test-${Math.random()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    const alias = `cycle-test-${instanceId.slice(0, 8)}`;
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+    await db.insert(kiloclaw_inbound_email_reserved_aliases).values({ alias });
+    await db.insert(kiloclaw_inbound_email_aliases).values({ alias, instance_id: instanceId });
+    const caller = createCaller({ user });
+
+    const result = await caller.cycleInboundEmailAddress();
+
+    expect(result.inboundEmailAddress).toMatch(/@kiloclaw\.ai$/);
+    expect(result.inboundEmailAddress).not.toBe(`${alias}@kiloclaw.ai`);
+    const rows = await db
+      .select()
+      .from(kiloclaw_inbound_email_aliases)
+      .where(eq(kiloclaw_inbound_email_aliases.instance_id, instanceId));
+    expect(rows.find(row => row.alias === alias)?.retired_at).not.toBeNull();
+    expect(rows.filter(row => row.retired_at === null)).toHaveLength(1);
   });
 });

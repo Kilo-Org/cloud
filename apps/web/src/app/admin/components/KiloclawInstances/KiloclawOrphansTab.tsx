@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, formatDistanceToNow, subDays } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import Link from 'next/link';
 import { AlertTriangle, Loader2, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { formatRelativeTime } from './shared';
 
 type OrphanRow = {
   id: string;
@@ -57,10 +58,6 @@ function toDatetimeLocalInput(date: Date): string {
 
 function toIsoFromDatetimeLocal(value: string): string {
   return new Date(value).toISOString();
-}
-
-function formatRelativeTime(timestamp: string): string {
-  return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
 }
 
 function TroubleshootingEventsDialog({

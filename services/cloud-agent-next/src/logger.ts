@@ -25,6 +25,9 @@ export type CloudAgentTags = {
 
   // Source tracking (auto-added by decorators)
   source?: string;
+
+  // Stable searchable log tag for cross-cutting events
+  logTag?: string;
 };
 
 /**

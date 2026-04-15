@@ -1421,7 +1421,7 @@ platform.post('/kilo-cli-run/start', async c => {
         'controller_route_unavailable'
       );
     }
-    if ('conflict' in response) {
+    if (isRecord(response) && typeof response.conflict === 'string') {
       return jsonError(response.conflict, 409);
     }
     return c.json(response, 200);
@@ -1470,7 +1470,7 @@ platform.post('/kilo-cli-run/cancel', async c => {
       stub => stub.cancelKiloCliRun().then(r => r),
       'cancelKiloCliRun'
     );
-    if ('conflict' in response) {
+    if (isRecord(response) && typeof response.conflict === 'string') {
       return jsonError(response.conflict, 409);
     }
     return c.json(response, 200);

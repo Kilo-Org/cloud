@@ -24,7 +24,11 @@ import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId, userIdFromSandboxId } from './auth/sandbox-id';
 import { InstanceIdParam } from './schemas/instance-config';
-import { isValidInstanceId } from '@kilocode/worker-utils/instance-id';
+import {
+  isInstanceKeyedSandboxId,
+  instanceIdFromSandboxId,
+  isValidInstanceId,
+} from '@kilocode/worker-utils/instance-id';
 import { registerVersionIfNeeded } from './lib/image-version';
 import { resolveDoKeyForUser } from './lib/instance-routing';
 import { startingUpPage } from './pages/starting-up';
@@ -1126,6 +1130,12 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
    * RPC method called by kilo-chat service via service binding.
    * Routes the webhook payload to the correct kiloclaw Fly machine
    * based on the targetBotId (bot:kiloclaw:{sandboxId}).
+   *
+   * Two sandboxId formats are supported:
+   *   - Instance-keyed (`ki_{uuid-no-hyphens}`, 35 chars): the DO key is the
+   *     instanceId, which we recover directly with instanceIdFromSandboxId.
+   *   - Legacy (base64url-encoded userId): resolve via the registry, then fall
+   *     back to Postgres, then to the userId itself as the doKey.
    */
   async deliverChatWebhook(payload: ChatWebhookPayload): Promise<void> {
     const botPrefix = 'bot:kiloclaw:';
@@ -1133,42 +1143,52 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
       throw new Error(`Invalid targetBotId: ${payload.targetBotId}`);
     }
     const sandboxId = payload.targetBotId.slice(botPrefix.length);
-    const userId = userIdFromSandboxId(sandboxId);
 
-    // Resolve instance via registry (same logic as resolveRegistryEntry)
     let stub: ReturnType<KiloClawEnv['KILOCLAW_INSTANCE']['get']>;
-    try {
-      const registryKey = `user:${userId}`;
-      const registryStub = this.env.KILOCLAW_REGISTRY.get(
-        this.env.KILOCLAW_REGISTRY.idFromName(registryKey)
-      );
-      const entries = await registryStub.listInstances(registryKey);
-      if (entries.length === 0) {
-        throw new Error(`No instance found for user ${userId}`);
+    let resolvedIdForErrors: string;
+
+    if (isInstanceKeyedSandboxId(sandboxId)) {
+      // Instance-keyed: doKey = instanceId. No user lookup needed.
+      const instanceId = instanceIdFromSandboxId(sandboxId);
+      resolvedIdForErrors = `instance ${instanceId}`;
+      stub = this.env.KILOCLAW_INSTANCE.get(this.env.KILOCLAW_INSTANCE.idFromName(instanceId));
+    } else {
+      // Legacy: sandboxId = base64url(userId). Resolve via registry.
+      const userId = userIdFromSandboxId(sandboxId);
+      resolvedIdForErrors = `user ${userId}`;
+      try {
+        const registryKey = `user:${userId}`;
+        const registryStub = this.env.KILOCLAW_REGISTRY.get(
+          this.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+        );
+        const entries = await registryStub.listInstances(registryKey);
+        if (entries.length === 0) {
+          throw new Error(`No instance found for user ${userId}`);
+        }
+        stub = this.env.KILOCLAW_INSTANCE.get(
+          this.env.KILOCLAW_INSTANCE.idFromName(entries[0].doKey)
+        );
+      } catch (err) {
+        console.error('[WEBHOOK] Registry lookup failed, falling back to userId:', err);
+        const fallbackDoKey =
+          (await resolveDoKeyForUser(this.env.HYPERDRIVE?.connectionString, userId).catch(
+            fallbackErr => {
+              console.error('[WEBHOOK] Postgres fallback failed, using userId:', fallbackErr);
+              return null;
+            }
+          )) ?? userId;
+        stub = this.env.KILOCLAW_INSTANCE.get(this.env.KILOCLAW_INSTANCE.idFromName(fallbackDoKey));
       }
-      stub = this.env.KILOCLAW_INSTANCE.get(
-        this.env.KILOCLAW_INSTANCE.idFromName(entries[0].doKey)
-      );
-    } catch (err) {
-      console.error('[WEBHOOK] Registry lookup failed, falling back to userId:', err);
-      const fallbackDoKey =
-        (await resolveDoKeyForUser(this.env.HYPERDRIVE?.connectionString, userId).catch(
-          fallbackErr => {
-            console.error('[WEBHOOK] Postgres fallback failed, using userId:', fallbackErr);
-            return null;
-          }
-        )) ?? userId;
-      stub = this.env.KILOCLAW_INSTANCE.get(this.env.KILOCLAW_INSTANCE.idFromName(fallbackDoKey));
     }
 
     const status = await stub.getStatus();
     if (!status.sandboxId) {
-      throw new Error(`Instance for user ${userId} has no sandboxId`);
+      throw new Error(`Instance for ${resolvedIdForErrors} has no sandboxId`);
     }
 
     const routingTarget = await stub.getRoutingTarget();
     if (!routingTarget) {
-      throw new Error(`No routing target for user ${userId}`);
+      throw new Error(`No routing target for ${resolvedIdForErrors}`);
     }
     const targetUrl = `${routingTarget.origin}/plugins/kilo-chat/webhook`;
 

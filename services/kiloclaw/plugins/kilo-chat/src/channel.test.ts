@@ -51,6 +51,43 @@ describe('kilo-chat outbound.sendText', () => {
   });
 });
 
+describe('kilo-chat messaging adapter', () => {
+  const ULID = '01KP8R0VX4HK4ZSVQR5ZBVKHQH';
+  const adapter = kiloChatPlugin.messaging!;
+
+  it('normalizeTarget strips the kilo-chat: prefix', () => {
+    expect(adapter.normalizeTarget!(`kilo-chat:${ULID}`)).toBe(ULID);
+    expect(adapter.normalizeTarget!(ULID)).toBe(ULID);
+    expect(adapter.normalizeTarget!(`  kilo-chat:${ULID}  `)).toBe(ULID);
+  });
+
+  it('parseExplicitTarget accepts ULID with or without prefix', () => {
+    expect(adapter.parseExplicitTarget!({ raw: `kilo-chat:${ULID}` })).toEqual({
+      to: ULID,
+      chatType: 'direct',
+    });
+    expect(adapter.parseExplicitTarget!({ raw: ULID })).toEqual({
+      to: ULID,
+      chatType: 'direct',
+    });
+  });
+
+  it('parseExplicitTarget rejects non-ULID input', () => {
+    expect(adapter.parseExplicitTarget!({ raw: 'not-a-ulid' })).toBeNull();
+    expect(adapter.parseExplicitTarget!({ raw: 'kilo-chat:garbage' })).toBeNull();
+  });
+
+  it('targetResolver.looksLikeId matches ULIDs with or without prefix', () => {
+    expect(adapter.targetResolver!.looksLikeId!(ULID)).toBe(true);
+    expect(adapter.targetResolver!.looksLikeId!(`kilo-chat:${ULID}`)).toBe(true);
+    expect(adapter.targetResolver!.looksLikeId!('not-a-ulid')).toBe(false);
+  });
+
+  it('inferTargetChatType always returns direct', () => {
+    expect(adapter.inferTargetChatType!({ to: ULID })).toBe('direct');
+  });
+});
+
 describe('kilo-chat actions adapter', () => {
   it('declares react in describeMessageTool', () => {
     const adapter = kiloChatPlugin.actions;

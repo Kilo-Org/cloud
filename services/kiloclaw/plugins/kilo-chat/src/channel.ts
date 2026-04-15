@@ -1,9 +1,22 @@
-import { createChannelPluginBase, createChatChannelPlugin } from 'openclaw/plugin-sdk/core';
+import {
+  buildChannelOutboundSessionRoute,
+  createChannelPluginBase,
+  createChatChannelPlugin,
+} from 'openclaw/plugin-sdk/core';
 import type { ChannelMessageActionContext, OpenClawConfig } from 'openclaw/plugin-sdk/core';
 import { createKiloChatClient } from './client';
 import { handleKiloChatReactAction } from './react-action';
 
 const CHANNEL_ID = 'kilo-chat';
+const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
+
+function stripKiloChatPrefix(raw: string): string {
+  return raw.trim().replace(/^kilo-chat:/i, '');
+}
+
+function looksLikeKiloChatTarget(raw: string): boolean {
+  return ULID_RE.test(stripKiloChatPrefix(raw));
+}
 const DEFAULT_CONTROLLER_URL = 'http://127.0.0.1:18789';
 
 function resolveControllerUrl(): string {
@@ -69,6 +82,31 @@ const pluginBase = createChannelPluginBase({
 export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
   base: {
     ...pluginBase,
+    messaging: {
+      normalizeTarget: raw => stripKiloChatPrefix(raw) || undefined,
+      parseExplicitTarget: ({ raw }) => {
+        const cleaned = stripKiloChatPrefix(raw);
+        if (!ULID_RE.test(cleaned)) return null;
+        return { to: cleaned, chatType: 'direct' as const };
+      },
+      inferTargetChatType: () => 'direct' as const,
+      targetResolver: {
+        looksLikeId: raw => looksLikeKiloChatTarget(raw),
+        hint: '<conversationId (ULID)>',
+      },
+      resolveOutboundSessionRoute: ({ cfg, agentId, accountId, target }) => {
+        const conversationId = stripKiloChatPrefix(target);
+        return buildChannelOutboundSessionRoute({
+          cfg,
+          agentId,
+          channel: CHANNEL_ID,
+          accountId,
+          peer: { kind: 'direct', id: conversationId },
+          chatType: 'direct',
+          from: `kilo-chat:${accountId ?? ''}`,
+        });
+      },
+    },
     actions: {
       describeMessageTool: () => ({
         actions: ['react'] as const,

@@ -1,5 +1,6 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import { redisGet, redisSet } from '@/lib/redis';
+import * as crypto from 'crypto';
 import * as z from 'zod';
 
 /**
@@ -59,10 +60,15 @@ export async function posthogQuery(name: string, query: string): Promise<PostHog
 }
 export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
   return async (name: string, query: string) => {
-    const redisKey = `posthog:query:${name}`;
-    const cached = await redisGet(redisKey);
-    if (cached) {
-      return JSON.parse(cached) as Output[];
+    const queryHash = crypto.createHash('sha256').update(query).digest('hex');
+    const redisKey = `posthog:query:${name}:${queryHash}`;
+    try {
+      const cached = await redisGet(redisKey);
+      if (cached) {
+        return JSON.parse(cached) as Output[];
+      }
+    } catch {
+      // fall through to compute
     }
 
     const startTime = performance.now();
@@ -77,7 +83,11 @@ export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
     console.debug(
       `[cachedPosthogQuery] ${name} returned ${result.data.length} rows in ${performance.now() - startTime}ms`
     );
-    await redisSet(redisKey, JSON.stringify(result.data), 60 * 60 * 24);
+    try {
+      await redisSet(redisKey, JSON.stringify(result.data), 60 * 60 * 24);
+    } catch {
+      // ignore cache write failures
+    }
     return result.data;
   };
 }

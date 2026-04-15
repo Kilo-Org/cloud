@@ -44,9 +44,13 @@ const VERCEL_MODELS_REDIS_KEY = 'vercel:models';
 const VERCEL_MODELS_TTL = 3600;
 
 async function getVercelModels_cached() {
-  const cached = await redisGet(VERCEL_MODELS_REDIS_KEY);
-  if (cached) {
-    return JSON.parse(cached) as string[];
+  try {
+    const cached = await redisGet(VERCEL_MODELS_REDIS_KEY);
+    if (cached) {
+      return JSON.parse(cached) as string[];
+    }
+  } catch {
+    // fall through to compute
   }
 
   const result = await readDb
@@ -57,7 +61,11 @@ async function getVercelModels_cached() {
   const models = Object.values(z.record(z.string(), StoredModelSchema).parse(result.at(0)?.vercel))
     .filter(model => model.type === 'language' && model.endpoints.length > 0)
     .map(model => model.id);
-  await redisSet(VERCEL_MODELS_REDIS_KEY, JSON.stringify(models), VERCEL_MODELS_TTL);
+  try {
+    await redisSet(VERCEL_MODELS_REDIS_KEY, JSON.stringify(models), VERCEL_MODELS_TTL);
+  } catch {
+    // ignore cache write failures
+  }
   return models;
 }
 

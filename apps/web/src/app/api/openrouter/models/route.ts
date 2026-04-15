@@ -12,12 +12,20 @@ import { filterByFeature } from '@/lib/models';
 
 async function getDirectByokModels(userId: string) {
   const redisKey = `openrouter:direct-byok-models:${userId}`;
-  const cached = await redisGet(redisKey);
-  if (cached) {
-    return JSON.parse(cached) as Awaited<ReturnType<typeof getDirectByokModelsForUser>>;
+  try {
+    const cached = await redisGet(redisKey);
+    if (cached) {
+      return JSON.parse(cached) as Awaited<ReturnType<typeof getDirectByokModelsForUser>>;
+    }
+  } catch {
+    // fall through to compute
   }
   const models = await getDirectByokModelsForUser(userId);
-  await redisSet(redisKey, JSON.stringify(models), 60);
+  try {
+    await redisSet(redisKey, JSON.stringify(models), 60);
+  } catch {
+    // ignore cache write failures
+  }
   return models;
 }
 

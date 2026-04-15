@@ -10,9 +10,13 @@ const OPENROUTER_PROVIDERS_REDIS_KEY = 'openrouter:providers';
 const OPENROUTER_PROVIDERS_TTL = 86400;
 
 async function getCachedProviders() {
-  const cached = await redisGet(OPENROUTER_PROVIDERS_REDIS_KEY);
-  if (cached) {
-    return JSON.parse(cached) as OpenRouterProvider[];
+  try {
+    const cached = await redisGet(OPENROUTER_PROVIDERS_REDIS_KEY);
+    if (cached) {
+      return JSON.parse(cached) as OpenRouterProvider[];
+    }
+  } catch {
+    // fall through to fetch
   }
 
   const response = await fetch('https://openrouter.ai/api/frontend/all-providers', {
@@ -32,7 +36,11 @@ async function getCachedProviders() {
   }
 
   const data = (await response.json()) as OpenRouterProvider[];
-  await redisSet(OPENROUTER_PROVIDERS_REDIS_KEY, JSON.stringify(data), OPENROUTER_PROVIDERS_TTL);
+  try {
+    await redisSet(OPENROUTER_PROVIDERS_REDIS_KEY, JSON.stringify(data), OPENROUTER_PROVIDERS_TTL);
+  } catch {
+    // ignore cache write failures
+  }
   return data;
 }
 

@@ -38,9 +38,13 @@ const SUPPORTED_MODELS_REDIS_KEY = 'byok:supported-models';
 const SUPPORTED_MODELS_TTL = 300;
 
 async function fetchSupportedModels(): Promise<Record<string, string[]>> {
-  const cached = await redisGet(SUPPORTED_MODELS_REDIS_KEY);
-  if (cached) {
-    return JSON.parse(cached) as Record<string, string[]>;
+  try {
+    const cached = await redisGet(SUPPORTED_MODELS_REDIS_KEY);
+    if (cached) {
+      return JSON.parse(cached) as Record<string, string[]>;
+    }
+  } catch {
+    // fall through to compute
   }
 
   const modelMetadataRaw = (
@@ -108,7 +112,11 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     models.sort();
   }
 
-  await redisSet(SUPPORTED_MODELS_REDIS_KEY, JSON.stringify(result), SUPPORTED_MODELS_TTL);
+  try {
+    await redisSet(SUPPORTED_MODELS_REDIS_KEY, JSON.stringify(result), SUPPORTED_MODELS_TTL);
+  } catch {
+    // ignore cache write failures
+  }
   return result;
 }
 

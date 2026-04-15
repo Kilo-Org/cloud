@@ -16,9 +16,13 @@ import type { BYOKResult } from '@/lib/providers/types';
 
 async function getModelUserByokProviders_cached(modelId: string) {
   const redisKey = `byok:providers:${modelId}`;
-  const cached = await redisGet(redisKey);
-  if (cached) {
-    return JSON.parse(cached) as UserByokProviderId[];
+  try {
+    const cached = await redisGet(redisKey);
+    if (cached) {
+      return JSON.parse(cached) as UserByokProviderId[];
+    }
+  } catch {
+    // fall through to compute
   }
 
   const vercelModelMetadata = (
@@ -37,14 +41,19 @@ async function getModelUserByokProviders_cached(modelId: string) {
       .map(ep => VercelUserByokInferenceProviderIdSchema.safeParse(ep.tag).data)
       .filter(providerId => providerId !== undefined) ?? [];
   if (providers.length === 0) {
-    console.debug(`[getModelUserByokProviders_cached] no user byok providers for ${modelId}`);
+    console.debug('[getModelUserByokProviders_cached] no user byok providers for %s', modelId);
     return [];
   }
   console.debug(
-    `[getModelUserByokProviders_cached] found user byok providers for ${modelId}`,
+    '[getModelUserByokProviders_cached] found user byok providers for %s',
+    modelId,
     providers
   );
-  await redisSet(redisKey, JSON.stringify(providers), 300);
+  try {
+    await redisSet(redisKey, JSON.stringify(providers), 300);
+  } catch {
+    // ignore cache write failures
+  }
   return providers;
 }
 

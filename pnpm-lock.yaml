@@ -83,6 +83,7 @@ overrides:
   hono: ^4.12.7
   undici@^6: ^6.24.1
   lightningcss: 1.30.1
+  axios: '>=1.15.0'
 
 patchedDependencies:
   '@gorhom/bottom-sheet@5.1.8':
@@ -944,7 +945,7 @@ importers:
         version: link:../encryption
       '@sentry/nextjs':
         specifier: ^10.43.0
-        version: 10.43.0(@opentelemetry/context-async-hooks@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(next@16.1.6(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(webpack@5.105.4)
+        version: 10.43.0(@opentelemetry/context-async-hooks@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(next@16.1.6(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(webpack@5.105.4)
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260319.1
@@ -1451,7 +1452,7 @@ importers:
         version: 7.0.0-dev.20260319.1
       jest:
         specifier: ^30.3.0
-        version: 30.3.0(@types/node@24.12.0)(esbuild-register@3.6.0(esbuild@0.27.4))
+        version: 30.3.0(esbuild-register@3.6.0(esbuild@0.27.4))
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -8204,8 +8205,8 @@ packages:
   aws4fetch@1.0.20:
     resolution: {integrity: sha512-/djoAN709iY65ETD6LKCtyyEI04XIBP5xVvfmNxsEP0uJB5tyaGBztSryRr4HqMStr9R06PisQE7m9zDTXKu6g==}
 
-  axios@1.13.6:
-    resolution: {integrity: sha512-ChTCHMouEe2kn713WHbQGcuYrr6fXTBiu460OTwWrWob16g1bXn4vtz07Ope7ewMozJAnEquLk5lWQWtBig9DQ==}
+  axios@1.15.0:
+    resolution: {integrity: sha512-wWyJDlAatxk30ZJer+GeCWS209sA42X+N5jU2jy6oHTp7ufw8uzUTVFBX9+wTfAlhiJXGS0Bq7X6efruWjuK9Q==}
 
   b4a@1.8.0:
     resolution: {integrity: sha512-qRuSmNSkGQaHwNbM7J78Wwy+ghLEYF1zNrSeMxj4Kgw6y33O3mXcQ6Ie9fRvfU/YnxWkOchPXbaLb73TkIsfdg==}
@@ -12634,6 +12635,10 @@ packages:
 
   proxy-from-env@1.1.0:
     resolution: {integrity: sha512-D+zkORCbA9f1tdWRK0RaCR3GPv50cMxcrz4X8k5LTSUD1Dkw47mKJEZQNunItRTkWwgtaUSo1RVFRIG9ZXiFYg==}
+
+  proxy-from-env@2.1.0:
+    resolution: {integrity: sha512-cJ+oHTW1VAEa8cJslgmUZrc+sjRKgAKl3Zyse6+PV38hZe/V6Z14TbCuXcan9F9ghlz4QrFr2c92TNF82UkYHA==}
+    engines: {node: '>=10'}
 
   public-encrypt@4.0.3:
     resolution: {integrity: sha512-zVpa8oKZSz5bTMTFClc1fQOnyyEzpl5ozpi1B5YcvBrdohMjH2rfsBtyXcuNuwjsDIXmBYlF2N5FlJYhR29t8Q==}
@@ -20018,7 +20023,7 @@ snapshots:
       - supports-color
       - webpack
 
-  '@sentry/nextjs@10.43.0(@opentelemetry/context-async-hooks@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(next@16.1.6(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(webpack@5.105.4)':
+  '@sentry/nextjs@10.43.0(@opentelemetry/context-async-hooks@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(next@16.1.6(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(webpack@5.105.4)':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/semantic-conventions': 1.40.0
@@ -20210,7 +20215,7 @@ snapshots:
       '@slack/types': 2.20.1
       '@types/node': 25.5.0
       '@types/retry': 0.12.0
-      axios: 1.13.6
+      axios: 1.15.0
       eventemitter3: 5.0.4
       form-data: 4.0.5
       is-electron: 2.2.2
@@ -21858,6 +21863,12 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
+  '@vitest/mocker@3.2.4':
+    dependencies:
+      '@vitest/spy': 3.2.4
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+
   '@vitest/mocker@3.2.4(vite@8.0.0(@types/node@24.12.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))':
     dependencies:
       '@vitest/spy': 3.2.4
@@ -22311,11 +22322,11 @@ snapshots:
 
   aws4fetch@1.0.20: {}
 
-  axios@1.13.6:
+  axios@1.15.0:
     dependencies:
       follow-redirects: 1.15.11
       form-data: 4.0.5
-      proxy-from-env: 1.1.0
+      proxy-from-env: 2.1.0
     transitivePeerDependencies:
       - debug
 
@@ -25307,6 +25318,25 @@ snapshots:
       - supports-color
       - ts-node
 
+  jest-cli@30.3.0(esbuild-register@3.6.0(esbuild@0.27.4)):
+    dependencies:
+      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.27.4))
+      '@jest/test-result': 30.3.0
+      '@jest/types': 30.3.0
+      chalk: 4.1.2
+      exit-x: 0.2.2
+      import-local: 3.2.0
+      jest-config: 30.3.0(esbuild-register@3.6.0(esbuild@0.27.4))
+      jest-util: 30.3.0
+      jest-validate: 30.3.0
+      yargs: 17.7.2
+    transitivePeerDependencies:
+      - '@types/node'
+      - babel-plugin-macros
+      - esbuild-register
+      - supports-color
+      - ts-node
+
   jest-config@29.7.0(@types/node@24.12.0):
     dependencies:
       '@babel/core': 7.29.0
@@ -25426,6 +25456,37 @@ snapshots:
       strip-json-comments: 3.1.1
     optionalDependencies:
       '@types/node': 25.5.0
+      esbuild-register: 3.6.0(esbuild@0.27.4)
+    transitivePeerDependencies:
+      - babel-plugin-macros
+      - supports-color
+
+  jest-config@30.3.0(esbuild-register@3.6.0(esbuild@0.27.4)):
+    dependencies:
+      '@babel/core': 7.29.0
+      '@jest/get-type': 30.1.0
+      '@jest/pattern': 30.0.1
+      '@jest/test-sequencer': 30.3.0
+      '@jest/types': 30.3.0
+      babel-jest: 30.3.0(@babel/core@7.29.0)
+      chalk: 4.1.2
+      ci-info: 4.4.0
+      deepmerge: 4.3.1
+      glob: 13.0.6
+      graceful-fs: 4.2.11
+      jest-circus: 30.3.0
+      jest-docblock: 30.2.0
+      jest-environment-node: 30.3.0
+      jest-regex-util: 30.0.1
+      jest-resolve: 30.3.0
+      jest-runner: 30.3.0
+      jest-util: 30.3.0
+      jest-validate: 30.3.0
+      parse-json: 5.2.0
+      pretty-format: 30.3.0
+      slash: 3.0.0
+      strip-json-comments: 3.1.1
+    optionalDependencies:
       esbuild-register: 3.6.0(esbuild@0.27.4)
     transitivePeerDependencies:
       - babel-plugin-macros
@@ -25958,6 +26019,19 @@ snapshots:
       - supports-color
       - ts-node
 
+  jest@30.3.0(esbuild-register@3.6.0(esbuild@0.27.4)):
+    dependencies:
+      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.27.4))
+      '@jest/types': 30.3.0
+      import-local: 3.2.0
+      jest-cli: 30.3.0(esbuild-register@3.6.0(esbuild@0.27.4))
+    transitivePeerDependencies:
+      - '@types/node'
+      - babel-plugin-macros
+      - esbuild-register
+      - supports-color
+      - ts-node
+
   jimp-compact@0.16.1: {}
 
   jiti@2.6.1: {}
@@ -26318,7 +26392,7 @@ snapshots:
 
   mailgun.js@12.7.1:
     dependencies:
-      axios: 1.13.6
+      axios: 1.15.0
       base-64: 1.0.0
       url-join: 4.0.1
     transitivePeerDependencies:
@@ -27956,6 +28030,8 @@ snapshots:
 
   proxy-from-env@1.1.0: {}
 
+  proxy-from-env@2.1.0: {}
+
   public-encrypt@4.0.3:
     dependencies:
       bn.js: 4.12.3
@@ -29145,7 +29221,7 @@ snapshots:
       '@testing-library/jest-dom': 6.9.1
       '@testing-library/user-event': 14.6.1
       '@vitest/expect': 3.2.4
-      '@vitest/mocker': 3.2.4(vite@8.0.0(@types/node@24.12.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
+      '@vitest/mocker': 3.2.4
       '@vitest/spy': 3.2.4
       better-opn: 3.0.2
       esbuild: 0.27.4
@@ -29298,7 +29374,7 @@ snapshots:
     dependencies:
       '@types/jsonwebtoken': 9.0.10
       '@types/ws': 8.18.1
-      axios: 1.13.6
+      axios: 1.15.0
       base64-js: 1.5.1
       form-data: 4.0.5
       isomorphic-ws: 5.0.0(ws@8.19.0)
@@ -30295,7 +30371,7 @@ snapshots:
 
   wait-on@7.2.0:
     dependencies:
-      axios: 1.13.6
+      axios: 1.15.0
       joi: 17.13.3
       lodash: 4.17.23
       minimist: 1.2.8

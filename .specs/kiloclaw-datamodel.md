@@ -108,10 +108,14 @@ on application logs that may be rotated or incomplete.
 ### Instance–Subscription Relationship
 
 4. Every instance record MUST have a corresponding subscription
-   record. There MUST NOT exist an instance record without a
-   subscription record. This invariant is enforced at the application
-   layer; the creation-order rules (19–23) define the sequence that
-   satisfies it.
+   record. This is an eventually-consistent invariant: during the
+   creation sequence (rules 19–23), a brief window exists between
+   the instance INSERT and the subscription INSERT where the
+   instance has no subscription. Outside that bounded creation
+   window, there MUST NOT exist an instance record without a
+   subscription record. This invariant is enforced at the
+   application layer; the creation-order rules define the sequence
+   that satisfies it.
 5. Each subscription record MUST reference exactly one instance. The
    relationship is one-to-one: at most one subscription per instance
    (see kiloclaw-billing.md, Plans rule 5).
@@ -192,7 +196,12 @@ and serves as the authoritative audit trail for subscription state.
     the transaction is acceptable — the entire operation will be
     retried. When no enclosing transaction exists, a change log
     failure MUST NOT prevent the mutation from succeeding; the
-    system MUST log the failure and proceed.
+    system MUST log the failure and proceed. The system MUST
+    retry the failed change log write or run a reconciliation
+    process that detects and backfills missing entries. Missing
+    entries MUST be resolved within a bounded time (defined by
+    the implementing service's SLA) so the audit trail remains
+    complete.
 16. When a subscription mutation occurs within a database
     transaction, the change log entry SHOULD be written within the
     same transaction so that the log is consistent with the
@@ -228,7 +237,12 @@ complete).
     the kiloclaw CF worker service MUST call the kiloclaw-billing
     service to create the corresponding `kiloclaw_subscription`
     record. Subscription creation MUST NOT be attempted before the
-    instance record is persisted.
+    instance record is persisted. This call MUST occur as part of
+    the same provisioning request — the window between instance
+    commit and subscription creation (see rule 4) MUST be bounded
+    to the duration of that request. If subscription creation
+    fails, the provisioning service MUST retry or mark the instance
+    as requiring remediation so the orphan is not silently ignored.
 23. The onboarding flow MUST NOT be considered complete (and MUST NOT
     play the completion "ding" sound) until both the instance record
     and the subscription record have been persisted to the database.

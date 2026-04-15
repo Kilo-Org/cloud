@@ -1,0 +1,2 @@
+ALTER TABLE "kiloclaw_instances" ADD COLUMN "provider" text DEFAULT 'fly' NOT NULL;--> statement-breakpoint
+ALTER TABLE "kiloclaw_instances" ADD CONSTRAINT "kiloclaw_instances_provider_check" CHECK ("kiloclaw_instances"."provider" IN ('fly', 'docker-local', 'northflank'));

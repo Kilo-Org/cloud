@@ -99,6 +99,7 @@ describe('database schema', () => {
         'security.audit_log.exported',
       ],
       KiloClawPlan: ['trial', 'commit', 'standard'],
+      KiloClawProvider: ['fly', 'docker-local', 'northflank'],
       KiloClawScheduledPlan: ['commit', 'standard'],
       KiloClawScheduledBy: ['auto', 'user'],
       KiloClawSubscriptionStatus: ['trialing', 'active', 'past_due', 'canceled', 'unpaid'],

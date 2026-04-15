@@ -38,6 +38,7 @@ import {
   CliSessionSharedState,
   SecurityAuditLogAction,
   KiloClawPlan,
+  KiloClawProvider,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
@@ -109,6 +110,7 @@ export const SCHEMA_CHECK_ENUMS = {
   CliSessionSharedState,
   SecurityAuditLogAction,
   KiloClawPlan,
+  KiloClawProvider,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
@@ -3669,6 +3671,7 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     sandbox_id: text().notNull(),
+    provider: text().$type<KiloClawProvider>().notNull().default(KiloClawProvider.Fly),
     // Null = personal instance. Non-null = org-owned instance.
     organization_id: uuid().references(() => organizations.id),
     name: text(),
@@ -3680,6 +3683,7 @@ export const kiloclaw_instances = pgTable(
     uniqueIndex('UQ_kiloclaw_instances_active')
       .on(table.user_id, table.sandbox_id)
       .where(isNull(table.destroyed_at)),
+    enumCheck('kiloclaw_instances_provider_check', table.provider, KiloClawProvider),
   ]
 );
 

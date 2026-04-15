@@ -4,11 +4,13 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { sandboxIdFromInstanceId } from '@/lib/kiloclaw/sandbox-id';
+import type { KiloClawProvider } from '@kilocode/db/schema-types';
 
 export type ActiveKiloClawInstance = {
   id: string;
   userId: string;
   sandboxId: string;
+  provider: KiloClawProvider;
   organizationId: string | null;
   name: string | null;
 };
@@ -51,6 +53,7 @@ export function workerInstanceId(
 type EnsureActiveInstanceOpts = {
   /** Organization ID. When provided, creates an org-owned instance. */
   orgId?: string;
+  provider?: KiloClawProvider;
 };
 
 /**
@@ -75,9 +78,11 @@ export async function ensureActiveInstance(
     id: kiloclaw_instances.id,
     userId: kiloclaw_instances.user_id,
     sandboxId: kiloclaw_instances.sandbox_id,
+    provider: kiloclaw_instances.provider,
     organizationId: kiloclaw_instances.organization_id,
     name: kiloclaw_instances.name,
   };
+  const provider = opts?.provider ?? 'fly';
 
   if (opts?.orgId) {
     // Org instance: generate UUID, derive sandboxId from it.
@@ -91,6 +96,7 @@ export async function ensureActiveInstance(
         id: instanceId,
         user_id: userId,
         sandbox_id: sandboxId,
+        provider,
         organization_id: opts.orgId,
       })
       .returning(selectFields);
@@ -122,6 +128,7 @@ export async function ensureActiveInstance(
       id: instanceId,
       user_id: userId,
       sandbox_id: sandboxId,
+      provider,
     })
     .returning(selectFields);
 
@@ -162,6 +169,7 @@ export async function markActiveInstanceDestroyed(
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
       sandboxId: kiloclaw_instances.sandbox_id,
+      provider: kiloclaw_instances.provider,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
     });
@@ -207,6 +215,7 @@ export async function getActiveInstance(userId: string): Promise<ActiveKiloClawI
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
       sandboxId: kiloclaw_instances.sandbox_id,
+      provider: kiloclaw_instances.provider,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
     })
@@ -235,6 +244,7 @@ export async function getInstanceById(instanceId: string): Promise<ActiveKiloCla
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
       sandboxId: kiloclaw_instances.sandbox_id,
+      provider: kiloclaw_instances.provider,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
     })
@@ -258,6 +268,7 @@ export async function getActiveOrgInstance(
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
       sandboxId: kiloclaw_instances.sandbox_id,
+      provider: kiloclaw_instances.provider,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
     })
@@ -290,6 +301,7 @@ export async function listAllActiveInstances(userId: string): Promise<ActiveKilo
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
       sandboxId: kiloclaw_instances.sandbox_id,
+      provider: kiloclaw_instances.provider,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
     })
@@ -318,6 +330,7 @@ export async function listActiveOrgInstances(orgId: string): Promise<ActiveKiloC
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
       sandboxId: kiloclaw_instances.sandbox_id,
+      provider: kiloclaw_instances.provider,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
     })

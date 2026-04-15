@@ -1,4 +1,5 @@
 import type { EncryptedEnvelope } from '@/lib/encryption';
+import type { KiloClawProvider } from '@kilocode/db/schema-types';
 import type { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
 
 /** Mirrors the worker's ImageVersionEntry schema (KV stored version metadata) */
@@ -24,6 +25,7 @@ export type ProvisionInput = {
   kilocodeApiKeyExpiresAt?: string;
   kilocodeDefaultModel?: string;
   pinnedImageTag?: string;
+  provider?: KiloClawProviderId;
 };
 
 export type KiloCodeConfigPatchInput = {
@@ -138,8 +140,7 @@ export type MachineSize = {
   cpu_kind?: 'shared' | 'performance';
 };
 
-// Keep in sync with services/kiloclaw/src/schemas/instance-config.ts ProviderIdSchema.
-export type KiloClawProviderId = 'fly' | 'docker-local' | 'northflank';
+export type KiloClawProviderId = KiloClawProvider;
 
 /** Response from POST /api/platform/restore-volume-snapshot */
 export type RestoreVolumeSnapshotResponse = {

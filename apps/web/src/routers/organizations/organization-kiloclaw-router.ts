@@ -26,6 +26,9 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
+import { getKiloClawNorthflankRolloutAvailable } from '@/lib/kiloclaw/provider-rollout-config';
+import { selectOrgKiloClawProvider } from '@/lib/kiloclaw/provider-selection';
+import { getOrganizationById } from '@/lib/organizations/organizations';
 import {
   ensureActiveInstance,
   getActiveOrgInstance,
@@ -332,8 +335,21 @@ export const organizationKiloclawRouter = createTRPCRouter({
         });
       }
 
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      const provider = selectOrgKiloClawProvider({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        organizationSettings: organization.settings,
+        rolloutAvailable: getKiloClawNorthflankRolloutAvailable(),
+      });
+
       const { instance: instanceRow } = await ensureActiveInstance(ctx.user.id, {
         orgId: input.organizationId,
+        provider,
       });
 
       const encryptedSecrets = input.secrets
@@ -367,6 +383,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
             kilocodeApiKeyExpiresAt,
             kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
             pinnedImageTag: pin?.image_tag,
+            provider,
           },
           { instanceId: instanceRow.id, orgId: input.organizationId }
         );
@@ -378,6 +395,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
             user_id: ctx.user.id,
             organization_id: input.organizationId,
             instance_id: instanceRow.id,
+            provider,
           },
         });
 

@@ -2,11 +2,16 @@ process.env.STRIPE_KILOCLAW_COMMIT_PRICE_ID ||= 'price_commit';
 process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID ||= 'price_standard';
 process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
 
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { cleanupDbForTest } from '@/lib/drizzle';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { createCallerFactory } from '@/lib/trpc/init';
-import { kiloclawRouter } from '@/routers/kiloclaw-router';
+import { ensureActiveInstance } from '@/lib/kiloclaw/instance-registry';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
+import type { kiloclawRouter } from '@/routers/kiloclaw-router';
+import type { User } from '@kilocode/db/schema';
+import { kiloclaw_instances } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
@@ -14,6 +19,14 @@ type AnyMock = jest.Mock<(...args: any[]) => any>;
 type KiloClawClientMock = {
   KiloClawInternalClient: AnyMock;
   __getStatusMock: AnyMock;
+  __provisionMock: AnyMock;
+};
+
+type KiloClawRouterInputs = inferRouterInputs<typeof kiloclawRouter>;
+type KiloClawRouterOutputs = inferRouterOutputs<typeof kiloclawRouter>;
+type KiloClawCaller = {
+  provision(input: KiloClawRouterInputs['provision']): Promise<KiloClawRouterOutputs['provision']>;
+  getStatus(): Promise<KiloClawRouterOutputs['getStatus']>;
 };
 
 jest.mock('@/lib/stripe-client', () => {
@@ -56,9 +69,11 @@ jest.mock('next/headers', () => {
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const getStatusMock = jest.fn();
+  const provisionMock = jest.fn();
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       getStatus: getStatusMock,
+      provision: provisionMock,
     })),
     KiloClawApiError: class KiloClawApiError extends Error {
       statusCode: number;
@@ -70,19 +85,100 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       }
     },
     __getStatusMock: getStatusMock,
+    __provisionMock: provisionMock,
   };
 });
 
-const createCaller = createCallerFactory(kiloclawRouter);
-const kiloclawClientMock = jest.requireMock<KiloClawClientMock>(
-  '@/lib/kiloclaw/kiloclaw-internal-client'
-);
+let createCaller: (ctx: { user: User }) => KiloClawCaller;
+let kiloclawClientMock: KiloClawClientMock;
+
+beforeAll(async () => {
+  const [{ kiloclawRouter }, clientMock] = await Promise.all([
+    import('@/routers/kiloclaw-router'),
+    import('@/lib/kiloclaw/kiloclaw-internal-client'),
+  ]);
+  const callerFactory = createCallerFactory(kiloclawRouter);
+  createCaller = ctx => callerFactory(ctx) as KiloClawCaller;
+  kiloclawClientMock = jest.mocked(clientMock as unknown as KiloClawClientMock);
+});
 
 describe('kiloclawRouter getStatus', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
     kiloclawClientMock.KiloClawInternalClient.mockClear();
     kiloclawClientMock.__getStatusMock.mockReset();
+    kiloclawClientMock.__provisionMock.mockReset();
+    delete process.env.KILOCLAW_NORTHFLANK_ROLLOUT_AVAILABLE;
+    delete process.env.KILOCLAW_PERSONAL_NORTHFLANK_ENABLED;
+    delete process.env.KILOCLAW_PERSONAL_NORTHFLANK_TRAFFIC_PERCENT;
+  });
+
+  it('provisions Fly by default and stores the provider on the instance row', async () => {
+    kiloclawClientMock.__provisionMock.mockResolvedValue({ ok: true });
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-provision-test-${Math.random()}@example.com`,
+    });
+    const caller = createCaller({ user });
+
+    await caller.provision({});
+
+    const [instance] = await db
+      .select({ provider: kiloclaw_instances.provider })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.user_id, user.id));
+
+    expect(instance).toBeDefined();
+    if (!instance) throw new Error('Expected instance row');
+    expect(instance.provider).toBe('fly');
+    expect(kiloclawClientMock.__provisionMock).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({ provider: 'fly' }),
+      expect.objectContaining({ instanceId: expect.any(String) })
+    );
+  });
+
+  it('selects Northflank for new personal rows only when global rollout is available', async () => {
+    process.env.KILOCLAW_NORTHFLANK_ROLLOUT_AVAILABLE = 'true';
+    process.env.KILOCLAW_PERSONAL_NORTHFLANK_ENABLED = 'true';
+    process.env.KILOCLAW_PERSONAL_NORTHFLANK_TRAFFIC_PERCENT = '100';
+    kiloclawClientMock.__provisionMock.mockResolvedValue({ ok: true });
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-northflank-test-${Math.random()}@example.com`,
+    });
+    const caller = createCaller({ user });
+
+    await caller.provision({});
+
+    const [instance] = await db
+      .select({ provider: kiloclaw_instances.provider })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.user_id, user.id));
+
+    expect(instance).toBeDefined();
+    if (!instance) throw new Error('Expected instance row');
+    expect(instance.provider).toBe('northflank');
+    expect(kiloclawClientMock.__provisionMock).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({ provider: 'northflank' }),
+      expect.objectContaining({ instanceId: expect.any(String) })
+    );
+  });
+
+  it('passes the persisted provider for a pre-created personal instance row', async () => {
+    kiloclawClientMock.__provisionMock.mockResolvedValue({ ok: true });
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-precreated-provider-test-${Math.random()}@example.com`,
+    });
+    await ensureActiveInstance(user.id, { provider: 'northflank' });
+    const caller = createCaller({ user });
+
+    await caller.provision({});
+
+    expect(kiloclawClientMock.__provisionMock).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({ provider: 'northflank' }),
+      expect.objectContaining({ instanceId: expect.any(String) })
+    );
   });
 
   it('returns a no-instance sentinel without querying the legacy worker path', async () => {

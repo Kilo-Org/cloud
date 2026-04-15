@@ -66,6 +66,9 @@ import {
 } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
 import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { getPersonalKiloClawProviderRolloutConfig } from '@/lib/kiloclaw/provider-rollout-config';
+import { selectPersonalKiloClawProvider } from '@/lib/kiloclaw/provider-selection';
+import type { KiloClawProviderId } from '@/lib/kiloclaw/types';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
@@ -187,6 +190,13 @@ async function adoptOrphanedSubscription(userId: string, activeInstanceId: strin
  * In both cases, attempts to adopt an orphaned subscription (instance_id =
  * NULL) onto the active instance via {@link adoptOrphanedSubscription}.
  */
+function selectPersonalProviderForUser(userId: string): KiloClawProviderId {
+  return selectPersonalKiloClawProvider({
+    userId,
+    personalRolloutConfig: getPersonalKiloClawProviderRolloutConfig(),
+  });
+}
+
 async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKiloClawInstance> {
   const active = await getActiveInstance(userId);
   if (active) {
@@ -194,7 +204,9 @@ async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKilo
     return active;
   }
 
-  const { instance } = await ensureActiveInstance(userId);
+  const { instance } = await ensureActiveInstance(userId, {
+    provider: selectPersonalProviderForUser(userId),
+  });
   await adoptOrphanedSubscription(userId, instance.id);
   return instance;
 }
@@ -515,14 +527,18 @@ async function provisionInstance(
   /** The exact row ID that ensureProvisionAccess created (if any).
    *  Null when the access check returned an existing row or skipped
    *  row creation (earlybird path). */
-  instanceIdCreatedByAccessCheck: string | null
+  instanceIdCreatedByAccessCheck: string | null,
+  provider: KiloClawProviderId
 ) {
-  const { instance: instanceRow, created: createdHere } = await ensureActiveInstance(user.id);
+  const { instance: instanceRow, created: createdHere } = await ensureActiveInstance(user.id, {
+    provider,
+  });
   // Track the exact row ID this request created. Under concurrent
   // provisions, two requests may each create a row but then converge on
   // the oldest one via getActiveInstance. Only clean up instanceRow if
   // it's the same row this request actually inserted.
   const createdRowId = instanceIdCreatedByAccessCheck ?? (createdHere ? instanceRow.id : null);
+  const provisionProvider = workerInstanceId(instanceRow) ? instanceRow.provider : undefined;
 
   const encryptedSecrets = input.secrets
     ? Object.fromEntries(
@@ -556,6 +572,7 @@ async function provisionInstance(
         kilocodeApiKeyExpiresAt,
         kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
         pinnedImageTag,
+        provider: provisionProvider,
       },
       workerInstanceId(instanceRow) ? { instanceId: instanceRow.id } : undefined
     );
@@ -673,7 +690,8 @@ async function fetchKiloClawServiceDegraded(): Promise<boolean> {
  */
 async function ensureProvisionAccess(
   userId: string,
-  userEmail: string
+  userEmail: string,
+  provider: KiloClawProviderId
 ): Promise<{ createdInstanceId: string | null }> {
   // Check earlybird before anything else — active earlybird grants access,
   // expired earlybird must not fall through to the trial bootstrap.
@@ -693,7 +711,7 @@ async function ensureProvisionAccess(
   // Ensure the instance row exists so we can check/link subscriptions.
   // ensureActiveInstance is idempotent; the subsequent call in provisionInstance
   // will be a no-op.
-  const { instance, created } = await ensureActiveInstance(userId);
+  const { instance, created } = await ensureActiveInstance(userId, { provider });
   const createdInstanceId = created ? instance.id : null;
 
   // Adopt any orphaned subscription (instance_id = NULL) onto this instance
@@ -1759,11 +1777,13 @@ export const kiloclawRouter = createTRPCRouter({
 
   // Explicit lifecycle APIs
   provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
+    const provider = selectPersonalProviderForUser(ctx.user.id);
     const { createdInstanceId } = await ensureProvisionAccess(
       ctx.user.id,
-      ctx.user.google_user_email
+      ctx.user.google_user_email,
+      provider
     );
-    return provisionInstance(ctx.user, input, createdInstanceId);
+    return provisionInstance(ctx.user, input, createdInstanceId, provider);
   }),
 
   patchConfig: clawAccessProcedure
@@ -1775,11 +1795,13 @@ export const kiloclawRouter = createTRPCRouter({
   // Backward-compatible alias — uses the same trial-bootstrap flow as provision
   // so first-time callers can create a trial row (clawAccessProcedure would reject them).
   updateConfig: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
+    const provider = selectPersonalProviderForUser(ctx.user.id);
     const { createdInstanceId } = await ensureProvisionAccess(
       ctx.user.id,
-      ctx.user.google_user_email
+      ctx.user.google_user_email,
+      provider
     );
-    return provisionInstance(ctx.user, input, createdInstanceId);
+    return provisionInstance(ctx.user, input, createdInstanceId, provider);
   }),
 
   updateKiloCodeConfig: clawAccessProcedure
@@ -3217,6 +3239,7 @@ export const kiloclawRouter = createTRPCRouter({
             id: kiloclaw_instances.id,
             userId: kiloclaw_instances.user_id,
             sandboxId: kiloclaw_instances.sandbox_id,
+            provider: kiloclaw_instances.provider,
             organizationId: kiloclaw_instances.organization_id,
             name: kiloclaw_instances.name,
           })

@@ -485,11 +485,12 @@ export class ConversationDO extends DurableObject<Env> {
           message_id: string;
           member_id: string;
           emoji: string;
+          at: number | null;
         }>(sql`
-          SELECT id AS event_id, 'added' AS kind, message_id, member_id, emoji
+          SELECT id AS event_id, 'added' AS kind, message_id, member_id, emoji, added_at AS at
             FROM reactions WHERE id > ${lastEventId}
           UNION ALL
-          SELECT removed_id AS event_id, 'removed' AS kind, message_id, member_id, emoji
+          SELECT removed_id AS event_id, 'removed' AS kind, message_id, member_id, emoji, NULL AS at
             FROM reactions WHERE removed_id IS NOT NULL AND removed_id > ${lastEventId}
         `);
 
@@ -529,7 +530,7 @@ export class ConversationDO extends DurableObject<Env> {
               id: r.event_id,
               text: formatSseEvent(
                 'reaction.added',
-                { messageId: r.message_id, memberId: r.member_id, emoji: r.emoji },
+                { messageId: r.message_id, memberId: r.member_id, emoji: r.emoji, at: r.at },
                 r.event_id
               ),
             });

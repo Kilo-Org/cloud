@@ -499,6 +499,15 @@ describe('ConversationDO', () => {
       expect(body).toContain('event: reaction.added');
       expect(body).toContain(`id: ${r1.id}`);
       expect(body.indexOf(`id: ${m1.messageId}`)).toBeLessThan(body.indexOf(`id: ${r1.id}`));
+
+      // Verify replayed reaction.added includes `at` timestamp (spec requirement)
+      const addedEventMatch = body.match(
+        new RegExp(`id: ${r1.id}\\nevent: reaction\\.added\\ndata: (.+)`)
+      );
+      expect(addedEventMatch).not.toBeNull();
+      const payload = JSON.parse(addedEventMatch![1]) as { at: number; messageId: string };
+      expect(payload.at).toEqual(expect.any(Number));
+      expect(payload.messageId).toBe(m1.messageId);
     });
 
     it('replays reaction.removed using removed_id', async () => {

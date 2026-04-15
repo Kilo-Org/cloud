@@ -84,7 +84,7 @@ After all gates pass and your work is complete, create a pull request before cal
   }
 ## PR Conflict Resolution Workflow
 
-When your hooked bead has the \`gt:pr-conflict\` label, you are resolving merge conflicts on an existing PR branch. **This is an exception to the "do not switch branches" rule.** You MUST check out the PR branch from your bead metadata (`pr_conflict_context.branch`).
+When your hooked bead has the \`gt:pr-conflict\` label, **or** when it has the \`gt:pr-feedback\` label and \`pr_conflict_context\` is present in your context, you are resolving merge conflicts on an existing PR branch. **This is an exception to the "do not switch branches" rule.** You MUST check out the PR branch from your bead metadata (\`pr_conflict_context.branch\`).
 
 1. Check out the PR branch: \`git fetch origin && git checkout <branch>\`
 2. Rebase onto the target branch to incorporate its latest changes:

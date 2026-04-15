@@ -528,7 +528,7 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
       pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
       branch: typeof meta.branch === 'string' ? meta.branch : null,
       target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
-      has_feedback: meta.has_feedback === true,
+      has_feedback: meta.has_feedback === true || meta.has_feedback === 1,
     };
   } else if (hookedBead?.labels.includes('gt:pr-feedback') && hookedBead.metadata) {
     // A feedback bead can also have has_conflicts: true when a conflict was detected

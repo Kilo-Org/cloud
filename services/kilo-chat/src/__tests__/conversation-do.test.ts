@@ -274,35 +274,47 @@ describe('ConversationDO', () => {
       return { stub, messageId: created.messageId };
     }
 
-    it('addReaction on a fresh (message, member, emoji) returns { added: true, id }', async () => {
+    it('addReaction on a fresh (message, member, emoji) returns { ok: true, added: true, id }', async () => {
       const { stub, messageId } = await seed('conv-rx-add-1');
       const r = await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
-      expect('added' in r && r.added).toBe(true);
-      expect('id' in r ? r.id : '').toMatch(/^[0-9A-Z]{26}$/);
+      expect(r.ok).toBe(true);
+      if (r.ok) {
+        expect(r.added).toBe(true);
+        expect(r.id).toMatch(/^[0-9A-Z]{26}$/);
+      }
     });
 
-    it('addReaction is idempotent for a live tuple (returns { added: false, id: original })', async () => {
+    it('addReaction is idempotent for a live tuple (returns { ok: true, added: false, id: original })', async () => {
       const { stub, messageId } = await seed('conv-rx-add-2');
       const first = await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
       const second = await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
-      expect('added' in second && second.added).toBe(false);
-      expect('id' in second && 'id' in first && second.id).toBe('id' in first ? first.id : '');
+      expect(first.ok).toBe(true);
+      expect(second.ok).toBe(true);
+      if (first.ok && second.ok) {
+        expect(second.added).toBe(false);
+        expect(second.id).toBe(first.id);
+      }
     });
 
-    it('removeReaction on a live tuple returns { removed: true, removed_id }', async () => {
+    it('removeReaction on a live tuple returns { ok: true, removed: true, removed_id }', async () => {
       const { stub, messageId } = await seed('conv-rx-rem-1');
       await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
       const r = await stub.removeReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
-      expect('removed' in r && r.removed).toBe(true);
-      if ('removed' in r && r.removed) {
+      expect(r.ok).toBe(true);
+      if (r.ok && r.removed) {
         expect(r.removed_id).toMatch(/^[0-9A-Z]{26}$/);
+      } else {
+        throw new Error('Expected removed: true');
       }
     });
 
     it('removeReaction is idempotent when the tuple is absent', async () => {
       const { stub, messageId } = await seed('conv-rx-rem-2');
       const r = await stub.removeReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
-      expect('removed' in r && r.removed).toBe(false);
+      expect(r.ok).toBe(true);
+      if (r.ok) {
+        expect(r.removed).toBe(false);
+      }
     });
 
     it('add -> remove -> add re-activates the same row with a new id; removed_id cleared', async () => {
@@ -310,8 +322,12 @@ describe('ConversationDO', () => {
       const a1 = await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
       await stub.removeReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
       const a2 = await stub.addReaction({ messageId, memberId: 'user-alice', emoji: '👍' });
-      expect('added' in a2 && a2.added).toBe(true);
-      expect('id' in a2 && 'id' in a1 && a2.id !== a1.id).toBe(true);
+      expect(a1.ok).toBe(true);
+      expect(a2.ok).toBe(true);
+      if (a1.ok && a2.ok) {
+        expect(a2.added).toBe(true);
+        expect(a2.id).not.toBe(a1.id);
+      }
     });
 
     it('rejects reactions on non-existent messages (FK)', async () => {
@@ -322,14 +338,19 @@ describe('ConversationDO', () => {
         memberId: 'user-alice',
         emoji: '👍',
       });
-      // Match the ok-pattern already in use in this file for constraint errors.
-      expect('added' in result ? result.added : false).toBe(false);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/constraint|foreign key/i);
+      }
     });
 
     it('rejects reactions from non-member (FK)', async () => {
       const { stub, messageId } = await seed('conv-rx-bad-mem');
       const result = await stub.addReaction({ messageId, memberId: 'user-nonmember', emoji: '👍' });
-      expect('added' in result ? result.added : false).toBe(false);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/constraint|foreign key/i);
+      }
     });
   });
 

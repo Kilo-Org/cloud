@@ -72,13 +72,12 @@ export type DeleteMessageResult = { ok: true } | { ok: false; error: string };
 
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
-  | { added: true; id: string }
-  | { added: false; id: string }
+  | { ok: true; added: boolean; id: string }
   | { ok: false; error: string };
 export type RemoveReactionParams = { messageId: string; memberId: string; emoji: string };
 export type RemoveReactionResult =
-  | { removed: true; removed_id: string }
-  | { removed: false }
+  | { ok: true; removed: true; removed_id: string }
+  | { ok: true; removed: false }
   | { ok: false; error: string };
 
 export class ConversationDO extends DurableObject<Env> {
@@ -339,11 +338,11 @@ export class ConversationDO extends DurableObject<Env> {
           { messageId: params.messageId, memberId: params.memberId, emoji: params.emoji, at: now },
           id
         );
-        return { added: true, id };
+        return { ok: true, added: true, id };
       }
 
       if (existing.deleted_at === null) {
-        return { added: false, id: existing.id };
+        return { ok: true, added: false, id: existing.id };
       }
 
       // Dead row — re-activate.
@@ -364,7 +363,7 @@ export class ConversationDO extends DurableObject<Env> {
         { messageId: params.messageId, memberId: params.memberId, emoji: params.emoji, at: now },
         id
       );
-      return { added: true, id };
+      return { ok: true, added: true, id };
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
         return { ok: false, error: err.message };
@@ -388,7 +387,7 @@ export class ConversationDO extends DurableObject<Env> {
         )
         .get();
 
-      if (!live) return { removed: false };
+      if (!live) return { ok: true, removed: false };
 
       const removedId = this.nextUlid();
       this.db
@@ -407,7 +406,7 @@ export class ConversationDO extends DurableObject<Env> {
         { messageId: params.messageId, memberId: params.memberId, emoji: params.emoji },
         removedId
       );
-      return { removed: true, removed_id: removedId };
+      return { ok: true, removed: true, removed_id: removedId };
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
         return { ok: false, error: err.message };

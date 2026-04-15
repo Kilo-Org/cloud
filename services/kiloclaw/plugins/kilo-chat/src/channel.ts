@@ -14,8 +14,8 @@ function stripKiloChatPrefix(raw: string): string {
   return raw.trim().replace(/^kilo-chat:/i, '');
 }
 
-function looksLikeKiloChatTarget(raw: string): boolean {
-  return ULID_RE.test(stripKiloChatPrefix(raw));
+function isValidUlid(raw: string): boolean {
+  return ULID_RE.test(raw);
 }
 const DEFAULT_CONTROLLER_URL = 'http://127.0.0.1:18789';
 
@@ -86,12 +86,12 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
       normalizeTarget: raw => stripKiloChatPrefix(raw) || undefined,
       parseExplicitTarget: ({ raw }) => {
         const cleaned = stripKiloChatPrefix(raw);
-        if (!ULID_RE.test(cleaned)) return null;
+        if (!isValidUlid(cleaned)) return null;
         return { to: cleaned, chatType: 'direct' as const };
       },
       inferTargetChatType: () => 'direct' as const,
       targetResolver: {
-        looksLikeId: raw => looksLikeKiloChatTarget(raw),
+        looksLikeId: raw => isValidUlid(stripKiloChatPrefix(raw)),
         hint: '<conversationId (ULID)>',
       },
       resolveOutboundSessionRoute: ({ cfg, agentId, accountId, target }) => {

@@ -82,6 +82,16 @@ describe('createKiloChatWebhookHandler', () => {
     await handler(makeReq(body), res);
     expect(getStatus()).toBe(400);
   });
+
+  it('returns 413 when the inbound body exceeds the size cap', async () => {
+    // 1 MB + 1 byte: well over the 1 MB cap. readBody must reject before parsing.
+    const body = 'x'.repeat(1 * 1024 * 1024 + 1);
+    const handler = createKiloChatWebhookHandler({ api: {} as never });
+    const { res, getStatus, getBody } = makeRes();
+    await handler(makeReq(body), res);
+    expect(getStatus()).toBe(413);
+    expect(getBody()).toContain('Payload too large');
+  });
 });
 
 function fakeClient(calls: { type: string; args: unknown }[]): KiloChatClient {

@@ -249,10 +249,25 @@ async function dispatchInbound(
 // HTTP body reader
 // ---------------------------------------------------------------------------
 
+/** Max accepted inbound webhook body. Messages are small — 1 MB is already generous. */
+const MAX_WEBHOOK_BODY_BYTES = 1 * 1024 * 1024;
+
+export class WebhookBodyTooLargeError extends Error {
+  constructor(public readonly limit: number) {
+    super(`kilo-chat: webhook body exceeds ${limit} bytes`);
+  }
+}
+
 async function readBody(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
+  let total = 0;
   for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
+    total += buf.length;
+    if (total > MAX_WEBHOOK_BODY_BYTES) {
+      throw new WebhookBodyTooLargeError(MAX_WEBHOOK_BODY_BYTES);
+    }
+    chunks.push(buf);
   }
   return Buffer.concat(chunks).toString('utf8');
 }
@@ -263,7 +278,18 @@ async function readBody(req: IncomingMessage): Promise<string> {
 
 export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
-    const rawBody = await readBody(req);
+    let rawBody: string;
+    try {
+      rawBody = await readBody(req);
+    } catch (err) {
+      if (err instanceof WebhookBodyTooLargeError) {
+        res.statusCode = 413;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ error: 'Payload too large' }));
+        return true;
+      }
+      throw err;
+    }
 
     let parsed: unknown;
     try {

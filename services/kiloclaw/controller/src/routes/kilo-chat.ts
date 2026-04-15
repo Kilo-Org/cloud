@@ -1,4 +1,4 @@
-import type { Hono } from 'hono';
+import type { Context, Hono } from 'hono';
 import { timingSafeTokenEqual } from '../auth';
 import { getBearerToken } from './gateway';
 
@@ -10,6 +10,31 @@ export type KiloChatRouteOptions = {
   fetchImpl?: typeof fetch;
 };
 
+/**
+ * Max accepted body for kilo-chat proxy routes. Message content is small; 1 MB
+ * is already generous. Guards against unbounded buffering in c.req.text().
+ */
+const MAX_BODY_BYTES = 1 * 1024 * 1024;
+/** Reactions/typing/delete carry tiny payloads; cap tighter. */
+const MAX_SMALL_BODY_BYTES = 8 * 1024;
+
+/**
+ * Reject oversized bodies by Content-Length. Returns a 413 Response if the
+ * declared body exceeds `limit`, otherwise `null` to continue. Missing/invalid
+ * Content-Length is allowed (chunked encoding) — the underlying platform
+ * enforces its own per-request memory ceiling.
+ */
+function guardBodySize(c: Context, limit: number): Response | null {
+  const header = c.req.header('content-length');
+  if (!header) return null;
+  const n = Number(header);
+  if (!Number.isFinite(n) || n < 0) return null;
+  if (n > limit) {
+    return c.json({ error: 'Payload too large' }, 413);
+  }
+  return null;
+}
+
 const KILO_CHAT_SEND_PATH = '/_kilo/kilo-chat/send';
 
 export function registerKiloChatSendRoute(app: Hono, options: KiloChatRouteOptions): void {
@@ -20,6 +45,9 @@ export function registerKiloChatSendRoute(app: Hono, options: KiloChatRouteOptio
     if (!token || !timingSafeTokenEqual(token, options.expectedToken)) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
+
+    const oversized = guardBodySize(c, MAX_BODY_BYTES);
+    if (oversized) return oversized;
 
     const rawBody = await c.req.text();
 
@@ -52,6 +80,10 @@ export function registerKiloChatEditRoute(app: Hono, options: KiloChatRouteOptio
     if (!token || !timingSafeTokenEqual(token, options.expectedToken)) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
+
+    const oversized = guardBodySize(c, MAX_BODY_BYTES);
+    if (oversized) return oversized;
+
     const messageId = c.req.param('messageId');
     const rawBody = await c.req.text();
 
@@ -87,6 +119,9 @@ export function registerKiloChatTypingRoute(app: Hono, options: KiloChatRouteOpt
     if (!token || !timingSafeTokenEqual(token, options.expectedToken)) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
+
+    const oversized = guardBodySize(c, MAX_SMALL_BODY_BYTES);
+    if (oversized) return oversized;
 
     let body: { conversationId?: unknown };
     try {
@@ -130,6 +165,10 @@ export function registerKiloChatReactionPostRoute(app: Hono, options: KiloChatRo
     if (!token || !timingSafeTokenEqual(token, options.expectedToken)) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
+
+    const oversized = guardBodySize(c, MAX_SMALL_BODY_BYTES);
+    if (oversized) return oversized;
+
     const messageId = c.req.param('messageId');
     const rawBody = await c.req.text();
 
@@ -166,6 +205,10 @@ export function registerKiloChatReactionDeleteRoute(
     if (!token || !timingSafeTokenEqual(token, options.expectedToken)) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
+
+    const oversized = guardBodySize(c, MAX_SMALL_BODY_BYTES);
+    if (oversized) return oversized;
+
     const messageId = c.req.param('messageId');
     const rawBody = await c.req.text();
 
@@ -199,6 +242,10 @@ export function registerKiloChatDeleteRoute(app: Hono, options: KiloChatRouteOpt
     if (!token || !timingSafeTokenEqual(token, options.expectedToken)) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
+
+    const oversized = guardBodySize(c, MAX_SMALL_BODY_BYTES);
+    if (oversized) return oversized;
+
     const messageId = c.req.param('messageId');
     const rawBody = await c.req.text();
 

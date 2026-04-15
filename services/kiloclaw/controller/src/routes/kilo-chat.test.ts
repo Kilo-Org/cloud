@@ -492,3 +492,65 @@ describe('DELETE /_kilo/kilo-chat/messages/:id/reactions', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('body size limits', () => {
+  function makeApp(register: typeof registerKiloChatSendRoute, fetchImpl: typeof fetch) {
+    const app = new Hono();
+    register(app, {
+      expectedToken: TOKEN,
+      sandboxId: SANDBOX_ID,
+      apiToken: 'api_token',
+      baseUrl: 'https://chat.example.test',
+      fetchImpl,
+    });
+    return app;
+  }
+
+  it('send route rejects bodies larger than the 1 MB cap with 413', async () => {
+    let upstreamCalled = false;
+    const fetchImpl = (async () => {
+      upstreamCalled = true;
+      return new Response('{}', { status: 201 });
+    }) as typeof fetch;
+    const app = makeApp(registerKiloChatSendRoute, fetchImpl);
+
+    const oversizedBody = 'x'.repeat(1 * 1024 * 1024 + 10);
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/send', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${TOKEN}`,
+          'content-type': 'application/json',
+          'content-length': String(oversizedBody.length),
+        },
+        body: oversizedBody,
+      })
+    );
+    expect(res.status).toBe(413);
+    expect(upstreamCalled).toBe(false);
+  });
+
+  it('typing route rejects bodies larger than the small cap with 413', async () => {
+    let upstreamCalled = false;
+    const fetchImpl = (async () => {
+      upstreamCalled = true;
+      return new Response('{}', { status: 204 });
+    }) as typeof fetch;
+    const app = makeApp(registerKiloChatTypingRoute, fetchImpl);
+
+    const oversizedBody = JSON.stringify({ conversationId: 'c1', padding: 'x'.repeat(16 * 1024) });
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/typing', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${TOKEN}`,
+          'content-type': 'application/json',
+          'content-length': String(oversizedBody.length),
+        },
+        body: oversizedBody,
+      })
+    );
+    expect(res.status).toBe(413);
+    expect(upstreamCalled).toBe(false);
+  });
+});

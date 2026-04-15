@@ -2,7 +2,13 @@ import { createClient } from 'redis';
 
 type RedisClient = ReturnType<typeof createClient>;
 
-const COMMAND_TIMEOUT_MS = 2_000;
+// TCP handshake + TLS negotiation can take a moment on a cold connection.
+// Redis official docs recommend 1-3s for connect (redis.io/docs/latest/develop/clients).
+const CONNECT_TIMEOUT_MS = 1_500;
+
+// Simple GET/SET commands complete in sub-millisecond; anything over 200ms
+// means Redis is overloaded or unreachable and we should fail open.
+const COMMAND_TIMEOUT_MS = 200;
 
 let client: RedisClient | null = null;
 let connectPromise: Promise<unknown> | null = null;
@@ -14,7 +20,7 @@ function getOrCreateClient(): RedisClient | null {
   if (!client) {
     client = createClient({
       url: process.env.REDIS_URL,
-      socket: { connectTimeout: COMMAND_TIMEOUT_MS },
+      socket: { connectTimeout: CONNECT_TIMEOUT_MS },
     });
     client.on('error', err => {
       console.error('[redis] client error', err);
@@ -46,14 +52,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function redisGet(key: string): Promise<string | null> {
   const c = getOrCreateClient();
   if (!c) return null;
-  await withTimeout(ensureConnected(c), COMMAND_TIMEOUT_MS);
+  await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
   return withTimeout(c.get(key), COMMAND_TIMEOUT_MS);
 }
 
 export async function redisSet(key: string, value: string, ttlSeconds?: number): Promise<void> {
   const c = getOrCreateClient();
   if (!c) return;
-  await withTimeout(ensureConnected(c), COMMAND_TIMEOUT_MS);
+  await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
   if (ttlSeconds) {
     await withTimeout(c.set(key, value, { EX: ttlSeconds }), COMMAND_TIMEOUT_MS);
   } else {

@@ -354,6 +354,76 @@ describe('ConversationDO', () => {
     });
   });
 
+  describe('listMessages reactions aggregation', () => {
+    it('returns reactions grouped by emoji with counts and member ids', async () => {
+      const stub = getStub('conv-agg-1');
+      await stub.initialize({
+        ...BASE_PARAMS,
+        id: 'conv-agg-1',
+        members: [
+          { id: 'user-alice', kind: 'user' },
+          { id: 'user-bob', kind: 'user' },
+          { id: 'bot-1', kind: 'bot' },
+        ],
+      });
+      const m = await stub.createMessage({
+        senderId: 'user-alice',
+        content: [{ type: 'text', text: 'hi' }],
+      });
+      if (!m.ok) throw new Error('create failed');
+
+      const a1 = await stub.addReaction({
+        messageId: m.messageId,
+        memberId: 'user-alice',
+        emoji: '👍',
+      });
+      const a2 = await stub.addReaction({
+        messageId: m.messageId,
+        memberId: 'user-bob',
+        emoji: '👍',
+      });
+      const a3 = await stub.addReaction({ messageId: m.messageId, memberId: 'bot-1', emoji: '🎉' });
+      if (!a1.ok || !a2.ok || !a3.ok) throw new Error('add failed');
+
+      const { messages } = await stub.listMessages({ limit: 10 });
+      const msg = messages.find(x => x.id === m.messageId)!;
+      expect(msg.reactions).toHaveLength(2);
+      const thumbs = msg.reactions.find(r => r.emoji === '👍')!;
+      expect(thumbs.count).toBe(2);
+      expect(thumbs.memberIds.sort()).toEqual(['user-alice', 'user-bob']);
+      const party = msg.reactions.find(r => r.emoji === '🎉')!;
+      expect(party.count).toBe(1);
+      expect(party.memberIds).toEqual(['bot-1']);
+    });
+
+    it('omits dead reactions from the aggregation', async () => {
+      const stub = getStub('conv-agg-2');
+      await stub.initialize({ ...BASE_PARAMS, id: 'conv-agg-2' });
+      const m = await stub.createMessage({
+        senderId: 'user-alice',
+        content: [{ type: 'text', text: 'hi' }],
+      });
+      if (!m.ok) throw new Error('create failed');
+      await stub.addReaction({ messageId: m.messageId, memberId: 'user-alice', emoji: '👍' });
+      await stub.removeReaction({ messageId: m.messageId, memberId: 'user-alice', emoji: '👍' });
+
+      const { messages } = await stub.listMessages({ limit: 10 });
+      expect(messages.find(x => x.id === m.messageId)!.reactions).toEqual([]);
+    });
+
+    it('messages without any reactions still have reactions: []', async () => {
+      const stub = getStub('conv-agg-3');
+      await stub.initialize({ ...BASE_PARAMS, id: 'conv-agg-3' });
+      const m = await stub.createMessage({
+        senderId: 'user-alice',
+        content: [{ type: 'text', text: 'hi' }],
+      });
+      if (!m.ok) throw new Error('create failed');
+      const { messages } = await stub.listMessages({ limit: 10 });
+      expect(messages[0].reactions).toEqual([]);
+    });
+  });
+
   describe('schema constraints', () => {
     it('rejects a reply that points at a non-existent parent message (FK)', async () => {
       const stub = getStub('conv-fk-reply');

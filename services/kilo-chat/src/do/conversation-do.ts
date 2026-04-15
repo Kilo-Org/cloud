@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { eq, lt, gt, desc, ne, and, asc, sql } from 'drizzle-orm';
+import { eq, lt, gt, desc, ne, and, asc, sql, inArray } from 'drizzle-orm';
 import { conversation, members, messages, reactions } from '../db/conversation-schema';
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
@@ -38,6 +38,12 @@ export type ListMessagesParams = {
   before?: string;
 };
 
+export type MessageReactionSummary = {
+  emoji: string;
+  count: number;
+  memberIds: string[];
+};
+
 export type MessageRow = {
   id: string;
   senderId: string;
@@ -46,6 +52,7 @@ export type MessageRow = {
   version: number;
   updatedAt: number | null;
   deleted: boolean;
+  reactions: MessageReactionSummary[];
 };
 
 export type ListMessagesResult = {
@@ -219,6 +226,30 @@ export class ConversationDO extends DurableObject<Env> {
           .all()
       : query.orderBy(desc(messages.id)).limit(params.limit).all();
 
+    if (rows.length === 0) {
+      return { messages: [] };
+    }
+
+    const ids = rows.map(r => r.id);
+    const reactionRows = this.db
+      .select()
+      .from(reactions)
+      .where(and(inArray(reactions.message_id, ids), sql`${reactions.deleted_at} IS NULL`))
+      .all();
+
+    const reactionsByMessage = new Map<string, MessageReactionSummary[]>();
+    for (const r of reactionRows) {
+      const list = reactionsByMessage.get(r.message_id) ?? [];
+      let bucket = list.find(b => b.emoji === r.emoji);
+      if (!bucket) {
+        bucket = { emoji: r.emoji, count: 0, memberIds: [] };
+        list.push(bucket);
+      }
+      bucket.count += 1;
+      bucket.memberIds.push(r.member_id);
+      reactionsByMessage.set(r.message_id, list);
+    }
+
     return {
       messages: rows.map(row => ({
         id: row.id,
@@ -228,6 +259,7 @@ export class ConversationDO extends DurableObject<Env> {
         version: row.version,
         updatedAt: row.updated_at,
         deleted: row.deleted === 1,
+        reactions: reactionsByMessage.get(row.id) ?? [],
       })),
     };
   }

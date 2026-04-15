@@ -39,6 +39,7 @@ import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
+import { getInboundEmailAddressForInstance } from '@/lib/kiloclaw/inbound-email-alias';
 import {
   ensureActiveInstance,
   getActiveInstance,
@@ -498,6 +499,7 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
     workerUrl,
     name: null,
     instanceId: null,
+    inboundEmailAddress: null,
   } satisfies KiloClawDashboardStatus;
 }
 
@@ -1517,7 +1519,10 @@ export const kiloclawRouter = createTRPCRouter({
     }
 
     const client = new KiloClawInternalClient();
-    const status = await client.getStatus(ctx.user.id, workerInstanceId(instance));
+    const [status, inboundEmailAddress] = await Promise.all([
+      client.getStatus(ctx.user.id, workerInstanceId(instance)),
+      getInboundEmailAddressForInstance(instance.id),
+    ]);
 
     return {
       ...status,
@@ -1527,6 +1532,7 @@ export const kiloclawRouter = createTRPCRouter({
       // Legacy instances use userId-keyed DOs — returning their row UUID would
       // cause the frontend/gateway to resolve the wrong DO.
       instanceId: workerInstanceId(instance) ? instance.id : null,
+      inboundEmailAddress,
     } satisfies KiloClawDashboardStatus;
   }),
 

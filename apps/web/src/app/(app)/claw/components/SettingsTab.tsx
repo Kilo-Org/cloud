@@ -666,6 +666,44 @@ function DestroyInstanceDialog({
   );
 }
 
+function InboundEmailCard({ address }: { address: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    void navigator.clipboard
+      .writeText(address)
+      .then(() => toast.success('Inbound email address copied'))
+      .catch(() => toast.error('Failed to copy inbound email address'));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="rounded-lg border px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <Hash className="text-muted-foreground h-5 w-5 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Inbound Email</p>
+            <p className="text-muted-foreground text-xs">
+              Send email to this address to message your agent.
+            </p>
+          </div>
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <code className="bg-muted text-foreground min-w-0 truncate rounded px-2 py-1 text-xs">
+            {address}
+          </code>
+          <Button variant="outline" size="sm" onClick={handleCopy}>
+            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+            Copy
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // SettingsTab
 // ---------------------------------------------------------------------------
@@ -824,6 +862,8 @@ export function SettingsTab({
           icon={status.channelCount > 0 ? Check : Hash}
         />
       </div>
+
+      {status.inboundEmailAddress && <InboundEmailCard address={status.inboundEmailAddress} />}
 
       {/* ── Pairing Requests ── */}
       {isRunning && <PairingSection mutations={mutations} />}

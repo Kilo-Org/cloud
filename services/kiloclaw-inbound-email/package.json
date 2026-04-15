@@ -17,6 +17,8 @@
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "@kilocode/db": "workspace:*",
+    "drizzle-orm": "catalog:",
     "node-html-markdown": "^2.0.0",
     "postal-mime": "^2.7.4"
   }

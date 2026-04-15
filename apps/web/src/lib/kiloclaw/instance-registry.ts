@@ -3,6 +3,7 @@ import 'server-only';
 import { and, eq, isNull } from 'drizzle-orm';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
+import { createDefaultInboundEmailAlias } from '@/lib/kiloclaw/inbound-email-alias';
 import { sandboxIdFromInstanceId } from '@/lib/kiloclaw/sandbox-id';
 
 export type ActiveKiloClawInstance = {
@@ -85,19 +86,24 @@ export async function ensureActiveInstance(
     const instanceId = crypto.randomUUID();
     const sandboxId = sandboxIdFromInstanceId(instanceId);
 
-    const [row] = await db
-      .insert(kiloclaw_instances)
-      .values({
-        id: instanceId,
-        user_id: userId,
-        sandbox_id: sandboxId,
-        organization_id: opts.orgId,
-      })
-      .returning(selectFields);
+    const row = await db.transaction(async tx => {
+      const [inserted] = await tx
+        .insert(kiloclaw_instances)
+        .values({
+          id: instanceId,
+          user_id: userId,
+          sandbox_id: sandboxId,
+          organization_id: opts.orgId,
+        })
+        .returning(selectFields);
 
-    if (!row) {
-      throw new Error('Failed to create org instance row');
-    }
+      if (!inserted) {
+        throw new Error('Failed to create org instance row');
+      }
+
+      await createDefaultInboundEmailAlias(tx, inserted.id);
+      return inserted;
+    });
 
     return { instance: row, created: true };
   }
@@ -116,18 +122,23 @@ export async function ensureActiveInstance(
   const instanceId = crypto.randomUUID();
   const sandboxId = sandboxIdFromInstanceId(instanceId);
 
-  const [row] = await db
-    .insert(kiloclaw_instances)
-    .values({
-      id: instanceId,
-      user_id: userId,
-      sandbox_id: sandboxId,
-    })
-    .returning(selectFields);
+  const row = await db.transaction(async tx => {
+    const [inserted] = await tx
+      .insert(kiloclaw_instances)
+      .values({
+        id: instanceId,
+        user_id: userId,
+        sandbox_id: sandboxId,
+      })
+      .returning(selectFields);
 
-  if (!row) {
-    throw new Error('Failed to create personal instance row');
-  }
+    if (!inserted) {
+      throw new Error('Failed to create personal instance row');
+    }
+
+    await createDefaultInboundEmailAlias(tx, inserted.id);
+    return inserted;
+  });
 
   return { instance: row, created: true };
 }

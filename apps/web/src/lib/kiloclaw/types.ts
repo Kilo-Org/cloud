@@ -422,4 +422,6 @@ export type KiloClawDashboardStatus = PlatformStatusResponse & {
   name: string | null;
   /** Postgres row ID. Used to construct /i/{instanceId} proxy paths for instance-keyed instances. */
   instanceId: string | null;
+  /** Copyable inbound email address for routing messages into this instance. */
+  inboundEmailAddress: string | null;
 };

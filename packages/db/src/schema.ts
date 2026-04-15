@@ -3685,6 +3685,20 @@ export const kiloclaw_instances = pgTable(
 
 export type KiloClawInstance = typeof kiloclaw_instances.$inferSelect;
 
+export const kiloclaw_inbound_email_aliases = pgTable(
+  'kiloclaw_inbound_email_aliases',
+  {
+    alias: text().primaryKey().notNull(),
+    instance_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_instances.id, { onDelete: 'cascade' }),
+  },
+  table => [index('IDX_kiloclaw_inbound_email_aliases_instance_id').on(table.instance_id)]
+);
+
+export type KiloClawInboundEmailAlias = typeof kiloclaw_inbound_email_aliases.$inferSelect;
+export type NewKiloClawInboundEmailAlias = typeof kiloclaw_inbound_email_aliases.$inferInsert;
+
 // KiloClaw Admin Audit Log — tracks admin actions on KiloClaw instances
 export const kiloclaw_admin_audit_logs = pgTable(
   'kiloclaw_admin_audit_logs',

@@ -1,4 +1,5 @@
-import { instanceIdFromRecipient, truncate } from './address';
+import { resolveRecipient, truncate } from './address';
+import { lookupInstanceIdByAlias } from './recipient-db';
 import { handleQueue } from './consumer';
 import { parseRawEmail, stableMessageId } from './parser';
 import type { AppEnv, InboundEmailQueueMessage } from './types';
@@ -20,8 +21,10 @@ async function buildQueueMessage(
   message: ForwardableEmailMessage,
   env: AppEnv
 ): Promise<InboundEmailQueueMessage | null> {
-  const instanceId = instanceIdFromRecipient(message.to, env.INBOUND_EMAIL_DOMAIN);
-  if (!instanceId) {
+  const recipient = await resolveRecipient(message.to, env.INBOUND_EMAIL_DOMAIN, alias =>
+    lookupInstanceIdByAlias(env, alias)
+  );
+  if (!recipient) {
     message.setReject('Address unavailable');
     return null;
   }
@@ -38,7 +41,9 @@ async function buildQueueMessage(
   const messageId = parsed.messageId ?? (await stableMessageId(raw));
 
   return {
-    instanceId,
+    instanceId: recipient.instanceId,
+    recipientKind: recipient.recipientKind,
+    recipientAlias: recipient.recipientAlias,
     messageId: truncate(messageId, 512),
     from: truncate(parsed.from ?? message.from, 512),
     to: truncate(message.to, 512),

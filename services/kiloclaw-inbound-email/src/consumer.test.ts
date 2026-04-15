@@ -4,6 +4,7 @@ import type { AppEnv, InboundEmailQueueMessage } from './types';
 
 const message: InboundEmailQueueMessage = {
   instanceId: '11111111-1111-4111-8111-111111111111',
+  recipientKind: 'legacy',
   messageId: '<msg-1@example.com>',
   from: 'sender@example.com',
   to: 'ki-11111111111141118111111111111111@kiloclaw.ai',

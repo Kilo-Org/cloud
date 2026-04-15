@@ -125,6 +125,7 @@ describe('kiloclawRouter getStatus', () => {
       workerUrl: 'https://claw.kilo.ai',
       name: null,
       instanceId: null,
+      inboundEmailAddress: null,
     });
   });
 });

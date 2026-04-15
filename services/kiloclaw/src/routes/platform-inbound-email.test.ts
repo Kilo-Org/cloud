@@ -130,6 +130,32 @@ describe('POST /inbound-email', () => {
     );
   });
 
+  it('accepts alias recipient metadata without mismatch warnings', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { env } = makeEnv();
+
+    const response = await platform.request(
+      '/inbound-email',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: deliveryBody({
+          to: 'amber-river-quiet-maple@kiloclaw.ai',
+          recipientKind: 'alias',
+          recipientAlias: 'amber-river-quiet-maple',
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(202);
+    expect(warn).not.toHaveBeenCalledWith(
+      '[platform] inbound email recipient does not match instanceId',
+      expect.anything()
+    );
+    warn.mockRestore();
+  });
+
   it('sanitizes subject punctuation in the readable session key', async () => {
     const { env } = makeEnv();
 

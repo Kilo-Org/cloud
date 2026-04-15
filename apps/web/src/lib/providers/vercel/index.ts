@@ -22,36 +22,11 @@ import { desc } from 'drizzle-orm';
 import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
 
-// EMERGENCY SWITCH
-// This routes all models that normally would be routed to OpenRouter to Vercel instead.
-// Many of these models are not available, named differently or not tested on Vercel.
-// Only use when OpenRouter is down and automatic failover is not working adequately.
-const ENABLE_UNIVERSAL_VERCEL_ROUTING = false;
-
-const ERROR_RATE_THRESHOLD = 0.5;
-
 function getRandomNumberLessThan100(randomSeed: string) {
   return crypto.createHash('sha256').update(randomSeed).digest().readUInt32BE(0) % 100;
 }
 
 async function getVercelRoutingPercentage() {
-  if (ENABLE_UNIVERSAL_VERCEL_ROUTING) {
-    console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
-    return 100;
-  }
-  const errorRate = await getGatewayErrorRate();
-  const isOpenRouterErrorRateHigh = errorRate.openrouter > ERROR_RATE_THRESHOLD;
-  const isVercelErrorRateHigh = errorRate.vercel > ERROR_RATE_THRESHOLD;
-  if (isOpenRouterErrorRateHigh && !isVercelErrorRateHigh) {
-    console.error(
-      `[getVercelRoutingPercentage] OpenRouter error rate is high: ${errorRate.openrouter}`
-    );
-    return 90;
-  }
-  if (!isOpenRouterErrorRateHigh && isVercelErrorRateHigh) {
-    console.error(`[getVercelRoutingPercentage] Vercel error rate is high: ${errorRate.vercel}`);
-    return 10;
-  }
   return 10;
 }
 

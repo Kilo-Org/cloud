@@ -1,4 +1,4 @@
-if [ "${CLOUD_AGENT:-}" = "1" ] || [ "${CLOUD_AGENT:-}" = "true" ]; then
+if [ "${KILO_CLOUD_AGENT:-}" = "1" ] || [ "${KILO_CLOUD_AGENT:-}" = "true" ]; then
   base=$(git merge-base origin/main HEAD 2>/dev/null || true)
 
   if [ -n "$base" ]; then
@@ -14,10 +14,10 @@ if [ "${CLOUD_AGENT:-}" = "1" ] || [ "${CLOUD_AGENT:-}" = "true" ]; then
       | grep -q .; then
       scripts/typecheck-all.sh --changes-only
     else
-      echo "[pre-push] CLOUD_AGENT: no TS/config changes, skipping typecheck"
+      echo "[pre-push] KILO_CLOUD_AGENT: no TS/config changes, skipping typecheck"
     fi
   else
-    echo "[pre-push] CLOUD_AGENT: no merge base found, running default checks"
+    echo "[pre-push] KILO_CLOUD_AGENT: no merge base found, running default checks"
     pnpm format:check &
     pid_format=$!
 

@@ -1287,7 +1287,20 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
-      const result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
+
+      let result: Awaited<ReturnType<KiloClawInternalClient['cancelKiloCliRun']>>;
+      try {
+        result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
+      } catch (err) {
+        if (err instanceof KiloClawApiError && err.statusCode === 409) {
+          const { message } = getKiloClawApiErrorPayload(err);
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: message ?? 'Instance is not running',
+          });
+        }
+        throw err;
+      }
 
       if (result.ok) {
         await db

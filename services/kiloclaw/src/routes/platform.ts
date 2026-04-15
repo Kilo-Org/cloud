@@ -1461,13 +1461,18 @@ platform.post('/kilo-cli-run/cancel', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    // The DO returns a discriminated union: success | { conflict }.
+    // See startKiloCliRun for the same pattern and the reason for .then(r => r).
     const response = await withResolvedDORetry(
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.cancelKiloCliRun(),
+      stub => stub.cancelKiloCliRun().then(r => r),
       'cancelKiloCliRun'
     );
+    if ('conflict' in response) {
+      return jsonError(response.conflict, 409);
+    }
     return c.json(response, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'kilo-cli-run cancel');

@@ -193,19 +193,20 @@ function throwKiloclawAdminError(
  * Otherwise fall back to the user's active (personal) instance.
  */
 async function resolveInstance(userId: string, instanceId?: string) {
-  if (instanceId) {
-    const instance = await getInstanceById(instanceId);
-    if (!instance) {
+  const instance = instanceId ? await getInstanceById(instanceId) : await getActiveInstance(userId);
+
+  if (!instance) {
+    if (instanceId) {
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: `Instance ${instanceId} not found`,
         cause: new UpstreamApiError('instance_not_found'),
       });
     }
-    return instance;
+    return null;
   }
 
-  return getActiveInstance(userId);
+  return instance;
 }
 
 function assertInstanceBelongsToUser(

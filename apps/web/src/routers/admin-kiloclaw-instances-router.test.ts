@@ -584,6 +584,7 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
     expect(row.completed_at).not.toBeNull();
   });
 
+
   it('lists the initiating admin email for admin-started runs', async () => {
     const caller = await createCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawInstances.listAllCliRuns({

@@ -69,14 +69,16 @@ export type EditMessageParams = {
 export type EditMessageResult =
   | { ok: true; conflict: false; messageId: string; version: number }
   | { ok: true; conflict: true; messageId: string; version: number }
-  | { ok: false; error: string };
+  | { ok: false; code: 'not_found' | 'forbidden'; error: string };
 
 export type DeleteMessageParams = {
   messageId: string;
   senderId: string;
 };
 
-export type DeleteMessageResult = { ok: true } | { ok: false; error: string };
+export type DeleteMessageResult =
+  | { ok: true }
+  | { ok: false; code: 'not_found' | 'forbidden'; error: string };
 
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
@@ -268,12 +270,17 @@ export class ConversationDO extends DurableObject<Env> {
   editMessage(params: EditMessageParams): EditMessageResult {
     const row = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
     if (!row) {
-      return { ok: false, error: `Message ${params.messageId} not found` };
+      return {
+        ok: false,
+        code: 'not_found',
+        error: `Message ${params.messageId} not found`,
+      };
     }
 
     if (params.senderId !== row.sender_id) {
       return {
         ok: false,
+        code: 'forbidden',
         error: `Sender ${params.senderId} is not the owner of message ${params.messageId}`,
       };
     }
@@ -315,12 +322,17 @@ export class ConversationDO extends DurableObject<Env> {
   deleteMessage(params: DeleteMessageParams): DeleteMessageResult {
     const row = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
     if (!row) {
-      return { ok: false, error: `Message ${params.messageId} not found` };
+      return {
+        ok: false,
+        code: 'not_found',
+        error: `Message ${params.messageId} not found`,
+      };
     }
 
     if (params.senderId !== row.sender_id) {
       return {
         ok: false,
+        code: 'forbidden',
         error: `Sender ${params.senderId} is not the owner of message ${params.messageId}`,
       };
     }

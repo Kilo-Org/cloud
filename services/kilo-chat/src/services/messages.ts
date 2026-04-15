@@ -137,12 +137,8 @@ export async function editMessageFor(
     version,
   });
   if (!result.ok) {
-    if (result.error.includes('not the owner') || result.error.includes('is not the owner')) {
-      return { ok: false, code: 'forbidden', error: 'Forbidden' };
-    }
-    if (result.error.includes('not found')) {
-      return { ok: false, code: 'not_found', error: 'Not found' };
-    }
+    if (result.code === 'forbidden') return { ok: false, code: 'forbidden', error: 'Forbidden' };
+    if (result.code === 'not_found') return { ok: false, code: 'not_found', error: 'Not found' };
     return { ok: false, code: 'internal', error: result.error };
   }
   if (result.conflict) {
@@ -187,12 +183,8 @@ export async function deleteMessageFor(
 
   const result = await convStub.deleteMessage({ messageId, senderId: callerId });
   if (!result.ok) {
-    if (result.error.includes('not the owner') || result.error.includes('is not the owner')) {
-      return { ok: false, code: 'forbidden', error: 'Forbidden' };
-    }
-    if (result.error.includes('not found')) {
-      return { ok: false, code: 'not_found', error: 'Not found' };
-    }
+    if (result.code === 'forbidden') return { ok: false, code: 'forbidden', error: 'Forbidden' };
+    if (result.code === 'not_found') return { ok: false, code: 'not_found', error: 'Not found' };
     return { ok: false, code: 'internal', error: result.error };
   }
   return { ok: true };

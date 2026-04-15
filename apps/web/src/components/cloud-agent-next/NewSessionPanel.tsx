@@ -383,7 +383,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);
   const { data: recentRepoData } = useQuery(
-    trpc.unifiedSessions.recentRepositories.queryOptions({
+    trpc.cliSessionsV2.recentRepositories.queryOptions({
       organizationId: organizationId ?? null,
       updatedSince: repoUpdatedSince,
     })
@@ -650,7 +650,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       }
 
       void queryClient.invalidateQueries({
-        queryKey: trpc.unifiedSessions.list.queryKey({
+        queryKey: trpc.cliSessionsV2.list.queryKey({
           limit: 3,
           createdOnPlatform: 'cloud-agent',
           orderBy: 'updated_at',
@@ -682,7 +682,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     selectedPlatform,
     selectedRepo,
     selectedProfile,
-    trpc.unifiedSessions.list,
+    trpc.cliSessionsV2.list,
     trpcClient,
     variant,
   ]);

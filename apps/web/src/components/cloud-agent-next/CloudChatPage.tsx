@@ -148,7 +148,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   useEffect(() => {
     if (prevActivityRef.current === 'busy' && activity.type === 'idle') {
       playCelebrationSound();
-      void queryClient.invalidateQueries(trpc.unifiedSessions.list.pathFilter());
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
     }
     prevActivityRef.current = activity.type;
   }, [activity.type, playCelebrationSound, queryClient, trpc]);

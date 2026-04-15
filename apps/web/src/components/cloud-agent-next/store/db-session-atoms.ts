@@ -148,10 +148,29 @@ function getSessionStore(): MiniDb<IndexedDbSessionData> {
 // ============================================================================
 
 /**
- * API session type - matches the shape returned by cli-sessions-router.list (V1)
- * Dates are returned as strings from the tRPC API
+ * API session type - matches the shape returned by cliSessionsV2 router list procedure.
+ * The cli_sessions_v2 schema uses `mode: 'string'` for timestamps, so dates are strings.
  */
 type ApiSession = {
+  session_id: string;
+  title: string | null;
+  git_url: string | null;
+  git_branch: string | null;
+  cloud_agent_session_id: string | null;
+  created_on_platform: string;
+  created_at: string;
+  updated_at: string;
+  version: number;
+  organization_id: string | null;
+  status: string | null;
+  status_updated_at: string | null;
+  parent_session_id: string | null;
+};
+
+/**
+ * Database session type - timestamps are ISO strings (Drizzle `mode: 'string'`).
+ */
+export type DbSession = {
   session_id: string;
   title: string | null;
   git_url: string | null;
@@ -169,49 +188,29 @@ type ApiSession = {
 };
 
 /**
- * Database session type - with Date objects for convenient manipulation
- */
-export type DbSession = {
-  session_id: string;
-  title: string | null;
-  git_url: string | null;
-  git_branch: string | null;
-  cloud_agent_session_id: string | null;
-  created_on_platform: string;
-  created_at: Date;
-  updated_at: Date;
-  last_mode: string | null;
-  last_model: string | null;
-  version: number;
-  organization_id: string | null;
-  status: string | null;
-  status_updated_at: Date | null;
-};
-
-/**
- * Database session type for V2 - with Date objects
+ * Database session type for V2 - timestamps are ISO strings.
  * V2 sessions don't have git_url, organization_id, or mode/model fields
  */
 export type DbSessionV2 = {
   session_id: string;
   title: string | null;
   cloud_agent_session_id: string | null;
-  created_at: Date;
-  updated_at: Date;
+  created_at: string;
+  updated_at: string;
   version: number;
   status: string | null;
-  status_updated_at: Date | null;
+  status_updated_at: string | null;
 };
 
 /**
- * Convert an API session (with string dates) to DbSession format (with Date objects)
+ * Convert an API session from the v2 router to DbSession format.
+ * Dates are already Date objects; last_mode/last_model are not present in v2.
  */
 export function apiSessionToDbSession(apiSession: ApiSession): DbSession {
   return {
     ...apiSession,
-    created_at: new Date(apiSession.created_at),
-    updated_at: new Date(apiSession.updated_at),
-    status_updated_at: apiSession.status_updated_at ? new Date(apiSession.status_updated_at) : null,
+    last_mode: null,
+    last_model: null,
   };
 }
 
@@ -226,8 +225,8 @@ export type DbSessionDetails = {
   title: string | null;
   cloud_agent_session_id: string | null;
   organization_id: string | null;
-  created_at: Date;
-  updated_at: Date;
+  created_at: Date | string;
+  updated_at: Date | string;
   // V1-only fields (optional for V2 compatibility)
   kilo_user_id?: string;
   git_url?: string | null;

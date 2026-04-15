@@ -104,7 +104,7 @@ async function getSessionWithOwnerCheck(sessionId: string, userId: string) {
 const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
-  orderBy: z.enum(['created_at', 'updated_at']).optional().default('created_at'),
+  orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
   includeChildren: z.boolean().optional().default(false),
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
@@ -113,6 +113,18 @@ const ListSessionsInputSchema = z.object({
   gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
   updatedSince: z.iso.datetime().optional(),
   version: z.number().optional(),
+});
+
+const SearchInputSchema = z.object({
+  search_string: z.string().min(1),
+  limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
+  offset: z.number().min(0).optional().default(0),
+  createdOnPlatform: z
+    .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
+    .optional(),
+  organizationId: z.uuid().nullable().optional(),
+  includeChildren: z.boolean().optional().default(false),
+  gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
 });
 
 const GetSessionInputSchema = z.object({
@@ -288,6 +300,63 @@ export const cliSessionsV2Router = createTRPCRouter({
     return {
       cliSessions: resultSessions,
       nextCursor: hasMore ? nextCursor : null,
+    };
+  }),
+
+  /**
+   * Search sessions by title or session_id with ILIKE matching.
+   */
+  search: baseProcedure.input(SearchInputSchema).query(async ({ ctx, input }) => {
+    const {
+      search_string,
+      limit,
+      offset,
+      createdOnPlatform,
+      organizationId,
+      includeChildren,
+      gitUrl,
+    } = input;
+
+    const whereConditions: SQL[] = [eq(cli_sessions_v2.kilo_user_id, ctx.user.id)];
+
+    await addOrganizationCondition(whereConditions, ctx, organizationId);
+    addCreatedOnPlatformConditions(whereConditions, createdOnPlatform);
+    addGitUrlConditions(whereConditions, gitUrl);
+
+    if (!includeChildren) {
+      whereConditions.push(isNull(cli_sessions_v2.parent_session_id));
+    }
+
+    // Escape ILIKE wildcard characters so literal %, _ in user input are matched exactly
+    const escaped = search_string.replace(/[%_]/g, '\\$&');
+
+    whereConditions.push(
+      sql`(COALESCE(${cli_sessions_v2.title}, '') ILIKE ${`%${escaped}%`} OR ${cli_sessions_v2.session_id}::text ILIKE ${`%${escaped}%`})`
+    );
+
+    const baseWhere = and(...whereConditions);
+
+    const [results, countResult] = await Promise.all([
+      db
+        .select(commonSessionFields)
+        .from(cli_sessions_v2)
+        .where(baseWhere)
+        .orderBy(desc(cli_sessions_v2.updated_at))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<string>`COUNT(*)` })
+        .from(cli_sessions_v2)
+        .where(baseWhere),
+    ]);
+
+    const total = countResult.length > 0 ? Number(countResult[0].count) : 0;
+
+    return {
+      results,
+      total,
+      limit,
+      offset,
     };
   }),
 

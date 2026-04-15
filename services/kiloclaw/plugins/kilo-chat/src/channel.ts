@@ -1,5 +1,5 @@
 import { createChannelPluginBase, createChatChannelPlugin } from 'openclaw/plugin-sdk/core';
-import type { OpenClawConfig } from 'openclaw/plugin-sdk/core';
+import type { ChannelMessageActionContext, OpenClawConfig } from 'openclaw/plugin-sdk/core';
 import { createKiloChatClient } from './client';
 import { handleKiloChatReactAction } from './react-action';
 
@@ -75,12 +75,7 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
       }),
       supportsAction: ({ action }: { action: string }) => action === 'react',
       resolveExecutionMode: () => 'local' as const,
-      handleAction: async (ctx: {
-        action: string;
-        cfg: unknown;
-        params: Record<string, unknown>;
-        toolContext?: { currentChannelId?: string; currentMessageId?: string | number };
-      }) => {
+      handleAction: async (ctx: ChannelMessageActionContext) => {
         const client = makeClient();
         return handleKiloChatReactAction({
           action: ctx.action,

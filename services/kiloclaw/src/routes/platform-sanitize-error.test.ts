@@ -97,6 +97,44 @@ describe('sanitizeError: Instance-not-* status correction', () => {
   });
 });
 
+describe('kilo-cli-run/start: conflict response handling', () => {
+  /** Minimal env whose DO startKiloCliRun returns a conflict discriminated-union value. */
+  function envWithStartConflict(message: string) {
+    return {
+      KILOCLAW_INSTANCE: {
+        idFromName: (id: string) => id,
+        get: () => ({ startKiloCliRun: () => Promise.resolve({ conflict: message }) }),
+      },
+      KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      KV_CLAW_CACHE: {
+        get: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue({ keys: [], list_complete: true }),
+        getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+      },
+    } as never;
+  }
+
+  it('returns 409 when the DO signals a run is already in progress', async () => {
+    const env = envWithStartConflict('A Kilo CLI run is already in progress');
+
+    const resp = await platform.request(
+      '/kilo-cli-run/start',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1', prompt: 'fix this' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(409);
+    const body = await jsonBody(resp);
+    expect(body.error).toBe('A Kilo CLI run is already in progress');
+  });
+});
+
 describe('kilo-cli-run/cancel: conflict response handling', () => {
   /** Minimal env whose DO cancelKiloCliRun returns a conflict discriminated-union value. */
   function envWithCancelConflict(message: string) {

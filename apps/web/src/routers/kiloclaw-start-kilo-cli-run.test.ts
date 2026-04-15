@@ -11,10 +11,12 @@ import type { KiloClawApiError as KiloClawApiErrorType } from '@/lib/kiloclaw/ki
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type StartKiloCliRunResult = { ok: true; startedAt: string };
+type CancelKiloCliRunResult = { ok: boolean };
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
 const mockStartKiloCliRun = jest.fn<() => Promise<StartKiloCliRunResult>>();
+const mockCancelKiloCliRun = jest.fn<() => Promise<CancelKiloCliRunResult>>();
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const actual: Record<string, unknown> = jest.requireActual(
     '@/lib/kiloclaw/kiloclaw-internal-client'
@@ -22,6 +24,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       startKiloCliRun: mockStartKiloCliRun,
+      cancelKiloCliRun: mockCancelKiloCliRun,
     })),
     KiloClawApiError: actual.KiloClawApiError,
   };
@@ -55,6 +58,7 @@ let org: Organization;
 beforeEach(async () => {
   await cleanupDbForTest();
   mockStartKiloCliRun.mockReset();
+  mockCancelKiloCliRun.mockReset();
 
   user = await insertTestUser({
     google_user_email: `clirun-test-${Math.random()}@example.com`,
@@ -236,6 +240,82 @@ describe('organizations.kiloclaw.startKiloCliRun error translation', () => {
       instance_id: expect.any(String),
       prompt: 'fix the org config',
       status: 'running',
+    });
+  });
+});
+
+// ── Personal router: kiloclaw.cancelKiloCliRun ────────────────────────────
+
+describe('kiloclaw.cancelKiloCliRun error translation', () => {
+  beforeEach(async () => {
+    await grantKiloClawAccess(user.id);
+    await createPersonalInstance(user.id);
+  });
+
+  it('maps worker 409 to tRPC CONFLICT', async () => {
+    mockCancelKiloCliRun.mockRejectedValue(
+      new KiloClawApiError(409, '{"error":"Instance is not running"}')
+    );
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.kiloclaw.cancelKiloCliRun({ runId: '10000000-1000-4000-8000-000000000001' })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Instance is not running',
+    });
+  });
+
+  it('maps worker 409 without message body to CONFLICT with fallback message', async () => {
+    mockCancelKiloCliRun.mockRejectedValue(new KiloClawApiError(409, ''));
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.kiloclaw.cancelKiloCliRun({ runId: '10000000-1000-4000-8000-000000000001' })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Instance is not running',
+    });
+  });
+});
+
+// ── Org router: organizations.kiloclaw.cancelKiloCliRun ───────────────────
+
+describe('organizations.kiloclaw.cancelKiloCliRun error translation', () => {
+  beforeEach(async () => {
+    org = await createOrganization('Test Org', user.id);
+    await createOrgInstance(user.id, org.id);
+  });
+
+  it('maps worker 409 to tRPC CONFLICT', async () => {
+    mockCancelKiloCliRun.mockRejectedValue(
+      new KiloClawApiError(409, '{"error":"Instance is not running"}')
+    );
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.cancelKiloCliRun({
+        organizationId: org.id,
+        runId: '10000000-1000-4000-8000-000000000001',
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Instance is not running',
+    });
+  });
+
+  it('maps worker 409 without message body to CONFLICT with fallback message', async () => {
+    mockCancelKiloCliRun.mockRejectedValue(new KiloClawApiError(409, ''));
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.cancelKiloCliRun({
+        organizationId: org.id,
+        runId: '10000000-1000-4000-8000-000000000001',
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Instance is not running',
     });
   });
 });

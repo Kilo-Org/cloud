@@ -303,6 +303,26 @@ describe('admin.kiloclawInstances.startKiloCliRun', () => {
       message: 'Instance needs redeploy to support recovery',
     });
   });
+
+  it('maps worker 409 with empty body to CONFLICT with fallback message', async () => {
+    const { KiloClawApiError } = jest.requireMock<{
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      KiloClawApiError: new (statusCode: number, responseBody: string) => any;
+    }>('@/lib/kiloclaw/kiloclaw-internal-client');
+
+    mockStartKiloCliRun.mockRejectedValue(new KiloClawApiError(409, ''));
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.startKiloCliRun({
+        userId: testUserId,
+        prompt: 'test prompt',
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Failed to start kilo CLI run',
+    });
+  });
 });
 
 

@@ -5209,6 +5209,32 @@ describe('kilo CLI run routing', () => {
     fetchSpy.mockRestore();
   });
 
+  it('returns { conflict } from startKiloCliRun when instance is not running', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage); // status: 'provisioned', not 'running'
+
+    const result = await instance.startKiloCliRun('fix something');
+
+    expect(result).toEqual({ conflict: 'Instance is not running' });
+  });
+
+  it('returns { conflict } from startKiloCliRun when controller returns 409', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'A Kilo CLI run is already in progress' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.startKiloCliRun('fix something');
+
+    expect(result).toEqual({ conflict: 'A Kilo CLI run is already in progress' });
+    fetchSpy.mockRestore();
+  });
+
   it('returns { conflict } from cancelKiloCliRun when instance is not running', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage); // status: 'provisioned', not 'running'

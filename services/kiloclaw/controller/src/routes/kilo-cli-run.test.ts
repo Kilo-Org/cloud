@@ -224,6 +224,55 @@ describe('/_kilo/cli-run routes', () => {
     expect(mockKill).toHaveBeenCalledWith('SIGTERM');
   });
 
+  // ── Serialized concurrent starts ────────────────────────────────────
+
+  it('serializes concurrent starts: exactly one 200 and one 409', async () => {
+    const [r1, r2] = await Promise.all([
+      app.request('/_kilo/cli-run/start', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ prompt: 'task A' }),
+      }),
+      app.request('/_kilo/cli-run/start', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ prompt: 'task B' }),
+      }),
+    ]);
+
+    const statuses = [r1.status, r2.status].sort((a, b) => a - b);
+    expect(statuses).toEqual([200, 409]);
+  });
+
+  it('queue continues after a failed start attempt', async () => {
+    // Make the first spawn call throw synchronously
+    const spawnMock = vi.mocked(spawn);
+    spawnMock.mockImplementationOnce(() => {
+      throw new Error('spawn failed intentionally');
+    });
+
+    const r1 = await app.request('/_kilo/cli-run/start', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ prompt: 'failing task' }),
+    });
+    // Should get a 500 (spawn threw)
+    expect(r1.status).toBe(500);
+
+    // Run state should not be set to running after the failure
+    expect(_getActiveRun()).toBeNull();
+
+    // Now restore the default spawn mock and try a valid start
+    const r2 = await app.request('/_kilo/cli-run/start', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ prompt: 'recovery task' }),
+    });
+    expect(r2.status).toBe(200);
+    const body = (await r2.json()) as Record<string, unknown>;
+    expect(body.ok).toBe(true);
+  });
+
   // ── GET /_kilo/cli-run/status (with active run) ────────────────────
 
   it('returns run status after start', async () => {

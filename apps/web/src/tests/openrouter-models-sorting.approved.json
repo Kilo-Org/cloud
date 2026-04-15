@@ -150,81 +150,6 @@
       "isFree": true
     },
     {
-      "id": "bytedance-seed/dola-seed-2.0-pro:free",
-      "canonical_slug": "bytedance-seed/dola-seed-2.0-pro:free",
-      "hugging_face_id": "",
-      "name": "ByteDance Seed: Dola Seed 2.0 Pro (free)",
-      "created": 1756238927,
-      "description": "Built for the Agent era, it delivers stable performance in complex reasoning and long-horizon tasks, including multi-step planning, visual-text reasoning, video understanding, and advanced analysis. **Note:** For the free endpoint, all prompts and output are logged to improve the provider's model and its product and services. Please do not upload any personal, confidential, or otherwise sensitive information.",
-      "context_length": 256000,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": [
-          "text",
-          "image"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.000000000000",
-        "completion": "0.000000000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.000000000000"
-      },
-      "top_provider": {
-        "context_length": 256000,
-        "max_completion_tokens": 128000,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "default_parameters": {},
-      "preferredIndex": 3,
-      "isFree": true,
-      "opencode": {
-        "ai_sdk_provider": "openai-compatible",
-        "variants": {
-          "none": {
-            "reasoning": {
-              "enabled": false,
-              "effort": "minimal"
-            }
-          },
-          "low": {
-            "reasoning": {
-              "enabled": true,
-              "effort": "low"
-            }
-          },
-          "medium": {
-            "reasoning": {
-              "enabled": true,
-              "effort": "medium"
-            }
-          },
-          "high": {
-            "reasoning": {
-              "enabled": true,
-              "effort": "high"
-            }
-          }
-        }
-      }
-    },
-    {
       "id": "x-ai/grok-code-fast-1:optimized:free",
       "canonical_slug": "x-ai/grok-code-fast-1:optimized:free",
       "hugging_face_id": "",
@@ -266,7 +191,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 4,
+      "preferredIndex": 3,
       "isFree": true,
       "opencode": {
         "ai_sdk_provider": "openai"
@@ -317,7 +242,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 5,
+      "preferredIndex": 4,
       "isFree": true,
       "opencode": {}
     },
@@ -639,6 +564,80 @@
       "context_length": 32000,
       "isFree": false,
       "opencode": {}
+    },
+    {
+      "id": "bytedance-seed/dola-seed-2.0-pro:free",
+      "canonical_slug": "bytedance-seed/dola-seed-2.0-pro:free",
+      "hugging_face_id": "",
+      "name": "ByteDance Seed: Dola Seed 2.0 Pro (free)",
+      "created": 1756238927,
+      "description": "Built for the Agent era, it delivers stable performance in complex reasoning and long-horizon tasks, including multi-step planning, visual-text reasoning, video understanding, and advanced analysis. **Note:** For the free endpoint, all prompts and output are logged to improve the provider's model and its product and services. Please do not upload any personal, confidential, or otherwise sensitive information.",
+      "context_length": 256000,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000000000000",
+        "completion": "0.000000000000",
+        "request": "0",
+        "image": "0",
+        "web_search": "0",
+        "internal_reasoning": "0",
+        "input_cache_read": "0.000000000000"
+      },
+      "top_provider": {
+        "context_length": 256000,
+        "max_completion_tokens": 128000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools",
+        "reasoning",
+        "include_reasoning"
+      ],
+      "default_parameters": {},
+      "isFree": true,
+      "opencode": {
+        "ai_sdk_provider": "openai-compatible",
+        "variants": {
+          "none": {
+            "reasoning": {
+              "enabled": false,
+              "effort": "minimal"
+            }
+          },
+          "low": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "low"
+            }
+          },
+          "medium": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "medium"
+            }
+          },
+          "high": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "high"
+            }
+          }
+        }
+      }
     },
     {
       "id": "qwen/qwen3.6-plus",

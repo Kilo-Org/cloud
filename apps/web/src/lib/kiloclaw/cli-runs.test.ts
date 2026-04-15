@@ -114,7 +114,7 @@ describe('cancelCliRun', () => {
     });
   });
 
-  it('does not cancel the controller run when its timestamp belongs to a different stored run', async () => {
+  it('persists failed and does not cancel when controller timestamp belongs to a different run', async () => {
     const user = await insertTestUser();
     const instanceId = await createTestInstance(user.id);
     const runId = await createCliRun({
@@ -146,10 +146,11 @@ describe('cancelCliRun', () => {
     ).resolves.toEqual({ ok: true, runFound: true, cancelled: false });
 
     expect(cancelControllerRun).not.toHaveBeenCalled();
-    await expect(getRunStatus(runId)).resolves.toEqual({
-      status: 'running',
-      completed_at: null,
-    });
+
+    const row = await getRunRow(runId);
+    expect(row.status).toBe('failed');
+    expect(row.output).toBe('[run state unavailable: controller has moved on to a newer run]');
+    expect(row.completed_at).not.toBeNull();
   });
 
   it('reports cancelled: false when the DB row left running between the SELECT and the cancel UPDATE', async () => {
@@ -439,7 +440,7 @@ describe('getCliRunStatus', () => {
     expect(row.completed_at).not.toBeNull();
   });
 
-  it('returns running without persisting when controller timestamp mismatches the row', async () => {
+  it('persists failed with superseded message when controller timestamp mismatches the row', async () => {
     const user = await insertTestUser();
     const instanceId = await createTestInstance(user.id);
     const startedAt = '2026-04-12T12:00:00.000Z';
@@ -469,19 +470,20 @@ describe('getCliRunStatus', () => {
 
     expect(result).toMatchObject({
       hasRun: true,
-      status: 'running',
-      output: null,
+      status: 'failed',
+      output: '[run state unavailable: controller has moved on to a newer run]',
       exitCode: null,
-      completedAt: null,
       prompt: 'stale row',
       initiatedBy: 'user',
     });
     expect(new Date(result.startedAt!).toISOString()).toBe(startedAt);
+    expect(result.completedAt).not.toBeNull();
 
-    // DB row should remain unchanged.
+    // DB row should be persisted as failed.
     const row = await getRunRow(runId);
-    expect(row.status).toBe('running');
-    expect(row.completed_at).toBeNull();
+    expect(row.status).toBe('failed');
+    expect(row.output).toBe('[run state unavailable: controller has moved on to a newer run]');
+    expect(row.completed_at).not.toBeNull();
   });
 
   it('returns controller state pass-through when controller says running and timestamps match', async () => {
@@ -575,6 +577,49 @@ describe('getCliRunStatus', () => {
     expect(row.output).toBe('final output');
     expect(row.exit_code).toBe(0);
     expect(row.completed_at).toBe('2026-04-12T12:01:00.000Z');
+  });
+
+  it('preserves existing output when controller has moved on and row already has output', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'run with partial output',
+      startedAt,
+      initiatedByAdminId: null,
+    });
+
+    // Simulate partial output already written to the row while it was running.
+    await db
+      .update(kiloclaw_cli_runs)
+      .set({ output: 'partial output before superseded' })
+      .where(eq(kiloclaw_cli_runs.id, runId));
+
+    const result = await getCliRunStatus({
+      runId,
+      userId: user.id,
+      instanceId,
+      workerInstanceId: 'ki_current',
+      getControllerStatus: async () => ({
+        hasRun: true,
+        status: 'completed',
+        output: 'output from newer run',
+        exitCode: 0,
+        startedAt: '2026-04-12T12:05:00.000Z',
+        completedAt: '2026-04-12T12:06:00.000Z',
+        prompt: 'newer run',
+      }),
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.output).toBe('partial output before superseded');
+
+    const row = await getRunRow(runId);
+    expect(row.status).toBe('failed');
+    expect(row.output).toBe('partial output before superseded');
+    expect(row.completed_at).not.toBeNull();
   });
 
   it('returns empty status when the run does not exist', async () => {

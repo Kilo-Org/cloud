@@ -90,6 +90,9 @@ export type CliRunStatusResult = KiloCliRunStatusResponse & {
 const LOST_CONTROLLER_RUN_OUTPUT =
   '[run state unavailable: controller no longer has an active CLI run for this record]';
 
+const SUPERSEDED_CONTROLLER_RUN_OUTPUT =
+  '[run state unavailable: controller has moved on to a newer run]';
+
 export async function markCliRunCancelled(params: CancelCliRunParams): Promise<boolean> {
   const rows = await db
     .update(kiloclaw_cli_runs)
@@ -204,6 +207,19 @@ export async function cancelCliRun(params: {
 
   const controllerStatus = await getControllerStatus(params.userId, effectiveWorkerInstanceId);
   if (!isControllerStatusForRun(row, controllerStatus)) {
+    // Controller has moved on — persist 'failed' so the row doesn't stay
+    // 'running' forever, then report not-cancelled (there's nothing to cancel).
+    await persistCliRunControllerStatus({
+      runId: params.runId,
+      userId: params.userId,
+      instanceId: row.instance_id,
+      controllerStatus: {
+        status: 'failed',
+        exitCode: row.exit_code,
+        output: row.output ?? SUPERSEDED_CONTROLLER_RUN_OUTPUT,
+        completedAt: new Date().toISOString(),
+      },
+    });
     return { ok: true, runFound: true, cancelled: false };
   }
 
@@ -315,13 +331,30 @@ export async function getCliRunStatus(params: {
   }
 
   if (!isControllerStatusForRun(row, controllerStatus)) {
+    // The controller has a run but with a different startedAt — it has moved
+    // on to a newer CLI run and will never report a terminal state for our
+    // row. Persist 'failed' so the row doesn't stay 'running' forever.
+    const completedAt = new Date().toISOString();
+    const output = row.output ?? SUPERSEDED_CONTROLLER_RUN_OUTPUT;
+    await persistCliRunControllerStatus({
+      runId: params.runId,
+      userId: params.userId,
+      instanceId: row.instance_id,
+      controllerStatus: {
+        status: 'failed',
+        exitCode: row.exit_code,
+        output,
+        completedAt,
+      },
+    });
+
     return {
       hasRun: true,
-      status: 'running',
-      output: row.output,
+      status: 'failed',
+      output,
       exitCode: row.exit_code,
       startedAt: row.started_at,
-      completedAt: row.completed_at,
+      completedAt,
       prompt: row.prompt,
       initiatedBy: getCliRunInitiatedBy(row),
     };

@@ -754,19 +754,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             const refineryConfig = townConfig.refinery;
             if (!refineryConfig) return;
 
-            // Conflict detection: check if PR has merge conflicts.
-            // auto_resolve_merge_conflicts may not be in the schema yet (added by a parallel
-            // bead in the same convoy) — default to true if the field is absent.
-            const autoResolveConflictsField = z
-              .object({ auto_resolve_merge_conflicts: z.boolean().optional() })
-              .safeParse(refineryConfig);
-            const wantsAutoResolveConflicts =
-              autoResolveConflictsField.success
-                ? autoResolveConflictsField.data.auto_resolve_merge_conflicts !== false
-                : true;
-
             if (mergeable_state === 'dirty') {
-              // PR has merge conflicts — emit event ONCE per conflict episode
+              // PR has merge conflicts — emit event ONCE per conflict episode.
+              // The reconciler decides whether to create a conflict bead or an escalation
+              // based on the rig's auto_resolve_merge_conflicts config.
               const conflictMetaRows = z
                 .object({ has_conflicts: z.unknown() })
                 .array()
@@ -784,7 +775,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               const alreadyMarked = conflictMetaRows[0]?.has_conflicts === 1 ||
                 conflictMetaRows[0]?.has_conflicts === true;
 
-              if (!alreadyMarked && wantsAutoResolveConflicts) {
+              if (!alreadyMarked) {
                 // Mark conflict on MR bead metadata
                 query(
                   sql,
@@ -832,6 +823,20 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                   },
                 });
               }
+
+              // A dirty PR must not proceed to the auto-merge timer — reset the
+              // grace-period clock so the timer starts fresh once conflicts are resolved.
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${review_metadata}
+                  SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+                  WHERE ${review_metadata.bead_id} = ?
+                    AND ${review_metadata.columns.auto_merge_ready_since} IS NOT NULL
+                `,
+                [action.bead_id]
+              );
+              return;
             } else if (mergeable_state === 'clean' || mergeable_state === 'unknown') {
               // Conflict resolved — clear the has_conflicts flag
               query(

@@ -263,6 +263,23 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
   }
 
   /**
+   * Return diagnostic info for the admin debug UI.
+   * Exposes enough to debug env key mismatches without leaking the full key.
+   */
+  async getDiagnostics(): Promise<{
+    flyAppName: string | null;
+    envKeySet: boolean;
+    envKeyFingerprint: string | null;
+  }> {
+    await this.loadState();
+    return {
+      flyAppName: this.flyAppName,
+      envKeySet: this.envKeySet,
+      envKeyFingerprint: this.envKey ? this.envKey.slice(0, 8) : null,
+    };
+  }
+
+  /**
    * Delete the Fly App entirely.
    * For future use (e.g. account deletion). Not called on instance destroy.
    */

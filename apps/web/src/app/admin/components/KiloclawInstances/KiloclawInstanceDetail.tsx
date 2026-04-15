@@ -2283,6 +2283,115 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         {data.workerStatus && (
           <Card>
             <CardHeader>
+              <CardTitle>Env Key Diagnostics</CardTitle>
+              <CardDescription>
+                Encryption key state from the App DO — helps debug boot decryption failures
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <DetailField label="App DO Key">
+                  <code className="text-xs">{data.workerStatus.envKeyAppDOKey ?? '—'}</code>
+                </DetailField>
+
+                <DetailField label="App DO Fly App Name">
+                  {data.workerStatus.envKeyAppDOFlyAppName ? (
+                    <code className="text-xs">{data.workerStatus.envKeyAppDOFlyAppName}</code>
+                  ) : (
+                    <span className="text-destructive text-xs font-medium">
+                      null (no Fly secret sync!)
+                    </span>
+                  )}
+                </DetailField>
+
+                <DetailField label="Instance DO Fly App Name">
+                  <code className="text-xs">{data.workerStatus.flyAppName ?? '—'}</code>
+                </DetailField>
+
+                <DetailField label="App DO envKeySet">
+                  {data.workerStatus.envKeyAppDOKeySet === null
+                    ? '—'
+                    : data.workerStatus.envKeyAppDOKeySet
+                      ? 'true'
+                      : 'false'}
+                </DetailField>
+
+                <DetailField label="Env Key Fingerprint">
+                  {data.workerStatus.envKeyAppDOFingerprint ? (
+                    <code className="text-xs">{data.workerStatus.envKeyAppDOFingerprint}...</code>
+                  ) : (
+                    <span className="text-destructive text-xs font-medium">no key</span>
+                  )}
+                </DetailField>
+
+                {data.workerStatus.envKeyAppDOFlyAppName !== null &&
+                  data.workerStatus.flyAppName !== null &&
+                  data.workerStatus.envKeyAppDOFlyAppName !== data.workerStatus.flyAppName && (
+                    <div className="bg-destructive/10 border-destructive/30 col-span-full rounded-md border p-3">
+                      <p className="text-destructive text-sm font-medium">
+                        Fly app name mismatch: App DO thinks it&apos;s{' '}
+                        <code>{data.workerStatus.envKeyAppDOFlyAppName}</code> but Instance DO has{' '}
+                        <code>{data.workerStatus.flyAppName}</code>. The App DO will set the Fly
+                        secret on the wrong app.
+                      </p>
+                    </div>
+                  )}
+
+                {data.workerStatus.envKeyAppDOFlyAppName === null &&
+                  data.workerStatus.flyAppName !== null && (
+                    <div className="bg-destructive/10 border-destructive/30 col-span-full rounded-md border p-3">
+                      <p className="text-destructive text-sm font-medium">
+                        App DO has no flyAppName — ensureEnvKey() will not call setAppSecret().
+                        Encrypted env vars will use the App DO&apos;s key but the Fly secret will be
+                        stale or missing.
+                      </p>
+                    </div>
+                  )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {data.workerStatus &&
+          (data.workerStatus.lastStartErrorMessage ||
+            data.workerStatus.lastRestartErrorMessage) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Start / Restart Errors</CardTitle>
+                <CardDescription>Most recent start or restart failure</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {data.workerStatus.lastStartErrorMessage && (
+                    <DetailField label="Last Start Error">
+                      <span className="text-destructive text-xs">
+                        <code>{data.workerStatus.lastStartErrorMessage}</code>
+                        <br />
+                        <span className="text-muted-foreground">
+                          {formatEpochTime(data.workerStatus.lastStartErrorAt)}
+                        </span>
+                      </span>
+                    </DetailField>
+                  )}
+                  {data.workerStatus.lastRestartErrorMessage && (
+                    <DetailField label="Last Restart Error">
+                      <span className="text-destructive text-xs">
+                        <code>{data.workerStatus.lastRestartErrorMessage}</code>
+                        <br />
+                        <span className="text-muted-foreground">
+                          {formatEpochTime(data.workerStatus.lastRestartErrorAt)}
+                        </span>
+                      </span>
+                    </DetailField>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+        {data.workerStatus && (
+          <Card>
+            <CardHeader>
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <CardTitle>Unexpected Stop Recovery</CardTitle>

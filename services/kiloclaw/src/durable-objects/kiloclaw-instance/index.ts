@@ -52,7 +52,7 @@ import type { GatewayProcessStatus } from '../gateway-controller-types';
 
 // Domain modules
 import type { InstanceMutableState, InstanceStatus, DestroyResult } from './types';
-import { getFlyConfig } from './types';
+import { getAppKey, getFlyConfig } from './types';
 import {
   applyProviderState,
   createMutableState,
@@ -1994,9 +1994,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     restoreStartedAt: string | null;
     pendingRestoreVolumeId: string | null;
     instanceReadyEmailSent: boolean;
+    // --- env key diagnostics ---
+    envKeyAppDOKey: string | null;
+    envKeyAppDOFlyAppName: string | null;
+    envKeyAppDOKeySet: boolean | null;
+    envKeyAppDOFingerprint: string | null;
   }> {
     await this.loadState();
     const alarmScheduledAt = await this.ctx.storage.getAlarm();
+
+    // Fetch env key diagnostics from the App DO (best-effort, don't fail the whole response).
+    let envKeyDiag: {
+      flyAppName: string | null;
+      envKeySet: boolean;
+      envKeyFingerprint: string | null;
+    } | null = null;
+    let envKeyAppDOKey: string | null = null;
+    try {
+      if (this.s.userId || this.s.sandboxId) {
+        envKeyAppDOKey = getAppKey({ userId: this.s.userId, sandboxId: this.s.sandboxId });
+        const appStub = this.env.KILOCLAW_APP.get(this.env.KILOCLAW_APP.idFromName(envKeyAppDOKey));
+        envKeyDiag = await appStub.getDiagnostics();
+      }
+    } catch {
+      // Swallow — diagnostics are best-effort.
+    }
 
     return {
       userId: this.s.userId,
@@ -2050,6 +2072,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       restoreStartedAt: this.s.restoreStartedAt,
       pendingRestoreVolumeId: this.s.pendingRestoreVolumeId,
       instanceReadyEmailSent: this.s.instanceReadyEmailSent,
+      envKeyAppDOKey,
+      envKeyAppDOFlyAppName: envKeyDiag?.flyAppName ?? null,
+      envKeyAppDOKeySet: envKeyDiag?.envKeySet ?? null,
+      envKeyAppDOFingerprint: envKeyDiag?.envKeyFingerprint ?? null,
     };
   }
 

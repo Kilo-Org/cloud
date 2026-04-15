@@ -10,6 +10,7 @@ export type KiloClawEnv = {
   KILOCLAW_INSTANCE: DurableObjectNamespace<KiloClawInstance>;
   KILOCLAW_APP: DurableObjectNamespace<KiloClawApp>;
   KILOCLAW_REGISTRY: DurableObjectNamespace<KiloClawRegistry>;
+  KILOCLAW_BILLING?: Fetcher;
   KILOCLAW_AE?: AnalyticsEngineDataset;
   KILOCLAW_CONTROLLER_AE: AnalyticsEngineDataset;
   HYPERDRIVE?: Hyperdrive;

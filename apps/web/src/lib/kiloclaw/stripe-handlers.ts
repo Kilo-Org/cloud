@@ -5,6 +5,7 @@ import { eq, and, isNotNull, isNull, sql } from 'drizzle-orm';
 import { addMonths } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
+import { insertKiloClawSubscriptionChangeLog, type KiloClawSubscription } from '@kilocode/db';
 import { kiloclaw_subscriptions, kiloclaw_instances, kilocode_users } from '@kilocode/db/schema';
 import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
 import {
@@ -26,11 +27,19 @@ import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 const logInfo = sentryLogger('kiloclaw-stripe', 'info');
 const logWarning = sentryLogger('kiloclaw-stripe', 'warning');
 const logError = sentryLogger('kiloclaw-stripe', 'error');
+const STRIPE_WEBHOOK_ACTOR = {
+  actorType: 'system',
+  actorId: 'stripe-webhook',
+} as const;
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type SubscriptionLogWriter = DbTransaction | typeof db;
 
 type KiloClawSubscriptionMetadata = {
   type: 'kiloclaw';
   plan: 'commit' | 'standard';
   kiloUserId: string;
+  instanceId: string | null;
+  billingContext: 'personal' | null;
   affiliateTrackingId?: string;
 };
 
@@ -46,6 +55,8 @@ function getKiloClawMetadata(
     type: 'kiloclaw',
     plan,
     kiloUserId,
+    instanceId: typeof metadata.instanceId === 'string' ? metadata.instanceId : null,
+    billingContext: metadata.billingContext === 'personal' ? 'personal' : null,
     affiliateTrackingId: metadata.affiliateTrackingId || metadata.impactClickId || undefined,
   };
 }
@@ -56,6 +67,193 @@ function getImpactItemCategory(plan: 'commit' | 'standard') {
 
 function getImpactItemName(plan: 'commit' | 'standard') {
   return plan === 'commit' ? 'KiloClaw Commit Plan' : 'KiloClaw Standard Plan';
+}
+
+function logQuarantinedStripeEvent(
+  reason: string,
+  fields: Record<string, string | number | boolean | null | undefined>
+) {
+  logWarning('KiloClaw Stripe event quarantined', {
+    event: 'kiloclaw_stripe_quarantine',
+    reason,
+    ...fields,
+  });
+}
+
+async function insertStripeSubscriptionChangeLog(
+  tx: SubscriptionLogWriter,
+  params: {
+    subscriptionId: string;
+    action:
+      | 'created'
+      | 'status_changed'
+      | 'canceled'
+      | 'payment_source_changed'
+      | 'schedule_changed'
+      | 'plan_switched';
+    reason: string;
+    before: KiloClawSubscription | null;
+    after: KiloClawSubscription | null;
+    bestEffort?: boolean;
+  }
+) {
+  if (!params.after) {
+    return;
+  }
+
+  try {
+    await insertKiloClawSubscriptionChangeLog(tx, {
+      subscriptionId: params.subscriptionId,
+      actor: STRIPE_WEBHOOK_ACTOR,
+      action: params.action,
+      reason: params.reason,
+      before: params.before,
+      after: params.after,
+    });
+  } catch (error) {
+    if (!params.bestEffort) {
+      throw error;
+    }
+    logError('Failed to write Stripe subscription change log', {
+      subscription_id: params.subscriptionId,
+      action: params.action,
+      reason: params.reason,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function resolvePersonalBillingInstanceId(params: {
+  tx: DbTransaction;
+  userId: string;
+  instanceId: string;
+}): Promise<string | null> {
+  const [instance] = await params.tx
+    .select({ id: kiloclaw_instances.id })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.id, params.instanceId),
+        eq(kiloclaw_instances.user_id, params.userId),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+
+  return instance?.id ?? null;
+}
+
+async function adoptLegacyDetachedSubscriptionInstanceId(params: {
+  tx: DbTransaction;
+  userId: string;
+}): Promise<string | null> {
+  const activeInstances = await params.tx
+    .select({ id: kiloclaw_instances.id })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, params.userId),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(2);
+
+  if (activeInstances.length !== 1) {
+    return null;
+  }
+
+  const candidate = activeInstances[0];
+  if (!candidate) {
+    return null;
+  }
+
+  return candidate.id;
+}
+
+async function persistDetachedStripeSubscription(params: {
+  tx: DbTransaction;
+  kiloUserId: string;
+  subscription: Stripe.Subscription;
+  plan: 'commit' | 'standard';
+  status: KiloClawSubscriptionStatus;
+  periods: ReturnType<typeof getSubscriptionPeriods>;
+  existingStripeRow:
+    | {
+        id: string;
+      }
+    | undefined;
+}) {
+  const commitEndsAt =
+    params.plan === 'commit'
+      ? addMonths(
+          params.subscription.trial_end
+            ? new Date(params.subscription.trial_end * 1000)
+            : params.periods.current_period_start
+              ? new Date(params.periods.current_period_start)
+              : new Date(),
+          6
+        ).toISOString()
+      : null;
+
+  const [beforeSubscription] = params.existingStripeRow
+    ? await params.tx
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.id, params.existingStripeRow.id))
+        .limit(1)
+    : [];
+
+  if (params.existingStripeRow) {
+    const [afterSubscription] = await params.tx
+      .update(kiloclaw_subscriptions)
+      .set({
+        instance_id: null,
+        stripe_subscription_id: params.subscription.id,
+        plan: params.plan,
+        status: params.status,
+        cancel_at_period_end: params.subscription.cancel_at_period_end,
+        current_period_start: params.periods.current_period_start,
+        current_period_end: params.periods.current_period_end,
+        commit_ends_at: commitEndsAt,
+      })
+      .where(eq(kiloclaw_subscriptions.id, params.existingStripeRow.id))
+      .returning();
+
+    await insertStripeSubscriptionChangeLog(params.tx, {
+      subscriptionId: afterSubscription?.id ?? beforeSubscription?.id ?? '',
+      action: beforeSubscription ? 'status_changed' : 'created',
+      reason: 'stripe_subscription_created_detached',
+      before: beforeSubscription ?? null,
+      after: afterSubscription ?? null,
+    });
+    return;
+  }
+
+  const [afterSubscription] = await params.tx
+    .insert(kiloclaw_subscriptions)
+    .values({
+      user_id: params.kiloUserId,
+      instance_id: null,
+      stripe_subscription_id: params.subscription.id,
+      payment_source: null,
+      plan: params.plan,
+      status: params.status,
+      cancel_at_period_end: params.subscription.cancel_at_period_end,
+      current_period_start: params.periods.current_period_start,
+      current_period_end: params.periods.current_period_end,
+      commit_ends_at: commitEndsAt,
+    })
+    .returning();
+
+  await insertStripeSubscriptionChangeLog(params.tx, {
+    subscriptionId: afterSubscription?.id ?? '',
+    action: 'created',
+    reason: 'stripe_subscription_created_detached',
+    before: null,
+    after: afterSubscription ?? null,
+  });
 }
 
 async function runAfterResponse(work: () => Promise<void>) {
@@ -135,15 +333,34 @@ export function resolvePhasePrice(phase: Stripe.SubscriptionSchedule.Phase): str
   return typeof priceRef === 'string' ? priceRef : (priceRef.id ?? null);
 }
 
-async function persistAutoIntroSchedule(scheduleId: string, userId: string): Promise<void> {
-  await db
-    .update(kiloclaw_subscriptions)
-    .set({
-      stripe_schedule_id: scheduleId,
-      scheduled_plan: 'standard',
-      scheduled_by: 'auto',
-    })
-    .where(eq(kiloclaw_subscriptions.user_id, userId));
+async function persistAutoIntroSchedule(
+  scheduleId: string,
+  stripeSubscriptionId: string
+): Promise<void> {
+  await db.transaction(async tx => {
+    const [before] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.stripe_subscription_id, stripeSubscriptionId))
+      .limit(1);
+    const [after] = await tx
+      .update(kiloclaw_subscriptions)
+      .set({
+        stripe_schedule_id: scheduleId,
+        scheduled_plan: 'standard',
+        scheduled_by: 'auto',
+      })
+      .where(eq(kiloclaw_subscriptions.stripe_subscription_id, stripeSubscriptionId))
+      .returning();
+
+    await insertStripeSubscriptionChangeLog(tx, {
+      subscriptionId: after?.id ?? before?.id ?? '',
+      action: 'schedule_changed',
+      reason: 'persist_auto_intro_schedule',
+      before: before ?? null,
+      after: after ?? null,
+    });
+  });
 }
 
 /**
@@ -177,8 +394,7 @@ async function claimIfAutoIntro(schedule: Stripe.SubscriptionSchedule): Promise<
  */
 async function validateOrRepairAutoIntroSchedule(
   schedule: Stripe.SubscriptionSchedule,
-  stripeSubscriptionId: string,
-  userId: string
+  stripeSubscriptionId: string
 ): Promise<boolean> {
   // If the user has repurposed this schedule via switchPlan (scheduled_by = 'user'),
   // do not overwrite their pending plan switch. switchPlan reuses the auto-intro
@@ -186,7 +402,7 @@ async function validateOrRepairAutoIntroSchedule(
   const [dbRow] = await db
     .select({ scheduled_by: kiloclaw_subscriptions.scheduled_by })
     .from(kiloclaw_subscriptions)
-    .where(eq(kiloclaw_subscriptions.user_id, userId))
+    .where(eq(kiloclaw_subscriptions.stripe_subscription_id, stripeSubscriptionId))
     .limit(1);
 
   if (dbRow?.scheduled_by === 'user') {
@@ -197,7 +413,7 @@ async function validateOrRepairAutoIntroSchedule(
   const phase2Price = schedule.phases[1] ? resolvePhasePrice(schedule.phases[1]) : null;
 
   if (schedule.phases.length >= 2 && phase2Price === regularPriceId) {
-    await persistAutoIntroSchedule(schedule.id, userId);
+    await persistAutoIntroSchedule(schedule.id, stripeSubscriptionId);
     return true;
   }
 
@@ -208,7 +424,6 @@ async function validateOrRepairAutoIntroSchedule(
     logError('Half-configured auto-intro schedule has no usable phase', {
       stripe_subscription_id: stripeSubscriptionId,
       schedule_id: schedule.id,
-      user_id: userId,
     });
     return false;
   }
@@ -226,7 +441,7 @@ async function validateOrRepairAutoIntroSchedule(
     ],
     end_behavior: 'release',
   });
-  await persistAutoIntroSchedule(schedule.id, userId);
+  await persistAutoIntroSchedule(schedule.id, stripeSubscriptionId);
   return true;
 }
 
@@ -239,7 +454,7 @@ async function validateOrRepairAutoIntroSchedule(
  */
 export async function ensureAutoIntroSchedule(
   stripeSubscriptionId: string,
-  userId: string
+  _userId?: string
 ): Promise<void> {
   const liveSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
 
@@ -253,12 +468,11 @@ export async function ensureAutoIntroSchedule(
     const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
 
     if (await claimIfAutoIntro(schedule)) {
-      const valid = await validateOrRepairAutoIntroSchedule(schedule, stripeSubscriptionId, userId);
+      const valid = await validateOrRepairAutoIntroSchedule(schedule, stripeSubscriptionId);
       if (!valid) {
         logError('Auto-intro schedule is unrecoverable, skipping', {
           stripe_subscription_id: stripeSubscriptionId,
           schedule_id: schedule.id,
-          user_id: userId,
         });
       }
       return;
@@ -266,7 +480,6 @@ export async function ensureAutoIntroSchedule(
 
     logWarning('Subscription has non-auto-intro schedule attached, skipping auto schedule', {
       stripe_subscription_id: stripeSubscriptionId,
-      user_id: userId,
       schedule_id: schedule.id,
     });
     return;
@@ -276,17 +489,33 @@ export async function ensureAutoIntroSchedule(
   const [existingRow] = await db
     .select({ stripe_schedule_id: kiloclaw_subscriptions.stripe_schedule_id })
     .from(kiloclaw_subscriptions)
-    .where(eq(kiloclaw_subscriptions.user_id, userId))
+    .where(eq(kiloclaw_subscriptions.stripe_subscription_id, stripeSubscriptionId))
     .limit(1);
 
   if (existingRow?.stripe_schedule_id) {
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({ stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null })
-      .where(eq(kiloclaw_subscriptions.user_id, userId));
+    await db.transaction(async tx => {
+      const [before] = await tx
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.stripe_subscription_id, stripeSubscriptionId))
+        .limit(1);
+      const [after] = await tx
+        .update(kiloclaw_subscriptions)
+        .set({ stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null })
+        .where(eq(kiloclaw_subscriptions.stripe_subscription_id, stripeSubscriptionId))
+        .returning();
+
+      await insertStripeSubscriptionChangeLog(tx, {
+        subscriptionId: after?.id ?? before?.id ?? '',
+        action: 'schedule_changed',
+        reason: 'clear_stale_auto_intro_schedule',
+        before: before ?? null,
+        after: after ?? null,
+      });
+    });
   }
 
-  await createAutoIntroSchedule(stripeSubscriptionId, userId);
+  await createAutoIntroSchedule(stripeSubscriptionId);
 }
 
 /**
@@ -294,17 +523,14 @@ export async function ensureAutoIntroSchedule(
  * subscription. Handles the race where a concurrent caller attaches a schedule
  * between our check and the create call.
  */
-async function createAutoIntroSchedule(
-  stripeSubscriptionId: string,
-  userId: string
-): Promise<void> {
+async function createAutoIntroSchedule(stripeSubscriptionId: string): Promise<void> {
   let newSchedule: Stripe.SubscriptionSchedule;
   try {
     newSchedule = await stripe.subscriptionSchedules.create({
       from_subscription: stripeSubscriptionId,
     });
   } catch (error) {
-    await handleAutoIntroCreateRace(error, stripeSubscriptionId, userId);
+    await handleAutoIntroCreateRace(error, stripeSubscriptionId);
     return;
   }
 
@@ -314,7 +540,6 @@ async function createAutoIntroSchedule(
     logError('Auto-intro schedule created with unusable phase', {
       stripe_subscription_id: stripeSubscriptionId,
       schedule_id: newSchedule.id,
-      user_id: userId,
       has_phase: !!currentPhase,
       has_price: !!phase1Price,
     });
@@ -347,7 +572,7 @@ async function createAutoIntroSchedule(
     throw error;
   }
 
-  await persistAutoIntroSchedule(newSchedule.id, userId);
+  await persistAutoIntroSchedule(newSchedule.id, stripeSubscriptionId);
 }
 
 /**
@@ -357,15 +582,13 @@ async function createAutoIntroSchedule(
  */
 async function handleAutoIntroCreateRace(
   error: unknown,
-  stripeSubscriptionId: string,
-  userId: string
+  stripeSubscriptionId: string
 ): Promise<void> {
   const refetched = await stripe.subscriptions.retrieve(stripeSubscriptionId);
   const refetchedScheduleId = resolveScheduleId(refetched.schedule);
   if (!refetchedScheduleId) {
     logError('Failed to create auto-intro schedule (non-race error)', {
       stripe_subscription_id: stripeSubscriptionId,
-      user_id: userId,
       error: error instanceof Error ? error.message : String(error),
     });
     throw error;
@@ -373,23 +596,17 @@ async function handleAutoIntroCreateRace(
 
   logWarning('Race creating auto-intro schedule, re-checking subscription', {
     stripe_subscription_id: stripeSubscriptionId,
-    user_id: userId,
     error: error instanceof Error ? error.message : String(error),
   });
 
   const existingSchedule = await stripe.subscriptionSchedules.retrieve(refetchedScheduleId);
 
   if (await claimIfAutoIntro(existingSchedule)) {
-    const valid = await validateOrRepairAutoIntroSchedule(
-      existingSchedule,
-      stripeSubscriptionId,
-      userId
-    );
+    const valid = await validateOrRepairAutoIntroSchedule(existingSchedule, stripeSubscriptionId);
     if (!valid) {
       logError('Race-recovered auto-intro schedule is unrecoverable', {
         stripe_subscription_id: stripeSubscriptionId,
         schedule_id: existingSchedule.id,
-        user_id: userId,
       });
     }
   }
@@ -414,8 +631,8 @@ export async function handleKiloClawSubscriptionCreated(params: {
     return;
   }
 
-  const { kiloUserId } = metadata;
   const plan = detectPlanFromSubscription(subscription, metadata.plan);
+  let kiloUserId = metadata.kiloUserId;
   const periods = getSubscriptionPeriods(subscription, kiloUserId);
   const status = mapStripeStatus(subscription.status);
 
@@ -427,44 +644,77 @@ export async function handleKiloClawSubscriptionCreated(params: {
     typeof subscription.created === 'number' ? new Date(subscription.created * 1000) : new Date();
 
   await db.transaction(async tx => {
-    // Look up the user's active personal instance to link the subscription.
-    // Scoped to personal instances (organization_id IS NULL) so a checkout
-    // from the /claw page never attaches to an org-owned instance.  If no
-    // personal instance exists the subscription is inserted with
-    // instance_id = NULL and adoptOrphanedSubscription handles it later.
-    const [activeInstance] = await tx
-      .select({ id: kiloclaw_instances.id })
-      .from(kiloclaw_instances)
-      .where(
-        and(
-          eq(kiloclaw_instances.user_id, kiloUserId),
-          isNull(kiloclaw_instances.destroyed_at),
-          isNull(kiloclaw_instances.organization_id)
-        )
-      )
+    const [existingStripeRow] = await tx
+      .select({
+        id: kiloclaw_subscriptions.id,
+        user_id: kiloclaw_subscriptions.user_id,
+        instance_id: kiloclaw_subscriptions.instance_id,
+        stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
+        payment_source: kiloclaw_subscriptions.payment_source,
+        status: kiloclaw_subscriptions.status,
+        suspended_at: kiloclaw_subscriptions.suspended_at,
+        trial_started_at: kiloclaw_subscriptions.trial_started_at,
+        trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
+      })
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.stripe_subscription_id, subscription.id))
       .limit(1);
 
-    // Guard against stale subscription.created retries: if the instance already
-    // has a row referencing a different Stripe subscription, this event is
-    // outdated and must not overwrite the newer subscription's data.
-    // Exception: if the existing row is canceled, this is a legitimate
-    // re-subscription (createSubscriptionCheckout allows canceled users to
-    // buy again), so we let the upsert proceed.
-    const existingRow = activeInstance
-      ? (
-          await tx
-            .select({
-              stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
-              status: kiloclaw_subscriptions.status,
-              suspended_at: kiloclaw_subscriptions.suspended_at,
-              trial_started_at: kiloclaw_subscriptions.trial_started_at,
-              trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
-            })
-            .from(kiloclaw_subscriptions)
-            .where(eq(kiloclaw_subscriptions.instance_id, activeInstance.id))
-            .limit(1)
-        )[0]
-      : undefined;
+    kiloUserId = existingStripeRow?.user_id ?? metadata.kiloUserId;
+
+    let targetInstanceId = existingStripeRow?.instance_id ?? null;
+    if (!targetInstanceId && metadata.instanceId) {
+      targetInstanceId = await resolvePersonalBillingInstanceId({
+        tx,
+        userId: kiloUserId,
+        instanceId: metadata.instanceId,
+      });
+    }
+    if (!targetInstanceId) {
+      targetInstanceId = await adoptLegacyDetachedSubscriptionInstanceId({
+        tx,
+        userId: kiloUserId,
+      });
+    }
+
+    if (!targetInstanceId) {
+      await persistDetachedStripeSubscription({
+        tx,
+        kiloUserId,
+        subscription,
+        plan,
+        status,
+        periods,
+        existingStripeRow: existingStripeRow ? { id: existingStripeRow.id } : undefined,
+      });
+      logQuarantinedStripeEvent('missing_personal_instance_target', {
+        stripe_event_id: eventId,
+        stripe_subscription_id: subscription.id,
+        user_id: kiloUserId,
+        metadata_instance_id: metadata.instanceId,
+      });
+      didProcess = true;
+      return;
+    }
+
+    const existingRow =
+      existingStripeRow?.instance_id === targetInstanceId
+        ? existingStripeRow
+        : (
+            await tx
+              .select({
+                id: kiloclaw_subscriptions.id,
+                stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
+                payment_source: kiloclaw_subscriptions.payment_source,
+                status: kiloclaw_subscriptions.status,
+                suspended_at: kiloclaw_subscriptions.suspended_at,
+                trial_started_at: kiloclaw_subscriptions.trial_started_at,
+                trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
+              })
+              .from(kiloclaw_subscriptions)
+              .where(eq(kiloclaw_subscriptions.instance_id, targetInstanceId))
+              .limit(1)
+          )[0];
 
     if (
       existingRow &&
@@ -478,12 +728,12 @@ export async function handleKiloClawSubscriptionCreated(params: {
           stripe_event_id: eventId,
           stale_subscription_id: subscription.id,
           current_subscription_id: existingRow.stripe_subscription_id,
+          instance_id: targetInstanceId,
         }
       );
       return;
     }
 
-    // Captured after the stale guard so stale events don't auto-resume
     wasSuspended = !!existingRow?.suspended_at;
     const retainsTrialHistory =
       existingRow?.trial_started_at !== null || existingRow?.trial_ends_at !== null;
@@ -492,7 +742,14 @@ export async function handleKiloClawSubscriptionCreated(params: {
       (existingRow?.status !== 'canceled' &&
         retainsTrialHistory &&
         existingRow?.stripe_subscription_id === subscription.id);
-    resolvedInstanceId = activeInstance?.id;
+    resolvedInstanceId = targetInstanceId;
+    const [beforeSubscription] = existingRow
+      ? await tx
+          .select()
+          .from(kiloclaw_subscriptions)
+          .where(eq(kiloclaw_subscriptions.id, existingRow.id))
+          .limit(1)
+      : [];
 
     // For commit plans, derive commit_ends_at. Pre-launch subscriptions
     // had a delayed-billing trial_end — the 6-month commit term starts
@@ -509,40 +766,40 @@ export async function handleKiloClawSubscriptionCreated(params: {
           ).toISOString()
         : null;
 
-    // Clean up orphaned rows: if a prior delivery inserted a row with
-    // instance_id = NULL (no active instance at the time), delete it so
-    // the upsert below can link the subscription to the now-available
-    // instance without hitting the unique stripe_subscription_id constraint.
-    // We delete rather than update-in-place because the instance may
-    // already have its own row (e.g. trial), and reattaching would collide
-    // with UQ_kiloclaw_subscriptions_instance.
-    if (resolvedInstanceId) {
-      await tx
-        .delete(kiloclaw_subscriptions)
-        .where(
-          and(
-            eq(kiloclaw_subscriptions.stripe_subscription_id, subscription.id),
-            isNull(kiloclaw_subscriptions.instance_id)
-          )
-        );
-    }
+    if (existingStripeRow) {
+      const [afterSubscription] = await tx
+        .update(kiloclaw_subscriptions)
+        .set({
+          instance_id: targetInstanceId,
+          stripe_subscription_id: subscription.id,
+          cancel_at_period_end: subscription.cancel_at_period_end,
+          payment_source: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.payment_source} ELSE 'stripe' END`,
+          plan: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.plan} ELSE ${plan} END`,
+          status: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.status} ELSE ${status} END`,
+          current_period_start: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.current_period_start} ELSE ${periods.current_period_start}::timestamptz END`,
+          current_period_end: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.current_period_end} ELSE ${periods.current_period_end}::timestamptz END`,
+          credit_renewal_at: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.credit_renewal_at} ELSE NULL END`,
+          commit_ends_at: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.commit_ends_at} ELSE ${commitEndsAt}::timestamptz END`,
+          past_due_since: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.past_due_since} ELSE NULL END`,
+          suspended_at: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.suspended_at} ELSE NULL END`,
+          destruction_deadline: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.destruction_deadline} ELSE NULL END`,
+        })
+        .where(eq(kiloclaw_subscriptions.id, existingStripeRow.id))
+        .returning();
 
-    // Upsert: if trial/canceled row exists for this instance, upgrade it; otherwise insert.
-    // Always use the freshly computed commitEndsAt — the stale-subscription
-    // guard above already rejects replays for superseded subscriptions, so
-    // on conflict the incoming subscription is either identical (safe to
-    // overwrite with the same value) or a legitimate re-subscription after
-    // cancellation (must not inherit the old commit boundary).
-    //
-    // Conflict target is instance_id (the per-instance unique index) so a
-    // second Stripe subscription for the same user creates a separate row
-    // for each instance instead of overwriting a single user-scoped row.
-    if (resolvedInstanceId) {
-      await tx
+      await insertStripeSubscriptionChangeLog(tx, {
+        subscriptionId: afterSubscription?.id ?? beforeSubscription?.id ?? '',
+        action: beforeSubscription ? 'status_changed' : 'created',
+        reason: 'stripe_subscription_created',
+        before: beforeSubscription ?? null,
+        after: afterSubscription ?? null,
+      });
+    } else {
+      const [afterSubscription] = await tx
         .insert(kiloclaw_subscriptions)
         .values({
           user_id: kiloUserId,
-          instance_id: resolvedInstanceId,
+          instance_id: targetInstanceId,
           stripe_subscription_id: subscription.id,
           plan,
           status,
@@ -555,17 +812,8 @@ export async function handleKiloClawSubscriptionCreated(params: {
           target: kiloclaw_subscriptions.instance_id,
           targetWhere: isNotNull(kiloclaw_subscriptions.instance_id),
           set: {
-            // Always update regardless of payment_source
             stripe_subscription_id: subscription.id,
             cancel_at_period_end: subscription.cancel_at_period_end,
-            // Hybrid guard: when existing row is hybrid (payment_source = 'credits'
-            // AND has a stripe_subscription_id), preserve billing fields owned by
-            // invoice settlement (Hybrid Subscription Ownership rule 3).
-            // Non-hybrid rows (pure credit with null stripe_subscription_id, or
-            // legacy/null payment_source) get reset to fresh Stripe state. The
-            // ELSE branches must NOT preserve stale values — a canceled pure-credit
-            // row resubscribing via Stripe must reset payment_source to 'stripe'
-            // and clear credit_renewal_at to avoid looking hybrid before settlement.
             payment_source: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.payment_source} ELSE 'stripe' END`,
             plan: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.plan} ELSE ${plan} END`,
             status: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.status} ELSE ${status} END`,
@@ -577,25 +825,16 @@ export async function handleKiloClawSubscriptionCreated(params: {
             suspended_at: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.suspended_at} ELSE NULL END`,
             destruction_deadline: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.destruction_deadline} ELSE NULL END`,
           },
-        });
-    } else {
-      // No active instance — edge case where user destroyed their instance
-      // between checkout and webhook delivery. Use ON CONFLICT on
-      // stripe_subscription_id so Stripe webhook retries are idempotent.
-      await tx
-        .insert(kiloclaw_subscriptions)
-        .values({
-          user_id: kiloUserId,
-          instance_id: null,
-          stripe_subscription_id: subscription.id,
-          plan,
-          status,
-          cancel_at_period_end: subscription.cancel_at_period_end,
-          current_period_start: periods.current_period_start,
-          current_period_end: periods.current_period_end,
-          commit_ends_at: commitEndsAt,
         })
-        .onConflictDoNothing({ target: kiloclaw_subscriptions.stripe_subscription_id });
+        .returning();
+
+      await insertStripeSubscriptionChangeLog(tx, {
+        subscriptionId: afterSubscription?.id ?? beforeSubscription?.id ?? '',
+        action: beforeSubscription ? 'status_changed' : 'created',
+        reason: 'stripe_subscription_created',
+        before: beforeSubscription ?? null,
+        after: afterSubscription ?? null,
+      });
     }
 
     didProcess = true;
@@ -667,21 +906,27 @@ export async function handleKiloClawSubscriptionUpdated(params: {
   // Pre-read to detect hybrid state and suspension for auto-resume
   const [preRead] = await db
     .select({
+      id: kiloclaw_subscriptions.id,
+      user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
       suspended_at: kiloclaw_subscriptions.suspended_at,
       payment_source: kiloclaw_subscriptions.payment_source,
       stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
     })
     .from(kiloclaw_subscriptions)
-    .where(
-      and(
-        eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.stripe_subscription_id, subscription.id)
-      )
-    )
+    .where(eq(kiloclaw_subscriptions.stripe_subscription_id, subscription.id))
     .limit(1);
 
-  const isHybrid = preRead?.payment_source === 'credits' && preRead.stripe_subscription_id !== null;
+  if (!preRead) {
+    logWarning('KiloClaw subscription.updated: no matching row found', {
+      stripe_event_id: eventId,
+      user_id: kiloUserId,
+      stripe_subscription_id: subscription.id,
+    });
+    return;
+  }
+
+  const isHybrid = preRead.payment_source === 'credits' && preRead.stripe_subscription_id !== null;
 
   if (isHybrid) {
     // Hybrid guard: only propagate cancel intent and dunning states.
@@ -694,7 +939,12 @@ export async function handleKiloClawSubscriptionUpdated(params: {
     // the hybrid row before conversion can run.
     const isDunningStatus = status === 'past_due' || status === 'unpaid';
 
-    await db
+    const [before] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, preRead.id))
+      .limit(1);
+    const [after] = await db
       .update(kiloclaw_subscriptions)
       .set({
         cancel_at_period_end: subscription.cancel_at_period_end,
@@ -705,15 +955,19 @@ export async function handleKiloClawSubscriptionUpdated(params: {
           ? { past_due_since: sql`COALESCE(${kiloclaw_subscriptions.past_due_since}, now())` }
           : {}),
       })
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.user_id, kiloUserId),
-          eq(kiloclaw_subscriptions.stripe_subscription_id, subscription.id)
-        )
-      );
+      .where(eq(kiloclaw_subscriptions.id, preRead.id))
+      .returning();
+    await insertStripeSubscriptionChangeLog(db, {
+      subscriptionId: after?.id ?? before?.id ?? '',
+      action: 'status_changed',
+      reason: 'stripe_subscription_updated_hybrid',
+      before: before ?? null,
+      after: after ?? null,
+      bestEffort: true,
+    });
     logInfo('KiloClaw subscription.updated processed (hybrid path)', {
       stripe_event_id: eventId,
-      user_id: kiloUserId,
+      user_id: preRead.user_id,
       status,
       cancel_at_period_end: subscription.cancel_at_period_end,
       propagated_dunning: status === 'past_due' || status === 'unpaid',
@@ -722,11 +976,16 @@ export async function handleKiloClawSubscriptionUpdated(params: {
     return;
   } else {
     // Non-hybrid: keep existing behavior unchanged
-    const wasSuspended = status === 'active' && !!preRead?.suspended_at;
+    const wasSuspended = status === 'active' && !!preRead.suspended_at;
 
     // Guard on stripe_subscription_id so stale webhooks for a superseded
     // subscription don't overwrite the replacement subscription's data.
-    await db
+    const [before] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, preRead.id))
+      .limit(1);
+    const [after] = await db
       .update(kiloclaw_subscriptions)
       .set({
         status,
@@ -767,21 +1026,26 @@ export async function handleKiloClawSubscriptionUpdated(params: {
             : null,
         ...(status === 'active' ? { suspended_at: null, destruction_deadline: null } : {}),
       })
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.user_id, kiloUserId),
-          eq(kiloclaw_subscriptions.stripe_subscription_id, subscription.id)
-        )
-      );
+      .where(eq(kiloclaw_subscriptions.id, preRead.id))
+      .returning();
+
+    await insertStripeSubscriptionChangeLog(db, {
+      subscriptionId: after?.id ?? before?.id ?? '',
+      action: 'status_changed',
+      reason: 'stripe_subscription_updated',
+      before: before ?? null,
+      after: after ?? null,
+      bestEffort: true,
+    });
 
     if (wasSuspended) {
-      await autoResumeIfSuspended(kiloUserId, preRead?.instance_id ?? undefined);
+      await autoResumeIfSuspended(preRead.user_id, preRead.instance_id ?? undefined);
     }
   }
 
   logInfo('KiloClaw subscription.updated processed', {
     stripe_event_id: eventId,
-    user_id: kiloUserId,
+    user_id: preRead.user_id,
     status,
     plan,
   });
@@ -812,17 +1076,13 @@ export async function handleKiloClawSubscriptionDeleted(params: {
   const [preRead] = await db
     .select({
       id: kiloclaw_subscriptions.id,
+      user_id: kiloclaw_subscriptions.user_id,
       payment_source: kiloclaw_subscriptions.payment_source,
       current_period_end: kiloclaw_subscriptions.current_period_end,
       pending_conversion: kiloclaw_subscriptions.pending_conversion,
     })
     .from(kiloclaw_subscriptions)
-    .where(
-      and(
-        eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.stripe_subscription_id, subscription.id)
-      )
-    )
+    .where(eq(kiloclaw_subscriptions.stripe_subscription_id, subscription.id))
     .limit(1);
 
   if (!preRead) {
@@ -845,7 +1105,12 @@ export async function handleKiloClawSubscriptionDeleted(params: {
     // credit renewal sweep picks up the next renewal.
     // Restore status to 'active' because subscription.updated may have already
     // propagated 'canceled' for non-hybrid rows before this event fires.
-    await db
+    const [before] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, preRead.id))
+      .limit(1);
+    const [after] = await db
       .update(kiloclaw_subscriptions)
       .set({
         status: 'active',
@@ -858,16 +1123,31 @@ export async function handleKiloClawSubscriptionDeleted(params: {
         scheduled_by: null,
         stripe_schedule_id: null,
       })
-      .where(eq(kiloclaw_subscriptions.id, preRead.id));
+      .where(eq(kiloclaw_subscriptions.id, preRead.id))
+      .returning();
+
+    await insertStripeSubscriptionChangeLog(db, {
+      subscriptionId: after?.id ?? before?.id ?? '',
+      action: 'payment_source_changed',
+      reason: 'stripe_subscription_deleted_convert_to_credits',
+      before: before ?? null,
+      after: after ?? null,
+      bestEffort: true,
+    });
 
     logInfo('KiloClaw subscription.deleted: converted to pure credit', {
       stripe_event_id: eventId,
-      user_id: kiloUserId,
+      user_id: preRead.user_id,
       credit_renewal_at: preRead.current_period_end,
     });
   } else {
     // Standard cancellation path
-    await db
+    const [before] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, preRead.id))
+      .limit(1);
+    const [after] = await db
       .update(kiloclaw_subscriptions)
       .set({
         status: 'canceled',
@@ -876,11 +1156,21 @@ export async function handleKiloClawSubscriptionDeleted(params: {
         scheduled_by: null,
         stripe_schedule_id: null,
       })
-      .where(eq(kiloclaw_subscriptions.id, preRead.id));
+      .where(eq(kiloclaw_subscriptions.id, preRead.id))
+      .returning();
+
+    await insertStripeSubscriptionChangeLog(db, {
+      subscriptionId: after?.id ?? before?.id ?? '',
+      action: 'canceled',
+      reason: 'stripe_subscription_deleted',
+      before: before ?? null,
+      after: after ?? null,
+      bestEffort: true,
+    });
 
     logInfo('KiloClaw subscription.deleted processed', {
       stripe_event_id: eventId,
-      user_id: kiloUserId,
+      user_id: preRead.user_id,
     });
   }
 }
@@ -920,6 +1210,11 @@ export async function handleKiloClawScheduleEvent(params: {
     scheduleStatus === 'canceled' ||
     scheduleStatus === 'completed'
   ) {
+    const [before] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.stripe_schedule_id, scheduleId))
+      .limit(1);
     const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
       stripe_schedule_id: null,
       scheduled_plan: null,
@@ -950,10 +1245,21 @@ export async function handleKiloClawScheduleEvent(params: {
       }
     }
 
-    await db
+    const [after] = await db
       .update(kiloclaw_subscriptions)
       .set(updateSet)
-      .where(eq(kiloclaw_subscriptions.stripe_schedule_id, scheduleId));
+      .where(eq(kiloclaw_subscriptions.stripe_schedule_id, scheduleId))
+      .returning();
+
+    await insertStripeSubscriptionChangeLog(db, {
+      subscriptionId: after?.id ?? before?.id ?? '',
+      action:
+        scheduleStatus === 'completed' && !!updateSet.plan ? 'plan_switched' : 'schedule_changed',
+      reason: `stripe_schedule_${scheduleStatus}`,
+      before: before ?? null,
+      after: after ?? null,
+      bestEffort: true,
+    });
   }
 
   logInfo('KiloClaw schedule event processed', {
@@ -1080,8 +1386,9 @@ export async function handleKiloClawInvoicePaid(params: {
   const periodEnd = new Date(periodEndUnix * 1000).toISOString();
   const amountMicrodollars = invoice.amount_paid * 10_000;
 
-  await applyStripeFundedKiloClawPeriod({
+  const applied = await applyStripeFundedKiloClawPeriod({
     userId: metadata.kiloUserId,
+    metadataInstanceId: metadata.instanceId ?? undefined,
     stripeSubscriptionId,
     chargeId,
     plan,
@@ -1089,6 +1396,17 @@ export async function handleKiloClawInvoicePaid(params: {
     periodStart,
     periodEnd,
   });
+
+  if (!applied) {
+    logQuarantinedStripeEvent('invoice_paid_unresolved_target', {
+      stripe_event_id: eventId,
+      stripe_invoice_id: invoice.id,
+      stripe_subscription_id: stripeSubscriptionId,
+      user_id: metadata.kiloUserId,
+      metadata_instance_id: metadata.instanceId,
+    });
+    return;
+  }
 
   logInfo('KiloClaw invoice.paid processed', {
     stripe_event_id: eventId,

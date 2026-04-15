@@ -1005,6 +1005,7 @@ describe('createSubscriptionCheckout', () => {
         subscription_data: {
           metadata: {
             type: 'kiloclaw',
+            billingContext: 'personal',
             plan: 'standard',
             kiloUserId: user.id,
             affiliateTrackingId: 'impact-click-123',
@@ -1012,6 +1013,7 @@ describe('createSubscriptionCheckout', () => {
         },
         metadata: {
           type: 'kiloclaw',
+          billingContext: 'personal',
           plan: 'standard',
           kiloUserId: user.id,
           affiliateTrackingId: 'impact-click-123',

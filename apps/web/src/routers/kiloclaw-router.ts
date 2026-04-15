@@ -44,16 +44,18 @@ import {
   getInboundEmailAddressForInstance,
 } from '@/lib/kiloclaw/inbound-email-alias';
 import {
-  ensureActiveInstance,
   getActiveInstance,
   listAllActiveInstances,
   markActiveInstanceDestroyed,
-  markInstanceDestroyedById,
   renameInstance,
   restoreDestroyedInstance,
   workerInstanceId,
   type ActiveKiloClawInstance,
 } from '@/lib/kiloclaw/instance-registry';
+import {
+  getPersonalProvisionLockKey,
+  withKiloclawProvisionContextLock,
+} from '@/lib/kiloclaw/provision-lock';
 
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import {
@@ -75,10 +77,7 @@ import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
-import {
-  KILOCLAW_EARLYBIRD_EXPIRY_DATE,
-  KILOCLAW_TRIAL_DURATION_DAYS,
-} from '@/lib/kiloclaw/constants';
+import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
   getEffectiveKiloClawSubscription,
   getKiloClawSubscriptionAccessReason,
@@ -187,21 +186,67 @@ async function adoptOrphanedSubscription(userId: string, activeInstanceId: strin
 }
 
 /**
- * Return the user's active instance, creating a new registry row if none
- * exists (e.g. trial expired and personal instance was destroyed).
+ * Return active personal instance for billing flows.
  *
- * In both cases, attempts to adopt an orphaned subscription (instance_id =
- * NULL) onto the active instance via {@link adoptOrphanedSubscription}.
+ * Billing routes must not create instance rows. Worker provision owns
+ * `kiloclaw_instances` creation per datamodel rule 21.
  */
-async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKiloClawInstance> {
+async function requireActiveInstanceForBilling(userId: string): Promise<ActiveKiloClawInstance> {
   const active = await getActiveInstance(userId);
-  if (active) {
-    await adoptOrphanedSubscription(userId, active.id);
-    return active;
+  if (!active) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Checkout requires an active personal KiloClaw instance.',
+    });
   }
 
-  const { instance } = await ensureActiveInstance(userId);
-  await adoptOrphanedSubscription(userId, instance.id);
+  await adoptOrphanedSubscription(userId, active.id);
+  return active;
+}
+
+async function getOptionalActiveInstanceForBilling(
+  userId: string
+): Promise<ActiveKiloClawInstance | null> {
+  const active = await getActiveInstance(userId);
+  if (!active) {
+    return null;
+  }
+
+  await adoptOrphanedSubscription(userId, active.id);
+  return active;
+}
+
+async function getOwnedPersonalBillingInstance(params: {
+  userId: string;
+  instanceId: string;
+}): Promise<ActiveKiloClawInstance> {
+  const [instance] = await db
+    .select({
+      id: kiloclaw_instances.id,
+      userId: kiloclaw_instances.user_id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+      organizationId: kiloclaw_instances.organization_id,
+      name: kiloclaw_instances.name,
+      destroyedAt: kiloclaw_instances.destroyed_at,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
+    })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.id, params.instanceId),
+        eq(kiloclaw_instances.user_id, params.userId),
+        isNull(kiloclaw_instances.organization_id)
+      )
+    )
+    .limit(1);
+
+  if (!instance || instance.destroyedAt) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Checkout requires an active personal KiloClaw instance.',
+    });
+  }
+
   return instance;
 }
 
@@ -224,6 +269,34 @@ async function getLatestPersonalBillingInstance(
     .limit(1);
 
   return instance ?? null;
+}
+
+async function resolvePersonalBillingInstance(params: {
+  userId: string;
+  instanceId?: string;
+}): Promise<ActiveKiloClawInstance> {
+  if (params.instanceId) {
+    return getOwnedPersonalBillingInstance({
+      userId: params.userId,
+      instanceId: params.instanceId,
+    });
+  }
+
+  return requireActiveInstanceForBilling(params.userId);
+}
+
+async function resolvePersonalCheckoutInstance(params: {
+  userId: string;
+  instanceId?: string;
+}): Promise<ActiveKiloClawInstance | null> {
+  if (params.instanceId) {
+    return getOwnedPersonalBillingInstance({
+      userId: params.userId,
+      instanceId: params.instanceId,
+    });
+  }
+
+  return getOptionalActiveInstanceForBilling(params.userId);
 }
 
 async function getDisplayedPersonalKiloclawSubscription(params: {
@@ -272,6 +345,25 @@ async function getDisplayedPersonalKiloclawSubscription(params: {
   };
 }
 
+async function hasBlockingPersonalKiloclawSubscriptionAtInstance(params: {
+  userId: string;
+  instanceId: string;
+}): Promise<boolean> {
+  const [blockingSubscription] = await db
+    .select({ id: kiloclaw_subscriptions.id })
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId),
+        inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid'])
+      )
+    )
+    .limit(1);
+
+  return !!blockingSubscription;
+}
+
 async function hasBlockingPersonalKiloclawSubscription(userId: string): Promise<boolean> {
   const [blockingSubscription] = await db
     .select({ id: kiloclaw_subscriptions.id })
@@ -283,7 +375,7 @@ async function hasBlockingPersonalKiloclawSubscription(userId: string): Promise<
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid']),
         or(
           isNull(kiloclaw_subscriptions.instance_id),
-          and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.organization_id))
+          isNull(kiloclaw_instances.organization_id)
         )
       )
     )
@@ -537,18 +629,8 @@ function sanitizeKiloCodeConfigResponse(
 async function provisionInstance(
   user: Parameters<typeof generateApiToken>[0],
   input: z.infer<typeof updateConfigSchema>,
-  /** The exact row ID that ensureProvisionAccess created (if any).
-   *  Null when the access check returned an existing row or skipped
-   *  row creation (earlybird path). */
-  instanceIdCreatedByAccessCheck: string | null
+  params: { instanceId: string | null; bootstrapSubscription: boolean }
 ) {
-  const { instance: instanceRow, created: createdHere } = await ensureActiveInstance(user.id);
-  // Track the exact row ID this request created. Under concurrent
-  // provisions, two requests may each create a row but then converge on
-  // the oldest one via getActiveInstance. Only clean up instanceRow if
-  // it's the same row this request actually inserted.
-  const createdRowId = instanceIdCreatedByAccessCheck ?? (createdHere ? instanceRow.id : null);
-
   const encryptedSecrets = input.secrets
     ? Object.fromEntries(
         Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
@@ -561,44 +643,84 @@ async function provisionInstance(
   });
   const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
 
-  // Check if the user has a version pin
-  const [pin] = await db
-    .select({ image_tag: kiloclaw_version_pins.image_tag })
-    .from(kiloclaw_version_pins)
-    .where(eq(kiloclaw_version_pins.instance_id, instanceRow.id))
-    .limit(1);
-  const pinnedImageTag = pin?.image_tag;
+  const pinnedImageTag = params.instanceId
+    ? (
+        await db
+          .select({ image_tag: kiloclaw_version_pins.image_tag })
+          .from(kiloclaw_version_pins)
+          .where(eq(kiloclaw_version_pins.instance_id, params.instanceId))
+          .limit(1)
+      )[0]?.image_tag
+    : undefined;
 
   const client = new KiloClawInternalClient();
+  return client.provision(
+    user.id,
+    {
+      envVars: input.envVars,
+      encryptedSecrets,
+      channels: buildWorkerChannels(input.channels),
+      kilocodeApiKey,
+      kilocodeApiKeyExpiresAt,
+      kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+      userTimezone: input.userTimezone ?? undefined,
+      pinnedImageTag,
+    },
+    params.instanceId
+      ? {
+          instanceId: params.instanceId,
+          bootstrapSubscription: params.bootstrapSubscription,
+        }
+      : undefined
+  );
+}
+
+async function enqueueProvisionTrialStartAffiliateEvent(params: {
+  userId: string;
+  instanceId: string;
+}) {
   try {
-    return await client.provision(
-      user.id,
-      {
-        envVars: input.envVars,
-        encryptedSecrets,
-        channels: buildWorkerChannels(input.channels),
-        kilocodeApiKey,
-        kilocodeApiKeyExpiresAt,
-        kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-        userTimezone: input.userTimezone ?? undefined,
-        pinnedImageTag,
-      },
-      workerInstanceId(instanceRow) ? { instanceId: instanceRow.id } : undefined
-    );
+    const [subscription] = await db
+      .select({
+        id: kiloclaw_subscriptions.id,
+        createdAt: kiloclaw_subscriptions.created_at,
+        plan: kiloclaw_subscriptions.plan,
+        status: kiloclaw_subscriptions.status,
+        trialStartedAt: kiloclaw_subscriptions.trial_started_at,
+        accessOrigin: kiloclaw_subscriptions.access_origin,
+      })
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, params.userId),
+          eq(kiloclaw_subscriptions.instance_id, params.instanceId)
+        )
+      )
+      .limit(1);
+
+    if (!subscription) return;
+    if (subscription.plan !== 'trial' || subscription.status !== 'trialing') return;
+    if (subscription.accessOrigin === 'earlybird') return;
+
+    const eventDate = new Date(subscription.trialStartedAt ?? subscription.createdAt);
+    await enqueueAffiliateEventForUser({
+      userId: params.userId,
+      provider: 'impact',
+      eventType: 'trial_start',
+      dedupeKey: buildAffiliateEventDedupeKey({
+        provider: 'impact',
+        eventType: 'trial_start',
+        entityId: subscription.id,
+      }),
+      eventDate,
+      orderId: IMPACT_ORDER_ID_MACRO,
+    });
   } catch (error) {
-    // Only clean up if this request created the row AND it's the row
-    // we actually tried to provision. Under concurrent inserts, the
-    // row we created may differ from instanceRow (which converges on
-    // the oldest active row). Never destroy a row another request owns.
-    if (createdRowId && createdRowId === instanceRow.id) {
-      await markInstanceDestroyedById(instanceRow.id).catch(cleanupErr => {
-        console.error(
-          '[kiloclaw] Failed to clean up instance row after provision error:',
-          cleanupErr
-        );
-      });
-    }
-    throw error;
+    sentryLogger('affiliate-events', 'warning')('Affiliate trial start enqueue failed', {
+      user_id: params.userId,
+      instance_id: params.instanceId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -691,148 +813,102 @@ async function fetchKiloClawServiceDegraded(): Promise<boolean> {
 }
 
 /**
- * Ensure the user has billing access for provisioning: auto-create a trial row
- * for new users, allow active/past_due/trialing/earlybird, and reject otherwise.
- * Used by both `provision` and its backward-compatible alias `updateConfig`.
- *
- * Earlybird is checked first so earlybird purchasers never get an accidental
- * trial row, and expired earlybird users cannot regain access by provisioning.
+ * Ensure user has billing access for provisioning.
+ * Returns active instance when access is bound to one, otherwise null when
+ * caller may provision without existing instance row.
  */
 async function ensureProvisionAccess(
   userId: string,
-  userEmail: string
-): Promise<{ createdInstanceId: string | null }> {
-  // Check earlybird before anything else — active earlybird grants access,
-  // expired earlybird must not fall through to the trial bootstrap.
+  _userEmail: string
+): Promise<{
+  instanceId: string | null;
+  bootstrapSubscription: boolean;
+  shouldEnqueueTrialStartAffiliate: boolean;
+}> {
+  const now = new Date();
+  const activeInstance = await getActiveInstance(userId);
+  if (activeInstance) {
+    await adoptOrphanedSubscription(userId, activeInstance.id);
+
+    const [instanceSub] = await db
+      .select({
+        status: kiloclaw_subscriptions.status,
+        trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
+        suspended_at: kiloclaw_subscriptions.suspended_at,
+      })
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, userId),
+          eq(kiloclaw_subscriptions.instance_id, activeInstance.id)
+        )
+      )
+      .limit(1);
+
+    if (instanceSub) {
+      const hasAccess =
+        instanceSub.status === 'active' ||
+        (instanceSub.status === 'past_due' && !instanceSub.suspended_at) ||
+        (instanceSub.status === 'trialing' &&
+          !!instanceSub.trial_ends_at &&
+          new Date(instanceSub.trial_ends_at) > now);
+
+      if (hasAccess) {
+        return {
+          instanceId: activeInstance.id,
+          bootstrapSubscription: false,
+          shouldEnqueueTrialStartAffiliate: false,
+        };
+      }
+    }
+  }
+
   const [earlybird] = await db
     .select({ id: kiloclaw_earlybird_purchases.id })
     .from(kiloclaw_earlybird_purchases)
     .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
     .limit(1);
   if (earlybird) {
-    if (new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > new Date()) {
-      return { createdInstanceId: null };
+    if (new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now) {
+      return {
+        instanceId: activeInstance?.id ?? null,
+        bootstrapSubscription: false,
+        shouldEnqueueTrialStartAffiliate: false,
+      };
     }
-    // Expired earlybird — fall through to subscription check, but must not
-    // auto-create a trial (spec: user must manually subscribe).
   }
 
-  // Ensure the instance row exists so we can check/link subscriptions.
-  // ensureActiveInstance is idempotent; the subsequent call in provisionInstance
-  // will be a no-op.
-  const { instance, created } = await ensureActiveInstance(userId);
-  const createdInstanceId = created ? instance.id : null;
-
-  // Adopt any orphaned subscription (instance_id = NULL) onto this instance
-  // before checking access.  This covers the case where a user destroyed their
-  // instance between checkout and webhook delivery — the webhook inserted with
-  // instance_id = NULL.  See billing spec: Trial Eligibility rule 5.
-  await adoptOrphanedSubscription(userId, instance.id);
-
-  // Trial eligibility: check ANY subscription for the user (not just on this
-  // instance).  Spec rule 2 says a trial is only created when the user has no
-  // existing subscription record at all — detached orphans (expired trials,
-  // canceled subscriptions) still count.
-  const [anySub] = await db
-    .select({ id: kiloclaw_subscriptions.id })
-    .from(kiloclaw_subscriptions)
-    .where(eq(kiloclaw_subscriptions.user_id, userId))
-    .limit(1);
-
-  if (!anySub && !earlybird) {
-    // New user with no subscription record and no earlybird purchase — start trial.
-    const now = new Date();
-    const trialEndsAt = new Date(now.getTime() + KILOCLAW_TRIAL_DURATION_DAYS * 86_400_000);
-    // Use onConflictDoNothing so concurrent requests (e.g. double-submit)
-    // don't fail on the per-instance unique constraint.
-    const [inserted] = await db
-      .insert(kiloclaw_subscriptions)
-      .values({
-        user_id: userId,
-        instance_id: instance.id,
-        plan: 'trial',
-        status: 'trialing',
-        trial_started_at: now.toISOString(),
-        trial_ends_at: trialEndsAt.toISOString(),
-      })
-      .onConflictDoNothing({
-        target: kiloclaw_subscriptions.instance_id,
-        where: isNotNull(kiloclaw_subscriptions.instance_id),
-      })
-      .returning({ id: kiloclaw_subscriptions.id });
-
-    if (inserted) {
-      PostHogClient().capture({
-        distinctId: userEmail,
-        event: 'claw_trial_started',
-        properties: {
-          user_id: userId,
-          plan: 'trial',
-          trial_ends_at: trialEndsAt.toISOString(),
-        },
-      });
-
-      void (async () => {
-        await enqueueAffiliateEventForUser({
-          userId,
-          provider: 'impact',
-          eventType: 'trial_start',
-          dedupeKey: buildAffiliateEventDedupeKey({
-            provider: 'impact',
-            eventType: 'trial_start',
-            entityId: inserted.id,
-          }),
-          eventDate: now,
-          orderId: IMPACT_ORDER_ID_MACRO,
-        });
-      })().catch(error => {
-        sentryLogger('affiliate-events', 'warning')('Affiliate trial start enqueue failed', {
-          user_id: userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
-    }
-    return { createdInstanceId };
-  }
-
-  // Access check: check the subscription on this specific instance.
-  // After adoption, this will include any previously-orphaned subscription
-  // that was linked to this instance above.
-  const [instanceSub] = await db
+  const subscriptions = await db
     .select({
       status: kiloclaw_subscriptions.status,
       trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
       suspended_at: kiloclaw_subscriptions.suspended_at,
     })
     .from(kiloclaw_subscriptions)
-    .where(
-      and(
-        eq(kiloclaw_subscriptions.user_id, userId),
-        eq(kiloclaw_subscriptions.instance_id, instance.id)
-      )
-    )
-    .limit(1);
+    .where(eq(kiloclaw_subscriptions.user_id, userId));
 
-  if (instanceSub) {
-    // Mirror requireKiloClawAccess: active always passes; past_due passes only
-    // until the billing lifecycle cron sets suspended_at.
-    const hasAccess =
-      instanceSub.status === 'active' ||
-      (instanceSub.status === 'past_due' && !instanceSub.suspended_at) ||
-      (instanceSub.status === 'trialing' &&
-        !!instanceSub.trial_ends_at &&
-        new Date(instanceSub.trial_ends_at) > new Date());
-
-    if (hasAccess) return { createdInstanceId };
+  if (subscriptions.length === 0 && !earlybird) {
+    return {
+      instanceId: activeInstance?.id ?? null,
+      bootstrapSubscription: activeInstance !== null,
+      shouldEnqueueTrialStartAffiliate: true,
+    };
   }
 
-  // Access denied — clean up the row if this request created it.
-  // Without this, the row becomes an orphan: active DB row with no
-  // backing DO and no valid subscription to provision against.
-  if (createdInstanceId) {
-    await markInstanceDestroyedById(createdInstanceId).catch(cleanupErr => {
-      console.error('[kiloclaw] Failed to clean up instance row after access denial:', cleanupErr);
-    });
+  const hasDetachedAccess = subscriptions.some(
+    subscription =>
+      subscription.status === 'active' ||
+      (subscription.status === 'past_due' && !subscription.suspended_at) ||
+      (subscription.status === 'trialing' &&
+        !!subscription.trial_ends_at &&
+        new Date(subscription.trial_ends_at) > now)
+  );
+  if (hasDetachedAccess) {
+    return {
+      instanceId: activeInstance?.id ?? null,
+      bootstrapSubscription: false,
+      shouldEnqueueTrialStartAffiliate: false,
+    };
   }
 
   throw new TRPCError({
@@ -844,6 +920,7 @@ async function ensureProvisionAccess(
 // ── Personal subscription management schemas ──────────────────────────
 
 const KiloclawInstanceInputSchema = z.object({ instanceId: z.string().uuid() });
+const KiloclawOptionalInstanceInputSchema = z.object({ instanceId: z.string().uuid().optional() });
 const KiloclawInstanceSwitchPlanInputSchema = z.object({
   instanceId: z.string().uuid(),
   toPlan: z.enum(['commit', 'standard']),
@@ -1827,11 +1904,24 @@ export const kiloclawRouter = createTRPCRouter({
 
   // Explicit lifecycle APIs
   provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    const { createdInstanceId } = await ensureProvisionAccess(
-      ctx.user.id,
-      ctx.user.google_user_email
+    return await withKiloclawProvisionContextLock(
+      getPersonalProvisionLockKey(ctx.user.id),
+      async () => {
+        const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
+          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
+        const result = await provisionInstance(ctx.user, input, {
+          instanceId,
+          bootstrapSubscription,
+        });
+        if (shouldEnqueueTrialStartAffiliate) {
+          await enqueueProvisionTrialStartAffiliateEvent({
+            userId: ctx.user.id,
+            instanceId: result.instanceId,
+          });
+        }
+        return result;
+      }
     );
-    return provisionInstance(ctx.user, input, createdInstanceId);
   }),
 
   patchConfig: clawAccessProcedure
@@ -1843,11 +1933,24 @@ export const kiloclawRouter = createTRPCRouter({
   // Backward-compatible alias — uses the same trial-bootstrap flow as provision
   // so first-time callers can create a trial row (clawAccessProcedure would reject them).
   updateConfig: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    const { createdInstanceId } = await ensureProvisionAccess(
-      ctx.user.id,
-      ctx.user.google_user_email
+    return await withKiloclawProvisionContextLock(
+      getPersonalProvisionLockKey(ctx.user.id),
+      async () => {
+        const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
+          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
+        const result = await provisionInstance(ctx.user, input, {
+          instanceId,
+          bootstrapSubscription,
+        });
+        if (shouldEnqueueTrialStartAffiliate) {
+          await enqueueProvisionTrialStartAffiliateEvent({
+            userId: ctx.user.id,
+            instanceId: result.instanceId,
+          });
+        }
+        return result;
+      }
     );
-    return provisionInstance(ctx.user, input, createdInstanceId);
   }),
 
   updateKiloCodeConfig: clawAccessProcedure
@@ -3110,16 +3213,25 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   createSubscriptionCheckout: baseProcedure
-    .input(z.object({ plan: z.enum(['commit', 'standard']) }))
+    .input(KiloclawOptionalInstanceInputSchema.extend({ plan: z.enum(['commit', 'standard']) }))
     .mutation(async ({ ctx, input }) => {
       const stripeCustomerId = ctx.user.stripe_customer_id;
       if (!stripeCustomerId) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
       }
 
-      // Reject checkout if any non-ended subscription exists (active, past_due, unpaid).
-      // The trialing status is exempted so trial users can convert to paid.
-      if (await hasBlockingPersonalKiloclawSubscription(ctx.user.id)) {
+      const instance = await resolvePersonalCheckoutInstance({
+        userId: ctx.user.id,
+        instanceId: input.instanceId,
+      });
+
+      const hasBlockingSubscription = instance
+        ? await hasBlockingPersonalKiloclawSubscriptionAtInstance({
+            userId: ctx.user.id,
+            instanceId: instance.id,
+          })
+        : await hasBlockingPersonalKiloclawSubscription(ctx.user.id);
+      if (hasBlockingSubscription) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'You already have an active subscription.',
@@ -3134,7 +3246,10 @@ export const kiloclawRouter = createTRPCRouter({
         stripe.checkout.sessions.list({ customer: stripeCustomerId, status: 'open', limit: 10 }),
       ]);
       const hasActiveKiloClawSub = [...activeSubs.data, ...trialingSubs.data].some(
-        s => s.metadata.type === 'kiloclaw'
+        s =>
+          s.metadata.type === 'kiloclaw' &&
+          (s.metadata.billingContext === 'personal' || !s.metadata.billingContext) &&
+          (!instance || s.metadata.instanceId === instance.id || !s.metadata.instanceId)
       );
       if (hasActiveKiloClawSub) {
         throw new TRPCError({
@@ -3145,7 +3260,11 @@ export const kiloclawRouter = createTRPCRouter({
       // Best-effort: expire stale open checkout sessions so the user can retry.
       // Concurrent duplicates are tolerable — hasActiveKiloClawSub prevents
       // duplicate subscriptions, which is what actually matters.
-      const staleKiloClawSessions = openSessions.data.filter(s => s.metadata?.type === 'kiloclaw');
+      const staleKiloClawSessions = openSessions.data.filter(
+        s =>
+          s.metadata?.type === 'kiloclaw' &&
+          (!instance || s.metadata.instanceId === instance.id || !s.metadata.instanceId)
+      );
       await Promise.all(
         staleKiloClawSessions.map(s => stripe.checkout.sessions.expire(s.id).catch(() => {}))
       );
@@ -3158,6 +3277,20 @@ export const kiloclawRouter = createTRPCRouter({
           : getStripePriceIdForClawPlan(input.plan);
 
       const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
+      const sessionMetadata = {
+        type: 'kiloclaw',
+        billingContext: 'personal',
+        plan: input.plan,
+        kiloUserId: ctx.user.id,
+        affiliateTrackingId: attribution?.tracking_id ?? '',
+        ...(instance ? { instanceId: instance.id } : {}),
+      };
+      const successUrl = instance
+        ? `${APP_URL}/payments/kiloclaw/success?session_id={CHECKOUT_SESSION_ID}&clawInstanceId=${instance.id}`
+        : `${APP_URL}/payments/kiloclaw/success?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = instance
+        ? `${APP_URL}/claw?checkout=cancelled&clawInstanceId=${instance.id}`
+        : `${APP_URL}/claw?checkout=cancelled`;
 
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
@@ -3167,22 +3300,12 @@ export const kiloclawRouter = createTRPCRouter({
         allow_promotion_codes: true,
         customer_update: { name: 'auto', address: 'auto' },
         tax_id_collection: { enabled: true, required: 'never' },
-        success_url: `${APP_URL}/payments/kiloclaw/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${APP_URL}/claw?checkout=cancelled`,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
         subscription_data: {
-          metadata: {
-            type: 'kiloclaw',
-            plan: input.plan,
-            kiloUserId: ctx.user.id,
-            affiliateTrackingId: attribution?.tracking_id ?? '',
-          },
+          metadata: sessionMetadata,
         },
-        metadata: {
-          type: 'kiloclaw',
-          plan: input.plan,
-          kiloUserId: ctx.user.id,
-          affiliateTrackingId: attribution?.tracking_id ?? '',
-        },
+        metadata: sessionMetadata,
       });
 
       return { url: typeof session.url === 'string' ? session.url : null };
@@ -3196,40 +3319,10 @@ export const kiloclawRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // When a specific instanceId is provided (e.g. from the Kilo Pass upsell
-      // callback URL), look up that instance directly so enrollment targets the
-      // correct one even if the user reprovisioned since checkout started.
-      let instance: ActiveKiloClawInstance;
-      if (input.instanceId) {
-        const [row] = await db
-          .select({
-            id: kiloclaw_instances.id,
-            userId: kiloclaw_instances.user_id,
-            sandboxId: kiloclaw_instances.sandbox_id,
-            organizationId: kiloclaw_instances.organization_id,
-            name: kiloclaw_instances.name,
-            inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
-          })
-          .from(kiloclaw_instances)
-          .where(
-            and(
-              eq(kiloclaw_instances.id, input.instanceId),
-              eq(kiloclaw_instances.user_id, ctx.user.id),
-              isNull(kiloclaw_instances.destroyed_at)
-            )
-          )
-          .limit(1);
-
-        if (!row) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Instance not found or does not belong to you.',
-          });
-        }
-        instance = row;
-      } else {
-        instance = await getOrCreateInstanceForBilling(ctx.user.id);
-      }
+      const instance = await resolvePersonalCheckoutInstance({
+        userId: ctx.user.id,
+        instanceId: input.instanceId,
+      });
 
       // Intro pricing eligibility (spec Credit Enrollment rule 3).
       const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
@@ -3237,7 +3330,7 @@ export const kiloclawRouter = createTRPCRouter({
       try {
         await enrollWithCreditsImpl({
           userId: ctx.user.id,
-          instanceId: instance.id,
+          instanceId: instance?.id ?? null,
           plan: input.plan,
           hadPaidSubscription,
         });
@@ -3260,6 +3353,7 @@ export const kiloclawRouter = createTRPCRouter({
   createKiloPassUpsellCheckout: baseProcedure
     .input(
       z.object({
+        instanceId: z.string().uuid().optional(),
         tier: z.enum(['19', '49', '199']),
         cadence: z.enum(['monthly', 'yearly']),
         hostingPlan: z.enum(['commit', 'standard']),
@@ -3271,20 +3365,18 @@ export const kiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
       }
 
-      // Get the user's active instance — needed for both the guard and callback URL.
-      // If none exists (e.g. trial expired and instance was destroyed) create a new
-      // registry row and reassign any existing subscription to it.
-      const instance = await getOrCreateInstanceForBilling(ctx.user.id);
+      const activeInstance = await resolvePersonalCheckoutInstance({
+        userId: ctx.user.id,
+        instanceId: input.instanceId,
+      });
 
-      // Reject if this instance already has a non-ended KiloClaw subscription.
-      // Safe with LIMIT 1: kiloclaw_subscriptions has a partial unique index on instance_id.
-      const [existing] = await db
-        .select({ status: kiloclaw_subscriptions.status })
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.instance_id, instance.id))
-        .limit(1);
-
-      if (existing && existing.status !== 'canceled' && existing.status !== 'trialing') {
+      const hasBlockingSubscription = activeInstance
+        ? await hasBlockingPersonalKiloclawSubscriptionAtInstance({
+            userId: ctx.user.id,
+            instanceId: activeInstance.id,
+          })
+        : await hasBlockingPersonalKiloclawSubscription(ctx.user.id);
+      if (hasBlockingSubscription) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'You already have an active subscription.',
@@ -3331,7 +3423,9 @@ export const kiloclawRouter = createTRPCRouter({
           enabled: true,
           required: 'never',
         },
-        success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}&clawHostingPlan=${input.hostingPlan}&clawInstanceId=${instance.id}`,
+        success_url: activeInstance
+          ? `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}&clawHostingPlan=${input.hostingPlan}&clawInstanceId=${activeInstance.id}`
+          : `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}&clawHostingPlan=${input.hostingPlan}`,
         cancel_url: `${APP_URL}/claw?checkout=cancelled`,
         subscription_data: {
           metadata: {

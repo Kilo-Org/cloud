@@ -9,6 +9,13 @@ import {
 } from './types.js';
 import { runSweep } from './lifecycle.js';
 import { logger, withLogTags, type BillingLogFields } from './logger.js';
+import { bootstrapProvisionSubscription } from './bootstrap.js';
+
+const BootstrapProvisionSubscriptionSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().uuid(),
+  orgId: z.string().uuid().nullable().optional(),
+});
 
 const BillingSweepMessageSchema = z.object({
   runId: z.string().uuid(),
@@ -36,7 +43,52 @@ function log(level: 'info' | 'warn' | 'error', message: string, fields: BillingL
 }
 
 export const handler: ExportedHandler<BillingWorkerEnv, BillingSweepMessage> = {
-  async fetch() {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (request.method === 'POST' && url.pathname === '/bootstrap-subscription') {
+      if (!env.INTERNAL_API_SECRET) {
+        return Response.json({ error: 'INTERNAL_API_SECRET is not configured' }, { status: 500 });
+      }
+
+      const providedSecret = request.headers.get('x-internal-api-key');
+      if (!providedSecret || providedSecret !== env.INTERNAL_API_SECRET) {
+        return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return Response.json({ error: 'Malformed JSON body' }, { status: 400 });
+      }
+
+      const parsed = BootstrapProvisionSubscriptionSchema.safeParse(body);
+      if (!parsed.success) {
+        return Response.json(
+          { error: 'Invalid request', details: parsed.error.flatten().fieldErrors },
+          { status: 400 }
+        );
+      }
+
+      try {
+        const subscription = await bootstrapProvisionSubscription(env, {
+          userId: parsed.data.userId,
+          instanceId: parsed.data.instanceId,
+          orgId: parsed.data.orgId ?? null,
+        });
+
+        return Response.json({
+          ok: true,
+          subscriptionId: subscription.id,
+        });
+      } catch (error) {
+        return Response.json(
+          { error: error instanceof Error ? error.message : String(error) },
+          { status: 500 }
+        );
+      }
+    }
+
     return Response.json({
       ok: true,
       service: 'kiloclaw-billing',

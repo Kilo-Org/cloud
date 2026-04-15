@@ -34,14 +34,16 @@ import {
   getInboundEmailAddressForInstance,
 } from '@/lib/kiloclaw/inbound-email-alias';
 import {
-  ensureActiveInstance,
   getActiveOrgInstance,
   markActiveInstanceDestroyed,
-  markInstanceDestroyedById,
   renameOrgInstance,
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
+import {
+  getOrganizationProvisionLockKey,
+  withKiloclawProvisionContextLock,
+} from '@/lib/kiloclaw/provision-lock';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -378,79 +380,61 @@ export const organizationKiloclawRouter = createTRPCRouter({
   provision: organizationMemberMutationProcedure
     .input(updateConfigSchema)
     .mutation(async ({ ctx, input }) => {
-      // TODO: org-specific kiloclaw billing gate — currently gated by
-      // organizationMemberMutationProcedure (requireActiveSubscriptionOrTrial for org)
+      return await withKiloclawProvisionContextLock(
+        getOrganizationProvisionLockKey(ctx.user.id, input.organizationId),
+        async () => {
+          // TODO: org-specific kiloclaw billing gate — currently gated by
+          // organizationMemberMutationProcedure (requireActiveSubscriptionOrTrial for org)
+          const existing = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+          if (existing) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'You already have an active KiloClaw instance in this organization',
+            });
+          }
 
-      // Cardinality check: 1 instance per (org, user) in Phase 1
-      const existing = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-      if (existing) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'You already have an active KiloClaw instance in this organization',
-        });
-      }
+          const encryptedSecrets = input.secrets
+            ? Object.fromEntries(
+                Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
+              )
+            : undefined;
 
-      const { instance: instanceRow } = await ensureActiveInstance(ctx.user.id, {
-        orgId: input.organizationId,
-      });
+          const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
+          const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
+            expiresIn: expiresInSeconds,
+          });
+          const kilocodeApiKeyExpiresAt = new Date(
+            Date.now() + expiresInSeconds * 1000
+          ).toISOString();
 
-      const encryptedSecrets = input.secrets
-        ? Object.fromEntries(
-            Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
-          )
-        : undefined;
-
-      const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-      const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
-        expiresIn: expiresInSeconds,
-      });
-      const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
-
-      // Check if the user has a version pin
-      const [pin] = await db
-        .select({ image_tag: kiloclaw_version_pins.image_tag })
-        .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.instance_id, instanceRow.id))
-        .limit(1);
-
-      const client = new KiloClawInternalClient();
-      try {
-        const result = await client.provision(
-          ctx.user.id,
-          {
-            envVars: input.envVars,
-            encryptedSecrets,
-            channels: buildWorkerChannels(input.channels),
-            kilocodeApiKey,
-            kilocodeApiKeyExpiresAt,
-            kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-            userTimezone: input.userTimezone ?? undefined,
-            pinnedImageTag: pin?.image_tag,
-          },
-          { instanceId: instanceRow.id, orgId: input.organizationId }
-        );
-
-        PostHogClient().capture({
-          distinctId: ctx.user.google_user_email,
-          event: 'claw_org_instance_provisioned',
-          properties: {
-            user_id: ctx.user.id,
-            organization_id: input.organizationId,
-            instance_id: instanceRow.id,
-          },
-        });
-
-        return result;
-      } catch (error) {
-        // Org provision always creates a new row, so always clean up on failure.
-        await markInstanceDestroyedById(instanceRow.id).catch(cleanupErr => {
-          console.error(
-            '[kiloclaw-org] Failed to clean up instance row after provision error:',
-            cleanupErr
+          const client = new KiloClawInternalClient();
+          const result = await client.provision(
+            ctx.user.id,
+            {
+              envVars: input.envVars,
+              encryptedSecrets,
+              channels: buildWorkerChannels(input.channels),
+              kilocodeApiKey,
+              kilocodeApiKeyExpiresAt,
+              kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+              userTimezone: input.userTimezone ?? undefined,
+            },
+            { orgId: input.organizationId }
           );
-        });
-        throw error;
-      }
+
+          PostHogClient().capture({
+            distinctId: ctx.user.google_user_email,
+            event: 'claw_org_instance_provisioned',
+            properties: {
+              user_id: ctx.user.id,
+              organization_id: input.organizationId,
+              instance_id: result.instanceId,
+            },
+          });
+
+          return result;
+        }
+      );
     }),
 
   updateConfig: organizationMemberMutationProcedure

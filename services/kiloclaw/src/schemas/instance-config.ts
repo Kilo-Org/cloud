@@ -180,6 +180,8 @@ export const ProvisionRequestSchema = z.object({
   instanceId: z.string().uuid().optional(),
   /** Optional org ID — null/absent means personal instance. */
   orgId: z.string().uuid().nullable().optional(),
+  /** Bootstrap subscription against an existing instance row during migration cleanup. */
+  bootstrapSubscription: z.boolean().optional(),
   provider: ProviderIdSchema.optional(),
   ...InstanceConfigSchema.omit({ googleCredentials: true }).shape,
 });

@@ -25,6 +25,7 @@ export type AutoCommitOptions = {
    *  committing to that branch even if it is main/master. Protection is only bypassed
    *  when the current branch matches this value exactly. */
   upstreamBranch?: string;
+  signal?: AbortSignal;
 };
 
 function emitStarted(
@@ -58,13 +59,13 @@ function emitCompleted(
 }
 
 export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommitResult> {
-  const { workspacePath, onEvent, kiloClient, messageId } = opts;
+  const { workspacePath, onEvent, kiloClient, messageId, signal } = opts;
 
   logToFile(`auto-commit: starting workspacePath=${workspacePath}`);
 
   try {
     // Check current branch (agent may have switched branches during execution)
-    const branch = await getCurrentBranch(workspacePath, GIT_LOCAL_TIMEOUT_MS);
+    const branch = await getCurrentBranch(workspacePath, GIT_LOCAL_TIMEOUT_MS, signal);
     logToFile(`auto-commit: branch=${branch || '(detached HEAD)'}`);
     if (!branch) {
       logToFile('auto-commit: skipping - detached HEAD state');
@@ -102,14 +103,21 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     }
 
     // Check actual git upstream (not stale config) to decide push strategy
-    const trackingUpstream = await hasGitUpstream(workspacePath, GIT_LOCAL_TIMEOUT_MS);
+    const trackingUpstream = await hasGitUpstream(workspacePath, GIT_LOCAL_TIMEOUT_MS, signal);
     logToFile(`auto-commit: hasGitUpstream=${trackingUpstream}`);
 
     // Check for uncommitted changes
     const status = await git(['status', '--porcelain'], {
       cwd: workspacePath,
       timeoutMs: GIT_LOCAL_TIMEOUT_MS,
+      signal,
     });
+    if (status.terminationReason === 'abort') {
+      const msg = 'git status aborted';
+      logToFile(`auto-commit: ${msg} (exit 124)`);
+      emitCompleted(onEvent, { success: false, message: msg }, messageId);
+      return { success: false, error: msg };
+    }
     if (status.exitCode === 124) {
       const msg = 'git status timed out';
       logToFile(`auto-commit: ${msg} (exit 124)`);
@@ -134,13 +142,29 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     let commitMessage: string;
     try {
       const commitMsgPromise = kiloClient.generateCommitMessage({ path: workspacePath });
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      let abortHandler: (() => void) | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeout = setTimeout(
           () => reject(new Error('Commit message generation timed out')),
           COMMIT_MESSAGE_TIMEOUT_MS
-        )
+        );
+      });
+      const abortPromise = new Promise<never>((_, reject) => {
+        if (!signal) return;
+        abortHandler = () => reject(new Error('Commit message generation aborted'));
+        if (signal.aborted) {
+          abortHandler();
+          return;
+        }
+        signal.addEventListener('abort', abortHandler, { once: true });
+      });
+      const result = await Promise.race([commitMsgPromise, timeoutPromise, abortPromise]).finally(
+        () => {
+          if (timeout) clearTimeout(timeout);
+          if (signal && abortHandler) signal.removeEventListener('abort', abortHandler);
+        }
       );
-      const result = await Promise.race([commitMsgPromise, timeoutPromise]);
       commitMessage = result.message.trim() || 'wip';
       logToFile(`auto-commit: generated commit message: ${commitMessage}`);
     } catch (err) {
@@ -156,6 +180,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     const addResult = await git(['add', '-A'], {
       cwd: workspacePath,
       timeoutMs: GIT_LOCAL_TIMEOUT_MS,
+      signal,
     });
     if (addResult.exitCode !== 0) {
       const msg = `git add failed: ${addResult.stderr.trim()}`;
@@ -169,12 +194,14 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     let commitResult = await git(['commit', '-m', commitMessage], {
       cwd: workspacePath,
       timeoutMs: GIT_LOCAL_TIMEOUT_MS,
+      signal,
     });
     if (commitResult.exitCode !== 0) {
       logToFile('auto-commit: commit failed, retrying with --no-verify');
       commitResult = await git(['commit', '--no-verify', '-m', commitMessage], {
         cwd: workspacePath,
         timeoutMs: GIT_LOCAL_TIMEOUT_MS,
+        signal,
       });
       if (commitResult.exitCode !== 0) {
         const msg = `git commit failed: ${commitResult.stderr.trim()}`;
@@ -191,6 +218,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
       const hashResult = await git(['rev-parse', '--short', 'HEAD'], {
         cwd: workspacePath,
         timeoutMs: GIT_LOCAL_TIMEOUT_MS,
+        signal,
       });
       if (hashResult.exitCode === 0 && hashResult.stdout.trim()) {
         commitHash = hashResult.stdout.trim();
@@ -204,7 +232,11 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     const pushArgs = trackingUpstream ? ['push'] : ['push', '-u', 'origin', branch];
     logToFile(`auto-commit: pushing with args: git ${pushArgs.join(' ')}`);
 
-    const pushResult = await git(pushArgs, { cwd: workspacePath, timeoutMs: GIT_PUSH_TIMEOUT_MS });
+    const pushResult = await git(pushArgs, {
+      cwd: workspacePath,
+      timeoutMs: GIT_PUSH_TIMEOUT_MS,
+      signal,
+    });
     if (pushResult.exitCode !== 0) {
       // Push failure is non-fatal — changes are committed locally
       const msg = `git push failed: ${pushResult.stderr.trim()}`;

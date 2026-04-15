@@ -16,14 +16,14 @@ function buildGoogleRedirectPath(state: string | null, queryParam: string): stri
   const owner = verified?.owner;
 
   if (owner?.type === 'org') {
-    return `/organizations/${owner.id}/integrations?${queryParam}`;
+    return `/organizations/${owner.id}/claw/settings?${queryParam}`;
   }
 
   if (owner?.type === 'user') {
-    return `/integrations?${queryParam}`;
+    return `/claw/settings?${queryParam}`;
   }
 
-  return `/integrations?${queryParam}`;
+  return `/claw/settings?${queryParam}`;
 }
 
 /**
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
         tags: { endpoint: 'google/callback', source: 'google_oauth' },
         extra: { state, allParams: Object.fromEntries(searchParams.entries()) },
       });
-      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+      return NextResponse.redirect(new URL('/claw/settings?error=invalid_state', APP_URL));
     }
 
     if (verifiedState.userId !== user.id) {
@@ -90,13 +90,13 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+      return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
     }
 
     if (verifiedState.owner.type === 'org') {
       await ensureOrganizationAccess({ user }, verifiedState.owner.id);
     } else if (verifiedState.owner.id !== user.id) {
-      return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+      return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
     }
 
     const instance = await getInstanceById(verifiedState.instanceId);
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+      return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
     }
 
     const oauthData = await exchangeGoogleOAuthCode(code, verifiedState.capabilities);
@@ -157,8 +157,8 @@ export async function GET(request: NextRequest) {
 
     const successPath =
       verifiedState.owner.type === 'org'
-        ? `/organizations/${verifiedState.owner.id}/integrations?success=google_connected`
-        : '/integrations?success=google_connected';
+        ? `/organizations/${verifiedState.owner.id}/claw/settings?success=google_connected`
+        : '/claw/settings?success=google_connected';
 
     return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {

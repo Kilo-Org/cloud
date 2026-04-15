@@ -15,10 +15,10 @@ const OrganizationIdSchema = z.string().uuid();
 
 function buildConnectErrorPath(organizationId: string | undefined, errorCode: string): string {
   if (organizationId) {
-    return `/organizations/${organizationId}/integrations?error=${encodeURIComponent(errorCode)}`;
+    return `/organizations/${organizationId}/claw/settings?error=${encodeURIComponent(errorCode)}`;
   }
 
-  return `/integrations?error=${encodeURIComponent(errorCode)}`;
+  return `/claw/settings?error=${encodeURIComponent(errorCode)}`;
 }
 
 /**
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     if (organizationIdParam) {
       const parsedOrgId = OrganizationIdSchema.safeParse(organizationIdParam);
       if (!parsedOrgId.success) {
-        return NextResponse.redirect(new URL('/integrations?error=invalid_organization', APP_URL));
+        return NextResponse.redirect(new URL('/claw/settings?error=invalid_organization', APP_URL));
       }
       organizationId = parsedOrgId.data;
       await ensureOrganizationAccess({ user }, organizationId);

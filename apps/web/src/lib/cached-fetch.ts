@@ -2,9 +2,9 @@
  * In-process stale-while-revalidate cache for async fetchers.
  *
  * Returns the cached value immediately if it's younger than `ttlMs`,
- * otherwise calls `fetcher` to refresh. Useful for values that change
- * infrequently (admin config, feature flags, etc.) where paying a
- * network round-trip on every call is wasteful.
+ * otherwise calls `fetcher` to refresh. If the fetcher throws (e.g.
+ * Redis timeout), returns the last-known-good value rather than
+ * propagating the error. Only throws if there is no cached value at all.
  */
 export function createCachedFetch<T>(fetcher: () => Promise<T>, ttlMs: number) {
   let cached: { value: T; at: number } | null = null;
@@ -13,8 +13,15 @@ export function createCachedFetch<T>(fetcher: () => Promise<T>, ttlMs: number) {
     if (cached && Date.now() - cached.at < ttlMs) {
       return cached.value;
     }
-    const value = await fetcher();
-    cached = { value, at: Date.now() };
-    return value;
+    try {
+      const value = await fetcher();
+      cached = { value, at: Date.now() };
+      return value;
+    } catch (e) {
+      if (cached) {
+        return cached.value;
+      }
+      throw e;
+    }
   };
 }

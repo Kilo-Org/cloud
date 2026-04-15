@@ -1,9 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { writeKiloCliConfig, toKiloModelId, type KiloCliConfigDeps } from './kilo-cli-config';
 
-function fakeDeps(existingConfig?: string) {
+function fakeDeps(existingConfig?: string, legacyConfig?: string) {
   const written: { path: string; data: string; mode: number }[] = [];
   const dirs: string[] = [];
+  const files = new Map<string, string>();
+
+  if (existingConfig !== undefined) files.set('/tmp/kilo/kilo.json', existingConfig);
+  if (legacyConfig !== undefined) files.set('/tmp/kilo/opencode.json', legacyConfig);
 
   const deps: KiloCliConfigDeps = {
     mkdirSync: vi.fn((dir: string, _opts: { recursive: boolean }) => {
@@ -11,15 +15,14 @@ function fakeDeps(existingConfig?: string) {
     }),
     writeFileSync: vi.fn((filePath: string, data: string, opts: { mode: number }) => {
       written.push({ path: filePath, data, mode: opts.mode });
+      files.set(filePath, data);
     }),
-    readFileSync: vi.fn((_path: string) => {
-      if (existingConfig !== undefined) return existingConfig;
+    readFileSync: vi.fn((filePath: string) => {
+      const data = files.get(filePath);
+      if (data !== undefined) return data;
       throw new Error('ENOENT');
     }),
-    existsSync: vi.fn((filePath: string) => {
-      if (filePath.endsWith('opencode.json')) return existingConfig !== undefined;
-      return false;
-    }),
+    existsSync: vi.fn((filePath: string) => files.has(filePath)),
   };
 
   return { deps, written, dirs };
@@ -82,6 +85,7 @@ describe('writeKiloCliConfig', () => {
     expect(deps.mkdirSync).toHaveBeenCalledWith('/tmp/kilo', { recursive: true });
 
     expect(written.length).toBeGreaterThanOrEqual(1);
+    expect(written[0].path).toBe('/tmp/kilo/kilo.json');
     const seedConfig = JSON.parse(written[0].data);
     expect(seedConfig.$schema).toBe('https://app.kilo.ai/config.json');
     // No provider block — KiloAuthPlugin auto-registers via KILO_API_KEY env var
@@ -112,6 +116,43 @@ describe('writeKiloCliConfig', () => {
 
     expect(result).toBe(true);
     // No seed (file exists), no patch (no KILOCODE_API_BASE_URL)
+    expect(written).toHaveLength(0);
+  });
+
+  it('migrates legacy opencode config to kilo config', () => {
+    const legacy = JSON.stringify({
+      permission: { edit: 'allow', bash: 'allow' },
+      provider: { kilo: { options: { baseURL: 'https://stale.example.com' } } },
+    });
+    const { deps, written, dirs } = fakeDeps(undefined, legacy);
+    const env = baseEnv({
+      KILOCLAW_FRESH_INSTALL: 'false',
+      KILOCODE_DEFAULT_MODEL: 'kilocode/openai/gpt-5',
+    });
+
+    const result = writeKiloCliConfig(env, '/tmp/kilo', deps);
+
+    expect(result).toBe(true);
+    expect(dirs).toContain('/tmp/kilo');
+    expect(written).toHaveLength(2);
+    expect(written[0].path).toBe('/tmp/kilo/kilo.json');
+    expect(written[0].data).toBe(legacy);
+    expect(written[0].mode).toBe(0o600);
+
+    const config = JSON.parse(written[1].data);
+    expect(written[1].path).toBe('/tmp/kilo/kilo.json');
+    expect(config.model).toBe('kilo/openai/gpt-5');
+    expect(config.provider.kilo.options.baseURL).toBeUndefined();
+  });
+
+  it('keeps existing kilo config when legacy opencode config also exists', () => {
+    const existing = JSON.stringify({ permission: { edit: 'allow', bash: 'allow' } });
+    const legacy = JSON.stringify({ permission: { edit: 'deny', bash: 'deny' } });
+    const { deps, written } = fakeDeps(existing, legacy);
+
+    const result = writeKiloCliConfig(baseEnv(), '/tmp/kilo', deps);
+
+    expect(result).toBe(true);
     expect(written).toHaveLength(0);
   });
 
@@ -223,13 +264,13 @@ describe('writeKiloCliConfig', () => {
 
     let seeded = false;
     (deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((filePath: string) => {
-      if (filePath.endsWith('opencode.json')) return seeded;
+      if (filePath.endsWith('kilo.json')) return seeded;
       return false;
     });
     (deps.writeFileSync as ReturnType<typeof vi.fn>).mockImplementation(
       (filePath: string, data: string, opts: { mode: number }) => {
         written.push({ path: filePath, data, mode: opts.mode });
-        if (filePath.endsWith('opencode.json')) seeded = true;
+        if (filePath.endsWith('kilo.json')) seeded = true;
       }
     );
     (deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation(() => {

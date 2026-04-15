@@ -4013,6 +4013,7 @@ export const kiloclaw_cli_runs = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     instance_id: uuid().references(() => kiloclaw_instances.id),
+    initiated_by_admin_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
     prompt: text().notNull(),
     status: text().$type<KiloClawCliRunStatus>().notNull().default('running'),
     exit_code: integer(),

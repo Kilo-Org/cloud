@@ -610,6 +610,13 @@
       "when": 1776244339941,
       "tag": "0086_puzzling_crystal",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1776258588925,
+      "tag": "0087_lively_skin",
+      "breakpoints": true
     }
   ]
 }

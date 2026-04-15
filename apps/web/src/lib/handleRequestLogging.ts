@@ -38,7 +38,9 @@ export async function handleRequestLogging(params: {
     return;
   }
   after(async () => {
+    let response: string | undefined;
     try {
+      response = await clonedResponse.text();
       const apiRequestLogId = await db
         .insert(api_request_log)
         .values({
@@ -48,7 +50,7 @@ export async function handleRequestLogging(params: {
           model,
           provider,
           request: request.body,
-          response: await clonedResponse.text(),
+          response,
         })
         .returning({ id: api_request_log.id });
       logExceptInTest(
@@ -56,7 +58,31 @@ export async function handleRequestLogging(params: {
         apiRequestLogId[0].id
       );
     } catch (e) {
-      logExceptInTest('[handleRequestLogging] Failed to insert api_request_log', e);
+      logExceptInTest(
+        `[handleRequestLogging] failed to insert api_request_log (user=${user?.id}, status=${clonedResponse.status}, model=${model})`
+      );
+      try {
+        logExceptInTest(
+          '[handleRequestLogging] error (truncated): ' + String(e).substring(0, 4000)
+        );
+      } catch {
+        //ignore
+      }
+      try {
+        logExceptInTest(
+          '[handleRequestLogging] request (truncated): ' +
+            JSON.stringify(request.body).substring(0, 4000)
+        );
+      } catch {
+        //ignore
+      }
+      try {
+        logExceptInTest(
+          '[handleRequestLogging] response (truncated): ' + response?.substring(0, 4000)
+        );
+      } catch {
+        //ignore
+      }
     }
   });
 }

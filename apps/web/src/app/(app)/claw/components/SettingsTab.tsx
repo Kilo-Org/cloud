@@ -744,7 +744,6 @@ export function SettingsTab({
     variantsMatch,
     trackedVersion,
     runningVersion,
-    latestAvailableVersion,
     latestVersion,
     controllerVersion,
     isLoadingControllerVersion,
@@ -910,8 +909,8 @@ export function SettingsTab({
                       <TooltipContent>
                         <p>
                           {catalogNewerThanImage
-                            ? `A newer OpenClaw version (${latestAvailableVersion}) is available — click to upgrade`
-                            : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available — click to upgrade`}
+                            ? 'A new version of KiloClaw is available. This update includes a new OpenClaw version. Click to upgrade.'
+                            : 'A new version of KiloClaw is available — click to upgrade.'}
                         </p>
                       </TooltipContent>
                     </Tooltip>

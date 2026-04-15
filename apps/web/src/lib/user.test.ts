@@ -1070,6 +1070,31 @@ describe('User', () => {
       ).toBe(0);
     });
 
+    it('should clear kiloclaw_cli_runs initiated by the deleted admin', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const user = await insertTestUser();
+
+      const [run] = await db
+        .insert(kiloclaw_cli_runs)
+        .values({
+          user_id: user.id,
+          initiated_by_admin_id: admin.id,
+          prompt: 'admin run',
+          status: 'completed',
+        })
+        .returning({ id: kiloclaw_cli_runs.id });
+
+      await softDeleteUser(admin.id);
+
+      expect(
+        await db
+          .select({ initiated_by_admin_id: kiloclaw_cli_runs.initiated_by_admin_id })
+          .from(kiloclaw_cli_runs)
+          .where(eq(kiloclaw_cli_runs.id, run.id))
+          .then(r => r[0].initiated_by_admin_id)
+      ).toBeNull();
+    });
+
     it('should delete kiloclaw_subscriptions for the user', async () => {
       const user = await insertTestUser();
 

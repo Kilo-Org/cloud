@@ -49,6 +49,23 @@ export function workerInstanceId(
   return sandboxId.startsWith('ki_') ? instance.id : undefined;
 }
 
+/**
+ * Resolve the worker instance ID for DO routing from a database instance row ID.
+ * Unlike {@link getInstanceById}, this includes destroyed instances — needed
+ * when routing requests for historical runs whose instance has been torn down.
+ */
+export async function resolveWorkerInstanceId(instanceId: string): Promise<string | undefined> {
+  const [row] = await db
+    .select({
+      id: kiloclaw_instances.id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+    })
+    .from(kiloclaw_instances)
+    .where(eq(kiloclaw_instances.id, instanceId))
+    .limit(1);
+  return row ? workerInstanceId(row) : undefined;
+}
+
 type EnsureActiveInstanceOpts = {
   /** Organization ID. When provided, creates an org-owned instance. */
   orgId?: string;

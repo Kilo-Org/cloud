@@ -469,35 +469,86 @@ export class ConversationDO extends DurableObject<Env> {
       // Build replay data before opening the stream so we can send it immediately
       let replayBytes: Uint8Array | null = null;
       if (lastEventId) {
-        const missed = this.db
+        const missedMessages = this.db
           .select()
           .from(messages)
           .where(gt(messages.id, lastEventId))
           .orderBy(asc(messages.id))
           .all();
 
-        // On reconnect, client has never seen these messages. Always replay as
-        // message.created (with latest content/version), except deleted messages
-        // which replay as message.deleted so the client can remove them.
-        const replayEvents = missed.map(row => {
-          if (row.deleted === 1) {
-            return formatSseEvent('message.deleted', { messageId: row.id }, row.id);
-          }
-          return formatSseEvent(
-            'message.created',
-            {
-              messageId: row.id,
-              senderId: row.sender_id,
-              content: JSON.parse(row.content) as Array<{ type: string; [key: string]: unknown }>,
-              version: row.version,
-              inReplyToMessageId: row.in_reply_to_message_id,
-            },
-            row.id
-          );
-        });
+        // UNION ALL forces each arm to hit its dedicated index (reactions_by_id /
+        // reactions_by_removed_id). An OR-shape would be at the mercy of SQLite's
+        // OR-to-UNION optimizer.
+        const reactionEvents = this.db.all<{
+          event_id: string;
+          kind: 'added' | 'removed';
+          message_id: string;
+          member_id: string;
+          emoji: string;
+        }>(sql`
+          SELECT id AS event_id, 'added' AS kind, message_id, member_id, emoji
+            FROM reactions WHERE id > ${lastEventId}
+          UNION ALL
+          SELECT removed_id AS event_id, 'removed' AS kind, message_id, member_id, emoji
+            FROM reactions WHERE removed_id IS NOT NULL AND removed_id > ${lastEventId}
+        `);
 
-        if (replayEvents.length > 0) {
-          replayBytes = this.encoder.encode(replayEvents.join(''));
+        type ReplayItem = { id: string; text: string };
+        const items: ReplayItem[] = [];
+
+        for (const row of missedMessages) {
+          if (row.deleted === 1) {
+            items.push({
+              id: row.id,
+              text: formatSseEvent('message.deleted', { messageId: row.id }, row.id),
+            });
+          } else {
+            items.push({
+              id: row.id,
+              text: formatSseEvent(
+                'message.created',
+                {
+                  messageId: row.id,
+                  senderId: row.sender_id,
+                  content: JSON.parse(row.content) as Array<{
+                    type: string;
+                    [key: string]: unknown;
+                  }>,
+                  version: row.version,
+                  inReplyToMessageId: row.in_reply_to_message_id,
+                },
+                row.id
+              ),
+            });
+          }
+        }
+
+        for (const r of reactionEvents) {
+          if (r.kind === 'added') {
+            items.push({
+              id: r.event_id,
+              text: formatSseEvent(
+                'reaction.added',
+                { messageId: r.message_id, memberId: r.member_id, emoji: r.emoji },
+                r.event_id
+              ),
+            });
+          } else {
+            items.push({
+              id: r.event_id,
+              text: formatSseEvent(
+                'reaction.removed',
+                { messageId: r.message_id, memberId: r.member_id, emoji: r.emoji },
+                r.event_id
+              ),
+            });
+          }
+        }
+
+        items.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+        if (items.length > 0) {
+          replayBytes = this.encoder.encode(items.map(i => i.text).join(''));
         }
       }
 
@@ -518,13 +569,18 @@ export class ConversationDO extends DurableObject<Env> {
       const reader = readable.getReader();
       const outputReadable = new ReadableStream<Uint8Array>({
         pull(controller) {
-          return reader.read().then(({ done, value }) => {
-            if (done) {
-              controller.close();
-            } else if (value !== undefined) {
-              controller.enqueue(value);
-            }
-          });
+          return reader
+            .read()
+            .then(({ done, value }) => {
+              if (done) {
+                controller.close();
+              } else if (value !== undefined) {
+                controller.enqueue(value);
+              }
+            })
+            .catch(() => {
+              // Stream was cancelled by the client — nothing to do.
+            });
         },
         cancel: () => {
           this.sseClients.delete(connId);

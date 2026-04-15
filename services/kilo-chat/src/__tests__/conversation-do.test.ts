@@ -424,6 +424,111 @@ describe('ConversationDO', () => {
     });
   });
 
+  describe('SSE replay — messages + reactions interleaved', () => {
+    async function collectReplay(
+      stub: DurableObjectStub<ConversationDO>,
+      memberId: string,
+      lastEventId: string,
+      durationMs = 200
+    ): Promise<string> {
+      const url = `https://do/subscribe?memberId=${encodeURIComponent(memberId)}`;
+      const res = await stub.fetch(new Request(url, { headers: { 'last-event-id': lastEventId } }));
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      const deadline = Date.now() + durationMs;
+      let out = '';
+      while (Date.now() < deadline) {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        const timer = new Promise<{ done: boolean }>(r =>
+          setTimeout(() => r({ done: true }), remaining)
+        );
+        const readP = reader.read();
+        const race = await Promise.race([readP, timer]);
+        if ('done' in race && race.done) break;
+        const { value, done } = race as ReadableStreamReadResult<Uint8Array>;
+        if (done) break;
+        if (value) out += decoder.decode(value);
+      }
+      await reader.cancel().catch(() => {});
+      return out;
+    }
+
+    it('replays reaction.added interleaved with messages in ULID order', async () => {
+      const stub = getStub('conv-replay-rx-1');
+      await stub.initialize({ ...BASE_PARAMS, id: 'conv-replay-rx-1' });
+      const m1 = await stub.createMessage({
+        senderId: 'user-alice',
+        content: [{ type: 'text', text: 'a' }],
+      });
+      if (!m1.ok) throw new Error('create failed');
+      const r1 = await stub.addReaction({
+        messageId: m1.messageId,
+        memberId: 'user-alice',
+        emoji: '👍',
+      });
+      if (!r1.ok) throw new Error('add failed');
+
+      const body = await collectReplay(stub, 'user-alice', '00000000000000000000000000');
+      expect(body).toContain('event: message.created');
+      expect(body).toContain(`id: ${m1.messageId}`);
+      expect(body).toContain('event: reaction.added');
+      expect(body).toContain(`id: ${r1.id}`);
+      expect(body.indexOf(`id: ${m1.messageId}`)).toBeLessThan(body.indexOf(`id: ${r1.id}`));
+    });
+
+    it('replays reaction.removed using removed_id', async () => {
+      const stub = getStub('conv-replay-rx-2');
+      await stub.initialize({ ...BASE_PARAMS, id: 'conv-replay-rx-2' });
+      const m = await stub.createMessage({
+        senderId: 'user-alice',
+        content: [{ type: 'text', text: 'x' }],
+      });
+      if (!m.ok) throw new Error('create failed');
+      await stub.addReaction({ messageId: m.messageId, memberId: 'user-alice', emoji: '👍' });
+      const rem = await stub.removeReaction({
+        messageId: m.messageId,
+        memberId: 'user-alice',
+        emoji: '👍',
+      });
+      if (!rem.ok || !rem.removed) throw new Error('remove failed');
+
+      const body = await collectReplay(stub, 'user-alice', '00000000000000000000000000');
+      expect(body).toContain('event: reaction.removed');
+      expect(body).toContain(`id: ${rem.removed_id}`);
+    });
+
+    it('for an add->remove->add cycle, old events are compacted (only the final add replays)', async () => {
+      const stub = getStub('conv-replay-rx-3');
+      await stub.initialize({ ...BASE_PARAMS, id: 'conv-replay-rx-3' });
+      const m = await stub.createMessage({
+        senderId: 'user-alice',
+        content: [{ type: 'text', text: 'x' }],
+      });
+      if (!m.ok) throw new Error('create failed');
+      const a1 = await stub.addReaction({
+        messageId: m.messageId,
+        memberId: 'user-alice',
+        emoji: '👍',
+      });
+      await stub.removeReaction({
+        messageId: m.messageId,
+        memberId: 'user-alice',
+        emoji: '👍',
+      });
+      const a2 = await stub.addReaction({
+        messageId: m.messageId,
+        memberId: 'user-alice',
+        emoji: '👍',
+      });
+      if (!a1.ok || !a2.ok) throw new Error('add failed');
+
+      const body = await collectReplay(stub, 'user-alice', '00000000000000000000000000');
+      expect(body).toContain(`id: ${a2.id}`);
+      expect(body).not.toContain(`id: ${a1.id}`);
+    });
+  });
+
   describe('schema constraints', () => {
     it('rejects a reply that points at a non-existent parent message (FK)', async () => {
       const stub = getStub('conv-fk-reply');

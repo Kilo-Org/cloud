@@ -261,4 +261,43 @@ describe('ConversationDO', () => {
     expect(botsExcludingAlice).toHaveLength(2);
     expect(botsExcludingAlice.every(b => b.kind === 'bot')).toBe(true);
   });
+
+  describe('schema constraints', () => {
+    it('rejects a message whose sender is not a member (FK)', async () => {
+      const stub = getStub('conv-fk-sender');
+      await stub.initialize(BASE_PARAMS);
+      const result = await stub.createMessage({
+        senderId: 'user-never-joined',
+        content: [{ type: 'text', text: 'x' }],
+      });
+      expect(result.ok).toBe(false);
+    });
+
+    it('rejects a reply that points at a non-existent parent message (FK)', async () => {
+      const stub = getStub('conv-fk-reply');
+      await stub.initialize(BASE_PARAMS);
+      const result = await stub.createMessage({
+        senderId: 'user-alice',
+        content: [{ type: 'text', text: 'reply' }],
+        inReplyToMessageId: '00000000000000000000000000',
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/foreign key|constraint/i);
+      }
+    });
+
+    it('rejects a member kind outside ("user", "bot") (CHECK)', async () => {
+      const stub = getStub('conv-check-kind');
+      const result = await stub.initialize({
+        ...BASE_PARAMS,
+        id: 'conv-check-kind',
+        members: [{ id: 'x', kind: 'admin' as 'user' }],
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/check constraint|constraint/i);
+      }
+    });
+  });
 });

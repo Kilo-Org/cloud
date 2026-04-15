@@ -93,28 +93,38 @@ export class ConversationDO extends DurableObject<Env> {
     }
   }
 
-  initialize(params: InitializeParams): void {
-    this.db
-      .insert(conversation)
-      .values({
-        id: params.id,
-        title: params.title,
-        created_by: params.createdBy,
-        created_at: params.createdAt,
-      })
-      .onConflictDoNothing()
-      .run();
+  initialize(params: InitializeParams): { ok: true } | { ok: false; error: string } {
+    try {
+      // Insert members before conversation — conversation.created_by has FK to members.id
+      for (const member of params.members) {
+        this.db
+          .insert(members)
+          .values({
+            id: member.id,
+            kind: member.kind,
+            joined_at: params.createdAt,
+          })
+          .onConflictDoNothing()
+          .run();
+      }
 
-    for (const member of params.members) {
       this.db
-        .insert(members)
+        .insert(conversation)
         .values({
-          id: member.id,
-          kind: member.kind,
-          joined_at: params.createdAt,
+          id: params.id,
+          title: params.title,
+          created_by: params.createdBy,
+          created_at: params.createdAt,
         })
         .onConflictDoNothing()
         .run();
+
+      return { ok: true };
+    } catch (err) {
+      if (err instanceof Error && /constraint/i.test(err.message)) {
+        return { ok: false, error: err.message };
+      }
+      throw err;
     }
   }
 
@@ -154,17 +164,24 @@ export class ConversationDO extends DurableObject<Env> {
 
     const messageId = this.nextUlid();
 
-    this.db
-      .insert(messages)
-      .values({
-        id: messageId,
-        sender_id: params.senderId,
-        content: JSON.stringify(params.content),
-        in_reply_to_message_id: params.inReplyToMessageId ?? null,
-        version: 1,
-        deleted: 0,
-      })
-      .run();
+    try {
+      this.db
+        .insert(messages)
+        .values({
+          id: messageId,
+          sender_id: params.senderId,
+          content: JSON.stringify(params.content),
+          in_reply_to_message_id: params.inReplyToMessageId ?? null,
+          version: 1,
+          deleted: 0,
+        })
+        .run();
+    } catch (err) {
+      if (err instanceof Error && /constraint/i.test(err.message)) {
+        return { ok: false, error: err.message };
+      }
+      throw err;
+    }
 
     this.broadcast(
       'message.created',

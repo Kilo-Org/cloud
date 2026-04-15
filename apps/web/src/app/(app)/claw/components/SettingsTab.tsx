@@ -699,7 +699,7 @@ export function SettingsTab({
   const isRunning = status.status === 'running';
   const {
     updateAvailable,
-    openClawUpdateExcerpt,
+    catalogNewerThanImage,
     needsImageUpgrade,
     isModified,
     hasVersionInfo,
@@ -868,8 +868,8 @@ export function SettingsTab({
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>
-                          {openClawUpdateExcerpt
-                            ? `A newer version of KiloClaw is available. ${openClawUpdateExcerpt} Click to upgrade.`
+                          {catalogNewerThanImage
+                            ? 'A newer version of KiloClaw is available. This update includes a newer OpenClaw version. Click to upgrade.'
                             : 'A newer version of KiloClaw is available — click to upgrade.'}
                         </p>
                       </TooltipContent>

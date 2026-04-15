@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ArrowUpCircle,
   Check,
   Cpu,
   HardDrive,
@@ -17,7 +16,6 @@ import {
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
-import { Banner } from '@/components/shared/Banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +37,7 @@ import { RunDoctorDialog } from './RunDoctorDialog';
 import { StartKiloCliRunDialog } from './StartKiloCliRunDialog';
 import { AnimatedDots } from './AnimatedDots';
 import { OpenClawButton } from './OpenClawButton';
+import { KiloClawUpdateAvailableBanner } from './KiloClawUpdateAvailableBanner';
 
 const VOLUME_SIZE_GB = 10;
 // Default machine spec fallback (matches kiloclaw DEFAULT_MACHINE_GUEST)
@@ -87,7 +86,7 @@ export function InstanceControls({
   const [confirmRedeploy, setConfirmRedeploy] = useState(false);
   const [redeployMode, setRedeployMode] = useState<'redeploy' | 'upgrade'>('redeploy');
 
-  const { updateAvailable, latestAvailableVersion, latestVersion, openClawUpdateExcerpt } =
+  const { updateAvailable, catalogNewerThanImage, latestAvailableVersion, latestVersion } =
     useClawUpdateAvailable(status);
 
   const upgradeVersion = latestAvailableVersion ?? latestVersion?.imageTag ?? '';
@@ -214,35 +213,15 @@ export function InstanceControls({
         </div>
       </div>
       {showUpgradeBanner && (
-        <Banner color="amber" className="mb-4">
-          <Banner.Icon>
-            <ArrowUpCircle />
-          </Banner.Icon>
-          <Banner.Content>
-            <Banner.Title>A newer version of KiloClaw is available</Banner.Title>
-            <Banner.Description>
-              {openClawUpdateExcerpt ? `${openClawUpdateExcerpt} ` : null}
-              Upgrade your instance to get the latest features and fixes.
-            </Banner.Description>
-          </Banner.Content>
-          <Banner.Button
-            className="text-white"
-            onClick={() => {
-              setRedeployMode('upgrade');
-              setConfirmRedeploy(true);
-            }}
-          >
-            Upgrade now
-          </Banner.Button>
-          <button
-            type="button"
-            onClick={dismissBanner}
-            className="text-amber-400/60 hover:text-amber-400 transition-colors"
-            aria-label="Dismiss upgrade banner"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </Banner>
+        <KiloClawUpdateAvailableBanner
+          className="mb-4"
+          catalogNewerThanImage={catalogNewerThanImage}
+          onUpgrade={() => {
+            setRedeployMode('upgrade');
+            setConfirmRedeploy(true);
+          }}
+          onDismiss={dismissBanner}
+        />
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <OpenClawButton

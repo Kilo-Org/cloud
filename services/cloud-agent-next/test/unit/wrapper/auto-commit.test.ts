@@ -11,12 +11,18 @@ import type { ExecResult } from '../../../wrapper/src/utils.js';
 // Mock the utils module (spawns git processes + writes log files)
 // ---------------------------------------------------------------------------
 
-vi.mock('../../../wrapper/src/utils.js', () => ({
-  git: vi.fn(),
-  getCurrentBranch: vi.fn(),
-  hasGitUpstream: vi.fn(),
-  logToFile: vi.fn(),
-}));
+vi.mock('../../../wrapper/src/utils.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../wrapper/src/utils.js')>(
+    '../../../wrapper/src/utils.js'
+  );
+  return {
+    ...actual,
+    git: vi.fn(),
+    getCurrentBranch: vi.fn(),
+    hasGitUpstream: vi.fn(),
+    logToFile: vi.fn(),
+  };
+});
 
 // Import mocked functions so we can configure per-test return values
 import { git, getCurrentBranch, hasGitUpstream } from '../../../wrapper/src/utils.js';

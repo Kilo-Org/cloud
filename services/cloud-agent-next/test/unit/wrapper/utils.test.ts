@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { git } from '../../../wrapper/src/utils.js';
+import { git, runProcess } from '../../../wrapper/src/utils.js';
 
 const createdRepos: string[] = [];
 
@@ -14,6 +14,16 @@ async function createRepo(): Promise<string> {
   await git(['config', 'user.name', 'Test User'], { cwd: repoPath, timeoutMs: 5_000 });
   return repoPath;
 }
+
+describe('runProcess', () => {
+  it('runs non-git commands with captured output', async () => {
+    const result = await runProcess(process.execPath, ['-e', 'console.log("hello")'], {
+      timeoutMs: 5_000,
+    });
+
+    expect(result).toEqual({ stdout: 'hello\n', stderr: '', exitCode: 0 });
+  });
+});
 
 describe('git', () => {
   afterEach(async () => {

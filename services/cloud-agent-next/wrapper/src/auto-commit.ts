@@ -1,6 +1,6 @@
 import type { IngestEvent } from '../../src/shared/protocol.js';
 import type { WrapperKiloClient } from './kilo-api.js';
-import { git, getCurrentBranch, hasGitUpstream, logToFile } from './utils.js';
+import { git, getCurrentBranch, hasGitUpstream, logToFile, withTimeoutAndAbort } from './utils.js';
 
 /** Timeout for local git operations (status, add, commit) */
 const GIT_LOCAL_TIMEOUT_MS = 30_000;
@@ -141,28 +141,13 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     logToFile('auto-commit: generating commit message');
     let commitMessage: string;
     try {
-      const commitMsgPromise = kiloClient.generateCommitMessage({ path: workspacePath });
-      let timeout: ReturnType<typeof setTimeout> | undefined;
-      let abortHandler: (() => void) | undefined;
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeout = setTimeout(
-          () => reject(new Error('Commit message generation timed out')),
-          COMMIT_MESSAGE_TIMEOUT_MS
-        );
-      });
-      const abortPromise = new Promise<never>((_, reject) => {
-        if (!signal) return;
-        abortHandler = () => reject(new Error('Commit message generation aborted'));
-        if (signal.aborted) {
-          abortHandler();
-          return;
-        }
-        signal.addEventListener('abort', abortHandler, { once: true });
-      });
-      const result = await Promise.race([commitMsgPromise, timeoutPromise, abortPromise]).finally(
-        () => {
-          if (timeout) clearTimeout(timeout);
-          if (signal && abortHandler) signal.removeEventListener('abort', abortHandler);
+      const result = await withTimeoutAndAbort(
+        kiloClient.generateCommitMessage({ path: workspacePath }),
+        {
+          timeoutMs: COMMIT_MESSAGE_TIMEOUT_MS,
+          timeoutMessage: 'Commit message generation timed out',
+          signal,
+          abortMessage: 'Commit message generation aborted',
         }
       );
       commitMessage = result.message.trim() || 'wip';

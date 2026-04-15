@@ -27,16 +27,17 @@ function getRandomNumberLessThan100(randomSeed: string) {
   return crypto.createHash('sha256').update(randomSeed).digest().readUInt32BE(0) % 100;
 }
 
+const RedisPercentageSchema = z.object({
+  vercel_routing_percentage: z.number().int().min(0).max(100),
+});
+
 const getVercelRoutingPercentage = createCachedFetch(async () => {
   try {
     const raw = await redisGet('gateway:vercel-routing-percentage');
     if (raw) {
-      const parsed = JSON.parse(raw) as { vercel_routing_percentage?: number | null };
-      if (
-        parsed.vercel_routing_percentage !== null &&
-        parsed.vercel_routing_percentage !== undefined
-      ) {
-        return parsed.vercel_routing_percentage;
+      const result = RedisPercentageSchema.safeParse(JSON.parse(raw));
+      if (result.success) {
+        return result.data.vercel_routing_percentage;
       }
     }
   } catch (e) {

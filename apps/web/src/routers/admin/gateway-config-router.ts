@@ -30,8 +30,6 @@ async function readConfig(): Promise<StoredConfig> {
   }
 }
 
-export const VERCEL_ROUTING_REDIS_KEY = REDIS_KEY;
-
 export const adminGatewayConfigRouter = createTRPCRouter({
   get: adminProcedure.query(async () => {
     return readConfig();

@@ -21,8 +21,8 @@ import { desc } from 'drizzle-orm';
 import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
-import { VERCEL_ROUTING_REDIS_KEY } from '@/routers/admin/gateway-config-router';
 
+const VERCEL_ROUTING_REDIS_KEY = 'gateway:vercel-routing-percentage';
 const DEFAULT_VERCEL_ROUTING_PERCENTAGE = 10;
 
 function getRandomNumberLessThan100(randomSeed: string) {

@@ -565,6 +565,7 @@ function DestroyInstanceDialog({
   onConfirm: () => void;
 }) {
   const [confirmation, setConfirmation] = useState('');
+  const [copied, setCopied] = useState(false);
   const { displayName, sandboxId, instanceKind, confirmationOptions, primaryConfirmation } =
     useMemo(
       () => getDestroyConfirmationContext({ status, organizationName }),
@@ -573,11 +574,22 @@ function DestroyInstanceDialog({
   const confirmationMatches =
     confirmationOptions.length > 0 && confirmationOptions.includes(confirmation.trim());
 
+  function handleCopyConfirmation() {
+    if (!primaryConfirmation) return;
+    void navigator.clipboard.writeText(primaryConfirmation);
+    setCopied(true);
+  }
+
   useEffect(() => {
     if (!open) {
       setConfirmation('');
+      setCopied(false);
+      return;
     }
-  }, [open]);
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [open, copied]);
 
   return (
     <Dialog open={open} onOpenChange={isPending ? () => {} : onOpenChange}>
@@ -627,13 +639,25 @@ function DestroyInstanceDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="destroy-instance-confirmation">
-              Type{' '}
-              <code className="bg-muted rounded px-1 py-0.5 select-text">
-                {primaryConfirmation}
-              </code>{' '}
-              to confirm
-            </Label>
+            <div className="flex items-center gap-1.5 text-sm font-medium">
+              <Label htmlFor="destroy-instance-confirmation">Type</Label>
+              <span className="bg-muted inline-flex items-center gap-1.5 rounded border border-border/50 py-0.5 pr-1 pl-2 select-text">
+                <code>{primaryConfirmation}</code>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground inline-flex cursor-pointer items-center rounded p-0.5 transition-colors"
+                  onClick={handleCopyConfirmation}
+                  aria-label="Copy confirmation string"
+                >
+                  {copied ? (
+                    <Check className="h-3.5 w-3.5 text-green-500" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </span>
+              <Label htmlFor="destroy-instance-confirmation">to confirm</Label>
+            </div>
             <Input
               id="destroy-instance-confirmation"
               value={confirmation}

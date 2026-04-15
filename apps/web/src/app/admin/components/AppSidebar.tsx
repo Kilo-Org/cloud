@@ -11,7 +11,6 @@ import {
   BarChart,
   Rocket,
   Blocks,
-  MessageSquare,
   Bot,
   Sparkles,
   MailCheck,
@@ -116,13 +115,8 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <GitPullRequest />,
   },
   {
-    title: () => 'Slack Bot',
-    url: '/admin/slack-bot',
-    icon: () => <MessageSquare />,
-  },
-  {
     title: () => 'Kilo Bot',
-    url: '/admin/bot-requests',
+    url: '/admin/bots',
     icon: () => <Bot />,
   },
   {

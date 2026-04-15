@@ -24,6 +24,7 @@ import type { Owner } from '@/lib/code-reviews/core';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { addReactionToMR, isMergeCommit, setCommitStatus } from '../adapter';
+import { resolveMergeRequestCheckoutRef } from './merge-request-checkout-ref';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import {
@@ -224,7 +225,10 @@ export async function handleMergeRequestCodeReview(
       );
     }
 
-    // 6. Create review record (session_id will be updated async)
+    // 6. Resolve checkout ref (fork MRs use refs/merge-requests/<iid>/head)
+    const { checkoutRef } = resolveMergeRequestCheckoutRef(payload);
+
+    // 7. Create review record (session_id will be updated async)
     const reviewId = await createCodeReview({
       owner,
       platformIntegrationId: integration.id,
@@ -234,7 +238,7 @@ export async function handleMergeRequestCodeReview(
       prTitle: mr.title,
       prAuthor: payload.user.username,
       baseRef: mr.target_branch,
-      headRef: mr.source_branch,
+      headRef: checkoutRef,
       headSha,
       platform: PLATFORM.GITLAB,
       platformProjectId: project.id,
@@ -242,7 +246,7 @@ export async function handleMergeRequestCodeReview(
 
     logExceptInTest(`Created code review ${reviewId} for ${project.path_with_namespace}!${mr.iid}`);
 
-    // 7. Get or create Project Access Token (PrAT) for bot identity
+    // 8. Get or create Project Access Token (PrAT) for bot identity
     // This is also used later in prepare-review-payload.ts for the actual review
     const fullIntegration = await getIntegrationById(integration.id);
     const metadata = fullIntegration?.metadata as {
@@ -250,7 +254,7 @@ export async function handleMergeRequestCodeReview(
     } | null;
     const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
 
-    // 8. Post 👀 reaction and set commit status (using PrAT for bot identity)
+    // 9. Post 👀 reaction and set commit status (using PrAT for bot identity)
     const isPrGateEnabled =
       process.env.NODE_ENV === 'development' ||
       (await isFeatureFlagEnabled('code-review-pr-gate', owner.userId));
@@ -298,7 +302,7 @@ export async function handleMergeRequestCodeReview(
       }
     }
 
-    // 9. Try to dispatch pending reviews (including this new one)
+    // 10. Try to dispatch pending reviews (including this new one)
     // Review is created with status='pending' and dispatch will pick it up if slots available
     try {
       const dispatchResult = await tryDispatchPendingReviews(owner);
@@ -323,7 +327,7 @@ export async function handleMergeRequestCodeReview(
       // Don't throw - review record created as pending, will be picked up later
     }
 
-    // 10. Return 202 Accepted (always succeeds, review queued as pending)
+    // 11. Return 202 Accepted (always succeeds, review queued as pending)
     return NextResponse.json(
       {
         message: 'Code review queued',

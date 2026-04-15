@@ -807,6 +807,15 @@ async function ensureProvisionAccess(
     if (hasAccess) return { createdInstanceId };
   }
 
+  // Access denied — clean up the row if this request created it.
+  // Without this, the row becomes an orphan: active DB row with no
+  // backing DO and no valid subscription to provision against.
+  if (createdInstanceId) {
+    await markInstanceDestroyedById(createdInstanceId).catch(cleanupErr => {
+      console.error('[kiloclaw] Failed to clean up instance row after access denial:', cleanupErr);
+    });
+  }
+
   throw new TRPCError({
     code: 'FORBIDDEN',
     message: 'Your trial has expired. Please subscribe to continue using KiloClaw.',

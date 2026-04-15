@@ -614,8 +614,15 @@
     {
       "idx": 87,
       "version": "7",
-      "when": 1776261180051,
-      "tag": "0087_thankful_the_watchers",
+      "when": 1776258588925,
+      "tag": "0087_lively_skin",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1776267352667,
+      "tag": "0088_melted_sentinels",
       "breakpoints": true
     }
   ]

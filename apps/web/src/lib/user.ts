@@ -648,6 +648,10 @@ export async function softDeleteUser(userId: string) {
       .delete(kiloclaw_earlybird_purchases)
       .where(eq(kiloclaw_earlybird_purchases.user_id, userId));
     await tx.delete(kiloclaw_email_log).where(eq(kiloclaw_email_log.user_id, userId));
+    await tx
+      .update(kiloclaw_cli_runs)
+      .set({ initiated_by_admin_id: null })
+      .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
     await tx
       .delete(kiloclaw_inbound_email_aliases)

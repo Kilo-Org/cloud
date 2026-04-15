@@ -1,6 +1,6 @@
 {
-  "id": "665df60d-4a93-42b9-9c59-e45c17dd3da3",
-  "prevId": "e23a0099-7b0d-4dd8-b10f-aed7da2859ff",
+  "id": "ab8570b8-8cd3-49c2-ad8f-f5c5a99ad4c6",
+  "prevId": "665df60d-4a93-42b9-9c59-e45c17dd3da3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -8844,6 +8844,19 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "retired_at": {
+          "name": "retired_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -8858,6 +8871,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_kiloclaw_inbound_email_aliases_active_instance": {
+          "name": "UQ_kiloclaw_inbound_email_aliases_active_instance",
+          "columns": [
+            {
+              "expression": "instance_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"kiloclaw_inbound_email_aliases\".\"retired_at\" is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -8878,6 +8907,32 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.kiloclaw_inbound_email_reserved_aliases": {
+      "name": "kiloclaw_inbound_email_reserved_aliases",
+      "schema": "",
+      "columns": {
+        "alias": {
+          "name": "alias",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -8918,6 +8973,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "inbound_email_enabled": {
+          "name": "inbound_email_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         },
         "created_at": {
           "name": "created_at",

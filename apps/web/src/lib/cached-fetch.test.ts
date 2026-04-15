@@ -8,7 +8,7 @@ beforeEach(() => {
 describe('createCachedFetch', () => {
   test('calls fetcher on first invocation', async () => {
     const fetcher = jest.fn<() => Promise<number>>().mockResolvedValue(42);
-    const get = createCachedFetch(fetcher, 10_000);
+    const get = createCachedFetch(fetcher, 10_000, 0);
 
     const result = await get();
 
@@ -18,7 +18,7 @@ describe('createCachedFetch', () => {
 
   test('returns cached value within TTL without calling fetcher again', async () => {
     const fetcher = jest.fn<() => Promise<number>>().mockResolvedValue(42);
-    const get = createCachedFetch(fetcher, 10_000);
+    const get = createCachedFetch(fetcher, 10_000, 0);
 
     await get();
     const result = await get();
@@ -33,7 +33,7 @@ describe('createCachedFetch', () => {
       .fn<() => Promise<number>>()
       .mockResolvedValueOnce(1)
       .mockResolvedValueOnce(2);
-    const get = createCachedFetch(fetcher, 500);
+    const get = createCachedFetch(fetcher, 500, 0);
 
     const first = await get();
     expect(first).toBe(1);
@@ -56,7 +56,7 @@ describe('createCachedFetch', () => {
       .fn<() => Promise<string>>()
       .mockResolvedValueOnce('good')
       .mockRejectedValueOnce(new Error('Redis timeout'));
-    const get = createCachedFetch(fetcher, 0); // TTL=0 forces re-fetch every call
+    const get = createCachedFetch(fetcher, 0, 'fallback'); // TTL=0 forces re-fetch every call
 
     const first = await get();
     expect(first).toBe('good');
@@ -66,13 +66,14 @@ describe('createCachedFetch', () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
-  test('throws when fetcher fails and there is no cached value', async () => {
+  test('returns default value when fetcher fails and there is no cached value', async () => {
     const fetcher = jest
       .fn<() => Promise<string>>()
       .mockRejectedValue(new Error('connection refused'));
-    const get = createCachedFetch(fetcher, 10_000);
+    const get = createCachedFetch(fetcher, 10_000, 'default');
 
-    await expect(get()).rejects.toThrow('connection refused');
+    const result = await get();
+    expect(result).toBe('default');
   });
 
   test('updates cached value after stale fallback when fetcher recovers', async () => {
@@ -81,7 +82,7 @@ describe('createCachedFetch', () => {
       .mockResolvedValueOnce(10)
       .mockRejectedValueOnce(new Error('timeout'))
       .mockResolvedValueOnce(20);
-    const get = createCachedFetch(fetcher, 0);
+    const get = createCachedFetch(fetcher, 0, 0);
 
     expect(await get()).toBe(10);
     expect(await get()).toBe(10); // stale fallback

@@ -1,4 +1,5 @@
 import { createClient } from 'redis';
+import { captureException } from '@sentry/nextjs';
 
 type RedisClient = ReturnType<typeof createClient>;
 
@@ -23,7 +24,7 @@ function getOrCreateClient(): RedisClient | null {
       socket: { connectTimeout: CONNECT_TIMEOUT_MS },
     });
     client.on('error', err => {
-      console.error('[redis] client error', err);
+      captureException(err, { tags: { service: 'redis' } });
     });
   }
   return client;
@@ -33,7 +34,7 @@ async function ensureConnected(c: RedisClient): Promise<RedisClient> {
   if (c.isOpen) return c;
   if (!connectPromise) {
     connectPromise = c.connect().catch(err => {
-      console.error('[redis] connect error', err);
+      captureException(err, { tags: { service: 'redis', operation: 'connect' } });
       connectPromise = null;
       throw err;
     });
@@ -55,19 +56,29 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function redisGet(key: string): Promise<string | null> {
   const c = getOrCreateClient();
   if (!c) return null;
-  await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
-  return withTimeout(c.get(key), COMMAND_TIMEOUT_MS);
+  try {
+    await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
+    return await withTimeout(c.get(key), COMMAND_TIMEOUT_MS);
+  } catch (err) {
+    captureException(err, { tags: { service: 'redis', operation: 'get' }, extra: { key } });
+    throw err;
+  }
 }
 
 /** Returns false if Redis is not configured (REDIS_URL unset). */
 export async function redisSet(key: string, value: string, ttlSeconds?: number): Promise<boolean> {
   const c = getOrCreateClient();
   if (!c) return false;
-  await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
-  if (ttlSeconds) {
-    await withTimeout(c.set(key, value, { EX: ttlSeconds }), COMMAND_TIMEOUT_MS);
-  } else {
-    await withTimeout(c.set(key, value), COMMAND_TIMEOUT_MS);
+  try {
+    await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
+    if (ttlSeconds) {
+      await withTimeout(c.set(key, value, { EX: ttlSeconds }), COMMAND_TIMEOUT_MS);
+    } else {
+      await withTimeout(c.set(key, value), COMMAND_TIMEOUT_MS);
+    }
+    return true;
+  } catch (err) {
+    captureException(err, { tags: { service: 'redis', operation: 'set' }, extra: { key } });
+    throw err;
   }
-  return true;
 }

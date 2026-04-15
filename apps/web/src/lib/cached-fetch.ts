@@ -3,10 +3,10 @@
  *
  * Returns the cached value immediately if it's younger than `ttlMs`,
  * otherwise calls `fetcher` to refresh. If the fetcher throws (e.g.
- * Redis timeout), returns the last-known-good value rather than
- * propagating the error. Only throws if there is no cached value at all.
+ * Redis timeout), returns the last-known-good cached value, or
+ * `defaultValue` if nothing has been cached yet.
  */
-export function createCachedFetch<T>(fetcher: () => Promise<T>, ttlMs: number) {
+export function createCachedFetch<T>(fetcher: () => Promise<T>, ttlMs: number, defaultValue: T) {
   let cached: { value: T; at: number } | null = null;
 
   return async function get(): Promise<T> {
@@ -17,11 +17,8 @@ export function createCachedFetch<T>(fetcher: () => Promise<T>, ttlMs: number) {
       const value = await fetcher();
       cached = { value, at: Date.now() };
       return value;
-    } catch (e) {
-      if (cached) {
-        return cached.value;
-      }
-      throw e;
+    } catch {
+      return cached?.value ?? defaultValue;
     }
   };
 }

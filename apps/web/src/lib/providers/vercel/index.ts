@@ -32,8 +32,10 @@ const RedisPercentageSchema = z.object({
   vercel_routing_percentage: z.number().int().min(0).max(100),
 });
 
-const getVercelRoutingPercentage = createCachedFetch(async () => {
-  try {
+const DEFAULT_VERCEL_PERCENTAGE = 10;
+
+const getVercelRoutingPercentage = createCachedFetch(
+  async () => {
     const raw = await redisGet(VERCEL_ROUTING_REDIS_KEY);
     if (raw) {
       const result = RedisPercentageSchema.safeParse(JSON.parse(raw));
@@ -41,11 +43,11 @@ const getVercelRoutingPercentage = createCachedFetch(async () => {
         return result.data.vercel_routing_percentage;
       }
     }
-  } catch (e) {
-    console.error(`[getVercelRoutingPercentage] failed to read from Redis`, e);
-  }
-  return 10;
-}, 10_000);
+    return DEFAULT_VERCEL_PERCENTAGE;
+  },
+  10_000,
+  DEFAULT_VERCEL_PERCENTAGE
+);
 
 const getVercelModels_cached = unstable_cache(
   async () => {

@@ -12,7 +12,8 @@ import {
 import type { BillingWorkerEnv } from './types.js';
 
 const KILOCLAW_EARLYBIRD_EXPIRY_DATE = '2026-09-26';
-const TRIAL_DURATION_DAYS = 7;
+const PERSONAL_TRIAL_DURATION_DAYS = 7;
+const ORGANIZATION_TRIAL_DURATION_DAYS = 14;
 const BOOTSTRAP_ACTOR = {
   actorType: 'system',
   actorId: 'kiloclaw-billing-bootstrap',
@@ -58,7 +59,9 @@ function isAccessGrantingSubscription(
 }
 
 function getTrialEndsAt(startedAt: Date): string {
-  return new Date(startedAt.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  return new Date(
+    startedAt.getTime() + PERSONAL_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
 }
 
 async function bootstrapOrganizationSubscription(
@@ -117,7 +120,8 @@ async function bootstrapOrganizationSubscription(
   const trialEndsAt =
     organization.freeTrialEndAt ??
     new Date(
-      new Date(organization.createdAt).getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
+      new Date(organization.createdAt).getTime() +
+        ORGANIZATION_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
     ).toISOString();
 
   const [created] = await db

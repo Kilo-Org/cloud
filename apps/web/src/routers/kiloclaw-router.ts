@@ -21,7 +21,7 @@ import {
   STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID,
   STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID,
 } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
@@ -127,9 +127,13 @@ const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed
  * Scoped to personal instances only (organization_id IS NULL) so org
  * subscriptions are never touched.
  */
-async function adoptOrphanedSubscription(userId: string, activeInstanceId: string) {
+async function adoptOrphanedSubscription(
+  userId: string,
+  activeInstanceId: string,
+  executor: typeof db | DrizzleTransaction = db
+) {
   // Check whether the active instance already owns a subscription.
-  const [incumbent] = await db
+  const [incumbent] = await executor
     .select({ id: kiloclaw_subscriptions.id })
     .from(kiloclaw_subscriptions)
     .where(
@@ -155,7 +159,7 @@ async function adoptOrphanedSubscription(userId: string, activeInstanceId: strin
   // Find the best access-granting orphan. Two sources:
   // 1. Detached rows (instance_id IS NULL)
   // 2. Rows on destroyed personal instances
-  const [orphan] = await db
+  const [orphan] = await executor
     .select({ id: kiloclaw_subscriptions.id })
     .from(kiloclaw_subscriptions)
     .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
@@ -179,7 +183,7 @@ async function adoptOrphanedSubscription(userId: string, activeInstanceId: strin
 
   if (!orphan) return;
 
-  await db
+  await executor
     .update(kiloclaw_subscriptions)
     .set({ instance_id: activeInstanceId })
     .where(eq(kiloclaw_subscriptions.id, orphan.id));
@@ -629,7 +633,8 @@ function sanitizeKiloCodeConfigResponse(
 async function provisionInstance(
   user: Parameters<typeof generateApiToken>[0],
   input: z.infer<typeof updateConfigSchema>,
-  params: { instanceId: string | null; bootstrapSubscription: boolean }
+  params: { instanceId: string | null; bootstrapSubscription: boolean },
+  executor: typeof db | DrizzleTransaction = db
 ) {
   const encryptedSecrets = input.secrets
     ? Object.fromEntries(
@@ -645,7 +650,7 @@ async function provisionInstance(
 
   const pinnedImageTag = params.instanceId
     ? (
-        await db
+        await executor
           .select({ image_tag: kiloclaw_version_pins.image_tag })
           .from(kiloclaw_version_pins)
           .where(eq(kiloclaw_version_pins.instance_id, params.instanceId))
@@ -819,18 +824,19 @@ async function fetchKiloClawServiceDegraded(): Promise<boolean> {
  */
 async function ensureProvisionAccess(
   userId: string,
-  _userEmail: string
+  _userEmail: string,
+  executor: typeof db | DrizzleTransaction = db
 ): Promise<{
   instanceId: string | null;
   bootstrapSubscription: boolean;
   shouldEnqueueTrialStartAffiliate: boolean;
 }> {
   const now = new Date();
-  const activeInstance = await getActiveInstance(userId);
+  const activeInstance = await getActiveInstance(userId, executor);
   if (activeInstance) {
-    await adoptOrphanedSubscription(userId, activeInstance.id);
+    await adoptOrphanedSubscription(userId, activeInstance.id, executor);
 
-    const [instanceSub] = await db
+    const [instanceSub] = await executor
       .select({
         status: kiloclaw_subscriptions.status,
         trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
@@ -863,7 +869,7 @@ async function ensureProvisionAccess(
     }
   }
 
-  const [earlybird] = await db
+  const [earlybird] = await executor
     .select({ id: kiloclaw_earlybird_purchases.id })
     .from(kiloclaw_earlybird_purchases)
     .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
@@ -878,7 +884,7 @@ async function ensureProvisionAccess(
     }
   }
 
-  const subscriptions = await db
+  const subscriptions = await executor
     .select({
       status: kiloclaw_subscriptions.status,
       trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
@@ -1906,13 +1912,13 @@ export const kiloclawRouter = createTRPCRouter({
   provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
     return await withKiloclawProvisionContextLock(
       getPersonalProvisionLockKey(ctx.user.id),
-      async () => {
+      async tx => {
         const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
-          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
+          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email, tx);
         const result = await provisionInstance(ctx.user, input, {
           instanceId,
           bootstrapSubscription,
-        });
+        }, tx);
         if (shouldEnqueueTrialStartAffiliate) {
           await enqueueProvisionTrialStartAffiliateEvent({
             userId: ctx.user.id,
@@ -1935,13 +1941,13 @@ export const kiloclawRouter = createTRPCRouter({
   updateConfig: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
     return await withKiloclawProvisionContextLock(
       getPersonalProvisionLockKey(ctx.user.id),
-      async () => {
+      async tx => {
         const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
-          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
+          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email, tx);
         const result = await provisionInstance(ctx.user, input, {
           instanceId,
           bootstrapSubscription,
-        });
+        }, tx);
         if (shouldEnqueueTrialStartAffiliate) {
           await enqueueProvisionTrialStartAffiliateEvent({
             userId: ctx.user.id,

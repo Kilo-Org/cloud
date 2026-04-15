@@ -18,7 +18,7 @@ import {
 } from '@kilocode/kiloclaw-secret-catalog';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
 import { sentryLogger } from '@/lib/utils.server';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
@@ -382,10 +382,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       return await withKiloclawProvisionContextLock(
         getOrganizationProvisionLockKey(ctx.user.id, input.organizationId),
-        async () => {
+        async (tx: DrizzleTransaction) => {
           // TODO: org-specific kiloclaw billing gate — currently gated by
           // organizationMemberMutationProcedure (requireActiveSubscriptionOrTrial for org)
-          const existing = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+          const existing = await getActiveOrgInstance(ctx.user.id, input.organizationId, tx);
           if (existing) {
             throw new TRPCError({
               code: 'CONFLICT',

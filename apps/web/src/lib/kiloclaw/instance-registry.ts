@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
 import { kiloclaw_instances } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
 export type ActiveKiloClawInstance = {
   id: string;
@@ -17,6 +17,8 @@ export type EnsureActiveInstanceResult = {
   instance: ActiveKiloClawInstance;
   created: boolean;
 };
+
+type InstanceRegistryExecutor = typeof db | DrizzleTransaction;
 
 /**
  * Returns true if this instance row uses the instance-keyed identity scheme
@@ -165,8 +167,11 @@ export async function restoreDestroyedInstance(instanceId: string): Promise<void
  * by ensureActiveInstance). For multi-instance (org), use instance-specific
  * lookups instead.
  */
-export async function getActiveInstance(userId: string): Promise<ActiveKiloClawInstance | null> {
-  const [row] = await db
+export async function getActiveInstance(
+  userId: string,
+  executor: InstanceRegistryExecutor = db
+): Promise<ActiveKiloClawInstance | null> {
+  const [row] = await executor
     .select({
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
@@ -217,9 +222,10 @@ export async function getInstanceById(instanceId: string): Promise<ActiveKiloCla
  */
 export async function getActiveOrgInstance(
   userId: string,
-  orgId: string
+  orgId: string,
+  executor: InstanceRegistryExecutor = db
 ): Promise<ActiveKiloClawInstance | null> {
-  const [row] = await db
+  const [row] = await executor
     .select({
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,

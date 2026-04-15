@@ -4,7 +4,7 @@ if [ "${CLOUD_AGENT:-}" = "1" ] || [ "${CLOUD_AGENT:-}" = "true" ]; then
   if [ -n "$base" ]; then
     pnpm format:changed
 
-    if git diff --name-only "$base" --diff-filter=ACMR -- \
+    if git diff --name-only "$base" --diff-filter=ACMDR -- \
       '*.ts' \
       '*.tsx' \
       '**/tsconfig*.json' \

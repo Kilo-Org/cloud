@@ -603,6 +603,13 @@
       "when": 1775999621732,
       "tag": "0085_mixed_pestilence",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1776244339941,
+      "tag": "0086_puzzling_crystal",
+      "breakpoints": true
     }
   ]
 }

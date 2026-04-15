@@ -2,6 +2,15 @@ import type { SandboxInstance, ExecutionSession, SystemSandboxUsageEvent } from 
 import type { ExecResult, ExecOptions } from '@cloudflare/sandbox';
 import { logger } from './logger.js';
 import { findWrapperForSessionInProcesses } from './kilo/wrapper-manager.js';
+import {
+  DISK_CHECK_TIMEOUT_MS,
+  FAST_SANDBOX_COMMAND_TIMEOUT_MS,
+  GIT_CLONE_TIMEOUT_MS,
+  GIT_COMMAND_TIMEOUT_MS,
+  logSandboxOperationTimeout,
+  timedExec,
+  withSandboxOperationTimeoutLog,
+} from './sandbox-timeout-logging.js';
 import { withTimeout } from '@kilocode/worker-utils';
 
 /**
@@ -46,6 +55,14 @@ const KILOCODE_DIR = `.kilocode`;
 const CLI_DIR = `${KILOCODE_DIR}/cli`;
 const CLI_GLOBAL_TASKS_PATH = `${CLI_DIR}/global/tasks`;
 const CLI_LOGS_PATH = `${CLI_DIR}/logs`;
+
+// Re-export timeout constants so existing imports from workspace.ts keep working.
+export {
+  DISK_CHECK_TIMEOUT_MS,
+  FAST_SANDBOX_COMMAND_TIMEOUT_MS,
+  GIT_CLONE_TIMEOUT_MS,
+  GIT_COMMAND_TIMEOUT_MS,
+} from './sandbox-timeout-logging.js';
 
 export function getBaseWorkspacePath(
   kilocodeOrganizationId: string | undefined,
@@ -96,10 +113,10 @@ export function getKilocodeGlobalDir(sessionHome: string): string {
   return `${getKilocodeCliDir(sessionHome)}/global`;
 }
 
-export interface SessionPaths {
+export type SessionPaths = {
   workspacePath: string;
   sessionHome: string;
-}
+};
 
 /**
  * Check disk space and clean up stale workspaces if low, using the sandbox
@@ -176,7 +193,11 @@ export async function cleanupWorkspace(
 
   try {
     // Delete workspace directory
-    const workspaceResult = await executor.exec(`rm -rf '${workspacePath}'`);
+    const workspaceResult = await timedExec(
+      executor,
+      `rm -rf '${workspacePath}'`,
+      'workspace.cleanup.workspace'
+    );
     if (workspaceResult.exitCode !== 0) {
       logger
         .withFields({ stderr: workspaceResult.stderr })
@@ -184,7 +205,11 @@ export async function cleanupWorkspace(
     }
 
     // Delete session home directory
-    const homeResult = await executor.exec(`rm -rf '${sessionHome}'`);
+    const homeResult = await timedExec(
+      executor,
+      `rm -rf '${sessionHome}'`,
+      'workspace.cleanup.home'
+    );
     if (homeResult.exitCode !== 0) {
       logger
         .withFields({ stderr: homeResult.stderr })
@@ -216,7 +241,11 @@ export async function cleanupStaleWorkspaces(
 
   let sessionDirs: string[];
   try {
-    const lsResult = await sandbox.exec(`ls -1 '${baseWorkspacePath}/sessions/'`);
+    const lsResult = await timedExec(
+      sandbox,
+      `ls -1 '${baseWorkspacePath}/sessions/'`,
+      'workspace.cleanupStale.listSessions'
+    );
     if (lsResult.exitCode !== 0 || !lsResult.stdout) {
       logger
         .withFields({ stderr: lsResult.stderr })
@@ -267,7 +296,11 @@ export async function cleanupStaleWorkspaces(
       // If we can't determine age (stat fails or unparseable), also skip — unknown
       // age is treated as potentially recent to avoid destroying active work.
       const workspacePath = `${baseWorkspacePath}/sessions/${candidateSessionId}`;
-      const statResult = await sandbox.exec(`stat -c %Y '${workspacePath}'`);
+      const statResult = await timedExec(
+        sandbox,
+        `stat -c %Y '${workspacePath}'`,
+        'workspace.cleanupStale.statSession'
+      );
       if (statResult.exitCode !== 0 || !statResult.stdout) {
         logger
           .withFields({ candidateSessionId })
@@ -349,7 +382,12 @@ export async function checkDiskSpace(executor: CommandExecutor): Promise<DiskSpa
   // df -B1 gives output in bytes for clean numeric parsing (no M/G/K suffixes)
   // --output=avail,size gives available and total space
   // Always use "/" since all container paths share the same root filesystem
-  const result = await executor.exec('df -B1 --output=avail,size / | tail -1');
+  const result = await timedExec(
+    executor,
+    'df -B1 --output=avail,size / | tail -1',
+    'workspace.checkDiskSpace',
+    { timeoutMs: DISK_CHECK_TIMEOUT_MS }
+  );
 
   if (result.exitCode !== 0) {
     logger
@@ -462,16 +500,29 @@ export async function cloneGitRepo(
   logger.info('Cloning generic git repository');
 
   try {
-    // Git clone with 2-minute timeout to prevent indefinite hangs
-    const CLONE_TIMEOUT_MS = 120_000; // 2 minutes
+    // SDK clone timeout terminates the subprocess; the outer timeout bounds the request.
     const result = await withTimeout(
-      session.gitCheckout(repoUrl, {
-        targetDir: workspacePath,
-        // Use depth: 1 for shallow clones (faster, less disk space)
-        ...(shallow && { depth: 1 }),
-      }),
-      CLONE_TIMEOUT_MS,
-      `Git clone timed out after ${CLONE_TIMEOUT_MS / 1000} seconds for ${sanitizedGitUrl}`
+      withSandboxOperationTimeoutLog(
+        session.gitCheckout(repoUrl, {
+          targetDir: workspacePath,
+          cloneTimeoutMs: GIT_CLONE_TIMEOUT_MS,
+          // Use depth: 1 for shallow clones (faster, less disk space)
+          ...(shallow && { depth: 1 }),
+        }),
+        {
+          operation: 'git.clone',
+          timeoutMs: GIT_CLONE_TIMEOUT_MS,
+          timeoutLayer: 'sdk',
+        }
+      ),
+      GIT_CLONE_TIMEOUT_MS + FAST_SANDBOX_COMMAND_TIMEOUT_MS,
+      `Git clone request timed out after ${(GIT_CLONE_TIMEOUT_MS + FAST_SANDBOX_COMMAND_TIMEOUT_MS) / 1000} seconds for ${sanitizedGitUrl}`,
+      () =>
+        logSandboxOperationTimeout({
+          operation: 'git.clone',
+          timeoutMs: GIT_CLONE_TIMEOUT_MS + FAST_SANDBOX_COMMAND_TIMEOUT_MS,
+          timeoutLayer: 'outer',
+        })
     );
 
     if (!result.success) {
@@ -481,8 +532,16 @@ export async function cloneGitRepo(
     const authorName = gitAuthor?.name ?? 'Kilo Code Cloud';
     const authorEmail = gitAuthor?.email ?? 'agent@kilocode.ai';
 
-    await session.exec(`cd ${workspacePath} && git config user.name "${authorName}"`);
-    await session.exec(`cd ${workspacePath} && git config user.email "${authorEmail}"`);
+    await timedExec(
+      session,
+      `cd ${workspacePath} && git config user.name "${authorName}"`,
+      'git.config.userName'
+    );
+    await timedExec(
+      session,
+      `cd ${workspacePath} && git config user.email "${authorEmail}"`,
+      'git.config.userEmail'
+    );
 
     logger.info('Successfully cloned generic git repository');
   } catch (err) {
@@ -558,8 +617,10 @@ export async function updateGitRemoteToken(
   logger.setTags({ workspacePath, gitUrl: sanitizedGitUrl });
   logger.info('Updating git remote URL with new token');
 
-  const result = await session.exec(
-    `cd '${workspacePath}' && git remote set-url origin '${newUrl.toString()}'`
+  const result = await timedExec(
+    session,
+    `cd '${workspacePath}' && git remote set-url origin '${newUrl.toString()}'`,
+    'git.updateRemoteToken'
   );
 
   if (result.exitCode !== 0) {
@@ -575,7 +636,9 @@ export async function updateGitRemoteToken(
 }
 
 async function gitFetch(session: ExecutionSession, workspacePath: string): Promise<void> {
-  const result = await session.exec(`cd ${workspacePath} && git fetch origin`);
+  const result = await timedExec(session, `cd ${workspacePath} && git fetch origin`, 'git.fetch', {
+    timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+  });
   if (result.exitCode !== 0) {
     logger.withFields({ stderr: sanitizeGitOutput(result.stderr) }).warn('Git fetch failed');
   }
@@ -586,8 +649,10 @@ async function branchExistsLocally(
   workspacePath: string,
   branchName: string
 ): Promise<boolean> {
-  const result = await session.exec(
-    `cd ${workspacePath} && git rev-parse --verify '${branchName}' 2>/dev/null`
+  const result = await timedExec(
+    session,
+    `cd ${workspacePath} && git rev-parse --verify '${branchName}' 2>/dev/null`,
+    'git.branchExistsLocal'
   );
   return result.exitCode === 0;
 }
@@ -597,8 +662,10 @@ async function branchExistsRemotely(
   workspacePath: string,
   branchName: string
 ): Promise<boolean> {
-  const result = await session.exec(
-    `cd ${workspacePath} && git rev-parse --verify 'origin/${branchName}' 2>/dev/null`
+  const result = await timedExec(
+    session,
+    `cd ${workspacePath} && git rev-parse --verify 'origin/${branchName}' 2>/dev/null`,
+    'git.branchExistsRemote'
   );
   return result.exitCode === 0;
 }
@@ -608,7 +675,11 @@ async function checkoutExistingBranch(
   workspacePath: string,
   branchName: string
 ): Promise<void> {
-  const result = await session.exec(`cd ${workspacePath} && git checkout '${branchName}'`);
+  const result = await timedExec(
+    session,
+    `cd ${workspacePath} && git checkout '${branchName}'`,
+    'git.checkoutExistingBranch'
+  );
   if (result.exitCode !== 0) {
     throw new Error(
       `Failed to checkout branch ${branchName}: ${sanitizeGitOutput(result.stderr || result.stdout)}`
@@ -621,7 +692,12 @@ async function pullLatestChangesLenient(
   workspacePath: string,
   branchName: string
 ): Promise<void> {
-  const result = await session.exec(`cd ${workspacePath} && git pull origin '${branchName}'`);
+  const result = await timedExec(
+    session,
+    `cd ${workspacePath} && git pull origin '${branchName}'`,
+    'git.pullLatestChanges',
+    { timeoutMs: GIT_COMMAND_TIMEOUT_MS }
+  );
   if (result.exitCode !== 0) {
     // Session branches might have unpushed work or conflicts, just warn
     logger
@@ -635,8 +711,10 @@ async function createTrackingBranch(
   workspacePath: string,
   branchName: string
 ): Promise<void> {
-  const result = await session.exec(
-    `cd ${workspacePath} && git checkout -b '${branchName}' 'origin/${branchName}'`
+  const result = await timedExec(
+    session,
+    `cd ${workspacePath} && git checkout -b '${branchName}' 'origin/${branchName}'`,
+    'git.createTrackingBranch'
   );
   if (result.exitCode !== 0) {
     throw new Error(
@@ -650,7 +728,11 @@ async function createNewBranch(
   workspacePath: string,
   branchName: string
 ): Promise<void> {
-  const result = await session.exec(`cd ${workspacePath} && git checkout -b '${branchName}'`);
+  const result = await timedExec(
+    session,
+    `cd ${workspacePath} && git checkout -b '${branchName}'`,
+    'git.createNewBranch'
+  );
   if (result.exitCode !== 0) {
     throw new Error(
       `Failed to create branch ${branchName}: ${sanitizeGitOutput(result.stderr || result.stdout)}`
@@ -669,15 +751,22 @@ async function fetchPullRefAndCheckout(
     throw new Error(`Invalid pull ref format: ${pullRef}`);
   }
 
-  const fetchResult = await session.exec(`cd ${workspacePath} && git fetch origin '${pullRef}'`);
+  const fetchResult = await timedExec(
+    session,
+    `cd ${workspacePath} && git fetch origin '${pullRef}'`,
+    'git.fetchPullRef',
+    { timeoutMs: GIT_COMMAND_TIMEOUT_MS }
+  );
   if (fetchResult.exitCode !== 0) {
     throw new Error(
       `Failed to fetch pull ref ${pullRef}: ${sanitizeGitOutput(fetchResult.stderr || fetchResult.stdout)}`
     );
   }
 
-  const checkoutResult = await session.exec(
-    `cd ${workspacePath} && git checkout -B '${pullRef}' FETCH_HEAD`
+  const checkoutResult = await timedExec(
+    session,
+    `cd ${workspacePath} && git checkout -B '${pullRef}' FETCH_HEAD`,
+    'git.checkoutPullRef'
   );
   if (checkoutResult.exitCode !== 0) {
     throw new Error(

@@ -28,6 +28,7 @@ import {
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
+import { getInboundEmailAddressForInstance } from '@/lib/kiloclaw/inbound-email-alias';
 import {
   ensureActiveInstance,
   getActiveOrgInstance,
@@ -292,17 +293,22 @@ export const organizationKiloclawRouter = createTRPCRouter({
         workerUrl,
         name: null,
         instanceId: null,
+        inboundEmailAddress: null,
       } satisfies KiloClawDashboardStatus;
     }
 
     const client = new KiloClawInternalClient();
-    const status = await client.getStatus(ctx.user.id, workerInstanceId(instance));
+    const [status, inboundEmailAddress] = await Promise.all([
+      client.getStatus(ctx.user.id, workerInstanceId(instance)),
+      getInboundEmailAddressForInstance(instance.id),
+    ]);
 
     return {
       ...status,
       name: instance.name ?? null,
       workerUrl,
       instanceId: instance.id,
+      inboundEmailAddress,
     } satisfies KiloClawDashboardStatus;
   }),
 

@@ -196,6 +196,8 @@ export const CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID = getEnvVariable(
 // KiloClaw Worker
 export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';
 export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_API_SECRET') || '';
+export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
+  getEnvVariable('KILOCLAW_INBOUND_EMAIL_DOMAIN') || 'kiloclaw.ai';
 
 // KiloClaw Early Bird Checkout
 export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(

@@ -23,7 +23,6 @@ export type SignInFormInitialState = {
   email?: string;
   showTurnstile?: boolean;
   showEmailInput?: boolean;
-  showOtherMethods?: boolean;
   pendingSignIn?: AuthProviderId | null;
   turnstileError?: boolean;
   availableProviders?: AuthProviderId[];
@@ -46,7 +45,6 @@ export type SignInFlowReturn = {
   showTurnstile: boolean;
   isVerifying: boolean;
   showEmailInput: boolean;
-  showOtherMethods: boolean;
   isHintLoaded: boolean;
 
   // Data
@@ -75,7 +73,6 @@ export type SignInFlowReturn = {
   handleRetryTurnstile: () => void;
   handleSendMagicLink: () => Promise<void>;
   handleShowEmailInput: () => void;
-  handleToggleOtherMethods: () => void;
 };
 
 export function useSignInFlow({
@@ -164,11 +161,6 @@ export function useSignInFlow({
   // Auto-show email input if DIFFERENT-OAUTH error - user needs to re-enter email
   const [showEmailInput, setShowEmailInput] = useState(
     storybookInitialState?.showEmailInput ?? (ssoMode || initialError === 'DIFFERENT-OAUTH')
-  );
-
-  // UI state for returning user flow (expand to show other sign-in methods)
-  const [showOtherMethods, setShowOtherMethods] = useState(
-    storybookInitialState?.showOtherMethods ?? false
   );
 
   // Store pending SSO orgId in ref instead of window object
@@ -565,7 +557,6 @@ export function useSignInFlow({
     setError('');
     setAvailableProviders([]);
     setShowEmailInput(false);
-    setShowOtherMethods(false);
   }, []);
 
   const handleShowEmailInput = useCallback(() => {
@@ -573,16 +564,11 @@ export function useSignInFlow({
     setPendingSignIn('email');
   }, []);
 
-  const handleToggleOtherMethods = useCallback(() => {
-    setShowOtherMethods(prev => !prev);
-  }, []);
-
   const handleClearHint = useCallback(() => {
     clearHint();
     setEmailState('');
     setFlowState('landing');
     setShowEmailInput(false);
-    setShowOtherMethods(false);
   }, [clearHint]);
 
   const handleClearInvite = useCallback(() => {
@@ -594,7 +580,6 @@ export function useSignInFlow({
     setEmailState('');
     setFlowState('landing');
     setShowEmailInput(false);
-    setShowOtherMethods(false);
   }, [params]);
 
   return {
@@ -603,7 +588,6 @@ export function useSignInFlow({
     showTurnstile,
     isVerifying,
     showEmailInput,
-    showOtherMethods,
     isHintLoaded,
     email,
     emailValidation,
@@ -628,6 +612,5 @@ export function useSignInFlow({
     handleRetryTurnstile,
     handleSendMagicLink,
     handleShowEmailInput,
-    handleToggleOtherMethods,
   };
 }

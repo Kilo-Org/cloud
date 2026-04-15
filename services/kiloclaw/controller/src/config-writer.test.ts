@@ -837,16 +837,16 @@ describe('generateBaseConfig', () => {
     expect(config.hooks.mappings).toContainEqual({
       id: 'cloudflare-email-inbound',
       match: { path: 'email' },
-      action: 'wake',
+      action: 'agent',
       wakeMode: 'now',
       name: 'Inbound Email',
       sessionKey: '{{payload.sessionKey}}',
-      textTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+      messageTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
       deliver: false,
     });
   });
 
-  it('migrates wake hook messageTemplate to textTemplate', () => {
+  it('migrates existing inbound email wake hook to agent mapping', () => {
     const existing = JSON.stringify({
       hooks: {
         mappings: [
@@ -857,7 +857,7 @@ describe('generateBaseConfig', () => {
             wakeMode: 'now',
             name: 'Inbound Email',
             sessionKey: '{{payload.sessionKey}}',
-            messageTemplate: 'old template',
+            textTemplate: 'old template',
             deliver: false,
           },
           {
@@ -875,11 +875,11 @@ describe('generateBaseConfig', () => {
     expect(config.hooks.mappings).toContainEqual({
       id: 'cloudflare-email-inbound',
       match: { path: 'email' },
-      action: 'wake',
+      action: 'agent',
       wakeMode: 'now',
       name: 'Inbound Email',
       sessionKey: '{{payload.sessionKey}}',
-      textTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+      messageTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
       deliver: false,
     });
     expect(config.hooks.mappings).toContainEqual({
@@ -887,7 +887,15 @@ describe('generateBaseConfig', () => {
       action: 'wake',
       textTemplate: 'custom template',
     });
-    expect(JSON.stringify(config.hooks.mappings)).not.toContain('messageTemplate');
+    expect(config.hooks.mappings).not.toContainEqual(
+      expect.objectContaining({ id: 'cloudflare-email-inbound', action: 'wake' })
+    );
+    expect(config.hooks.mappings).not.toContainEqual(
+      expect.objectContaining({ id: 'cloudflare-email-inbound', textTemplate: expect.any(String) })
+    );
+    expect(config.hooks.mappings).toContainEqual(
+      expect.objectContaining({ id: 'cloudflare-email-inbound', wakeMode: 'now' })
+    );
   });
 
   it('adds gmail preset when Gog credentials are configured', () => {

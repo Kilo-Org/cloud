@@ -1748,6 +1748,8 @@ const InboundEmailSchema = z.object({
   messageId: z.string().trim().min(1).max(512),
   from: z.string().trim().min(1).max(512),
   to: z.string().trim().min(1).max(512),
+  recipientKind: z.enum(['legacy', 'alias']).optional(),
+  recipientAlias: z.string().trim().min(1).max(512).optional(),
   subject: z.string().max(1_000),
   text: z.string().min(1).max(32_000),
   receivedAt: z.string().datetime(),
@@ -1800,6 +1802,8 @@ function inboundEmailLogContext(delivery: InboundEmailDelivery) {
     toLocalPart: recipient.localPart,
     toDomain: recipient.domain,
     toAddressValid: recipient.validSingleAddress,
+    recipientKind: delivery.recipientKind ?? null,
+    recipientAlias: delivery.recipientAlias ?? null,
     expectedToLocalPart: expectedRecipientLocalPart,
     toMatchesInstanceId: recipient.localPart === expectedRecipientLocalPart,
     subjectLength: delivery.subject.length,
@@ -1839,7 +1843,10 @@ platform.post('/inbound-email', async c => {
   const delivery = result.data;
   const logContext = inboundEmailLogContext(delivery);
   console.log('[platform] inbound email received', logContext);
-  if (!logContext.toMatchesInstanceId) {
+  if (
+    (!delivery.recipientKind || delivery.recipientKind === 'legacy') &&
+    !logContext.toMatchesInstanceId
+  ) {
     console.warn('[platform] inbound email recipient does not match instanceId', logContext);
   }
 

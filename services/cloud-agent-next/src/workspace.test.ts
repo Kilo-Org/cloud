@@ -1,4 +1,30 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const { mockTimeoutWarn, mockTimeoutWithFields, mockTimeoutWithTags } = vi.hoisted(() => {
+  const warn = vi.fn();
+  const loggerChain = { warn, info: vi.fn(), error: vi.fn(), debug: vi.fn() };
+  const withFields = vi.fn(() => loggerChain);
+  const withTags = vi.fn(() => ({ ...loggerChain, withFields }));
+  return {
+    mockTimeoutWarn: warn,
+    mockTimeoutWithFields: withFields,
+    mockTimeoutWithTags: withTags,
+  };
+});
+
+vi.mock('./logger.js', () => ({
+  logger: {
+    setTags: vi.fn(),
+    withTags: mockTimeoutWithTags,
+    withFields: vi.fn(() => ({ warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() })),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+  WithLogTags: () => (_target: unknown, _propertyKey: string, descriptor: PropertyDescriptor) =>
+    descriptor,
+}));
 import {
   manageBranch,
   cloneGitHubRepo,
@@ -283,6 +309,9 @@ describe('disk space checking', () => {
   let mockGitCheckout: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    mockTimeoutWarn.mockClear();
+    mockTimeoutWithFields.mockClear();
+    mockTimeoutWithTags.mockClear();
     mockExec = vi.fn();
     mockGitCheckout = vi.fn();
     fakeSession = {
@@ -519,6 +548,25 @@ describe('disk space checking', () => {
         expect.any(Object)
       );
     });
+
+    it('logs sdk timeout when gitCheckout rejects with clone timeout', async () => {
+      mockGitCheckout.mockRejectedValueOnce(new Error('Git clone timed out after 120000ms'));
+
+      await expect(
+        cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git')
+      ).rejects.toThrow('Failed to clone repository from https://example.com/repo.git');
+
+      expect(mockTimeoutWithTags).toHaveBeenCalledWith({ logTag: 'sandbox-operation-timeout' });
+      expect(mockTimeoutWithFields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'git.clone',
+          timeoutMs: 120000,
+          timeoutLayer: 'sdk',
+          error: 'Git clone timed out after 120000ms',
+        })
+      );
+      expect(mockTimeoutWarn).toHaveBeenCalledWith('Sandbox operation timed out');
+    });
   });
 
   describe('updateGitRemoteToken', () => {
@@ -533,7 +581,10 @@ describe('disk space checking', () => {
         'gitlab'
       );
 
-      expect(mockExec).toHaveBeenCalledWith(expect.stringContaining('oauth2:new-token'));
+      expect(mockExec).toHaveBeenCalledWith(
+        expect.stringContaining('oauth2:new-token'),
+        expect.any(Object)
+      );
     });
 
     it('should use x-access-token username for github platform', async () => {
@@ -547,7 +598,10 @@ describe('disk space checking', () => {
         'github'
       );
 
-      expect(mockExec).toHaveBeenCalledWith(expect.stringContaining('x-access-token:new-token'));
+      expect(mockExec).toHaveBeenCalledWith(
+        expect.stringContaining('x-access-token:new-token'),
+        expect.any(Object)
+      );
     });
 
     it('should use x-access-token username when platform is undefined', async () => {
@@ -560,7 +614,10 @@ describe('disk space checking', () => {
         'new-token'
       );
 
-      expect(mockExec).toHaveBeenCalledWith(expect.stringContaining('x-access-token:new-token'));
+      expect(mockExec).toHaveBeenCalledWith(
+        expect.stringContaining('x-access-token:new-token'),
+        expect.any(Object)
+      );
     });
   });
 

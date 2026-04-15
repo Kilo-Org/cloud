@@ -2301,7 +2301,20 @@ export const kiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      const result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
+
+      let result: Awaited<ReturnType<KiloClawInternalClient['cancelKiloCliRun']>>;
+      try {
+        result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
+      } catch (err) {
+        if (err instanceof KiloClawApiError && err.statusCode === 409) {
+          const { message } = getKiloClawApiErrorPayload(err);
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: message ?? 'Instance is not running',
+          });
+        }
+        throw err;
+      }
 
       // Mark the specific run as cancelled in DB
       if (result.ok) {

@@ -50,3 +50,23 @@ describe('kilo-chat outbound.sendText', () => {
     }
   });
 });
+
+describe('kilo-chat actions adapter', () => {
+  it('declares react in describeMessageTool', () => {
+    const adapter = kiloChatPlugin.actions;
+    expect(adapter).toBeDefined();
+    const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
+    expect(discovery?.actions).toContain('react');
+  });
+
+  it('supportsAction returns true for react and false for other actions', () => {
+    const adapter = kiloChatPlugin.actions;
+    expect(adapter?.supportsAction?.({ action: 'react' as never })).toBe(true);
+    expect(adapter?.supportsAction?.({ action: 'send' as never })).toBe(false);
+  });
+
+  it('resolveExecutionMode returns "local"', () => {
+    const adapter = kiloChatPlugin.actions;
+    expect(adapter?.resolveExecutionMode?.({ action: 'react' as never })).toBe('local');
+  });
+});

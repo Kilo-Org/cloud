@@ -1,0 +1,123 @@
+import { emojify, get } from 'node-emoji';
+import type { KiloChatClient } from './client.js';
+
+/**
+ * Common shortcode aliases that differ between GitHub/Slack and node-emoji v2.
+ * node-emoji v2 uses `+1` for thumbs-up while most chat platforms use `thumbsup`.
+ */
+const SHORTCODE_ALIASES: Record<string, string> = {
+  thumbsup: '+1',
+  thumbs_up: '+1',
+  thumbsdown: '-1',
+  thumbs_down: '-1',
+};
+
+/**
+ * Normalize an emoji string for the kilo-chat service.
+ *
+ * - Raw unicode: passed through unchanged.
+ * - Bare shortcode like "thumbsup": expanded to unicode if known.
+ * - ":colon-wrapped:" shortcode: expanded to unicode if known.
+ * - Empty string: passed through unchanged (interpreted upstream as a remove signal).
+ * - Unknown shortcode: passed through unchanged (service will reject if it doesn't
+ *   match its own validation rules).
+ */
+export function normalizeEmoji(input: string): string {
+  if (input === '') return '';
+
+  // Try direct unicode passthrough — if it already contains non-ASCII, assume emoji.
+  if (/[^\x00-\x7F]/.test(input)) return input;
+
+  // Strip optional colons for uniform lookup.
+  const bare = input.replace(/^:(.+):$/, '$1');
+
+  // Check alias map first.
+  const aliased = SHORTCODE_ALIASES[bare] ?? bare;
+
+  // Try direct get() lookup (handles bare shortcodes).
+  const direct = get(aliased);
+  if (direct != null) return direct;
+
+  // Try emojify with colon wrapping.
+  const wrapped = `:${aliased}:`;
+  const expanded = emojify(wrapped, { fallback: '' });
+  if (expanded !== '' && expanded !== wrapped) return expanded;
+
+  // Unknown — return original input unchanged.
+  return input;
+}
+
+export type HandleKiloChatReactActionParams = {
+  action: string;
+  cfg: unknown;
+  params: Record<string, unknown>;
+  toolContext?: {
+    currentChannelId?: string | null;
+    currentMessageId?: string | number | null;
+  };
+  client: KiloChatClient;
+};
+
+export type HandleKiloChatReactActionResult =
+  | {
+      content: Array<{ type: 'text'; text: string }>;
+      details: { added: true; id: string; emoji: string };
+    }
+  | {
+      content: Array<{ type: 'text'; text: string }>;
+      details: { removed: true; emoji: string };
+    };
+
+function readString(params: Record<string, unknown>, key: string): string | undefined {
+  const v = params[key];
+  return typeof v === 'string' && v.length > 0 ? v : undefined;
+}
+
+export async function handleKiloChatReactAction(
+  args: HandleKiloChatReactActionParams,
+): Promise<HandleKiloChatReactActionResult> {
+  const conversationId =
+    readString(args.params, 'to') ??
+    (typeof args.toolContext?.currentChannelId === 'string'
+      ? args.toolContext.currentChannelId
+      : undefined);
+  if (!conversationId) {
+    throw new Error('kilo-chat: conversationId (or `to`) is required');
+  }
+
+  const paramMessageId = readString(args.params, 'messageId');
+  const ctxMessageId =
+    args.toolContext?.currentMessageId != null
+      ? String(args.toolContext.currentMessageId)
+      : undefined;
+  const messageId = paramMessageId ?? ctxMessageId;
+  if (!messageId) {
+    throw new Error('kilo-chat: messageId is required (explicit or via toolContext)');
+  }
+
+  const rawEmoji = typeof args.params.emoji === 'string' ? args.params.emoji : '';
+  const remove =
+    typeof args.params.remove === 'boolean' ? args.params.remove : rawEmoji === '';
+
+  if (remove) {
+    const emoji = normalizeEmoji(rawEmoji);
+    if (emoji === '') {
+      throw new Error('kilo-chat: remove requires a specific emoji');
+    }
+    await args.client.removeReaction({ conversationId, messageId, emoji });
+    return {
+      content: [{ type: 'text', text: `Removed ${emoji} from ${messageId}` }],
+      details: { removed: true, emoji },
+    };
+  }
+
+  const emoji = normalizeEmoji(rawEmoji);
+  if (emoji === '') {
+    throw new Error('kilo-chat: emoji is required for add');
+  }
+  const { id } = await args.client.addReaction({ conversationId, messageId, emoji });
+  return {
+    content: [{ type: 'text', text: `Reacted ${emoji} to ${messageId}` }],
+    details: { added: true, id, emoji },
+  };
+}

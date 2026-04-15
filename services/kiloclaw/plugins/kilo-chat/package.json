@@ -32,5 +32,8 @@
   "devDependencies": {
     "esbuild": "^0.25.2",
     "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "node-emoji": "^2.2.0"
   }
 }

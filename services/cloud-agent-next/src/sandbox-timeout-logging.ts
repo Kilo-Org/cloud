@@ -7,8 +7,8 @@ export const FAST_SANDBOX_COMMAND_TIMEOUT_MS = 30_000;
 /** Timeout for git network operations (fetch, pull, push). */
 export const GIT_COMMAND_TIMEOUT_MS = 120_000;
 
-/** Timeout for git clone via SDK (large repos need headroom). */
-export const GIT_CLONE_TIMEOUT_MS = 5 * 60 * 1000;
+/** Timeout for git clone via SDK. */
+export const GIT_CLONE_TIMEOUT_MS = 2 * 60 * 1000;
 
 /** Timeout for disk-space checks. */
 export const DISK_CHECK_TIMEOUT_MS = 10_000;

@@ -247,6 +247,10 @@ export async function getCliRunStatus(params: {
   userId: string;
   instanceId: string | null;
   workerInstanceId?: string;
+  getControllerStatus?: (
+    userId: string,
+    workerInstanceId: string | undefined
+  ) => Promise<KiloCliRunStatusResponse>;
 }): Promise<CliRunStatusResult> {
   const [row] = await db
     .select()
@@ -275,11 +279,13 @@ export async function getCliRunStatus(params: {
     params.workerInstanceId ??
     (row.instance_id ? await resolveWorkerInstanceId(row.instance_id) : undefined);
 
-  const client = new KiloClawInternalClient();
-  const controllerStatus = await client.getKiloCliRunStatus(
-    params.userId,
-    effectiveWorkerInstanceId
-  );
+  const getControllerStatus =
+    params.getControllerStatus ??
+    ((userId: string, workerInstanceId: string | undefined) => {
+      const client = new KiloClawInternalClient();
+      return client.getKiloCliRunStatus(userId, workerInstanceId);
+    });
+  const controllerStatus = await getControllerStatus(params.userId, effectiveWorkerInstanceId);
 
   if (!controllerStatus.hasRun) {
     const completedAt = new Date().toISOString();

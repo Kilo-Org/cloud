@@ -7,6 +7,7 @@ import {
   cancelCliRun,
   createCliRun,
   getCliRunInitiatedBy,
+  getCliRunStatus,
   markCliRunCancelled,
   shouldPersistCliRunControllerStatus,
 } from '@/lib/kiloclaw/cli-runs';
@@ -36,6 +37,28 @@ async function getRunStatus(runId: string) {
     .select({
       status: kiloclaw_cli_runs.status,
       completed_at: kiloclaw_cli_runs.completed_at,
+    })
+    .from(kiloclaw_cli_runs)
+    .where(eq(kiloclaw_cli_runs.id, runId))
+    .limit(1);
+
+  if (!row) {
+    throw new Error('Failed to load KiloClaw CLI run');
+  }
+
+  return {
+    ...row,
+    completed_at: row.completed_at ? new Date(row.completed_at).toISOString() : null,
+  };
+}
+
+async function getRunRow(runId: string) {
+  const [row] = await db
+    .select({
+      status: kiloclaw_cli_runs.status,
+      completed_at: kiloclaw_cli_runs.completed_at,
+      output: kiloclaw_cli_runs.output,
+      exit_code: kiloclaw_cli_runs.exit_code,
     })
     .from(kiloclaw_cli_runs)
     .where(eq(kiloclaw_cli_runs.id, runId))
@@ -318,6 +341,265 @@ describe('shouldPersistCliRunControllerStatus', () => {
         }
       )
     ).toBe(false);
+  });
+});
+
+describe('getCliRunStatus', () => {
+  it('returns the row state without calling the controller when already terminal', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'completed run',
+      startedAt,
+      initiatedByAdminId: null,
+    });
+
+    // Manually mark the run as completed so the row is terminal.
+    await db
+      .update(kiloclaw_cli_runs)
+      .set({
+        status: 'completed',
+        output: 'done',
+        exit_code: 0,
+        completed_at: '2026-04-12T12:01:00.000Z',
+      })
+      .where(eq(kiloclaw_cli_runs.id, runId));
+
+    const getControllerStatus = jest.fn();
+
+    const result = await getCliRunStatus({
+      runId,
+      userId: user.id,
+      instanceId,
+      workerInstanceId: 'ki_current',
+      getControllerStatus,
+    });
+
+    expect(getControllerStatus).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      hasRun: true,
+      status: 'completed',
+      output: 'done',
+      exitCode: 0,
+      prompt: 'completed run',
+      initiatedBy: 'user',
+    });
+    // startedAt and completedAt come from the raw DB string; just check they
+    // parse to the right instant rather than asserting an exact format.
+    expect(new Date(result.startedAt!).toISOString()).toBe('2026-04-12T12:00:00.000Z');
+    expect(new Date(result.completedAt!).toISOString()).toBe('2026-04-12T12:01:00.000Z');
+  });
+
+  it('persists failed with lost-run output when controller returns hasRun: false', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'lost run',
+      startedAt,
+      initiatedByAdminId: null,
+    });
+
+    const result = await getCliRunStatus({
+      runId,
+      userId: user.id,
+      instanceId,
+      workerInstanceId: 'ki_current',
+      getControllerStatus: async () => ({
+        hasRun: false,
+        status: null,
+        output: null,
+        exitCode: null,
+        startedAt: null,
+        completedAt: null,
+        prompt: null,
+      }),
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.output).toBe(
+      '[run state unavailable: controller no longer has an active CLI run for this record]'
+    );
+    expect(result.hasRun).toBe(true);
+    expect(result.prompt).toBe('lost run');
+    expect(result.initiatedBy).toBe('user');
+    expect(result.completedAt).not.toBeNull();
+
+    // Also verify the DB row was persisted.
+    const row = await getRunRow(runId);
+    expect(row.status).toBe('failed');
+    expect(row.output).toBe(
+      '[run state unavailable: controller no longer has an active CLI run for this record]'
+    );
+    expect(row.completed_at).not.toBeNull();
+  });
+
+  it('returns running without persisting when controller timestamp mismatches the row', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'stale row',
+      startedAt,
+      initiatedByAdminId: null,
+    });
+
+    const result = await getCliRunStatus({
+      runId,
+      userId: user.id,
+      instanceId,
+      workerInstanceId: 'ki_current',
+      getControllerStatus: async () => ({
+        hasRun: true,
+        status: 'running',
+        output: null,
+        exitCode: null,
+        startedAt: '2026-04-12T12:05:00.000Z', // Different timestamp
+        completedAt: null,
+        prompt: 'newer run on controller',
+      }),
+    });
+
+    expect(result).toMatchObject({
+      hasRun: true,
+      status: 'running',
+      output: null,
+      exitCode: null,
+      completedAt: null,
+      prompt: 'stale row',
+      initiatedBy: 'user',
+    });
+    expect(new Date(result.startedAt!).toISOString()).toBe(startedAt);
+
+    // DB row should remain unchanged.
+    const row = await getRunRow(runId);
+    expect(row.status).toBe('running');
+    expect(row.completed_at).toBeNull();
+  });
+
+  it('returns controller state pass-through when controller says running and timestamps match', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'active run',
+      startedAt,
+      initiatedByAdminId: null,
+    });
+
+    const result = await getCliRunStatus({
+      runId,
+      userId: user.id,
+      instanceId,
+      workerInstanceId: 'ki_current',
+      getControllerStatus: async () => ({
+        hasRun: true,
+        status: 'running',
+        output: 'partial output',
+        exitCode: null,
+        startedAt: '2026-04-12T12:00:00Z',
+        completedAt: null,
+        prompt: 'active run',
+      }),
+    });
+
+    expect(result).toEqual({
+      hasRun: true,
+      status: 'running',
+      output: 'partial output',
+      exitCode: null,
+      startedAt: '2026-04-12T12:00:00Z',
+      completedAt: null,
+      prompt: 'active run',
+      initiatedBy: 'user',
+    });
+
+    // DB row should not be persisted (still running).
+    const row = await getRunRow(runId);
+    expect(row.status).toBe('running');
+    expect(row.completed_at).toBeNull();
+  });
+
+  it('persists and returns terminal state when controller reached a terminal state for this run', async () => {
+    const user = await insertTestUser();
+    const admin = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'run that completed',
+      startedAt,
+      initiatedByAdminId: admin.id,
+    });
+
+    const result = await getCliRunStatus({
+      runId,
+      userId: user.id,
+      instanceId,
+      workerInstanceId: 'ki_current',
+      getControllerStatus: async () => ({
+        hasRun: true,
+        status: 'completed',
+        output: 'final output',
+        exitCode: 0,
+        startedAt: '2026-04-12T12:00:00Z',
+        completedAt: '2026-04-12T12:01:00.000Z',
+        prompt: 'run that completed',
+      }),
+    });
+
+    expect(result).toEqual({
+      hasRun: true,
+      status: 'completed',
+      output: 'final output',
+      exitCode: 0,
+      startedAt: '2026-04-12T12:00:00Z',
+      completedAt: '2026-04-12T12:01:00.000Z',
+      prompt: 'run that completed',
+      initiatedBy: 'admin',
+    });
+
+    // Verify the DB row was persisted with terminal state.
+    const row = await getRunRow(runId);
+    expect(row.status).toBe('completed');
+    expect(row.output).toBe('final output');
+    expect(row.exit_code).toBe(0);
+    expect(row.completed_at).toBe('2026-04-12T12:01:00.000Z');
+  });
+
+  it('returns empty status when the run does not exist', async () => {
+    const user = await insertTestUser();
+
+    const result = await getCliRunStatus({
+      runId: crypto.randomUUID(),
+      userId: user.id,
+      instanceId: null,
+      workerInstanceId: 'ki_current',
+      getControllerStatus: async () => {
+        throw new Error('should not be called');
+      },
+    });
+
+    expect(result).toEqual({
+      hasRun: false,
+      status: null,
+      output: null,
+      exitCode: null,
+      startedAt: null,
+      completedAt: null,
+      prompt: null,
+      initiatedBy: null,
+    });
   });
 });
 

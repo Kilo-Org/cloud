@@ -272,3 +272,8 @@ export function _getActiveRun(): RunState | null {
 export function _resetActiveRun(): void {
   activeRun = null;
 }
+
+/** Exported for testing. */
+export function _resetStartQueue(): void {
+  startQueue = Promise.resolve();
+}

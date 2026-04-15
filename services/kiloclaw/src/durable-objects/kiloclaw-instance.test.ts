@@ -5209,6 +5209,15 @@ describe('kilo CLI run routing', () => {
     fetchSpy.mockRestore();
   });
 
+  it('returns { conflict } from cancelKiloCliRun when instance is not running', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage); // status: 'provisioned', not 'running'
+
+    const result = await instance.cancelKiloCliRun();
+
+    expect(result).toEqual({ conflict: 'Instance is not running' });
+  });
+
   it('cancels a Kilo CLI run for docker-local via controller without flyMachineId', async () => {
     const { instance, storage } = createInstance();
     await seedDockerInstance(storage, { status: 'running' });

@@ -73,7 +73,8 @@ describe('sanitizeError: Instance-not-* status correction', () => {
   });
 
   it('does not override status for non-"Instance not" safe errors', async () => {
-    // "Instance is not running" uses a different prefix — should stay 500
+    // "Instance is not running" thrown by DO lifecycle methods (not CLI cancel) stays 500
+    // because only "Instance not provisioned" has a correctLostStatus entry.
     const err = new Error('Instance is not running');
     const env = envWithDOError(err);
 
@@ -93,6 +94,44 @@ describe('sanitizeError: Instance-not-* status correction', () => {
     expect(resp.status).toBe(500);
     const body = await jsonBody(resp);
     expect(body.error).toBe('status failed');
+  });
+});
+
+describe('kilo-cli-run/cancel: conflict response handling', () => {
+  /** Minimal env whose DO cancelKiloCliRun returns a conflict discriminated-union value. */
+  function envWithCancelConflict(message: string) {
+    return {
+      KILOCLAW_INSTANCE: {
+        idFromName: (id: string) => id,
+        get: () => ({ cancelKiloCliRun: () => Promise.resolve({ conflict: message }) }),
+      },
+      KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      KV_CLAW_CACHE: {
+        get: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue({ keys: [], list_complete: true }),
+        getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+      },
+    } as never;
+  }
+
+  it('returns 409 when the DO signals instance is not running', async () => {
+    const env = envWithCancelConflict('Instance is not running');
+
+    const resp = await platform.request(
+      '/kilo-cli-run/cancel',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(409);
+    const body = await jsonBody(resp);
+    expect(body.error).toBe('Instance is not running');
   });
 });
 

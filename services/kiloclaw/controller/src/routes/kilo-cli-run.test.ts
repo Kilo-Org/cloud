@@ -6,6 +6,7 @@ import {
   buildRunPrompt,
   _getActiveRun,
   _resetActiveRun,
+  _resetStartQueue,
 } from './kilo-cli-run';
 
 // Mock child_process.spawn
@@ -62,6 +63,7 @@ describe('/_kilo/cli-run routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     _resetActiveRun();
+    _resetStartQueue();
     app = new Hono();
     registerKiloCliRunRoutes(app, 'test-token');
     // Set env vars needed by the routes

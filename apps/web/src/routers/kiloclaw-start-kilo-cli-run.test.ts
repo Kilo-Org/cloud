@@ -1,14 +1,19 @@
 import { describe, expect, it, beforeAll, beforeEach, jest } from '@jest/globals';
+import { eq } from 'drizzle-orm';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
-import { kiloclaw_instances, kiloclaw_subscriptions } from '@kilocode/db/schema';
+import { kiloclaw_instances, kiloclaw_subscriptions, kiloclaw_cli_runs } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import type { User, Organization } from '@kilocode/db/schema';
 
-// ── Mocks ──────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockStartKiloCliRun: jest.Mock<any> = jest.fn();
+type AnyMock = jest.Mock<(...args: any[]) => any>;
+
+// ── Mocks ──────────────────────────────────────────────────────────────────
+
+const mockStartKiloCliRun: AnyMock = jest.fn();
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const actual: Record<string, unknown> = jest.requireActual(
     '@/lib/kiloclaw/kiloclaw-internal-client'
@@ -22,8 +27,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
 });
 
 jest.mock('next/headers', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fn = jest.fn as (...args: any[]) => jest.Mock<any>;
+  const fn = jest.fn as (...args: unknown[]) => AnyMock;
   return {
     cookies: fn().mockResolvedValue({ get: fn() }),
     headers: fn().mockReturnValue(new Map()),
@@ -32,10 +36,8 @@ jest.mock('next/headers', () => {
 
 // ── Dynamic imports (after mocks) ──────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let createCallerForUser: (userId: string) => Promise<any>;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let KiloClawApiError: any;
+let createCallerForUser: (typeof import('@/routers/test-utils'))['createCallerForUser'];
+let KiloClawApiError: (typeof import('@/lib/kiloclaw/kiloclaw-internal-client'))['KiloClawApiError'];
 
 beforeAll(async () => {
   const mod = await import('@/routers/test-utils');
@@ -131,6 +133,27 @@ describe('kiloclaw.startKiloCliRun error translation', () => {
       message: 'Instance needs redeploy to support recovery',
     });
   });
+
+  it('inserts a running kiloclaw_cli_runs row on success', async () => {
+    const startedAt = '2024-01-01T00:00:00.000Z';
+    mockStartKiloCliRun.mockResolvedValue({ ok: true, startedAt });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.startKiloCliRun({ prompt: 'fix the config' });
+
+    expect(result).toMatchObject({ ok: true, startedAt, id: expect.any(String) });
+
+    const rows = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, result.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      user_id: user.id,
+      prompt: 'fix the config',
+      status: 'running',
+    });
+  });
 });
 
 // ── Org router: organizations.kiloclaw.startKiloCliRun ─────────────────────
@@ -187,6 +210,31 @@ describe('organizations.kiloclaw.startKiloCliRun error translation', () => {
     ).rejects.toMatchObject({
       code: 'PRECONDITION_FAILED',
       message: 'Instance needs redeploy to support recovery',
+    });
+  });
+
+  it('inserts a running kiloclaw_cli_runs row on success', async () => {
+    const startedAt = '2024-01-01T00:00:00.000Z';
+    mockStartKiloCliRun.mockResolvedValue({ ok: true, startedAt });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.organizations.kiloclaw.startKiloCliRun({
+      organizationId: org.id,
+      prompt: 'fix the org config',
+    });
+
+    expect(result).toMatchObject({ ok: true, startedAt, id: expect.any(String) });
+
+    const rows = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, result.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      user_id: user.id,
+      instance_id: expect.any(String),
+      prompt: 'fix the org config',
+      status: 'running',
     });
   });
 });

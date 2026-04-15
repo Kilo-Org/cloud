@@ -93,13 +93,17 @@ export async function getKiloCliRunStatus(
 
 /**
  * Cancel the active kilo CLI run on the controller.
+ *
+ * Returns a `{ conflict }` variant instead of throwing on not-running because
+ * custom error properties (like `.status`) are lost crossing the DO RPC
+ * boundary — only `.message` survives. Return values serialize correctly.
  */
 export async function cancelKiloCliRun(
   state: InstanceMutableState,
   env: KiloClawEnv
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean } | KiloCliRunConflict> {
   if (state.status !== 'running' || !getRuntimeId(state)) {
-    throw Object.assign(new Error('Instance is not running'), { status: 409 });
+    return { conflict: 'Instance is not running' };
   }
 
   return callGatewayController(

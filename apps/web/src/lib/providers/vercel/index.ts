@@ -26,7 +26,15 @@ function getRandomNumberLessThan100(randomSeed: string) {
   return crypto.createHash('sha256').update(randomSeed).digest().readUInt32BE(0) % 100;
 }
 
+let cachedPercentage: number | null = null;
+let cachedAt = 0;
+const CACHE_TTL_MS = 10_000;
+
 async function getVercelRoutingPercentage() {
+  if (cachedPercentage !== null && Date.now() - cachedAt < CACHE_TTL_MS) {
+    return cachedPercentage;
+  }
+  let percentage = 10;
   try {
     const raw = await redisGet('gateway:vercel-routing-percentage');
     if (raw) {
@@ -35,16 +43,15 @@ async function getVercelRoutingPercentage() {
         parsed.vercel_routing_percentage !== null &&
         parsed.vercel_routing_percentage !== undefined
       ) {
-        console.debug(
-          `[getVercelRoutingPercentage] using admin override: ${parsed.vercel_routing_percentage}%`
-        );
-        return parsed.vercel_routing_percentage;
+        percentage = parsed.vercel_routing_percentage;
       }
     }
   } catch (e) {
     console.error(`[getVercelRoutingPercentage] failed to read from Redis`, e);
   }
-  return 10;
+  cachedPercentage = percentage;
+  cachedAt = Date.now();
+  return percentage;
 }
 
 const getVercelModels_cached = unstable_cache(

@@ -11,8 +11,8 @@ ARG KILOCODE_CLI_VERSION="7.1.17"
 #
 # This builds kilo-cli from source and copies the linux-x64 binary here.
 
-# Install ripgrep and Generate locales to suppress setlocale warnings
-RUN apt-get update && apt-get install -y --no-install-recommends ripgrep jq locales && \
+# Install CLI tools and generate locales to suppress setlocale warnings
+RUN apt-get update && apt-get install -y --no-install-recommends git-lfs jq locales ripgrep && \
 	   sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
 	   locale-gen && \
 	   apt-get clean && \

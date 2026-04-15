@@ -12,7 +12,7 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
 	&& mkdir -p -m 755 /etc/apt/sources.list.d \
 	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
 	&& apt update \
-	&& apt install gh jq -y
+	&& apt install gh git-lfs jq -y
 
 # Install GitLab CLI (glab) - download official .deb from GitLab releases
 RUN GLAB_VERSION="1.80.4" \

@@ -241,3 +241,117 @@ describe('sendTyping', () => {
     await expect(client.sendTyping({ conversationId: 'c1' })).rejects.toThrow(/500/);
   });
 });
+
+describe('createKiloChatClient.addReaction', () => {
+  it('POSTs to /_kilo/kilo-chat/messages/:id/reactions with body and returns { id }', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ id: '01JXXXXXXXXXXXXXXXXXXXXXXX' }), { status: 201 });
+    }) as typeof fetch;
+
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+
+    const result = await client.addReaction({
+      conversationId: 'C',
+      messageId: 'M',
+      emoji: '👍',
+    });
+    expect(result).toEqual({ id: '01JXXXXXXXXXXXXXXXXXXXXXXX' });
+    expect(calls[0].url).toBe('http://ctrl/_kilo/kilo-chat/messages/M/reactions');
+    expect(calls[0].init.method).toBe('POST');
+    const headers = calls[0].init.headers as Record<string, string>;
+    expect(headers.authorization).toBe('Bearer gw');
+    expect(headers['content-type']).toBe('application/json');
+    const body = JSON.parse(String(calls[0].init.body));
+    expect(body).toEqual({ conversationId: 'C', emoji: '👍' });
+  });
+
+  it('accepts 200 status (dedupe) and returns the same shape', async () => {
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({ id: '01JDEDUPE' }), { status: 200 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+    const r = await client.addReaction({ conversationId: 'C', messageId: 'M', emoji: '👍' });
+    expect(r).toEqual({ id: '01JDEDUPE' });
+  });
+
+  it('throws on non-2xx response with status + body included in message', async () => {
+    const fetchImpl = (async () => new Response('boom', { status: 500 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+    await expect(
+      client.addReaction({ conversationId: 'C', messageId: 'M', emoji: '👍' })
+    ).rejects.toThrow(/500/);
+  });
+
+  it('throws when response is missing id', async () => {
+    const fetchImpl = (async () => new Response('{}', { status: 201 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+    await expect(
+      client.addReaction({ conversationId: 'C', messageId: 'M', emoji: '👍' })
+    ).rejects.toThrow(/reaction id/i);
+  });
+});
+
+describe('createKiloChatClient.removeReaction', () => {
+  it('DELETEs with body; resolves void on 204', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(null, { status: 204 });
+    }) as typeof fetch;
+
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+    await client.removeReaction({ conversationId: 'C', messageId: 'M', emoji: '👍' });
+    expect(calls[0].url).toBe('http://ctrl/_kilo/kilo-chat/messages/M/reactions');
+    expect(calls[0].init.method).toBe('DELETE');
+    const body = JSON.parse(String(calls[0].init.body));
+    expect(body).toEqual({ conversationId: 'C', emoji: '👍' });
+  });
+
+  it('throws on non-2xx response', async () => {
+    const fetchImpl = (async () => new Response('nope', { status: 403 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+    await expect(
+      client.removeReaction({ conversationId: 'C', messageId: 'M', emoji: '👍' })
+    ).rejects.toThrow(/403/);
+  });
+
+  it('URL-encodes the message id', async () => {
+    const calls: Array<string> = [];
+    const fetchImpl = (async (url: string | URL) => {
+      calls.push(String(url));
+      return new Response(null, { status: 204 });
+    }) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+    await client.removeReaction({ conversationId: 'C', messageId: 'M/weird?x=1', emoji: '👍' });
+    expect(calls[0]).toBe('http://ctrl/_kilo/kilo-chat/messages/M%2Fweird%3Fx%3D1/reactions');
+  });
+});

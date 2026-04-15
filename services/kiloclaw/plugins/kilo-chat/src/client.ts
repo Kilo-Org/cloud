@@ -24,11 +24,17 @@ export type DeleteMessageParams = { conversationId: string; messageId: string };
 
 export type SendTypingParams = { conversationId: string };
 
+export type AddReactionParams = { conversationId: string; messageId: string; emoji: string };
+export type AddReactionResult = { id: string };
+export type RemoveReactionParams = { conversationId: string; messageId: string; emoji: string };
+
 export type KiloChatClient = {
   createMessage(p: CreateMessageParams): Promise<CreateMessageResult>;
   editMessage(p: EditMessageParams): Promise<EditMessageResult>;
   deleteMessage(p: DeleteMessageParams): Promise<void>;
   sendTyping(p: SendTypingParams): Promise<void>;
+  addReaction(p: AddReactionParams): Promise<AddReactionResult>;
+  removeReaction(p: RemoveReactionParams): Promise<void>;
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -122,10 +128,50 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     void response.body?.cancel();
   }
 
+  async function addReaction(params: AddReactionParams): Promise<AddReactionResult> {
+    const response = await fetchImpl(
+      `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}/reactions`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ conversationId: params.conversationId, emoji: params.emoji }),
+      }
+    );
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller POST reactions responded ${response.status}: ${await response.text()}`
+      );
+    }
+    const data = (await response.json()) as { id?: unknown };
+    if (typeof data.id !== 'string' || data.id.length === 0) {
+      throw new Error('kilo-chat: response missing reaction id');
+    }
+    return { id: data.id };
+  }
+
+  async function removeReaction(params: RemoveReactionParams): Promise<void> {
+    const response = await fetchImpl(
+      `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}/reactions`,
+      {
+        method: 'DELETE',
+        headers,
+        body: JSON.stringify({ conversationId: params.conversationId, emoji: params.emoji }),
+      }
+    );
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller DELETE reactions responded ${response.status}: ${await response.text()}`
+      );
+    }
+    void response.body?.cancel();
+  }
+
   return {
     createMessage,
     editMessage,
     deleteMessage,
     sendTyping,
+    addReaction,
+    removeReaction,
   };
 }

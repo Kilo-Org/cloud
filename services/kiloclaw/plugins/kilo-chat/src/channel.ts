@@ -66,39 +66,32 @@ const pluginBase = createChannelPluginBase({
   },
 });
 
-// Assign actions + capabilities onto the base created by createChannelPluginBase.
-// The SDK helper returns config/capabilities as Partial in its type, but they are
-// always present at runtime. We use Object.assign so the runtime value is correct
-// and a targeted `as any` keeps the spread from fighting ChatChannelPluginBase.
-const kiloChatBase = Object.assign(pluginBase, {
-  capabilities: { chatTypes: ['direct', 'group'] as const, reactions: true },
-  actions: {
-    describeMessageTool: () => ({
-      actions: ['react'] as const,
-    }),
-    supportsAction: ({ action }: { action: string }) => action === 'react',
-    resolveExecutionMode: () => 'local' as const,
-    handleAction: async (ctx: {
-      action: string;
-      cfg: unknown;
-      params: Record<string, unknown>;
-      toolContext?: { currentChannelId?: string; currentMessageId?: string | number };
-    }) => {
-      const client = makeClient();
-      return handleKiloChatReactAction({
-        action: ctx.action,
-        cfg: ctx.cfg,
-        params: ctx.params,
-        toolContext: ctx.toolContext,
-        client,
-      });
+export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
+  base: {
+    ...pluginBase,
+    actions: {
+      describeMessageTool: () => ({
+        actions: ['react'] as const,
+      }),
+      supportsAction: ({ action }: { action: string }) => action === 'react',
+      resolveExecutionMode: () => 'local' as const,
+      handleAction: async (ctx: {
+        action: string;
+        cfg: unknown;
+        params: Record<string, unknown>;
+        toolContext?: { currentChannelId?: string; currentMessageId?: string | number };
+      }) => {
+        const client = makeClient();
+        return handleKiloChatReactAction({
+          action: ctx.action,
+          cfg: ctx.cfg,
+          params: ctx.params,
+          toolContext: ctx.toolContext,
+          client,
+        });
+      },
     },
   },
-});
-
-export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  base: kiloChatBase as any,
   threading: { topLevelReplyToMode: 'reply' },
   outbound: {
     base: { deliveryMode: 'direct' },

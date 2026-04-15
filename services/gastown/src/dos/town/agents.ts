@@ -528,7 +528,7 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   const isConsolidatedFeedbackBead =
     hookedBead?.labels.includes('gt:pr-feedback') &&
     hookedBead.metadata !== null &&
-    (hookedBead.metadata as Record<string, unknown>).has_conflicts === true;
+    Boolean((hookedBead.metadata as Record<string, unknown>).has_conflicts);
 
   if ((isPureConflictBead || isConsolidatedFeedbackBead) && hookedBead?.metadata) {
     const meta = hookedBead.metadata as Record<string, unknown>;

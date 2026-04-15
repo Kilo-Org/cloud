@@ -18,7 +18,15 @@ import { getCookie, deleteCookie } from 'hono/cookie';
 
 import type { AppEnv, KiloClawEnv, ChatWebhookPayload } from './types';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
-import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform, controller } from './routes';
+import {
+  accessGatewayRoutes,
+  publicRoutes,
+  api,
+  kiloclaw,
+  platform,
+  controller,
+  kiloChatProxy,
+} from './routes';
 import { handleSnapshotRestoreQueue } from './queue/snapshot-restore';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
@@ -219,6 +227,11 @@ app.route('/', accessGatewayRoutes);
 
 // Controller check-in routes (machine-to-worker, custom auth)
 app.route('/api/controller', controller);
+
+// Kilo-Chat outbound proxy (machine-to-worker, gateway-token auth, dispatched
+// to kilo-chat via service binding). Mounted before the JWT authGuard so it
+// runs its own per-sandbox gateway-token verification.
+app.route('/api/kilo-chat', kiloChatProxy);
 
 // Debug routes are removed.
 app.all('/debug', c => c.notFound());

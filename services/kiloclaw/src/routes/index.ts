@@ -4,3 +4,4 @@ export { api } from './api';
 export { kiloclaw } from './kiloclaw';
 export { platform } from './platform';
 export { controller } from './controller';
+export { kiloChatProxy } from './kilo-chat';

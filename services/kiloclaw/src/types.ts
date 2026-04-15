@@ -62,10 +62,94 @@ export type KiloClawEnv = {
   KILOCLAW_CHECKIN_URL?: string;
   REQUIRE_PROXY_TOKEN?: string;
 
-  // KiloChat channel plugin
-  KILOCHAT_API_TOKEN?: string;
-  KILOCHAT_BASE_URL?: string;
+  // KiloChat channel plugin.
+  // Outbound traffic goes plugin → controller proxy → kiloclaw Worker (this
+  // worker!) → kilo-chat via service binding, authenticated by the
+  // per-sandbox gateway token. No shared token crosses the internet.
+  /** Enable the kilo-chat channel on new/restarted machines. "true" to enable. */
+  KILOCHAT_ENABLED?: string;
+  /** Reaction feature level forwarded to the plugin's channel config. */
   KILOCHAT_REACTION_LEVEL?: string;
+
+  /**
+   * Service binding to the kilo-chat worker. Used by /api/kilo-chat/* routes
+   * to dispatch bot operations via RPC after verifying the caller's
+   * per-sandbox gateway token. The method signatures are duplicated in
+   * worker-configuration.d.ts and here because AppEnv uses this manual type
+   * rather than the generated Env.
+   */
+  KILOCHAT?: Fetcher & {
+    botCreateMessage(params: {
+      sandboxId: string;
+      conversationId: string;
+      content: Array<{ type: string; [key: string]: unknown }>;
+      inReplyToMessageId?: string;
+    }): Promise<
+      | { ok: true; messageId: string; version: number }
+      | {
+          ok: false;
+          code: 'forbidden' | 'internal' | 'invalid_sandbox';
+          error: string;
+        }
+    >;
+    botEditMessage(params: {
+      sandboxId: string;
+      conversationId: string;
+      messageId: string;
+      content: Array<{ type: string; [key: string]: unknown }>;
+      version: number;
+    }): Promise<
+      | { ok: true; conflict: false; messageId: string; version: number }
+      | { ok: true; conflict: true; messageId: string; version: number }
+      | {
+          ok: false;
+          code: 'forbidden' | 'not_found' | 'internal' | 'invalid_sandbox';
+          error: string;
+        }
+    >;
+    botDeleteMessage(params: {
+      sandboxId: string;
+      conversationId: string;
+      messageId: string;
+    }): Promise<
+      | { ok: true }
+      | {
+          ok: false;
+          code: 'forbidden' | 'not_found' | 'internal' | 'invalid_sandbox';
+          error: string;
+        }
+    >;
+    botAddReaction(params: {
+      sandboxId: string;
+      conversationId: string;
+      messageId: string;
+      emoji: string;
+    }): Promise<
+      | { ok: true; id: string; added: boolean }
+      | {
+          ok: false;
+          code: 'forbidden' | 'internal' | 'invalid_sandbox';
+          error: string;
+        }
+    >;
+    botRemoveReaction(params: {
+      sandboxId: string;
+      conversationId: string;
+      messageId: string;
+      emoji: string;
+    }): Promise<
+      | { ok: true }
+      | {
+          ok: false;
+          code: 'forbidden' | 'internal' | 'invalid_sandbox';
+          error: string;
+        }
+    >;
+    botSendTyping(params: {
+      sandboxId: string;
+      conversationId: string;
+    }): Promise<{ ok: true } | { ok: false; code: 'forbidden' | 'invalid_sandbox'; error: string }>;
+  };
 
   // PostHog product telemetry
   NEXT_PUBLIC_POSTHOG_KEY?: string;

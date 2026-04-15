@@ -156,6 +156,19 @@ export function getEmptyCliRunStatus(): CliRunStatusResult {
   };
 }
 
+/**
+ * Cancel a running CLI run, reconciling controller and DB state.
+ *
+ * Limitation: when the controller reports `hasRun: false`, the run's actual
+ * terminal state is already evicted from controller memory. We record the row
+ * as `'failed'` with a sentinel output, even though the run may have completed
+ * successfully just before the cancel arrived. A re-poll cannot recover the
+ * real outcome because the controller has already discarded it. This is a
+ * strict improvement over leaving the row stuck in `'running'` forever, but
+ * callers should be aware that a `'failed'` status with the
+ * `LOST_CONTROLLER_RUN_OUTPUT` sentinel does not necessarily mean the run
+ * actually failed — it means the outcome is unknown.
+ */
 export async function cancelCliRun(params: {
   runId: string;
   userId: string;
@@ -283,6 +296,14 @@ export async function cancelCliRun(params: {
   return { ok: true, runFound: true, cancelled: didUpdate };
 }
 
+/**
+ * Poll the status of a CLI run, reconciling controller and DB state.
+ *
+ * Limitation: when the controller reports `hasRun: false`, the run's actual
+ * terminal state is already evicted from controller memory. We record the row
+ * as `'failed'` with a sentinel output, even though the run may have completed
+ * successfully. See {@link cancelCliRun} for the same limitation and rationale.
+ */
 export async function getCliRunStatus(params: {
   runId: string;
   userId: string;

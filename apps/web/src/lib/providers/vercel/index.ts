@@ -22,16 +22,13 @@ import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
 
-const VERCEL_ROUTING_REDIS_KEY = 'gateway:vercel-routing-percentage';
-const DEFAULT_VERCEL_ROUTING_PERCENTAGE = 10;
-
 function getRandomNumberLessThan100(randomSeed: string) {
   return crypto.createHash('sha256').update(randomSeed).digest().readUInt32BE(0) % 100;
 }
 
 async function getVercelRoutingPercentage() {
   try {
-    const raw = await redisGet(VERCEL_ROUTING_REDIS_KEY);
+    const raw = await redisGet('gateway:vercel-routing-percentage');
     if (raw) {
       const parsed = JSON.parse(raw) as { vercel_routing_percentage?: number | null };
       if (
@@ -47,7 +44,7 @@ async function getVercelRoutingPercentage() {
   } catch (e) {
     console.error(`[getVercelRoutingPercentage] failed to read from Redis`, e);
   }
-  return DEFAULT_VERCEL_ROUTING_PERCENTAGE;
+  return 10;
 }
 
 const getVercelModels_cached = unstable_cache(

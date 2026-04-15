@@ -29,7 +29,7 @@ type Story = StoryObj<typeof meta>;
 
 export const KiloClawOnly: Story = {};
 
-export const IncludesNewerOpenClawVersion: Story = {
+export const IncludesNewOpenClawVersion: Story = {
   args: {
     catalogNewerThanImage: true,
   },

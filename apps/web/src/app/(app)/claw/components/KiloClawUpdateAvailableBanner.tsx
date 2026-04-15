@@ -22,9 +22,9 @@ export function KiloClawUpdateAvailableBanner({
         <ArrowUpCircle />
       </Banner.Icon>
       <Banner.Content>
-        <Banner.Title>A newer version of KiloClaw is available</Banner.Title>
+        <Banner.Title>A new version of KiloClaw is available</Banner.Title>
         <Banner.Description>
-          {catalogNewerThanImage ? 'This update includes a newer OpenClaw version. ' : null}
+          {catalogNewerThanImage ? 'This update includes a new OpenClaw version. ' : null}
           Upgrade your instance to get the latest features and fixes.
         </Banner.Description>
       </Banner.Content>

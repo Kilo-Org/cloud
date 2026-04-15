@@ -869,8 +869,8 @@ export function SettingsTab({
                       <TooltipContent>
                         <p>
                           {catalogNewerThanImage
-                            ? 'A newer version of KiloClaw is available. This update includes a newer OpenClaw version. Click to upgrade.'
-                            : 'A newer version of KiloClaw is available — click to upgrade.'}
+                            ? 'A new version of KiloClaw is available. This update includes a new OpenClaw version. Click to upgrade.'
+                            : 'A new version of KiloClaw is available — click to upgrade.'}
                         </p>
                       </TooltipContent>
                     </Tooltip>

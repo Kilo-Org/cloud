@@ -1,5 +1,4 @@
 import type { BYOKResult } from '@/lib/providers/types';
-import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
 import type { VercelUserByokInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
   DirectUserByokInferenceProviderIdSchema,

@@ -33,7 +33,7 @@ capitals, as shown here.
 
 - **Instance record**: A row in `kiloclaw_instance` representing a
   KiloClaw instance, whether or not the underlying infrastructure
-  (CF worker Durable Object and Fly app) still exists.
+  (CF worker Durable Object and infra provider resources) still exists.
 - **Subscription record**: A row in `kiloclaw_subscription`
   representing a billing subscription tied to a specific instance.
 - **Destroyed instance**: An instance record whose underlying
@@ -62,6 +62,8 @@ capitals, as shown here.
   source, cancellation flags, suspension state, etc.). Automated
   timestamp updates (e.g., `updated_at`) that occur without any
   other field change are not mutations for change log purposes.
+- **Infra Provider**: The backing service provider where we provision compute and storage and onto which we actually deploy OpenClaw. For example fly.io, docker-local, Northflank.
+- **Infra Provider Base Resource**: Some infra providers have base top-level organizational resource that must exist. For example fly.io has a app concept, Northflank has projects.
 
 ## Overview
 
@@ -93,7 +95,7 @@ on application logs that may be rotated or incomplete.
 
 1. An instance record MUST NOT be deleted from `kiloclaw_instance`,
    even after the underlying infrastructure (CF worker Durable Object
-   and Fly app) is destroyed. Destroyed instances MUST be marked as
+   and infra provider resources) is destroyed. Destroyed instances MUST be marked as
    destroyed rather than removed.
 2. A subscription record MUST NOT be deleted from
    `kiloclaw_subscription`. Subscription lifecycle transitions
@@ -222,7 +224,7 @@ MUST be enforced only after the existing data model has been brought
 into the desired state (rules 1–6 satisfied, early-bird backfill
 complete).
 
-19. A Cloudflare Worker Durable Object and a Fly app MUST both exist
+19. A Cloudflare Worker Durable Object and a infra provider base resource  MUST both exist
     before an instance record is created in `kiloclaw_instance`.
     Infrastructure MUST be provisioned first; the record is a
     reflection of existing infrastructure, not a reservation.

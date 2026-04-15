@@ -74,7 +74,7 @@ function readString(params: Record<string, unknown>, key: string): string | unde
 }
 
 export async function handleKiloChatReactAction(
-  args: HandleKiloChatReactActionParams,
+  args: HandleKiloChatReactActionParams
 ): Promise<HandleKiloChatReactActionResult> {
   const conversationId =
     readString(args.params, 'to') ??
@@ -96,8 +96,7 @@ export async function handleKiloChatReactAction(
   }
 
   const rawEmoji = typeof args.params.emoji === 'string' ? args.params.emoji : '';
-  const remove =
-    typeof args.params.remove === 'boolean' ? args.params.remove : rawEmoji === '';
+  const remove = typeof args.params.remove === 'boolean' ? args.params.remove : rawEmoji === '';
 
   if (remove) {
     const emoji = normalizeEmoji(rawEmoji);

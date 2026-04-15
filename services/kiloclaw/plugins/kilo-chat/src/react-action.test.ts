@@ -18,7 +18,7 @@ describe('normalizeEmoji', () => {
   it('passes through unicode emoji unchanged', () => {
     expect(normalizeEmoji('\u{1F44D}')).toBe('\u{1F44D}');
     expect(normalizeEmoji('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}')).toBe(
-      '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}',
+      '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}'
     );
   });
 
@@ -69,7 +69,7 @@ describe('handleKiloChatReactAction', () => {
       client,
     });
     expect(client.addReaction).toHaveBeenCalledWith(
-      expect.objectContaining({ emoji: '\u{1F44D}' }),
+      expect.objectContaining({ emoji: '\u{1F44D}' })
     );
   });
 
@@ -92,7 +92,7 @@ describe('handleKiloChatReactAction', () => {
   it('throws when add is attempted with empty emoji', async () => {
     const client = mockClient();
     await expect(
-      handleKiloChatReactAction({ ...baseArgs, params: { emoji: '' }, client }),
+      handleKiloChatReactAction({ ...baseArgs, params: { emoji: '' }, client })
     ).rejects.toThrow(/emoji/i);
   });
 
@@ -103,7 +103,7 @@ describe('handleKiloChatReactAction', () => {
         ...baseArgs,
         params: { emoji: '', remove: true },
         client,
-      }),
+      })
     ).rejects.toThrow(/specific/i);
   });
 
@@ -131,7 +131,7 @@ describe('handleKiloChatReactAction', () => {
       client,
     });
     expect(client.addReaction).toHaveBeenCalledWith(
-      expect.objectContaining({ conversationId: 'CONV', messageId: 'MID' }),
+      expect.objectContaining({ conversationId: 'CONV', messageId: 'MID' })
     );
   });
 
@@ -144,7 +144,7 @@ describe('handleKiloChatReactAction', () => {
         params: { emoji: '\u{1F44D}' },
         toolContext: { currentMessageId: 'MID' },
         client,
-      }),
+      })
     ).rejects.toThrow(/conversation/i);
   });
 
@@ -157,7 +157,7 @@ describe('handleKiloChatReactAction', () => {
         params: { emoji: '\u{1F44D}' },
         toolContext: { currentChannelId: 'CONV' },
         client,
-      }),
+      })
     ).rejects.toThrow(/message/i);
   });
 
@@ -173,8 +173,6 @@ describe('handleKiloChatReactAction', () => {
       },
       client,
     });
-    expect(client.addReaction).toHaveBeenCalledWith(
-      expect.objectContaining({ messageId: '42' }),
-    );
+    expect(client.addReaction).toHaveBeenCalledWith(expect.objectContaining({ messageId: '42' }));
   });
 });

@@ -115,7 +115,7 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <GitPullRequest />,
   },
   {
-    title: () => 'Bots',
+    title: () => 'Kilo Bot',
     url: '/admin/bots',
     icon: () => <Bot />,
   },

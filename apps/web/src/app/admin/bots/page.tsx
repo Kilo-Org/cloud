@@ -40,14 +40,14 @@ export default function AdminBotsPage() {
 
   const breadcrumbs = (
     <BreadcrumbItem>
-      <BreadcrumbPage>Bots</BreadcrumbPage>
+      <BreadcrumbPage>Kilo Bot</BreadcrumbPage>
     </BreadcrumbItem>
   );
 
   return (
     <AdminPage breadcrumbs={breadcrumbs}>
       <div className="flex w-full flex-col gap-y-4">
-        <h2 className="text-2xl font-bold">Bots</h2>
+        <h2 className="text-2xl font-bold">Kilo Bot</h2>
         <Tabs value={activeTab} onValueChange={onTabChange}>
           <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
             <TabsTrigger value="slack-bot" className={tabTriggerClass}>

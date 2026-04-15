@@ -93,6 +93,7 @@ type KiloclawTrpcCode =
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'TOO_MANY_REQUESTS'
+  | 'PRECONDITION_FAILED'
   | 'INTERNAL_SERVER_ERROR';
 
 function kiloclawStatusToTrpcCode(statusCode: number): KiloclawTrpcCode {
@@ -103,6 +104,8 @@ function kiloclawStatusToTrpcCode(statusCode: number): KiloclawTrpcCode {
       return 'NOT_FOUND';
     case 409:
       return 'CONFLICT';
+    case 412:
+      return 'PRECONDITION_FAILED';
     case 429:
       return 'TOO_MANY_REQUESTS';
     default:
@@ -110,21 +113,27 @@ function kiloclawStatusToTrpcCode(statusCode: number): KiloclawTrpcCode {
   }
 }
 
-function getKiloclawApiErrorMessage(err: KiloClawApiError, fallbackMessage: string): string {
-  if (!err.responseBody) return fallbackMessage;
+function getKiloclawApiErrorPayload(
+  err: KiloClawApiError,
+  fallbackMessage: string
+): { code?: string; message: string } {
+  if (!err.responseBody) return { message: fallbackMessage };
 
   try {
     const parsed: unknown = JSON.parse(err.responseBody);
     if (typeof parsed === 'object' && parsed !== null) {
-      const record = parsed as { error?: unknown; message?: unknown };
-      if (typeof record.error === 'string') return record.error;
-      if (typeof record.message === 'string') return record.message;
+      const code = 'code' in parsed && typeof parsed.code === 'string' ? parsed.code : undefined;
+      const error = 'error' in parsed ? parsed.error : undefined;
+      const message = 'message' in parsed ? parsed.message : undefined;
+      if (typeof error === 'string') return { code, message: error };
+      if (typeof message === 'string') return { code, message };
+      return { code, message: fallbackMessage };
     }
   } catch {
     // Fall back to the raw response body when the controller did not return JSON.
   }
 
-  return err.responseBody.trim() || fallbackMessage;
+  return { message: err.responseBody.trim() || fallbackMessage };
 }
 
 function throwKiloclawAdminError(
@@ -136,13 +145,22 @@ function throwKiloclawAdminError(
   }
 ): never {
   if (err instanceof KiloClawApiError) {
+    const payload = getKiloclawApiErrorPayload(err, fallbackMessage);
     throw new TRPCError({
       code:
-        options?.statusCodeOverrides?.[err.statusCode] ?? kiloclawStatusToTrpcCode(err.statusCode),
+        options?.statusCodeOverrides?.[err.statusCode] ??
+        (payload.code === 'controller_route_unavailable'
+          ? 'PRECONDITION_FAILED'
+          : kiloclawStatusToTrpcCode(err.statusCode)),
       message:
         options?.messageOverrides?.[err.statusCode] ??
-        getKiloclawApiErrorMessage(err, fallbackMessage),
-      cause: err,
+        (payload.code === 'controller_route_unavailable'
+          ? 'Instance needs redeploy to support recovery'
+          : payload.message),
+      cause:
+        payload.code === 'controller_route_unavailable'
+          ? new UpstreamApiError('controller_route_unavailable')
+          : err,
     });
   }
 
@@ -240,7 +258,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     } catch (err) {
       workerStatusError =
         err instanceof KiloClawApiError
-          ? getKiloclawApiErrorMessage(err, 'Failed to fetch worker status')
+          ? getKiloclawApiErrorPayload(err, 'Failed to fetch worker status').message
           : err instanceof Error
             ? err.message
             : 'Failed to fetch worker status';

@@ -8,11 +8,13 @@ import { and, eq } from 'drizzle-orm';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockGetDebugStatus: jest.Mock<any, any> = jest.fn();
 const mockDestroyFlyMachine: jest.Mock<any, any> = jest.fn();
+const mockStartKiloCliRun: jest.Mock<any, any> = jest.fn();
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn().mockImplementation(() => ({
     getDebugStatus: mockGetDebugStatus,
     destroyFlyMachine: mockDestroyFlyMachine,
+    startKiloCliRun: mockStartKiloCliRun,
   })),
   KiloClawApiError: class KiloClawApiError extends Error {
     statusCode: number;
@@ -60,6 +62,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   mockGetDebugStatus.mockReset();
   mockDestroyFlyMachine.mockReset();
+  mockStartKiloCliRun.mockReset();
   // Clean audit logs between tests so counts are accurate
   await db
     .delete(kiloclaw_admin_audit_logs)
@@ -231,5 +234,54 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
     ).rejects.toThrow('Invalid Fly machine ID');
 
     expect(mockGetDebugStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin.kiloclawInstances.startKiloCliRun', () => {
+  it('maps worker 409 to tRPC CONFLICT', async () => {
+    const { KiloClawApiError } = jest.requireMock<{
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      KiloClawApiError: new (statusCode: number, responseBody: string) => any;
+    }>('@/lib/kiloclaw/kiloclaw-internal-client');
+
+    mockStartKiloCliRun.mockRejectedValue(
+      new KiloClawApiError(409, JSON.stringify({ error: 'A CLI run is already in progress' }))
+    );
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.startKiloCliRun({
+        userId: testUserId,
+        prompt: 'test prompt',
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'A CLI run is already in progress',
+    });
+  });
+
+  it('maps controller_route_unavailable to PRECONDITION_FAILED', async () => {
+    const { KiloClawApiError } = jest.requireMock<{
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      KiloClawApiError: new (statusCode: number, responseBody: string) => any;
+    }>('@/lib/kiloclaw/kiloclaw-internal-client');
+
+    mockStartKiloCliRun.mockRejectedValue(
+      new KiloClawApiError(
+        404,
+        JSON.stringify({ error: 'Route not found', code: 'controller_route_unavailable' })
+      )
+    );
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.startKiloCliRun({
+        userId: testUserId,
+        prompt: 'test prompt',
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Instance needs redeploy to support recovery',
+    });
   });
 });

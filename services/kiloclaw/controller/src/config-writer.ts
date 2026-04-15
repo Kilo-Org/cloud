@@ -12,6 +12,16 @@ import path from 'node:path';
 
 const DEFAULT_CONFIG_PATH = '/root/.openclaw/openclaw.json';
 
+const VALID_REACTION_LEVELS = ['off', 'ack', 'minimal', 'extensive'] as const;
+type ReactionLevel = (typeof VALID_REACTION_LEVELS)[number];
+
+function resolveReactionLevel(raw: string | undefined): ReactionLevel {
+  if (raw && (VALID_REACTION_LEVELS as readonly string[]).includes(raw)) {
+    return raw as ReactionLevel;
+  }
+  return 'minimal';
+}
+
 export const MAX_CONFIG_BACKUPS = 5;
 
 // NOTE: writeBaseConfig does NOT use the shared atomicWrite utility because
@@ -442,6 +452,7 @@ export function generateBaseConfig(
     config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
     config.channels['kilo-chat'].enabled = true;
     config.channels['kilo-chat'].baseUrl = env.KILOCHAT_BASE_URL;
+    config.channels['kilo-chat'].reactionLevel = resolveReactionLevel(env.KILOCHAT_REACTION_LEVEL);
 
     config.plugins = config.plugins ?? {};
     config.plugins.load = config.plugins.load ?? {};

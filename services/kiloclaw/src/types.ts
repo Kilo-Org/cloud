@@ -65,6 +65,7 @@ export type KiloClawEnv = {
   // KiloChat channel plugin
   KILOCHAT_API_TOKEN?: string;
   KILOCHAT_BASE_URL?: string;
+  KILOCHAT_REACTION_LEVEL?: string;
 
   // PostHog product telemetry
   NEXT_PUBLIC_POSTHOG_KEY?: string;

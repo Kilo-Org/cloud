@@ -782,6 +782,55 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries['kilo-chat'].enabled).toBe(true);
   });
 
+  it('writes reactionLevel to the kilo-chat channel block when KILOCHAT_REACTION_LEVEL is set', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCHAT_API_TOKEN: 'tok',
+      KILOCHAT_BASE_URL: 'https://chat.example.test',
+      KILOCHAT_REACTION_LEVEL: 'extensive',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.channels['kilo-chat'].reactionLevel).toBe('extensive');
+  });
+
+  it('defaults reactionLevel to minimal when KILOCHAT_REACTION_LEVEL is unset', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCHAT_API_TOKEN: 'tok',
+      KILOCHAT_BASE_URL: 'https://chat.example.test',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.channels['kilo-chat'].reactionLevel).toBe('minimal');
+  });
+
+  it('falls back to minimal when KILOCHAT_REACTION_LEVEL is invalid', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCHAT_API_TOKEN: 'tok',
+      KILOCHAT_BASE_URL: 'https://chat.example.test',
+      KILOCHAT_REACTION_LEVEL: 'bogus',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.channels['kilo-chat'].reactionLevel).toBe('minimal');
+  });
+
+  it('accepts each valid reactionLevel value', () => {
+    for (const level of ['off', 'ack', 'minimal', 'extensive'] as const) {
+      const { deps } = fakeDeps();
+      const env = {
+        ...minimalEnv(),
+        KILOCHAT_API_TOKEN: 'tok',
+        KILOCHAT_BASE_URL: 'https://chat.example.test',
+        KILOCHAT_REACTION_LEVEL: level,
+      };
+      const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+      expect(config.channels['kilo-chat'].reactionLevel).toBe(level);
+    }
+  });
+
   it('leaves kilo-chat channel unconfigured when KILOCHAT_API_TOKEN is missing', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);

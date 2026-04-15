@@ -316,9 +316,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       targetRow &&
       targetRow.id !== existingRow.id
     ) {
-      await tx
-        .delete(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.id, existingRow.id));
+      await tx.delete(kiloclaw_subscriptions).where(eq(kiloclaw_subscriptions.id, existingRow.id));
     }
 
     wasSuspended = !!targetRow?.suspended_at;
@@ -519,7 +517,10 @@ export async function enrollWithCredits(params: {
     .where(
       instanceId
         ? eq(kiloclaw_subscriptions.instance_id, instanceId)
-        : and(eq(kiloclaw_subscriptions.user_id, userId), isNull(kiloclaw_subscriptions.instance_id))
+        : and(
+            eq(kiloclaw_subscriptions.user_id, userId),
+            isNull(kiloclaw_subscriptions.instance_id)
+          )
     )
     .limit(1);
 
@@ -614,7 +615,10 @@ export async function enrollWithCredits(params: {
       .where(
         instanceId
           ? eq(kiloclaw_subscriptions.instance_id, instanceId)
-          : and(eq(kiloclaw_subscriptions.user_id, userId), isNull(kiloclaw_subscriptions.instance_id))
+          : and(
+              eq(kiloclaw_subscriptions.user_id, userId),
+              isNull(kiloclaw_subscriptions.instance_id)
+            )
       )
       .limit(1);
 

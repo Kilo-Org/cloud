@@ -189,25 +189,6 @@ async function adoptOrphanedSubscription(
     .where(eq(kiloclaw_subscriptions.id, orphan.id));
 }
 
-/**
- * Return active personal instance for billing flows.
- *
- * Billing routes must not create instance rows. Worker provision owns
- * `kiloclaw_instances` creation per datamodel rule 21.
- */
-async function requireActiveInstanceForBilling(userId: string): Promise<ActiveKiloClawInstance> {
-  const active = await getActiveInstance(userId);
-  if (!active) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Checkout requires an active personal KiloClaw instance.',
-    });
-  }
-
-  await adoptOrphanedSubscription(userId, active.id);
-  return active;
-}
-
 async function getOptionalActiveInstanceForBilling(
   userId: string
 ): Promise<ActiveKiloClawInstance | null> {
@@ -273,20 +254,6 @@ async function getLatestPersonalBillingInstance(
     .limit(1);
 
   return instance ?? null;
-}
-
-async function resolvePersonalBillingInstance(params: {
-  userId: string;
-  instanceId?: string;
-}): Promise<ActiveKiloClawInstance> {
-  if (params.instanceId) {
-    return getOwnedPersonalBillingInstance({
-      userId: params.userId,
-      instanceId: params.instanceId,
-    });
-  }
-
-  return requireActiveInstanceForBilling(params.userId);
 }
 
 async function resolvePersonalCheckoutInstance(params: {
@@ -377,10 +344,7 @@ async function hasBlockingPersonalKiloclawSubscription(userId: string): Promise<
       and(
         eq(kiloclaw_subscriptions.user_id, userId),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid']),
-        or(
-          isNull(kiloclaw_subscriptions.instance_id),
-          isNull(kiloclaw_instances.organization_id)
-        )
+        or(isNull(kiloclaw_subscriptions.instance_id), isNull(kiloclaw_instances.organization_id))
       )
     )
     .limit(1);
@@ -1915,10 +1879,15 @@ export const kiloclawRouter = createTRPCRouter({
       async tx => {
         const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
           await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email, tx);
-        const result = await provisionInstance(ctx.user, input, {
-          instanceId,
-          bootstrapSubscription,
-        }, tx);
+        const result = await provisionInstance(
+          ctx.user,
+          input,
+          {
+            instanceId,
+            bootstrapSubscription,
+          },
+          tx
+        );
         if (shouldEnqueueTrialStartAffiliate) {
           await enqueueProvisionTrialStartAffiliateEvent({
             userId: ctx.user.id,
@@ -1944,10 +1913,15 @@ export const kiloclawRouter = createTRPCRouter({
       async tx => {
         const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
           await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email, tx);
-        const result = await provisionInstance(ctx.user, input, {
-          instanceId,
-          bootstrapSubscription,
-        }, tx);
+        const result = await provisionInstance(
+          ctx.user,
+          input,
+          {
+            instanceId,
+            bootstrapSubscription,
+          },
+          tx
+        );
         if (shouldEnqueueTrialStartAffiliate) {
           await enqueueProvisionTrialStartAffiliateEvent({
             userId: ctx.user.id,

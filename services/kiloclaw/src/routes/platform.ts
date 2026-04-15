@@ -809,12 +809,7 @@ platform.post('/provision', async c => {
     const registryStub = c.env.KILOCLAW_REGISTRY.get(
       c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
     );
-    await registryStub.createInstance(
-      registryKey,
-      userId,
-      provisionedInstanceId,
-      provisionDoKey
-    );
+    await registryStub.createInstance(registryKey, userId, provisionedInstanceId, provisionDoKey);
     console.log('[platform] Registry entry created:', {
       registryKey,
       instanceId: provisionedInstanceId,

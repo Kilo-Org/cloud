@@ -6,6 +6,7 @@ import { db } from '@/lib/drizzle';
 import {
   GOOGLE_WORKSPACE_OAUTH_CLIENT_ID,
   GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET,
+  GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI,
   GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY,
 } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
@@ -20,7 +21,8 @@ import {
   resolveGoogleScopesForCapabilities,
 } from '@/lib/integrations/google/capabilities';
 
-const GOOGLE_OAUTH_REDIRECT_URI = `${APP_URL}/api/integrations/google/callback`;
+const GOOGLE_OAUTH_CALLBACK_PATH = '/api/integrations/google/callback';
+const EXPECTED_GOOGLE_OAUTH_REDIRECT_URI = `${APP_URL}${GOOGLE_OAUTH_CALLBACK_PATH}`;
 const GOOGLE_USERINFO_ENDPOINT = 'https://openidconnect.googleapis.com/v1/userinfo';
 
 type GoogleUserInfoResponse = {
@@ -60,15 +62,31 @@ type GoogleIntegrationMetadata = {
   last_refresh_error_at?: string | null;
 };
 
+export function resolveGoogleOAuthRedirectURI(): string {
+  if (!GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI) {
+    throw new Error('GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI is not configured');
+  }
+
+  if (GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI !== EXPECTED_GOOGLE_OAUTH_REDIRECT_URI) {
+    throw new Error(
+      `GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI must equal ${EXPECTED_GOOGLE_OAUTH_REDIRECT_URI}`
+    );
+  }
+
+  return GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI;
+}
+
 function createGoogleOAuthClient(): OAuth2Client {
   if (!GOOGLE_WORKSPACE_OAUTH_CLIENT_ID || !GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET) {
     throw new Error('Google Workspace OAuth credentials are not configured');
   }
 
+  const redirectUri = resolveGoogleOAuthRedirectURI();
+
   return new OAuth2Client({
     clientId: GOOGLE_WORKSPACE_OAUTH_CLIENT_ID,
     clientSecret: GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET,
-    redirectUri: GOOGLE_OAUTH_REDIRECT_URI,
+    redirectUri,
   });
 }
 

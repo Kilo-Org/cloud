@@ -66,6 +66,7 @@ const fakeStatus = {
   workerUrl: 'https://claw.kilo.ai',
   name: 'Fake KiloClaw',
   instanceId: 'fake-instance',
+  inboundEmailAddress: null,
 } satisfies PopulatedClawStatus;
 
 export function ClawOnboardingFakeWalkthrough({

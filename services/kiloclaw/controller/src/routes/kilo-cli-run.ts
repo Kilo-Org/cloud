@@ -135,27 +135,25 @@ export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void
       return c.json({ error: 'KILO_API_KEY is not configured' }, 400);
     }
 
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    const parsed = StartRunBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid request body', details: z.treeifyError(parsed.error) }, 400);
+    }
+
+    const { prompt } = parsed.data;
+
     return runStartExclusive(async () => {
       if (activeRun?.status === 'running') {
         return c.json({ error: 'A Kilo CLI run is already in progress' }, 409);
       }
 
-      let body: unknown;
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ error: 'Invalid JSON body' }, 400);
-      }
-
-      const parsed = StartRunBodySchema.safeParse(body);
-      if (!parsed.success) {
-        return c.json(
-          { error: 'Invalid request body', details: z.treeifyError(parsed.error) },
-          400
-        );
-      }
-
-      const { prompt } = parsed.data;
       const fullPrompt = buildRunPrompt(prompt);
 
       // Spawn the kilo CLI process

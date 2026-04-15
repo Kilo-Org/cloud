@@ -21,20 +21,13 @@ import { desc } from 'drizzle-orm';
 import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
+import { createCachedFetch } from '@/lib/cached-fetch';
 
 function getRandomNumberLessThan100(randomSeed: string) {
   return crypto.createHash('sha256').update(randomSeed).digest().readUInt32BE(0) % 100;
 }
 
-let cachedPercentage: number | null = null;
-let cachedAt = 0;
-const CACHE_TTL_MS = 10_000;
-
-async function getVercelRoutingPercentage() {
-  if (cachedPercentage !== null && Date.now() - cachedAt < CACHE_TTL_MS) {
-    return cachedPercentage;
-  }
-  let percentage = 10;
+const getVercelRoutingPercentage = createCachedFetch(async () => {
   try {
     const raw = await redisGet('gateway:vercel-routing-percentage');
     if (raw) {
@@ -43,16 +36,14 @@ async function getVercelRoutingPercentage() {
         parsed.vercel_routing_percentage !== null &&
         parsed.vercel_routing_percentage !== undefined
       ) {
-        percentage = parsed.vercel_routing_percentage;
+        return parsed.vercel_routing_percentage;
       }
     }
   } catch (e) {
     console.error(`[getVercelRoutingPercentage] failed to read from Redis`, e);
   }
-  cachedPercentage = percentage;
-  cachedAt = Date.now();
-  return percentage;
-}
+  return 10;
+}, 10_000);
 
 const getVercelModels_cached = unstable_cache(
   async () => {

@@ -435,6 +435,91 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       return;
     }
 
+    case 'pr_conflict_detected': {
+      const mrBeadId = typeof payload.mr_bead_id === 'string' ? payload.mr_bead_id : null;
+      if (!mrBeadId) {
+        console.warn(`${LOG} applyEvent: pr_conflict_detected missing mr_bead_id`);
+        return;
+      }
+
+      const mrBead = beadOps.getBead(sql, mrBeadId);
+      if (!mrBead || mrBead.status === 'closed' || mrBead.status === 'failed') return;
+
+      // Idempotent: check for an existing open gt:pr-conflict bead for this pr_url
+      if (hasExistingPrConflictBead(sql, mrBeadId)) return;
+
+      const prUrl = typeof payload.pr_url === 'string' ? payload.pr_url : '';
+      const branch = typeof payload.branch === 'string' ? payload.branch : '';
+      const sourceBead = typeof payload.source_bead_id === 'string' ? payload.source_bead_id : null;
+
+      // Read the target_branch from review_metadata
+      const rmRows = z
+        .object({ target_branch: z.string() })
+        .array()
+        .parse([
+          ...query(
+            sql,
+            /* sql */ `
+              SELECT ${review_metadata.columns.target_branch}
+              FROM ${review_metadata}
+              WHERE ${review_metadata.bead_id} = ?
+            `,
+            [mrBeadId]
+          ),
+        ]);
+      const targetBranch = rmRows[0]?.target_branch ?? '';
+
+      // Read auto_resolve_merge_conflicts from rig config (default true if not configured yet).
+      // townConfig is not available in applyEvent, so we read from rig config directly.
+      // The field may not exist yet (added by a parallel bead) — default to true.
+      const rig = mrBead.rig_id ? getRig(sql, mrBead.rig_id) : null;
+      const autoResolveConflictsField = z
+        .object({ auto_resolve_merge_conflicts: z.boolean().optional() })
+        .safeParse(rig?.config);
+      const autoResolveConflicts =
+        autoResolveConflictsField.success
+          ? autoResolveConflictsField.data.auto_resolve_merge_conflicts !== false
+          : true;
+
+      if (autoResolveConflicts) {
+        const conflictBead = beadOps.createBead(sql, {
+          type: 'issue',
+          title: `Resolve merge conflicts on PR: ${branch}`,
+          body: buildConflictResolutionPrompt(prUrl, branch, targetBranch),
+          rig_id: mrBead.rig_id ?? undefined,
+          parent_bead_id: mrBeadId,
+          labels: ['gt:pr-conflict'],
+          metadata: {
+            pr_url: prUrl,
+            branch,
+            target_branch: targetBranch,
+            mr_bead_id: mrBeadId,
+            source_bead_id: sourceBead,
+          },
+        });
+
+        // Conflict bead blocks the MR bead (same pattern as feedback beads)
+        beadOps.insertDependency(sql, mrBeadId, conflictBead.bead_id, 'blocks');
+      } else {
+        // auto_resolve_merge_conflicts disabled — create an escalation bead
+        beadOps.createBead(sql, {
+          type: 'escalation',
+          title: `Merge conflict detected: ${branch}`,
+          body: `PR ${prUrl} (branch ${branch}) has merge conflicts that require manual resolution.`,
+          priority: 'high',
+          metadata: {
+            pr_url: prUrl,
+            branch,
+            target_branch: targetBranch,
+            mr_bead_id: mrBeadId,
+            source_bead_id: sourceBead,
+            conflict: true,
+          },
+        });
+      }
+      return;
+    }
+
     case 'pr_auto_merge': {
       const mrBeadId = typeof payload.mr_bead_id === 'string' ? payload.mr_bead_id : null;
       if (!mrBeadId) {
@@ -2163,6 +2248,26 @@ function hasRecentNudge(sql: SqlStorage, agentId: string, tier: string): boolean
   return rows.length > 0;
 }
 
+/** Check if an MR bead has a non-terminal conflict bead (gt:pr-conflict) blocking it. */
+function hasExistingPrConflictBead(sql: SqlStorage, mrBeadId: string): boolean {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT 1 FROM ${bead_dependencies} bd
+        INNER JOIN ${beads} fb ON fb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
+        WHERE bd.${bead_dependencies.columns.bead_id} = ?
+          AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
+          AND fb.${beads.columns.labels} LIKE '%gt:pr-conflict%'
+          AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
+        LIMIT 1
+      `,
+      [mrBeadId]
+    ),
+  ];
+  return rows.length > 0;
+}
+
 /** Check if an MR bead has a non-terminal feedback bead (gt:pr-feedback) blocking it. */
 function hasExistingPrFeedbackBead(sql: SqlStorage, mrBeadId: string): boolean {
   const rows = [
@@ -2257,6 +2362,45 @@ function buildFeedbackPrompt(
   lines.push(
     'After addressing everything, push all changes in a single commit (or minimal commits) and call gt_done.'
   );
+
+  return lines.join('\n');
+}
+
+/** Build the polecat prompt body for resolving merge conflicts on a PR branch. */
+function buildConflictResolutionPrompt(
+  prUrl: string,
+  branch: string,
+  targetBranch: string
+): string {
+  const lines: string[] = [];
+  lines.push(`You are resolving merge conflicts on branch \`${branch}\`.`);
+  lines.push(`The PR is: ${prUrl}`);
+  lines.push(`The target branch is: \`${targetBranch}\``);
+  lines.push('');
+  lines.push('## Steps');
+  lines.push('');
+  lines.push('1. Fetch the latest state of the remote:');
+  lines.push('   ```');
+  lines.push('   git fetch origin');
+  lines.push('   ```');
+  lines.push('');
+  lines.push(`2. Rebase your branch onto the target branch to incorporate its latest changes:`);
+  lines.push('   ```');
+  lines.push(`   git rebase origin/${targetBranch}`);
+  lines.push('   ```');
+  lines.push('');
+  lines.push('3. If there are conflicts during rebase, resolve them:');
+  lines.push('   - Edit the conflicting files to resolve the conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)');
+  lines.push('   - Stage the resolved files: `git add <file>`');
+  lines.push('   - Continue the rebase: `git rebase --continue`');
+  lines.push('   - Repeat until the rebase completes');
+  lines.push('');
+  lines.push('4. Push the rebased branch:');
+  lines.push('   ```');
+  lines.push(`   git push --force-with-lease origin ${branch}`);
+  lines.push('   ```');
+  lines.push('');
+  lines.push('5. Call `gt_done` with the PR URL once the push succeeds.');
 
   return lines.join('\n');
 }

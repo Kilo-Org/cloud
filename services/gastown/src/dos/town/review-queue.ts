@@ -532,9 +532,15 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
 
   // PR-fixup beads skip the review queue. The polecat pushed fixup commits
   // to an existing PR branch — no separate review is needed.
-  if (hookedBead?.labels.includes('gt:pr-fixup')) {
+  // PR-conflict beads also skip the review queue: the polecat rebased and
+  // force-pushed the branch to resolve conflicts — closing the bead unblocks
+  // the parent MR bead so poll_pr can re-check mergeable_state.
+  if (
+    hookedBead?.labels.includes('gt:pr-fixup') ||
+    hookedBead?.labels.includes('gt:pr-conflict')
+  ) {
     console.log(
-      `[review-queue] agentDone: pr-fixup bead ${agent.current_hook_bead_id} — closing directly (skip review)`
+      `[review-queue] agentDone: ${hookedBead.labels.includes('gt:pr-conflict') ? 'pr-conflict' : 'pr-fixup'} bead ${agent.current_hook_bead_id} — closing directly (skip review)`
     );
     closeBead(sql, agent.current_hook_bead_id, agentId);
     unhookBead(sql, agentId);

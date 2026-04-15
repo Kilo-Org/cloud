@@ -13,6 +13,7 @@ export const TownEventType = z.enum([
   'nudge_timeout',
   'pr_feedback_detected',
   'pr_auto_merge',
+  'pr_conflict_detected',
 ]);
 
 export type TownEventType = z.output<typeof TownEventType>;

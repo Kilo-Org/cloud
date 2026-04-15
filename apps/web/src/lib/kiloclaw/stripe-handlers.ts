@@ -256,6 +256,40 @@ async function persistDetachedStripeSubscription(params: {
   });
 }
 
+async function archiveDetachedStripeSubscription(
+  tx: DbTransaction,
+  subscriptionId: string,
+  reason: string
+) {
+  const [beforeSubscription] = await tx
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(eq(kiloclaw_subscriptions.id, subscriptionId))
+    .limit(1);
+
+  if (!beforeSubscription) {
+    return;
+  }
+
+  const [afterSubscription] = await tx
+    .update(kiloclaw_subscriptions)
+    .set({
+      stripe_subscription_id: null,
+      status: 'canceled',
+      cancel_at_period_end: true,
+    })
+    .where(eq(kiloclaw_subscriptions.id, subscriptionId))
+    .returning();
+
+  await insertStripeSubscriptionChangeLog(tx, {
+    subscriptionId,
+    action: 'status_changed',
+    reason,
+    before: beforeSubscription,
+    after: afterSubscription ?? null,
+  });
+}
+
 async function runAfterResponse(work: () => Promise<void>) {
   if (IS_IN_AUTOMATED_TEST) {
     await work();
@@ -697,8 +731,11 @@ export async function handleKiloClawSubscriptionCreated(params: {
       return;
     }
 
+    let stripeRow:
+      | typeof existingStripeRow
+      | undefined = existingStripeRow;
     const existingRow =
-      existingStripeRow?.instance_id === targetInstanceId
+      stripeRow?.instance_id === targetInstanceId
         ? existingStripeRow
         : (
             await tx
@@ -717,14 +754,17 @@ export async function handleKiloClawSubscriptionCreated(params: {
           )[0];
 
     if (
-      existingStripeRow &&
-      existingStripeRow.instance_id === null &&
+      stripeRow &&
+      stripeRow.instance_id === null &&
       existingRow &&
-      existingRow.id !== existingStripeRow.id
+      existingRow.id !== stripeRow.id
     ) {
-      await tx
-        .delete(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.id, existingStripeRow.id));
+      await archiveDetachedStripeSubscription(
+        tx,
+        stripeRow.id,
+        'stripe_subscription_reconciled_to_instance'
+      );
+      stripeRow = undefined;
     }
 
     if (
@@ -777,7 +817,7 @@ export async function handleKiloClawSubscriptionCreated(params: {
           ).toISOString()
         : null;
 
-    if (existingStripeRow) {
+    if (stripeRow) {
       const [afterSubscription] = await tx
         .update(kiloclaw_subscriptions)
         .set({
@@ -795,7 +835,7 @@ export async function handleKiloClawSubscriptionCreated(params: {
           suspended_at: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.suspended_at} ELSE NULL END`,
           destruction_deadline: sql`CASE WHEN ${kiloclaw_subscriptions.payment_source} = 'credits' AND ${kiloclaw_subscriptions.stripe_subscription_id} IS NOT NULL THEN ${kiloclaw_subscriptions.destruction_deadline} ELSE NULL END`,
         })
-        .where(eq(kiloclaw_subscriptions.id, existingStripeRow.id))
+        .where(eq(kiloclaw_subscriptions.id, stripeRow.id))
         .returning();
 
       await insertStripeSubscriptionChangeLog(tx, {

@@ -45,6 +45,41 @@ const CREDIT_BILLING_ACTOR = {
   actorId: 'kiloclaw-credit-billing',
 } as const;
 
+async function archiveDetachedStripeSettlementRow(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  subscriptionId: string,
+  reason: string
+) {
+  const [before] = await tx
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(eq(kiloclaw_subscriptions.id, subscriptionId))
+    .limit(1);
+
+  if (!before) {
+    return;
+  }
+
+  const [after] = await tx
+    .update(kiloclaw_subscriptions)
+    .set({
+      stripe_subscription_id: null,
+      status: 'canceled',
+      cancel_at_period_end: true,
+    })
+    .where(eq(kiloclaw_subscriptions.id, subscriptionId))
+    .returning();
+
+  await insertKiloClawSubscriptionChangeLog(tx, {
+    subscriptionId,
+    actor: CREDIT_BILLING_ACTOR,
+    action: 'status_changed',
+    reason,
+    before,
+    after: after ?? null,
+  });
+}
+
 export const KILOCLAW_PLAN_COST_MICRODOLLARS = {
   standard: 9_000_000, // $9/month
   commit: 48_000_000, // $48/6 months
@@ -310,13 +345,21 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       }
     }
 
+    let stripeRow:
+      | typeof existingRow
+      | undefined = existingRow;
     if (
-      existingRow &&
-      existingRow.instance_id === null &&
+      stripeRow &&
+      stripeRow.instance_id === null &&
       targetRow &&
-      targetRow.id !== existingRow.id
+      targetRow.id !== stripeRow.id
     ) {
-      await tx.delete(kiloclaw_subscriptions).where(eq(kiloclaw_subscriptions.id, existingRow.id));
+      await archiveDetachedStripeSettlementRow(
+        tx,
+        stripeRow.id,
+        'stripe_invoice_settlement_reconciled_to_instance'
+      );
+      stripeRow = undefined;
     }
 
     wasSuspended = !!targetRow?.suspended_at;

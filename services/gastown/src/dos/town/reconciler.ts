@@ -1311,9 +1311,14 @@ export function reconcileReviewQueue(
     }
 
     // Orphan cleanup: open MR beads without pr_url that aren't convoy
-    // review-and-merge beads. The polecat should have created the PR
-    // (merge_strategy=pr) but didn't — fail the MR and reopen the
-    // source bead so another polecat can retry.
+    // review-and-merge beads or system-created landing MR beads.
+    // The polecat should have created the PR (merge_strategy=pr) but
+    // didn't — fail the MR and reopen the source bead so another
+    // polecat can retry.
+    // Landing MR beads (created_by='system') are excluded because they
+    // are created by reconcileConvoys for review-then-land convoys and
+    // intentionally have no pr_url at creation — the refinery creates
+    // the PR when it picks up the landing MR.
     const orphanedMrs = z
       .object({ bead_id: z.string(), source_bead_id: z.string().nullable() })
       .array()
@@ -1333,6 +1338,7 @@ export function reconcileReviewQueue(
               AND b.${beads.columns.status} = 'open'
               AND b.${beads.columns.rig_id} = ?
               AND rm.${review_metadata.columns.pr_url} IS NULL
+              AND b.${beads.columns.created_by} != 'system'
               AND NOT EXISTS (
                 SELECT 1
                 FROM ${beads} parent
@@ -1395,21 +1401,25 @@ export function reconcileReviewQueue(
       ]);
 
     for (const { rig_id } of rigsWithOpenMrs) {
-      // When code_review=false, only dispatch the refinery for convoy
-      // review-and-merge MR beads (refinery does combined review+merge).
+      // When code_review=false, only dispatch the refinery for:
+      //  1. Convoy review-and-merge MR beads (refinery does combined review+merge)
+      //  2. System-created landing MR beads (review-then-land convoy finalization)
       // MR beads WITH a pr_url are handled by the fast-track → poll_pr.
       // MR beads WITHOUT a pr_url when merge_strategy=pr are orphaned
-      // (polecat should have created the PR) — Rule 2 handles them.
+      // (polecat should have created the PR) — orphan cleanup handles them.
       const refineryNeededFilter = rigCodeReview(rig_id)
         ? ''
         : /* sql */ `
-            AND EXISTS (
-              SELECT 1
-              FROM ${beads} outer_parent
-              JOIN ${convoy_metadata} cm
-                ON cm.${convoy_metadata.columns.bead_id} = outer_parent.${beads.columns.bead_id}
-              WHERE outer_parent.${beads.columns.bead_id} = ${beads.parent_bead_id}
-                AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+            AND (
+              EXISTS (
+                SELECT 1
+                FROM ${beads} outer_parent
+                JOIN ${convoy_metadata} cm
+                  ON cm.${convoy_metadata.columns.bead_id} = outer_parent.${beads.columns.bead_id}
+                WHERE outer_parent.${beads.columns.bead_id} = ${beads.parent_bead_id}
+                  AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+              )
+              OR ${beads.created_by} = 'system'
             )`;
 
       // Check if rig already has an in_progress MR that needs the refinery.
@@ -2305,7 +2315,9 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
   }
 
   // Invariant 5: Convoy beads should not be in unexpected states.
-  // Valid transient states: open, in_progress, in_review, closed.
+  // Valid states: open, in_progress, in_review, closed, failed.
+  // 'failed' is a terminal state set by FailConvoy when landing MR
+  // creation is exhausted.
   const badStateConvoys = z
     .object({ bead_id: z.string(), status: z.string() })
     .array()
@@ -2316,7 +2328,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
         SELECT ${beads.bead_id}, ${beads.status}
         FROM ${beads}
         WHERE ${beads.type} = 'convoy'
-          AND ${beads.status} NOT IN ('open', 'in_progress', 'in_review', 'closed')
+          AND ${beads.status} NOT IN ('open', 'in_progress', 'in_review', 'closed', 'failed')
       `,
         []
       ),

@@ -769,7 +769,6 @@ describe('generateBaseConfig', () => {
     const env = {
       ...minimalEnv(),
       KILOCHAT_API_TOKEN: 'tok',
-      KILOCHAT_WEBHOOK_SECRET: 'whk',
       KILOCHAT_BASE_URL: 'https://chat.example.test',
     };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);

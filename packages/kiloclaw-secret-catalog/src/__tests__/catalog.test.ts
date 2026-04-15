@@ -471,7 +471,6 @@ describe('Secret Catalog', () => {
 
     it('contains Kilo Chat operator-provisioned tokens', () => {
       expect(INTERNAL_SENSITIVE_ENV_VARS.has('KILOCHAT_API_TOKEN')).toBe(true);
-      expect(INTERNAL_SENSITIVE_ENV_VARS.has('KILOCHAT_WEBHOOK_SECRET')).toBe(true);
     });
 
     it('does not overlap with catalog-derived ALL_SECRET_ENV_VARS', () => {

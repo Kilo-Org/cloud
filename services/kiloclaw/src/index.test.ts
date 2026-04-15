@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class FakeDurableObject {},
+  WorkerEntrypoint: class FakeWorkerEntrypoint {},
 }));
 
 vi.mock('./routes', async () => {

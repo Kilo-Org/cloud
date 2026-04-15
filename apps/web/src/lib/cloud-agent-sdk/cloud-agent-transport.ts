@@ -11,13 +11,20 @@ import { createConnection, type Connection } from './cloud-agent-connection';
 import { normalize, isChatEvent } from './normalizer';
 import type { ServiceEvent } from './normalizer';
 import type { CloudAgentSessionId, KiloSessionId, SessionSnapshot } from './types';
-import type { CloudAgentApi, TransportFactory, TransportSink } from './transport';
+import type {
+  CloudAgentApi,
+  CloudAgentStreamTicketResult,
+  TransportFactory,
+  TransportSink,
+} from './transport';
 
 type CloudAgentTransportConfig = {
   sessionId: CloudAgentSessionId;
   kiloSessionId: KiloSessionId;
   api: CloudAgentApi;
-  getTicket: (sessionId: CloudAgentSessionId) => string | Promise<string>;
+  getTicket: (
+    sessionId: CloudAgentSessionId
+  ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
   fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   websocketBaseUrl?: string;
   onError?: (message: string) => void;
@@ -62,7 +69,10 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       }
     }
 
-    function connectWebSocket(ticket: string, expectedGeneration: number): void {
+    function connectWebSocket(
+      ticket: CloudAgentStreamTicketResult,
+      expectedGeneration: number
+    ): void {
       if (expectedGeneration !== lifecycleGeneration) return;
 
       const stoppedEvent: ServiceEvent = { type: 'stopped', reason: 'disconnected' };

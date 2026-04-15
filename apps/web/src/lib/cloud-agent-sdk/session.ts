@@ -14,7 +14,13 @@ import type { ServiceState } from './service-state';
 import { createCloudAgentTransport } from './cloud-agent-transport';
 import { createCliLiveTransport } from './cli-live-transport';
 import { createCliHistoricalTransport } from './cli-historical-transport';
-import type { CloudAgentApi, TransportFactory, TransportSink, Transport } from './transport';
+import type {
+  CloudAgentApi,
+  CloudAgentStreamTicketResult,
+  TransportFactory,
+  TransportSink,
+  Transport,
+} from './transport';
 import { createMemoryStorage } from './storage/memory';
 import type { SessionStorage } from './storage/types';
 import type {
@@ -76,7 +82,9 @@ type CloudAgentSessionRespondToPermissionInput = {
 
 type CloudAgentSessionTransport = {
   // Cloud Agent transport construction
-  getTicket?: (sessionId: CloudAgentSessionId) => string | Promise<string>;
+  getTicket?: (
+    sessionId: CloudAgentSessionId
+  ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
   api?: CloudAgentApi;
 
   // Shared

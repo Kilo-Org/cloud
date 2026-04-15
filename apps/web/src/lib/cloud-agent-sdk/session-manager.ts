@@ -6,7 +6,7 @@ import { createCloudAgentSession } from './session';
 import type { CloudAgentSession } from './session';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
-import type { CloudAgentApi } from './transport';
+import type { CloudAgentApi, CloudAgentStreamTicketResult } from './transport';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
@@ -88,7 +88,9 @@ type PrepareInput = {
 type SessionManagerConfig = {
   store: JotaiStore;
   resolveSession: (kiloSessionId: KiloSessionId) => Promise<ResolvedSession>;
-  getTicket: (sessionId: CloudAgentSessionId) => string | Promise<string>;
+  getTicket: (
+    sessionId: CloudAgentSessionId
+  ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
   fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   getAuthToken: () => string | Promise<string>;
   cliWebsocketUrl?: string;
@@ -594,7 +596,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     images?: Images;
   }): Promise<boolean> {
     store.set(errorAtom, null);
-    setIndicator(null);
+    if (store.get(agentStatusAtom).type !== 'disconnected') {
+      setIndicator(null);
+    }
 
     const storage = store.get(sessionStorageAtom);
     const kiloSessionId = activeSessionId;
@@ -642,7 +646,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       store.set(failedPromptAtom, payload.prompt);
       config.onSendFailed?.(payload.prompt);
-      setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
+      if (store.get(agentStatusAtom).type !== 'disconnected') {
+        setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
+      }
       return false;
     }
   }

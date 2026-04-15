@@ -8,6 +8,14 @@ import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { Images } from '@/lib/images-schema';
 import type { CloudAgentSessionId } from './types';
 
+type CloudAgentStreamTicket = {
+  ticket: string;
+  /** Unix timestamp in seconds when the ticket expires. */
+  expiresAt?: number;
+};
+
+type CloudAgentStreamTicketResult = string | CloudAgentStreamTicket;
+
 /** Sink callbacks that a transport pushes typed events into. */
 type TransportSink = {
   onChatEvent: (event: ChatEvent) => void;
@@ -70,4 +78,11 @@ type CloudAgentApi = {
   }) => Promise<unknown>;
 };
 
-export type { TransportSink, Transport, TransportFactory, CloudAgentApi };
+export type {
+  CloudAgentApi,
+  CloudAgentStreamTicket,
+  CloudAgentStreamTicketResult,
+  TransportFactory,
+  TransportSink,
+  Transport,
+};

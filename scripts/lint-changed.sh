@@ -14,12 +14,16 @@ if [ -z "$base" ]; then
 fi
 
 root_lint_files=$(git diff --name-only "$base" --diff-filter=ACMR -- \
+  '*.js' \
+  '*.jsx' \
   '*.ts' \
   '*.tsx' \
   ':!apps/mobile/**' \
   || true)
 
 mobile_lint_files=$(git diff --name-only "$base" --diff-filter=ACMR -- \
+  'apps/mobile/**/*.js' \
+  'apps/mobile/**/*.jsx' \
   'apps/mobile/**/*.ts' \
   'apps/mobile/**/*.tsx' \
   || true)
@@ -27,11 +31,11 @@ mobile_lint_files=$(git diff --name-only "$base" --diff-filter=ACMR -- \
 if [ -n "$root_lint_files" ]; then
   printf '%s\n' "$root_lint_files" | xargs oxlint --config .oxlintrc.json
 else
-  echo "[lint] no changed root TS files"
+  echo "[lint] no changed root JS/TS files"
 fi
 
 if [ -n "$mobile_lint_files" ]; then
   printf '%s\n' "$mobile_lint_files" | xargs oxlint --config apps/mobile/.oxlintrc.json
 else
-  echo "[lint] no changed mobile TS files"
+  echo "[lint] no changed mobile JS/TS files"
 fi

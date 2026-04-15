@@ -170,11 +170,25 @@ export type DrizzleTransaction = Parameters<Parameters<typeof db.transaction>[0]
 export async function cleanupDbForTest(): Promise<void> {
   // Use primary for test cleanup to ensure consistency
   const { rows: tables } = await primaryDb.execute<{ tablename: string }>(
-    sql`SELECT tablename FROM pg_tables WHERE schemaname = 'public' and tablename != 'migrations'`
+    sql`
+      SELECT tablename
+      FROM pg_tables
+      WHERE schemaname = 'public'
+        AND tablename != 'migrations'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM pg_inherits
+          JOIN pg_class child ON pg_inherits.inhrelid = child.oid
+          JOIN pg_namespace child_ns ON child.relnamespace = child_ns.oid
+          WHERE child_ns.nspname = 'public'
+            AND child.relname = pg_tables.tablename
+        )
+      ORDER BY tablename
+    `
   );
 
-  const truncates = tables
-    .map(({ tablename }) => `TRUNCATE TABLE "${tablename}" RESTART IDENTITY CASCADE;\n`)
-    .join('');
-  await primaryDb.execute(sql.raw(truncates));
+  if (tables.length === 0) return;
+
+  const truncateTargets = tables.map(({ tablename }) => `"${tablename}"`).join(', ');
+  await primaryDb.execute(sql.raw(`TRUNCATE TABLE ${truncateTargets} RESTART IDENTITY CASCADE;`));
 }

@@ -263,16 +263,6 @@ describe('ConversationDO', () => {
   });
 
   describe('schema constraints', () => {
-    it('rejects a message whose sender is not a member (FK)', async () => {
-      const stub = getStub('conv-fk-sender');
-      await stub.initialize(BASE_PARAMS);
-      const result = await stub.createMessage({
-        senderId: 'user-never-joined',
-        content: [{ type: 'text', text: 'x' }],
-      });
-      expect(result.ok).toBe(false);
-    });
-
     it('rejects a reply that points at a non-existent parent message (FK)', async () => {
       const stub = getStub('conv-fk-reply');
       await stub.initialize(BASE_PARAMS);

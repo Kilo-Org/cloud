@@ -39,7 +39,7 @@ export function registerConversationRoutes(
 
     // Initialize ConversationDO
     const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
-    await convStub.initialize({
+    const initResult = await convStub.initialize({
       id: conversationId,
       title: body.data.title ?? null,
       createdBy: callerId,
@@ -49,6 +49,10 @@ export function registerConversationRoutes(
         { id: botId, kind: 'bot' },
       ],
     });
+
+    if (!initResult.ok) {
+      return c.json({ error: 'Failed to initialize conversation' }, 500);
+    }
 
     // Update MembershipDOs for both members
     const memberParams = {

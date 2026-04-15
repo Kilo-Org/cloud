@@ -33,7 +33,7 @@ const RedisPercentageSchema = z.object({
 
 const getVercelRoutingPercentage = createCachedFetch(async () => {
   try {
-    const raw = await redisGet('gateway:vercel-routing-percentage');
+    const raw = await redisGet('ai-gateway:vercel-routing-percentage');
     if (raw) {
       const result = RedisPercentageSchema.parse(JSON.parse(raw));
       if (result.success) {

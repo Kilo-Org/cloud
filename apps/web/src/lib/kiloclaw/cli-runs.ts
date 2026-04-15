@@ -206,9 +206,28 @@ export async function cancelCliRun(params: {
     });
 
   const controllerStatus = await getControllerStatus(params.userId, effectiveWorkerInstanceId);
+
+  if (!controllerStatus.hasRun) {
+    // Controller has no active run at all — the process was evicted or the
+    // instance was destroyed. Persist 'failed' so the row doesn't stay
+    // 'running' forever.
+    await persistCliRunControllerStatus({
+      runId: params.runId,
+      userId: params.userId,
+      instanceId: row.instance_id,
+      controllerStatus: {
+        status: 'failed',
+        exitCode: row.exit_code,
+        output: row.output ?? LOST_CONTROLLER_RUN_OUTPUT,
+        completedAt: new Date().toISOString(),
+      },
+    });
+    return { ok: true, runFound: true, cancelled: false };
+  }
+
   if (!isControllerStatusForRun(row, controllerStatus)) {
-    // Controller has moved on — persist 'failed' so the row doesn't stay
-    // 'running' forever, then report not-cancelled (there's nothing to cancel).
+    // Controller has a run but with a different startedAt — it has moved on
+    // to a newer CLI run. Persist 'failed' with a distinct message.
     await persistCliRunControllerStatus({
       runId: params.runId,
       userId: params.userId,

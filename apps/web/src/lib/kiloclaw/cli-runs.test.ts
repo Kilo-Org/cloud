@@ -114,6 +114,87 @@ describe('cancelCliRun', () => {
     });
   });
 
+  it('persists failed with lost-run output and does not cancel when controller returns hasRun: false', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'lost controller run',
+      startedAt: '2026-04-12T12:00:00.000Z',
+      initiatedByAdminId: null,
+    });
+    const cancelControllerRun = jest.fn(async () => ({ ok: true }));
+
+    await expect(
+      cancelCliRun({
+        runId,
+        userId: user.id,
+        instanceId,
+        workerInstanceId: 'ki_current',
+        getControllerStatus: async () => ({
+          hasRun: false,
+          status: null,
+          output: null,
+          exitCode: null,
+          startedAt: null,
+          completedAt: null,
+          prompt: null,
+        }),
+        cancelControllerRun,
+      })
+    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false });
+
+    expect(cancelControllerRun).not.toHaveBeenCalled();
+
+    const row = await getRunRow(runId);
+    expect(row.status).toBe('failed');
+    expect(row.output).toBe(
+      '[run state unavailable: controller no longer has an active CLI run for this record]'
+    );
+    expect(row.completed_at).not.toBeNull();
+  });
+
+  it('resolves the worker instance ID from a destroyed instance when workerInstanceId is not provided', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'destroyed instance run',
+      startedAt,
+      initiatedByAdminId: null,
+    });
+
+    const getControllerStatus = jest.fn(async (_userId: string, _wid: string | undefined) => ({
+      hasRun: true as const,
+      status: 'running' as const,
+      output: null,
+      exitCode: null,
+      startedAt,
+      completedAt: null,
+      prompt: 'destroyed instance run',
+    }));
+    const cancelControllerRun = jest.fn(async (_userId: string, _wid: string | undefined) => ({
+      ok: true,
+    }));
+
+    await cancelCliRun({
+      runId,
+      userId: user.id,
+      instanceId,
+      // Omit workerInstanceId — forces resolveWorkerInstanceId lookup
+      getControllerStatus,
+      cancelControllerRun,
+    });
+
+    // The resolved worker instance ID should be the instance UUID (ki_ prefix
+    // sandbox IDs resolve to the instance row ID).
+    expect(getControllerStatus).toHaveBeenCalledWith(user.id, instanceId);
+    expect(cancelControllerRun).toHaveBeenCalledWith(user.id, instanceId);
+  });
+
   it('persists failed and does not cancel when controller timestamp belongs to a different run', async () => {
     const user = await insertTestUser();
     const instanceId = await createTestInstance(user.id);

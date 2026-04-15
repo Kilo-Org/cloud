@@ -155,7 +155,6 @@ describe('kiloclawRouter getStatus', () => {
 describe('kiloclawRouter listKiloCliRuns', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
-    kiloclawClientMock.__cancelKiloCliRunMock.mockReset();
   });
 
   it('returns only runs for the active personal instance when one exists', async () => {
@@ -304,56 +303,6 @@ describe('kiloclawRouter listKiloCliRuns', () => {
       hasRun: true,
       status: 'completed',
       prompt: 'destroyed instance run',
-    });
-  });
-
-  // Verifies that cancelling a run on a destroyed instance reaches the
-  // controller call path (resolveWorkerInstanceId succeeds). The mock for
-  // KiloClawInternalClient covers the router's direct import but not the
-  // transitive import inside cancelCliRun (cli-runs.ts), so the real
-  // constructor fires and throws about the missing env var. The assertion
-  // confirms the code got past the DB lookup and instance resolution.
-  it('reaches the controller when cancelling a destroyed-instance run', async () => {
-    const user = await insertTestUser({
-      google_user_email: `kiloclaw-cli-runs-cancel-${Math.random()}@example.com`,
-    });
-
-    await grantKiloClawAccess(user.id);
-
-    const [destroyedInstance] = await db
-      .insert(kiloclaw_instances)
-      .values({
-        user_id: user.id,
-        sandbox_id: sandboxId(),
-        destroyed_at: '2026-04-01T00:00:00.000Z',
-      })
-      .returning({ id: kiloclaw_instances.id });
-
-    if (!destroyedInstance) {
-      throw new Error('Failed to create KiloClaw test instance');
-    }
-
-    const [run] = await db
-      .insert(kiloclaw_cli_runs)
-      .values({
-        user_id: user.id,
-        instance_id: destroyedInstance.id,
-        prompt: 'destroyed instance run',
-        status: 'running',
-        started_at: '2026-04-01T00:00:00.000Z',
-      })
-      .returning({ id: kiloclaw_cli_runs.id });
-
-    if (!run) {
-      throw new Error('Failed to create KiloClaw CLI run');
-    }
-
-    kiloclawClientMock.__cancelKiloCliRunMock.mockResolvedValue({ ok: true });
-
-    const caller = createCaller({ user });
-    await expect(caller.cancelKiloCliRun({ runId: run.id })).rejects.toMatchObject({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'KILOCLAW_API_URL is not configured',
     });
   });
 });

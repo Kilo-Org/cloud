@@ -225,13 +225,13 @@
       }
     },
     {
-      "id": "x-ai/grok-code-fast-1:optimized:free",
-      "canonical_slug": "x-ai/grok-code-fast-1:optimized:free",
+      "id": "stepfun/step-3.5-flash:free",
+      "canonical_slug": "stepfun/step-3.5-flash:free",
       "hugging_face_id": "",
-      "name": "xAI: Grok Code Fast 1 Optimized (free)",
+      "name": "StepFun: Step 3.5 Flash (free)",
       "created": 1756238927,
-      "description": "An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.",
-      "context_length": 256000,
+      "description": "Step 3.5 Flash is StepFun's most capable open-source foundation model. Built on a sparse Mixture of Experts (MoE) architecture, it selectively activates only 11B of its 196B parameters per token. It is a reasoning model that is incredibly speed efficient even at long contexts.",
+      "context_length": 262144,
       "architecture": {
         "modality": "text->text",
         "input_modalities": [
@@ -253,8 +253,8 @@
         "input_cache_read": "0.000000000000"
       },
       "top_provider": {
-        "context_length": 256000,
-        "max_completion_tokens": 10000,
+        "context_length": 262144,
+        "max_completion_tokens": 262144,
         "is_moderated": false
       },
       "per_request_limits": null,
@@ -268,12 +268,7 @@
       "default_parameters": {},
       "preferredIndex": 4,
       "isFree": true,
-      "opencode": {
-        "ai_sdk_provider": "openai"
-      },
-      "openclaw": {
-        "api_adapter": "openai-responses"
-      }
+      "opencode": {}
     },
     {
       "id": "anthropic/claude-sonnet-4",
@@ -703,13 +698,13 @@
       "opencode": {}
     },
     {
-      "id": "stepfun/step-3.5-flash:free",
-      "canonical_slug": "stepfun/step-3.5-flash:free",
+      "id": "x-ai/grok-code-fast-1:optimized:free",
+      "canonical_slug": "x-ai/grok-code-fast-1:optimized:free",
       "hugging_face_id": "",
-      "name": "StepFun: Step 3.5 Flash (free)",
+      "name": "xAI: Grok Code Fast 1 Optimized (free)",
       "created": 1756238927,
-      "description": "Step 3.5 Flash is StepFun's most capable open-source foundation model. Built on a sparse Mixture of Experts (MoE) architecture, it selectively activates only 11B of its 196B parameters per token. It is a reasoning model that is incredibly speed efficient even at long contexts.",
-      "context_length": 262144,
+      "description": "An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.",
+      "context_length": 256000,
       "architecture": {
         "modality": "text->text",
         "input_modalities": [
@@ -731,8 +726,8 @@
         "input_cache_read": "0.000000000000"
       },
       "top_provider": {
-        "context_length": 262144,
-        "max_completion_tokens": 262144,
+        "context_length": 256000,
+        "max_completion_tokens": 10000,
         "is_moderated": false
       },
       "per_request_limits": null,
@@ -745,7 +740,12 @@
       ],
       "default_parameters": {},
       "isFree": true,
-      "opencode": {}
+      "opencode": {
+        "ai_sdk_provider": "openai"
+      },
+      "openclaw": {
+        "api_adapter": "openai-responses"
+      }
     },
     {
       "id": "kilo-auto/small",

@@ -31,9 +31,7 @@ export const preferredModels = [
   KILO_AUTO_BALANCED_MODEL.id,
   KILO_AUTO_FREE_MODEL.id,
   seed_20_pro_free_model.status === 'public' ? seed_20_pro_free_model.public_id : null,
-  grok_code_fast_1_optimized_free_model.status === 'public'
-    ? grok_code_fast_1_optimized_free_model.public_id
-    : null,
+  stepfun_35_flash_free_model.status === 'public' ? stepfun_35_flash_free_model.public_id : null,
   'openrouter/elephant-alpha',
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,

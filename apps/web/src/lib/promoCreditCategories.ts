@@ -12,6 +12,7 @@ import {
 } from '@/lib/constants';
 import { promoCategoriesOld } from '@/lib/promoCreditCategoriesOld';
 import {
+  created_before,
   has_githubAuth,
   has_githubAuthAndWelcomeCredits,
   has_holdOrPayment,
@@ -718,6 +719,18 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     amount_usd: 9,
     promotion_ends_at: new Date('2026-04-30'),
     total_redemptions_allowed: 563,
+  },
+  {
+    encrypted_credit_category:
+      'uUuur9I2iZOBVuFT12Qesw==:nzwZRYrw5yNyIceuzIlFIA==:2gJR8oVMRq6ka1mEQ0U=',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 10,
+    description: 'Free AI Inference KiloClaw email',
+    promotion_ends_at: new Date('2026-04-22'),
+    total_redemptions_allowed: 4175,
+    expiry_hours: 7 * 24,
+    customer_requirement: created_before(new Date('2026-04-11')),
   },
 ];
 

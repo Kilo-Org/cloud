@@ -3,6 +3,7 @@ import type { KiloClawEnv } from '../../types';
 import * as fly from '../../fly/client';
 import type { InstanceMutableState } from './types';
 import { getFlyConfig } from './types';
+import { getRuntimeId } from './state';
 import { callGatewayController, isErrorUnknownRoute } from './gateway';
 import { doError, doWarn, toLoggable } from './log';
 import {
@@ -54,8 +55,7 @@ export async function listPairingRequests(
   env: KiloClawEnv,
   forceRefresh = false
 ): Promise<{ requests: PairingRequest[] }> {
-  const { flyMachineId } = state;
-  if (state.status !== 'running' || !flyMachineId) {
+  if (state.status !== 'running' || !getRuntimeId(state)) {
     return { requests: [] };
   }
 
@@ -78,6 +78,11 @@ export async function listPairingRequests(
       throw error;
     }
     // Controller predates this route — fall through to KV cache / fly exec
+  }
+
+  const { flyMachineId } = state;
+  if (!flyMachineId) {
+    return { requests: [] };
   }
 
   const cacheKey = makeCacheKey('pairing', state);
@@ -147,8 +152,7 @@ export async function approvePairingRequest(
   channel: string,
   code: string
 ): Promise<{ success: boolean; message: string }> {
-  const { flyMachineId } = state;
-  if (state.status !== 'running' || !flyMachineId) {
+  if (state.status !== 'running' || !getRuntimeId(state)) {
     return { success: false, message: 'Instance is not running' };
   }
 
@@ -180,6 +184,14 @@ export async function approvePairingRequest(
       throw error;
     }
     // Controller predates this route — fall through to fly exec
+  }
+
+  const { flyMachineId } = state;
+  if (!flyMachineId) {
+    return {
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    };
   }
 
   const flyConfig = getFlyConfig(env, state);
@@ -231,8 +243,7 @@ export async function listDevicePairingRequests(
   env: KiloClawEnv,
   forceRefresh = false
 ): Promise<{ requests: DevicePairingRequest[] }> {
-  const { flyMachineId } = state;
-  if (state.status !== 'running' || !flyMachineId) {
+  if (state.status !== 'running' || !getRuntimeId(state)) {
     return { requests: [] };
   }
 
@@ -255,6 +266,11 @@ export async function listDevicePairingRequests(
       throw error;
     }
     // Controller predates this route — fall through to KV cache / fly exec
+  }
+
+  const { flyMachineId } = state;
+  if (!flyMachineId) {
+    return { requests: [] };
   }
 
   const cacheKey = makeCacheKey('device-pairing', state);
@@ -322,8 +338,7 @@ export async function approveDevicePairingRequest(
   env: KiloClawEnv,
   requestId: string
 ): Promise<{ success: boolean; message: string }> {
-  const { flyMachineId } = state;
-  if (state.status !== 'running' || !flyMachineId) {
+  if (state.status !== 'running' || !getRuntimeId(state)) {
     return { success: false, message: 'Instance is not running' };
   }
 
@@ -352,6 +367,14 @@ export async function approveDevicePairingRequest(
       throw error;
     }
     // Controller predates this route — fall through to fly exec
+  }
+
+  const { flyMachineId } = state;
+  if (!flyMachineId) {
+    return {
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    };
   }
 
   const flyConfig = getFlyConfig(env, state);

@@ -3,6 +3,7 @@ import 'server-only';
 import { and, eq, isNull } from 'drizzle-orm';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
+import { createDefaultInboundEmailAlias } from '@/lib/kiloclaw/inbound-email-alias';
 import { sandboxIdFromInstanceId } from '@/lib/kiloclaw/sandbox-id';
 
 export type ActiveKiloClawInstance = {
@@ -48,6 +49,23 @@ export function workerInstanceId(
   return sandboxId.startsWith('ki_') ? instance.id : undefined;
 }
 
+/**
+ * Resolve the worker instance ID for DO routing from a database instance row ID.
+ * Unlike {@link getInstanceById}, this includes destroyed instances — needed
+ * when routing requests for historical runs whose instance has been torn down.
+ */
+export async function resolveWorkerInstanceId(instanceId: string): Promise<string | undefined> {
+  const [row] = await db
+    .select({
+      id: kiloclaw_instances.id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+    })
+    .from(kiloclaw_instances)
+    .where(eq(kiloclaw_instances.id, instanceId))
+    .limit(1);
+  return row ? workerInstanceId(row) : undefined;
+}
+
 type EnsureActiveInstanceOpts = {
   /** Organization ID. When provided, creates an org-owned instance. */
   orgId?: string;
@@ -85,19 +103,24 @@ export async function ensureActiveInstance(
     const instanceId = crypto.randomUUID();
     const sandboxId = sandboxIdFromInstanceId(instanceId);
 
-    const [row] = await db
-      .insert(kiloclaw_instances)
-      .values({
-        id: instanceId,
-        user_id: userId,
-        sandbox_id: sandboxId,
-        organization_id: opts.orgId,
-      })
-      .returning(selectFields);
+    const row = await db.transaction(async tx => {
+      const [inserted] = await tx
+        .insert(kiloclaw_instances)
+        .values({
+          id: instanceId,
+          user_id: userId,
+          sandbox_id: sandboxId,
+          organization_id: opts.orgId,
+        })
+        .returning(selectFields);
 
-    if (!row) {
-      throw new Error('Failed to create org instance row');
-    }
+      if (!inserted) {
+        throw new Error('Failed to create org instance row');
+      }
+
+      await createDefaultInboundEmailAlias(tx, inserted.id);
+      return inserted;
+    });
 
     return { instance: row, created: true };
   }
@@ -116,18 +139,23 @@ export async function ensureActiveInstance(
   const instanceId = crypto.randomUUID();
   const sandboxId = sandboxIdFromInstanceId(instanceId);
 
-  const [row] = await db
-    .insert(kiloclaw_instances)
-    .values({
-      id: instanceId,
-      user_id: userId,
-      sandbox_id: sandboxId,
-    })
-    .returning(selectFields);
+  const row = await db.transaction(async tx => {
+    const [inserted] = await tx
+      .insert(kiloclaw_instances)
+      .values({
+        id: instanceId,
+        user_id: userId,
+        sandbox_id: sandboxId,
+      })
+      .returning(selectFields);
 
-  if (!row) {
-    throw new Error('Failed to create personal instance row');
-  }
+    if (!inserted) {
+      throw new Error('Failed to create personal instance row');
+    }
+
+    await createDefaultInboundEmailAlias(tx, inserted.id);
+    return inserted;
+  });
 
   return { instance: row, created: true };
 }

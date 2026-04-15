@@ -2,8 +2,9 @@
  * AES-256-GCM encryption for environment variable values.
  *
  * Used to encrypt sensitive env var values in the CF Worker before placing
- * them in Fly Machine config.env. Decrypted at boot by the controller's
- * bootstrap module using the KILOCLAW_ENV_KEY (stored as a Fly app secret).
+ * them in the provider runtime environment. Decrypted at boot by the
+ * controller's bootstrap module using KILOCLAW_ENV_KEY, which providers
+ * deliver either through a secret store or direct bootstrap env injection.
  *
  * Ciphertext format: "enc:v1:{base64(12-byte-iv + ciphertext + 16-byte-tag)}"
  */

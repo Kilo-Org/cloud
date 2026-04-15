@@ -12,14 +12,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { stripAnsi } from '@/lib/stripAnsi';
 
 type DoctorMutation = ReturnType<typeof useKiloClawMutations>['runDoctor'];
-
-/** Strip ANSI escape codes so raw terminal output can render in a browser &lt;pre&gt;. */
-function stripAnsi(raw: string): string {
-  // eslint-disable-next-line no-control-regex
-  return raw.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
-}
 
 export function RunDoctorDialog({
   open,

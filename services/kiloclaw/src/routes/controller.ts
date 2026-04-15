@@ -29,6 +29,13 @@ const ProductTelemetrySchema = z.object({
 
 const INSTANCE_READY_LOAD_THRESHOLD = 0.1;
 
+const DiskBytesSchema = z
+  .number()
+  .int()
+  .nullable()
+  .optional()
+  .transform(value => Math.max(value ?? 0, 0));
+
 const CheckinSchema = z.object({
   sandboxId: z.string().min(1),
   machineId: z.string().optional(),
@@ -44,8 +51,8 @@ const CheckinSchema = z.object({
   bandwidthBytesIn: z.number().min(0),
   bandwidthBytesOut: z.number().min(0),
   lastExitReason: z.string().optional(),
-  diskUsedBytes: z.number().int().min(0).nullable().optional(),
-  diskTotalBytes: z.number().int().min(0).nullable().optional(),
+  diskUsedBytes: DiskBytesSchema,
+  diskTotalBytes: DiskBytesSchema,
   productTelemetry: ProductTelemetrySchema.optional(),
 });
 
@@ -161,6 +168,8 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
         data.loadAvg5m,
         data.bandwidthBytesIn,
         data.bandwidthBytesOut,
+        data.diskUsedBytes,
+        data.diskTotalBytes,
       ],
       indexes: [data.sandboxId],
     });
@@ -201,13 +210,6 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
     })();
 
     waitUntil(telemetryPromise);
-  }
-
-  // Persist disk stats (best-effort). Missing/null pair clears DO storage so the admin UI does not show stale usage.
-  try {
-    await stub.recordDiskStats(data.diskUsedBytes ?? null, data.diskTotalBytes ?? null);
-  } catch (err) {
-    console.error('[controller] recordDiskStats failed (non-fatal):', err);
   }
 
   // Instance readiness detection: when load drops below threshold, notify the

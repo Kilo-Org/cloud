@@ -33,6 +33,13 @@ export function resolveImageRef(state: InstanceMutableState, env: KiloClawEnv): 
   return `registry.fly.io/${getRegistryApp(env)}:${resolveImageTag(state, env)}`;
 }
 
+export function resolveRuntimeImageRef(state: InstanceMutableState, env: KiloClawEnv): string {
+  if (state.provider === 'docker-local') {
+    return env.DOCKER_LOCAL_IMAGE ?? 'kiloclaw:local';
+  }
+  return resolveImageRef(state, env);
+}
+
 /**
  * Check whether the stored API key has expired.
  */
@@ -92,6 +99,7 @@ export async function buildUserEnvVars(
   state: InstanceMutableState
 ): Promise<{
   envVars: Record<string, string>;
+  bootstrapEnv: Record<string, string>;
   minSecretsVersion: number;
 }> {
   if (!state.sandboxId || !env.GATEWAY_TOKEN_SECRET) {
@@ -148,6 +156,7 @@ export async function buildUserEnvVars(
       kilocodeDefaultModel: state.kilocodeDefaultModel ?? undefined,
       channels: state.channels ?? undefined,
       googleCredentials: state.googleCredentials ?? undefined,
+      kiloExaSearchMode: state.kiloExaSearchMode,
       instanceFeatures: state.instanceFeatures,
       execSecurity: state.execSecurity ?? undefined,
       execAsk: state.execAsk ?? undefined,
@@ -188,5 +197,11 @@ export async function buildUserEnvVars(
     result[`${ENCRYPTED_ENV_PREFIX}${name}`] = encryptEnvValue(envKey, value);
   }
 
-  return { envVars: result, minSecretsVersion: secretsVersion };
+  return {
+    envVars: result,
+    bootstrapEnv: {
+      KILOCLAW_ENV_KEY: envKey,
+    },
+    minSecretsVersion: secretsVersion,
+  };
 }

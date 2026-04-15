@@ -27,6 +27,7 @@ import {
   magic_link_tokens,
   stytch_fingerprints,
   kiloclaw_instances,
+  kiloclaw_inbound_email_aliases,
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   security_findings,
@@ -71,6 +72,7 @@ describe('User', () => {
     await db.delete(organization_audit_logs);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
+    await db.delete(kiloclaw_inbound_email_aliases);
     await db.delete(security_analysis_queue);
     await db.delete(security_findings);
     await db.delete(security_analysis_owner_state);
@@ -1068,6 +1070,31 @@ describe('User', () => {
       ).toBe(0);
     });
 
+    it('should clear kiloclaw_cli_runs initiated by the deleted admin', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const user = await insertTestUser();
+
+      const [run] = await db
+        .insert(kiloclaw_cli_runs)
+        .values({
+          user_id: user.id,
+          initiated_by_admin_id: admin.id,
+          prompt: 'admin run',
+          status: 'completed',
+        })
+        .returning({ id: kiloclaw_cli_runs.id });
+
+      await softDeleteUser(admin.id);
+
+      expect(
+        await db
+          .select({ initiated_by_admin_id: kiloclaw_cli_runs.initiated_by_admin_id })
+          .from(kiloclaw_cli_runs)
+          .where(eq(kiloclaw_cli_runs.id, run.id))
+          .then(r => r[0].initiated_by_admin_id)
+      ).toBeNull();
+    });
+
     it('should delete kiloclaw_subscriptions for the user', async () => {
       const user = await insertTestUser();
 
@@ -1136,6 +1163,48 @@ describe('User', () => {
           .where(eq(kiloclaw_cli_runs.user_id, user.id))
           .then(r => r[0].count)
       ).toBe(0);
+    });
+
+    it('should delete kiloclaw_inbound_email_aliases for the user instances', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      const [instance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: user.id,
+          sandbox_id: `test-gdpr-alias-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+      const [otherInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: otherUser.id,
+          sandbox_id: `test-gdpr-alias-other-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      await db.insert(kiloclaw_inbound_email_aliases).values([
+        { alias: `soft-delete-${Date.now()}`, instance_id: instance.id },
+        { alias: `soft-delete-other-${Date.now()}`, instance_id: otherInstance.id },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_inbound_email_aliases)
+          .where(eq(kiloclaw_inbound_email_aliases.instance_id, instance.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_inbound_email_aliases)
+          .where(eq(kiloclaw_inbound_email_aliases.instance_id, otherInstance.id))
+          .then(r => r[0].count)
+      ).toBe(1);
     });
 
     it('should throw SoftDeletePreconditionError for active KiloClaw subscription', async () => {

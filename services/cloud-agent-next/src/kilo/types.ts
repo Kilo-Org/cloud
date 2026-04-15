@@ -19,8 +19,9 @@ export type TextPartInput = {
 
 export type FilePartInput = {
   type: 'file';
-  data: string;
-  mimeType: string;
+  mime: string;
+  url: string;
+  filename?: string;
 };
 
 export type SessionCommandResponse = unknown;

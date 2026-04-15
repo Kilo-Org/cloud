@@ -23,6 +23,7 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
   isFreeModel,
   isDeadFreeModel,
+  isExcludedForFeature,
   isKiloExclusiveFreeModel,
   isKiloStealthModel,
 } from '@/lib/models';
@@ -32,6 +33,7 @@ import {
   checkOrganizationModelRestrictions,
   dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
+  featureExclusiveModelResponse,
   invalidPathResponse,
   invalidRequestResponse,
   makeErrorReadable,
@@ -226,6 +228,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   const originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+
+  // Reject early (before rate limiting) if the model is exclusive to other features.
+  if (isExcludedForFeature(originalModelIdLowerCased, feature)) {
+    console.warn(
+      `Model ${originalModelIdLowerCased} is not available for feature ${feature}; rejecting.`
+    );
+    return featureExclusiveModelResponse(originalModelIdLowerCased);
+  }
 
   // Extract IP for all requests (needed for free model rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
@@ -580,7 +590,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  handleRequestLogging({
+  await handleRequestLogging({
     clonedResponse: response.clone(),
     user: maybeUser,
     organization_id: organizationId || null,
@@ -595,8 +605,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed,
       response,
       isUserByok: !!userByok,
-      feature,
-      balance: (await balanceAndSettingsPromise).balance,
     });
     if (errorResponse) {
       return errorResponse;

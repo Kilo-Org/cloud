@@ -1,15 +1,21 @@
 /**
  * KiloClawApp Durable Object
  *
- * Manages the per-user Fly App lifecycle: creation, IP allocation, env key setup, and deletion.
+ * Manages owner-scoped bootstrap state shared across KiloClaw providers.
+ *
+ * Today that includes:
+ * - Fly App lifecycle for Fly-backed runtimes
+ * - the env encryption key used to encrypt sensitive controller env vars
+ *
+ * The env key is provider-neutral durable state. Fly secret propagation is
+ * best-effort provider-specific bootstrap layered on top when a Fly app exists.
  * Keyed by userId: env.KILOCLAW_APP.idFromName(userId) — one per user.
  *
  * Separate from KiloClawInstance to support future multi-instance per user,
  * where one Fly App contains multiple instances (machines + volumes).
  *
- * The App DO ensures that each user has a Fly App with allocated IPs and
- * an encryption key before any machines are created. ensureApp() is idempotent:
- * safe to call multiple times, only creates the app + IPs + key on first call.
+ * ensureApp() remains Fly-specific and idempotent: safe to call multiple times,
+ * only creates the Fly app + IPs + synced env key on first call.
  *
  * If setup partially fails, the alarm retries.
  */
@@ -77,7 +83,7 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
     this.loaded = true;
   }
 
-  /** Check if all setup steps are complete. */
+  /** Check if Fly app setup is complete. */
   private isSetupComplete(): boolean {
     return this.ipv4Allocated && this.ipv6Allocated && this.envKeySet;
   }
@@ -185,16 +191,19 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
 
   /**
    * Ensure the env encryption key exists, creating it if needed.
-   * Always re-sets the Fly app secret (idempotent) to self-heal if the
-   * secret was deleted externally.
+   *
+   * The key itself is provider-neutral durable state and may exist even when
+   * no Fly app has been created yet. When a Fly app exists, this method also
+   * re-sets the Fly secret (idempotent) to self-heal if it was deleted.
    *
    * Interleaving safety: the key is generated and persisted to in-memory state
-   * + durable storage before the setAppSecret() fetch. Any interleaved call
+   * + durable storage before the optional setAppSecret() fetch. Any interleaved call
    * entering during the await will see this.envKey already set and reuse it,
    * so no two calls can generate different keys.
    *
-   * Called by Instance DO at machine start time. This ensures legacy apps that
-   * were created before the encryption feature get their key on first start.
+   * Called by Instance DO at machine start time. This ensures every provider can
+   * bootstrap encrypted env vars, while legacy Fly apps still get their Fly secret
+   * synced on first start.
    */
   async ensureEnvKey(ownerKey: string): Promise<{ key: string; secretsVersion: number }> {
     await this.loadState();
@@ -203,15 +212,13 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
       throw new Error(`ownerKey mismatch: DO has ${this.userId}, caller passed ${ownerKey}`);
     }
 
-    const apiToken = this.env.FLY_API_TOKEN;
-    if (!apiToken) throw new Error('FLY_API_TOKEN is not configured');
-
-    if (!this.flyAppName) {
-      throw new Error('Cannot create env key: Fly App not yet created (call ensureApp first)');
+    if (!this.userId) {
+      this.userId = ownerKey;
+      await this.ctx.storage.put({ userId: ownerKey } satisfies Partial<AppState>);
     }
 
     // Persist key before any async I/O so interleaved calls reuse the same key.
-    // envKeySet: false means "key generated but not yet confirmed in Fly."
+    // envKeySet: false means "key generated but not yet confirmed in a provider secret store."
     if (!this.envKey) {
       this.envKey = generateEnvKey();
       await this.ctx.storage.put({
@@ -220,19 +227,29 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
       } satisfies Partial<AppState>);
     }
 
+    if (!this.envKeySet) {
+      this.envKeySet = true;
+      await this.ctx.storage.put({ envKeySet: true } satisfies Partial<AppState>);
+      console.log(
+        '[AppDO] Persisted env encryption key for:',
+        this.flyAppName ?? `owner ${ownerKey}`
+      );
+    }
+
+    if (!this.flyAppName) {
+      return { key: this.envKey, secretsVersion: 0 };
+    }
+
+    const apiToken = this.env.FLY_API_TOKEN;
+    if (!apiToken) throw new Error('FLY_API_TOKEN is not configured');
+
     // Always re-set the Fly secret (idempotent) to self-heal if deleted externally.
-    // Returns the secrets version for use with min_secrets_version on machine create/update.
+    // Returns the secrets version for use with min_secrets_version on Fly machine create/update.
     const { version: secretsVersion } = await setAppSecret(
       { apiToken, appName: this.flyAppName },
       ENV_KEY_SECRET_NAME,
       this.envKey
     );
-
-    if (!this.envKeySet) {
-      this.envKeySet = true;
-      await this.ctx.storage.put({ envKeySet: true } satisfies Partial<AppState>);
-      console.log('[AppDO] Set env encryption key for:', this.flyAppName);
-    }
 
     return { key: this.envKey, secretsVersion };
   }

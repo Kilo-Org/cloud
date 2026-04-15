@@ -344,8 +344,8 @@ export function createIngestHandler(
           ? new Date(ingestEvent.timestamp).getTime()
           : Date.now();
 
-        const payload = JSON.stringify(ingestEvent.data ?? {});
         const eventType = ingestEvent.streamEventType;
+        const payload = JSON.stringify(ingestEvent.data ?? {});
 
         let eventId: number;
 
@@ -427,7 +427,7 @@ export function createIngestHandler(
         // -- Handler integrations --
 
         // Handle kilocode events (session ID capture)
-        if (ingestEvent.streamEventType === 'kilocode') {
+        if (eventType === 'kilocode') {
           const parsedKilocode = kilocodeEventSchema.safeParse(ingestEvent.data);
           if (parsedKilocode.success) {
             await handleKilocodeEvent(
@@ -479,7 +479,7 @@ export function createIngestHandler(
         }
 
         // Handle complete events (branch capture + lifecycle)
-        if (ingestEvent.streamEventType === 'complete') {
+        if (eventType === 'complete') {
           if (await shouldIgnoreTerminalEvent(executionId, doContext)) {
             return;
           }
@@ -515,7 +515,7 @@ export function createIngestHandler(
         }
 
         // Handle interrupted events
-        if (ingestEvent.streamEventType === 'interrupted') {
+        if (eventType === 'interrupted') {
           if (await shouldIgnoreTerminalEvent(executionId, doContext)) {
             return;
           }
@@ -534,7 +534,7 @@ export function createIngestHandler(
         }
 
         // Handle fatal errors
-        if (ingestEvent.streamEventType === 'error') {
+        if (eventType === 'error') {
           const parsedError = errorEventSchema.safeParse(ingestEvent.data);
           if (!parsedError.success) {
             console.warn('Invalid error event payload', parsedError.error);

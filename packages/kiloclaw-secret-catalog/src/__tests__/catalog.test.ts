@@ -518,6 +518,7 @@ describe('Secret Catalog', () => {
       expect(isValidCustomSecretKey('DISCORD_BOT_TOKEN')).toBe(false);
       expect(isValidCustomSecretKey('GITHUB_TOKEN')).toBe(false);
       expect(isValidCustomSecretKey('BRAVE_API_KEY')).toBe(false);
+      expect(isValidCustomSecretKey('KILO_EXA_SEARCH_MODE')).toBe(false);
     });
 
     it('rejects reserved prefixes', () => {

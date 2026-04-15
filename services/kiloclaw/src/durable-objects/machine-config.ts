@@ -31,12 +31,14 @@ export type MachineIdentity = {
 export function buildRuntimeSpec(
   imageRef: string,
   envVars: Record<string, string>,
+  bootstrapEnv: Record<string, string>,
   machineSize: MachineSize | null,
   identity: MachineIdentity
 ): RuntimeSpec {
   return {
     imageRef,
     env: envVars,
+    bootstrapEnv,
     machineSize,
     rootMountPath: '/root',
     controllerPort: OPENCLAW_PORT,

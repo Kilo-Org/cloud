@@ -33,9 +33,10 @@ import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
-import { assertImplementedProvider } from '../providers';
+import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
-import { resolveDoKeyForUser } from '../lib/instance-routing';
+import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
+import { getInstanceById, getWorkerDb } from '../db';
 
 const GmailHistoryIdSchema = z.object({
   userId: z.string().min(1),
@@ -54,6 +55,11 @@ const KiloCodeConfigPatchSchema = z.object({
     )
     .nullable()
     .optional(),
+});
+
+const WebSearchConfigPatchSchema = z.object({
+  userId: z.string().min(1),
+  exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
 });
 
 const platform = new Hono<AppEnv>();
@@ -479,7 +485,7 @@ platform.post('/provision', async c => {
   let provision;
   try {
     if (provider) {
-      assertImplementedProvider(provider);
+      assertAvailableProvider(c.env, provider);
     }
     provision = await withResolvedDORetry(
       c.env,
@@ -563,6 +569,31 @@ platform.patch('/kilocode-config', async c => {
     return c.json(updated, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'kilocode-config patch');
+    return jsonError(message, status);
+  }
+});
+
+// PATCH /api/platform/web-search-config
+platform.patch('/web-search-config', async c => {
+  const result = await parseBody(c, WebSearchConfigPatchSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, exaMode } = result.data;
+
+  try {
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateWebSearchConfig({ exaMode }),
+      'updateWebSearchConfig'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'web-search-config patch');
     return jsonError(message, status);
   }
 });
@@ -1706,6 +1737,273 @@ platform.get('/stream-chat-credentials', async c => {
     return c.json(creds);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'stream-chat-credentials');
+    return jsonError(message, status);
+  }
+});
+
+const MAX_INBOUND_EMAIL_TITLE_SLUG_LENGTH = 80;
+
+const InboundEmailSchema = z.object({
+  instanceId: z.string().uuid(),
+  messageId: z.string().trim().min(1).max(512),
+  from: z.string().trim().min(1).max(512),
+  to: z.string().trim().min(1).max(512),
+  recipientKind: z.enum(['legacy', 'alias']).optional(),
+  recipientAlias: z.string().trim().min(1).max(512).optional(),
+  subject: z.string().max(1_000),
+  text: z.string().min(1).max(32_000),
+  receivedAt: z.string().datetime(),
+});
+
+type InboundEmailDelivery = z.infer<typeof InboundEmailSchema>;
+
+function inboundEmailTitleSlug(subject: string): string {
+  const slug = subject
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_INBOUND_EMAIL_TITLE_SLUG_LENGTH)
+    .replace(/-+$/g, '');
+
+  return slug || 'no-subject';
+}
+
+function inboundEmailSessionKey(subject: string, receivedAt: string): string {
+  return `inbound-email:${receivedAt.slice(0, 10)}-${inboundEmailTitleSlug(subject)}`;
+}
+
+function inboundEmailExpectedLocalPart(instanceId: string): string {
+  return `ki-${instanceId.replace(/-/g, '')}`;
+}
+
+function inboundEmailAddressParts(address: string): {
+  localPart: string;
+  domain: string;
+  validSingleAddress: boolean;
+} {
+  const [localPart, domain, ...extra] = address.trim().toLowerCase().split('@');
+  return {
+    localPart: localPart ?? '',
+    domain: domain ?? '',
+    validSingleAddress: Boolean(localPart && domain && extra.length === 0),
+  };
+}
+
+function inboundEmailLogContext(delivery: InboundEmailDelivery) {
+  const recipient = inboundEmailAddressParts(delivery.to);
+  const sender = inboundEmailAddressParts(delivery.from);
+  const expectedRecipientLocalPart = inboundEmailExpectedLocalPart(delivery.instanceId);
+
+  return {
+    instanceId: delivery.instanceId,
+    messageIdLength: delivery.messageId.length,
+    fromDomain: sender.domain,
+    toLocalPart: recipient.localPart,
+    toDomain: recipient.domain,
+    toAddressValid: recipient.validSingleAddress,
+    recipientKind: delivery.recipientKind ?? null,
+    recipientAlias: delivery.recipientAlias ?? null,
+    expectedToLocalPart: expectedRecipientLocalPart,
+    toMatchesInstanceId: recipient.localPart === expectedRecipientLocalPart,
+    subjectLength: delivery.subject.length,
+    textLength: delivery.text.length,
+    receivedAt: delivery.receivedAt,
+  };
+}
+
+async function resolveInboundEmailDoKey(
+  env: AppEnv['Bindings'],
+  instance: { id: string; userId: string; sandboxId: string; orgId: string | null }
+): Promise<string> {
+  const ownerKey = instance.orgId ? `org:${instance.orgId}` : `user:${instance.userId}`;
+  try {
+    const registryStub = env.KILOCLAW_REGISTRY.get(env.KILOCLAW_REGISTRY.idFromName(ownerKey));
+    const doKey = await registryStub.resolveDoKey(ownerKey, instance.id);
+    if (doKey) return doKey;
+  } catch (err) {
+    console.warn(
+      '[platform] inbound-email registry lookup failed, falling back to instance identity',
+      {
+        instanceId: instance.id,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    );
+  }
+  return doKeyFromActiveInstance(instance);
+}
+
+// POST /api/platform/inbound-email
+// Deliver a Cloudflare Email Routing message to an instance's OpenClaw hook endpoint.
+platform.post('/inbound-email', async c => {
+  const startedAt = performance.now();
+  const result = await parseBody(c, InboundEmailSchema);
+  if ('error' in result) return result.error;
+
+  const delivery = result.data;
+  const logContext = inboundEmailLogContext(delivery);
+  console.log('[platform] inbound email received', logContext);
+  if (
+    (!delivery.recipientKind || delivery.recipientKind === 'legacy') &&
+    !logContext.toMatchesInstanceId
+  ) {
+    console.warn('[platform] inbound email recipient does not match instanceId', logContext);
+  }
+
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    console.error('[platform] inbound email database unavailable', logContext);
+    return jsonError('Database is not configured', 503);
+  }
+  if (!c.env.GATEWAY_TOKEN_SECRET) {
+    console.error('[platform] inbound email gateway token secret unavailable', logContext);
+    return jsonError('GATEWAY_TOKEN_SECRET is not configured', 503);
+  }
+
+  try {
+    const instance = await getInstanceById(getWorkerDb(connectionString), delivery.instanceId);
+    if (!instance) {
+      console.warn('[platform] inbound email instance not found', logContext);
+      return jsonError('Instance not found', 404);
+    }
+    c.set('userId', instance.userId);
+    console.log('[platform] inbound email instance resolved', {
+      ...logContext,
+      userId: instance.userId,
+      sandboxId: instance.sandboxId,
+      orgId: instance.orgId,
+    });
+
+    const doKey = await resolveInboundEmailDoKey(c.env, instance);
+    console.log('[platform] inbound email DO resolved', {
+      ...logContext,
+      userId: instance.userId,
+      orgId: instance.orgId,
+      doKey,
+      doKeyMatchesInstanceId: doKey === instance.id,
+    });
+
+    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+    const status = await stub.getStatus();
+    console.log('[platform] inbound email status resolved', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      instanceStatus: status.status,
+      statusUserId: status.userId,
+      statusSandboxId: status.sandboxId,
+      hasSandboxId: Boolean(status.sandboxId),
+    });
+
+    if (status.status !== 'running') {
+      console.warn('[platform] inbound email instance is not running', {
+        ...logContext,
+        userId: instance.userId,
+        doKey,
+        instanceStatus: status.status,
+      });
+      return jsonError('Instance is not running', 503);
+    }
+    if (!status.sandboxId) {
+      console.error('[platform] inbound email instance has no sandboxId', {
+        ...logContext,
+        userId: instance.userId,
+        doKey,
+        instanceStatus: status.status,
+      });
+      return jsonError('Instance has no sandboxId', 500);
+    }
+
+    const routingTarget = await stub.getRoutingTarget();
+    if (!routingTarget) {
+      console.warn('[platform] inbound email instance not routable', {
+        ...logContext,
+        userId: instance.userId,
+        doKey,
+        instanceStatus: status.status,
+      });
+      return jsonError('Instance not routable', 503);
+    }
+    console.log('[platform] inbound email routing target resolved', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      targetOrigin: routingTarget.origin,
+      hasFlyForceInstanceId: 'fly-force-instance-id' in routingTarget.headers,
+    });
+
+    const gatewayToken = await deriveGatewayToken(status.sandboxId, c.env.GATEWAY_TOKEN_SECRET);
+    const sessionKey = inboundEmailSessionKey(delivery.subject, delivery.receivedAt);
+    console.log('[platform] inbound email forwarding to controller', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      targetOrigin: routingTarget.origin,
+      sessionKeyPrefix: sessionKey.split(':')[0] ?? '',
+      sessionKeyLength: sessionKey.length,
+    });
+    const response = await fetch(`${routingTarget.origin}/_kilo/hooks/email`, {
+      method: 'POST',
+      headers: {
+        ...routingTarget.headers,
+        authorization: `Bearer ${gatewayToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sessionKey,
+        messageId: delivery.messageId,
+        from: delivery.from,
+        to: delivery.to,
+        subject: delivery.subject,
+        text: delivery.text,
+        receivedAt: delivery.receivedAt,
+      }),
+    });
+
+    console.log('[platform] inbound email controller response', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      status: response.status,
+      ok: response.ok,
+      durationMs: performance.now() - startedAt,
+    });
+
+    if (response.ok) {
+      writeEvent(c.env, {
+        event: 'instance.webhook_chat_message_sent',
+        delivery: 'http',
+        route: '/api/platform/inbound-email',
+        userId: instance.userId,
+        instanceId: instance.id,
+      });
+      return c.json({ success: true }, 202);
+    }
+
+    const error = await response.text().catch(() => '');
+    const controllerFailure = {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      status: response.status,
+      error: error.slice(0, 500),
+      durationMs: performance.now() - startedAt,
+    };
+    if (response.status >= 500) {
+      console.error('[platform] inbound email controller delivery failed', controllerFailure);
+    } else {
+      console.warn('[platform] inbound email controller rejected delivery', controllerFailure);
+    }
+
+    const responseStatus = response.status >= 400 && response.status < 600 ? response.status : 502;
+    return jsonError('Inbound email delivery failed', responseStatus);
+  } catch (err) {
+    console.error('[platform] inbound email delivery threw', {
+      ...logContext,
+      error: err instanceof Error ? err.message : String(err),
+      durationMs: performance.now() - startedAt,
+    });
+    const { message, status } = sanitizeError(err, 'inbound-email');
     return jsonError(message, status);
   }
 });

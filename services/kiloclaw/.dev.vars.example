@@ -23,10 +23,19 @@ INTERNAL_API_SECRET=dev-internal-secret
 # Auth (static defaults — these work as-is for local dev)
 # HMAC secret for deriving per-sandbox gateway tokens (machine authentication)
 GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw
+# Default provider for new provisions in local dev. Use "fly" or "docker-local".
+KILOCLAW_DEFAULT_PROVIDER=fly
 # Override WORKER_ENV to "development" for local development.
 # Production default is set in wrangler.jsonc. This selects the development
 # Fly app naming prefix ("dev-") for per-user app creation.
 WORKER_ENV=development
+
+# Docker-local demo provider (wrangler dev only).
+# Expose the Docker socket over loopback first:
+#   socat TCP-LISTEN:23750,bind=127.0.0.1,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock
+DOCKER_LOCAL_API_BASE=http://127.0.0.1:23750
+DOCKER_LOCAL_IMAGE=kiloclaw:local
+DOCKER_LOCAL_PORT_RANGE=45000-45999
 
 # Auto-populated by dev-start from `fly auth whoami`.
 # Tags Fly machines with developer identity for cleanup.

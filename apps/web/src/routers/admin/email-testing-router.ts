@@ -101,6 +101,8 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return {
         destruction_date: formatDate(new Date(Date.now() + 2 * 86_400_000)),
         claw_url: `${NEXTAUTH_URL}/claw`,
+        instance_label: 'Research Claw',
+        instance_id_short: '11111111',
       };
     case 'clawEarlybirdEndingSoon':
       return { days_remaining: '14', expiry_date: '2026-09-26', claw_url: `${NEXTAUTH_URL}/claw` };

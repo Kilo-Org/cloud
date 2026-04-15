@@ -533,13 +533,20 @@ describe('createSessionManager', () => {
       await mgr.switchSession(kiloId('ses-1'));
 
       mockSession.send.mockResolvedValue(undefined);
-      await mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
+      const accepted = await mgr.send({
+        prompt: 'Hello',
+        mode: 'code',
+        model: 'claude-3-5-sonnet',
+      });
 
+      expect(accepted).toBe(true);
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
         prompt: 'Hello',
         mode: 'code',
         model: 'claude-3-5-sonnet',
+        variant: undefined,
+        images: undefined,
       });
 
       const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
@@ -574,8 +581,13 @@ describe('createSessionManager', () => {
       await mgr.switchSession(kiloId('ses-1'));
 
       mockSession.send.mockRejectedValue(new Error('ECONNREFUSED'));
-      await mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
+      const accepted = await mgr.send({
+        prompt: 'Hello',
+        mode: 'code',
+        model: 'claude-3-5-sonnet',
+      });
 
+      expect(accepted).toBe(false);
       const indicator = atomValue<{ type: string; message: string } | null>(
         config.store,
         mgr.atoms.statusIndicator
@@ -621,6 +633,33 @@ describe('createSessionManager', () => {
         mode: 'code',
         model: 'claude-3-5-sonnet',
         variant: 'high',
+        images: undefined,
+      });
+    });
+
+    it('passes images through to session.send', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const images = { path: 'cloud-agent/message-1', files: ['image.png'] };
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockResolvedValue(undefined);
+      const accepted = await mgr.send({
+        prompt: 'Hello',
+        mode: 'code',
+        model: 'claude-3-5-sonnet',
+        images,
+      });
+
+      expect(accepted).toBe(true);
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        prompt: 'Hello',
+        mode: 'code',
+        model: 'claude-3-5-sonnet',
+        variant: undefined,
+        images,
       });
     });
 
@@ -647,8 +686,13 @@ describe('createSessionManager', () => {
       const mgr = createSessionManager(config);
 
       // No switchSession — no active session
-      await mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
+      const accepted = await mgr.send({
+        prompt: 'Hello',
+        mode: 'code',
+        model: 'claude-3-5-sonnet',
+      });
 
+      expect(accepted).toBe(false);
       const indicator = atomValue<{ type: string; message: string } | null>(
         config.store,
         mgr.atoms.statusIndicator

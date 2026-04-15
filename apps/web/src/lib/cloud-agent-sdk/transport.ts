@@ -5,6 +5,7 @@
  * Command methods are optional — present only on interactive transports.
  */
 import type { ChatEvent, ServiceEvent } from './normalizer';
+import type { Images } from '@/lib/images-schema';
 import type { CloudAgentSessionId } from './types';
 
 /** Sink callbacks that a transport pushes typed events into. */
@@ -26,6 +27,7 @@ type Transport = {
     model?: string;
     variant?: string;
     messageId?: string;
+    images?: Images;
   }) => Promise<unknown>;
   interrupt?: () => Promise<unknown>;
   answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
@@ -52,6 +54,7 @@ type CloudAgentApi = {
     model?: string;
     variant?: string;
     messageId?: string;
+    images?: Images;
   }) => Promise<unknown>;
   interrupt: (payload: { sessionId: CloudAgentSessionId }) => Promise<unknown>;
   answer: (payload: {

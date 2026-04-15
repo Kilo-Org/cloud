@@ -38,6 +38,36 @@ describe('kilo-exa web search provider', () => {
     });
   });
 
+  it('does not create a tool when plugin webSearch.enabled is false', () => {
+    const provider = createKiloExaWebSearchProvider();
+    const tool = provider.createTool({
+      config: {
+        plugins: {
+          entries: {
+            'kiloclaw-customizer': {
+              config: {
+                webSearch: {
+                  enabled: false,
+                },
+              },
+            },
+          },
+        },
+      },
+      searchConfig: {},
+    });
+
+    expect(tool).toBeNull();
+  });
+
+  it('applySelectionConfig enables plugin web search flag', () => {
+    const provider = createKiloExaWebSearchProvider();
+    const config = provider.applySelectionConfig?.({}) ?? {};
+
+    expect(config.plugins?.entries?.['kiloclaw-customizer']?.enabled).toBe(true);
+    expect(config.plugins?.entries?.['kiloclaw-customizer']?.config?.webSearch?.enabled).toBe(true);
+  });
+
   it('normalizes uppercase freshness values', async () => {
     webSearchSdkStub.setPostHandler(async () => ({ results: [] }));
     const tool = getTool();

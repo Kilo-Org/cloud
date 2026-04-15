@@ -61,6 +61,7 @@ export type InstanceMutableState = {
   kilocodeApiKey: PersistedState['kilocodeApiKey'];
   kilocodeApiKeyExpiresAt: PersistedState['kilocodeApiKeyExpiresAt'];
   kilocodeDefaultModel: PersistedState['kilocodeDefaultModel'];
+  kiloExaSearchMode: PersistedState['kiloExaSearchMode'];
   channels: PersistedState['channels'];
   googleCredentials: GoogleCredentials | null;
   provisionedAt: number | null;
@@ -117,8 +118,6 @@ export type InstanceMutableState = {
   preRestoreStatus: InstanceStatus | null;
   pendingRestoreVolumeId: string | null;
   instanceReadyEmailSent: boolean;
-  diskUsedBytes: number | null;
-  diskTotalBytes: number | null;
   customSecretMeta: PersistedState['customSecretMeta'];
   // Stream Chat default channel (auto-provisioned)
   streamChatApiKey: string | null;

@@ -51,6 +51,7 @@ import { DetailTile } from './DetailTile';
 
 import { getEntriesByCategory } from '@kilocode/kiloclaw-secret-catalog';
 import { SecretEntrySection } from './SecretEntrySection';
+import { ExaSearchEntrySection } from './ExaSearchEntrySection';
 import { AnimatedDots } from './AnimatedDots';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PairingSection } from './PairingSection';
@@ -61,6 +62,8 @@ import { CustomSecretsSection } from './CustomSecretsSection';
 import { WebhookIntegrationSection } from './WebhookIntegrationSection';
 import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.types';
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
+
+const EXA_SEARCH_UI_MIN_CONTROLLER_VERSION = '2026.4.14';
 
 // ---------------------------------------------------------------------------
 // 1Password setup guide dialog
@@ -663,6 +666,44 @@ function DestroyInstanceDialog({
   );
 }
 
+function InboundEmailCard({ address }: { address: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    void navigator.clipboard
+      .writeText(address)
+      .then(() => toast.success('Inbound email address copied'))
+      .catch(() => toast.error('Failed to copy inbound email address'));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="rounded-lg border px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <Hash className="text-muted-foreground h-5 w-5 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Inbound Email</p>
+            <p className="text-muted-foreground text-xs">
+              Send email to this address to message your agent.
+            </p>
+          </div>
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <code className="bg-muted text-foreground min-w-0 truncate rounded px-2 py-1 text-xs">
+            {address}
+          </code>
+          <Button variant="outline" size="sm" onClick={handleCopy}>
+            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+            Copy
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // SettingsTab
 // ---------------------------------------------------------------------------
@@ -703,7 +744,6 @@ export function SettingsTab({
     variantsMatch,
     trackedVersion,
     runningVersion,
-    latestAvailableVersion,
     latestVersion,
     controllerVersion,
     isLoadingControllerVersion,
@@ -758,8 +798,19 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     '2026.2.26'
   );
+  const supportsExaSearchUi = calverAtLeast(
+    cleanVersion(controllerVersion?.version),
+    EXA_SEARCH_UI_MIN_CONTROLLER_VERSION
+  );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
+  const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
+  const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
+  const exaSearchConfigured =
+    supportsExaSearchUi && (kiloExaSearchMode === 'kilo-proxy' || kiloExaSearchMode === null);
+  const exaSearchDisplayMode =
+    supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
+  const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
 
   function handleSave() {
@@ -811,6 +862,8 @@ export function SettingsTab({
         />
       </div>
 
+      {status.inboundEmailAddress && <InboundEmailCard address={status.inboundEmailAddress} />}
+
       {/* ── Pairing Requests ── */}
       {isRunning && <PairingSection mutations={mutations} />}
 
@@ -856,8 +909,8 @@ export function SettingsTab({
                       <TooltipContent>
                         <p>
                           {catalogNewerThanImage
-                            ? `A newer OpenClaw version (${latestAvailableVersion}) is available — click to upgrade`
-                            : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available — click to upgrade`}
+                            ? 'A new version of KiloClaw is available. This update includes a new OpenClaw version. Click to upgrade.'
+                            : 'A new version of KiloClaw is available — click to upgrade.'}
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -982,12 +1035,60 @@ export function SettingsTab({
                 <SecretEntrySection
                   key={entry.id}
                   entry={entry}
-                  configured={configuredSecrets[entry.id] ?? false}
+                  configured={braveSearchEnabled}
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
+                  actionRowInlineExtra={
+                    supportsExaSearchUi && braveSearchConfigured && exaSearchConfigured ? (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-8 px-1 text-xs"
+                        disabled={mutations.patchWebSearchConfig.isPending}
+                        onClick={() => {
+                          mutations.patchWebSearchConfig.mutate(
+                            { exaMode: 'disabled' },
+                            {
+                              onSuccess: () => {
+                                toast.success('Brave Search re-enabled. Redeploy to apply.', {
+                                  duration: 8000,
+                                });
+                                onSecretsChanged?.('brave-search');
+                              },
+                              onError: err => {
+                                toast.error(`Failed to re-enable Brave Search: ${err.message}`);
+                              },
+                            }
+                          );
+                        }}
+                      >
+                        Re-enable Brave Search
+                      </Button>
+                    ) : undefined
+                  }
+                  saveConfirmation={
+                    supportsExaSearchUi && exaSearchConfigured
+                      ? {
+                          title: 'Enable Brave Search?',
+                          description:
+                            'Exa Search is currently configured. Enabling Brave will disable Exa on the next redeploy.',
+                          confirmLabel: 'Enable Brave and disable Exa',
+                        }
+                      : undefined
+                  }
                 />
               ))}
+            {supportsExaSearchUi && (
+              <ExaSearchEntrySection
+                mode={exaSearchDisplayMode}
+                configured={exaSearchConfigured}
+                braveConfigured={braveSearchConfigured}
+                mutations={mutations}
+                onSecretsChanged={onSecretsChanged}
+                isDirty={dirtySecrets.has('kilo-exa-search')}
+              />
+            )}
           </div>
         </div>
       )}

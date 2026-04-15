@@ -21,7 +21,7 @@ scripts/          CI and one-off scripts
 
 ## Verification
 
-After making changes, verify your work. At minimum run typecheck; run the full suite when appropriate.
+After making changes, verify your work. At minimum run typecheck; run the full suite when appropriate. **Always run `pnpm format` before committing** — CI will reject unformatted code.
 
 | Command          | What it checks                               |
 | ---------------- | -------------------------------------------- |

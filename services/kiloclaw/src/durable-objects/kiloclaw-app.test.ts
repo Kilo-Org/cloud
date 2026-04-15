@@ -371,6 +371,20 @@ describe('alarm retry', () => {
 });
 
 describe('ensureEnvKey', () => {
+  it('creates and persists a provider-neutral key before any Fly app exists', async () => {
+    const storage = createFakeStorage();
+    const { appDO } = createAppDO(storage);
+
+    const { key, secretsVersion } = await appDO.ensureEnvKey('user-1');
+
+    expect(key).toBeTruthy();
+    expect(secretsVersion).toBe(0);
+    expect(secretsClient.setAppSecret).not.toHaveBeenCalled();
+    expect(storage._store.get('userId')).toBe('user-1');
+    expect(storage._store.get('envKey')).toBe(key);
+    expect(storage._store.get('envKeySet')).toBe(true);
+  });
+
   it('always re-sets Fly secret (self-healing) even when key exists', async () => {
     const { appDO } = createAppDO();
     await appDO.ensureApp('user-1');

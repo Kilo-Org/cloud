@@ -17,14 +17,18 @@ import {
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
+import { sentryLogger } from '@/lib/utils.server';
 import { db } from '@/lib/drizzle';
 import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   kiloclaw_cli_runs,
+  kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
+import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
+import { getInboundEmailAddressForInstance } from '@/lib/kiloclaw/inbound-email-alias';
 import {
   ensureActiveInstance,
   getActiveOrgInstance,
@@ -209,6 +213,8 @@ function sanitizeKiloCodeConfigResponse(
   };
 }
 
+const logDiskUsageError = sentryLogger('organization-kiloclaw-disk-usage', 'error');
+
 // ── Router ─────────────────────────────────────────────────────────
 
 export const organizationKiloclawRouter = createTRPCRouter({
@@ -256,6 +262,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
       return {
         userId: ctx.user.id,
         sandboxId: null,
+        provider: null,
+        runtimeId: null,
+        storageId: null,
+        region: null,
         status: null,
         provisionedAt: null,
         lastStartedAt: null,
@@ -283,18 +293,41 @@ export const organizationKiloclawRouter = createTRPCRouter({
         workerUrl,
         name: null,
         instanceId: null,
+        inboundEmailAddress: null,
       } satisfies KiloClawDashboardStatus;
     }
 
     const client = new KiloClawInternalClient();
-    const status = await client.getStatus(ctx.user.id, workerInstanceId(instance));
+    const [status, inboundEmailAddress] = await Promise.all([
+      client.getStatus(ctx.user.id, workerInstanceId(instance)),
+      getInboundEmailAddressForInstance(instance.id),
+    ]);
 
     return {
       ...status,
       name: instance.name ?? null,
       workerUrl,
       instanceId: instance.id,
+      inboundEmailAddress,
     } satisfies KiloClawDashboardStatus;
+  }),
+
+  getDiskUsage: organizationMemberProcedure.query(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+    try {
+      return await queryDiskUsage(instance.sandboxId);
+    } catch (error) {
+      logDiskUsageError('Failed to fetch organization disk usage', {
+        error,
+        organizationId: input.organizationId,
+        sandboxId: instance.sandboxId,
+      });
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch disk usage',
+        cause: error,
+      });
+    }
   }),
 
   renameInstance: organizationMemberMutationProcedure
@@ -451,14 +484,31 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id, instance.id);
     const client = new KiloClawInternalClient();
+    let result: Awaited<ReturnType<KiloClawInternalClient['destroy']>>;
     try {
-      return await client.destroy(ctx.user.id, workerInstanceId(instance));
+      result = await client.destroy(ctx.user.id, workerInstanceId(instance));
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);
       }
       throw error;
     }
+
+    try {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ destruction_deadline: null })
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.user_id, ctx.user.id),
+            eq(kiloclaw_subscriptions.instance_id, instance.id)
+          )
+        );
+    } catch (cleanupError) {
+      console.error('[organization-kiloclaw] Post-destroy cleanup failed:', cleanupError);
+    }
+
+    return result;
   }),
 
   // ── Config ────────────────────────────────────────────────────

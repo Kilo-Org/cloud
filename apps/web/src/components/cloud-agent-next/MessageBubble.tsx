@@ -74,25 +74,24 @@ function CompactionSeparator({
   );
 }
 
-/**
- * Inline file attachment display for user message bubbles
- * Shows icon, filename, and MIME type in a compact format
- */
-function InlineFileAttachment({ part }: { part: FilePart }) {
-  const isImage = part.mime.startsWith('image/');
-  const Icon = isImage ? Image : FileText;
-  const displayName = part.filename || (isImage ? 'Image' : 'File');
+function InlineImageAttachmentCount({ count }: { count: number }) {
+  return (
+    <div className="bg-primary-foreground/10 mt-2 flex items-center gap-2 rounded px-2 py-1.5">
+      <Image className="h-4 w-4 shrink-0 opacity-70" />
+      <span className="text-sm">
+        {count} {count === 1 ? 'image' : 'images'} attached
+      </span>
+    </div>
+  );
+}
 
-  // Format MIME type for display (e.g., "image/png" -> "PNG", "application/pdf" -> "PDF")
+function InlineFileAttachment({ part }: { part: FilePart }) {
+  const displayName = part.filename || 'File';
+
   const formatMimeType = (mime: string): string => {
     const parts = mime.split('/');
     const subtype = parts[1] || mime;
-    // Handle common subtypes
     if (subtype.startsWith('x-')) return subtype.slice(2).toUpperCase();
-    if (subtype === 'jpeg') return 'JPEG';
-    if (subtype === 'png') return 'PNG';
-    if (subtype === 'gif') return 'GIF';
-    if (subtype === 'webp') return 'WebP';
     if (subtype === 'pdf') return 'PDF';
     if (subtype === 'plain') return 'TXT';
     return subtype.toUpperCase();
@@ -100,7 +99,7 @@ function InlineFileAttachment({ part }: { part: FilePart }) {
 
   return (
     <div className="bg-primary-foreground/10 mt-2 flex items-center gap-2 rounded px-2 py-1.5">
-      <Icon className="h-4 w-4 shrink-0 opacity-70" />
+      <FileText className="h-4 w-4 shrink-0 opacity-70" />
       <span className="min-w-0 flex-1 truncate text-sm">{displayName}</span>
       <span className="text-primary-foreground/60 shrink-0 text-xs">
         {formatMimeType(part.mime)}
@@ -187,6 +186,8 @@ export function MessageBubble({
 
     const userContent = getUserTextContent(message.parts);
     const fileParts = message.parts.filter(isFilePart);
+    const imageFileParts = fileParts.filter(part => part.mime.startsWith('image/'));
+    const nonImageFileParts = fileParts.filter(part => !part.mime.startsWith('image/'));
 
     return (
       <div className="group/msg flex flex-col items-end py-2">
@@ -200,7 +201,10 @@ export function MessageBubble({
               <TextWithLinks text={userContent} />
             </p>
           )}
-          {fileParts.map((part, index) => (
+          {imageFileParts.length > 0 && (
+            <InlineImageAttachmentCount count={imageFileParts.length} />
+          )}
+          {nonImageFileParts.map((part, index) => (
             <InlineFileAttachment key={part.id || index} part={part} />
           ))}
         </div>

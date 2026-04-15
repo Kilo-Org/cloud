@@ -14,6 +14,7 @@ import {
   getActiveInstance,
   getInstanceById,
   markActiveInstanceDestroyed,
+  markInstanceDestroyedById,
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
@@ -45,6 +46,7 @@ import {
   inArray,
   sql,
   gte,
+  lte,
   type SQL,
 } from 'drizzle-orm';
 
@@ -55,6 +57,13 @@ const ListInstancesSchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional(),
   status: z.enum(['all', 'active', 'suspended', 'destroyed']).default('all'),
+});
+
+const DetectOrphansSchema = z.object({
+  /** ISO date string — only check instances created on or after this date. */
+  createdAfter: z.string().datetime(),
+  /** ISO date string — only check instances created on or before this date. */
+  createdBefore: z.string().datetime(),
 });
 
 const GetInstanceSchema = z.object({
@@ -897,6 +906,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       } catch (err) {
         throwKiloclawAdminError(err, 'Failed to verify machine state before destroy');
       }
+      if (status.provider !== 'fly') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Direct Fly machine destroy is not supported for provider ${status.provider}`,
+        });
+      }
       if (status.flyAppName !== input.appName || status.flyMachineId !== input.machineId) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -1059,6 +1074,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     // Post-destroy cleanup: best-effort DB tidying that must not report
     // failure after a successful destroy.
     try {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ destruction_deadline: null })
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.user_id, instance.user_id),
+            eq(kiloclaw_subscriptions.instance_id, instance.id)
+          )
+        );
+
       // Clear lifecycle emails so they can fire again if the user re-provisions.
       const resettableEmailTypes = [
         'claw_suspended_trial',
@@ -1308,5 +1333,179 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         console.error('Failed to restore snapshot for user:', input.userId, err);
         throwKiloclawAdminError(err, 'Failed to restore from snapshot');
       }
+    }),
+
+  // ── Orphan detection ──────────────────────────────────────────────────
+
+  detectOrphans: adminProcedure.input(DetectOrphansSchema).mutation(async ({ input }) => {
+    // 1. Fetch all active (non-destroyed) instances created within the date range.
+    //    Cap at 1000 to avoid excessively long fan-outs; the UI shows when capped.
+    const MAX_SCAN = 1000;
+    const instances = await db
+      .select({
+        id: kiloclaw_instances.id,
+        user_id: kiloclaw_instances.user_id,
+        sandbox_id: kiloclaw_instances.sandbox_id,
+        organization_id: kiloclaw_instances.organization_id,
+        created_at: kiloclaw_instances.created_at,
+        user_email: kilocode_users.google_user_email,
+        subscription_id: kiloclaw_subscriptions.id,
+        subscription_status: kiloclaw_subscriptions.status,
+      })
+      .from(kiloclaw_instances)
+      .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+      .leftJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
+      )
+      .where(
+        and(
+          isNull(kiloclaw_instances.destroyed_at),
+          gte(kiloclaw_instances.created_at, input.createdAfter),
+          lte(kiloclaw_instances.created_at, input.createdBefore)
+        )
+      )
+      .orderBy(desc(kiloclaw_instances.created_at))
+      .limit(MAX_SCAN + 1);
+
+    const capped = instances.length > MAX_SCAN;
+    const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
+
+    if (toScan.length === 0) {
+      return { orphans: [], scanned: 0, capped: false };
+    }
+
+    // 2. Fan out getDebugStatus calls with concurrency limit.
+    const CONCURRENCY = 10;
+    const client = new KiloClawInternalClient();
+
+    type OrphanResult = {
+      id: string;
+      user_id: string;
+      sandbox_id: string;
+      organization_id: string | null;
+      created_at: string;
+      user_email: string | null;
+      subscription_id: string | null;
+      subscription_status: string | null;
+      workerStatusError: string | null;
+    };
+
+    const orphans: OrphanResult[] = [];
+
+    for (let i = 0; i < toScan.length; i += CONCURRENCY) {
+      const batch = toScan.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(async instance => {
+          const instId = instance.sandbox_id.startsWith('ki_') ? instance.id : undefined;
+          const status = await client.getDebugStatus(instance.user_id, instId);
+          return { instance, status };
+        })
+      );
+
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
+        if (result.status === 'fulfilled') {
+          const { instance, status } = result.value;
+          // A null/undefined status means the DO has never been provisioned.
+          if (!status?.status) {
+            orphans.push({
+              id: instance.id,
+              user_id: instance.user_id,
+              sandbox_id: instance.sandbox_id,
+              organization_id: instance.organization_id,
+              created_at: instance.created_at,
+              user_email: instance.user_email,
+              subscription_id: instance.subscription_id,
+              subscription_status: instance.subscription_status,
+              workerStatusError: null,
+            });
+          }
+        } else {
+          // If the status call itself failed, flag it as a potential orphan
+          // with the error — the admin can investigate.
+          const instance = batch[j];
+          if (instance) {
+            orphans.push({
+              id: instance.id,
+              user_id: instance.user_id,
+              sandbox_id: instance.sandbox_id,
+              organization_id: instance.organization_id,
+              created_at: instance.created_at,
+              user_email: instance.user_email,
+              subscription_id: instance.subscription_id,
+              subscription_status: instance.subscription_status,
+              workerStatusError:
+                result.reason instanceof Error ? result.reason.message : 'Status check failed',
+            });
+          }
+        }
+      }
+    }
+
+    return { orphans, scanned: toScan.length, capped };
+  }),
+
+  destroyOrphan: adminProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      // Verify the instance exists and is not already destroyed.
+      const [instance] = await db
+        .select({
+          id: kiloclaw_instances.id,
+          user_id: kiloclaw_instances.user_id,
+          sandbox_id: kiloclaw_instances.sandbox_id,
+          destroyed_at: kiloclaw_instances.destroyed_at,
+        })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, input.id))
+        .limit(1);
+
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      }
+      if (instance.destroyed_at !== null) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Instance is already destroyed' });
+      }
+
+      // Verify the instance is actually an orphan — the DO should have no state.
+      // If it does, the admin should use the standard destroy flow instead.
+      const client = new KiloClawInternalClient();
+      const instId = instance.sandbox_id.startsWith('ki_') ? instance.id : undefined;
+      const workerStatus = await client.getDebugStatus(instance.user_id, instId);
+      if (workerStatus?.status) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Instance has active DO state (status: ${workerStatus.status}) — use the standard destroy flow instead`,
+        });
+      }
+
+      console.log(
+        `[admin-kiloclaw] Orphan cleanup by admin ${ctx.user.id} (${ctx.user.google_user_email}) for instance ${instance.id} (user: ${instance.user_id})`
+      );
+
+      // Soft-delete the DB row. No DO destroy needed — the DO was never
+      // provisioned (that's what makes it an orphan).
+      await markInstanceDestroyedById(instance.id);
+
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.orphan.destroy',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: instance.user_id,
+          message: `Orphaned instance destroyed: ${instance.sandbox_id}`,
+          metadata: {
+            reason: 'Orphaned instance — active DB row with no backing Durable Object',
+            instance_id: instance.id,
+            sandbox_id: instance.sandbox_id,
+          },
+        });
+      } catch (auditErr) {
+        console.error('[admin-kiloclaw] Failed to write audit log for orphan destroy:', auditErr);
+      }
+
+      return { success: true };
     }),
 });

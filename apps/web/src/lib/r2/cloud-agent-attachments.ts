@@ -7,7 +7,7 @@ import {
 import type { CloudAgentImageAllowedType } from '@/lib/cloud-agent/constants';
 import { r2Client, r2CloudAgentAttachmentsBucketName } from '@/lib/r2/client';
 
-type Service = 'app-builder';
+type Service = 'app-builder' | 'cloud-agent';
 
 function getExtensionFromContentType(contentType: CloudAgentImageAllowedType): string {
   return CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION[contentType];

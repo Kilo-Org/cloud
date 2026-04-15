@@ -49,7 +49,9 @@ export type EnsureWrapperOptions = {
 
 export type WrapperPromptOptions = {
   prompt?: string;
-  parts?: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
+  parts?: Array<
+    { type: 'text'; text: string } | { type: 'file'; mime: string; url: string; filename?: string }
+  >;
   model?: { providerID?: string; modelID: string };
   variant?: string;
   agent?: string;

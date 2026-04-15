@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ChevronLeft, ChevronRight, X, Bomb } from 'lucide-react';
 import Link from 'next/link';
-import { formatDistanceToNow, format, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import {
   ComposedChart,
   Bar,
@@ -46,6 +46,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
+import { formatRelativeTime } from './shared';
 
 type SortField = 'created_at' | 'destroyed_at';
 type SortOrder = 'asc' | 'desc';
@@ -67,11 +68,6 @@ function toSortedSearchParams(obj: Record<string, unknown>): URLSearchParams {
     if (value) params.set(key, String(value));
   }
   return params;
-}
-
-function formatRelativeTime(timestamp: string | null): string {
-  if (!timestamp) return '—';
-  return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
 }
 
 function formatLifespan(minutes: number | null): string {

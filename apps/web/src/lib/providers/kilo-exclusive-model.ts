@@ -1,3 +1,4 @@
+import type { FeatureValue } from '@/lib/feature-detection';
 import type { OpenRouterInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import type { ProviderId } from '@/lib/providers/types';
 
@@ -30,6 +31,8 @@ export type KiloExclusiveModel = {
   internal_id: string;
   inference_provider: OpenRouterInferenceProviderId | null;
   pricing: Pricing | null;
+  /** Features allowed to use this model. Empty array means no restriction. */
+  exclusive_to: ReadonlyArray<FeatureValue>;
 };
 
 function formatPricePerMillionAsPerToken(price: number): string;

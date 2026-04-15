@@ -7,7 +7,7 @@ vi.mock('cloudflare:workers', () => ({
 }));
 
 type ProviderMetadata = {
-  provider: 'fly' | 'k8s';
+  provider: 'fly' | 'northflank';
   capabilities: {
     volumeSnapshots: boolean;
     candidateVolumes: boolean;
@@ -87,7 +87,7 @@ describe('platform provider capability gates', () => {
 
   it('rejects volume snapshot listing for unsupported providers', async () => {
     const { env, listVolumeSnapshots } = makeEnv({
-      provider: 'k8s',
+      provider: 'northflank',
       capabilities: {
         volumeSnapshots: false,
         candidateVolumes: false,
@@ -101,14 +101,14 @@ describe('platform provider capability gates', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
-      error: 'volume-snapshots is not supported for provider k8s',
+      error: 'volume-snapshots is not supported for provider northflank',
     });
     expect(listVolumeSnapshots).not.toHaveBeenCalled();
   });
 
   it('rejects candidate volume listing for unsupported providers', async () => {
     const { env, listCandidateVolumes } = makeEnv({
-      provider: 'k8s',
+      provider: 'northflank',
       capabilities: {
         volumeSnapshots: false,
         candidateVolumes: false,
@@ -122,14 +122,14 @@ describe('platform provider capability gates', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
-      error: 'candidate-volumes is not supported for provider k8s',
+      error: 'candidate-volumes is not supported for provider northflank',
     });
     expect(listCandidateVolumes).not.toHaveBeenCalled();
   });
 
   it('rejects volume reassociation for unsupported providers', async () => {
     const { env, reassociateVolume } = makeEnv({
-      provider: 'k8s',
+      provider: 'northflank',
       capabilities: {
         volumeSnapshots: false,
         candidateVolumes: false,
@@ -155,14 +155,14 @@ describe('platform provider capability gates', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
-      error: 'reassociate-volume is not supported for provider k8s',
+      error: 'reassociate-volume is not supported for provider northflank',
     });
     expect(reassociateVolume).not.toHaveBeenCalled();
   });
 
   it('rejects snapshot restore for unsupported providers', async () => {
     const { env, enqueueSnapshotRestore } = makeEnv({
-      provider: 'k8s',
+      provider: 'northflank',
       capabilities: {
         volumeSnapshots: false,
         candidateVolumes: false,
@@ -187,7 +187,7 @@ describe('platform provider capability gates', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
-      error: 'restore-volume-snapshot is not supported for provider k8s',
+      error: 'restore-volume-snapshot is not supported for provider northflank',
     });
     expect(enqueueSnapshotRestore).not.toHaveBeenCalled();
   });

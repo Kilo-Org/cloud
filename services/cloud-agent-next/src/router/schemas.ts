@@ -7,6 +7,7 @@ import {
   EncryptedSecretEnvelopeSchema,
   EncryptedSecretsSchema,
   CallbackTargetSchema,
+  ImagesSchema,
 } from '../persistence/schemas.js';
 import { AgentModeSchema, Limits } from '../schema.js';
 
@@ -14,25 +15,16 @@ import { AgentModeSchema, Limits } from '../schema.js';
 export { sessionIdSchema, githubRepoSchema, gitUrlSchema, envVarsSchema };
 export { MCPServerConfigSchema, branchNameSchema, modelIdSchema };
 export { AgentModeSchema, Limits };
-export { EncryptedSecretEnvelopeSchema, EncryptedSecretsSchema, CallbackTargetSchema };
+export {
+  EncryptedSecretEnvelopeSchema,
+  EncryptedSecretsSchema,
+  CallbackTargetSchema,
+  ImagesSchema,
+};
 
 // Re-export types
 export type { EncryptedSecretEnvelope, EncryptedSecrets } from '../persistence/schemas.js';
 
-/**
- * Schema for image attachments that will be downloaded from R2 to the sandbox.
- * Images are stored in R2 at path: {bucket}/{userId}/{path}/{filename}
- */
-export const ImagesSchema = z.object({
-  path: z
-    .string()
-    .min(1)
-    .describe('R2 path prefix under the user ID (e.g., "app-builder/msg-uuid")'),
-  files: z
-    .array(z.string().min(1))
-    .min(1)
-    .describe('Ordered array of specific filenames to download'),
-});
 export type Images = z.infer<typeof ImagesSchema>;
 
 /**

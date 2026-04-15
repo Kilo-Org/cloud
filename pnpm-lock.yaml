@@ -1192,8 +1192,8 @@ importers:
   services/cloud-agent-next:
     dependencies:
       '@cloudflare/sandbox':
-        specifier: 0.7.13
-        version: 0.7.13(@xterm/xterm@6.0.0)
+        specifier: 0.8.9
+        version: 0.8.9(@xterm/xterm@6.0.0)
       '@hono/trpc-server':
         specifier: ^0.4.2
         version: 0.4.2(@trpc/server@11.13.0(typescript@5.9.3))(hono@4.12.8)
@@ -1232,8 +1232,8 @@ importers:
         version: 4.3.6
     devDependencies:
       '@cloudflare/containers':
-        specifier: 0.1.1
-        version: 0.1.1
+        specifier: 0.3.0
+        version: 0.3.0
       '@cloudflare/vitest-pool-workers':
         specifier: ^0.12.21
         version: 0.12.21(@cloudflare/workers-types@4.20260313.1)(@vitest/runner@4.1.0)(@vitest/snapshot@4.1.0)(vitest@3.2.4)
@@ -1732,6 +1732,34 @@ importers:
       vitest:
         specifier: ^4.1.0
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@24.12.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+      wrangler:
+        specifier: 'catalog:'
+        version: 4.73.0(@cloudflare/workers-types@4.20260313.1)
+
+  services/kiloclaw-inbound-email:
+    dependencies:
+      '@kilocode/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
+      node-html-markdown:
+        specifier: ^2.0.0
+        version: 2.0.0
+      postal-mime:
+        specifier: ^2.7.4
+        version: 2.7.4
+    devDependencies:
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260319.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
       wrangler:
         specifier: 'catalog:'
         version: 4.73.0(@cloudflare/workers-types@4.20260313.1)
@@ -2970,6 +2998,9 @@ packages:
   '@cloudflare/containers@0.1.1':
     resolution: {integrity: sha512-YTdobRTnTlUOUPMFemufH367A9Z8pDfZ+UboYMLbGpO0VlvEXZDiioSmXPQMHld2vRtkL31mcRii3bcbQU6fdw==}
 
+  '@cloudflare/containers@0.3.0':
+    resolution: {integrity: sha512-8HM1NgXThWCTk7SH28QFxqMNLJwl6RrMkj3qd0KvDA59BALsn3mZXNDT94i1JaGZnP4Bc8sPGs1u9UAl/mVUVg==}
+
   '@cloudflare/kv-asset-handler@0.4.0':
     resolution: {integrity: sha512-+tv3z+SPp+gqTIcImN9o0hqE9xyfQjI1XD9pL6NuKjua9B1y7mNYv0S9cP+QEbA4ppVgGZEmKOvHX5G5Ei1CVA==}
     engines: {node: '>=18.0.0'}
@@ -3002,6 +3033,20 @@ packages:
 
   '@cloudflare/sandbox@0.7.13':
     resolution: {integrity: sha512-HVbg6nUqudsUPGMKznyG4gPgYVdEH6nt2NYgKmCJzUJeXixoWDiqCVsJpmCzNueHg/2HX982A6EhQgIUol6jzQ==}
+    peerDependencies:
+      '@openai/agents': ^0.3.3
+      '@opencode-ai/sdk': ^1.1.40
+      '@xterm/xterm': '>=5.0.0'
+    peerDependenciesMeta:
+      '@openai/agents':
+        optional: true
+      '@opencode-ai/sdk':
+        optional: true
+      '@xterm/xterm':
+        optional: true
+
+  '@cloudflare/sandbox@0.8.9':
+    resolution: {integrity: sha512-4lmMo96fOVck9lcmjJAJYRf2NNspcoGy8pNuEdBTary3WWuFeXBQLmzuid4ay5i6aGu2AeRegPSmjD+Z1K6qJw==}
     peerDependencies:
       '@openai/agents': ^0.3.3
       '@opencode-ai/sdk': ^1.1.40
@@ -11976,6 +12021,13 @@ packages:
     resolution: {integrity: sha512-rLvcdSyRCyouf6jcOIPe/BgwG/d7hKjzMKOas33/pHEr6gbq18IK9zV7DiPvzsz0oBJPme6qr6H6kGZuI9/DZg==}
     engines: {node: '>= 6.13.0'}
 
+  node-html-markdown@2.0.0:
+    resolution: {integrity: sha512-DqUC3GGP7pwSYxS93SwHoP+qCw78xcMP6C6H2DuC8rPD2AweJRjBzQb5SdXpKtDlqAQ7hVotJcfhgU7hU5Gthw==}
+    engines: {node: '>=20.0.0'}
+
+  node-html-parser@6.1.13:
+    resolution: {integrity: sha512-qIsTMOY4C/dAa5Q5vsobRpOOvPfC4pB61UVW2uSwZNUp0QU/jCekTal1vMmbO0DgdHeLUJpv/ARmDqErVxA3Sg==}
+
   node-int64@0.4.0:
     resolution: {integrity: sha512-O5lz91xSOeoXP6DulyHfllpq+Eg00MWitZIbtPfoSEvqIHdl5gfcY6hYzDWnj0qD5tz52PI08u9qUvSVeUBeHw==}
 
@@ -12406,6 +12458,9 @@ packages:
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
     engines: {node: '>= 0.4'}
+
+  postal-mime@2.7.4:
+    resolution: {integrity: sha512-0WdnFQYUrPGGTFu1uOqD2s7omwua8xaeYGdO6rb88oD5yJ/4pPHDA4sdWqfD8wQVfCny563n/HQS7zTFft+f/g==}
 
   postcss-loader@8.2.1:
     resolution: {integrity: sha512-k98jtRzthjj3f76MYTs9JTpRqV1RaaMhEU0Lpw9OTmQZQdppg4B30VZ74BojuBHt3F4KyubHJoXCMUeM8Bqeow==}
@@ -16279,6 +16334,8 @@ snapshots:
 
   '@cloudflare/containers@0.1.1': {}
 
+  '@cloudflare/containers@0.3.0': {}
+
   '@cloudflare/kv-asset-handler@0.4.0':
     dependencies:
       mime: 3.0.0
@@ -16296,6 +16353,13 @@ snapshots:
   '@cloudflare/sandbox@0.7.13(@xterm/xterm@6.0.0)':
     dependencies:
       '@cloudflare/containers': 0.1.1
+      aws4fetch: 1.0.20
+    optionalDependencies:
+      '@xterm/xterm': 6.0.0
+
+  '@cloudflare/sandbox@0.8.9(@xterm/xterm@6.0.0)':
+    dependencies:
+      '@cloudflare/containers': 0.3.0
       aws4fetch: 1.0.20
     optionalDependencies:
       '@xterm/xterm': 6.0.0
@@ -27162,6 +27226,15 @@ snapshots:
 
   node-forge@1.3.3: {}
 
+  node-html-markdown@2.0.0:
+    dependencies:
+      node-html-parser: 6.1.13
+
+  node-html-parser@6.1.13:
+    dependencies:
+      css-select: 5.2.2
+      he: 1.2.0
+
   node-int64@0.4.0: {}
 
   node-polyfill-webpack-plugin@2.0.1(webpack@5.105.4(esbuild@0.27.4)):
@@ -27702,6 +27775,8 @@ snapshots:
       '@babel/runtime': 7.29.2
 
   possible-typed-array-names@1.1.0: {}
+
+  postal-mime@2.7.4: {}
 
   postcss-loader@8.2.1(postcss@8.5.8)(typescript@5.9.3)(webpack@5.105.4(esbuild@0.27.4)):
     dependencies:

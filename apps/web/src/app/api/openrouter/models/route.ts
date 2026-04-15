@@ -7,6 +7,8 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { getDirectByokModelsForUser } from '@/lib/providers/direct-byok';
 import { unstable_cache } from 'next/cache';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
+import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
+import { filterByFeature } from '@/lib/models';
 
 const getDirectByokModels = unstable_cache(
   (userId: string) => getDirectByokModelsForUser(userId),
@@ -28,15 +30,19 @@ async function tryGetUserFromAuth() {
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
 export async function GET(
-  _request: NextRequest
+  request: NextRequest
 ): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
+  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
   const auth = await tryGetUserFromAuth();
   try {
     const result = auth?.organizationId
       ? await getAvailableModelsForOrganization(auth.organizationId)
       : null;
     if (result) {
-      return NextResponse.json(result);
+      return NextResponse.json({
+        ...result,
+        data: filterByFeature(result.data, feature),
+      });
     }
 
     const data = await getEnhancedOpenRouterModels();
@@ -44,7 +50,7 @@ export async function GET(
       return NextResponse.json(data);
     }
     const byokModels = auth?.user ? await getDirectByokModels(auth.user.id) : [];
-    return NextResponse.json({ data: data.data.concat(byokModels) });
+    return NextResponse.json({ data: filterByFeature(data.data.concat(byokModels), feature) });
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'openrouter/models' },

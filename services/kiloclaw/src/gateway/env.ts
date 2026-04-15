@@ -7,6 +7,7 @@ import type {
   EncryptedEnvelope,
   EncryptedChannelTokens,
   GoogleCredentials,
+  KiloExaSearchMode,
 } from '../schemas/instance-config';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import {
@@ -25,6 +26,7 @@ export type UserConfig = {
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   kilocodeApiKey?: string | null;
   kilocodeDefaultModel?: string | null;
+  kiloExaSearchMode?: KiloExaSearchMode | null;
   channels?: EncryptedChannelTokens;
   googleCredentials?: GoogleCredentials;
   instanceFeatures?: string[];
@@ -211,6 +213,9 @@ export async function buildEnvVars(
   sensitive.OPENCLAW_GATEWAY_TOKEN = await deriveGatewayToken(sandboxId, gatewayTokenSecret);
   plainEnv.KILOCLAW_SANDBOX_ID = sandboxId;
   plainEnv.AUTO_APPROVE_DEVICES = 'true';
+  if (userConfig?.kiloExaSearchMode != null) {
+    plainEnv.KILO_EXA_SEARCH_MODE = userConfig.kiloExaSearchMode;
+  }
 
   // User-selected exec permissions preset (non-sensitive, survives restarts).
   if (userConfig?.execSecurity) plainEnv.KILOCLAW_EXEC_SECURITY = userConfig.execSecurity;

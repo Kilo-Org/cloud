@@ -63,8 +63,10 @@ type ExecutionBinding = {
 
 type PromptBody = {
   prompt?: string;
-  /** Message parts - only text parts are supported */
-  parts?: Array<{ type: 'text'; text: string }>;
+  /** Message parts - text or file (with local file:// URL) */
+  parts?: Array<
+    { type: 'text'; text: string } | { type: 'file'; mime: string; url: string; filename?: string }
+  >;
   model?: { providerID?: string; modelID: string };
   variant?: string;
   agent?: string;

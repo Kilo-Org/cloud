@@ -26,37 +26,72 @@ export const AuditFinding = z.object({
   severity: FindingSeverity,
   title: z.string(),
   detail: z.string(),
-  remediation: z.string().nullable(),
+  remediation: z.string().nullable().optional(),
 });
 export type AuditFinding = z.infer<typeof AuditFinding>;
 
-export const SecurityAdvisorRequestSchema = z.object({
-  apiVersion: z.literal('2026-04-01'),
+/**
+ * Semver regex (major.minor.patch with optional prerelease + build metadata).
+ * Matches the format used by `@kilocode/cli` and other kilocode packages.
+ *
+ * `source.pluginVersion` is optional at the field level because non-plugin
+ * callers (`method: 'api' | 'webhook' | 'cloud-agent'`) have no plugin
+ * involved and shouldn't be forced to invent a version string. When the
+ * caller IS a plugin (`method: 'plugin'`), we enforce presence + semver
+ * format via the superRefine below, giving us a clean foundation for
+ * observability and future version-based branching without breaking any
+ * non-plugin integration path.
+ */
+const SEMVER_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[\w.-]+)?(?:\+[\w.-]+)?$/;
+const SemverString = z
+  .string()
+  .regex(SEMVER_REGEX, 'Must be a semver version string (e.g. "1.2.3")');
 
-  source: z.object({
-    platform: SourcePlatform,
-    method: SourceMethod,
-    pluginVersion: z.string().optional(),
-    openclawVersion: z.string().optional(),
-  }),
+export const SecurityAdvisorRequestSchema = z
+  .object({
+    apiVersion: z.literal('2026-04-01'),
 
-  audit: z.object({
-    ts: z.number(),
-    summary: z.object({
-      critical: z.number(),
-      warn: z.number(),
-      info: z.number(),
+    source: z.object({
+      platform: SourcePlatform,
+      method: SourceMethod,
+      // Plugin package semver. Optional here so non-plugin callers aren't
+      // forced to send a version; superRefine below requires it (and
+      // enforces semver format) whenever method === 'plugin'. Server logs
+      // and persists this to `security_advisor_scans.plugin_version` on
+      // every scan; future schema evolutions may branch on it.
+      pluginVersion: SemverString.optional(),
+      openclawVersion: z.string().optional(),
     }),
-    findings: z.array(AuditFinding),
-    deep: z.record(z.string(), z.unknown()).optional(),
-    secretDiagnostics: z.array(z.unknown()).optional(),
-  }),
 
-  publicIp: z
-    .string()
-    .regex(/^(?:\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]+$/, 'Must be a valid IPv4 or IPv6 address')
-    .optional(),
-});
+    audit: z.object({
+      ts: z.number(),
+      summary: z.object({
+        critical: z.number(),
+        warn: z.number(),
+        info: z.number(),
+      }),
+      findings: z.array(AuditFinding),
+      deep: z.record(z.string(), z.unknown()).optional(),
+      secretDiagnostics: z.array(z.unknown()).optional(),
+    }),
+
+    publicIp: z
+      .string()
+      .regex(/^(?:\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]+$/, 'Must be a valid IPv4 or IPv6 address')
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    // Plugin callers must always announce their version. SemverString
+    // already validates format when pluginVersion is present; here we
+    // guard presence for the plugin-method path specifically.
+    if (data.source.method === 'plugin' && !data.source.pluginVersion) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['source', 'pluginVersion'],
+        message: 'source.pluginVersion is required when source.method is "plugin"',
+      });
+    }
+  });
 export type SecurityAdvisorRequest = z.infer<typeof SecurityAdvisorRequestSchema>;
 
 // --- Response schemas ---
@@ -133,4 +168,4 @@ export type KiloClawComparisonEntry = z.infer<typeof KiloClawComparisonEntry>;
 // --- Constants ---
 
 export const API_VERSION = '2026-04-01' as const;
-export const RATE_LIMIT_PER_DAY = 5;
+export const RATE_LIMIT_PER_DAY = 50;

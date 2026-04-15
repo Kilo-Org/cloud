@@ -1,5 +1,6 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { redisGet, redisSet } from '@/lib/redis';
+import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
 const REDIS_KEY = 'gateway:vercel-routing-percentage';
@@ -21,9 +22,9 @@ const DEFAULT_CONFIG: StoredConfig = {
 };
 
 async function readConfig(): Promise<StoredConfig> {
-  const raw = await redisGet(REDIS_KEY);
-  if (!raw) return DEFAULT_CONFIG;
   try {
+    const raw = await redisGet(REDIS_KEY);
+    if (!raw) return DEFAULT_CONFIG;
     return StoredConfigSchema.parse(JSON.parse(raw));
   } catch {
     return DEFAULT_CONFIG;
@@ -48,7 +49,13 @@ export const adminGatewayConfigRouter = createTRPCRouter({
         updated_by: ctx.user.id,
         updated_by_email: ctx.user.google_user_email,
       };
-      await redisSet(REDIS_KEY, JSON.stringify(config));
+      const written = await redisSet(REDIS_KEY, JSON.stringify(config));
+      if (!written) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Redis is not configured — cannot save routing override',
+        });
+      }
       return config;
     }),
 });

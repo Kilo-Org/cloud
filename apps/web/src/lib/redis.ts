@@ -43,9 +43,12 @@ async function ensureConnected(c: RedisClient): Promise<RedisClient> {
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
   return Promise.race([
-    promise,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), ms)),
+    promise.finally(() => clearTimeout(timer)),
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Redis timeout')), ms);
+    }),
   ]);
 }
 
@@ -56,13 +59,15 @@ export async function redisGet(key: string): Promise<string | null> {
   return withTimeout(c.get(key), COMMAND_TIMEOUT_MS);
 }
 
-export async function redisSet(key: string, value: string, ttlSeconds?: number): Promise<void> {
+/** Returns false if Redis is not configured (REDIS_URL unset). */
+export async function redisSet(key: string, value: string, ttlSeconds?: number): Promise<boolean> {
   const c = getOrCreateClient();
-  if (!c) return;
+  if (!c) return false;
   await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
   if (ttlSeconds) {
     await withTimeout(c.set(key, value, { EX: ttlSeconds }), COMMAND_TIMEOUT_MS);
   } else {
     await withTimeout(c.set(key, value), COMMAND_TIMEOUT_MS);
   }
+  return true;
 }

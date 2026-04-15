@@ -15,7 +15,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     description:
       'KiloClaw instances now come with a read-only email address for receiving messages and notifications without granting send access. You can find the address on the KiloClaw settings page.',
     category: 'feature',
-    deployHint: null,
+    deployHint: 'redeploy_suggested',
   },
   {
     date: '2026-04-06',

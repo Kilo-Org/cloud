@@ -252,21 +252,20 @@ async function dispatchInbound(
 /** Max accepted inbound webhook body. Messages are small — 1 MB is already generous. */
 const MAX_WEBHOOK_BODY_BYTES = 1 * 1024 * 1024;
 
-export class WebhookBodyTooLargeError extends Error {
-  constructor(public readonly limit: number) {
-    super(`kilo-chat: webhook body exceeds ${limit} bytes`);
-  }
-}
+/**
+ * Sentinel returned by readBody when the stream exceeds the cap. Using a
+ * sentinel (rather than a thrown error) keeps the success path obvious and
+ * lets the caller respond with 413 without an instanceof dance.
+ */
+const BODY_TOO_LARGE = Symbol('body-too-large');
 
-async function readBody(req: IncomingMessage): Promise<string> {
+async function readBody(req: IncomingMessage): Promise<string | typeof BODY_TOO_LARGE> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of req) {
     const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
     total += buf.length;
-    if (total > MAX_WEBHOOK_BODY_BYTES) {
-      throw new WebhookBodyTooLargeError(MAX_WEBHOOK_BODY_BYTES);
-    }
+    if (total > MAX_WEBHOOK_BODY_BYTES) return BODY_TOO_LARGE;
     chunks.push(buf);
   }
   return Buffer.concat(chunks).toString('utf8');
@@ -278,18 +277,14 @@ async function readBody(req: IncomingMessage): Promise<string> {
 
 export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
-    let rawBody: string;
-    try {
-      rawBody = await readBody(req);
-    } catch (err) {
-      if (err instanceof WebhookBodyTooLargeError) {
-        res.statusCode = 413;
-        res.setHeader('content-type', 'application/json');
-        res.end(JSON.stringify({ error: 'Payload too large' }));
-        return true;
-      }
-      throw err;
+    const body = await readBody(req);
+    if (body === BODY_TOO_LARGE) {
+      res.statusCode = 413;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ error: 'Payload too large' }));
+      return true;
     }
+    const rawBody = body;
 
     let parsed: unknown;
     try {

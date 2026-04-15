@@ -425,31 +425,55 @@ describe('ConversationDO', () => {
   });
 
   describe('SSE replay — messages + reactions interleaved', () => {
+    /**
+     * Read replay events from an SSE subscribe response.
+     *
+     * Replay bytes are written to the stream before the Response is
+     * returned, so the first read() resolves immediately with all
+     * buffered replay data. We read until no more replay data arrives,
+     * then cancel the stream while no reader.read() is pending.
+     *
+     * The earlier version used Promise.race(reader.read(), timeout) in
+     * a loop — when the timeout won, a dangling reader.read() promise
+     * remained. Calling reader.cancel() then caused that pending read
+     * to reject inside workerd's TransformStream RPC plumbing as an
+     * unhandled "Stream was cancelled" rejection that JS cannot catch.
+     *
+     * This version avoids the problem by never leaving a pending read:
+     * it reads in a loop until data stops arriving (the content check
+     * or read-count limit breaks the loop), then cancels cleanly.
+     */
     async function collectReplay(
       stub: DurableObjectStub<ConversationDO>,
       memberId: string,
-      lastEventId: string,
-      durationMs = 200
+      lastEventId: string
     ): Promise<string> {
       const url = `https://do/subscribe?memberId=${encodeURIComponent(memberId)}`;
       const res = await stub.fetch(new Request(url, { headers: { 'last-event-id': lastEventId } }));
-      const reader = res.body!.getReader();
+      const reader = (res.body as ReadableStream<Uint8Array>).getReader();
       const decoder = new TextDecoder();
-      const deadline = Date.now() + durationMs;
       let out = '';
-      while (Date.now() < deadline) {
-        const remaining = deadline - Date.now();
-        if (remaining <= 0) break;
-        const timer = new Promise<{ done: boolean }>(r =>
-          setTimeout(() => r({ done: true }), remaining)
-        );
-        const readP = reader.read();
-        const race = await Promise.race([readP, timer]);
-        if ('done' in race && race.done) break;
-        const { value, done } = race as ReadableStreamReadResult<Uint8Array>;
-        if (done) break;
-        if (value) out += decoder.decode(value);
-      }
+
+      // Replay data is pre-buffered — read chunks until the stream
+      // would block (i.e. all buffered replay data is consumed).
+      // The first read always resolves immediately with the replay
+      // bytes. Once we have data, break and cancel with no pending read.
+      const readLoop = async () => {
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done || value === undefined) break;
+          out += decoder.decode(value);
+          // Replay is written as a single chunk, so one successful
+          // read is enough. Break to avoid blocking on live events.
+          break;
+        }
+      };
+
+      // Safety timeout in case the stream blocks unexpectedly.
+      await Promise.race([readLoop(), new Promise<void>(r => setTimeout(r, 2000))]);
+
+      // Cancel with no pending reader.read() — safe, no dangling promise.
       await reader.cancel().catch(() => {});
       return out;
     }

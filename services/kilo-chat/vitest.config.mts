@@ -2,10 +2,6 @@ import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
 
 export default defineWorkersConfig({
   test: {
-    // SSE stream tests trigger "Stream was cancelled" unhandled rejections
-    // inside workerd's internal TransformStream when the test reader cancels
-    // the response body. These are benign and unavoidable in this environment.
-    dangerouslyIgnoreUnhandledErrors: true,
     poolOptions: {
       workers: {
         wrangler: { configPath: './wrangler.jsonc' },

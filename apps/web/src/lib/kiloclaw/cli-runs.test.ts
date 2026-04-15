@@ -236,6 +236,45 @@ describe('cancelCliRun', () => {
       completed_at: '2026-04-12T12:01:00.000Z',
     });
   });
+
+  it('returns ok: false when the controller rejects the cancel', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'run that exits between status poll and cancel',
+      startedAt,
+      initiatedByAdminId: null,
+    });
+
+    const result = await cancelCliRun({
+      runId,
+      userId: user.id,
+      instanceId,
+      workerInstanceId: 'ki_current',
+      getControllerStatus: async () => ({
+        hasRun: true,
+        status: 'running',
+        output: null,
+        exitCode: null,
+        startedAt,
+        completedAt: null,
+        prompt: 'run that exits between status poll and cancel',
+      }),
+      // The run exited between the status poll and the cancel request.
+      cancelControllerRun: async () => ({ ok: false }),
+    });
+
+    expect(result).toEqual({ ok: false, runFound: true, cancelled: false });
+
+    // The DB row should remain 'running' so the caller can retry or poll.
+    await expect(getRunStatus(runId)).resolves.toEqual({
+      status: 'running',
+      completed_at: null,
+    });
+  });
 });
 
 describe('markCliRunCancelled', () => {

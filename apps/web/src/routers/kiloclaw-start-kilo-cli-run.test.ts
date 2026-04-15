@@ -14,11 +14,21 @@ import { UpstreamApiError } from '@/lib/trpc/init';
 
 type StartKiloCliRunResult = { ok: true; startedAt: string };
 type CancelKiloCliRunResult = { ok: boolean };
+type KiloCliRunStatusResult = {
+  hasRun: boolean;
+  status: 'running' | 'completed' | 'failed' | 'cancelled' | null;
+  output: string | null;
+  exitCode: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  prompt: string | null;
+};
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
 const mockStartKiloCliRun = jest.fn<() => Promise<StartKiloCliRunResult>>();
 const mockCancelKiloCliRun = jest.fn<() => Promise<CancelKiloCliRunResult>>();
+const mockGetKiloCliRunStatus = jest.fn<() => Promise<KiloCliRunStatusResult>>();
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const actual: Record<string, unknown> = jest.requireActual(
     '@/lib/kiloclaw/kiloclaw-internal-client'
@@ -27,6 +37,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       startKiloCliRun: mockStartKiloCliRun,
       cancelKiloCliRun: mockCancelKiloCliRun,
+      getKiloCliRunStatus: mockGetKiloCliRunStatus,
     })),
     KiloClawApiError: actual.KiloClawApiError,
   };
@@ -61,6 +72,7 @@ beforeEach(async () => {
   await cleanupDbForTest();
   mockStartKiloCliRun.mockReset();
   mockCancelKiloCliRun.mockReset();
+  mockGetKiloCliRunStatus.mockReset();
 
   user = await insertTestUser({
     google_user_email: `clirun-test-${Math.random()}@example.com`,
@@ -74,7 +86,8 @@ async function createPersonalInstance(userId: string): Promise<string> {
       user_id: userId,
       sandbox_id: `sandbox-${userId.slice(0, 8)}`,
     })
-    .returning();
+    .returning({ id: kiloclaw_instances.id });
+  if (!row) throw new Error('Failed to create personal KiloClaw instance');
   return row.id;
 }
 
@@ -86,7 +99,8 @@ async function createOrgInstance(userId: string, organizationId: string): Promis
       sandbox_id: `sandbox-org-${userId.slice(0, 8)}`,
       organization_id: organizationId,
     })
-    .returning();
+    .returning({ id: kiloclaw_instances.id });
+  if (!row) throw new Error('Failed to create organization KiloClaw instance');
   return row.id;
 }
 
@@ -96,6 +110,39 @@ async function grantKiloClawAccess(userId: string): Promise<void> {
     plan: 'standard',
     status: 'active',
     stripe_subscription_id: `sub_test_${userId.slice(0, 8)}`,
+  });
+}
+
+async function createRunningCliRun(params: {
+  userId: string;
+  instanceId: string;
+  prompt: string;
+  startedAt: string;
+}): Promise<string> {
+  const [row] = await db
+    .insert(kiloclaw_cli_runs)
+    .values({
+      user_id: params.userId,
+      instance_id: params.instanceId,
+      prompt: params.prompt,
+      status: 'running',
+      started_at: params.startedAt,
+    })
+    .returning({ id: kiloclaw_cli_runs.id });
+
+  if (!row) throw new Error('Failed to create Kilo CLI run');
+  return row.id;
+}
+
+function mockRunningCliStatus(params: { startedAt: string; prompt: string }): void {
+  mockGetKiloCliRunStatus.mockResolvedValue({
+    hasRun: true,
+    status: 'running',
+    output: null,
+    exitCode: null,
+    startedAt: params.startedAt,
+    completedAt: null,
+    prompt: params.prompt,
   });
 }
 
@@ -288,6 +335,27 @@ describe('kiloclaw.cancelKiloCliRun error translation', () => {
       message: 'Kilo CLI run not found',
     });
   });
+
+  it('maps a late worker 409 during cancel to ok: false', async () => {
+    const [instance] = await db
+      .select({ id: kiloclaw_instances.id })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.user_id, user.id))
+      .limit(1);
+    if (!instance) throw new Error('Expected personal KiloClaw instance');
+
+    const instanceId = instance.id;
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const prompt = 'run that exits between status poll and cancel';
+    const runId = await createRunningCliRun({ userId: user.id, instanceId, prompt, startedAt });
+    mockRunningCliStatus({ startedAt, prompt });
+    mockCancelKiloCliRun.mockRejectedValue(
+      new KiloClawApiError(409, '{"code":"kilo_cli_run_no_active_run"}')
+    );
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.cancelKiloCliRun({ runId })).resolves.toEqual({ ok: false });
+  });
 });
 
 // ── Org router: organizations.kiloclaw.cancelKiloCliRun ───────────────────
@@ -309,5 +377,32 @@ describe('organizations.kiloclaw.cancelKiloCliRun error translation', () => {
       code: 'NOT_FOUND',
       message: 'Kilo CLI run not found',
     });
+  });
+
+  it('maps a late worker 409 during cancel to ok: false', async () => {
+    const [instance] = await db
+      .select({ id: kiloclaw_instances.id })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.organization_id, org.id))
+      .limit(1);
+    if (!instance) throw new Error('Expected organization KiloClaw instance');
+
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const prompt = 'org run that exits between status poll and cancel';
+    const runId = await createRunningCliRun({
+      userId: user.id,
+      instanceId: instance.id,
+      prompt,
+      startedAt,
+    });
+    mockRunningCliStatus({ startedAt, prompt });
+    mockCancelKiloCliRun.mockRejectedValue(
+      new KiloClawApiError(409, '{"code":"kilo_cli_run_no_active_run"}')
+    );
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.cancelKiloCliRun({ organizationId: org.id, runId })
+    ).resolves.toEqual({ ok: false });
   });
 });

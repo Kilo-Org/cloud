@@ -257,7 +257,6 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   });
 });
 
-
 describe('admin.kiloclawInstances.startKiloCliRun', () => {
   it('maps worker 409 to tRPC CONFLICT', async () => {
     const { KiloClawApiError } = jest.requireMock<{
@@ -339,7 +338,6 @@ describe('admin.kiloclawInstances.startKiloCliRun', () => {
     });
   });
 });
-
 
 describe('admin.kiloclawInstances inbound email controls', () => {
   it('cycles the active alias and writes an audit log', async () => {

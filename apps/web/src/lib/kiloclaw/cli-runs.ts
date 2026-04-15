@@ -1,7 +1,7 @@
 import { db } from '@/lib/drizzle';
 import { and, eq, isNull, type SQL } from 'drizzle-orm';
 import { kiloclaw_cli_runs } from '@kilocode/db/schema';
-import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { resolveWorkerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import type { KiloCliRunStatusResponse } from '@/lib/kiloclaw/types';
 
@@ -200,9 +200,19 @@ export async function cancelCliRun(params: {
     });
   const cancelControllerRun =
     params.cancelControllerRun ??
-    ((userId: string, workerInstanceId: string | undefined) => {
+    (async (userId: string, workerInstanceId: string | undefined) => {
       if (!client) throw new Error('KiloClaw internal client is not available');
-      return client.cancelKiloCliRun(userId, workerInstanceId);
+      try {
+        return await client.cancelKiloCliRun(userId, workerInstanceId);
+      } catch (err) {
+        // The run finished between our status poll and the cancel request —
+        // the controller rejects with 409. Translate to { ok: false } so the
+        // caller can retry or poll for the terminal state.
+        if (err instanceof KiloClawApiError && err.statusCode === 409) {
+          return { ok: false };
+        }
+        throw err;
+      }
     });
 
   const controllerStatus = await getControllerStatus(params.userId, effectiveWorkerInstanceId);

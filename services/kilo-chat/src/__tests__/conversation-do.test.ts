@@ -140,7 +140,7 @@ describe('ConversationDO', () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.conflict).toBeUndefined();
+    expect(result.conflict).toBe(false);
     expect(result.version).toBe(2);
 
     const { messages } = await stub.listMessages({ limit: 10 });

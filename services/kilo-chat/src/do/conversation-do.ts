@@ -67,7 +67,8 @@ export type EditMessageParams = {
 };
 
 export type EditMessageResult =
-  | { ok: true; messageId: string; version: number; conflict?: boolean }
+  | { ok: true; conflict: false; messageId: string; version: number }
+  | { ok: true; conflict: true; messageId: string; version: number }
   | { ok: false; error: string };
 
 export type DeleteMessageParams = {
@@ -300,7 +301,7 @@ export class ConversationDO extends DurableObject<Env> {
       params.messageId
     );
 
-    return { ok: true, messageId: params.messageId, version: newVersion };
+    return { ok: true, conflict: false, messageId: params.messageId, version: newVersion };
   }
 
   setTyping(memberId: string): { ok: true } | { ok: false; error: string } {

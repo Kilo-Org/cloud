@@ -5,7 +5,7 @@
   "description": "Kilo Chat channel plugin",
   "channels": ["kilo-chat"],
   "channelEnvVars": {
-    "kilo-chat": ["KILOCHAT_API_TOKEN", "KILOCHAT_BASE_URL"]
+    "kilo-chat": []
   },
   "configSchema": {
     "type": "object",
@@ -16,7 +16,7 @@
         "additionalProperties": false,
         "properties": {
           "enabled": { "type": "boolean" },
-          "baseUrl": { "type": "string" }
+          "reactionLevel": { "type": "string" }
         }
       }
     }

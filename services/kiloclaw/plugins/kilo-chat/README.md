@@ -1,6 +1,6 @@
 # Kilo Chat
 
-OpenClaw channel plugin for Kilo's hosted chat service.
+OpenClaw channel plugin for Kilo's hosted chat service (kilo-chat worker).
 
 ## Build
 
@@ -11,25 +11,43 @@ pnpm build
 
 Build output is written to `dist/` during `pnpm build` and `npm pack` (`prepack`).
 
-## Env vars
+## Runtime requirements
 
-- `KILOCHAT_API_TOKEN` (required, encrypted) — auth token for the external service.
-- `KILOCHAT_WEBHOOK_SECRET` (required, encrypted) — HMAC secret for inbound webhooks.
-- `KILOCHAT_BASE_URL` (optional, plaintext) — overrides default endpoint.
+No per-sandbox secrets. The plugin reuses credentials already provisioned
+on the Fly machine:
+
+- `OPENCLAW_GATEWAY_TOKEN` (required) — per-sandbox HMAC token used to
+  authenticate the plugin → controller → kiloclaw-worker chain.
+- `KILOCLAW_CONTROLLER_URL` (optional) — controller localhost URL;
+  defaults to `http://127.0.0.1:18789`.
+
+Operator-facing channel toggles (set on the kiloclaw worker, not the
+sandbox) are `KILOCHAT_ENABLED` (gates the channel) and
+`KILOCHAT_REACTION_LEVEL` (`off` | `ack` | `minimal` | `extensive`,
+default `minimal`).
 
 ## Streaming
 
-Agent replies stream to the external service Telegram-style: a single message is
-created on the first token and edited in place as more tokens arrive. Subsequent
-reply blocks become separate messages.
+Agent replies stream to kilo-chat Telegram-style: a single message is
+created on the first token and edited in place as more tokens arrive.
+Subsequent reply blocks become separate messages.
 
 Outbound calls (all proxied through the controller):
 
-- `POST   /v1/messages` — create the initial preview (`version: 1`).
-- `PATCH  /v1/messages/:id` with `{conversationId, text, version}` — each edit;
-  the server MAY reject with `409` on a stale version, which is treated as a
-  benign drop.
-- `DELETE /v1/messages/:id` — preview cleanup on dispatch failure.
-- `POST   /v1/conversations/:conversationId/typing` — typing indicator. Server
-  holds the indicator for ~5s then auto-clears. The plugin re-pings every 3s
-  while the agent reply turn is in progress (openclaw SDK keepalive default).
+- `POST   /_kilo/kilo-chat/send` — create the initial preview (`version: 1`).
+- `PATCH  /_kilo/kilo-chat/messages/:id` with `{conversationId, content, version}` —
+  each edit; the server MAY reject with `409` on a stale version, which is
+  treated as a benign drop (the plugin re-sends on finalize).
+- `DELETE /_kilo/kilo-chat/messages/:id` — preview cleanup on dispatch failure.
+- `POST   /_kilo/kilo-chat/typing` with `{conversationId}` — typing indicator.
+  Server holds the indicator for ~5s then auto-clears. The plugin re-pings
+  every 3s while the agent reply turn is in progress (openclaw SDK default).
+- `POST` / `DELETE /_kilo/kilo-chat/messages/:id/reactions` — emoji reactions
+  driven through the OpenClaw `react` message-tool action.
+
+## Inbound webhook
+
+kilo-chat delivers inbound messages to the plugin at
+`/plugins/kilo-chat/webhook` on the OpenClaw gateway. Auth is the
+per-sandbox gateway token forwarded by the kiloclaw worker; there is no
+separate HMAC envelope.

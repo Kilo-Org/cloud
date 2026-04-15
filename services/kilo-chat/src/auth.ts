@@ -7,14 +7,12 @@ export type AuthContext = {
 };
 
 /**
- * Public HTTP auth for kilo-chat. Only humans authenticate over HTTP; their
- * bearer is a Kilo JWT verified with NEXTAUTH_SECRET.
+ * Public HTTP auth for kilo-chat — humans only. The bearer is a Kilo JWT
+ * verified with NEXTAUTH_SECRET.
  *
- * Bots (kiloclaw sandboxes) do NOT come in here. They reach the bot surface
- * exclusively via the kilo-chat WorkerEntrypoint's RPC methods, invoked from
- * the kiloclaw CF Worker over a trusted service binding after kiloclaw has
- * verified the caller's per-sandbox gateway token. There is no shared API
- * token to leak and no `x-kilo-sandbox-id` header to spoof.
+ * Bots (kiloclaw sandboxes) reach the bot surface via this Worker's RPC
+ * methods (service binding from the kiloclaw worker). They never hit HTTP,
+ * so this middleware is JWT-only and has no bot-identity path.
  */
 export const authMiddleware = createMiddleware<{
   Bindings: Env;

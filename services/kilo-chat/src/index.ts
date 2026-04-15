@@ -71,8 +71,7 @@ app.use(
       return allowed.includes(origin) ? origin : '';
     },
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    // Bots use RPC (service binding), not HTTP. Humans use a JWT bearer.
-    // x-kilo-sandbox-id is not needed on any public HTTP surface.
+    // Bots reach the Worker via RPC; HTTP is humans-only with a JWT bearer.
     allowHeaders: ['Content-Type', 'Authorization', 'Last-Event-ID'],
     exposeHeaders: ['Content-Type'],
     maxAge: 86400,

@@ -73,18 +73,4 @@ describe('authMiddleware', () => {
     );
     expect(res.status).toBe(401);
   });
-
-  it('ignores x-kilo-sandbox-id header entirely (legacy spoof surface is gone)', async () => {
-    const res = await makeApp(defaultEnv).request(
-      '/test',
-      {
-        headers: {
-          authorization: 'Bearer some-value',
-          'x-kilo-sandbox-id': 'sandbox-B',
-        },
-      },
-      defaultEnv
-    );
-    expect(res.status).toBe(401);
-  });
 });

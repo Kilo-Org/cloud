@@ -33,6 +33,8 @@ After making changes, verify your work. At minimum run typecheck; run the full s
 
 Target a specific test file: `pnpm test -- <path>`. Run tests for a specific service: `pnpm --filter <package> test`.
 
+**Before running tests**, ensure the test database is running. If there is no active Postgres instance, run `pnpm test:db` first — this starts the Postgres container and applies migrations. You can check whether Postgres is already running with `docker compose -f dev/docker-compose.yml ps postgres`.
+
 ## Coding Standards
 
 - Prefer `type` over `interface`.

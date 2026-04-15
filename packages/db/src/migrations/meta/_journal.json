@@ -624,6 +624,13 @@
       "when": 1776267352667,
       "tag": "0088_melted_sentinels",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1776284246585,
+      "tag": "0089_secret_molten_man",
+      "breakpoints": true
     }
   ]
 }

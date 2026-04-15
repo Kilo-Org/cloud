@@ -33,6 +33,7 @@ const DESTRUCTION_WARNING_DAYS = 2;
 const KILOCLAW_EARLYBIRD_EXPIRY_DATE = '2026-09-26';
 const AUTO_RESUME_INITIAL_BACKOFF_MS = 2 * 60 * 60 * 1000;
 const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
+const SOFT_DELETED_EMAIL_SUFFIX = '@deleted.invalid';
 
 const KILOCLAW_PLAN_COST_MICRODOLLARS = {
   standard: 9_000_000,
@@ -257,6 +258,14 @@ function getKiloClawAffiliateItemSku(env: BillingWorkerEnv, plan: 'commit' | 'st
 
 function formatDateForEmail(date: Date): string {
   return format(date, 'MMMM d, yyyy');
+}
+
+function isSoftDeletedUserEmail(email: string): boolean {
+  return email.endsWith(SOFT_DELETED_EMAIL_SUFFIX);
+}
+
+function notSoftDeletedUserFilter() {
+  return sql`${kilocode_users.google_user_email} NOT LIKE ${`%${SOFT_DELETED_EMAIL_SUFFIX}`}`;
 }
 
 function shortInstanceId(instanceId: string): string {
@@ -599,6 +608,11 @@ async function trySendEmail(
   subjectOverride?: string,
   entityFields: BillingEntityFields = {}
 ): Promise<boolean> {
+  if (isSoftDeletedUserEmail(userEmail)) {
+    summary.emails_skipped++;
+    return false;
+  }
+
   const result = await database
     .insert(kiloclaw_email_log)
     .values({ user_id: userId, email_type: emailType })
@@ -1142,12 +1156,14 @@ async function runCreditRenewalSweep(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         isNull(kiloclaw_subscriptions.stripe_subscription_id),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due']),
-        lte(kiloclaw_subscriptions.credit_renewal_at, now)
+        lte(kiloclaw_subscriptions.credit_renewal_at, now),
+        notSoftDeletedUserFilter()
       )
     );
 
   for (const row of creditRenewalRows) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) continue;
       await processCreditRenewalRow(database, env, context, row, clawUrl, summary);
     } catch (error) {
       summary.errors++;
@@ -1282,12 +1298,14 @@ async function runTrialExpirySweep(
       and(
         eq(kiloclaw_subscriptions.status, 'trialing'),
         lt(kiloclaw_subscriptions.trial_ends_at, now),
-        isNull(kiloclaw_subscriptions.suspended_at)
+        isNull(kiloclaw_subscriptions.suspended_at),
+        notSoftDeletedUserFilter()
       )
     );
 
   for (const row of expiredTrials) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) continue;
       await stopInstanceForEnforcement(env, context, row);
 
       const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
@@ -1364,12 +1382,14 @@ async function runSubscriptionExpirySweep(
       and(
         eq(kiloclaw_subscriptions.status, 'canceled'),
         lt(kiloclaw_subscriptions.current_period_end, now),
-        isNull(kiloclaw_subscriptions.suspended_at)
+        isNull(kiloclaw_subscriptions.suspended_at),
+        notSoftDeletedUserFilter()
       )
     );
 
   for (const row of expiredSubscriptions) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) continue;
       const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
 
       await stopInstanceForEnforcement(env, context, row);
@@ -1430,12 +1450,14 @@ async function runInstanceDestructionSweep(
     .where(
       and(
         lt(kiloclaw_subscriptions.destruction_deadline, now),
-        isNotNull(kiloclaw_subscriptions.suspended_at)
+        isNotNull(kiloclaw_subscriptions.suspended_at),
+        notSoftDeletedUserFilter()
       )
     );
 
   for (const row of destructionCandidates) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) continue;
       await destroyInstanceForEnforcement(env, context, row);
 
       if (row.instance_id) {
@@ -1509,12 +1531,14 @@ async function runPastDueCleanupSweep(
       and(
         eq(kiloclaw_subscriptions.status, 'past_due'),
         lt(kiloclaw_subscriptions.past_due_since, fourteenDaysAgo),
-        isNull(kiloclaw_subscriptions.suspended_at)
+        isNull(kiloclaw_subscriptions.suspended_at),
+        notSoftDeletedUserFilter()
       )
     );
 
   for (const row of pastDueRows) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) continue;
       const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
 
       await stopInstanceForEnforcement(env, context, row);
@@ -1620,12 +1644,14 @@ async function runDestructionWarningSweep(
         gte(kiloclaw_subscriptions.destruction_deadline, advisoryNow),
         lte(kiloclaw_subscriptions.destruction_deadline, twoDaysFromNow),
         isNotNull(kiloclaw_subscriptions.suspended_at),
-        isNull(kiloclaw_instances.destroyed_at)
+        isNull(kiloclaw_instances.destroyed_at),
+        notSoftDeletedUserFilter()
       )
     );
 
   for (const row of destructionWarningRows) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) continue;
       if (!row.destruction_deadline || row.instance_destroyed_at) continue;
       const instanceIdShort = shortInstanceId(row.instance_id);
       const sent = await trySendEmail(
@@ -1684,12 +1710,14 @@ async function runTrialWarningSweep(
         eq(kiloclaw_subscriptions.status, 'trialing'),
         gte(kiloclaw_subscriptions.trial_ends_at, advisoryNow),
         lte(kiloclaw_subscriptions.trial_ends_at, trialWarningCutoff),
-        isNull(kiloclaw_subscriptions.suspended_at)
+        isNull(kiloclaw_subscriptions.suspended_at),
+        notSoftDeletedUserFilter()
       )
     );
 
   for (const row of trialWarningRows) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) continue;
       if (!row.trial_ends_at) continue;
 
       const daysRemaining = Math.ceil(
@@ -1764,12 +1792,14 @@ async function runEarlybirdWarningSweep(
     .where(
       and(
         sql`(${kiloclaw_subscriptions.status} IS NULL OR ${kiloclaw_subscriptions.status} NOT IN ('active', 'trialing'))`,
-        isNull(kiloclaw_subscriptions.suspended_at)
+        isNull(kiloclaw_subscriptions.suspended_at),
+        notSoftDeletedUserFilter()
       )
     );
 
   for (const row of earlybirdRows) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) continue;
       const expiryDate = formatDateForEmail(earlybirdExpiry);
       const sent =
         daysUntilEarlybird <= 1
@@ -1853,6 +1883,7 @@ async function runComplementaryInferenceEndedSweep(
         gt(kiloclaw_email_log.sent_at, COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO),
         lte(kiloclaw_email_log.sent_at, windowCutoff),
         isNull(kiloclaw_instances.destroyed_at),
+        notSoftDeletedUserFilter(),
         // Not already sent the complementary inference ended email for this instance
         sql`NOT EXISTS (
           SELECT 1 FROM ${kiloclaw_email_log} AS sent_check
@@ -1871,6 +1902,7 @@ async function runComplementaryInferenceEndedSweep(
 
   for (const row of rows) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) continue;
       const sent = await trySendEmail(
         database,
         env,

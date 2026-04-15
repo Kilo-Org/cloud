@@ -46,7 +46,6 @@ import {
   kiloclaw_instances,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
-  kiloclaw_earlybird_purchases,
   user_period_cache,
   user_feedback,
   app_builder_feedback,
@@ -56,7 +55,6 @@ import {
   kilo_pass_scheduled_changes,
   security_analysis_owner_state,
   kiloclaw_subscriptions,
-  kiloclaw_email_log,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
   user_push_tokens,
@@ -64,7 +62,7 @@ import {
   contributor_champion_memberships,
   contributor_champion_contributors,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, isNotNull, sql, or } from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, isNull, sql, or } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
@@ -549,6 +547,18 @@ export async function softDeleteUser(userId: string) {
       );
     }
 
+    const activeClawInstances = await tx
+      .select({ id: kiloclaw_instances.id })
+      .from(kiloclaw_instances)
+      .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
+      .limit(1);
+
+    if (activeClawInstances.length > 0) {
+      throw new SoftDeletePreconditionError(
+        `User ${userId} still has an active KiloClaw instance. Destroy the instance before deleting the account.`
+      );
+    }
+
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx
       .update(kilocode_users)
@@ -641,13 +651,6 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
-    // kiloclaw_subscriptions and kiloclaw_cli_runs both have FK references to
-    // kiloclaw_instances, so they must be deleted before instances.
-    await tx.delete(kiloclaw_subscriptions).where(eq(kiloclaw_subscriptions.user_id, userId));
-    await tx
-      .delete(kiloclaw_earlybird_purchases)
-      .where(eq(kiloclaw_earlybird_purchases.user_id, userId));
-    await tx.delete(kiloclaw_email_log).where(eq(kiloclaw_email_log.user_id, userId));
     await tx
       .update(kiloclaw_cli_runs)
       .set({ initiated_by_admin_id: null })
@@ -664,7 +667,6 @@ export async function softDeleteUser(userId: string) {
             .where(eq(kiloclaw_instances.user_id, userId))
         )
       );
-    await tx.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, userId));
     await tx.delete(user_push_tokens).where(eq(user_push_tokens.user_id, userId));
     await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
     await tx

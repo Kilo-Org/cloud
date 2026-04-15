@@ -36,6 +36,7 @@ import {
   security_analysis_owner_state,
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
+  kiloclaw_email_log,
   kiloclaw_cli_runs,
   bot_requests,
   kiloclaw_admin_audit_logs,
@@ -88,6 +89,13 @@ describe('User', () => {
     await db.delete(magic_link_tokens);
     await db.delete(bot_requests);
     await db.delete(stytch_fingerprints);
+    await db.delete(kiloclaw_cli_runs);
+    await db.delete(kiloclaw_email_log);
+    await db.delete(kiloclaw_version_pins);
+    await db.delete(kiloclaw_image_catalog);
+    await db.delete(kiloclaw_subscriptions);
+    await db.delete(kiloclaw_earlybird_purchases);
+    await db.delete(kiloclaw_instances);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -988,7 +996,7 @@ describe('User', () => {
       expect((await db.select({ count: count() }).from(magic_link_tokens))[0].count).toBe(0);
     });
 
-    it('should delete kiloclaw_version_pins for the user', async () => {
+    it('should retain kiloclaw_version_pins for the user', async () => {
       const user = await insertTestUser();
       const adminUser = await insertTestUser({ is_admin: true });
 
@@ -1017,6 +1025,11 @@ describe('User', () => {
         reason: 'test pin',
       });
 
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, instance.id));
+
       await softDeleteUser(user.id);
 
       expect(
@@ -1025,13 +1038,10 @@ describe('User', () => {
           .from(kiloclaw_version_pins)
           .where(eq(kiloclaw_version_pins.instance_id, instance.id))
           .then(r => r[0].count)
-      ).toBe(0);
-
-      // Cleanup catalog entry
-      await db.delete(kiloclaw_image_catalog).where(eq(kiloclaw_image_catalog.image_tag, testTag));
+      ).toBe(1);
     });
 
-    it('should delete kiloclaw_earlybird_purchases for the user', async () => {
+    it('should retain kiloclaw_earlybird_purchases for the user', async () => {
       const user = await insertTestUser();
 
       await db.insert(kiloclaw_earlybird_purchases).values({
@@ -1048,7 +1058,7 @@ describe('User', () => {
           .from(kiloclaw_earlybird_purchases)
           .where(eq(kiloclaw_earlybird_purchases.user_id, user.id))
           .then(r => r[0].count)
-      ).toBe(0);
+      ).toBe(1);
     });
 
     it('should delete kiloclaw_cli_runs for the user', async () => {
@@ -1096,7 +1106,7 @@ describe('User', () => {
       ).toBeNull();
     });
 
-    it('should delete kiloclaw_subscriptions for the user', async () => {
+    it('should retain kiloclaw_subscriptions for the user', async () => {
       const user = await insertTestUser();
 
       await db.insert(kiloclaw_subscriptions).values({
@@ -1113,10 +1123,10 @@ describe('User', () => {
           .from(kiloclaw_subscriptions)
           .where(eq(kiloclaw_subscriptions.user_id, user.id))
           .then(r => r[0].count)
-      ).toBe(0);
+      ).toBe(1);
     });
 
-    it('should delete kiloclaw_subscriptions and kiloclaw_cli_runs linked to a kiloclaw_instance for the user', async () => {
+    it('should retain instance-linked subscriptions and delete kiloclaw_cli_runs for the user', async () => {
       const user = await insertTestUser();
 
       const [instance] = await db
@@ -1141,6 +1151,11 @@ describe('User', () => {
         instance_id: instance.id,
       });
 
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, instance.id));
+
       await softDeleteUser(user.id);
 
       expect(
@@ -1149,14 +1164,14 @@ describe('User', () => {
           .from(kiloclaw_instances)
           .where(eq(kiloclaw_instances.user_id, user.id))
           .then(r => r[0].count)
-      ).toBe(0);
+      ).toBe(1);
       expect(
         await db
           .select({ count: count() })
           .from(kiloclaw_subscriptions)
           .where(eq(kiloclaw_subscriptions.user_id, user.id))
           .then(r => r[0].count)
-      ).toBe(0);
+      ).toBe(1);
       expect(
         await db
           .select({ count: count() })
@@ -1195,6 +1210,11 @@ describe('User', () => {
         { alias: otherAlias, instance_id: otherInstance.id },
       ]);
 
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, instance.id));
+
       await softDeleteUser(user.id);
 
       expect(
@@ -1216,6 +1236,25 @@ describe('User', () => {
           .select({ count: count() })
           .from(kiloclaw_inbound_email_reserved_aliases)
           .where(eq(kiloclaw_inbound_email_reserved_aliases.alias, alias))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should retain kiloclaw_email_log rows for the user', async () => {
+      const user = await insertTestUser();
+
+      await db.insert(kiloclaw_email_log).values({
+        user_id: user.id,
+        email_type: 'claw_trial_1d',
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_email_log)
+          .where(eq(kiloclaw_email_log.user_id, user.id))
           .then(r => r[0].count)
       ).toBe(1);
     });
@@ -1258,6 +1297,19 @@ describe('User', () => {
         plan: 'trial',
         status: 'trialing',
         trial_ends_at: new Date(Date.now() + 86_400_000).toISOString(),
+      });
+
+      await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
+      const userAfter = await findUserById(user.id);
+      expect(userAfter!.google_user_email).toBe(user.google_user_email);
+    });
+
+    it('should throw SoftDeletePreconditionError for active KiloClaw instance even without live subscription', async () => {
+      const user = await insertTestUser();
+
+      await db.insert(kiloclaw_instances).values({
+        user_id: user.id,
+        sandbox_id: `test-active-instance-${Date.now()}`,
       });
 
       await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);

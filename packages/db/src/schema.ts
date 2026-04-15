@@ -42,6 +42,9 @@ import {
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
   KiloClawPaymentSource,
+  KiloClawSubscriptionAccessOrigin,
+  KiloClawSubscriptionChangeActorType,
+  KiloClawSubscriptionChangeAction,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -112,6 +115,9 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
+  KiloClawSubscriptionAccessOrigin,
+  KiloClawSubscriptionChangeActorType,
+  KiloClawSubscriptionChangeAction,
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
@@ -3667,7 +3673,7 @@ export const kiloclaw_instances = pgTable(
       .notNull(),
     user_id: text()
       .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+      .references(() => kilocode_users.id),
     sandbox_id: text().notNull(),
     // Null = personal instance. Non-null = org-owned instance.
     organization_id: uuid().references(() => organizations.id),
@@ -3681,6 +3687,12 @@ export const kiloclaw_instances = pgTable(
     uniqueIndex('UQ_kiloclaw_instances_active')
       .on(table.user_id, table.sandbox_id)
       .where(isNull(table.destroyed_at)),
+    index('IDX_kiloclaw_instances_active_personal_by_user')
+      .on(table.user_id)
+      .where(sql`${table.organization_id} IS NULL AND ${table.destroyed_at} IS NULL`),
+    index('IDX_kiloclaw_instances_active_org_by_user_org')
+      .on(table.user_id, table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
   ]
 );
 
@@ -3830,7 +3842,7 @@ export const kiloclaw_version_pins = pgTable('kiloclaw_version_pins', {
     .notNull(),
   instance_id: uuid()
     .notNull()
-    .references(() => kiloclaw_instances.id, { onDelete: 'cascade' })
+    .references(() => kiloclaw_instances.id)
     .unique(),
   image_tag: text()
     .notNull()
@@ -3855,7 +3867,7 @@ export const kiloclaw_earlybird_purchases = pgTable('kiloclaw_earlybird_purchase
     .notNull(),
   user_id: text()
     .notNull()
-    .references(() => kilocode_users.id, { onDelete: 'cascade' })
+    .references(() => kilocode_users.id)
     .unique(),
   stripe_charge_id: text().unique(),
   manual_payment_id: text().unique(),
@@ -3874,10 +3886,11 @@ export const kiloclaw_subscriptions = pgTable(
       .notNull(),
     user_id: text()
       .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+      .references(() => kilocode_users.id),
     stripe_subscription_id: text().unique(),
     stripe_schedule_id: text(),
     instance_id: uuid().references(() => kiloclaw_instances.id),
+    access_origin: text().$type<KiloClawSubscriptionAccessOrigin>(),
     payment_source: text().$type<KiloClawPaymentSource>(),
     plan: text().notNull().$type<KiloClawPlan>(),
     scheduled_plan: text().$type<KiloClawScheduledPlan>(),
@@ -3906,6 +3919,8 @@ export const kiloclaw_subscriptions = pgTable(
   },
   table => [
     index('IDX_kiloclaw_subscriptions_status').on(table.status),
+    index('IDX_kiloclaw_subscriptions_user_id').on(table.user_id),
+    index('IDX_kiloclaw_subscriptions_user_status').on(table.user_id, table.status),
     index('IDX_kiloclaw_subscriptions_stripe_schedule_id').on(table.stripe_schedule_id),
     index('IDX_kiloclaw_subscriptions_auto_resume_retry_after').on(table.auto_resume_retry_after),
     enumCheck('kiloclaw_subscriptions_plan_check', table.plan, KiloClawPlan),
@@ -3916,9 +3931,17 @@ export const kiloclaw_subscriptions = pgTable(
     ),
     enumCheck('kiloclaw_subscriptions_scheduled_by_check', table.scheduled_by, KiloClawScheduledBy),
     enumCheck('kiloclaw_subscriptions_status_check', table.status, KiloClawSubscriptionStatus),
+    enumCheck(
+      'kiloclaw_subscriptions_access_origin_check',
+      table.access_origin,
+      KiloClawSubscriptionAccessOrigin
+    ),
     uniqueIndex('UQ_kiloclaw_subscriptions_instance')
       .on(table.instance_id)
       .where(isNotNull(table.instance_id)),
+    index('IDX_kiloclaw_subscriptions_earlybird_origin')
+      .on(table.user_id, table.access_origin)
+      .where(sql`${table.access_origin} = 'earlybird'`),
     enumCheck(
       'kiloclaw_subscriptions_payment_source_check',
       table.payment_source,
@@ -3930,6 +3953,46 @@ export const kiloclaw_subscriptions = pgTable(
 export type KiloClawSubscription = typeof kiloclaw_subscriptions.$inferSelect;
 export type NewKiloClawSubscription = typeof kiloclaw_subscriptions.$inferInsert;
 
+export const kiloclaw_subscription_change_log = pgTable(
+  'kiloclaw_subscription_change_log',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    subscription_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_subscriptions.id),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    actor_type: text().notNull().$type<KiloClawSubscriptionChangeActorType>(),
+    actor_id: text().notNull(),
+    action: text().notNull().$type<KiloClawSubscriptionChangeAction>(),
+    reason: text(),
+    before_state: jsonb().$type<Record<string, unknown> | null>(),
+    after_state: jsonb().$type<Record<string, unknown> | null>(),
+  },
+  table => [
+    index('IDX_kiloclaw_subscription_change_log_subscription_created_at').on(
+      table.subscription_id,
+      table.created_at
+    ),
+    index('IDX_kiloclaw_subscription_change_log_created_at').on(table.created_at),
+    enumCheck(
+      'kiloclaw_subscription_change_log_actor_type_check',
+      table.actor_type,
+      KiloClawSubscriptionChangeActorType
+    ),
+    enumCheck(
+      'kiloclaw_subscription_change_log_action_check',
+      table.action,
+      KiloClawSubscriptionChangeAction
+    ),
+  ]
+);
+
+export type KiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferSelect;
+export type NewKiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferInsert;
+
 export const kiloclaw_email_log = pgTable(
   'kiloclaw_email_log',
   {
@@ -3939,11 +4002,19 @@ export const kiloclaw_email_log = pgTable(
       .notNull(),
     user_id: text()
       .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+      .references(() => kilocode_users.id),
+    instance_id: uuid().references(() => kiloclaw_instances.id),
     email_type: text().notNull(),
     sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
-  table => [uniqueIndex('UQ_kiloclaw_email_log_user_type').on(table.user_id, table.email_type)]
+  table => [
+    uniqueIndex('UQ_kiloclaw_email_log_user_type_global')
+      .on(table.user_id, table.email_type)
+      .where(isNull(table.instance_id)),
+    uniqueIndex('UQ_kiloclaw_email_log_user_instance_type')
+      .on(table.user_id, table.instance_id, table.email_type)
+      .where(isNotNull(table.instance_id)),
+  ]
 );
 
 export type KiloClawEmailLog = typeof kiloclaw_email_log.$inferSelect;

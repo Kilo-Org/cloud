@@ -156,6 +156,40 @@ export const KiloClawPaymentSource = {
 export type KiloClawPaymentSource =
   (typeof KiloClawPaymentSource)[keyof typeof KiloClawPaymentSource];
 
+export const KiloClawSubscriptionAccessOrigin = {
+  Earlybird: 'earlybird',
+} as const;
+
+export type KiloClawSubscriptionAccessOrigin =
+  (typeof KiloClawSubscriptionAccessOrigin)[keyof typeof KiloClawSubscriptionAccessOrigin];
+
+export const KiloClawSubscriptionChangeActorType = {
+  User: 'user',
+  System: 'system',
+} as const;
+
+export type KiloClawSubscriptionChangeActorType =
+  (typeof KiloClawSubscriptionChangeActorType)[keyof typeof KiloClawSubscriptionChangeActorType];
+
+export const KiloClawSubscriptionChangeAction = {
+  Created: 'created',
+  StatusChanged: 'status_changed',
+  PlanSwitched: 'plan_switched',
+  PeriodAdvanced: 'period_advanced',
+  Canceled: 'canceled',
+  Reactivated: 'reactivated',
+  Suspended: 'suspended',
+  DestructionScheduled: 'destruction_scheduled',
+  Reassigned: 'reassigned',
+  Backfilled: 'backfilled',
+  PaymentSourceChanged: 'payment_source_changed',
+  ScheduleChanged: 'schedule_changed',
+  AdminOverride: 'admin_override',
+} as const;
+
+export type KiloClawSubscriptionChangeAction =
+  (typeof KiloClawSubscriptionChangeAction)[keyof typeof KiloClawSubscriptionChangeAction];
+
 export const AffiliateProvider = {
   Impact: 'impact',
 } as const;

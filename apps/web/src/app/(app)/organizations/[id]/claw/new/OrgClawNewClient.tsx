@@ -6,11 +6,32 @@ import {
   ClawOnboardingFlow,
   type ClawOnboardingMode,
 } from '@/app/(app)/claw/components/ClawOnboardingFlow';
+import type { ClawOnboardingRenderStep } from '@/app/(app)/claw/components/ClawOnboardingFlow.state';
+import { ClawOnboardingFakeWalkthrough } from '@/app/(app)/claw/components/ClawOnboardingFakeWalkthrough';
 import { withStatusQueryBoundary } from '@/app/(app)/claw/components/withStatusQueryBoundary';
 
 const ClawOnboardingWithBoundary = withStatusQueryBoundary(ClawOnboardingFlow);
 
-export function OrgClawNewClient({ organizationId }: { organizationId: string }) {
+export function OrgClawNewClient({
+  organizationId,
+  fakeOnboardingStep,
+}: {
+  organizationId: string;
+  fakeOnboardingStep: ClawOnboardingRenderStep | null;
+}) {
+  if (fakeOnboardingStep) {
+    return (
+      <ClawOnboardingFakeWalkthrough
+        initialStep={fakeOnboardingStep}
+        basePath={`/organizations/${organizationId}/claw`}
+      />
+    );
+  }
+
+  return <OrgClawNewLiveClient organizationId={organizationId} />;
+}
+
+function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
   const statusQuery = useOrgKiloClawStatus(organizationId);
   const [createFlowStartedAt, setCreateFlowStartedAt] = useState<number | null>(null);
   const [hasSettledStatus, setHasSettledStatus] = useState(false);

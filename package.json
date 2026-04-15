@@ -20,7 +20,7 @@
     "test:e2e": "pnpm --filter web run test:e2e",
     "dependency-cycle-check": "pnpm --filter web run dependency-cycle-check",
     "worktree:prepare": "bash scripts/worktree-prepare.sh",
-    "test:db": "docker compose -f dev/docker-compose.yml up -d postgres && pnpm drizzle migrate",
+    "test:db": "docker compose -f dev/docker-compose.yml up -d --wait postgres && pnpm drizzle migrate",
     "dev:start": "tsx dev/local/cli.ts up",
     "dev:stop": "tsx dev/local/cli.ts stop",
     "dev:status": "tsx dev/local/cli.ts status",

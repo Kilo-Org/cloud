@@ -72,7 +72,7 @@ RUN git lfs install --system
 # Install both glibc and musl variants — the CLI's binary resolver may
 # pick either depending on the detected libc.
 # Also install pnpm — many projects use it as their package manager.
-RUN npm install -g @kilocode/cli @kilocode/cli-linux-x64 @kilocode/cli-linux-x64-musl @kilocode/plugin pnpm && \
+RUN npm install -g @kilocode/cli@7.2.7 @kilocode/cli-linux-x64@7.2.7 @kilocode/cli-linux-x64-musl@7.2.7 @kilocode/plugin@7.2.7 pnpm && \
     ln -s "$(which kilo)" /usr/local/bin/opencode
 
 # Create non-root user for defense-in-depth

@@ -3,7 +3,7 @@ FROM docker.io/cloudflare/sandbox:0.8.9
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
 ARG VCS_REF=""
-ARG KILOCODE_CLI_VERSION="latest"
+ARG KILOCODE_CLI_VERSION="7.1.23"
 
 RUN mkdir -p -m 755 /etc/apt/keyrings \
 	&& out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \

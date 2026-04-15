@@ -1187,6 +1187,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
             throw new TRPCError({
               code: 'CONFLICT',
               message: message ?? 'Instance is busy',
+              cause: code ? new UpstreamApiError(code) : undefined,
             });
           }
         }

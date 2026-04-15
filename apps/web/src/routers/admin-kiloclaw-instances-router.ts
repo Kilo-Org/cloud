@@ -155,21 +155,21 @@ function throwKiloclawAdminError(
 ): never {
   if (err instanceof KiloClawApiError) {
     const payload = getKiloclawApiErrorPayload(err, fallbackMessage);
+    if (payload.code === 'controller_route_unavailable') {
+      throw new TRPCError({
+        code: options?.statusCodeOverrides?.[err.statusCode] ?? 'PRECONDITION_FAILED',
+        message:
+          options?.messageOverrides?.[err.statusCode] ??
+          'Instance needs redeploy to support recovery',
+        cause: new UpstreamApiError('controller_route_unavailable'),
+      });
+    }
+
     throw new TRPCError({
       code:
-        options?.statusCodeOverrides?.[err.statusCode] ??
-        (payload.code === 'controller_route_unavailable'
-          ? 'PRECONDITION_FAILED'
-          : kiloclawStatusToTrpcCode(err.statusCode)),
-      message:
-        options?.messageOverrides?.[err.statusCode] ??
-        (payload.code === 'controller_route_unavailable'
-          ? 'Instance needs redeploy to support recovery'
-          : payload.message),
-      cause:
-        payload.code === 'controller_route_unavailable'
-          ? new UpstreamApiError('controller_route_unavailable')
-          : err,
+        options?.statusCodeOverrides?.[err.statusCode] ?? kiloclawStatusToTrpcCode(err.statusCode),
+      message: options?.messageOverrides?.[err.statusCode] ?? payload.message,
+      cause: err,
     });
   }
 

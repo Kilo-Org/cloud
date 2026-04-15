@@ -87,9 +87,19 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
       }
     );
     if (response.status === 409) {
-      // Stale version — benign drop. Cancel the body so undici releases the socket.
-      void response.body?.cancel();
-      return { messageId: params.messageId, version: params.version, dropped: true };
+      // Stale version — benign drop. Read the server's authoritative current
+      // version from the 409 body so the caller can re-base subsequent edits
+      // on the real server state instead of echoing the stale client version.
+      let serverVersion = params.version;
+      try {
+        const body = (await response.json()) as { version?: unknown };
+        if (typeof body.version === 'number' && Number.isFinite(body.version) && body.version > 0) {
+          serverVersion = body.version;
+        }
+      } catch {
+        // Body missing or not JSON — fall back to the client-sent version.
+      }
+      return { messageId: params.messageId, version: serverVersion, dropped: true };
     }
     if (!response.ok) {
       throw new Error(

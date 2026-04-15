@@ -144,7 +144,29 @@ describe('editMessage', () => {
     expect(result).toEqual({ messageId: 'm1', version: 3 });
   });
 
-  it('returns a dropped-edit sentinel on 409 without throwing', async () => {
+  it('returns dropped-edit sentinel on 409 with server authoritative version from body', async () => {
+    // Server has advanced to version 7 while client tried to edit at version 1.
+    // The 409 body carries the current server version so the client can rebase.
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({ error: 'Conflict', messageId: 'm1', version: 7 }), {
+        status: 409,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl,
+    });
+    const result = await client.editMessage({
+      conversationId: 'c1',
+      messageId: 'm1',
+      content: [{ type: 'text', text: 'x' }],
+      version: 1,
+    });
+    expect(result).toEqual({ messageId: 'm1', version: 7, dropped: true });
+  });
+
+  it('falls back to the client-sent version on 409 when body has no version', async () => {
     const fetchImpl = (async () =>
       new Response(JSON.stringify({ error: 'stale version' }), {
         status: 409,
@@ -161,8 +183,27 @@ describe('editMessage', () => {
       content: [{ type: 'text', text: 'x' }],
       version: 1,
     });
-    // version echoed back equals the requested version; caller treats as drop.
     expect(result).toEqual({ messageId: 'm1', version: 1, dropped: true });
+  });
+
+  it('falls back to the client-sent version on 409 when body is not JSON', async () => {
+    const fetchImpl = (async () =>
+      new Response('not json', {
+        status: 409,
+        headers: { 'content-type': 'text/plain' },
+      })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl,
+    });
+    const result = await client.editMessage({
+      conversationId: 'c1',
+      messageId: 'm1',
+      content: [{ type: 'text', text: 'x' }],
+      version: 4,
+    });
+    expect(result).toEqual({ messageId: 'm1', version: 4, dropped: true });
   });
 
   it('throws on other non-2xx responses', async () => {

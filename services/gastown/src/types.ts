@@ -177,6 +177,14 @@ export type PrimeContext = {
     branch: string | null;
     target_branch: string | null;
   } | null;
+  /** Present when the hooked bead is a PR conflict resolution (gt:pr-conflict label). */
+  pr_conflict_context: {
+    pr_url: string | null;
+    branch: string | null;
+    target_branch: string | null;
+    /** When true, the bead also has pending review feedback to address after resolving conflicts. */
+    has_feedback: boolean;
+  } | null;
 };
 
 // -- Agent done --

@@ -519,6 +519,33 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
     };
   }
 
+  // Build PR conflict context if the hooked bead is a PR conflict resolution request,
+  // or if it is a PR feedback bead that has also accumulated merge conflicts.
+  let pr_conflict_context: PrimeContext['pr_conflict_context'] = null;
+  if (hookedBead?.labels.includes('gt:pr-conflict') && hookedBead.metadata) {
+    const meta = hookedBead.metadata as Record<string, unknown>;
+    pr_conflict_context = {
+      pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
+      branch: typeof meta.branch === 'string' ? meta.branch : null,
+      target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
+      has_feedback: meta.has_feedback === true,
+    };
+  } else if (hookedBead?.labels.includes('gt:pr-feedback') && hookedBead.metadata) {
+    // A feedback bead can also have has_conflicts: true when a conflict was detected
+    // after the feedback bead was already created. Surface the conflict context so the
+    // agent resolves conflicts first, then addresses review feedback.
+    const meta = hookedBead.metadata as Record<string, unknown>;
+    if (meta.has_conflicts === true || meta.has_conflicts === 1) {
+      pr_conflict_context = {
+        pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
+        branch: typeof meta.branch === 'string' ? meta.branch : null,
+        target_branch:
+          typeof meta.conflict_target_branch === 'string' ? meta.conflict_target_branch : null,
+        has_feedback: true,
+      };
+    }
+  }
+
   return {
     agent,
     hooked_bead: hookedBead,
@@ -526,6 +553,7 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
     open_beads: openBeads,
     rework_context,
     pr_fixup_context,
+    pr_conflict_context,
   };
 }
 

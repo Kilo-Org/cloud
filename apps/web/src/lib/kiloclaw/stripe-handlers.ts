@@ -717,6 +717,17 @@ export async function handleKiloClawSubscriptionCreated(params: {
           )[0];
 
     if (
+      existingStripeRow &&
+      existingStripeRow.instance_id === null &&
+      existingRow &&
+      existingRow.id !== existingStripeRow.id
+    ) {
+      await tx
+        .delete(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.id, existingStripeRow.id));
+    }
+
+    if (
       existingRow &&
       existingRow.stripe_subscription_id !== null &&
       existingRow.stripe_subscription_id !== subscription.id &&

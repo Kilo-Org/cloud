@@ -310,6 +310,17 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       }
     }
 
+    if (
+      existingRow &&
+      existingRow.instance_id === null &&
+      targetRow &&
+      targetRow.id !== existingRow.id
+    ) {
+      await tx
+        .delete(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.id, existingRow.id));
+    }
+
     wasSuspended = !!targetRow?.suspended_at;
     resolvedInstanceId = instanceId;
 

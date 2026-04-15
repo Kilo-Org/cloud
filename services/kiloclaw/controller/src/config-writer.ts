@@ -443,16 +443,16 @@ export function generateBaseConfig(
   // kilo-chat via controller proxy → kiloclaw Worker → service binding, so
   // nothing else needs to be provisioned per sandbox.
   //
-  // reactionLevel is set here (and declared in the plugin's configSchema)
-  // even though the channel has no URL-style config: OpenClaw's
-  // isChannelConfigured gate uses hasMeaningfulChannelConfig, which only
-  // returns true when the channel section has a key other than `enabled`.
-  // Without one, the plugin loads in `setup-runtime` mode instead of `full`,
-  // and registerFull (which registers the webhook HTTP route) is never
-  // called.
+  // reactionLevel has a real runtime effect AND doubles as the "meaningful
+  // channel config key" required by OpenClaw's isChannelConfigured gate —
+  // without some key other than `enabled`, hasMeaningfulChannelConfig
+  // returns false and the plugin loads in `setup-runtime` mode instead of
+  // `full`, which skips registerFull and the webhook HTTP route.
   if (env.KILOCHAT_ENABLED === 'true') {
     config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
     config.channels['kilo-chat'].enabled = true;
+    // Load-bearing: also the marker key for isChannelConfigured — do not
+    // remove without replacing with another non-`enabled` config key.
     config.channels['kilo-chat'].reactionLevel = resolveReactionLevel(env.KILOCHAT_REACTION_LEVEL);
 
     config.plugins = config.plugins ?? {};

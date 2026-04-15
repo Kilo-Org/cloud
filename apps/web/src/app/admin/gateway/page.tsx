@@ -7,9 +7,10 @@ import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SyncProvidersContent } from '@/app/admin/sync-providers/SyncProvidersContent';
 import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
+import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
 
-const VALID_TABS: readonly string[] = ['sync-providers', 'custom-llms'];
-type Tab = 'sync-providers' | 'custom-llms';
+const VALID_TABS: readonly string[] = ['sync-providers', 'custom-llms', 'routing'];
+type Tab = 'sync-providers' | 'custom-llms' | 'routing';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -56,12 +57,18 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="custom-llms" className={tabTriggerClass}>
               Custom LLMs
             </TabsTrigger>
+            <TabsTrigger value="routing" className={tabTriggerClass}>
+              Routing
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
             <SyncProvidersContent />
           </TabsContent>
           <TabsContent value="custom-llms" className="mt-4">
             <CustomLlmsContent />
+          </TabsContent>
+          <TabsContent value="routing" className="mt-4">
+            <RoutingContent />
           </TabsContent>
         </Tabs>
       </div>

@@ -6,6 +6,7 @@ import type { AuthContext } from './auth';
 import { registerConversationRoutes } from './routes/conversations';
 import { registerMessageRoutes } from './routes/messages';
 import { registerEventsRoutes } from './routes/events';
+import { registerReactionsRoutes } from './routes/reactions';
 import { registerTypingRoutes } from './routes/typing';
 import { buildWebhookPayload, type WebhookMessage } from './webhook/deliver';
 
@@ -39,6 +40,7 @@ app.use('/v1/*', authMiddleware);
 registerConversationRoutes(app);
 registerMessageRoutes(app);
 registerEventsRoutes(app);
+registerReactionsRoutes(app);
 registerTypingRoutes(app);
 
 export default class extends WorkerEntrypoint<Env> {

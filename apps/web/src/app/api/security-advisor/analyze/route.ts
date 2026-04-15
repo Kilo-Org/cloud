@@ -65,12 +65,24 @@ export async function POST(request: NextRequest) {
   if (!parseResult.success) {
     return errorResponse(
       'invalid_payload',
-      `Invalid request body: ${z.treeifyError(parseResult.error)}`,
+      `Invalid request body: ${JSON.stringify(z.treeifyError(parseResult.error))}`,
       400
     );
   }
 
   const payload = parseResult.data;
+
+  // Log the incoming version fingerprint so we have day-1 observability of
+  // what plugin and OpenClaw versions are calling us. We don't branch on
+  // this yet, but future schema changes will use these values to decide
+  // how to interpret a given payload.
+  console.log('[SecurityAdvisor] scan', {
+    userId: user.id,
+    pluginVersion: payload.source.pluginVersion,
+    openclawVersion: payload.source.openclawVersion,
+    sourcePlatform: payload.source.platform,
+    sourceMethod: payload.source.method,
+  });
 
   // 5. Rate limit (DB-backed, survives restarts, shared across replicas)
   const rateLimit = await checkSecurityAdvisorRateLimit(user.id);

@@ -93,10 +93,31 @@ type ConfigObject = Record<string, any>;
 
 type EnvLike = Record<string, string | undefined>;
 
+const INBOUND_EMAIL_HOOK_ID = 'cloudflare-email-inbound';
+
+function migrateHookMapping(mapping: ConfigObject): ConfigObject {
+  if (mapping.id === INBOUND_EMAIL_HOOK_ID) {
+    if (mapping.action === 'wake') {
+      mapping.action = 'agent';
+    }
+    if (typeof mapping.textTemplate === 'string' && typeof mapping.messageTemplate !== 'string') {
+      mapping.messageTemplate = mapping.textTemplate;
+    }
+    delete mapping.textTemplate;
+    return mapping;
+  }
+
+  if (mapping.action === 'wake' && typeof mapping.messageTemplate === 'string') {
+    mapping.textTemplate = mapping.messageTemplate;
+    delete mapping.messageTemplate;
+  }
+  return mapping;
+}
+
 const INBOUND_EMAIL_HOOK_MAPPING = {
-  id: 'cloudflare-email-inbound',
+  id: INBOUND_EMAIL_HOOK_ID,
   match: { path: 'email' },
-  action: 'wake',
+  action: 'agent',
   wakeMode: 'now',
   name: 'Inbound Email',
   sessionKey: '{{payload.sessionKey}}',
@@ -479,7 +500,9 @@ export function generateBaseConfig(
     config.hooks.token = env.KILOCLAW_HOOKS_TOKEN;
     config.hooks.path = '/hooks';
 
-    config.hooks.mappings = Array.isArray(config.hooks.mappings) ? config.hooks.mappings : [];
+    config.hooks.mappings = Array.isArray(config.hooks.mappings)
+      ? config.hooks.mappings.map((mapping: ConfigObject) => migrateHookMapping(mapping))
+      : [];
     const existingEmailMappingIndex = config.hooks.mappings.findIndex(
       (mapping: ConfigObject) => mapping.id === INBOUND_EMAIL_HOOK_MAPPING.id
     );

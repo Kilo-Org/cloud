@@ -38,6 +38,14 @@ export type KiloCodeConfigResponse = {
   kilocodeDefaultModel: string | null;
 };
 
+export type WebSearchConfigPatchInput = {
+  exaMode?: 'kilo-proxy' | 'disabled' | null;
+};
+
+export type WebSearchConfigPatchResponse = {
+  exaMode: 'kilo-proxy' | 'disabled' | null;
+};
+
 export type BotIdentityPatchInput = {
   botName?: string | null;
   botNature?: string | null;
@@ -257,6 +265,8 @@ export type UserConfigResponse = {
   kilocodeApiKeyExpiresAt?: string | null;
   /** Per catalog entry ID → whether all fields for that entry are configured. */
   configuredSecrets: Record<string, boolean>;
+  /** Search mode selected for Kilo-integrated Exa. */
+  kiloExaSearchMode: 'kilo-proxy' | 'disabled' | null;
   /** Env var names of user-defined custom (non-catalog) secrets. */
   customSecretKeys: string[];
   /** Metadata for custom secrets (config paths, etc.). */
@@ -412,4 +422,7 @@ export type KiloClawDashboardStatus = PlatformStatusResponse & {
   name: string | null;
   /** Postgres row ID. Used to construct /i/{instanceId} proxy paths for instance-keyed instances. */
   instanceId: string | null;
+  /** Copyable inbound email address for routing messages into this instance. */
+  inboundEmailAddress: string | null;
+  inboundEmailEnabled: boolean;
 };

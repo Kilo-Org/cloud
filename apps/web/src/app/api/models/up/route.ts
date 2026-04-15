@@ -49,8 +49,13 @@ const STATEMENT_TIMEOUT_MS = 10_000;
 
 // Models excluded from the top-level health status. They still get their
 // per-model health evaluated and returned, but can't trigger 503 responses.
-// Useful for preview models with inconsistent traffic that cause false alerts.
-const HEALTH_CHECK_EXCLUSIONS = new Set(['google/gemini-3.1-pro-preview']);
+// Useful for preview models with inconsistent traffic that cause false alerts,
+// or third-party models that can be retracted without notice.
+const HEALTH_CHECK_EXCLUSIONS = new Set([
+  'google/gemini-3.1-pro-preview',
+  // We don't control when this model may be retracted by OpenRouter.
+  'openrouter/elephant-alpha',
+]);
 
 function emptyMetrics(): Omit<ModelHealthMetrics, 'monitored'> {
   return {

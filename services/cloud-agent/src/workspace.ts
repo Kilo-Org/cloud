@@ -707,13 +707,14 @@ async function createNewBranch(
 }
 
 const GITHUB_PULL_REF_PATTERN = /^refs\/pull\/\d+\/head$/;
+const GITLAB_MR_REF_PATTERN = /^refs\/merge-requests\/\d+\/head$/;
 
 async function fetchPullRefAndCheckout(
   session: ExecutionSession,
   workspacePath: string,
   pullRef: string
 ): Promise<void> {
-  if (!GITHUB_PULL_REF_PATTERN.test(pullRef)) {
+  if (!GITHUB_PULL_REF_PATTERN.test(pullRef) && !GITLAB_MR_REF_PATTERN.test(pullRef)) {
     throw new Error(`Invalid pull ref format: ${pullRef}`);
   }
 
@@ -801,9 +802,12 @@ export async function manageBranch(
   } else {
     // Case 4: Doesn't exist anywhere
     if (isUpstreamBranch) {
-      if (GITHUB_PULL_REF_PATTERN.test(safeBranchName)) {
+      if (
+        GITHUB_PULL_REF_PATTERN.test(safeBranchName) ||
+        GITLAB_MR_REF_PATTERN.test(safeBranchName)
+      ) {
         await fetchPullRefAndCheckout(session, workspacePath, safeBranchName);
-        logger.withTags({ pullRef: safeBranchName }).info('Checked out GitHub pull ref');
+        logger.withTags({ pullRef: safeBranchName }).info('Checked out pull/merge-request ref');
         logger.debug('Successfully on branch');
         return safeBranchName;
       }

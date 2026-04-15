@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from '../db';
 
+const aliasRows = vi.hoisted(() => ({ rows: [{ alias: 'amber-river-quiet-maple' }] }));
+
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {},
   waitUntil: (promise: Promise<unknown>) => promise,
@@ -10,7 +12,15 @@ vi.mock('../db', async importOriginal => {
   const actual = await importOriginal<typeof DbModule>();
   return {
     ...actual,
-    getWorkerDb: vi.fn(() => ({})),
+    getWorkerDb: vi.fn(() => ({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve(aliasRows.rows)),
+          })),
+        })),
+      })),
+    })),
     getInstanceById: vi.fn(),
   };
 });
@@ -71,7 +81,8 @@ function deliveryBody(overrides: Record<string, unknown> = {}) {
     instanceId: INSTANCE_ID,
     messageId: '<msg-1@example.com>',
     from: 'sender@example.com',
-    to: 'ki-11111111111141118111111111111111@example.com',
+    to: 'amber-river-quiet-maple@kiloclaw.ai',
+    recipientAlias: 'amber-river-quiet-maple',
     subject: 'Hello',
     text: 'Email body',
     receivedAt: '2026-04-13T12:00:00.000Z',
@@ -82,12 +93,14 @@ function deliveryBody(overrides: Record<string, unknown> = {}) {
 describe('POST /inbound-email', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    aliasRows.rows = [{ alias: 'amber-river-quiet-maple' }];
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('ok', { status: 200 })));
     vi.mocked(getInstanceById).mockResolvedValue({
       id: INSTANCE_ID,
       userId: USER_ID,
       sandboxId: SANDBOX_ID,
       orgId: null,
+      inboundEmailEnabled: true,
     });
   });
 
@@ -128,6 +141,23 @@ describe('POST /inbound-email', () => {
         text: 'Email body',
       })
     );
+  });
+
+  it('rejects deliveries without alias metadata', async () => {
+    const { env } = makeEnv();
+
+    const response = await platform.request(
+      '/inbound-email',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: deliveryBody({ recipientAlias: undefined }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(410);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('sanitizes subject punctuation in the readable session key', async () => {
@@ -193,6 +223,48 @@ describe('POST /inbound-email', () => {
     expect(response.status).toBe(404);
   });
 
+  it('returns 410 when inbound email is disabled for the instance', async () => {
+    vi.mocked(getInstanceById).mockResolvedValue({
+      id: INSTANCE_ID,
+      userId: USER_ID,
+      sandboxId: SANDBOX_ID,
+      orgId: null,
+      inboundEmailEnabled: false,
+    });
+    const { env } = makeEnv();
+
+    const response = await platform.request(
+      '/inbound-email',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: deliveryBody(),
+      },
+      env
+    );
+
+    expect(response.status).toBe(410);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('returns 410 when the alias is no longer active', async () => {
+    aliasRows.rows = [];
+    const { env } = makeEnv();
+
+    const response = await platform.request(
+      '/inbound-email',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: deliveryBody(),
+      },
+      env
+    );
+
+    expect(response.status).toBe(410);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('returns 503 when instance is not running', async () => {
     const { env, getStatus } = makeEnv();
     getStatus.mockResolvedValueOnce({ userId: USER_ID, sandboxId: SANDBOX_ID, status: 'stopped' });
@@ -216,6 +288,7 @@ describe('POST /inbound-email', () => {
       userId: USER_ID,
       sandboxId: SANDBOX_ID,
       orgId: '22222222-2222-4222-8222-222222222222',
+      inboundEmailEnabled: true,
     });
     const { env, resolveDoKey } = makeEnv();
 

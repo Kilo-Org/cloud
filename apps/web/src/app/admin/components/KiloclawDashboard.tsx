@@ -4,12 +4,20 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { KiloclawInstancesPage } from './KiloclawInstances/KiloclawInstancesPage';
+import { KiloclawOrphansTab } from './KiloclawInstances/KiloclawOrphansTab';
 import { VersionsTab, PinsTab } from './KiloclawVersions/KiloclawVersionsPage';
 import { RegionsTab } from './KiloclawRegions/KiloclawRegionsPage';
 import { CliRunsTab } from './KiloclawCliRuns/KiloclawCliRunsTab';
 
-const VALID_TABS: readonly string[] = ['instances', 'versions', 'pins', 'regions', 'cli-runs'];
-type Tab = 'instances' | 'versions' | 'pins' | 'regions' | 'cli-runs';
+const VALID_TABS: readonly string[] = [
+  'instances',
+  'orphans',
+  'versions',
+  'pins',
+  'regions',
+  'cli-runs',
+];
+type Tab = 'instances' | 'orphans' | 'versions' | 'pins' | 'regions' | 'cli-runs';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -45,6 +53,9 @@ export function KiloclawDashboard() {
           <TabsTrigger value="instances" className={tabTriggerClass}>
             Instances
           </TabsTrigger>
+          <TabsTrigger value="orphans" className={tabTriggerClass}>
+            Orphans
+          </TabsTrigger>
           <TabsTrigger value="versions" className={tabTriggerClass}>
             Versions
           </TabsTrigger>
@@ -60,6 +71,9 @@ export function KiloclawDashboard() {
         </TabsList>
         <TabsContent value="instances" className="mt-4">
           <KiloclawInstancesPage />
+        </TabsContent>
+        <TabsContent value="orphans" className="mt-4">
+          <KiloclawOrphansTab />
         </TabsContent>
         <TabsContent value="versions" className="mt-4">
           <VersionsTab />

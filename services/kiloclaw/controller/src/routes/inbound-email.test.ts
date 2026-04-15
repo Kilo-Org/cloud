@@ -61,13 +61,14 @@ describe('registerInboundEmailRoute', () => {
     const mockFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
     vi.stubGlobal('fetch', mockFetch);
 
+    const payload = JSON.stringify({ messageId: 'msg-1', text: 'hello' });
     const res = await app.request('/_kilo/hooks/email', {
       method: 'POST',
       headers: {
         authorization: `Bearer ${GATEWAY_TOKEN}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ messageId: 'msg-1', text: 'hello' }),
+      body: payload,
     });
 
     expect(res.status).toBe(200);
@@ -76,6 +77,8 @@ describe('registerInboundEmailRoute', () => {
     const [url, init] = mockFetch.mock.calls[0];
     expect(url).toBe('http://127.0.0.1:3001/hooks/email');
     expect(init.headers.authorization).toBe(`Bearer ${HOOKS_TOKEN}`);
+    expect(init.body).toBe(payload);
+    expect('duplex' in init).toBe(false);
   });
 
   it('propagates hook 4xx as permanent failure', async () => {

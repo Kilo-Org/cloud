@@ -43,6 +43,7 @@ export const SecretFieldDefinitionSchema = z
     validationMessage: z.string().optional(),
     envVar: z.string(), // container env var name
     maxLength: z.number().int().positive(), // max input length
+    requiredForConfigured: z.boolean().optional(), // omit = true
   })
   .readonly();
 

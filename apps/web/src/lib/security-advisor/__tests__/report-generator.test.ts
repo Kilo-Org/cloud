@@ -129,6 +129,16 @@ describe('generateSecurityReport', () => {
 
     it('includes CTA for non-KiloClaw users', () => {
       expect(report.markdown).toContain('kilo.ai/kiloclaw');
+      expect(report.markdown).toContain('## Next step: try KiloClaw free');
+    });
+
+    it('does not leak agent-directive HTML comments to end users', () => {
+      // Earlier iterations included a <!-- display-verbatim --> directive as
+      // a hint to LLMs. Small summarizing models (e.g. gpt-4.1-nano) ignored
+      // the directive AND rendered the literal HTML comment into their
+      // reply. We no longer emit it.
+      expect(report.markdown).not.toContain('<!--');
+      expect(report.markdown).not.toContain('display-verbatim');
     });
   });
 
@@ -172,6 +182,7 @@ describe('generateSecurityReport', () => {
 
     it('omits CTA', () => {
       expect(report.markdown).not.toContain('kilo.ai/kiloclaw');
+      expect(report.markdown).not.toContain('## Next step: try KiloClaw free');
     });
   });
 

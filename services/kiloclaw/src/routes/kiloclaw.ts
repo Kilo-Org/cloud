@@ -56,6 +56,7 @@ kiloclaw.get('/config', c =>
       hasKiloCodeApiKey: !!config.kilocodeApiKey,
       kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
       configuredSecrets: buildConfiguredSecrets(config),
+      kiloExaSearchMode: config.webSearch?.exaMode ?? null,
       customSecretKeys: config.encryptedSecrets
         ? Object.keys(config.encryptedSecrets).filter(isCustomSecretEnvVar)
         : [],
@@ -127,7 +128,9 @@ function buildConfiguredSecrets(config: {
   const result: Record<string, boolean> = {};
 
   for (const entry of SECRET_CATALOG) {
-    result[entry.id] = entry.fields.every(field => {
+    const requiredFields = entry.fields.filter(field => field.requiredForConfigured !== false);
+    const fieldsToCheck = requiredFields.length > 0 ? requiredFields : entry.fields;
+    result[entry.id] = fieldsToCheck.every(field => {
       // Check new encryptedSecrets storage (keyed by env var name)
       if (config.encryptedSecrets?.[field.envVar] != null) return true;
       // Fall back to legacy channels storage (keyed by field key)

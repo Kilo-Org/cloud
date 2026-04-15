@@ -2,7 +2,19 @@ import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { eq, and, desc, lt, isNull } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  desc,
+  lt,
+  isNull,
+  inArray,
+  notInArray,
+  gte,
+  isNotNull,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
@@ -16,8 +28,9 @@ import {
 } from '@/lib/session-ingest-client';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
-import { sanitizeGitUrl } from '@/routers/cli-sessions-router';
+import { KNOWN_PLATFORMS, sanitizeGitUrl } from '@/routers/cli-sessions-router';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
+import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
@@ -42,6 +55,9 @@ function isSessionNotFoundError(err: unknown): boolean {
 }
 
 const PAGE_SIZE = 10;
+const RECENT_DAYS_LIMIT = 200;
+
+const createdOnPlatformField = z.string().min(1).max(100);
 
 /**
  * Fields to select for session list/get operations
@@ -50,6 +66,13 @@ const commonSessionFields = {
   session_id: cli_sessions_v2.session_id,
   title: cli_sessions_v2.title,
   cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
+  parent_session_id: cli_sessions_v2.parent_session_id,
+  organization_id: cli_sessions_v2.organization_id,
+  created_on_platform: cli_sessions_v2.created_on_platform,
+  git_url: cli_sessions_v2.git_url,
+  git_branch: cli_sessions_v2.git_branch,
+  status: cli_sessions_v2.status,
+  status_updated_at: cli_sessions_v2.status_updated_at,
   created_at: cli_sessions_v2.created_at,
   updated_at: cli_sessions_v2.updated_at,
   version: cli_sessions_v2.version,
@@ -83,7 +106,12 @@ const ListSessionsInputSchema = z.object({
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
   orderBy: z.enum(['created_at', 'updated_at']).optional().default('created_at'),
   includeChildren: z.boolean().optional().default(false),
-  gitUrl: z.string().optional(),
+  createdOnPlatform: z
+    .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
+    .optional(),
+  organizationId: z.uuid().nullable().optional(),
+  gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
+  updatedSince: z.iso.datetime().optional(),
   version: z.number().optional(),
 });
 
@@ -108,6 +136,85 @@ const ShareSessionInputSchema = z.object({
   session_id: sessionIdField,
 });
 
+function addCreatedOnPlatformConditions(
+  whereConditions: SQL[],
+  createdOnPlatform: string | string[] | undefined
+): void {
+  if (!createdOnPlatform) {
+    return;
+  }
+
+  const platforms = Array.isArray(createdOnPlatform) ? createdOnPlatform : [createdOnPlatform];
+  const hasOther = platforms.includes('other');
+  const concretePlatforms = platforms.filter(platform => platform !== 'other');
+
+  if (hasOther && concretePlatforms.length > 0) {
+    whereConditions.push(
+      sql`(${inArray(cli_sessions_v2.created_on_platform, concretePlatforms)} OR ${notInArray(
+        cli_sessions_v2.created_on_platform,
+        [...KNOWN_PLATFORMS]
+      )})`
+    );
+    return;
+  }
+
+  if (hasOther) {
+    whereConditions.push(notInArray(cli_sessions_v2.created_on_platform, [...KNOWN_PLATFORMS]));
+    return;
+  }
+
+  if (concretePlatforms.length === 1) {
+    const [platform] = concretePlatforms;
+    if (platform === undefined) {
+      return;
+    }
+    whereConditions.push(eq(cli_sessions_v2.created_on_platform, platform));
+    return;
+  }
+
+  whereConditions.push(inArray(cli_sessions_v2.created_on_platform, concretePlatforms));
+}
+
+function addGitUrlConditions(whereConditions: SQL[], gitUrl: string | string[] | undefined): void {
+  if (!gitUrl) {
+    return;
+  }
+
+  const urls = (Array.isArray(gitUrl) ? gitUrl : [gitUrl]).map(sanitizeGitUrl);
+  if (urls.length === 1) {
+    const [url] = urls;
+    if (url === undefined) {
+      return;
+    }
+    whereConditions.push(eq(cli_sessions_v2.git_url, url));
+    return;
+  }
+
+  whereConditions.push(inArray(cli_sessions_v2.git_url, urls));
+}
+
+async function addOrganizationCondition(
+  whereConditions: SQL[],
+  ctx: Parameters<typeof ensureOrganizationAccess>[0],
+  organizationId: string | null | undefined
+): Promise<void> {
+  if (organizationId === undefined) {
+    return;
+  }
+
+  if (organizationId === null) {
+    whereConditions.push(isNull(cli_sessions_v2.organization_id));
+    return;
+  }
+
+  await ensureOrganizationAccess(ctx, organizationId);
+  whereConditions.push(eq(cli_sessions_v2.organization_id, organizationId));
+}
+
+function joinWithAnd(fragments: SQL[]): SQL {
+  return sql.join(fragments, sql` AND `);
+}
+
 /**
  * Router for cli_sessions_v2 table operations.
  * Used by cloud-agent-next for session storage and retrieval.
@@ -120,12 +227,26 @@ export const cliSessionsV2Router = createTRPCRouter({
    * List sessions for the current user with cursor-based pagination.
    */
   list: baseProcedure.input(ListSessionsInputSchema).query(async ({ ctx, input }) => {
-    const { cursor, limit, orderBy, includeChildren, gitUrl, version } = input;
+    const {
+      cursor,
+      limit,
+      orderBy,
+      includeChildren,
+      createdOnPlatform,
+      organizationId,
+      gitUrl,
+      updatedSince,
+      version,
+    } = input;
 
     const orderColumn =
       orderBy === 'updated_at' ? cli_sessions_v2.updated_at : cli_sessions_v2.created_at;
 
-    const whereConditions = [eq(cli_sessions_v2.kilo_user_id, ctx.user.id)];
+    const whereConditions: SQL[] = [eq(cli_sessions_v2.kilo_user_id, ctx.user.id)];
+
+    await addOrganizationCondition(whereConditions, ctx, organizationId);
+    addCreatedOnPlatformConditions(whereConditions, createdOnPlatform);
+    addGitUrlConditions(whereConditions, gitUrl);
 
     if (cursor) {
       whereConditions.push(lt(orderColumn, cursor));
@@ -135,23 +256,25 @@ export const cliSessionsV2Router = createTRPCRouter({
       whereConditions.push(isNull(cli_sessions_v2.parent_session_id));
     }
 
-    if (gitUrl) {
-      whereConditions.push(eq(cli_sessions_v2.git_url, sanitizeGitUrl(gitUrl)));
+    if (updatedSince) {
+      whereConditions.push(gte(cli_sessions_v2.updated_at, updatedSince));
     }
 
     if (version !== undefined) {
       whereConditions.push(eq(cli_sessions_v2.version, version));
     }
 
+    const effectiveLimit = updatedSince ? RECENT_DAYS_LIMIT : limit;
+
     const results = await db
       .select(commonSessionFields)
       .from(cli_sessions_v2)
       .where(and(...whereConditions))
       .orderBy(desc(orderColumn))
-      .limit(limit + 1);
+      .limit(effectiveLimit + 1);
 
-    const hasMore = results.length > limit;
-    const resultSessions = hasMore ? results.slice(0, limit) : results;
+    const hasMore = results.length > effectiveLimit;
+    const resultSessions = hasMore ? results.slice(0, effectiveLimit) : results;
 
     const nextCursor =
       resultSessions.length > 0
@@ -167,6 +290,40 @@ export const cliSessionsV2Router = createTRPCRouter({
       nextCursor: hasMore ? nextCursor : null,
     };
   }),
+
+  recentRepositories: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid().nullable().optional(),
+        updatedSince: z.iso.datetime(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const whereConditions: SQL[] = [
+        eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+        isNull(cli_sessions_v2.parent_session_id),
+        isNotNull(cli_sessions_v2.git_url),
+        gte(cli_sessions_v2.updated_at, input.updatedSince),
+        sql`${cli_sessions_v2.created_on_platform} != 'app-builder'`,
+      ];
+
+      await addOrganizationCondition(whereConditions, ctx, input.organizationId);
+
+      const { rows } = await db.execute<{ git_url: string; last_used_at: string }>(sql`
+        SELECT ${cli_sessions_v2.git_url} AS git_url, MAX(${cli_sessions_v2.updated_at}) AS last_used_at
+        FROM ${cli_sessions_v2}
+        WHERE ${joinWithAnd(whereConditions)}
+        GROUP BY ${cli_sessions_v2.git_url}
+        ORDER BY last_used_at DESC
+        LIMIT 10`);
+
+      return {
+        repositories: rows.map(row => ({
+          gitUrl: row.git_url,
+          lastUsedAt: row.last_used_at,
+        })),
+      };
+    }),
 
   /**
    * Get a single session by session_id.

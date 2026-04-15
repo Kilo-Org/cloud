@@ -118,6 +118,13 @@ vercel env pull
 
 This creates `.env.local` with all required environment variables.
 
+The KiloClaw pages (`/claw/*`) render the Pylon support chat widget, which requires two env vars to activate:
+
+- `NEXT_PUBLIC_PYLON_APP_ID` — the Pylon app ID from the Pylon dashboard
+- `PYLON_IDENTITY_SECRET` — the identity verification secret used to HMAC-sign user emails
+
+Both are already present in Vercel and pulled by `vercel env pull`. If either is missing the widget is silently skipped, so local dev continues to work without Pylon configured.
+
 ### 4. Start the database
 
 The project uses PostgreSQL 18 with pgvector, running via Docker. The compose file is at `dev/docker-compose.yml`:

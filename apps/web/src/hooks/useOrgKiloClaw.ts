@@ -233,6 +233,11 @@ export function useOrgKiloClawMutations(organizationId: string) {
   const rawProvision = useMutation(
     trpc.organizations.kiloclaw.provision.mutationOptions({ onSuccess: invalidateStatus })
   );
+  const rawCycleInboundEmailAddress = useMutation(
+    trpc.organizations.kiloclaw.cycleInboundEmailAddress.mutationOptions({
+      onSuccess: invalidateStatus,
+    })
+  );
   const rawPatchConfig = useMutation(
     trpc.organizations.kiloclaw.patchConfig.mutationOptions({ onSuccess: invalidateStatus })
   );
@@ -397,6 +402,7 @@ export function useOrgKiloClawMutations(organizationId: string) {
     stop: bindVoid(rawStop),
     destroy: bindVoid(rawDestroy),
     provision: bind(rawProvision),
+    cycleInboundEmailAddress: bindVoid(rawCycleInboundEmailAddress),
     patchConfig: bind(rawPatchConfig),
     updateConfig: bind(rawUpdateConfig),
     updateKiloCodeConfig: bind(rawUpdateKiloCodeConfig),

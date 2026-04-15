@@ -22,15 +22,15 @@ export function registerInboundEmailRoute(
     }
 
     try {
+      const requestBody = await c.req.text();
       const upstream = await fetch(GATEWAY_HOOK_URL, {
         method: 'POST',
         headers: {
           'content-type': c.req.header('content-type') ?? 'application/json',
           authorization: `Bearer ${hooksToken}`,
         },
-        body: c.req.raw.body,
-        duplex: 'half',
-      } as RequestInit);
+        body: requestBody,
+      });
 
       const upstreamBody = await upstream.text();
 

@@ -8,12 +8,7 @@ import { useKiloCliRunStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { ClawConfigServiceBannerWithStatus } from '../../components/ClawConfigServiceBanner';
-
-/** Strip ANSI escape codes so raw terminal output renders in a browser <pre>. */
-function stripAnsi(raw: string): string {
-  // eslint-disable-next-line no-control-regex
-  return raw.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
-}
+import { stripAnsi } from '@/lib/stripAnsi';
 
 function StatusBadge({ status }: { status: string | null }) {
   switch (status) {

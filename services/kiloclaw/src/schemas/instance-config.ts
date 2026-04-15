@@ -82,12 +82,20 @@ export type FlyProviderState = z.infer<typeof FlyProviderStateSchema>;
 export type DockerLocalProviderState = z.infer<typeof DockerLocalProviderStateSchema>;
 export type ProviderState = z.infer<typeof ProviderStateSchema>;
 
+export const KiloExaSearchModeSchema = z.enum(['kilo-proxy', 'disabled']);
+export type KiloExaSearchMode = z.infer<typeof KiloExaSearchModeSchema>;
+
 export const InstanceConfigSchema = z.object({
   envVars: z.record(envVarNameSchema, z.string()).optional(),
   encryptedSecrets: z.record(envVarNameSchema, EncryptedEnvelopeSchema).optional(),
   kilocodeApiKey: z.string().nullable().optional(),
   kilocodeApiKeyExpiresAt: z.string().nullable().optional(),
   kilocodeDefaultModel: z.string().nullable().optional(),
+  webSearch: z
+    .object({
+      exaMode: KiloExaSearchModeSchema.optional(),
+    })
+    .optional(),
   // TODO: Legacy hardcoded channel storage. Kept for backward compat with
   // existing DO state and the decryptChannelTokens/buildEnvVars startup path.
   // Migrate to read from encryptedSecrets via catalog, then remove.
@@ -201,6 +209,7 @@ export const PersistedStateSchema = z.object({
   kilocodeApiKey: z.string().nullable().default(null),
   kilocodeApiKeyExpiresAt: z.string().nullable().default(null),
   kilocodeDefaultModel: z.string().nullable().default(null),
+  kiloExaSearchMode: KiloExaSearchModeSchema.nullable().default(null),
   channels: z
     .object({
       telegramBotToken: EncryptedEnvelopeSchema.optional(),

@@ -170,7 +170,7 @@ function mapFinding(finding: AuditFinding, isKiloClaw: boolean): ReportFinding {
     risk:
       template?.risk ??
       `Your OpenClaw instance reports this finding and should be reviewed: ${finding.detail}`,
-    fix: finding.remediation,
+    fix: finding.remediation ?? null,
     kiloClawComparison: formatComparison(comparison, isKiloClaw),
   };
 }
@@ -307,14 +307,20 @@ function renderMarkdown(opts: RenderOptions): string {
     lines.push('');
   }
 
-  // CTA for non-KiloClaw users
+  // CTA for non-KiloClaw users. Rendered as a top-level heading + bold
+  // paragraph (not a blockquote) so capable models treat it as structural
+  // report content and preserve it when reformatting. Small summarizing
+  // models will paraphrase regardless; the /security-checkup slash command
+  // bypasses the LLM entirely for those.
   if (!isKiloClaw) {
     lines.push('---');
     lines.push('');
+    lines.push('## Next step: try KiloClaw free');
+    lines.push('');
     lines.push(
-      '> **Want these issues handled automatically?** ' +
+      '**Want these issues handled automatically?** ' +
         'KiloClaw manages security configuration, patching, and monitoring out of the box. ' +
-        'Start a free trial at [kilo.ai/kiloclaw](https://kilo.ai/kiloclaw).'
+        '**Start a free trial at [kilo.ai/kiloclaw](https://kilo.ai/kiloclaw).**'
     );
     lines.push('');
   }

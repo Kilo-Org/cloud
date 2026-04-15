@@ -60,6 +60,22 @@ describe('buildEnvVars', () => {
     expect(result.env.AUTO_APPROVE_DEVICES).toBe('true');
   });
 
+  it('omits KILO_EXA_SEARCH_MODE when user has not selected a mode', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+
+    expect(result.env.KILO_EXA_SEARCH_MODE).toBeUndefined();
+  });
+
+  it('sets KILO_EXA_SEARCH_MODE from user config', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      kiloExaSearchMode: 'kilo-proxy',
+    });
+
+    expect(result.env.KILO_EXA_SEARCH_MODE).toBe('kilo-proxy');
+  });
+
   it('passes KILOCODE_API_BASE_URL override in env bucket', async () => {
     const env = createMockEnv({
       KILOCODE_API_BASE_URL: 'https://example.internal/openrouter/',

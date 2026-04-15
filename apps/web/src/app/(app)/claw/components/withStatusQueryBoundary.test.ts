@@ -38,6 +38,8 @@ const baseStatus: KiloClawDashboardStatus = {
   botEmoji: null,
   workerUrl: 'https://claw.kilo.ai',
   instanceId: null,
+  inboundEmailAddress: 'amber-river-quiet-maple@kiloclaw.ai',
+  inboundEmailEnabled: true,
 };
 
 describe('withStatusQueryBoundary', () => {

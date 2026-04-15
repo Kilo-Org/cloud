@@ -16,11 +16,13 @@ import {
   cleanupWorkspace,
   getSessionHomePath,
   getSessionWorkspacePath,
+  GIT_COMMAND_TIMEOUT_MS,
   manageBranch,
   restoreWorkspace,
   setupWorkspace,
 } from './workspace.js';
 import { logger, WithLogTags } from './logger.js';
+import { timedExec } from './sandbox-timeout-logging.js';
 import type {
   PersistenceEnv,
   CloudAgentSessionState,
@@ -287,9 +289,9 @@ export async function runSetupCommands(
   for (const command of setupCommands) {
     try {
       // Run command in workspace directory
-      const result = await session.exec(command, {
+      const result = await timedExec(session, command, 'session.runSetupCommand', {
+        timeoutMs: SETUP_COMMAND_TIMEOUT_SECONDS * 1000,
         cwd: context.workspacePath,
-        timeout: SETUP_COMMAND_TIMEOUT_SECONDS * 1000, // Convert to milliseconds
       });
 
       if (result.exitCode !== 0) {
@@ -342,7 +344,7 @@ export async function writeAuthFile(
   const authDir = `${sessionHome}/.local/share/kilo`;
   const authPath = `${authDir}/auth.json`;
 
-  await sandbox.exec(`mkdir -p ${authDir}`);
+  await timedExec(sandbox, `mkdir -p ${authDir}`, 'session.writeAuthFile.mkdir');
 
   const authContent = JSON.stringify({ kilo: { type: 'api', key: kilocodeToken } }, null, 2);
   await sandbox.writeFile(authPath, authContent);
@@ -361,7 +363,7 @@ export async function writeGlobalRules(
   const rulesDir = `${sessionHome}/.kilocode/rules`;
   const rulesPath = `${rulesDir}/cloud-agent.md`;
 
-  await sandbox.exec(`mkdir -p ${rulesDir}`);
+  await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
 
   const content = [
     '# Cloud Agent Environment',
@@ -906,8 +908,10 @@ export class SessionService {
     } else {
       // For session branches on initiate, create directly (can't exist remotely with UUID-based name)
       logger.withTags({ branchName: context.branchName }).info('Creating session branch');
-      const result = await session.exec(
-        `cd ${context.workspacePath} && git checkout -b '${context.branchName}'`
+      const result = await timedExec(
+        session,
+        `cd ${context.workspacePath} && git checkout -b '${context.branchName}'`,
+        'session.initiate.createBranch'
       );
       if (result.exitCode !== 0) {
         throw new Error(
@@ -1080,8 +1084,10 @@ export class SessionService {
       } else {
         // For session branches on initiate, create directly (can't exist remotely with UUID-based name)
         logger.withTags({ branchName: context.branchName }).info('Creating session branch');
-        const result = await session.exec(
-          `cd ${context.workspacePath} && git checkout -b '${context.branchName}'`
+        const result = await timedExec(
+          session,
+          `cd ${context.workspacePath} && git checkout -b '${context.branchName}'`,
+          'session.initiateFromKiloSession.createBranch'
         );
         if (result.exitCode !== 0) {
           throw new Error(
@@ -1231,7 +1237,11 @@ export class SessionService {
     );
 
     // Check if workspace repo exists - if not, we may need to reclone
-    const repoCheck = await session.exec(`test -d ${workspacePath}/.git && echo exists`);
+    const repoCheck = await timedExec(
+      session,
+      `test -d ${workspacePath}/.git && echo exists`,
+      'session.resume.repoExists'
+    );
     const repoExists = repoCheck.stdout?.includes('exists') ?? false;
     const isColdStart = !repoExists;
 
@@ -1325,9 +1335,11 @@ export class SessionService {
 
       const escapedId = metadata.kiloSessionId.replaceAll("'", "'\\''");
       const escapedWorkspace = context.workspacePath.replaceAll("'", "'\\''");
-      const restoreResult = await session.exec(
+      const restoreResult = await timedExec(
+        session,
         `bun /usr/local/bin/kilo-restore-session.js '${escapedId}' '${escapedWorkspace}'`,
-        { cwd: dirname(context.workspacePath) }
+        'session.coldStart.restore',
+        { timeoutMs: GIT_COMMAND_TIMEOUT_MS, cwd: dirname(context.workspacePath) }
       );
 
       if (restoreResult.exitCode !== 0) {

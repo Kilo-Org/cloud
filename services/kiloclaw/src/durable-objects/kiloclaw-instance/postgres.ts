@@ -95,6 +95,7 @@ export async function restoreFromPostgres(
         status: 'provisioned',
         envVars,
         encryptedSecrets,
+        kiloExaSearchMode: null,
         channels,
         provisionedAt: Date.now(),
         lastStartedAt: null,
@@ -122,6 +123,7 @@ export async function restoreFromPostgres(
     state.status = 'provisioned';
     state.envVars = envVars;
     state.encryptedSecrets = encryptedSecrets;
+    state.kiloExaSearchMode = null;
     state.channels = channels;
     state.provisionedAt = Date.now();
     state.lastStartedAt = null;

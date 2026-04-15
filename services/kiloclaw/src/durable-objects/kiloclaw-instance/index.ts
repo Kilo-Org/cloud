@@ -19,6 +19,7 @@ import type {
   CustomSecretMeta,
   ProviderId,
   ProviderState,
+  KiloExaSearchMode,
 } from '../../schemas/instance-config';
 import { DEFAULT_INSTANCE_FEATURES, ProviderStateSchema } from '../../schemas/instance-config';
 import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
@@ -120,6 +121,7 @@ export { METADATA_KEY_USER_ID } from '../machine-config';
 const CHANNEL_ENV_VARS = new Set(
   SECRET_CATALOG.filter(e => e.category === 'channel').flatMap(e => e.fields.map(f => f.envVar))
 );
+const BRAVE_SEARCH_FIELD_KEY = 'braveSearchApiKey';
 
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private s: InstanceMutableState = createMutableState();
@@ -644,6 +646,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeApiKey: config.kilocodeApiKey ?? null,
       kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
       kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
+      kiloExaSearchMode: config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null,
       channels: config.channels ?? null,
       machineSize: config.machineSize ?? this.s.machineSize ?? null,
     } satisfies Partial<PersistedState>;
@@ -701,6 +704,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.kilocodeApiKey = config.kilocodeApiKey ?? null;
     this.s.kilocodeApiKeyExpiresAt = config.kilocodeApiKeyExpiresAt ?? null;
     this.s.kilocodeDefaultModel = config.kilocodeDefaultModel ?? null;
+    this.s.kiloExaSearchMode = config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null;
     this.s.channels = config.channels ?? null;
     this.s.machineSize = config.machineSize ?? this.s.machineSize ?? null;
     if (isNew) {
@@ -841,6 +845,27 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return {
       execSecurity: this.s.execSecurity,
       execAsk: this.s.execAsk,
+    };
+  }
+
+  async updateWebSearchConfig(patch: {
+    exaMode?: KiloExaSearchMode | null;
+  }): Promise<{ exaMode: KiloExaSearchMode | null }> {
+    await this.loadState();
+
+    const pending: Partial<PersistedState> = {};
+
+    if (patch.exaMode !== undefined) {
+      this.s.kiloExaSearchMode = patch.exaMode;
+      pending.kiloExaSearchMode = this.s.kiloExaSearchMode;
+    }
+
+    if (Object.keys(pending).length > 0) {
+      await this.ctx.storage.put(storageUpdate(pending));
+    }
+
+    return {
+      exaMode: this.s.kiloExaSearchMode,
     };
   }
 
@@ -1060,10 +1085,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const hasMeta = Object.keys(currentMeta).length > 0;
     this.s.customSecretMeta = hasMeta ? currentMeta : null;
 
+    if (patch[BRAVE_SEARCH_FIELD_KEY] && this.s.kiloExaSearchMode !== 'disabled') {
+      this.s.kiloExaSearchMode = 'disabled';
+    }
+
     await this.ctx.storage.put({
       channels: this.s.channels,
       encryptedSecrets: this.s.encryptedSecrets,
       customSecretMeta: this.s.customSecretMeta,
+      kiloExaSearchMode: this.s.kiloExaSearchMode,
     });
 
     return { configured };
@@ -2027,6 +2057,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeApiKey: this.s.kilocodeApiKey ?? undefined,
       kilocodeApiKeyExpiresAt: this.s.kilocodeApiKeyExpiresAt ?? undefined,
       kilocodeDefaultModel: this.s.kilocodeDefaultModel ?? undefined,
+      webSearch: this.s.kiloExaSearchMode
+        ? {
+            exaMode: this.s.kiloExaSearchMode,
+          }
+        : undefined,
       channels: this.s.channels ?? undefined,
       machineSize: this.s.machineSize ?? undefined,
       customSecretMeta: this.s.customSecretMeta ?? undefined,

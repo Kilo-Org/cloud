@@ -33,6 +33,8 @@ After making changes, verify your work. At minimum run typecheck; run the full s
 
 Target a specific test file: `pnpm test -- <path>`. Run tests for a specific service: `pnpm --filter <package> test`.
 
+**Before running tests**, ensure the test database is running. If there is no active Postgres instance, run `pnpm test:db` first — this starts the Postgres container and applies migrations. You can check whether Postgres is already running with `docker compose -f dev/docker-compose.yml ps postgres`.
+
 ## Coding Standards
 
 - Prefer `type` over `interface`.
@@ -99,6 +101,7 @@ Business-rule specs live in `.specs/`. Before making **any** changes to a domain
 | Spec                                     | Governs                                                             |
 | ---------------------------------------- | ------------------------------------------------------------------- |
 | `.specs/kiloclaw-billing.md`             | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
+| `.specs/kiloclaw-datamodel.md`           | KiloClaw data model — instance/subscription tables, invariants      |
 | `.specs/kiloclaw-controller.md`          | KiloClaw controller/machine lifecycle, bootstrap, Docker image      |
 | `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management           |
 | `.specs/impact-affiliate-tracking.md`    | Impact.com affiliate conversion tracking                            |

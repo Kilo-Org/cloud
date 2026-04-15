@@ -12,7 +12,7 @@ import { AuthErrorNotification } from '@/components/auth/AuthErrorNotification';
 import Link from 'next/link';
 import { Mail, SquareUserRound } from 'lucide-react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
-import { OAuthProviderIds, ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
+import { OAuthProviderIds } from '@/lib/auth/provider-metadata';
 
 type SignInFormProps = {
   searchParams: Record<string, string>;
@@ -188,21 +188,12 @@ export function SignInForm({
                       customLabels={emailCustomLabel}
                     />
 
-                    {/* Expandable other methods section */}
-                    {flow.showOtherMethods ? (
-                      <AuthProviderButtons
-                        providers={ProdNonSSOAuthProviders.filter(p => p !== lastAuthMethod)}
-                        onProviderClick={flow.handleOAuthClick}
-                      />
-                    ) : (
-                      // Show "see other methods" button
-                      <button
-                        onClick={flow.handleToggleOtherMethods}
-                        className="text-muted-foreground text-sm hover:underline"
-                      >
-                        or see other sign-in methods
-                      </button>
-                    )}
+                    <button
+                      onClick={flow.handleClearHint}
+                      className="text-muted-foreground text-sm hover:underline"
+                    >
+                      or see other sign-in methods
+                    </button>
                   </div>
                 );
               })()}

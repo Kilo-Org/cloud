@@ -1,4 +1,5 @@
 import { SafetyIdentifiersBackfill } from '../components/SafetyIdentifiersBackfill';
+import { SafetyIdentifierHashGenerator } from '../components/SafetyIdentifierHashGenerator';
 import AdminPage from '../components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
@@ -18,6 +19,10 @@ export default function SafetyIdentifiersPage() {
           <h2 className="text-2xl font-bold">Safety Identifier Backfill</h2>
         </div>
         <SafetyIdentifiersBackfill />
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Hash Generator</h2>
+        </div>
+        <SafetyIdentifierHashGenerator />
       </div>
     </AdminPage>
   );

@@ -1,5 +1,5 @@
 /**
- * Writes Kilo CLI (opencode.json) config to disk on controller startup.
+ * Writes Kilo CLI (kilo.json) config to disk on controller startup.
  *
  * Gated by KILOCLAW_KILO_CLI feature flag. On fresh installs, creates
  * the config. On every boot, patches base URL for local dev.
@@ -16,7 +16,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const KILO_CONFIG_DIR = '/root/.config/kilo';
-export const CONFIG_FILE = 'opencode.json';
+export const CONFIG_FILE = 'kilo.json';
+export const LEGACY_CONFIG_FILE = 'opencode.json';
 
 /** The Kilo CLI uses `kilo/` as the provider prefix, but KiloClaw uses `kilocode/`. */
 export function toKiloModelId(kilocodeModelId: string): string {
@@ -49,9 +50,22 @@ export function writeKiloCliConfig(
   if (env.KILOCLAW_KILO_CLI !== 'true') return false;
 
   const configPath = path.join(configDir, CONFIG_FILE);
+  const legacyConfigPath = path.join(configDir, LEGACY_CONFIG_FILE);
   if (!env.KILOCODE_API_KEY) return false;
 
   const isFreshInstall = env.KILOCLAW_FRESH_INSTALL === 'true';
+
+  if (!deps.existsSync(configPath) && deps.existsSync(legacyConfigPath)) {
+    try {
+      deps.mkdirSync(configDir, { recursive: true });
+      deps.writeFileSync(configPath, deps.readFileSync(legacyConfigPath, 'utf8'), { mode: 0o600 });
+      console.log(
+        '[kilo-cli] Migrated legacy config from ' + legacyConfigPath + ' to ' + configPath
+      );
+    } catch (err) {
+      console.error('[kilo-cli] Failed to migrate legacy config, skipping:', err);
+    }
+  }
 
   // Seed config on fresh install only.
   // No provider block needed — the KiloAuthPlugin auto-registers the "kilo"
@@ -79,7 +93,7 @@ export function writeKiloCliConfig(
       let dirty = false;
 
       // Remove any stale provider.kilo.options.baseURL from the config file.
-      // Setting baseURL in opencode.json is broken (the Kilo CLI ignores it
+      // Setting baseURL in config JSON is broken (the Kilo CLI ignores it
       // in certain code paths). The correct mechanism is the KILO_API_URL env
       // var, which bootstrap sets from KILOCODE_API_BASE_URL. Early deployments
       // may still have the broken field, so we scrub it on every boot.
@@ -92,8 +106,11 @@ export function writeKiloCliConfig(
       // Updated on every boot so model changes in KiloClaw settings take effect.
       const defaultModel = env.KILOCODE_DEFAULT_MODEL;
       if (defaultModel) {
-        config.model = toKiloModelId(defaultModel);
-        dirty = true;
+        const model = toKiloModelId(defaultModel);
+        if (config.model !== model) {
+          config.model = model;
+          dirty = true;
+        }
       }
 
       if (dirty) {

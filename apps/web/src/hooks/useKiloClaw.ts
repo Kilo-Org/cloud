@@ -165,6 +165,9 @@ export function useKiloClawMutations() {
     provision: useMutation(
       trpc.kiloclaw.provision.mutationOptions({ onSuccess: invalidateStatusAndBilling })
     ),
+    cycleInboundEmailAddress: useMutation(
+      trpc.kiloclaw.cycleInboundEmailAddress.mutationOptions({ onSuccess: invalidateStatus })
+    ),
     patchConfig: useMutation(
       trpc.kiloclaw.patchConfig.mutationOptions({ onSuccess: invalidateStatus })
     ),
@@ -297,6 +300,14 @@ export function useKiloClawMutations() {
     ),
     patchExecPreset: useMutation(
       trpc.kiloclaw.patchExecPreset.mutationOptions({ onSuccess: invalidateStatus })
+    ),
+    patchWebSearchConfig: useMutation(
+      trpc.kiloclaw.patchWebSearchConfig.mutationOptions({
+        onSuccess: async () => {
+          await invalidateStatus();
+          await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
+        },
+      })
     ),
     patchBotIdentity: useMutation(
       trpc.kiloclaw.patchBotIdentity.mutationOptions({ onSuccess: invalidateStatus })

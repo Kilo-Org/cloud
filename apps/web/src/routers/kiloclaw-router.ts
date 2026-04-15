@@ -38,6 +38,11 @@ import { and, eq, ne, desc, isNotNull, isNull, inArray, sql, like, or } from 'dr
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
+import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
+import {
+  cycleInboundEmailAddressForInstance,
+  getInboundEmailAddressForInstance,
+} from '@/lib/kiloclaw/inbound-email-alias';
 import {
   ensureActiveInstance,
   getActiveInstance,
@@ -403,6 +408,10 @@ const updateKiloCodeConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
 });
 
+const patchWebSearchConfigSchema = z.object({
+  exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
+});
+
 const patchChannelsSchema = z.object({
   telegramBotToken: z.string().nullable().optional(),
   discordBotToken: z.string().nullable().optional(),
@@ -493,6 +502,8 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
     workerUrl,
     name: null,
     instanceId: null,
+    inboundEmailAddress: null,
+    inboundEmailEnabled: false,
   } satisfies KiloClawDashboardStatus;
 }
 
@@ -602,6 +613,7 @@ const STATUS_PAGE_TIMEOUT_MS = 5_000;
 
 const logStatusPageWarning = sentryLogger('kiloclaw-status-page', 'warning');
 const logBillingError = sentryLogger('kiloclaw-billing', 'error');
+const logDiskUsageError = sentryLogger('kiloclaw-disk-usage', 'error');
 
 /** Returns true if a Stripe error indicates the schedule is already in a terminal state. */
 function isScheduleAlreadyInactive(error: unknown): boolean {
@@ -793,6 +805,15 @@ async function ensureProvisionAccess(
         new Date(instanceSub.trial_ends_at) > new Date());
 
     if (hasAccess) return { createdInstanceId };
+  }
+
+  // Access denied — clean up the row if this request created it.
+  // Without this, the row becomes an orphan: active DB row with no
+  // backing DO and no valid subscription to provision against.
+  if (createdInstanceId) {
+    await markInstanceDestroyedById(createdInstanceId).catch(cleanupErr => {
+      console.error('[kiloclaw] Failed to clean up instance row after access denial:', cleanupErr);
+    });
   }
 
   throw new TRPCError({
@@ -1511,7 +1532,10 @@ export const kiloclawRouter = createTRPCRouter({
     }
 
     const client = new KiloClawInternalClient();
-    const status = await client.getStatus(ctx.user.id, workerInstanceId(instance));
+    const [status, inboundEmailAddress] = await Promise.all([
+      client.getStatus(ctx.user.id, workerInstanceId(instance)),
+      getInboundEmailAddressForInstance(instance.id),
+    ]);
 
     return {
       ...status,
@@ -1521,7 +1545,26 @@ export const kiloclawRouter = createTRPCRouter({
       // Legacy instances use userId-keyed DOs — returning their row UUID would
       // cause the frontend/gateway to resolve the wrong DO.
       instanceId: workerInstanceId(instance) ? instance.id : null,
+      inboundEmailAddress,
+      inboundEmailEnabled: instance.inboundEmailEnabled,
     } satisfies KiloClawDashboardStatus;
+  }),
+
+  getDiskUsage: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    if (!instance) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'No active instance' });
+    }
+    try {
+      return await queryDiskUsage(instance.sandboxId);
+    } catch (error) {
+      logDiskUsageError('Failed to fetch disk usage', { error, sandboxId: instance.sandboxId });
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch disk usage',
+        cause: error,
+      });
+    }
   }),
 
   renameInstance: baseProcedure
@@ -1536,6 +1579,16 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
     }),
+
+  cycleInboundEmailAddress: baseProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    if (!instance) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'No active instance' });
+    }
+    return {
+      inboundEmailAddress: await cycleInboundEmailAddressForInstance(instance.id),
+    };
+  }),
 
   getActiveInstanceId: clawAccessProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
@@ -1800,6 +1853,14 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       return client.patchExecPreset(ctx.user.id, input, workerInstanceId(instance));
+    }),
+
+  patchWebSearchConfig: clawAccessProcedure
+    .input(patchWebSearchConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return client.patchWebSearchConfig(ctx.user.id, input, workerInstanceId(instance));
     }),
 
   patchBotIdentity: clawAccessProcedure
@@ -3207,6 +3268,7 @@ export const kiloclawRouter = createTRPCRouter({
             sandboxId: kiloclaw_instances.sandbox_id,
             organizationId: kiloclaw_instances.organization_id,
             name: kiloclaw_instances.name,
+            inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
           })
           .from(kiloclaw_instances)
           .where(

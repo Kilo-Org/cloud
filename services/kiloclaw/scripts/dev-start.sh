@@ -760,7 +760,7 @@ fi
 # The process keeps running — it is NOT restarted later.
 
 echo "==> Starting Stripe webhook listener..."
-STRIPE_CMD="${NVM_PREFIX}cd '$MONOREPO_ROOT' && pnpm run stripe"
+STRIPE_CMD="${NVM_PREFIX}cd '$MONOREPO_ROOT' && pnpm --filter web run stripe"
 STRIPE_LOG="$(mktemp)"
 
 if [ "$DISPLAY_MODE" = "tmux" ]; then

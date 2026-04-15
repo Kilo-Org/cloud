@@ -5,6 +5,8 @@ import {
   registerKiloChatEditRoute,
   registerKiloChatDeleteRoute,
   registerKiloChatTypingRoute,
+  registerKiloChatReactionPostRoute,
+  registerKiloChatReactionDeleteRoute,
 } from './kilo-chat';
 
 const TOKEN = 'expected-gateway-token';
@@ -347,5 +349,146 @@ describe('POST /_kilo/kilo-chat/typing', () => {
       })
     );
     expect(res.status).toBe(502);
+  });
+});
+
+describe('POST /_kilo/kilo-chat/messages/:id/reactions', () => {
+  it('proxies to service with auth + sandbox header, forwards body + status', async () => {
+    const app = new Hono();
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ id: 'RXULIDXXX' }), { status: 201 });
+    }) as typeof fetch;
+
+    registerKiloChatReactionPostRoute(app, {
+      expectedToken: 'gw',
+      sandboxId: 'sbx',
+      apiToken: 'api',
+      baseUrl: 'http://svc',
+      fetchImpl,
+    });
+
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/messages/MID/reactions', {
+        method: 'POST',
+        headers: { authorization: 'Bearer gw', 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'C', emoji: '\u{1F44D}' }),
+      })
+    );
+    expect(res.status).toBe(201);
+    expect(calls[0].url).toBe('http://svc/v1/messages/MID/reactions');
+    const headers = calls[0].init.headers as Record<string, string>;
+    expect(headers.authorization).toBe('Bearer api');
+    expect(headers['x-kilo-sandbox-id']).toBe('sbx');
+    expect(calls[0].init.method).toBe('POST');
+    expect(calls[0].init.body).toBe(JSON.stringify({ conversationId: 'C', emoji: '\u{1F44D}' }));
+  });
+
+  it('passes through 200 dedupe status', async () => {
+    const app = new Hono();
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({ id: 'RXULIDXXX' }), { status: 200 })) as typeof fetch;
+    registerKiloChatReactionPostRoute(app, {
+      expectedToken: 'gw',
+      sandboxId: 's',
+      apiToken: 'a',
+      baseUrl: 'http://svc',
+      fetchImpl,
+    });
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/messages/MID/reactions', {
+        method: 'POST',
+        headers: { authorization: 'Bearer gw', 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'C', emoji: '\u{1F44D}' }),
+      })
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it('401 on missing bearer token', async () => {
+    const app = new Hono();
+    registerKiloChatReactionPostRoute(app, {
+      expectedToken: 'gw',
+      sandboxId: 's',
+      apiToken: 'a',
+      baseUrl: 'http://svc',
+      fetchImpl: (async () => new Response()) as typeof fetch,
+    });
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/messages/MID/reactions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      })
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('401 on wrong bearer token', async () => {
+    const app = new Hono();
+    registerKiloChatReactionPostRoute(app, {
+      expectedToken: 'gw',
+      sandboxId: 's',
+      apiToken: 'a',
+      baseUrl: 'http://svc',
+      fetchImpl: (async () => new Response()) as typeof fetch,
+    });
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/messages/MID/reactions', {
+        method: 'POST',
+        headers: { authorization: 'Bearer WRONG', 'content-type': 'application/json' },
+        body: '{}',
+      })
+    );
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('DELETE /_kilo/kilo-chat/messages/:id/reactions', () => {
+  it('proxies DELETE with auth + sandbox header; forwards 204', async () => {
+    const app = new Hono();
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(null, { status: 204 });
+    }) as typeof fetch;
+
+    registerKiloChatReactionDeleteRoute(app, {
+      expectedToken: 'gw',
+      sandboxId: 'sbx',
+      apiToken: 'api',
+      baseUrl: 'http://svc',
+      fetchImpl,
+    });
+
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/messages/MID/reactions', {
+        method: 'DELETE',
+        headers: { authorization: 'Bearer gw', 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'C', emoji: '\u{1F44D}' }),
+      })
+    );
+    expect(res.status).toBe(204);
+    expect(calls[0].init.method).toBe('DELETE');
+    expect(calls[0].url).toBe('http://svc/v1/messages/MID/reactions');
+    const headers = calls[0].init.headers as Record<string, string>;
+    expect(headers.authorization).toBe('Bearer api');
+    expect(headers['x-kilo-sandbox-id']).toBe('sbx');
+  });
+
+  it('401 on missing bearer', async () => {
+    const app = new Hono();
+    registerKiloChatReactionDeleteRoute(app, {
+      expectedToken: 'gw',
+      sandboxId: 's',
+      apiToken: 'a',
+      baseUrl: 'http://svc',
+      fetchImpl: (async () => new Response()) as typeof fetch,
+    });
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/messages/MID/reactions', { method: 'DELETE' })
+    );
+    expect(res.status).toBe(401);
   });
 });

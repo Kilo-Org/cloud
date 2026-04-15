@@ -121,6 +121,77 @@ export function registerKiloChatTypingRoute(app: Hono, options: KiloChatRouteOpt
   });
 }
 
+const KILO_CHAT_REACTIONS_PATH = '/_kilo/kilo-chat/messages/:messageId/reactions';
+
+export function registerKiloChatReactionPostRoute(app: Hono, options: KiloChatRouteOptions): void {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  app.post(KILO_CHAT_REACTIONS_PATH, async c => {
+    const token = getBearerToken(c.req.header('authorization'));
+    if (!token || !timingSafeTokenEqual(token, options.expectedToken)) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const messageId = c.req.param('messageId');
+    const rawBody = await c.req.text();
+
+    const upstream = await fetchImpl(
+      `${options.baseUrl}/v1/messages/${encodeURIComponent(messageId)}/reactions`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': c.req.header('content-type') ?? 'application/json',
+          authorization: `Bearer ${options.apiToken}`,
+          'x-kilo-sandbox-id': options.sandboxId,
+        },
+        body: rawBody,
+      }
+    );
+
+    const responseBody = await upstream.text();
+    return new Response(responseBody || null, {
+      status: upstream.status,
+      headers: {
+        'content-type': upstream.headers.get('content-type') ?? 'application/json',
+      },
+    });
+  });
+}
+
+export function registerKiloChatReactionDeleteRoute(
+  app: Hono,
+  options: KiloChatRouteOptions
+): void {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  app.delete(KILO_CHAT_REACTIONS_PATH, async c => {
+    const token = getBearerToken(c.req.header('authorization'));
+    if (!token || !timingSafeTokenEqual(token, options.expectedToken)) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const messageId = c.req.param('messageId');
+    const rawBody = await c.req.text();
+
+    const upstream = await fetchImpl(
+      `${options.baseUrl}/v1/messages/${encodeURIComponent(messageId)}/reactions`,
+      {
+        method: 'DELETE',
+        headers: {
+          'content-type': c.req.header('content-type') ?? 'application/json',
+          authorization: `Bearer ${options.apiToken}`,
+          'x-kilo-sandbox-id': options.sandboxId,
+        },
+        body: rawBody || undefined,
+      }
+    );
+
+    const responseBody = await upstream.text();
+    return new Response(responseBody || null, {
+      status: upstream.status,
+      headers: {
+        'content-type': upstream.headers.get('content-type') ?? 'application/json',
+      },
+    });
+  });
+}
+
 export function registerKiloChatDeleteRoute(app: Hono, options: KiloChatRouteOptions): void {
   const fetchImpl = options.fetchImpl ?? fetch;
   app.delete(KILO_CHAT_EDIT_PATH, async c => {

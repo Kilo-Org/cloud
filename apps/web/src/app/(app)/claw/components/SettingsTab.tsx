@@ -628,8 +628,11 @@ function DestroyInstanceDialog({
 
           <div className="space-y-2">
             <Label htmlFor="destroy-instance-confirmation">
-              Type <code className="bg-muted rounded px-1 py-0.5 select-text">{primaryConfirmation}</code> to
-              confirm
+              Type{' '}
+              <code className="bg-muted rounded px-1 py-0.5 select-text">
+                {primaryConfirmation}
+              </code>{' '}
+              to confirm
             </Label>
             <Input
               id="destroy-instance-confirmation"

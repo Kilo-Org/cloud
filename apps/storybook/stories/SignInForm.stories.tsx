@@ -143,22 +143,6 @@ export const LandingReturningSSO: Story = {
   },
 };
 
-export const LandingReturningOtherMethodsExpanded: Story = {
-  args: {
-    storybookInitialState: {
-      flowState: 'landing',
-      tier: 'returning',
-      email: 'user@gmail.com',
-      showOtherMethods: true,
-      hint: {
-        lastEmail: 'user@gmail.com',
-        lastAuthMethod: 'google',
-        lastLogin: new Date().toISOString(),
-      },
-    },
-  },
-};
-
 // ============================================================================
 // LANDING STATE - Tier 3: Invite
 // ============================================================================

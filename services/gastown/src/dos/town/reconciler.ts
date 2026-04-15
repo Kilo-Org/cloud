@@ -403,6 +403,27 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       const hasFailingChecks = payload.has_failing_checks === true;
       const hasUncheckedRuns = payload.has_unchecked_runs === true;
 
+      // Consolidation: if there's already an open gt:pr-conflict bead for this MR,
+      // add has_feedback: true to it instead of creating a separate feedback bead.
+      // The agent resolving conflicts will then also address review feedback afterward.
+      const existingConflictBeadId = getExistingPrConflictBeadId(sql, mrBeadId);
+      if (existingConflictBeadId) {
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.metadata} = json_set(COALESCE(${beads.metadata}, '{}'), '$.has_feedback', 1),
+                ${beads.columns.updated_at} = ?
+            WHERE ${beads.bead_id} = ?
+          `,
+          [new Date().toISOString(), existingConflictBeadId]
+        );
+        console.log(
+          `${LOG} pr_feedback_detected: merged into existing conflict bead ${existingConflictBeadId} (mrBeadId=${mrBeadId})`
+        );
+        return;
+      }
+
       const feedbackBead = beadOps.createBead(sql, {
         type: 'issue',
         title: buildFeedbackBeadTitle(
@@ -482,6 +503,28 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
           : true;
 
       if (autoResolveConflicts) {
+        // Consolidation: if there's already an open gt:pr-feedback bead for this MR,
+        // add has_conflicts: true to it instead of creating a separate conflict bead.
+        // The agent handling the feedback bead will resolve conflicts first, then
+        // address review comments.
+        const existingFeedbackBeadId = getExistingPrFeedbackBeadId(sql, mrBeadId);
+        if (existingFeedbackBeadId) {
+          query(
+            sql,
+            /* sql */ `
+              UPDATE ${beads}
+              SET ${beads.columns.metadata} = json_set(COALESCE(${beads.metadata}, '{}'), '$.has_conflicts', 1, '$.conflict_target_branch', ?),
+                  ${beads.columns.updated_at} = ?
+              WHERE ${beads.bead_id} = ?
+            `,
+            [targetBranch, new Date().toISOString(), existingFeedbackBeadId]
+          );
+          console.log(
+            `${LOG} pr_conflict_detected: merged into existing feedback bead ${existingFeedbackBeadId} (mrBeadId=${mrBeadId})`
+          );
+          return;
+        }
+
         const conflictBead = beadOps.createBead(sql, {
           type: 'issue',
           title: `Resolve merge conflicts on PR: ${branch}`,
@@ -2250,42 +2293,60 @@ function hasRecentNudge(sql: SqlStorage, agentId: string, tier: string): boolean
 
 /** Check if an MR bead has a non-terminal conflict bead (gt:pr-conflict) blocking it. */
 function hasExistingPrConflictBead(sql: SqlStorage, mrBeadId: string): boolean {
-  const rows = [
-    ...query(
-      sql,
-      /* sql */ `
-        SELECT 1 FROM ${bead_dependencies} bd
-        INNER JOIN ${beads} fb ON fb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
-        WHERE bd.${bead_dependencies.columns.bead_id} = ?
-          AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
-          AND fb.${beads.columns.labels} LIKE '%gt:pr-conflict%'
-          AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
-        LIMIT 1
-      `,
-      [mrBeadId]
-    ),
-  ];
-  return rows.length > 0;
+  return getExistingPrConflictBeadId(sql, mrBeadId) !== null;
+}
+
+/** Return the bead_id of a non-terminal conflict bead (gt:pr-conflict) blocking the MR, or null. */
+function getExistingPrConflictBeadId(sql: SqlStorage, mrBeadId: string): string | null {
+  const rows = z
+    .object({ bead_id: z.string() })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT fb.${beads.columns.bead_id}
+          FROM ${bead_dependencies} bd
+          INNER JOIN ${beads} fb ON fb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
+          WHERE bd.${bead_dependencies.columns.bead_id} = ?
+            AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
+            AND fb.${beads.columns.labels} LIKE '%gt:pr-conflict%'
+            AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
+          LIMIT 1
+        `,
+        [mrBeadId]
+      ),
+    ]);
+  return rows.length > 0 ? rows[0].bead_id : null;
 }
 
 /** Check if an MR bead has a non-terminal feedback bead (gt:pr-feedback) blocking it. */
 function hasExistingPrFeedbackBead(sql: SqlStorage, mrBeadId: string): boolean {
-  const rows = [
-    ...query(
-      sql,
-      /* sql */ `
-        SELECT 1 FROM ${bead_dependencies} bd
-        INNER JOIN ${beads} fb ON fb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
-        WHERE bd.${bead_dependencies.columns.bead_id} = ?
-          AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
-          AND fb.${beads.columns.labels} LIKE '%gt:pr-feedback%'
-          AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
-        LIMIT 1
-      `,
-      [mrBeadId]
-    ),
-  ];
-  return rows.length > 0;
+  return getExistingPrFeedbackBeadId(sql, mrBeadId) !== null;
+}
+
+/** Return the bead_id of a non-terminal feedback bead (gt:pr-feedback) blocking the MR, or null. */
+function getExistingPrFeedbackBeadId(sql: SqlStorage, mrBeadId: string): string | null {
+  const rows = z
+    .object({ bead_id: z.string() })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT fb.${beads.columns.bead_id}
+          FROM ${bead_dependencies} bd
+          INNER JOIN ${beads} fb ON fb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
+          WHERE bd.${bead_dependencies.columns.bead_id} = ?
+            AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
+            AND fb.${beads.columns.labels} LIKE '%gt:pr-feedback%'
+            AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
+          LIMIT 1
+        `,
+        [mrBeadId]
+      ),
+    ]);
+  return rows.length > 0 ? rows[0].bead_id : null;
 }
 
 /** Build a human-readable title for the feedback bead. */

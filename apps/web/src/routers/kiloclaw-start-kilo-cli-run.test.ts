@@ -15,8 +15,10 @@ type StartKiloCliRunResult = { ok: true; startedAt: string };
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
 const mockStartKiloCliRun = jest.fn<() => Promise<StartKiloCliRunResult>>();
-const mockGetKiloCliRunStatus: AnyMock = jest.fn();
-const mockCancelKiloCliRun: AnyMock = jest.fn();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockGetKiloCliRunStatus = jest.fn<(...args: any[]) => any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockCancelKiloCliRun = jest.fn<(...args: any[]) => any>();
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const actual: Record<string, unknown> = jest.requireActual(
     '@/lib/kiloclaw/kiloclaw-internal-client'

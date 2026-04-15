@@ -1,5 +1,4 @@
 import type { BYOKResult } from '@/lib/providers/types';
-import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
 import type { VercelUserByokInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
   DirectUserByokInferenceProviderIdSchema,
@@ -17,42 +16,37 @@ import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
 import * as crypto from 'crypto';
 import { unstable_cache } from 'next/cache';
 import { readDb } from '@/lib/drizzle';
-import { modelsByProvider } from '@kilocode/db/schema';
+import { gateway_config, modelsByProvider } from '@kilocode/db/schema';
 import { desc } from 'drizzle-orm';
 import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
 
-// EMERGENCY SWITCH
-// This routes all models that normally would be routed to OpenRouter to Vercel instead.
-// Many of these models are not available, named differently or not tested on Vercel.
-// Only use when OpenRouter is down and automatic failover is not working adequately.
-const ENABLE_UNIVERSAL_VERCEL_ROUTING = false;
-
-const ERROR_RATE_THRESHOLD = 0.5;
+const DEFAULT_VERCEL_ROUTING_PERCENTAGE = 10;
 
 function getRandomNumberLessThan100(randomSeed: string) {
   return crypto.createHash('sha256').update(randomSeed).digest().readUInt32BE(0) % 100;
 }
 
+const getVercelRoutingPercentageOverride_cached = unstable_cache(
+  async () => {
+    const row = await readDb.select().from(gateway_config).limit(1);
+    return row.at(0)?.vercel_routing_percentage ?? null;
+  },
+  ['gateway-config-vercel-routing-percentage'],
+  { revalidate: 60 }
+);
+
 async function getVercelRoutingPercentage() {
-  if (ENABLE_UNIVERSAL_VERCEL_ROUTING) {
-    console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
-    return 100;
+  try {
+    const override = await getVercelRoutingPercentageOverride_cached();
+    if (override !== null) {
+      console.debug(`[getVercelRoutingPercentage] using admin override: ${override}%`);
+      return override;
+    }
+  } catch (e) {
+    console.error(`[getVercelRoutingPercentage] failed to read override`, e);
   }
-  const errorRate = await getGatewayErrorRate();
-  const isOpenRouterErrorRateHigh = errorRate.openrouter > ERROR_RATE_THRESHOLD;
-  const isVercelErrorRateHigh = errorRate.vercel > ERROR_RATE_THRESHOLD;
-  if (isOpenRouterErrorRateHigh && !isVercelErrorRateHigh) {
-    console.error(
-      `[getVercelRoutingPercentage] OpenRouter error rate is high: ${errorRate.openrouter}`
-    );
-    return 90;
-  }
-  if (!isOpenRouterErrorRateHigh && isVercelErrorRateHigh) {
-    console.error(`[getVercelRoutingPercentage] Vercel error rate is high: ${errorRate.vercel}`);
-    return 10;
-  }
-  return 10;
+  return DEFAULT_VERCEL_ROUTING_PERCENTAGE;
 }
 
 const getVercelModels_cached = unstable_cache(

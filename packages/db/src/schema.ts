@@ -4164,3 +4164,12 @@ export const channel_badge_counts = pgTable(
 
 export type ChannelBadgeCount = typeof channel_badge_counts.$inferSelect;
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;
+
+// Single-row table for admin-configurable gateway routing settings.
+// The vercel_routing_percentage column is nullable: null means "use default logic".
+export const gateway_config = pgTable('gateway_config', {
+  id: integer().primaryKey().default(1),
+  vercel_routing_percentage: integer(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updated_by: text(),
+});

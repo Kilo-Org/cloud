@@ -198,6 +198,8 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.gateway.restart',
   'kiloclaw.config.restore',
   'kiloclaw.doctor.run',
+  'kiloclaw.inbound_email.cycle',
+  'kiloclaw.inbound_email.update_enabled',
   'kiloclaw.machine.destroy_fly',
   'kiloclaw.machine.resize',
   'kiloclaw.subscription.bulk_trial_grant',

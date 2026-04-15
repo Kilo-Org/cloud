@@ -28,7 +28,10 @@ import {
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
-import { getInboundEmailAddressForInstance } from '@/lib/kiloclaw/inbound-email-alias';
+import {
+  cycleInboundEmailAddressForInstance,
+  getInboundEmailAddressForInstance,
+} from '@/lib/kiloclaw/inbound-email-alias';
 import {
   ensureActiveInstance,
   getActiveOrgInstance,
@@ -294,6 +297,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
         name: null,
         instanceId: null,
         inboundEmailAddress: null,
+        inboundEmailEnabled: false,
       } satisfies KiloClawDashboardStatus;
     }
 
@@ -309,6 +313,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       workerUrl,
       instanceId: instance.id,
       inboundEmailAddress,
+      inboundEmailEnabled: instance.inboundEmailEnabled,
     } satisfies KiloClawDashboardStatus;
   }),
 
@@ -342,6 +347,13 @@ export const organizationKiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code, message });
       }
     }),
+
+  cycleInboundEmailAddress: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+    return {
+      inboundEmailAddress: await cycleInboundEmailAddressForInstance(instance.id),
+    };
+  }),
 
   // ── Lifecycle ─────────────────────────────────────────────────
 

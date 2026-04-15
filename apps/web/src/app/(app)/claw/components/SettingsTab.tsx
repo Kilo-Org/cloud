@@ -666,10 +666,22 @@ function DestroyInstanceDialog({
   );
 }
 
-function InboundEmailCard({ address }: { address: string }) {
+function InboundEmailCard({
+  address,
+  enabled,
+  isCycling,
+  onCycle,
+}: {
+  address: string | null;
+  enabled: boolean;
+  isCycling: boolean;
+  onCycle: () => void;
+}) {
   const [copied, setCopied] = useState(false);
+  const [confirmCycle, setConfirmCycle] = useState(false);
 
   function handleCopy() {
+    if (!address) return;
     void navigator.clipboard
       .writeText(address)
       .then(() => toast.success('Inbound email address copied'))
@@ -686,20 +698,50 @@ function InboundEmailCard({ address }: { address: string }) {
           <div className="min-w-0">
             <p className="text-sm font-medium">Inbound Email</p>
             <p className="text-muted-foreground text-xs">
-              Send email to this address to message your agent.
+              {enabled
+                ? 'Send email to this address to message your agent.'
+                : 'Inbound email is disabled for this instance.'}
             </p>
           </div>
         </div>
         <div className="flex min-w-0 items-center gap-2">
-          <code className="bg-muted text-foreground min-w-0 truncate rounded px-2 py-1 text-xs">
-            {address}
-          </code>
-          <Button variant="outline" size="sm" onClick={handleCopy}>
+          {address && enabled ? (
+            <code className="bg-muted text-foreground min-w-0 truncate rounded px-2 py-1 text-xs">
+              {address}
+            </code>
+          ) : (
+            <span className="text-muted-foreground text-xs">Unavailable</span>
+          )}
+          <Button variant="outline" size="sm" onClick={handleCopy} disabled={!address || !enabled}>
             {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
             Copy
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setConfirmCycle(true)}
+            disabled={!enabled || isCycling}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Cycle
+          </Button>
         </div>
       </div>
+      <ConfirmActionDialog
+        open={confirmCycle}
+        onOpenChange={setConfirmCycle}
+        title="Cycle inbound email address?"
+        description="This cannot be undone. The current address will stop working immediately and cannot be reassigned later."
+        confirmLabel="Cycle Address"
+        confirmIcon={<RotateCcw className="h-4 w-4" />}
+        isPending={isCycling}
+        pendingLabel="Cycling"
+        onConfirm={() => {
+          onCycle();
+          setConfirmCycle(false);
+        }}
+        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+      />
     </div>
   );
 }
@@ -813,6 +855,13 @@ export function SettingsTab({
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
 
+  function handleCycleInboundEmailAddress() {
+    mutations.cycleInboundEmailAddress.mutate(undefined, {
+      onSuccess: data => toast.success(`New inbound email address: ${data.inboundEmailAddress}`),
+      onError: err => toast.error(`Failed to cycle inbound email address: ${err.message}`),
+    });
+  }
+
   function handleSave() {
     if (hasModelSelectionError) {
       toast.error(modelSelectionError);
@@ -862,7 +911,14 @@ export function SettingsTab({
         />
       </div>
 
-      {status.inboundEmailAddress && <InboundEmailCard address={status.inboundEmailAddress} />}
+      {status.status !== null && (
+        <InboundEmailCard
+          address={status.inboundEmailAddress}
+          enabled={status.inboundEmailEnabled}
+          isCycling={mutations.cycleInboundEmailAddress.isPending}
+          onCycle={handleCycleInboundEmailAddress}
+        />
+      )}
 
       {/* ── Pairing Requests ── */}
       {isRunning && <PairingSection mutations={mutations} />}

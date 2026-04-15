@@ -13,7 +13,12 @@ export async function lookupInstanceIdByAlias(env: AppEnv, alias: string): Promi
       eq(kiloclaw_instances.id, kiloclaw_inbound_email_aliases.instance_id)
     )
     .where(
-      and(eq(kiloclaw_inbound_email_aliases.alias, alias), isNull(kiloclaw_instances.destroyed_at))
+      and(
+        eq(kiloclaw_inbound_email_aliases.alias, alias),
+        isNull(kiloclaw_inbound_email_aliases.retired_at),
+        isNull(kiloclaw_instances.destroyed_at),
+        eq(kiloclaw_instances.inbound_email_enabled, true)
+      )
     )
     .limit(1);
 

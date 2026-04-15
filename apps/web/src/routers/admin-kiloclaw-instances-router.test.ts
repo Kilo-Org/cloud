@@ -2,7 +2,12 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_admin_audit_logs } from '@kilocode/db/schema';
+import {
+  kiloclaw_admin_audit_logs,
+  kiloclaw_inbound_email_aliases,
+  kiloclaw_inbound_email_reserved_aliases,
+  kiloclaw_instances,
+} from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -44,6 +49,19 @@ function flyDebugStatus(overrides: Record<string, unknown> = {}) {
     status: 'running',
     ...overrides,
   };
+}
+
+async function insertInboundEmailInstance() {
+  const instanceId = crypto.randomUUID();
+  const alias = `admin-test-${instanceId.slice(0, 8)}`;
+  await db.insert(kiloclaw_instances).values({
+    id: instanceId,
+    user_id: regularUser.id,
+    sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+  });
+  await db.insert(kiloclaw_inbound_email_reserved_aliases).values({ alias });
+  await db.insert(kiloclaw_inbound_email_aliases).values({ alias, instance_id: instanceId });
+  return { instanceId, alias };
 }
 
 beforeAll(async () => {
@@ -231,5 +249,64 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
     ).rejects.toThrow('Invalid Fly machine ID');
 
     expect(mockGetDebugStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin.kiloclawInstances inbound email controls', () => {
+  it('cycles the active alias and writes an audit log', async () => {
+    const { instanceId, alias } = await insertInboundEmailInstance();
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.kiloclawInstances.cycleInboundEmailAddress({
+      id: instanceId,
+    });
+
+    expect(result.inboundEmailAddress).toMatch(/@kiloclaw\.ai$/);
+    expect(result.inboundEmailAddress).not.toBe(`${alias}@kiloclaw.ai`);
+
+    const rows = await db
+      .select()
+      .from(kiloclaw_inbound_email_aliases)
+      .where(eq(kiloclaw_inbound_email_aliases.instance_id, instanceId));
+    expect(rows).toHaveLength(2);
+    expect(rows.find(row => row.alias === alias)?.retired_at).not.toBeNull();
+    expect(rows.filter(row => row.retired_at === null)).toHaveLength(1);
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_admin_audit_logs)
+      .where(
+        and(
+          eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+          eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.inbound_email.cycle')
+        )
+      );
+    expect(logs).toHaveLength(1);
+    expect(logs[0].metadata).toEqual({ instanceId });
+  });
+
+  it('disables inbound email and writes an audit log', async () => {
+    const { instanceId } = await insertInboundEmailInstance();
+    const caller = await createCallerForUser(adminUser.id);
+
+    await caller.admin.kiloclawInstances.setInboundEmailEnabled({ id: instanceId, enabled: false });
+
+    const [row] = await db
+      .select({ inbound_email_enabled: kiloclaw_instances.inbound_email_enabled })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instanceId));
+    expect(row?.inbound_email_enabled).toBe(false);
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_admin_audit_logs)
+      .where(
+        and(
+          eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+          eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.inbound_email.update_enabled')
+        )
+      );
+    expect(logs).toHaveLength(1);
+    expect(logs[0].metadata).toEqual({ instanceId, enabled: false });
   });
 });

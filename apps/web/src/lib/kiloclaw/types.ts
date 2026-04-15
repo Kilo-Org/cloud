@@ -424,4 +424,5 @@ export type KiloClawDashboardStatus = PlatformStatusResponse & {
   instanceId: string | null;
   /** Copyable inbound email address for routing messages into this instance. */
   inboundEmailAddress: string | null;
+  inboundEmailEnabled: boolean;
 };

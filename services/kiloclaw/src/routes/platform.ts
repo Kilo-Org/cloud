@@ -37,6 +37,8 @@ import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
 import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
 import { getInstanceById, getWorkerDb } from '../db';
+import { kiloclaw_inbound_email_aliases } from '@kilocode/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
 
 const GmailHistoryIdSchema = z.object({
   userId: z.string().min(1),
@@ -1748,7 +1750,6 @@ const InboundEmailSchema = z.object({
   messageId: z.string().trim().min(1).max(512),
   from: z.string().trim().min(1).max(512),
   to: z.string().trim().min(1).max(512),
-  recipientKind: z.enum(['legacy', 'alias']).optional(),
   recipientAlias: z.string().trim().min(1).max(512).optional(),
   subject: z.string().max(1_000),
   text: z.string().min(1).max(32_000),
@@ -1773,10 +1774,6 @@ function inboundEmailSessionKey(subject: string, receivedAt: string): string {
   return `inbound-email:${receivedAt.slice(0, 10)}-${inboundEmailTitleSlug(subject)}`;
 }
 
-function inboundEmailExpectedLocalPart(instanceId: string): string {
-  return `ki-${instanceId.replace(/-/g, '')}`;
-}
-
 function inboundEmailAddressParts(address: string): {
   localPart: string;
   domain: string;
@@ -1793,7 +1790,6 @@ function inboundEmailAddressParts(address: string): {
 function inboundEmailLogContext(delivery: InboundEmailDelivery) {
   const recipient = inboundEmailAddressParts(delivery.to);
   const sender = inboundEmailAddressParts(delivery.from);
-  const expectedRecipientLocalPart = inboundEmailExpectedLocalPart(delivery.instanceId);
 
   return {
     instanceId: delivery.instanceId,
@@ -1802,10 +1798,7 @@ function inboundEmailLogContext(delivery: InboundEmailDelivery) {
     toLocalPart: recipient.localPart,
     toDomain: recipient.domain,
     toAddressValid: recipient.validSingleAddress,
-    recipientKind: delivery.recipientKind ?? null,
     recipientAlias: delivery.recipientAlias ?? null,
-    expectedToLocalPart: expectedRecipientLocalPart,
-    toMatchesInstanceId: recipient.localPart === expectedRecipientLocalPart,
     subjectLength: delivery.subject.length,
     textLength: delivery.text.length,
     receivedAt: delivery.receivedAt,
@@ -1842,12 +1835,11 @@ platform.post('/inbound-email', async c => {
 
   const delivery = result.data;
   const logContext = inboundEmailLogContext(delivery);
+  const recipientAlias = delivery.recipientAlias?.toLowerCase();
   console.log('[platform] inbound email received', logContext);
-  if (
-    (!delivery.recipientKind || delivery.recipientKind === 'legacy') &&
-    !logContext.toMatchesInstanceId
-  ) {
-    console.warn('[platform] inbound email recipient does not match instanceId', logContext);
+  if (!recipientAlias) {
+    console.warn('[platform] inbound email missing alias metadata', logContext);
+    return jsonError('Inbound email address is no longer available', 410);
   }
 
   const connectionString = c.env.HYPERDRIVE?.connectionString;
@@ -1861,11 +1853,33 @@ platform.post('/inbound-email', async c => {
   }
 
   try {
-    const instance = await getInstanceById(getWorkerDb(connectionString), delivery.instanceId);
+    const db = getWorkerDb(connectionString);
+    const instance = await getInstanceById(db, delivery.instanceId);
     if (!instance) {
       console.warn('[platform] inbound email instance not found', logContext);
       return jsonError('Instance not found', 404);
     }
+    if (!instance.inboundEmailEnabled) {
+      console.warn('[platform] inbound email disabled for instance', logContext);
+      return jsonError('Inbound email is disabled for this instance', 410);
+    }
+
+    const [activeAlias] = await db
+      .select({ alias: kiloclaw_inbound_email_aliases.alias })
+      .from(kiloclaw_inbound_email_aliases)
+      .where(
+        and(
+          eq(kiloclaw_inbound_email_aliases.instance_id, instance.id),
+          eq(kiloclaw_inbound_email_aliases.alias, recipientAlias),
+          isNull(kiloclaw_inbound_email_aliases.retired_at)
+        )
+      )
+      .limit(1);
+    if (!activeAlias) {
+      console.warn('[platform] inbound email alias is not active', logContext);
+      return jsonError('Inbound email address is no longer available', 410);
+    }
+
     c.set('userId', instance.userId);
     console.log('[platform] inbound email instance resolved', {
       ...logContext,

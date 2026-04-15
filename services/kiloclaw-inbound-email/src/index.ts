@@ -42,7 +42,6 @@ async function buildQueueMessage(
 
   return {
     instanceId: recipient.instanceId,
-    recipientKind: recipient.recipientKind,
     recipientAlias: recipient.recipientAlias,
     messageId: truncate(messageId, 512),
     from: truncate(parsed.from ?? message.from, 512),

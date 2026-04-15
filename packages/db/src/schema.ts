@@ -3672,6 +3672,7 @@ export const kiloclaw_instances = pgTable(
     // Null = personal instance. Non-null = org-owned instance.
     organization_id: uuid().references(() => organizations.id),
     name: text(),
+    inbound_email_enabled: boolean().default(true).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
@@ -3685,6 +3686,19 @@ export const kiloclaw_instances = pgTable(
 
 export type KiloClawInstance = typeof kiloclaw_instances.$inferSelect;
 
+export const kiloclaw_inbound_email_reserved_aliases = pgTable(
+  'kiloclaw_inbound_email_reserved_aliases',
+  {
+    alias: text().primaryKey().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  }
+);
+
+export type KiloClawInboundEmailReservedAlias =
+  typeof kiloclaw_inbound_email_reserved_aliases.$inferSelect;
+export type NewKiloClawInboundEmailReservedAlias =
+  typeof kiloclaw_inbound_email_reserved_aliases.$inferInsert;
+
 export const kiloclaw_inbound_email_aliases = pgTable(
   'kiloclaw_inbound_email_aliases',
   {
@@ -3692,8 +3706,15 @@ export const kiloclaw_inbound_email_aliases = pgTable(
     instance_id: uuid()
       .notNull()
       .references(() => kiloclaw_instances.id, { onDelete: 'cascade' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    retired_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
-  table => [index('IDX_kiloclaw_inbound_email_aliases_instance_id').on(table.instance_id)]
+  table => [
+    index('IDX_kiloclaw_inbound_email_aliases_instance_id').on(table.instance_id),
+    uniqueIndex('UQ_kiloclaw_inbound_email_aliases_active_instance')
+      .on(table.instance_id)
+      .where(isNull(table.retired_at)),
+  ]
 );
 
 export type KiloClawInboundEmailAlias = typeof kiloclaw_inbound_email_aliases.$inferSelect;

@@ -12,6 +12,7 @@ export type ActiveKiloClawInstance = {
   sandboxId: string;
   organizationId: string | null;
   name: string | null;
+  inboundEmailEnabled: boolean;
 };
 
 export type EnsureActiveInstanceResult = {
@@ -78,6 +79,7 @@ export async function ensureActiveInstance(
     sandboxId: kiloclaw_instances.sandbox_id,
     organizationId: kiloclaw_instances.organization_id,
     name: kiloclaw_instances.name,
+    inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
   };
 
   if (opts?.orgId) {
@@ -175,6 +177,7 @@ export async function markActiveInstanceDestroyed(
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
     });
 
   return row ?? null;
@@ -220,6 +223,7 @@ export async function getActiveInstance(userId: string): Promise<ActiveKiloClawI
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
     .where(
@@ -248,6 +252,7 @@ export async function getInstanceById(instanceId: string): Promise<ActiveKiloCla
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
     .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
@@ -271,6 +276,7 @@ export async function getActiveOrgInstance(
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
     .where(
@@ -303,6 +309,7 @@ export async function listAllActiveInstances(userId: string): Promise<ActiveKilo
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
     .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
@@ -331,6 +338,7 @@ export async function listActiveOrgInstances(orgId: string): Promise<ActiveKiloC
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
     .where(

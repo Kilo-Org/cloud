@@ -1,8 +1,11 @@
 import 'server-only';
 
 import { randomInt } from 'node:crypto';
-import { eq } from 'drizzle-orm';
-import { kiloclaw_inbound_email_aliases } from '@kilocode/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
+import {
+  kiloclaw_inbound_email_aliases,
+  kiloclaw_inbound_email_reserved_aliases,
+} from '@kilocode/db/schema';
 import { KILOCLAW_INBOUND_EMAIL_DOMAIN } from '@/lib/config.server';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
@@ -119,13 +122,6 @@ export function normalizeInboundEmailAlias(alias: string): string {
   return alias.trim().toLowerCase();
 }
 
-export function legacyInboundEmailAddress(
-  instanceId: string,
-  domain: string = KILOCLAW_INBOUND_EMAIL_DOMAIN
-): string {
-  return `ki-${instanceId.replace(/-/g, '')}@${domain}`;
-}
-
 export function generateInboundEmailAlias(): string {
   return ALIAS_WORDS.map(group => {
     const word = group[randomInt(group.length)];
@@ -134,35 +130,73 @@ export function generateInboundEmailAlias(): string {
   }).join('-');
 }
 
-export async function createDefaultInboundEmailAlias(
-  tx: DrizzleTransaction,
-  instanceId: string
-): Promise<string> {
+async function reserveInboundEmailAlias(tx: DrizzleTransaction): Promise<string> {
   for (let attempt = 0; attempt < MAX_ALIAS_INSERT_ATTEMPTS; attempt += 1) {
     const alias = normalizeInboundEmailAlias(generateInboundEmailAlias());
     const [inserted] = await tx
-      .insert(kiloclaw_inbound_email_aliases)
-      .values({ alias, instance_id: instanceId })
+      .insert(kiloclaw_inbound_email_reserved_aliases)
+      .values({ alias })
       .onConflictDoNothing()
-      .returning({ alias: kiloclaw_inbound_email_aliases.alias });
+      .returning({ alias: kiloclaw_inbound_email_reserved_aliases.alias });
 
     if (inserted) return inserted.alias;
   }
 
-  throw new Error('Failed to allocate a unique inbound email alias');
+  throw new Error('Failed to reserve a unique inbound email alias');
+}
+
+async function createInboundEmailAlias(
+  tx: DrizzleTransaction,
+  instanceId: string
+): Promise<string> {
+  const alias = await reserveInboundEmailAlias(tx);
+  await tx.insert(kiloclaw_inbound_email_aliases).values({ alias, instance_id: instanceId });
+  return alias;
+}
+
+export async function createDefaultInboundEmailAlias(
+  tx: DrizzleTransaction,
+  instanceId: string
+): Promise<string> {
+  return createInboundEmailAlias(tx, instanceId);
+}
+
+export async function cycleInboundEmailAddressForInstance(
+  instanceId: string,
+  domain: string = KILOCLAW_INBOUND_EMAIL_DOMAIN
+): Promise<string> {
+  const alias = await db.transaction(async tx => {
+    await tx
+      .update(kiloclaw_inbound_email_aliases)
+      .set({ retired_at: new Date().toISOString() })
+      .where(
+        and(
+          eq(kiloclaw_inbound_email_aliases.instance_id, instanceId),
+          isNull(kiloclaw_inbound_email_aliases.retired_at)
+        )
+      );
+
+    return createInboundEmailAlias(tx, instanceId);
+  });
+
+  return `${alias}@${domain}`;
 }
 
 export async function getInboundEmailAddressForInstance(
   instanceId: string,
   domain: string = KILOCLAW_INBOUND_EMAIL_DOMAIN
-): Promise<string> {
+): Promise<string | null> {
   const [aliasRow] = await db
     .select({ alias: kiloclaw_inbound_email_aliases.alias })
     .from(kiloclaw_inbound_email_aliases)
-    .where(eq(kiloclaw_inbound_email_aliases.instance_id, instanceId))
-    .orderBy(kiloclaw_inbound_email_aliases.alias)
+    .where(
+      and(
+        eq(kiloclaw_inbound_email_aliases.instance_id, instanceId),
+        isNull(kiloclaw_inbound_email_aliases.retired_at)
+      )
+    )
     .limit(1);
 
-  if (aliasRow) return `${aliasRow.alias}@${domain}`;
-  return legacyInboundEmailAddress(instanceId, domain);
+  if (!aliasRow) return null;
+  return `${aliasRow.alias}@${domain}`;
 }

@@ -165,6 +165,9 @@ export function useKiloClawMutations() {
     provision: useMutation(
       trpc.kiloclaw.provision.mutationOptions({ onSuccess: invalidateStatusAndBilling })
     ),
+    cycleInboundEmailAddress: useMutation(
+      trpc.kiloclaw.cycleInboundEmailAddress.mutationOptions({ onSuccess: invalidateStatus })
+    ),
     patchConfig: useMutation(
       trpc.kiloclaw.patchConfig.mutationOptions({ onSuccess: invalidateStatus })
     ),

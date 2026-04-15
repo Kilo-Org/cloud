@@ -67,6 +67,7 @@ const fakeStatus = {
   name: 'Fake KiloClaw',
   instanceId: 'fake-instance',
   inboundEmailAddress: null,
+  inboundEmailEnabled: false,
 } satisfies PopulatedClawStatus;
 
 export function ClawOnboardingFakeWalkthrough({

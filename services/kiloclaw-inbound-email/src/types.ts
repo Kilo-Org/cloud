@@ -1,7 +1,6 @@
 export type InboundEmailQueueMessage = {
   instanceId: string;
-  recipientKind: 'legacy' | 'alias';
-  recipientAlias?: string;
+  recipientAlias: string;
   messageId: string;
   from: string;
   to: string;

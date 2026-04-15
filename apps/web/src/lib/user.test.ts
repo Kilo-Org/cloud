@@ -28,6 +28,7 @@ import {
   stytch_fingerprints,
   kiloclaw_instances,
   kiloclaw_inbound_email_aliases,
+  kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   security_findings,
@@ -1159,9 +1160,14 @@ describe('User', () => {
         })
         .returning({ id: kiloclaw_instances.id });
 
+      const alias = `soft-delete-${Date.now()}`;
+      const otherAlias = `soft-delete-other-${Date.now()}`;
+      await db
+        .insert(kiloclaw_inbound_email_reserved_aliases)
+        .values([{ alias }, { alias: otherAlias }]);
       await db.insert(kiloclaw_inbound_email_aliases).values([
-        { alias: `soft-delete-${Date.now()}`, instance_id: instance.id },
-        { alias: `soft-delete-other-${Date.now()}`, instance_id: otherInstance.id },
+        { alias, instance_id: instance.id },
+        { alias: otherAlias, instance_id: otherInstance.id },
       ]);
 
       await softDeleteUser(user.id);
@@ -1178,6 +1184,13 @@ describe('User', () => {
           .select({ count: count() })
           .from(kiloclaw_inbound_email_aliases)
           .where(eq(kiloclaw_inbound_email_aliases.instance_id, otherInstance.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_inbound_email_reserved_aliases)
+          .where(eq(kiloclaw_inbound_email_reserved_aliases.alias, alias))
           .then(r => r[0].count)
       ).toBe(1);
     });

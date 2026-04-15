@@ -123,6 +123,7 @@ export async function getInstanceById(db: WorkerDb, instanceId: string) {
       sandbox_id: kiloclaw_instances.sandbox_id,
       user_id: kiloclaw_instances.user_id,
       organization_id: kiloclaw_instances.organization_id,
+      inbound_email_enabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
     .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
@@ -135,6 +136,7 @@ export async function getInstanceById(db: WorkerDb, instanceId: string) {
     sandboxId: row.sandbox_id,
     userId: row.user_id,
     orgId: row.organization_id,
+    inboundEmailEnabled: row.inbound_email_enabled,
   };
 }
 

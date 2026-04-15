@@ -8,6 +8,10 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
+import {
+  cycleInboundEmailAddressForInstance,
+  getInboundEmailAddressForInstance,
+} from '@/lib/kiloclaw/inbound-email-alias';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import {
@@ -72,6 +76,11 @@ const GetInstanceSchema = z.object({
 
 const DestroyInstanceSchema = z.object({
   id: z.string().uuid(),
+});
+
+const SetInboundEmailEnabledSchema = z.object({
+  id: z.string().uuid(),
+  enabled: z.boolean(),
 });
 
 const VolumeSnapshotsSchema = z.object({
@@ -179,6 +188,7 @@ export type AdminKiloclawInstance = {
   organization_id: string | null;
   created_at: string;
   destroyed_at: string | null;
+  inbound_email_enabled: boolean;
   suspended_at: string | null;
   user_email: string | null;
   subscription_id: string | null;
@@ -187,6 +197,7 @@ export type AdminKiloclawInstance = {
 
 export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
   derived_fly_app_name: string;
+  inbound_email_address: string | null;
   workerStatus: PlatformDebugStatusResponse | null;
   workerStatusError: string | null;
 };
@@ -221,6 +232,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       organization_id: result.instance.organization_id,
       created_at: result.instance.created_at,
       destroyed_at: result.instance.destroyed_at,
+      inbound_email_enabled: result.instance.inbound_email_enabled,
       suspended_at: result.suspended_at ?? null,
       user_email: result.user_email,
       subscription_id: result.subscription_id ?? null,
@@ -228,6 +240,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     };
 
     const derivedFlyAppName = flyAppNameFromUserId(instance.user_id);
+    const inboundEmailAddress = await getInboundEmailAddressForInstance(instance.id);
 
     // Fetch live worker status for all instances.
     // DB may be marked destroyed while DO is still retrying destroy.
@@ -249,10 +262,60 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     return {
       ...instance,
       derived_fly_app_name: derivedFlyAppName,
+      inbound_email_address: inboundEmailAddress,
       workerStatus,
       workerStatusError,
     } satisfies AdminKiloclawInstanceDetail;
   }),
+
+  cycleInboundEmailAddress: adminProcedure
+    .input(GetInstanceSchema)
+    .mutation(async ({ input, ctx }) => {
+      const [instance] = await db
+        .select({ id: kiloclaw_instances.id, user_id: kiloclaw_instances.user_id })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, input.id))
+        .limit(1);
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      }
+
+      const inboundEmailAddress = await cycleInboundEmailAddressForInstance(instance.id);
+      await createKiloClawAdminAuditLog({
+        action: 'kiloclaw.inbound_email.cycle',
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        target_user_id: instance.user_id,
+        message: `Inbound email address cycled for instance ${instance.id}`,
+        metadata: { instanceId: instance.id },
+      });
+      return { inboundEmailAddress };
+    }),
+
+  setInboundEmailEnabled: adminProcedure
+    .input(SetInboundEmailEnabledSchema)
+    .mutation(async ({ input, ctx }) => {
+      const [instance] = await db
+        .update(kiloclaw_instances)
+        .set({ inbound_email_enabled: input.enabled })
+        .where(eq(kiloclaw_instances.id, input.id))
+        .returning({ id: kiloclaw_instances.id, user_id: kiloclaw_instances.user_id });
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      }
+
+      await createKiloClawAdminAuditLog({
+        action: 'kiloclaw.inbound_email.update_enabled',
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        target_user_id: instance.user_id,
+        message: `Inbound email ${input.enabled ? 'enabled' : 'disabled'} for instance ${instance.id}`,
+        metadata: { instanceId: instance.id, enabled: input.enabled },
+      });
+      return { ok: true };
+    }),
 
   registryEntries: adminProcedure
     .input(z.object({ userId: z.string().min(1), orgId: z.string().optional() }))
@@ -341,6 +404,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       organization_id: row.instance.organization_id,
       created_at: row.instance.created_at,
       destroyed_at: row.instance.destroyed_at,
+      inbound_email_enabled: row.instance.inbound_email_enabled,
       suspended_at: row.suspended_at ?? null,
       user_email: row.user_email,
       subscription_id: row.subscription_id ?? null,

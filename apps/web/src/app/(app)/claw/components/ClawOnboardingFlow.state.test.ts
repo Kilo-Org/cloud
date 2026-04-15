@@ -56,6 +56,7 @@ function createStatus(status: KiloClawDashboardStatus['status']): KiloClawDashbo
     workerUrl: 'https://claw.kilo.ai',
     instanceId: null,
     inboundEmailAddress: null,
+    inboundEmailEnabled: false,
   };
 }
 

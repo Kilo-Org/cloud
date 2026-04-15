@@ -39,7 +39,10 @@ import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
-import { getInboundEmailAddressForInstance } from '@/lib/kiloclaw/inbound-email-alias';
+import {
+  cycleInboundEmailAddressForInstance,
+  getInboundEmailAddressForInstance,
+} from '@/lib/kiloclaw/inbound-email-alias';
 import {
   ensureActiveInstance,
   getActiveInstance,
@@ -500,6 +503,7 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
     name: null,
     instanceId: null,
     inboundEmailAddress: null,
+    inboundEmailEnabled: false,
   } satisfies KiloClawDashboardStatus;
 }
 
@@ -1533,6 +1537,7 @@ export const kiloclawRouter = createTRPCRouter({
       // cause the frontend/gateway to resolve the wrong DO.
       instanceId: workerInstanceId(instance) ? instance.id : null,
       inboundEmailAddress,
+      inboundEmailEnabled: instance.inboundEmailEnabled,
     } satisfies KiloClawDashboardStatus;
   }),
 
@@ -1565,6 +1570,16 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
     }),
+
+  cycleInboundEmailAddress: baseProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    if (!instance) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'No active instance' });
+    }
+    return {
+      inboundEmailAddress: await cycleInboundEmailAddressForInstance(instance.id),
+    };
+  }),
 
   getActiveInstanceId: clawAccessProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
@@ -3244,6 +3259,7 @@ export const kiloclawRouter = createTRPCRouter({
             sandboxId: kiloclaw_instances.sandbox_id,
             organizationId: kiloclaw_instances.organization_id,
             name: kiloclaw_instances.name,
+            inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
           })
           .from(kiloclaw_instances)
           .where(

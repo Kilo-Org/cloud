@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AuthContext } from '../auth';
+import { setTypingFor } from '../services/typing';
 
 const ulidSchema = z.string().regex(/^[0-9A-Z]{26}$/, 'Invalid ULID');
 
@@ -10,16 +11,11 @@ export function registerTypingRoutes(app: Hono<{ Bindings: Env; Variables: AuthC
     if (!idParam.success) {
       return c.json({ error: 'Invalid conversation ID' }, 400);
     }
-    const conversationId = idParam.data;
     const callerId = c.get('callerId');
-
-    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
-
-    const result = await convStub.setTyping(callerId);
+    const result = await setTypingFor(c.env, callerId, { conversationId: idParam.data });
     if (!result.ok) {
-      return c.json({ error: 'Forbidden' }, 403);
+      return c.json({ error: result.error }, 403);
     }
-
     return c.json({});
   });
 }

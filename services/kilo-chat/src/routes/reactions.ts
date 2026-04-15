@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AuthContext } from '../auth';
+import { addReactionFor, removeReactionFor } from '../services/reactions';
 
 const ulidSchema = z.string().regex(/^[0-9A-Z]{26}$/, 'Invalid ULID');
 
@@ -44,16 +45,13 @@ export function registerReactionsRoutes(
     }
 
     const callerId = c.get('callerId');
-    const { conversationId, emoji } = body.data;
-    const stub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
-    if (!(await stub.isMember(callerId))) return c.json({ error: 'Forbidden' }, 403);
-
-    const result = await stub.addReaction({
+    const result = await addReactionFor(c.env, callerId, {
+      conversationId: body.data.conversationId,
       messageId: msgIdParam.data,
-      memberId: callerId,
-      emoji,
+      emoji: body.data.emoji,
     });
     if (!result.ok) {
+      if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
       return c.json({ error: result.error }, 500);
     }
     return c.json({ id: result.id }, result.added ? 201 : 200);
@@ -75,16 +73,13 @@ export function registerReactionsRoutes(
     }
 
     const callerId = c.get('callerId');
-    const { conversationId, emoji } = body.data;
-    const stub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
-    if (!(await stub.isMember(callerId))) return c.json({ error: 'Forbidden' }, 403);
-
-    const result = await stub.removeReaction({
+    const result = await removeReactionFor(c.env, callerId, {
+      conversationId: body.data.conversationId,
       messageId: msgIdParam.data,
-      memberId: callerId,
-      emoji,
+      emoji: body.data.emoji,
     });
     if (!result.ok) {
+      if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
       return c.json({ error: result.error }, 500);
     }
     return new Response(null, { status: 204 });

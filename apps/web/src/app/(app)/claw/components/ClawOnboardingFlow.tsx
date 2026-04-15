@@ -44,6 +44,10 @@ function MaybeBillingWrapper({
   return <BillingWrapper hideBanners={hideBanners}>{children}</BillingWrapper>;
 }
 
+function assertNever(value: never): never {
+  throw new Error(`Unhandled KiloClaw onboarding render step: ${value}`);
+}
+
 export type { ClawOnboardingMode };
 
 export function ClawOnboardingFlow({
@@ -301,7 +305,9 @@ function ClawOnboardingFlowInner({
   }
 
   function renderStepContent() {
-    switch (flowState.renderStep) {
+    const renderStep = flowState.renderStep;
+
+    switch (renderStep) {
       case 'create-instance':
         return renderCreateInstanceStep();
       case 'identity':
@@ -316,6 +322,8 @@ function ClawOnboardingFlowInner({
         return renderPairingStep();
       case 'complete':
         return renderCompleteStep();
+      default:
+        return assertNever(renderStep);
     }
   }
 

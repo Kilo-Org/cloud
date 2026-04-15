@@ -22,7 +22,6 @@ import {
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
-import { flyAppNameFromUserId } from '@/lib/kiloclaw/fly-app-name';
 import {
   createKiloClawAdminAuditLog,
   listKiloClawAdminAuditLogs,
@@ -196,7 +195,6 @@ export type AdminKiloclawInstance = {
 };
 
 export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
-  derived_fly_app_name: string;
   inbound_email_address: string | null;
   workerStatus: PlatformDebugStatusResponse | null;
   workerStatusError: string | null;
@@ -239,7 +237,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       subscription_status: result.subscription_status ?? null,
     };
 
-    const derivedFlyAppName = flyAppNameFromUserId(instance.user_id);
     const inboundEmailAddress = await getInboundEmailAddressForInstance(instance.id);
 
     // Fetch live worker status for all instances.
@@ -261,7 +258,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
     return {
       ...instance,
-      derived_fly_app_name: derivedFlyAppName,
       inbound_email_address: inboundEmailAddress,
       workerStatus,
       workerStatusError,

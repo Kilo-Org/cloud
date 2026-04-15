@@ -1014,21 +1014,14 @@ function EventsTable({ rows }: { rows: KiloclawEventRow[] }) {
 
 type InstanceEventsCardProps = {
   sandboxId: string;
-  userId: string;
   flyAppName?: string | null;
   flyMachineId?: string | null;
 };
 
-function AllEventsTabContent({
-  sandboxId,
-  userId,
-  flyAppName,
-  flyMachineId,
-}: InstanceEventsCardProps) {
+function AllEventsTabContent({ sandboxId, flyAppName, flyMachineId }: InstanceEventsCardProps) {
   const [offset, setOffset] = useState(0);
   const { data, isLoading, error } = useKiloclawAllEvents({
     sandboxId,
-    userId,
     flyAppName,
     flyMachineId,
     offset,
@@ -1089,12 +1082,7 @@ function AllEventsTabContent({
   );
 }
 
-function InstanceEventsCard({
-  sandboxId,
-  userId,
-  flyAppName,
-  flyMachineId,
-}: InstanceEventsCardProps) {
+function InstanceEventsCard({ sandboxId, flyAppName, flyMachineId }: InstanceEventsCardProps) {
   const { data, isLoading, error } = useKiloclawInstanceEvents(sandboxId);
 
   return (
@@ -1142,7 +1130,6 @@ function InstanceEventsCard({
           <TabsContent value="all">
             <AllEventsTabContent
               sandboxId={sandboxId}
-              userId={userId}
               flyAppName={flyAppName}
               flyMachineId={flyMachineId}
             />
@@ -1812,19 +1799,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 {formatVolumeUsage(diskUsed, diskTotal, 'used-total')}
               </DetailField>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Technical Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Technical Details</CardTitle>
-            <CardDescription>Internal identifiers</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <DetailField label="Instance ID">
-              <code className="text-sm">{data.id}</code>
-            </DetailField>
             <DetailField label="Type">
               {data.organization_id ? (
                 <Badge
@@ -1842,25 +1817,34 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 </Badge>
               )}
             </DetailField>
+
+            <DetailField label="Instance ID">
+              <code className="text-sm">{data.id}</code>
+            </DetailField>
+
             <DetailField label="User ID">
               <code className="text-sm">{data.user_id}</code>
             </DetailField>
+
             {data.organization_id && (
               <DetailField label="Organization ID">
                 <code className="text-sm">{data.organization_id}</code>
               </DetailField>
             )}
-            <DetailField label="Derived Fly App">
-              <a
-                href={`https://fly.io/apps/${data.derived_fly_app_name}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-blue-600 hover:underline"
-              >
-                <code className="text-sm">{data.derived_fly_app_name}</code>
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </DetailField>
+
+            {data.workerStatus?.flyAppName && (
+              <DetailField label="Fly App">
+                <a
+                  href={`https://fly.io/apps/${data.workerStatus.flyAppName}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                >
+                  <code className="text-sm">{data.workerStatus.flyAppName}</code>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </DetailField>
+            )}
           </CardContent>
         </Card>
 
@@ -2389,8 +2373,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         {data.sandbox_id && (
           <InstanceEventsCard
             sandboxId={data.sandbox_id}
-            userId={data.user_id}
-            flyAppName={data.workerStatus?.flyAppName ?? data.derived_fly_app_name}
+            flyAppName={data.workerStatus?.flyAppName}
             flyMachineId={data.workerStatus?.flyMachineId}
           />
         )}

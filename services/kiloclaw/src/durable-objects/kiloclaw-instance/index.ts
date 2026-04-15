@@ -96,7 +96,7 @@ import {
   createShortLivedUserToken,
   deactivateStreamChatUsers,
 } from '../../stream-chat/client';
-import { writeEvent } from '../../utils/analytics';
+import { writeEvent, safeInstanceIdFromSandboxId } from '../../utils/analytics';
 import type { KiloClawEventData, KiloClawEventName } from '../../utils/analytics';
 import { getProviderAdapter, resolveDefaultProvider } from '../../providers';
 import type {
@@ -436,6 +436,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       | 'openclawVersion'
       | 'imageTag'
       | 'flyRegion'
+      | 'orgId'
+      | 'instanceId'
     > & { event: KiloClawEventName }
   ): void {
     doLog(this.s, data.event, {
@@ -455,6 +457,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       openclawVersion: this.s.openclawVersion ?? undefined,
       imageTag: this.s.trackedImageTag ?? undefined,
       flyRegion: this.s.flyRegion ?? undefined,
+      orgId: this.s.orgId ?? undefined,
+      instanceId: safeInstanceIdFromSandboxId(this.s.sandboxId ?? undefined),
       status: data.status ?? this.s.status ?? undefined,
     });
   }

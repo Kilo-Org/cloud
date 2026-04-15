@@ -46,12 +46,15 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
   let inFlight: Promise<unknown> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
+  /** Once the stream is terminal (`finalize` / `abort` called), all entry points no-op. */
+  const isDone = () => phase === 'finalized' || phase === 'aborted';
+
   async function flushOnce(): Promise<void> {
     if (timer) {
       clearTimeout(timer);
       timer = undefined;
     }
-    if (phase === 'aborted' || phase === 'finalized') return;
+    if (isDone()) return;
     if (inFlight) {
       await inFlight;
       // Do NOT re-enter: the caller (update-path post-flush check or timer-path
@@ -128,7 +131,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
 
   return {
     update(text: string): void {
-      if (phase === 'finalized' || phase === 'aborted') return;
+      if (isDone()) return;
       pendingText = text;
       if (phase === 'idle' && !inFlight) {
         // Fire the first POST without waiting for the throttle window —
@@ -141,7 +144,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       scheduleFlush();
     },
     async finalize(finalText: string): Promise<{ messageId: string }> {
-      if (phase === 'finalized' || phase === 'aborted') {
+      if (isDone()) {
         if (!messageId) throw new Error('kilo-chat preview: finalize on aborted stream');
         return { messageId };
       }
@@ -205,7 +208,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       return { messageId };
     },
     async abort(): Promise<void> {
-      if (phase === 'aborted' || phase === 'finalized') return;
+      if (isDone()) return;
       if (timer) {
         clearTimeout(timer);
         timer = undefined;

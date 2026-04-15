@@ -189,17 +189,25 @@ describe('/_kilo/cli-run routes', () => {
     });
     expect(resp.status).toBe(409);
     const body = (await resp.json()) as Record<string, unknown>;
-    expect(body.error).toContain('already in progress');
+    expect(body).toMatchObject({
+      code: 'kilo_cli_run_already_active',
+      error: expect.stringContaining('already in progress'),
+    });
   });
 
   // ── POST /_kilo/cli-run/cancel ──────────────────────────────────────
 
-  it('returns 404 when cancelling with no active run', async () => {
+  it('returns 409 when cancelling with no active run', async () => {
     const resp = await app.request('/_kilo/cli-run/cancel', {
       method: 'POST',
       headers: authHeaders(),
     });
-    expect(resp.status).toBe(404);
+    expect(resp.status).toBe(409);
+    const body = (await resp.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      code: 'kilo_cli_run_no_active_run',
+      error: 'No active run to cancel',
+    });
   });
 
   it('cancels an active run', async () => {

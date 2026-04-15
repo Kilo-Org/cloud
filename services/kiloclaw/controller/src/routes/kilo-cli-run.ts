@@ -151,7 +151,13 @@ export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void
 
     return runStartExclusive(async () => {
       if (activeRun?.status === 'running') {
-        return c.json({ error: 'A Kilo CLI run is already in progress' }, 409);
+        return c.json(
+          {
+            code: 'kilo_cli_run_already_active',
+            error: 'A Kilo CLI run is already in progress',
+          },
+          409
+        );
       }
 
       const fullPrompt = buildRunPrompt(prompt);
@@ -238,7 +244,7 @@ export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void
   // POST /_kilo/cli-run/cancel — kill the active run
   app.post('/_kilo/cli-run/cancel', c => {
     if (!activeRun || activeRun.status !== 'running') {
-      return c.json({ error: 'No active run to cancel' }, 404);
+      return c.json({ code: 'kilo_cli_run_no_active_run', error: 'No active run to cancel' }, 409);
     }
 
     try {

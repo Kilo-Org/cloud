@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeAll, beforeEach, jest } from '@jest/globals';
+import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
 import { kiloclaw_instances, kiloclaw_subscriptions, kiloclaw_cli_runs } from '@kilocode/db/schema';
@@ -7,6 +8,7 @@ import { createOrganization } from '@/lib/organizations/organizations';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { createCallerForUser as createCallerForUserType } from '@/routers/test-utils';
 import type { KiloClawApiError as KiloClawApiErrorType } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { UpstreamApiError } from '@/lib/trpc/init';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -137,6 +139,17 @@ describe('kiloclaw.startKiloCliRun error translation', () => {
       code: 'PRECONDITION_FAILED',
       message: 'Instance needs redeploy to support recovery',
     });
+
+    try {
+      await caller.kiloclaw.startKiloCliRun({ prompt: 'test prompt' });
+      throw new Error('Expected startKiloCliRun to reject');
+    } catch (err) {
+      expect(err).toBeInstanceOf(TRPCError);
+      if (!(err instanceof TRPCError)) throw err;
+      expect(err.cause).toBeInstanceOf(UpstreamApiError);
+      if (!(err.cause instanceof UpstreamApiError)) throw err;
+      expect(err.cause.upstreamCode).toBe('controller_route_unavailable');
+    }
   });
 
   it('inserts a running kiloclaw_cli_runs row on success', async () => {
@@ -216,6 +229,20 @@ describe('organizations.kiloclaw.startKiloCliRun error translation', () => {
       code: 'PRECONDITION_FAILED',
       message: 'Instance needs redeploy to support recovery',
     });
+
+    try {
+      await caller.organizations.kiloclaw.startKiloCliRun({
+        organizationId: org.id,
+        prompt: 'test prompt',
+      });
+      throw new Error('Expected startKiloCliRun to reject');
+    } catch (err) {
+      expect(err).toBeInstanceOf(TRPCError);
+      if (!(err instanceof TRPCError)) throw err;
+      expect(err.cause).toBeInstanceOf(UpstreamApiError);
+      if (!(err.cause instanceof UpstreamApiError)) throw err;
+      expect(err.cause.upstreamCode).toBe('controller_route_unavailable');
+    }
   });
 
   it('inserts a running kiloclaw_cli_runs row on success', async () => {
@@ -266,6 +293,40 @@ describe('kiloclaw.cancelKiloCliRun error translation', () => {
     });
   });
 
+  it('marks a running row cancelled when controller has no active run', async () => {
+    const [instance] = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.user_id, user.id));
+    const [run] = await db
+      .insert(kiloclaw_cli_runs)
+      .values({
+        user_id: user.id,
+        instance_id: instance.id,
+        prompt: 'stale run',
+        status: 'running',
+      })
+      .returning();
+    mockCancelKiloCliRun.mockRejectedValue(
+      new KiloClawApiError(
+        409,
+        '{"error":"No active run to cancel","code":"kilo_cli_run_no_active_run"}'
+      )
+    );
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.cancelKiloCliRun({ runId: run.id })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'No active run to cancel',
+    });
+
+    const rows = await db.select().from(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.id, run.id));
+    expect(rows[0]).toMatchObject({
+      status: 'cancelled',
+      completed_at: expect.any(String),
+    });
+  });
+
   it('maps worker 409 without message body to CONFLICT with fallback message', async () => {
     mockCancelKiloCliRun.mockRejectedValue(new KiloClawApiError(409, ''));
 
@@ -301,6 +362,45 @@ describe('organizations.kiloclaw.cancelKiloCliRun error translation', () => {
     ).rejects.toMatchObject({
       code: 'CONFLICT',
       message: 'Instance is not running',
+    });
+  });
+
+  it('marks a running org row cancelled when controller has no active run', async () => {
+    const [instance] = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.organization_id, org.id));
+    const [run] = await db
+      .insert(kiloclaw_cli_runs)
+      .values({
+        user_id: user.id,
+        instance_id: instance.id,
+        prompt: 'stale org run',
+        status: 'running',
+      })
+      .returning();
+    mockCancelKiloCliRun.mockRejectedValue(
+      new KiloClawApiError(
+        409,
+        '{"error":"No active run to cancel","code":"kilo_cli_run_no_active_run"}'
+      )
+    );
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.cancelKiloCliRun({
+        organizationId: org.id,
+        runId: run.id,
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'No active run to cancel',
+    });
+
+    const rows = await db.select().from(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.id, run.id));
+    expect(rows[0]).toMatchObject({
+      status: 'cancelled',
+      completed_at: expect.any(String),
     });
   });
 

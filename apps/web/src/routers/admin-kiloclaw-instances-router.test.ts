@@ -9,6 +9,8 @@ import {
   kiloclaw_instances,
 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+import { UpstreamApiError } from '@/lib/trpc/init';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockGetDebugStatus: jest.Mock<any, any> = jest.fn();
@@ -281,8 +283,7 @@ describe('admin.kiloclawInstances.startKiloCliRun', () => {
 
   it('maps controller_route_unavailable to PRECONDITION_FAILED', async () => {
     const { KiloClawApiError } = jest.requireMock<{
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      KiloClawApiError: new (statusCode: number, responseBody: string) => any;
+      KiloClawApiError: new (statusCode: number, responseBody: string) => Error;
     }>('@/lib/kiloclaw/kiloclaw-internal-client');
 
     mockStartKiloCliRun.mockRejectedValue(
@@ -302,6 +303,20 @@ describe('admin.kiloclawInstances.startKiloCliRun', () => {
       code: 'PRECONDITION_FAILED',
       message: 'Instance needs redeploy to support recovery',
     });
+
+    try {
+      await caller.admin.kiloclawInstances.startKiloCliRun({
+        userId: testUserId,
+        prompt: 'test prompt',
+      });
+      throw new Error('Expected startKiloCliRun to reject');
+    } catch (err) {
+      expect(err).toBeInstanceOf(TRPCError);
+      if (!(err instanceof TRPCError)) throw err;
+      expect(err.cause).toBeInstanceOf(UpstreamApiError);
+      if (!(err.cause instanceof UpstreamApiError)) throw err;
+      expect(err.cause.upstreamCode).toBe('controller_route_unavailable');
+    }
   });
 
   it('maps worker 409 with empty body to CONFLICT with fallback message', async () => {

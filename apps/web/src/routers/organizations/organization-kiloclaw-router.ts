@@ -1288,21 +1288,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
 
-      let result: Awaited<ReturnType<KiloClawInternalClient['cancelKiloCliRun']>>;
-      try {
-        result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
-      } catch (err) {
-        if (err instanceof KiloClawApiError && err.statusCode === 409) {
-          const { message } = getKiloClawApiErrorPayload(err);
-          throw new TRPCError({
-            code: 'CONFLICT',
-            message: message ?? 'Instance is not running',
-          });
-        }
-        throw err;
-      }
-
-      if (result.ok) {
+      const markRunCancelled = async () => {
         await db
           .update(kiloclaw_cli_runs)
           .set({
@@ -1317,6 +1303,28 @@ export const organizationKiloclawRouter = createTRPCRouter({
               eq(kiloclaw_cli_runs.status, 'running')
             )
           );
+      };
+
+      let result: Awaited<ReturnType<KiloClawInternalClient['cancelKiloCliRun']>>;
+      try {
+        result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
+      } catch (err) {
+        if (err instanceof KiloClawApiError && err.statusCode === 409) {
+          const { code, message } = getKiloClawApiErrorPayload(err);
+          if (code === 'kilo_cli_run_no_active_run') {
+            await markRunCancelled();
+          }
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: message ?? 'Instance is not running',
+            cause: code ? new UpstreamApiError(code) : undefined,
+          });
+        }
+        throw err;
+      }
+
+      if (result.ok) {
+        await markRunCancelled();
       }
 
       return result;

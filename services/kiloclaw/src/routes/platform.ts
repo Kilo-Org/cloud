@@ -64,6 +64,17 @@ const WebSearchConfigPatchSchema = z.object({
   exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
 });
 
+const KiloCliRunConflictSchema = z.object({
+  conflict: z.object({
+    code: z.enum([
+      'kilo_cli_run_instance_not_running',
+      'kilo_cli_run_already_active',
+      'kilo_cli_run_no_active_run',
+    ]),
+    error: z.string().min(1),
+  }),
+});
+
 const platform = new Hono<AppEnv>();
 type KiloClawInstanceStub = ReturnType<AppEnv['Bindings']['KILOCLAW_INSTANCE']['get']>;
 
@@ -337,6 +348,20 @@ function jsonError(message: string, status: number, code?: string): Response {
     status,
     headers: { 'content-type': 'application/json' },
   });
+}
+
+function kiloCliRunConflictResponse(response: unknown): Response | undefined {
+  const result = KiloCliRunConflictSchema.safeParse(response);
+  if (result.success) {
+    const { code, error } = result.data.conflict;
+    return jsonError(error, 409, code);
+  }
+
+  if (isRecord(response) && 'conflict' in response) {
+    return jsonError('Invalid Kilo CLI conflict response', 502, 'upstream_invalid_response');
+  }
+
+  return undefined;
 }
 
 /**
@@ -1423,9 +1448,8 @@ platform.post('/kilo-cli-run/start', async c => {
         'controller_route_unavailable'
       );
     }
-    if (isRecord(response) && typeof response.conflict === 'string') {
-      return jsonError(response.conflict, 409);
-    }
+    const conflictResponse = kiloCliRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'kilo-cli-run start');
@@ -1472,9 +1496,8 @@ platform.post('/kilo-cli-run/cancel', async c => {
       stub => stub.cancelKiloCliRun().then(r => r),
       'cancelKiloCliRun'
     );
-    if (isRecord(response) && typeof response.conflict === 'string') {
-      return jsonError(response.conflict, 409);
-    }
+    const conflictResponse = kiloCliRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
     return c.json(response, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'kilo-cli-run cancel');

@@ -204,8 +204,17 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
    * Called by Instance DO at machine start time. This ensures every provider can
    * bootstrap encrypted env vars, while legacy Fly apps still get their Fly secret
    * synced on first start.
+   *
+   * @param ownerKey - The App DO owner key (userId or instanceId).
+   * @param flyAppName - Optional Fly app name from the Instance DO. If the App DO
+   *   doesn't have a flyAppName yet (e.g., instance provisioned before per-instance
+   *   Fly apps existed), it adopts this value so it can sync the env key to the
+   *   correct Fly app secret store.
    */
-  async ensureEnvKey(ownerKey: string): Promise<{ key: string; secretsVersion: number }> {
+  async ensureEnvKey(
+    ownerKey: string,
+    flyAppName?: string
+  ): Promise<{ key: string; secretsVersion: number }> {
     await this.loadState();
 
     if (this.userId && this.userId !== ownerKey) {
@@ -215,6 +224,16 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
     if (!this.userId) {
       this.userId = ownerKey;
       await this.ctx.storage.put({ userId: ownerKey } satisfies Partial<AppState>);
+    }
+
+    // Adopt flyAppName from the Instance DO if we don't have one yet.
+    // This self-heals instances provisioned before per-instance Fly apps existed,
+    // where the App DO was created by ensureEnvKey (not ensureApp) and never
+    // learned the Fly app name.
+    if (!this.flyAppName && flyAppName) {
+      this.flyAppName = flyAppName;
+      await this.ctx.storage.put({ flyAppName } satisfies Partial<AppState>);
+      console.log('[AppDO] Adopted flyAppName from Instance DO:', flyAppName);
     }
 
     // Persist key before any async I/O so interleaved calls reuse the same key.

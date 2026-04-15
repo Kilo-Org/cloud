@@ -187,9 +187,15 @@ export async function buildUserEnvVars(
 
   // Get the env encryption key from the App DO, creating it if needed.
   // Instance-keyed DOs get per-instance apps, legacy DOs get per-user apps.
+  // Pass the Instance DO's known flyAppName so the App DO can adopt it if needed
+  // (self-heals instances provisioned before per-instance Fly apps existed).
   const appKey = getAppKey({ userId: state.userId, sandboxId: state.sandboxId });
   const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
-  const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(appKey);
+  const knownFlyAppName =
+    (state.providerState?.provider === 'fly' ? state.providerState.appName : null) ??
+    state.flyAppName ??
+    undefined;
+  const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(appKey, knownFlyAppName);
 
   // Encrypt sensitive values and prefix their names with KILOCLAW_ENC_
   const result: Record<string, string> = { ...plainEnv };

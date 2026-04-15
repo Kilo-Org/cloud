@@ -90,8 +90,8 @@ export type CliRunStatusResult = KiloCliRunStatusResponse & {
 const LOST_CONTROLLER_RUN_OUTPUT =
   '[run state unavailable: controller no longer has an active CLI run for this record]';
 
-export async function markCliRunCancelled(params: CancelCliRunParams): Promise<void> {
-  await db
+export async function markCliRunCancelled(params: CancelCliRunParams): Promise<boolean> {
+  const rows = await db
     .update(kiloclaw_cli_runs)
     .set({
       status: 'cancelled',
@@ -106,7 +106,10 @@ export async function markCliRunCancelled(params: CancelCliRunParams): Promise<v
           ? isNull(kiloclaw_cli_runs.instance_id)
           : eq(kiloclaw_cli_runs.instance_id, params.instanceId)
       )
-    );
+    )
+    .returning({ id: kiloclaw_cli_runs.id });
+
+  return rows.length > 0;
 }
 
 /**
@@ -218,20 +221,25 @@ export async function cancelCliRun(params: {
 
   const result = await cancelControllerRun(params.userId, effectiveWorkerInstanceId);
 
-  if (result.ok) {
-    await markCliRunCancelled({
-      runId: params.runId,
-      userId: params.userId,
-      instanceId: row.instance_id,
-    });
+  if (!result.ok) {
+    // The controller rejected the cancel (e.g. the process had already exited
+    // between our DB check and the cancel request). The DB row intentionally
+    // stays 'running' so the caller can retry or poll again — the next
+    // getKiloCliRunStatus call will pick up the terminal state from the
+    // controller and persist it.
+    return { ok: false, runFound: true, cancelled: false };
   }
 
-  // When result.ok is false the controller rejected the cancel (e.g. the process
-  // had already exited between our DB check and the cancel request). The DB row
-  // intentionally stays 'running' so the caller can retry or poll again — the
-  // next getKiloCliRunStatus call will pick up the terminal state from the
-  // controller and persist it.
-  return { ok: result.ok, runFound: true, cancelled: result.ok };
+  const didUpdate = await markCliRunCancelled({
+    runId: params.runId,
+    userId: params.userId,
+    instanceId: row.instance_id,
+  });
+
+  // didUpdate is false when the row left 'running' between our SELECT and
+  // this UPDATE (e.g. a concurrent getCliRunStatus poll persisted a terminal
+  // state, or another cancel request won the race).
+  return { ok: true, runFound: true, cancelled: didUpdate };
 }
 
 export async function getCliRunStatus(params: {

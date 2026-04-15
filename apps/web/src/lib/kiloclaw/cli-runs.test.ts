@@ -128,6 +128,49 @@ describe('cancelCliRun', () => {
       completed_at: null,
     });
   });
+
+  it('reports cancelled: false when the DB row left running between the SELECT and the cancel UPDATE', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'run that a concurrent poll completed',
+      startedAt,
+      initiatedByAdminId: null,
+    });
+
+    // Simulate a concurrent getCliRunStatus poll persisting a terminal state
+    // while cancelCliRun is waiting for the controller cancel response.
+    await db
+      .update(kiloclaw_cli_runs)
+      .set({ status: 'completed', completed_at: '2026-04-12T12:01:00.000Z' })
+      .where(eq(kiloclaw_cli_runs.id, runId));
+
+    const result = await cancelCliRun({
+      runId,
+      userId: user.id,
+      instanceId,
+      workerInstanceId: 'ki_current',
+      getControllerStatus: async () => ({
+        hasRun: true,
+        status: 'running',
+        output: null,
+        exitCode: null,
+        startedAt,
+        completedAt: null,
+        prompt: 'run that a concurrent poll completed',
+      }),
+      cancelControllerRun: async () => ({ ok: true }),
+    });
+
+    expect(result).toEqual({ ok: true, runFound: true, cancelled: false });
+    await expect(getRunStatus(runId)).resolves.toEqual({
+      status: 'completed',
+      completed_at: '2026-04-12T12:01:00.000Z',
+    });
+  });
 });
 
 describe('markCliRunCancelled', () => {

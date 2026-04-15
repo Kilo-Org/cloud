@@ -27,7 +27,7 @@ import { buildImagePromptParts, downloadImagePromptParts } from './image-prompt-
 import { withTimeout } from '@kilocode/worker-utils';
 
 /** Maximum time allowed for workspace preparation (resume, init, fast path). */
-const PREPARE_WORKSPACE_TIMEOUT_MS = 5 * 60 * 1000;
+const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 
 function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string): Promise<T> {
   return withTimeout(

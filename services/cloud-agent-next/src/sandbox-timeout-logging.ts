@@ -7,8 +7,8 @@ export const FAST_SANDBOX_COMMAND_TIMEOUT_MS = 30_000;
 /** Timeout for git network operations (fetch, pull, push). */
 export const GIT_COMMAND_TIMEOUT_MS = 120_000;
 
-/** Timeout for git clone via SDK. */
-export const GIT_CLONE_TIMEOUT_MS = 120_000;
+/** Timeout for git clone via SDK (large repos need headroom). */
+export const GIT_CLONE_TIMEOUT_MS = 5 * 60 * 1000;
 
 /** Timeout for disk-space checks. */
 export const DISK_CHECK_TIMEOUT_MS = 10_000;
@@ -34,37 +34,11 @@ export function isSandboxOperationTimeoutError(error: unknown): boolean {
     return false;
   }
 
-  const message = error.message;
-  if (message.includes('Operation was aborted')) {
-    return false;
-  }
-
-  if (message.includes('Command timeout after ')) {
-    return true;
-  }
-  if (message.includes('Git clone timed out after ')) {
-    return true;
-  }
-  if (message.includes('Request timeout after ')) {
-    return true;
-  }
-  if (message.includes('Stream idle timeout after ')) {
-    return true;
-  }
-  if (message.includes('WebSocket connection timeout after ')) {
-    return true;
-  }
-  if (message.includes('Process did not become ready within ')) {
-    return true;
-  }
-  if (message.includes('Operation timed out')) {
-    return true;
-  }
-  if (message.includes('timed out after ')) {
-    return true;
-  }
-
-  return false;
+  const msg = error.message;
+  if (msg.includes('Operation was aborted')) return false;
+  return (
+    msg.includes('timeout') || msg.includes('timed out') || msg.includes('did not become ready')
+  );
 }
 
 export function logSandboxOperationTimeout(

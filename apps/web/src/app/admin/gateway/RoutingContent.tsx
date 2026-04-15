@@ -7,8 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
-const DEFAULT_PERCENTAGE = 10;
+import { DEFAULT_VERCEL_PERCENTAGE } from '@/lib/gateway-config';
 
 export function RoutingContent() {
   const trpc = useTRPC();
@@ -72,8 +71,8 @@ export function RoutingContent() {
           <CardTitle>Vercel Routing Percentage</CardTitle>
           <CardDescription>
             Control the percentage of traffic routed to the Vercel AI Gateway (vs OpenRouter). Leave
-            empty to use the default ({DEFAULT_PERCENTAGE}%). Stored in Redis for sub-millisecond
-            reads on the hot path.
+            empty to use the default ({DEFAULT_VERCEL_PERCENTAGE}%). Stored in Redis for
+            sub-millisecond reads on the hot path.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -82,7 +81,7 @@ export function RoutingContent() {
               type="number"
               min={0}
               max={100}
-              placeholder={`Default: ${DEFAULT_PERCENTAGE}%`}
+              placeholder={`Default: ${DEFAULT_VERCEL_PERCENTAGE}%`}
               value={inputValue}
               onChange={e => {
                 setInputValue(e.target.value);
@@ -123,7 +122,9 @@ export function RoutingContent() {
                 )}
               </p>
             ) : (
-              <p>No override set. Using default routing ({DEFAULT_PERCENTAGE}% to Vercel).</p>
+              <p>
+                No override set. Using default routing ({DEFAULT_VERCEL_PERCENTAGE}% to Vercel).
+              </p>
             )}
           </div>
         </CardContent>

@@ -202,15 +202,18 @@ describe('ClawOnboardingFlow state machine', () => {
     }
   );
 
-  test('renders the post-provisioning spinner before a populated status exists', () => {
+  test('renders create-instance when post-provisioning has no provisioned DO', () => {
+    // status undefined — no DO state at all (e.g. credit enrollment created DB
+    // row + subscription but never triggered provision)
     expect(getClawOnboardingFlowState(createInput({ mode: 'post-provisioning' })).renderStep).toBe(
-      'provisioning'
+      'create-instance'
     );
+    // status with null machine status — DO exists but returned status: null
     expect(
       getClawOnboardingFlowState(
         createInput({ mode: 'post-provisioning', status: createStatus(null) })
       ).renderStep
-    ).toBe('provisioning');
+    ).toBe('create-instance');
   });
 
   test('renders complete in post-provisioning mode once the machine is running', () => {

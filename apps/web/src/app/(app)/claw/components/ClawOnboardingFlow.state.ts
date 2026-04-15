@@ -140,7 +140,12 @@ function getRenderStep({
   hasPairingStep,
 }: RenderStepInput): ClawOnboardingRenderStep {
   if (mode === 'post-provisioning') {
-    return postProvisioningReady ? 'complete' : 'provisioning';
+    if (postProvisioningReady) return 'complete';
+    // DB row + subscription exist but no DO provisioned yet (e.g. credit
+    // enrollment created the billing records without triggering provision).
+    // Show the onboarding entry point so the user can kick off provisioning.
+    if (!instanceStatus) return 'create-instance';
+    return 'provisioning';
   }
 
   if (instanceStatus === null && !createSetupStarted) {

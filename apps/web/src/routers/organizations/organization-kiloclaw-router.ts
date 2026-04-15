@@ -1241,11 +1241,41 @@ export const organizationKiloclawRouter = createTRPCRouter({
         workerInstanceId(instance)
       );
 
-      if (
-        controllerStatus.hasRun &&
-        controllerStatus.status !== 'running' &&
-        controllerStatus.startedAt
-      ) {
+      const controllerMatchesRow =
+        controllerStatus.hasRun && controllerStatus.startedAt === row.started_at;
+
+      if (!controllerMatchesRow) {
+        const completedAt = new Date().toISOString();
+        const output = row.output ?? '[controller lost track of this run]';
+
+        await db
+          .update(kiloclaw_cli_runs)
+          .set({
+            status: 'failed',
+            output,
+            completed_at: completedAt,
+          })
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.id, input.runId),
+              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.instance_id, instance.id),
+              eq(kiloclaw_cli_runs.status, 'running')
+            )
+          );
+
+        return {
+          hasRun: true,
+          status: 'failed' as const,
+          output,
+          exitCode: row.exit_code,
+          startedAt: row.started_at,
+          completedAt,
+          prompt: row.prompt,
+        };
+      }
+
+      if (controllerStatus.status !== 'running') {
         await db
           .update(kiloclaw_cli_runs)
           .set({
@@ -1275,6 +1305,53 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
+      const [run] = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(
+          and(
+            eq(kiloclaw_cli_runs.id, input.runId),
+            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+            eq(kiloclaw_cli_runs.instance_id, instance.id),
+            eq(kiloclaw_cli_runs.status, 'running')
+          )
+        )
+        .limit(1);
+
+      if (!run) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Kilo CLI run is no longer running',
+        });
+      }
+
+      const controllerStatus = await client.getKiloCliRunStatus(
+        ctx.user.id,
+        workerInstanceId(instance)
+      );
+
+      if (!controllerStatus.hasRun || controllerStatus.startedAt !== run.started_at) {
+        await db
+          .update(kiloclaw_cli_runs)
+          .set({
+            status: 'failed',
+            output: run.output ?? '[controller lost track of this run]',
+            completed_at: new Date().toISOString(),
+          })
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.id, input.runId),
+              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.instance_id, instance.id),
+              eq(kiloclaw_cli_runs.status, 'running')
+            )
+          );
+
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Kilo CLI run is no longer active on the controller',
+        });
+      }
 
       let result: Awaited<ReturnType<KiloClawInternalClient['cancelKiloCliRun']>>;
       try {
@@ -1291,7 +1368,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       }
 
       if (result.ok) {
-        await db
+        const [updated] = await db
           .update(kiloclaw_cli_runs)
           .set({
             status: 'cancelled',
@@ -1304,7 +1381,15 @@ export const organizationKiloclawRouter = createTRPCRouter({
               eq(kiloclaw_cli_runs.instance_id, instance.id),
               eq(kiloclaw_cli_runs.status, 'running')
             )
-          );
+          )
+          .returning({ id: kiloclaw_cli_runs.id });
+
+        if (!updated) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Kilo CLI run was already resolved',
+          });
+        }
       }
 
       return result;

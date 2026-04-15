@@ -15,6 +15,8 @@ type StartKiloCliRunResult = { ok: true; startedAt: string };
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
 const mockStartKiloCliRun = jest.fn<() => Promise<StartKiloCliRunResult>>();
+const mockGetKiloCliRunStatus: AnyMock = jest.fn();
+const mockCancelKiloCliRun: AnyMock = jest.fn();
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const actual: Record<string, unknown> = jest.requireActual(
     '@/lib/kiloclaw/kiloclaw-internal-client'
@@ -22,6 +24,8 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       startKiloCliRun: mockStartKiloCliRun,
+      getKiloCliRunStatus: mockGetKiloCliRunStatus,
+      cancelKiloCliRun: mockCancelKiloCliRun,
     })),
     KiloClawApiError: actual.KiloClawApiError,
   };
@@ -55,6 +59,8 @@ let org: Organization;
 beforeEach(async () => {
   await cleanupDbForTest();
   mockStartKiloCliRun.mockReset();
+  mockGetKiloCliRunStatus.mockReset();
+  mockCancelKiloCliRun.mockReset();
 
   user = await insertTestUser({
     google_user_email: `clirun-test-${Math.random()}@example.com`,
@@ -82,6 +88,24 @@ async function createOrgInstance(userId: string, organizationId: string): Promis
     })
     .returning();
   return row.id;
+}
+
+async function insertRunningCliRun(
+  userId: string,
+  instanceId: string,
+  startedAt: string
+): Promise<{ id: string; startedAt: string }> {
+  const [row] = await db
+    .insert(kiloclaw_cli_runs)
+    .values({
+      user_id: userId,
+      instance_id: instanceId,
+      prompt: 'test prompt',
+      status: 'running',
+      started_at: startedAt,
+    })
+    .returning({ id: kiloclaw_cli_runs.id, startedAt: kiloclaw_cli_runs.started_at });
+  return { id: row.id, startedAt: row.startedAt };
 }
 
 async function grantKiloClawAccess(userId: string): Promise<void> {
@@ -136,7 +160,7 @@ describe('kiloclaw.startKiloCliRun error translation', () => {
   });
 
   it('inserts a running kiloclaw_cli_runs row on success', async () => {
-    const startedAt = '2024-01-01T00:00:00.000Z';
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
     mockStartKiloCliRun.mockResolvedValue({ ok: true, startedAt });
 
     const caller = await createCallerForUser(user.id);
@@ -154,6 +178,262 @@ describe('kiloclaw.startKiloCliRun error translation', () => {
       prompt: 'fix the config',
       status: 'running',
     });
+  });
+});
+
+// ── Personal router: kiloclaw.getKiloCliRunStatus ──────────────────────────
+
+describe('kiloclaw.getKiloCliRunStatus reconciliation', () => {
+  beforeEach(async () => {
+    await grantKiloClawAccess(user.id);
+  });
+
+  it('terminalizes a running row when controller has no run', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createPersonalInstance(user.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: false,
+      status: null,
+      output: null,
+      exitCode: null,
+      startedAt: null,
+      completedAt: null,
+      prompt: null,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getKiloCliRunStatus({ runId });
+
+    expect(result).toMatchObject({
+      hasRun: true,
+      status: 'failed',
+    });
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('failed');
+    expect(dbRow.completed_at).not.toBeNull();
+  });
+
+  it('terminalizes a running row when controller reports a different run', async () => {
+    const rowStartedAt = '2024-01-01T00:00:00.000+00:00';
+    const controllerStartedAt = '2024-01-02T00:00:00.000+00:00';
+    const instanceId = await createPersonalInstance(user.id);
+    const run = await insertRunningCliRun(user.id, instanceId, rowStartedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'running',
+      output: 'some output from new run',
+      exitCode: null,
+      startedAt: controllerStartedAt,
+      completedAt: null,
+      prompt: 'different prompt',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getKiloCliRunStatus({ runId });
+
+    expect(result).toMatchObject({
+      hasRun: true,
+      status: 'failed',
+    });
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('failed');
+  });
+
+  it('persists terminal status when controller matches and is complete', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createPersonalInstance(user.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'completed',
+      output: 'task done',
+      exitCode: 0,
+      startedAt: run.startedAt,
+      completedAt: '2024-01-01T00:05:00.000Z',
+      prompt: 'test prompt',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getKiloCliRunStatus({ runId });
+
+    expect(result).toMatchObject({
+      hasRun: true,
+      status: 'completed',
+      output: 'task done',
+      exitCode: 0,
+    });
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('completed');
+    expect(dbRow.exit_code).toBe(0);
+  });
+
+  it('returns live output without terminalizing when controller matches and is running', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createPersonalInstance(user.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'running',
+      output: 'in progress...',
+      exitCode: null,
+      startedAt: run.startedAt,
+      completedAt: null,
+      prompt: 'test prompt',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getKiloCliRunStatus({ runId });
+
+    expect(result).toMatchObject({
+      hasRun: true,
+      status: 'running',
+      output: 'in progress...',
+    });
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('running');
+  });
+});
+
+// ── Personal router: kiloclaw.cancelKiloCliRun ─────────────────────────────
+
+describe('kiloclaw.cancelKiloCliRun identity validation', () => {
+  beforeEach(async () => {
+    await grantKiloClawAccess(user.id);
+  });
+
+  it('rejects cancel when the run is not running', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createPersonalInstance(user.id);
+    const [row] = await db
+      .insert(kiloclaw_cli_runs)
+      .values({
+        user_id: user.id,
+        instance_id: instanceId,
+        prompt: 'test prompt',
+        status: 'completed',
+        started_at: startedAt,
+        completed_at: '2024-01-01T00:05:00.000Z',
+      })
+      .returning({ id: kiloclaw_cli_runs.id });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.cancelKiloCliRun({ runId: row.id })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Kilo CLI run is no longer running',
+    });
+
+    expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
+  });
+
+  it('rejects cancel and terminalizes row when controller has no run', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createPersonalInstance(user.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: false,
+      status: null,
+      output: null,
+      exitCode: null,
+      startedAt: null,
+      completedAt: null,
+      prompt: null,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.cancelKiloCliRun({ runId })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Kilo CLI run is no longer active on the controller',
+    });
+
+    expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('failed');
+  });
+
+  it('rejects cancel when controller is running a different run', async () => {
+    const rowStartedAt = '2024-01-01T00:00:00.000+00:00';
+    const controllerStartedAt = '2024-01-02T00:00:00.000+00:00';
+    const instanceId = await createPersonalInstance(user.id);
+    const run = await insertRunningCliRun(user.id, instanceId, rowStartedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'running',
+      output: 'new run output',
+      exitCode: null,
+      startedAt: controllerStartedAt,
+      completedAt: null,
+      prompt: 'different prompt',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.cancelKiloCliRun({ runId })).rejects.toMatchObject({
+      code: 'CONFLICT',
+    });
+
+    expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
+  });
+
+  it('cancels successfully when controller matches the DB run', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createPersonalInstance(user.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'running',
+      output: 'in progress',
+      exitCode: null,
+      startedAt: run.startedAt,
+      completedAt: null,
+      prompt: 'test prompt',
+    });
+    mockCancelKiloCliRun.mockResolvedValue({ ok: true });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.cancelKiloCliRun({ runId });
+
+    expect(result).toMatchObject({ ok: true });
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('cancelled');
+    expect(dbRow.completed_at).not.toBeNull();
   });
 });
 
@@ -215,7 +495,7 @@ describe('organizations.kiloclaw.startKiloCliRun error translation', () => {
   });
 
   it('inserts a running kiloclaw_cli_runs row on success', async () => {
-    const startedAt = '2024-01-01T00:00:00.000Z';
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
     mockStartKiloCliRun.mockResolvedValue({ ok: true, startedAt });
 
     const caller = await createCallerForUser(user.id);
@@ -237,5 +517,285 @@ describe('organizations.kiloclaw.startKiloCliRun error translation', () => {
       prompt: 'fix the org config',
       status: 'running',
     });
+  });
+});
+
+// ── Org router: organizations.kiloclaw.getKiloCliRunStatus ─────────────────
+
+describe('organizations.kiloclaw.getKiloCliRunStatus reconciliation', () => {
+  beforeEach(async () => {
+    org = await createOrganization('Test Org', user.id);
+  });
+
+  it('terminalizes a running row when controller has no run', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createOrgInstance(user.id, org.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: false,
+      status: null,
+      output: null,
+      exitCode: null,
+      startedAt: null,
+      completedAt: null,
+      prompt: null,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.organizations.kiloclaw.getKiloCliRunStatus({
+      organizationId: org.id,
+      runId,
+    });
+
+    expect(result).toMatchObject({
+      hasRun: true,
+      status: 'failed',
+    });
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('failed');
+    expect(dbRow.completed_at).not.toBeNull();
+  });
+
+  it('terminalizes a running row when controller reports a different run', async () => {
+    const rowStartedAt = '2024-01-01T00:00:00.000+00:00';
+    const controllerStartedAt = '2024-01-02T00:00:00.000+00:00';
+    const instanceId = await createOrgInstance(user.id, org.id);
+    const run = await insertRunningCliRun(user.id, instanceId, rowStartedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'running',
+      output: 'some output from new run',
+      exitCode: null,
+      startedAt: controllerStartedAt,
+      completedAt: null,
+      prompt: 'different prompt',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.organizations.kiloclaw.getKiloCliRunStatus({
+      organizationId: org.id,
+      runId,
+    });
+
+    expect(result).toMatchObject({
+      hasRun: true,
+      status: 'failed',
+    });
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('failed');
+  });
+
+  it('persists terminal status when controller matches and is complete', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createOrgInstance(user.id, org.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'completed',
+      output: 'task done',
+      exitCode: 0,
+      startedAt: run.startedAt,
+      completedAt: '2024-01-01T00:05:00.000Z',
+      prompt: 'test prompt',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.organizations.kiloclaw.getKiloCliRunStatus({
+      organizationId: org.id,
+      runId,
+    });
+
+    expect(result).toMatchObject({
+      hasRun: true,
+      status: 'completed',
+      output: 'task done',
+      exitCode: 0,
+    });
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('completed');
+    expect(dbRow.exit_code).toBe(0);
+  });
+
+  it('returns live output without terminalizing when controller matches and is running', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createOrgInstance(user.id, org.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'running',
+      output: 'in progress...',
+      exitCode: null,
+      startedAt: run.startedAt,
+      completedAt: null,
+      prompt: 'test prompt',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.organizations.kiloclaw.getKiloCliRunStatus({
+      organizationId: org.id,
+      runId,
+    });
+
+    expect(result).toMatchObject({
+      hasRun: true,
+      status: 'running',
+      output: 'in progress...',
+    });
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('running');
+  });
+});
+
+// ── Org router: organizations.kiloclaw.cancelKiloCliRun ────────────────────
+
+describe('organizations.kiloclaw.cancelKiloCliRun identity validation', () => {
+  beforeEach(async () => {
+    org = await createOrganization('Test Org', user.id);
+  });
+
+  it('rejects cancel when the run is not running', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createOrgInstance(user.id, org.id);
+    const [row] = await db
+      .insert(kiloclaw_cli_runs)
+      .values({
+        user_id: user.id,
+        instance_id: instanceId,
+        prompt: 'test prompt',
+        status: 'completed',
+        started_at: startedAt,
+        completed_at: '2024-01-01T00:05:00.000Z',
+      })
+      .returning({ id: kiloclaw_cli_runs.id });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.cancelKiloCliRun({
+        organizationId: org.id,
+        runId: row.id,
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Kilo CLI run is no longer running',
+    });
+
+    expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
+  });
+
+  it('rejects cancel and terminalizes row when controller has no run', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createOrgInstance(user.id, org.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: false,
+      status: null,
+      output: null,
+      exitCode: null,
+      startedAt: null,
+      completedAt: null,
+      prompt: null,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.cancelKiloCliRun({ organizationId: org.id, runId })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Kilo CLI run is no longer active on the controller',
+    });
+
+    expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('failed');
+  });
+
+  it('rejects cancel when controller is running a different run', async () => {
+    const rowStartedAt = '2024-01-01T00:00:00.000+00:00';
+    const controllerStartedAt = '2024-01-02T00:00:00.000+00:00';
+    const instanceId = await createOrgInstance(user.id, org.id);
+    const run = await insertRunningCliRun(user.id, instanceId, rowStartedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'running',
+      output: 'new run output',
+      exitCode: null,
+      startedAt: controllerStartedAt,
+      completedAt: null,
+      prompt: 'different prompt',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.organizations.kiloclaw.cancelKiloCliRun({ organizationId: org.id, runId })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+    });
+
+    expect(mockCancelKiloCliRun).not.toHaveBeenCalled();
+  });
+
+  it('cancels successfully when controller matches the DB run', async () => {
+    const startedAt = '2024-01-01T00:00:00.000+00:00';
+    const instanceId = await createOrgInstance(user.id, org.id);
+    const run = await insertRunningCliRun(user.id, instanceId, startedAt);
+    const runId = run.id;
+
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'running',
+      output: 'in progress',
+      exitCode: null,
+      startedAt: run.startedAt,
+      completedAt: null,
+      prompt: 'test prompt',
+    });
+    mockCancelKiloCliRun.mockResolvedValue({ ok: true });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.organizations.kiloclaw.cancelKiloCliRun({
+      organizationId: org.id,
+      runId,
+    });
+
+    expect(result).toMatchObject({ ok: true });
+
+    const [dbRow] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, runId));
+    expect(dbRow.status).toBe('cancelled');
+    expect(dbRow.completed_at).not.toBeNull();
   });
 });

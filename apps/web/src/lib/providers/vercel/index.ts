@@ -37,7 +37,7 @@ const DEFAULT_VERCEL_PERCENTAGE = 10;
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
     const raw = await redisGet(VERCEL_ROUTING_REDIS_KEY);
-    return RedisPercentageSchema.parse(JSON.parse(raw)).vercel_routing_percentage;
+    return RedisPercentageSchema.parse(JSON.parse(raw ?? 'null')).vercel_routing_percentage;
   },
   10_000,
   DEFAULT_VERCEL_PERCENTAGE

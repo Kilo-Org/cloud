@@ -5,15 +5,16 @@ import { kiloclaw_instances, kiloclaw_subscriptions, kiloclaw_cli_runs } from '@
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import type { User, Organization } from '@kilocode/db/schema';
+import type { createCallerForUser as createCallerForUserType } from '@/routers/test-utils';
+import type { KiloClawApiError as KiloClawApiErrorType } from '@/lib/kiloclaw/kiloclaw-internal-client';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyMock = jest.Mock<(...args: any[]) => any>;
+type StartKiloCliRunResult = { ok: true; startedAt: string };
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
-const mockStartKiloCliRun: AnyMock = jest.fn();
+const mockStartKiloCliRun = jest.fn<() => Promise<StartKiloCliRunResult>>();
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const actual: Record<string, unknown> = jest.requireActual(
     '@/lib/kiloclaw/kiloclaw-internal-client'
@@ -27,17 +28,17 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
 });
 
 jest.mock('next/headers', () => {
-  const fn = jest.fn as (...args: unknown[]) => AnyMock;
+  const get = jest.fn<() => unknown>();
   return {
-    cookies: fn().mockResolvedValue({ get: fn() }),
-    headers: fn().mockReturnValue(new Map()),
+    cookies: jest.fn<() => Promise<{ get: typeof get }>>().mockResolvedValue({ get }),
+    headers: jest.fn<() => Map<string, string>>().mockReturnValue(new Map()),
   };
 });
 
 // ── Dynamic imports (after mocks) ──────────────────────────────────────────
 
-let createCallerForUser: (typeof import('@/routers/test-utils'))['createCallerForUser'];
-let KiloClawApiError: (typeof import('@/lib/kiloclaw/kiloclaw-internal-client'))['KiloClawApiError'];
+let createCallerForUser: typeof createCallerForUserType;
+let KiloClawApiError: typeof KiloClawApiErrorType;
 
 beforeAll(async () => {
   const mod = await import('@/routers/test-utils');

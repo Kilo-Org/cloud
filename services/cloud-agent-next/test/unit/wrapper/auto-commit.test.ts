@@ -269,6 +269,49 @@ describe('runAutoCommit', () => {
     );
   });
 
+  it('uses fallback commit message and still pushes when generation times out', async () => {
+    vi.useFakeTimers();
+    try {
+      mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
+      mockGit
+        .mockResolvedValueOnce(ok(' M file.ts'))
+        .mockResolvedValueOnce(ok())
+        .mockResolvedValueOnce(ok('[feature/cool-stuff abc1234] wip'))
+        .mockResolvedValueOnce(ok('abc1234'))
+        .mockResolvedValueOnce(ok());
+      const kiloClient = createMockKiloClient();
+      vi.mocked(kiloClient.generateCommitMessage).mockReturnValue(new Promise(() => {}));
+      const { opts, events } = createOpts({ kiloClient });
+
+      const resultPromise = runAutoCommit(opts);
+      await vi.advanceTimersByTimeAsync(30_000);
+      const result = await resultPromise;
+
+      expect(result).toEqual({ success: true });
+      expect(mockGit).toHaveBeenNthCalledWith(
+        3,
+        ['commit', '-m', 'wip'],
+        expect.objectContaining({ cwd: '/workspace', timeoutMs: 30_000 })
+      );
+      expect(mockGit).toHaveBeenLastCalledWith(
+        ['push'],
+        expect.objectContaining({ cwd: '/workspace', timeoutMs: 60_000 })
+      );
+      const completed = events.find(e => e.streamEventType === 'autocommit_completed');
+      expect(completed?.data).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: 'Changes committed and pushed',
+          commitHash: 'abc1234',
+          commitMessage: 'wip',
+        })
+      );
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('reports aborted git status distinctly from timeout', async () => {
     mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
     mockGit.mockResolvedValueOnce({

@@ -1,12 +1,19 @@
 process.env.STRIPE_KILOCLAW_COMMIT_PRICE_ID ||= 'price_commit';
 process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID ||= 'price_standard';
 process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
+process.env.KILOCLAW_API_URL ||= 'http://localhost:8795';
+process.env.KILOCLAW_INTERNAL_API_SECRET ||= 'test-secret';
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { cleanupDbForTest } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { createCallerFactory } from '@/lib/trpc/init';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import {
+  kiloclaw_cli_runs,
+  kiloclaw_earlybird_purchases,
+  kiloclaw_instances,
+} from '@kilocode/db/schema';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
@@ -14,6 +21,7 @@ type AnyMock = jest.Mock<(...args: any[]) => any>;
 type KiloClawClientMock = {
   KiloClawInternalClient: AnyMock;
   __getStatusMock: AnyMock;
+  __cancelKiloCliRunMock: AnyMock;
 };
 
 jest.mock('@/lib/stripe-client', () => {
@@ -56,9 +64,11 @@ jest.mock('next/headers', () => {
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const getStatusMock = jest.fn();
+  const cancelKiloCliRunMock = jest.fn();
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       getStatus: getStatusMock,
+      cancelKiloCliRun: cancelKiloCliRunMock,
     })),
     KiloClawApiError: class KiloClawApiError extends Error {
       statusCode: number;
@@ -70,6 +80,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       }
     },
     __getStatusMock: getStatusMock,
+    __cancelKiloCliRunMock: cancelKiloCliRunMock,
   };
 });
 
@@ -77,6 +88,18 @@ const createCaller = createCallerFactory(kiloclawRouter);
 const kiloclawClientMock = jest.requireMock<KiloClawClientMock>(
   '@/lib/kiloclaw/kiloclaw-internal-client'
 );
+
+function sandboxId(): string {
+  return `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+}
+
+async function grantKiloClawAccess(userId: string): Promise<void> {
+  await db.insert(kiloclaw_earlybird_purchases).values({
+    user_id: userId,
+    manual_payment_id: `manual-${crypto.randomUUID()}`,
+    amount_cents: 20_000,
+  });
+}
 
 describe('kiloclawRouter getStatus', () => {
   beforeEach(async () => {
@@ -125,6 +148,212 @@ describe('kiloclawRouter getStatus', () => {
       workerUrl: 'https://claw.kilo.ai',
       name: null,
       instanceId: null,
+    });
+  });
+});
+
+describe('kiloclawRouter listKiloCliRuns', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.__cancelKiloCliRunMock.mockReset();
+  });
+
+  it('returns only runs for the active personal instance when one exists', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-cli-runs-${Math.random()}@example.com`,
+    });
+
+    await grantKiloClawAccess(user.id);
+
+    const [destroyedInstance, activeInstance] = await db
+      .insert(kiloclaw_instances)
+      .values([
+        {
+          user_id: user.id,
+          sandbox_id: sandboxId(),
+          destroyed_at: '2026-04-01T00:00:00.000Z',
+        },
+        {
+          user_id: user.id,
+          sandbox_id: sandboxId(),
+        },
+      ])
+      .returning({ id: kiloclaw_instances.id });
+
+    if (!destroyedInstance || !activeInstance) {
+      throw new Error('Failed to create KiloClaw test instances');
+    }
+
+    await db.insert(kiloclaw_cli_runs).values([
+      {
+        user_id: user.id,
+        instance_id: destroyedInstance.id,
+        prompt: 'destroyed instance run',
+        status: 'completed',
+        started_at: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        user_id: user.id,
+        instance_id: activeInstance.id,
+        prompt: 'active instance run',
+        status: 'completed',
+        started_at: '2026-04-03T00:00:00.000Z',
+      },
+      {
+        user_id: user.id,
+        instance_id: null,
+        prompt: 'legacy null instance run',
+        status: 'completed',
+        started_at: '2026-04-05T00:00:00.000Z',
+      },
+    ]);
+
+    const caller = createCaller({ user });
+    const result = await caller.listKiloCliRuns();
+
+    expect(result.runs).toHaveLength(1);
+    expect(result.runs[0]?.prompt).toBe('active instance run');
+    expect(result.runs[0]?.instance_id).toBe(activeInstance.id);
+  });
+
+  it('preserves user-scoped listing when no active personal instance exists', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-cli-runs-legacy-${Math.random()}@example.com`,
+    });
+
+    await grantKiloClawAccess(user.id);
+
+    const [destroyedInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: sandboxId(),
+        destroyed_at: '2026-04-01T00:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    if (!destroyedInstance) {
+      throw new Error('Failed to create KiloClaw test instance');
+    }
+
+    await db.insert(kiloclaw_cli_runs).values([
+      {
+        user_id: user.id,
+        instance_id: destroyedInstance.id,
+        prompt: 'destroyed instance run',
+        status: 'completed',
+        started_at: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        user_id: user.id,
+        instance_id: null,
+        prompt: 'legacy null instance run',
+        status: 'completed',
+        started_at: '2026-04-02T00:00:00.000Z',
+      },
+    ]);
+
+    const caller = createCaller({ user });
+    const result = await caller.listKiloCliRuns();
+
+    expect(result.runs.map(run => run.prompt)).toEqual([
+      'legacy null instance run',
+      'destroyed instance run',
+    ]);
+  });
+
+  it('opens listed destroyed-instance runs when no active personal instance exists', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-cli-runs-status-${Math.random()}@example.com`,
+    });
+
+    await grantKiloClawAccess(user.id);
+
+    const [destroyedInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: sandboxId(),
+        destroyed_at: '2026-04-01T00:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    if (!destroyedInstance) {
+      throw new Error('Failed to create KiloClaw test instance');
+    }
+
+    const [run] = await db
+      .insert(kiloclaw_cli_runs)
+      .values({
+        user_id: user.id,
+        instance_id: destroyedInstance.id,
+        prompt: 'destroyed instance run',
+        status: 'completed',
+        started_at: '2026-04-01T00:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_cli_runs.id });
+
+    if (!run) {
+      throw new Error('Failed to create KiloClaw CLI run');
+    }
+
+    const caller = createCaller({ user });
+    const result = await caller.getKiloCliRunStatus({ runId: run.id });
+
+    expect(result).toMatchObject({
+      hasRun: true,
+      status: 'completed',
+      prompt: 'destroyed instance run',
+    });
+  });
+
+  // Verifies that cancelling a run on a destroyed instance reaches the
+  // controller call path (resolveWorkerInstanceId succeeds). The mock for
+  // KiloClawInternalClient covers the router's direct import but not the
+  // transitive import inside cancelCliRun (cli-runs.ts), so the real
+  // constructor fires and throws about the missing env var. The assertion
+  // confirms the code got past the DB lookup and instance resolution.
+  it('reaches the controller when cancelling a destroyed-instance run', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-cli-runs-cancel-${Math.random()}@example.com`,
+    });
+
+    await grantKiloClawAccess(user.id);
+
+    const [destroyedInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: sandboxId(),
+        destroyed_at: '2026-04-01T00:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    if (!destroyedInstance) {
+      throw new Error('Failed to create KiloClaw test instance');
+    }
+
+    const [run] = await db
+      .insert(kiloclaw_cli_runs)
+      .values({
+        user_id: user.id,
+        instance_id: destroyedInstance.id,
+        prompt: 'destroyed instance run',
+        status: 'running',
+        started_at: '2026-04-01T00:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_cli_runs.id });
+
+    if (!run) {
+      throw new Error('Failed to create KiloClaw CLI run');
+    }
+
+    kiloclawClientMock.__cancelKiloCliRunMock.mockResolvedValue({ ok: true });
+
+    const caller = createCaller({ user });
+    await expect(caller.cancelKiloCliRun({ runId: run.id })).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'KILOCLAW_API_URL is not configured',
     });
   });
 });

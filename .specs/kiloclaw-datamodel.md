@@ -224,7 +224,7 @@ MUST be enforced only after the existing data model has been brought
 into the desired state (rules 1–6 satisfied, early-bird backfill
 complete).
 
-19. A Cloudflare Worker Durable Object and a infra provider base resource  MUST both exist
+19. A Cloudflare Worker Durable Object and a infra provider base resource MUST both exist
     before an instance record is created in `kiloclaw_instance`.
     Infrastructure MUST be provisioned first; the record is a
     reflection of existing infrastructure, not a reservation.

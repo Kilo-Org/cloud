@@ -1,13 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { unstable_cache } from 'next/cache';
+import { createRedisCachedFetch } from '@/lib/cached-fetch';
 import { captureException } from '@sentry/nextjs';
 import type { OpenRouterProvider } from '@/lib/organizations/organization-types';
 
-export const revalidate = 86400; // 24 hours
-
 // Cache the providers fetch for 24 hours
-const getCachedProviders = unstable_cache(
+const getCachedProviders = createRedisCachedFetch(
+  'openrouter:providers',
   async () => {
     const response = await fetch('https://openrouter.ai/api/frontend/all-providers', {
       method: 'GET',
@@ -27,11 +26,8 @@ const getCachedProviders = unstable_cache(
 
     return response.json() as Promise<OpenRouterProvider[]>;
   },
-  ['openrouter-providers'], // Cache key
-  {
-    revalidate: 86400, // 24 hours in seconds
-    tags: ['openrouter-providers'], // Cache tags for granular invalidation
-  }
+  86_400_000,
+  []
 );
 
 /**

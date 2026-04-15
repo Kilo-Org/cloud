@@ -10,40 +10,47 @@ import {
   type UserByokProviderId,
 } from '@/lib/providers/openrouter/inference-provider-id';
 import { isCodestralModel } from '@/lib/providers/mistral';
-import { unstable_cache } from 'next/cache';
+import { getOrCreateRedisCachedFetch } from '@/lib/cached-fetch';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@/lib/providers/types';
 
-const getModelUserByokProviders_cached = unstable_cache(
-  async (modelId: string) => {
-    const vercelModelMetadata = (
-      await readDb
-        .select({ vercel: modelsByProvider.vercel })
-        .from(modelsByProvider)
-        .orderBy(desc(modelsByProvider.id))
-        .limit(1)
-    ).at(0)?.vercel;
-    if (!vercelModelMetadata) {
-      console.error('[getModelUserByokProviders_cached] no Vercel model metadata in the database');
-      return [];
-    }
-    const providers =
-      vercelModelMetadata[mapModelIdToVercel(modelId)]?.endpoints
-        .map(ep => VercelUserByokInferenceProviderIdSchema.safeParse(ep.tag).data)
-        .filter(providerId => providerId !== undefined) ?? [];
-    if (providers.length === 0) {
-      console.debug(`[getModelUserByokProviders_cached] no user byok providers for ${modelId}`);
-      return [];
-    }
-    console.debug(
-      `[getModelUserByokProviders_cached] found user byok providers for ${modelId}`,
-      providers
-    );
-    return providers;
-  },
-  undefined,
-  { revalidate: 300 }
-);
+function getModelUserByokProviders_cached(modelId: string) {
+  const redisKey = `byok:providers:${modelId}`;
+  const get = getOrCreateRedisCachedFetch(
+    redisKey,
+    async () => {
+      const vercelModelMetadata = (
+        await readDb
+          .select({ vercel: modelsByProvider.vercel })
+          .from(modelsByProvider)
+          .orderBy(desc(modelsByProvider.id))
+          .limit(1)
+      ).at(0)?.vercel;
+      if (!vercelModelMetadata) {
+        console.error(
+          '[getModelUserByokProviders_cached] no Vercel model metadata in the database'
+        );
+        return [];
+      }
+      const providers =
+        vercelModelMetadata[mapModelIdToVercel(modelId)]?.endpoints
+          .map(ep => VercelUserByokInferenceProviderIdSchema.safeParse(ep.tag).data)
+          .filter(providerId => providerId !== undefined) ?? [];
+      if (providers.length === 0) {
+        console.debug(`[getModelUserByokProviders_cached] no user byok providers for ${modelId}`);
+        return [];
+      }
+      console.debug(
+        `[getModelUserByokProviders_cached] found user byok providers for ${modelId}`,
+        providers
+      );
+      return providers;
+    },
+    300_000,
+    []
+  );
+  return get();
+}
 
 export async function getModelUserByokProviders(model: string): Promise<UserByokProviderId[]> {
   return isCodestralModel(model) ? ['codestral'] : await getModelUserByokProviders_cached(model);

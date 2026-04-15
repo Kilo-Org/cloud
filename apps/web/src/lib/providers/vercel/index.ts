@@ -14,14 +14,13 @@ import type {
 } from '@/lib/providers/openrouter/types';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
 import * as crypto from 'crypto';
-import { unstable_cache } from 'next/cache';
 import { readDb } from '@/lib/drizzle';
 import { modelsByProvider } from '@kilocode/db/schema';
 import { desc } from 'drizzle-orm';
 import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
-import { createCachedFetch } from '@/lib/cached-fetch';
+import { createCachedFetch, createRedisCachedFetch } from '@/lib/cached-fetch';
 import {
   VERCEL_ROUTING_REDIS_KEY,
   GatewayPercentageSchema,
@@ -41,7 +40,8 @@ const getVercelRoutingPercentage = createCachedFetch(
   DEFAULT_VERCEL_PERCENTAGE
 );
 
-const getVercelModels_cached = unstable_cache(
+const getVercelModels_cached = createRedisCachedFetch(
+  'vercel:models',
   async () => {
     const result = await readDb
       .select({ vercel: modelsByProvider.vercel })
@@ -52,8 +52,8 @@ const getVercelModels_cached = unstable_cache(
       .filter(model => model.type === 'language' && model.endpoints.length > 0)
       .map(model => model.id);
   },
-  undefined,
-  { revalidate: 3600 }
+  3_600_000,
+  []
 );
 
 async function getVercelModels() {

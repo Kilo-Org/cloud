@@ -5,16 +5,19 @@ import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-
 import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getDirectByokModelsForUser } from '@/lib/providers/direct-byok';
-import { unstable_cache } from 'next/cache';
+import { getOrCreateRedisCachedFetch } from '@/lib/cached-fetch';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { filterByFeature } from '@/lib/models';
 
-const getDirectByokModels = unstable_cache(
-  (userId: string) => getDirectByokModelsForUser(userId),
-  undefined,
-  { revalidate: 60 }
-);
+function getDirectByokModels(userId: string) {
+  return getOrCreateRedisCachedFetch(
+    `openrouter:direct-byok-models:${userId}`,
+    () => getDirectByokModelsForUser(userId),
+    60_000,
+    []
+  )();
+}
 
 async function tryGetUserFromAuth() {
   try {

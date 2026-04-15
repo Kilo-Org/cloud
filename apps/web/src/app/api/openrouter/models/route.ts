@@ -5,16 +5,21 @@ import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-
 import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getDirectByokModelsForUser } from '@/lib/providers/direct-byok';
-import { unstable_cache } from 'next/cache';
+import { redisGet, redisSet } from '@/lib/redis';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { filterByFeature } from '@/lib/models';
 
-const getDirectByokModels = unstable_cache(
-  (userId: string) => getDirectByokModelsForUser(userId),
-  undefined,
-  { revalidate: 60 }
-);
+async function getDirectByokModels(userId: string) {
+  const redisKey = `openrouter:direct-byok-models:${userId}`;
+  const cached = await redisGet(redisKey);
+  if (cached) {
+    return JSON.parse(cached) as Awaited<ReturnType<typeof getDirectByokModelsForUser>>;
+  }
+  const models = await getDirectByokModelsForUser(userId);
+  await redisSet(redisKey, JSON.stringify(models), 60);
+  return models;
+}
 
 async function tryGetUserFromAuth() {
   try {

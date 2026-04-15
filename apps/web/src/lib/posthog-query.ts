@@ -1,5 +1,5 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import { unstable_cache } from 'next/cache';
+import { redisGet, redisSet } from '@/lib/redis';
 import * as z from 'zod';
 
 /**
@@ -58,23 +58,26 @@ export async function posthogQuery(name: string, query: string): Promise<PostHog
   };
 }
 export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
-  return unstable_cache(
-    async (name: string, query: string) => {
-      const startTime = performance.now();
-      const response = await posthogQuery(name, query);
-      if (response.status !== 'ok') {
-        throw new Error(`${name} query failed: ${JSON.stringify(response.error, undefined, 2)}`);
-      }
-      const result = schema.safeParse(response.body.results);
-      if (!result.success) {
-        throw new Error(`${name} parse failed: ${z.prettifyError(result.error)}`);
-      }
-      console.debug(
-        `[cachedPosthogQuery] ${name} returned ${result.data.length} rows in ${performance.now() - startTime}ms`
-      );
-      return result.data;
-    },
-    undefined,
-    { revalidate: 60 * 60 * 24 } // 24 hours
-  );
+  return async (name: string, query: string) => {
+    const redisKey = `posthog:query:${name}`;
+    const cached = await redisGet(redisKey);
+    if (cached) {
+      return JSON.parse(cached) as Output[];
+    }
+
+    const startTime = performance.now();
+    const response = await posthogQuery(name, query);
+    if (response.status !== 'ok') {
+      throw new Error(`${name} query failed: ${JSON.stringify(response.error, undefined, 2)}`);
+    }
+    const result = schema.safeParse(response.body.results);
+    if (!result.success) {
+      throw new Error(`${name} parse failed: ${z.prettifyError(result.error)}`);
+    }
+    console.debug(
+      `[cachedPosthogQuery] ${name} returned ${result.data.length} rows in ${performance.now() - startTime}ms`
+    );
+    await redisSet(redisKey, JSON.stringify(result.data), 60 * 60 * 24);
+    return result.data;
+  };
 }

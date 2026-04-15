@@ -1,38 +1,40 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { unstable_cache } from 'next/cache';
+import { redisGet, redisSet } from '@/lib/redis';
 import { captureException } from '@sentry/nextjs';
 import type { OpenRouterProvider } from '@/lib/organizations/organization-types';
 
 export const revalidate = 86400; // 24 hours
 
-// Cache the providers fetch for 24 hours
-const getCachedProviders = unstable_cache(
-  async () => {
-    const response = await fetch('https://openrouter.ai/api/frontend/all-providers', {
-      method: 'GET',
-    });
+const OPENROUTER_PROVIDERS_REDIS_KEY = 'openrouter:providers';
+const OPENROUTER_PROVIDERS_TTL = 86400;
 
-    if (!response.ok) {
-      const errorMessage = `Failed to fetch OpenRouter providers: ${response.status} ${response.statusText}`;
-      captureException(new Error(errorMessage), {
-        tags: { endpoint: 'openrouter/providers', source: 'openrouter_public_api' },
-        extra: {
-          status: response.status,
-          statusText: response.statusText,
-        },
-      });
-      throw new Error(errorMessage);
-    }
-
-    return response.json() as Promise<OpenRouterProvider[]>;
-  },
-  ['openrouter-providers'], // Cache key
-  {
-    revalidate: 86400, // 24 hours in seconds
-    tags: ['openrouter-providers'], // Cache tags for granular invalidation
+async function getCachedProviders() {
+  const cached = await redisGet(OPENROUTER_PROVIDERS_REDIS_KEY);
+  if (cached) {
+    return JSON.parse(cached) as OpenRouterProvider[];
   }
-);
+
+  const response = await fetch('https://openrouter.ai/api/frontend/all-providers', {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    const errorMessage = `Failed to fetch OpenRouter providers: ${response.status} ${response.statusText}`;
+    captureException(new Error(errorMessage), {
+      tags: { endpoint: 'openrouter/providers', source: 'openrouter_public_api' },
+      extra: {
+        status: response.status,
+        statusText: response.statusText,
+      },
+    });
+    throw new Error(errorMessage);
+  }
+
+  const data = (await response.json()) as OpenRouterProvider[];
+  await redisSet(OPENROUTER_PROVIDERS_REDIS_KEY, JSON.stringify(data), OPENROUTER_PROVIDERS_TTL);
+  return data;
+}
 
 /**
  * Test using:

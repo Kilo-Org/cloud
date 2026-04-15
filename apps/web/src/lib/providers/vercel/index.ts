@@ -14,13 +14,12 @@ import type {
 } from '@/lib/providers/openrouter/types';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
 import * as crypto from 'crypto';
-import { unstable_cache } from 'next/cache';
+import { redisGet, redisSet } from '@/lib/redis';
 import { readDb } from '@/lib/drizzle';
 import { modelsByProvider } from '@kilocode/db/schema';
 import { desc } from 'drizzle-orm';
 import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
-import { redisGet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import {
   VERCEL_ROUTING_REDIS_KEY,
@@ -41,20 +40,26 @@ const getVercelRoutingPercentage = createCachedFetch(
   DEFAULT_VERCEL_PERCENTAGE
 );
 
-const getVercelModels_cached = unstable_cache(
-  async () => {
-    const result = await readDb
-      .select({ vercel: modelsByProvider.vercel })
-      .from(modelsByProvider)
-      .orderBy(desc(modelsByProvider.id))
-      .limit(1);
-    return Object.values(z.record(z.string(), StoredModelSchema).parse(result.at(0)?.vercel))
-      .filter(model => model.type === 'language' && model.endpoints.length > 0)
-      .map(model => model.id);
-  },
-  undefined,
-  { revalidate: 3600 }
-);
+const VERCEL_MODELS_REDIS_KEY = 'vercel:models';
+const VERCEL_MODELS_TTL = 3600;
+
+async function getVercelModels_cached() {
+  const cached = await redisGet(VERCEL_MODELS_REDIS_KEY);
+  if (cached) {
+    return JSON.parse(cached) as string[];
+  }
+
+  const result = await readDb
+    .select({ vercel: modelsByProvider.vercel })
+    .from(modelsByProvider)
+    .orderBy(desc(modelsByProvider.id))
+    .limit(1);
+  const models = Object.values(z.record(z.string(), StoredModelSchema).parse(result.at(0)?.vercel))
+    .filter(model => model.type === 'language' && model.endpoints.length > 0)
+    .map(model => model.id);
+  await redisSet(VERCEL_MODELS_REDIS_KEY, JSON.stringify(models), VERCEL_MODELS_TTL);
+  return models;
+}
 
 async function getVercelModels() {
   let models = new Array<string>();

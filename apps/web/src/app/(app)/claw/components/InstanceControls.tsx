@@ -87,7 +87,7 @@ export function InstanceControls({
   const [confirmRedeploy, setConfirmRedeploy] = useState(false);
   const [redeployMode, setRedeployMode] = useState<'redeploy' | 'upgrade'>('redeploy');
 
-  const { updateAvailable, catalogNewerThanImage, latestAvailableVersion, latestVersion } =
+  const { updateAvailable, latestAvailableVersion, latestVersion, openClawUpdateExcerpt } =
     useClawUpdateAvailable(status);
 
   const upgradeVersion = latestAvailableVersion ?? latestVersion?.imageTag ?? '';
@@ -219,12 +219,9 @@ export function InstanceControls({
             <ArrowUpCircle />
           </Banner.Icon>
           <Banner.Content>
-            <Banner.Title>
-              {catalogNewerThanImage
-                ? `A newer OpenClaw version (${latestAvailableVersion}) is available`
-                : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available`}
-            </Banner.Title>
+            <Banner.Title>A newer version of KiloClaw is available</Banner.Title>
             <Banner.Description>
+              {openClawUpdateExcerpt ? `${openClawUpdateExcerpt} ` : null}
               Upgrade your instance to get the latest features and fixes.
             </Banner.Description>
           </Banner.Content>
@@ -452,7 +449,7 @@ export function InstanceControls({
                 mutations.restartMachine.mutate(imageTag ? { imageTag } : undefined, {
                   onSuccess: () => {
                     toast.success(
-                      redeployMode === 'upgrade' ? 'Upgrading to latest image' : 'Redeploying'
+                      redeployMode === 'upgrade' ? 'Upgrading KiloClaw' : 'Redeploying'
                     );
                     setConfirmRedeploy(false);
                     onRedeploySuccess?.();

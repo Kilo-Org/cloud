@@ -699,14 +699,13 @@ export function SettingsTab({
   const isRunning = status.status === 'running';
   const {
     updateAvailable,
-    catalogNewerThanImage,
+    openClawUpdateExcerpt,
     needsImageUpgrade,
     isModified,
     hasVersionInfo,
     variantsMatch,
     trackedVersion,
     runningVersion,
-    latestAvailableVersion,
     latestVersion,
     controllerVersion,
     isLoadingControllerVersion,
@@ -869,9 +868,9 @@ export function SettingsTab({
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>
-                          {catalogNewerThanImage
-                            ? `A newer OpenClaw version (${latestAvailableVersion}) is available — click to upgrade`
-                            : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available — click to upgrade`}
+                          {openClawUpdateExcerpt
+                            ? `A newer version of KiloClaw is available. ${openClawUpdateExcerpt} Click to upgrade.`
+                            : 'A newer version of KiloClaw is available — click to upgrade.'}
                         </p>
                       </TooltipContent>
                     </Tooltip>

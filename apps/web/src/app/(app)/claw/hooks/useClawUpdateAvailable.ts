@@ -55,10 +55,15 @@ export function useClawUpdateAvailable(status: {
         calverAtLeast(latestAvailableVersion, runningVersion) &&
         latestAvailableVersion !== runningVersion)
     : imageTagDiffers;
+  const openClawUpdateExcerpt =
+    catalogNewerThanImage && latestAvailableVersion
+      ? `Includes OpenClaw ${latestAvailableVersion}.`
+      : null;
 
   return {
     updateAvailable,
     catalogNewerThanImage,
+    openClawUpdateExcerpt,
     needsImageUpgrade,
     isModified,
     hasVersionInfo,

@@ -7,6 +7,7 @@ import { kilologHash } from '@/lib/kilologHash';
 
 const users = [
   '992891e9fe987b8960a05ed0bc9cc456979d1d71410d467f212e6233dbc0a523', // christiaan
+  'a8cd59cc6df67645c2f509948ee9a579582a7593db43fbad9bcf37cce38f2d87', // https://kilo-code.slack.com/archives/C09H2GDAJ75/p1776149178143169
 ];
 
 const organizations = [

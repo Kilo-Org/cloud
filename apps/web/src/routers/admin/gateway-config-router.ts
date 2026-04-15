@@ -3,7 +3,7 @@ import { redisGet, redisSet } from '@/lib/redis';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
-const REDIS_KEY = 'gateway:vercel-routing-percentage';
+const REDIS_KEY = 'ai-gateway:vercel-routing-percentage';
 
 const StoredConfigSchema = z.object({
   vercel_routing_percentage: z.number().int().min(0).max(100).nullable(),

@@ -35,7 +35,7 @@ const getVercelRoutingPercentage = createCachedFetch(async () => {
   try {
     const raw = await redisGet('ai-gateway:vercel-routing-percentage');
     if (raw) {
-      const result = RedisPercentageSchema.parse(JSON.parse(raw));
+      const result = RedisPercentageSchema.safeParse(JSON.parse(raw));
       if (result.success) {
         return result.data.vercel_routing_percentage;
       }

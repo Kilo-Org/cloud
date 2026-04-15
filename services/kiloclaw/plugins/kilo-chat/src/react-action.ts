@@ -96,9 +96,9 @@ export async function handleKiloChatReactAction(
   }
 
   const rawEmoji = typeof args.params.emoji === 'string' ? args.params.emoji : '';
-  const remove = typeof args.params.remove === 'boolean' ? args.params.remove : rawEmoji === '';
+  const removeExplicit = typeof args.params.remove === 'boolean' ? args.params.remove : false;
 
-  if (remove) {
+  if (removeExplicit) {
     const emoji = normalizeEmoji(rawEmoji);
     if (emoji === '') {
       throw new Error('kilo-chat: remove requires a specific emoji');
@@ -110,9 +110,12 @@ export async function handleKiloChatReactAction(
     };
   }
 
+  if (rawEmoji === '') {
+    throw new Error('kilo-chat: emoji is required');
+  }
   const emoji = normalizeEmoji(rawEmoji);
   if (emoji === '') {
-    throw new Error('kilo-chat: emoji is required for add');
+    throw new Error('kilo-chat: emoji is required');
   }
   const { id } = await args.client.addReaction({ conversationId, messageId, emoji });
   return {

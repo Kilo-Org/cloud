@@ -89,11 +89,32 @@ describe('handleKiloChatReactAction', () => {
     expect(result.details).toMatchObject({ removed: true, emoji: '\u{1F44D}' });
   });
 
-  it('throws when add is attempted with empty emoji', async () => {
+  it('throws "emoji is required" when emoji is missing entirely (no implicit remove)', async () => {
+    const client = mockClient();
+    await expect(handleKiloChatReactAction({ ...baseArgs, params: {}, client })).rejects.toThrow(
+      /emoji is required/i
+    );
+    expect(client.removeReaction).not.toHaveBeenCalled();
+    expect(client.addReaction).not.toHaveBeenCalled();
+  });
+
+  it('throws "emoji is required" when emoji is an empty string (no implicit remove)', async () => {
     const client = mockClient();
     await expect(
       handleKiloChatReactAction({ ...baseArgs, params: { emoji: '' }, client })
-    ).rejects.toThrow(/emoji/i);
+    ).rejects.toThrow(/emoji is required/i);
+    expect(client.removeReaction).not.toHaveBeenCalled();
+  });
+
+  it('throws "emoji is required" when remove: false with empty emoji', async () => {
+    const client = mockClient();
+    await expect(
+      handleKiloChatReactAction({
+        ...baseArgs,
+        params: { emoji: '', remove: false },
+        client,
+      })
+    ).rejects.toThrow(/emoji is required/i);
   });
 
   it('throws when remove: true with empty emoji (no bulk clear support)', async () => {

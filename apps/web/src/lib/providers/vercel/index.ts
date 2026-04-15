@@ -52,8 +52,7 @@ const getVercelModels_cached = createRedisCachedFetch(
       .filter(model => model.type === 'language' && model.endpoints.length > 0)
       .map(model => model.id);
   },
-  3_600_000,
-  []
+  3_600_000
 );
 
 async function getVercelModels() {

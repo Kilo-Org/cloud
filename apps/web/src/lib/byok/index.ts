@@ -46,8 +46,7 @@ function getModelUserByokProviders_cached(modelId: string) {
       );
       return providers;
     },
-    300_000,
-    []
+    300_000
   );
   return get();
 }

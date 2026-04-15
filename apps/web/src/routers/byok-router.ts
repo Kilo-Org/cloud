@@ -106,8 +106,7 @@ async function fetchSupportedModelsImpl(): Promise<Record<string, string[]>> {
 const fetchSupportedModels = createRedisCachedFetch(
   'byok:supported-models',
   fetchSupportedModelsImpl,
-  300_000,
-  {}
+  300_000
 );
 
 export const byokRouter = createTRPCRouter({

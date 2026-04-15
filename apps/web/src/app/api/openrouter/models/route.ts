@@ -14,8 +14,7 @@ function getDirectByokModels(userId: string) {
   return getOrCreateRedisCachedFetch(
     `openrouter:direct-byok-models:${userId}`,
     () => getDirectByokModelsForUser(userId),
-    60_000,
-    []
+    60_000
   )();
 }
 

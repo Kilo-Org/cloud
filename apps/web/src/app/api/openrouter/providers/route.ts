@@ -26,8 +26,7 @@ const getCachedProviders = createRedisCachedFetch(
 
     return response.json() as Promise<OpenRouterProvider[]>;
   },
-  86_400_000,
-  []
+  86_400_000
 );
 
 /**

@@ -79,8 +79,7 @@ export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
         );
         return result.data;
       },
-      86_400_000,
-      []
+      86_400_000
     );
     return get();
   };

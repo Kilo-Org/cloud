@@ -279,63 +279,13 @@ describe('kiloclaw.cancelKiloCliRun error translation', () => {
     await createPersonalInstance(user.id);
   });
 
-  it('maps worker 409 to tRPC CONFLICT', async () => {
-    mockCancelKiloCliRun.mockRejectedValue(
-      new KiloClawApiError(409, '{"error":"Instance is not running"}')
-    );
-
+  it('maps missing run to tRPC NOT_FOUND', async () => {
     const caller = await createCallerForUser(user.id);
     await expect(
       caller.kiloclaw.cancelKiloCliRun({ runId: '10000000-1000-4000-8000-000000000001' })
     ).rejects.toMatchObject({
-      code: 'CONFLICT',
-      message: 'Instance is not running',
-    });
-  });
-
-  it('marks a running row cancelled when controller has no active run', async () => {
-    const [instance] = await db
-      .select()
-      .from(kiloclaw_instances)
-      .where(eq(kiloclaw_instances.user_id, user.id));
-    const [run] = await db
-      .insert(kiloclaw_cli_runs)
-      .values({
-        user_id: user.id,
-        instance_id: instance.id,
-        prompt: 'stale run',
-        status: 'running',
-      })
-      .returning();
-    mockCancelKiloCliRun.mockRejectedValue(
-      new KiloClawApiError(
-        409,
-        '{"error":"No active run to cancel","code":"kilo_cli_run_no_active_run"}'
-      )
-    );
-
-    const caller = await createCallerForUser(user.id);
-    await expect(caller.kiloclaw.cancelKiloCliRun({ runId: run.id })).rejects.toMatchObject({
-      code: 'CONFLICT',
-      message: 'No active run to cancel',
-    });
-
-    const rows = await db.select().from(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.id, run.id));
-    expect(rows[0]).toMatchObject({
-      status: 'cancelled',
-      completed_at: expect.any(String),
-    });
-  });
-
-  it('maps worker 409 without message body to CONFLICT with fallback message', async () => {
-    mockCancelKiloCliRun.mockRejectedValue(new KiloClawApiError(409, ''));
-
-    const caller = await createCallerForUser(user.id);
-    await expect(
-      caller.kiloclaw.cancelKiloCliRun({ runId: '10000000-1000-4000-8000-000000000001' })
-    ).rejects.toMatchObject({
-      code: 'CONFLICT',
-      message: 'Instance is not running',
+      code: 'NOT_FOUND',
+      message: 'Kilo CLI run not found',
     });
   });
 });
@@ -348,11 +298,7 @@ describe('organizations.kiloclaw.cancelKiloCliRun error translation', () => {
     await createOrgInstance(user.id, org.id);
   });
 
-  it('maps worker 409 to tRPC CONFLICT', async () => {
-    mockCancelKiloCliRun.mockRejectedValue(
-      new KiloClawApiError(409, '{"error":"Instance is not running"}')
-    );
-
+  it('maps missing run to tRPC NOT_FOUND', async () => {
     const caller = await createCallerForUser(user.id);
     await expect(
       caller.organizations.kiloclaw.cancelKiloCliRun({
@@ -360,62 +306,8 @@ describe('organizations.kiloclaw.cancelKiloCliRun error translation', () => {
         runId: '10000000-1000-4000-8000-000000000001',
       })
     ).rejects.toMatchObject({
-      code: 'CONFLICT',
-      message: 'Instance is not running',
-    });
-  });
-
-  it('marks a running org row cancelled when controller has no active run', async () => {
-    const [instance] = await db
-      .select()
-      .from(kiloclaw_instances)
-      .where(eq(kiloclaw_instances.organization_id, org.id));
-    const [run] = await db
-      .insert(kiloclaw_cli_runs)
-      .values({
-        user_id: user.id,
-        instance_id: instance.id,
-        prompt: 'stale org run',
-        status: 'running',
-      })
-      .returning();
-    mockCancelKiloCliRun.mockRejectedValue(
-      new KiloClawApiError(
-        409,
-        '{"error":"No active run to cancel","code":"kilo_cli_run_no_active_run"}'
-      )
-    );
-
-    const caller = await createCallerForUser(user.id);
-    await expect(
-      caller.organizations.kiloclaw.cancelKiloCliRun({
-        organizationId: org.id,
-        runId: run.id,
-      })
-    ).rejects.toMatchObject({
-      code: 'CONFLICT',
-      message: 'No active run to cancel',
-    });
-
-    const rows = await db.select().from(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.id, run.id));
-    expect(rows[0]).toMatchObject({
-      status: 'cancelled',
-      completed_at: expect.any(String),
-    });
-  });
-
-  it('maps worker 409 without message body to CONFLICT with fallback message', async () => {
-    mockCancelKiloCliRun.mockRejectedValue(new KiloClawApiError(409, ''));
-
-    const caller = await createCallerForUser(user.id);
-    await expect(
-      caller.organizations.kiloclaw.cancelKiloCliRun({
-        organizationId: org.id,
-        runId: '10000000-1000-4000-8000-000000000001',
-      })
-    ).rejects.toMatchObject({
-      code: 'CONFLICT',
-      message: 'Instance is not running',
+      code: 'NOT_FOUND',
+      message: 'Kilo CLI run not found',
     });
   });
 });

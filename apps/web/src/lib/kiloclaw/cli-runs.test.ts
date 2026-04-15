@@ -114,6 +114,47 @@ describe('cancelCliRun', () => {
     });
   });
 
+  it('persists failed and does not cancel when controller has no active run', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'lost run before cancel',
+      startedAt: '2026-04-12T12:00:00.000Z',
+      initiatedByAdminId: null,
+    });
+    const cancelControllerRun = jest.fn(async () => ({ ok: true }));
+
+    await expect(
+      cancelCliRun({
+        runId,
+        userId: user.id,
+        instanceId,
+        workerInstanceId: 'ki_current',
+        getControllerStatus: async () => ({
+          hasRun: false,
+          status: null,
+          output: null,
+          exitCode: null,
+          startedAt: null,
+          completedAt: null,
+          prompt: null,
+        }),
+        cancelControllerRun,
+      })
+    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false });
+
+    expect(cancelControllerRun).not.toHaveBeenCalled();
+
+    const row = await getRunRow(runId);
+    expect(row.status).toBe('failed');
+    expect(row.output).toBe(
+      '[run state unavailable: controller no longer has an active CLI run for this record]'
+    );
+    expect(row.completed_at).not.toBeNull();
+  });
+
   it('persists failed and does not cancel when controller timestamp belongs to a different run', async () => {
     const user = await insertTestUser();
     const instanceId = await createTestInstance(user.id);

@@ -206,6 +206,21 @@ export async function cancelCliRun(params: {
     });
 
   const controllerStatus = await getControllerStatus(params.userId, effectiveWorkerInstanceId);
+  if (!controllerStatus.hasRun) {
+    await persistCliRunControllerStatus({
+      runId: params.runId,
+      userId: params.userId,
+      instanceId: row.instance_id,
+      controllerStatus: {
+        status: 'failed',
+        exitCode: row.exit_code,
+        output: row.output ?? LOST_CONTROLLER_RUN_OUTPUT,
+        completedAt: new Date().toISOString(),
+      },
+    });
+    return { ok: true, runFound: true, cancelled: false };
+  }
+
   if (!isControllerStatusForRun(row, controllerStatus)) {
     // Controller has moved on — persist 'failed' so the row doesn't stay
     // 'running' forever, then report not-cancelled (there's nothing to cancel).

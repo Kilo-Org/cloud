@@ -24,7 +24,7 @@ describe('formatShortModelName', () => {
 
 describe('formatShortModelDisplayName', () => {
   it('strips "Provider: " prefix', () => {
-    expect(formatShortModelDisplayName('Anthropic: Claude Opus 4.6')).toBe('Claude Opus 4.6');
+    expect(formatShortModelDisplayName('Anthropic: Claude Opus 4.7')).toBe('Claude Opus 4.7');
   });
 
   it('strips Google prefix', () => {

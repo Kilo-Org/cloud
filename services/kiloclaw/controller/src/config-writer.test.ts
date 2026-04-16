@@ -11,7 +11,7 @@ import {
 /** Minimal config that `openclaw onboard` would produce. */
 const ONBOARD_CONFIG = JSON.stringify({
   gateway: { port: 3001, mode: 'local' },
-  agents: { defaults: { model: { primary: 'kilocode/anthropic/claude-opus-4.6' } } },
+  agents: { defaults: { model: { primary: 'kilocode/anthropic/claude-opus-4.7' } } },
   plugins: { entries: { telegram: { enabled: false }, discord: { enabled: false } } },
 });
 
@@ -505,9 +505,9 @@ describe('generateBaseConfig', () => {
     const existing = JSON.stringify({
       agents: {
         defaults: {
-          model: { primary: 'kilocode/anthropic/claude-opus-4.6' },
+          model: { primary: 'kilocode/anthropic/claude-opus-4.7' },
           models: {
-            'kilocode/anthropic/claude-opus-4.6': { alias: 'Kilo Gateway' },
+            'kilocode/anthropic/claude-opus-4.7': { alias: 'Kilo Gateway' },
           },
         },
       },
@@ -517,7 +517,7 @@ describe('generateBaseConfig', () => {
 
     expect(config.agents.defaults.models).toBeUndefined();
     // model.primary should still be preserved
-    expect(config.agents.defaults.model.primary).toBe('kilocode/anthropic/claude-opus-4.6');
+    expect(config.agents.defaults.model.primary).toBe('kilocode/anthropic/claude-opus-4.7');
   });
 
   it('overrides default model only when KILOCODE_DEFAULT_MODEL is set', () => {
@@ -533,7 +533,7 @@ describe('generateBaseConfig', () => {
       agents: {
         defaults: {
           model: {
-            primary: 'kilocode/anthropic/claude-opus-4.6',
+            primary: 'kilocode/anthropic/claude-opus-4.7',
             fallback: 'kilocode/openai/gpt-5',
             customSetting: 'user-value',
           },

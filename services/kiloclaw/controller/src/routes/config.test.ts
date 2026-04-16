@@ -184,7 +184,7 @@ describe('/_kilo/config/patch routes', () => {
     registerConfigRoutes(app, createMockSupervisor(), 'test-token');
 
     const existingConfig = {
-      agents: { defaults: { model: { primary: 'kilocode/anthropic/claude-opus-4.6' } } },
+      agents: { defaults: { model: { primary: 'kilocode/anthropic/claude-opus-4.7' } } },
       gateway: { port: 3001 },
     };
     readMock.mockReturnValue(JSON.stringify(existingConfig));

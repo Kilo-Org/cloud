@@ -156,7 +156,7 @@ const baseAnalysis: SecurityFindingAnalysis = {
   analyzedAt: '2025-01-01T00:00:00.000Z',
   modelUsed: 'anthropic/claude-sonnet-4',
   triageModel: 'anthropic/claude-sonnet-4',
-  analysisModel: 'anthropic/claude-opus-4.6',
+  analysisModel: 'anthropic/claude-opus-4.7',
   triggeredByUserId: 'user-trigger-1',
   correlationId: 'corr-123',
 };
@@ -412,7 +412,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       expect(mockFinalizeAnalysis).toHaveBeenCalledWith(
         FINDING_ID,
         'Analysis result markdown',
-        'anthropic/claude-opus-4.6',
+        'anthropic/claude-opus-4.7',
         { userId: 'user-trigger-1' }, // owner derived from owned_by_user_id
         'user-trigger-1',
         'fresh-token',
@@ -451,7 +451,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       expect(mockFinalizeAnalysis).toHaveBeenCalledWith(
         FINDING_ID,
         'Org analysis',
-        'anthropic/claude-opus-4.6',
+        'anthropic/claude-opus-4.7',
         { organizationId: orgId }, // owner is org-based
         'user-trigger-1',
         'fresh-token',
@@ -673,7 +673,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
       expect(mockFinalizeAnalysis).toHaveBeenCalledWith(
         FINDING_ID,
         'Result',
-        'anthropic/claude-opus-4.6',
+        'anthropic/claude-opus-4.7',
         expect.anything(),
         'user-trigger-1',
         'fresh-token',
@@ -837,7 +837,7 @@ describe('POST /api/internal/security-analysis-callback/[findingId]', () => {
         findingId: FINDING_ID,
         model: 'anthropic/claude-sonnet-4',
         triageModel: 'anthropic/claude-sonnet-4',
-        analysisModel: 'anthropic/claude-opus-4.6',
+        analysisModel: 'anthropic/claude-opus-4.7',
         triageOnly: false,
         durationMs: expect.any(Number),
       });

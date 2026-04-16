@@ -8,7 +8,7 @@ import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
  * Older OpenClaw builds cannot discover arbitrary gateway models dynamically.
  */
 export const KILOCODE_CATALOG_IDS = new Set([
-  'anthropic/claude-opus-4.6',
+  'anthropic/claude-opus-4.7',
   'z-ai/glm-5',
   'minimax/minimax-m2.5',
   'anthropic/claude-sonnet-4.5',

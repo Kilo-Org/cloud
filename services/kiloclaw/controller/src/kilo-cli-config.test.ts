@@ -39,14 +39,14 @@ function baseEnv(overrides: Record<string, string> = {}): Record<string, string 
 
 describe('toKiloModelId', () => {
   it('replaces kilocode/ prefix with kilo/', () => {
-    expect(toKiloModelId('kilocode/anthropic/claude-opus-4.6')).toBe(
-      'kilo/anthropic/claude-opus-4.6'
+    expect(toKiloModelId('kilocode/anthropic/claude-opus-4.7')).toBe(
+      'kilo/anthropic/claude-opus-4.7'
     );
     expect(toKiloModelId('kilocode/openai/gpt-5')).toBe('kilo/openai/gpt-5');
   });
 
   it('passes through values without kilocode/ prefix', () => {
-    expect(toKiloModelId('kilo/anthropic/claude-opus-4.6')).toBe('kilo/anthropic/claude-opus-4.6');
+    expect(toKiloModelId('kilo/anthropic/claude-opus-4.7')).toBe('kilo/anthropic/claude-opus-4.7');
     expect(toKiloModelId('other/model')).toBe('other/model');
   });
 });
@@ -99,13 +99,13 @@ describe('writeKiloCliConfig', () => {
 
   it('includes model in seed config when KILOCODE_DEFAULT_MODEL is set', () => {
     const { deps, written } = fakeDeps();
-    const env = baseEnv({ KILOCODE_DEFAULT_MODEL: 'kilocode/anthropic/claude-opus-4.6' });
+    const env = baseEnv({ KILOCODE_DEFAULT_MODEL: 'kilocode/anthropic/claude-opus-4.7' });
     const result = writeKiloCliConfig(env, '/tmp/kilo', deps);
 
     expect(result).toBe(true);
     expect(written.length).toBeGreaterThanOrEqual(1);
     const seedConfig = JSON.parse(written[0].data);
-    expect(seedConfig.model).toBe('kilo/anthropic/claude-opus-4.6');
+    expect(seedConfig.model).toBe('kilo/anthropic/claude-opus-4.7');
     expect(seedConfig.permission.edit).toBe('allow');
   });
 

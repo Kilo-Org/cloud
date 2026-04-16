@@ -112,7 +112,7 @@ describe('sync-service queue enqueue wiring', () => {
       sla_low_days: 90,
       auto_sync_enabled: true,
       repository_selection_mode: 'all',
-      model_slug: 'anthropic/claude-opus-4.6',
+      model_slug: 'anthropic/claude-opus-4.7',
       analysis_mode: 'auto',
       auto_dismiss_enabled: false,
       auto_dismiss_confidence_threshold: 'high',

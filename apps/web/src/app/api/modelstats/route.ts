@@ -11,7 +11,7 @@ export async function GET(): Promise<NextResponse> {
         costPerRequest: 0.070754096351306,
       },
       {
-        model: 'anthropic/claude-opus-4.6',
+        model: 'anthropic/claude-opus-4.7',
         cost: 1.55365784946837,
         costPerRequest: 0.130604072185604,
       },

@@ -4,9 +4,9 @@ export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
 
 export const CLAUDE_SONNET_CURRENT_MODEL_NAME = 'Claude Sonnet 4.6';
 
-export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.6';
+export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.7';
 
-export const CLAUDE_OPUS_CURRENT_MODEL_NAME = 'Claude Opus 4.6';
+export const CLAUDE_OPUS_CURRENT_MODEL_NAME = 'Claude Opus 4.7';
 
 export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
   public_id: CLAUDE_SONNET_CURRENT_MODEL_ID + ':clawsetup',

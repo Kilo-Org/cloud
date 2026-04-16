@@ -18,7 +18,7 @@ export function formatShortModelName(slug: string): string {
 /**
  * Strips "Provider: " prefix from a human-readable model display name.
  *
- * - `"Anthropic: Claude Opus 4.6"` → `"Claude Opus 4.6"`
+ * - `"Anthropic: Claude Opus 4.7"` → `"Claude Opus 4.7"`
  * - `"Google: Gemini 2.5 Pro"` → `"Gemini 2.5 Pro"`
  * - `"GPT-4o"` (no colon) → `"GPT-4o"`
  * - Empty string → empty string

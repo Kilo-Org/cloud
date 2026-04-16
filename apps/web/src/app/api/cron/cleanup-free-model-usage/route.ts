@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
-import { and, asc, lt, lte } from 'drizzle-orm';
+import { asc, lt, lte } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 
 const RETENTION_DAYS = 7;
@@ -39,23 +39,23 @@ export async function GET(request: Request) {
       .offset(BATCH_SIZE - 1)
       .limit(1);
 
-    const batchCutoff = boundary.length > 0 ? boundary[0].created_at : cutoffDate;
+    // No boundary row means fewer than BATCH_SIZE expired rows remain — this is the final batch
+    const isFinalBatch = boundary.length === 0;
+    const batchCutoff = isFinalBatch ? cutoffDate : boundary[0].created_at;
 
     const result = await db
       .delete(free_model_usage)
       .where(
-        and(
-          lt(free_model_usage.created_at, cutoffDate),
-          lte(free_model_usage.created_at, batchCutoff)
-        )
+        isFinalBatch
+          ? lt(free_model_usage.created_at, batchCutoff)
+          : lte(free_model_usage.created_at, batchCutoff)
       );
 
     const deleted = result.rowCount ?? 0;
     totalDeleted += deleted;
     iterations++;
 
-    // If there was no boundary row, we've deleted everything below the cutoff
-    if (boundary.length === 0 || deleted === 0) {
+    if (isFinalBatch || deleted === 0) {
       break;
     }
 

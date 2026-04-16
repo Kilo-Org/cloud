@@ -55,6 +55,13 @@ let cached: { data: LoadedSecurityAdvisorContent; expiresAt: number } | null = n
 // each fire its own loadFromDb().
 let inFlight: Promise<LoadedSecurityAdvisorContent> | null = null;
 
+// Version counter bumped on every invalidation. A load captures the version
+// when it starts; if the version changes before the load resolves (because
+// an admin save happened mid-load), the result is still returned to the
+// caller but is NOT written into `cached` — so the next request re-queries
+// and picks up the fresh DB state instead of re-seating pre-save data.
+let cacheVersion = 0;
+
 /**
  * Fresh empty content for the degraded-fallback path. Returned as a new
  * object on every call so a downstream caller that accidentally mutates
@@ -87,10 +94,18 @@ export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisor
   if (inFlight !== null) {
     return inFlight;
   }
+  const startVersion = cacheVersion;
   inFlight = (async () => {
     try {
       const data = await loadFromDb();
-      cached = { data, expiresAt: Date.now() + CACHE_TTL_MS };
+      // Only write back to `cached` if no invalidation happened while we
+      // were loading. If it did, a newer write has landed in the DB that
+      // this load didn't see — caching our result would re-seat stale
+      // content for a full TTL. Still return `data` to this caller; the
+      // next request will re-query and pick up the fresh state.
+      if (cacheVersion === startVersion) {
+        cached = { data, expiresAt: Date.now() + CACHE_TTL_MS };
+      }
       return data;
     } catch (err) {
       // Degrade gracefully on transient DB failures (e.g. read replica blip).
@@ -107,9 +122,14 @@ export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisor
   return inFlight;
 }
 
-/** Invalidate the in-process cache, forcing the next call to re-query. */
+/** Invalidate the in-process cache, forcing the next call to re-query.
+ * Also clears `inFlight` so a new request after invalidation starts a
+ * fresh DB load (rather than coalescing onto a pre-write load whose
+ * result is about to be discarded by the cacheVersion check). */
 export function invalidateSecurityAdvisorContentCache(): void {
   cached = null;
+  inFlight = null;
+  cacheVersion++;
 }
 
 async function loadFromDb(): Promise<LoadedSecurityAdvisorContent> {

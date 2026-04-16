@@ -598,42 +598,6 @@ describe('createSessionManager', () => {
       });
     });
 
-    it('sorts optimistic messages chronologically with millisecond backend messages', async () => {
-      jest.spyOn(Date, 'now').mockReturnValue(1_772_214_640_222);
-      const config = createMockConfig();
-      const mgr = createSessionManager(config);
-      const olderMessage = createStoredMessage(
-        'msg_backend_older',
-        'ses-1',
-        'assistant',
-        1_772_214_640_111
-      );
-      const newerMessage = createStoredMessage(
-        'msg_backend_newer',
-        'ses-1',
-        'assistant',
-        1_772_214_640_333
-      );
-
-      await mgr.switchSession(kiloId('ses-1'));
-      if (!latestStorage) throw new Error('expected session storage');
-
-      latestStorage.upsertMessage(newerMessage.info);
-      latestStorage.upsertMessage(olderMessage.info);
-      mockSession.send.mockImplementation(() => new Promise(() => {}));
-      void mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
-
-      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
-      expect(messages.map(message => message.info.time.created)).toEqual([
-        1_772_214_640_111, 1_772_214_640_222, 1_772_214_640_333,
-      ]);
-      expect(messages.map(message => message.info.id)).toEqual([
-        'msg_backend_older',
-        expect.stringMatching(/^msg_/),
-        'msg_backend_newer',
-      ]);
-    });
-
     it('reconciles optimistic user text when authoritative part has a different id', async () => {
       const prompt =
         "I want to build mobile portrait mode friendly interactive birthday invitation for an upcoming 6 year old girl party. Please suggest some cool ideas and let's implement.";
@@ -921,26 +885,6 @@ describe('createSessionManager', () => {
       expect(atomValue(config.store, mgr.atoms.messagesList)).toEqual([activeRootMessage]);
     });
 
-    it('messagesList orders root messages chronologically when ids sort differently', async () => {
-      const config = createMockConfig();
-      const mgr = createSessionManager(config);
-      const olderMessage = createStoredMessage('msg_z', 'ses-root', 'user', 1);
-      const newerMessage = createStoredMessage('msg_a', 'ses-root', 'assistant', 2);
-
-      mockSession.connect.mockImplementation(() => {
-        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root', parentID: null });
-      });
-
-      await mgr.switchSession(kiloId('ses-root'));
-
-      if (!latestStorage) throw new Error('expected session storage');
-
-      latestStorage.upsertMessage(newerMessage.info);
-      latestStorage.upsertMessage(olderMessage.info);
-
-      expect(atomValue(config.store, mgr.atoms.messagesList)).toEqual([olderMessage, newerMessage]);
-    });
-
     it('childMessages still returns only the requested child session messages', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -968,31 +912,6 @@ describe('createSessionManager', () => {
       );
 
       expect(childMessages('child-1')).toEqual([childOneFirst, childOneSecond]);
-    });
-
-    it('childMessages orders messages chronologically when ids sort differently', async () => {
-      const config = createMockConfig();
-      const mgr = createSessionManager(config);
-      const olderMessage = createStoredMessage('msg_z', 'child-1', 'assistant', 1);
-      const newerMessage = createStoredMessage('msg_a', 'child-1', 'user', 2);
-
-      mockSession.connect.mockImplementation(() => {
-        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root', parentID: null });
-      });
-
-      await mgr.switchSession(kiloId('ses-root'));
-
-      if (!latestStorage) throw new Error('expected session storage');
-
-      latestStorage.upsertMessage(newerMessage.info);
-      latestStorage.upsertMessage(olderMessage.info);
-
-      const childMessages = atomValue<(childSessionId: string) => unknown[]>(
-        config.store,
-        mgr.atoms.childMessages
-      );
-
-      expect(childMessages('child-1')).toEqual([olderMessage, newerMessage]);
     });
   });
 

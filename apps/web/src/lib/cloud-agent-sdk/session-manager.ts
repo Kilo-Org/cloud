@@ -204,12 +204,6 @@ function isMessageStreaming(msg: StoredMessage): boolean {
   });
 }
 
-function compareMessagesByCreatedTime(a: StoredMessage, b: StoredMessage): number {
-  const timeDiff = a.info.time.created - b.info.time.created;
-  if (timeDiff !== 0) return timeDiff;
-  return a.info.id.localeCompare(b.info.id);
-}
-
 // ---------------------------------------------------------------------------
 // Status → indicator mapping
 // ---------------------------------------------------------------------------
@@ -289,7 +283,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
       out.push({ info, parts: partsMap.get(id) ?? [] });
     }
-    out.sort(compareMessagesByCreatedTime);
     return out;
   });
 
@@ -317,7 +310,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         const info = msgMap.get(id);
         if (info?.sessionID === childSessionId) out.push({ info, parts: partsMap.get(id) ?? [] });
       }
-      return out.sort(compareMessagesByCreatedTime);
+      return out;
     };
   });
 

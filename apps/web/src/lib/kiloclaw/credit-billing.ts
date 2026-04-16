@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
@@ -315,16 +315,28 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     }
 
     if (!instanceId) {
-      logWarning('Stripe-funded settlement quarantined: unresolved instance target', {
-        user_id: userId,
-        stripe_subscription_id: stripeSubscriptionId,
-        metadata_instance_id: metadataInstanceId ?? null,
-      });
-      return;
+      if (existingRow?.instance_id === null) {
+        resolvedInstanceId = undefined;
+      } else if (existingRow) {
+        logWarning('Stripe-funded settlement quarantined: detached row missing for unresolved target', {
+          user_id: userId,
+          stripe_subscription_id: stripeSubscriptionId,
+          metadata_instance_id: metadataInstanceId ?? null,
+        });
+        return;
+      }
+
+      if (existingRow?.instance_id === null) {
+        instanceId = null;
+      }
+    }
+
+    if (!instanceId && !existingRow) {
+      resolvedInstanceId = undefined;
     }
 
     let targetRow = existingRow;
-    if (!targetRow || targetRow.instance_id !== instanceId) {
+    if (instanceId !== null && (!targetRow || targetRow.instance_id !== instanceId)) {
       const [instanceRow] = await tx
         .select({
           id: kiloclaw_subscriptions.id,
@@ -363,7 +375,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     }
 
     wasSuspended = !!targetRow?.suspended_at;
-    resolvedInstanceId = instanceId;
+    resolvedInstanceId = instanceId ?? undefined;
 
     const shouldClearSchedule = targetRow?.scheduled_plan === plan;
     const commitEndsAt = plan === 'commit' ? periodEnd : null;
@@ -557,12 +569,20 @@ export async function enrollWithCredits(params: {
       suspended_at: kiloclaw_subscriptions.suspended_at,
     })
     .from(kiloclaw_subscriptions)
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
     .where(
       instanceId
         ? eq(kiloclaw_subscriptions.instance_id, instanceId)
         : and(
             eq(kiloclaw_subscriptions.user_id, userId),
-            isNull(kiloclaw_subscriptions.instance_id)
+            or(
+              isNull(kiloclaw_subscriptions.instance_id),
+              and(
+                eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id),
+                isNull(kiloclaw_instances.organization_id),
+                isNotNull(kiloclaw_instances.destroyed_at)
+              )
+            )
           )
     )
     .limit(1);

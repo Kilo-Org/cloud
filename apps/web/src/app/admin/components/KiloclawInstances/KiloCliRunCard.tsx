@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,12 +58,10 @@ function InitiatedByBadge({ initiatedBy }: { initiatedBy: 'admin' | 'user' | nul
 
 function RunOutput({
   output,
-  outputRef,
   open,
   onToggle,
 }: {
   output: string | null;
-  outputRef: React.RefObject<HTMLPreElement | null>;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -87,7 +85,6 @@ function RunOutput({
       {open && (
         <div className="border-border bg-background mt-2 h-[300px] overflow-auto rounded-md border">
           <pre
-            ref={outputRef}
             className="p-3 text-xs leading-relaxed whitespace-pre-wrap break-words"
             style={{ fontFamily: "'Courier New', Courier, monospace", tabSize: 8 }}
           >
@@ -102,7 +99,6 @@ function RunOutput({
 export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const outputRef = useRef<HTMLPreElement>(null);
   const [prompt, setPrompt] = useState('');
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [outputOpen, setOutputOpen] = useState(false);
@@ -151,12 +147,6 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
       setActiveRunId(null);
     }
   }, [trackedRunStatus]);
-
-  useEffect(() => {
-    if (outputRef.current) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight;
-    }
-  }, [runStatus?.output]);
 
   const startMutation = useMutation(
     trpc.admin.kiloclawInstances.startKiloCliRun.mutationOptions({
@@ -337,7 +327,6 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
               output={
                 trackedRunId && runStatus?.output != null ? runStatus.output : latestRun.output
               }
-              outputRef={outputRef}
               open={outputOpen}
               onToggle={() => setOutputOpen(prev => !prev)}
             />

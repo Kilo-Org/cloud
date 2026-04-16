@@ -105,6 +105,10 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
           <Field label="Email">
             {user.google_user_email} <CopyTextButton text={user.google_user_email} />
           </Field>
+          <Field label="Normalized Email">
+            {user.normalized_email ?? <span className="text-muted-foreground">N/A</span>}
+            {user.normalized_email ? <CopyTextButton text={user.normalized_email} /> : null}
+          </Field>
           <Field label="Hosted Domain">
             {user.hosted_domain || 'N/A'}
             {user.hosted_domain ? <CopyTextButton text={user.hosted_domain} /> : null}

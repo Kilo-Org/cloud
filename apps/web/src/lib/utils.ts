@@ -175,6 +175,34 @@ export function getLowerDomainFromEmail(email: string): string | null {
 }
 
 /**
+ * Normalizes an email address for duplicate detection.
+ * - Lowercases the entire address
+ * - Strips `+` aliases (e.g. `user+tag@example.com` → `user@example.com`)
+ * - For Gmail/Googlemail: removes dots from the local part
+ */
+export function normalizeEmail(email: string): string {
+  const trimmed = email.trim().toLowerCase();
+  const atIndex = trimmed.lastIndexOf('@');
+  if (atIndex === -1) return trimmed;
+
+  let local = trimmed.slice(0, atIndex);
+  const domain = trimmed.slice(atIndex + 1);
+
+  // Strip +alias suffix
+  const plusIndex = local.indexOf('+');
+  if (plusIndex !== -1) {
+    local = local.slice(0, plusIndex);
+  }
+
+  // Gmail ignores dots in the local part
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    local = local.replace(/\./g, '');
+  }
+
+  return `${local}@${domain}`;
+}
+
+/**
  * Converts the first character of a string to uppercase.
  * Note: This is NOT full title-casing (e.g., "hello world" → "Hello world", not "Hello World")
  */

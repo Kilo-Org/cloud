@@ -104,12 +104,13 @@ async function createOrgInstance(userId: string, organizationId: string): Promis
   return row.id;
 }
 
-async function grantKiloClawAccess(userId: string): Promise<void> {
+async function grantKiloClawAccess(userId: string, instanceId: string): Promise<void> {
   await db.insert(kiloclaw_subscriptions).values({
     user_id: userId,
+    instance_id: instanceId,
     plan: 'standard',
     status: 'active',
-    stripe_subscription_id: `sub_test_${userId.slice(0, 8)}`,
+    stripe_subscription_id: `sub_test_${crypto.randomUUID()}`,
   });
 }
 
@@ -150,8 +151,8 @@ function mockRunningCliStatus(params: { startedAt: string; prompt: string }): vo
 
 describe('kiloclaw.startKiloCliRun error translation', () => {
   beforeEach(async () => {
-    await grantKiloClawAccess(user.id);
-    await createPersonalInstance(user.id);
+    const instanceId = await createPersonalInstance(user.id);
+    await grantKiloClawAccess(user.id, instanceId);
   });
 
   it('maps worker 409 to tRPC CONFLICT', async () => {
@@ -333,8 +334,8 @@ describe('organizations.kiloclaw.startKiloCliRun error translation', () => {
 
 describe('kiloclaw.cancelKiloCliRun error translation', () => {
   beforeEach(async () => {
-    await grantKiloClawAccess(user.id);
-    await createPersonalInstance(user.id);
+    const instanceId = await createPersonalInstance(user.id);
+    await grantKiloClawAccess(user.id, instanceId);
   });
 
   it('maps missing run to tRPC NOT_FOUND', async () => {

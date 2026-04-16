@@ -40,12 +40,8 @@ import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
 import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
-import {
-  doKeyFromActiveInstance,
-  resolveDoKeyForInstance,
-  resolveDoKeyForUser,
-} from '../lib/instance-routing';
-import { getInstanceById, getWorkerDb } from '../db';
+import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
+import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../db';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 const GmailHistoryIdSchema = z.object({
@@ -224,11 +220,15 @@ function setValidatedQueryUserId(c: Context<AppEnv>): string | null {
 /**
  * Resolve the DO key for a platform request.
  *
- * When instanceId is provided, the Postgres row is still consulted so legacy
- * sandboxes (sandbox_id not starting with `ki_`) route to the original
- * userId-keyed DO instead of a brand-new DO keyed by the row's UUID. If the
- * lookup fails or the row is missing, we fall back to the raw UUID — correct
- * for instance-keyed rows and a no-regression path for legacy rows.
+ * When instanceId is provided, it is authoritative. Postgres is only a
+ * best-effort bridge so legacy rows still route to their original userId-keyed
+ * DO and destroyed rows keep resolving after soft-delete. Missing rows fall
+ * back to the explicit instanceId so fresh provisioning can reach its DO
+ * before the instance record is inserted.
+ *
+ * Otherwise the active Postgres row is the source of truth so legacy sandboxes
+ * continue to route to the original userId-keyed DO after kilocode_users.id
+ * migrations.
  */
 export async function resolveInstanceDoKey(
   env: AppEnv['Bindings'],
@@ -236,23 +236,38 @@ export async function resolveInstanceDoKey(
   instanceId?: string
 ): Promise<string> {
   if (instanceId) {
-    if (!env.HYPERDRIVE?.connectionString) {
-      throw new Error('Missing database connection for instance DO-key resolution');
+    const connectionString = env.HYPERDRIVE?.connectionString;
+    if (!connectionString) {
+      console.warn(
+        '[platform] Missing database connection for explicit instance DO-key resolution, using instanceId',
+        { userId, instanceId }
+      );
+      return instanceId;
     }
 
     try {
-      const resolved = await resolveDoKeyForInstance(env.HYPERDRIVE.connectionString, instanceId);
-      if (!resolved) {
-        throw new Error(`Instance ${instanceId} not found during DO-key resolution`);
+      const instance = await getInstanceByIdIncludingDestroyed(
+        getWorkerDb(connectionString),
+        instanceId,
+        {
+          includeDestroyed: true,
+        }
+      );
+      if (!instance) {
+        console.warn(
+          '[platform] Instance not found during explicit DO-key resolution, using instanceId',
+          { userId, instanceId }
+        );
+        return instanceId;
       }
-      return resolved;
+      return doKeyFromActiveInstance(instance);
     } catch (err) {
-      console.warn('[platform] Failed to resolve DO key for instance, aborting request', {
+      console.warn('[platform] Failed to resolve DO key for explicit instance, using instanceId', {
         userId,
         instanceId,
         error: err instanceof Error ? err.message : String(err),
       });
-      throw err instanceof Error ? err : new Error(String(err));
+      return instanceId;
     }
   }
 

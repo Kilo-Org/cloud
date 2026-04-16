@@ -71,8 +71,13 @@ beforeAll(async () => {
   // Give test users active subscriptions so clawAccessProcedure doesn't block them
   const trialEnd = new Date(Date.now() + 7 * 86_400_000).toISOString();
   await db.insert(kiloclaw_subscriptions).values(
-    [userA, userB, adminUser].map(u => ({
-      user_id: u.id,
+    [
+      { user: userA, instanceId: userAInstanceId },
+      { user: userB, instanceId: userBInstanceId },
+      { user: adminUser, instanceId: adminInstanceId },
+    ].map(({ user, instanceId }) => ({
+      user_id: user.id,
+      instance_id: instanceId,
       plan: 'trial' as const,
       status: 'trialing' as const,
       trial_started_at: new Date().toISOString(),

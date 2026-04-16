@@ -233,6 +233,7 @@ kiloChatProxy.post('/sandboxes/:sandboxId/conversations/:conversationId/typing',
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
     if (result.code === 'invalid_sandbox') return c.json({ error: result.error }, 400);
+    return c.json({ error: 'Internal error' }, 500);
   }
   return c.body(null, 204);
 });

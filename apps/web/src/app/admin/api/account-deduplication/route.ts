@@ -95,7 +95,8 @@ export async function GET(
   // Group users by normalized_email
   const groupMap = new Map<string, DuplicateUser[]>();
   for (const user of users) {
-    const key = user.normalized_email!;
+    const key = user.normalized_email;
+    if (!key) continue;
     const existing = groupMap.get(key);
     if (existing) {
       existing.push(user as DuplicateUser);

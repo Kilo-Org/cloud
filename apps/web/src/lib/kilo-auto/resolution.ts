@@ -23,7 +23,7 @@ import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-pr
 import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
 
-const STEP_FLASH_ROUTING_PERCENTAGE = 10;
+const STEP_FLASH_ROUTING_PERCENTAGE = 20;
 
 type ResolveAutoModelParams = {
   model: string;

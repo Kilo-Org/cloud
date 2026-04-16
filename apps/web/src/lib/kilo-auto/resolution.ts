@@ -65,7 +65,7 @@ export async function applyResolvedAutoModel(
 ) {
   const resolved = await resolveAutoModel(
     model,
-    featureHeader === 'kiloclaw' || featureHeader === 'openclaw' ? 'KiloClaw' : modeHeader,
+    featureHeader === 'kiloclaw' ? 'KiloClaw' : modeHeader,
     userPromise,
     balancePromise
   );

@@ -450,6 +450,27 @@ describe('getBillingStatus', () => {
     expect(result.trialEligible).toBe(false);
   });
 
+  it('returns instance data for legacy earlybird access with no subscription row', async () => {
+    await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_earlybird_purchases).values({
+      user_id: user.id,
+      amount_cents: 2500,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result.hasAccess).toBe(true);
+    expect(result.accessReason).toBe('earlybird');
+    expect(result.instance).toEqual({
+      exists: true,
+      status: null,
+      suspendedAt: null,
+      destructionDeadline: null,
+      destroyed: false,
+    });
+  });
+
   it('prefers an active subscription over an older canceled row', async () => {
     const destroyedInstance = await createKiloclawInstance(user.id, '2026-04-01T00:00:00.000Z');
     const activeInstance = await createKiloclawInstance(user.id);
@@ -541,6 +562,22 @@ describe('provision detached personal billing recovery', () => {
       current_period_start: '2026-04-01T00:00:00.000Z',
       current_period_end: '2026-05-01T00:00:00.000Z',
     });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.provision({})).resolves.toEqual({});
+
+    expect(kiloclawInternalClientMock.__provisionMock).toHaveBeenCalledWith(
+      user.id,
+      expect.any(Object),
+      {
+        instanceId: activeInstance.id,
+        bootstrapSubscription: true,
+      }
+    );
+  });
+
+  it('bootstraps a fresh trial onto an active orphan instance with zero subscription rows', async () => {
+    const activeInstance = await createKiloclawInstance(user.id);
 
     const caller = await createCallerForUser(user.id);
     await expect(caller.kiloclaw.provision({})).resolves.toEqual({});
@@ -994,6 +1031,27 @@ describe('subscription center procedures', () => {
 });
 
 describe('createSubscriptionCheckout', () => {
+  it('allows checkout for active orphan instance with no subscription row', async () => {
+    const instance = await createKiloclawInstance(user.id);
+
+    stripeMock.checkout.sessions.create.mockResolvedValue({
+      url: 'https://checkout.stripe.com/test',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' })).resolves.toEqual(
+      { url: 'https://checkout.stripe.com/test' }
+    );
+
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          instanceId: instance.id,
+        }),
+      })
+    );
+  });
+
   it('allows checkout for legacy earlybird instance with no subscription row', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_earlybird_purchases).values({
@@ -1894,6 +1952,7 @@ describe('handleKiloClawSubscriptionCreated', () => {
     const updatedSuccessor = rows.find(row => row.instance_id === newInstance.id);
 
     expect(updatedPredecessor?.stripe_subscription_id).toBeNull();
+    expect(updatedPredecessor?.payment_source).toBe('credits');
     expect(updatedSuccessor).toMatchObject({
       stripe_subscription_id: 'sub_lineage_created',
       plan: 'standard',
@@ -2144,6 +2203,7 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
     const updatedSuccessor = rows.find(row => row.instance_id === newInstance.id);
 
     expect(updatedPredecessor?.stripe_subscription_id).toBeNull();
+    expect(updatedPredecessor?.payment_source).toBe('credits');
     expect(updatedSuccessor).toMatchObject({
       stripe_subscription_id: 'sub_lineage_invoice',
       payment_source: 'credits',

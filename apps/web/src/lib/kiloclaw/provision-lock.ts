@@ -12,10 +12,20 @@ export function getOrganizationProvisionLockKey(userId: string, organizationId: 
   return `kiloclaw:provision:org:${userId}:${organizationId}`;
 }
 
+const DEFAULT_PROVISION_LOCK_POOL_MAX = 16;
+
+function getProvisionLockPoolMax(): number {
+  const parsed = Number.parseInt(process.env.KILOCLAW_PROVISION_LOCK_POOL_MAX || '', 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return DEFAULT_PROVISION_LOCK_POOL_MAX;
+  }
+  return parsed;
+}
+
 const provisionLockClient = createDrizzleClient({
   connectionString: computeDatabaseUrl(),
   poolConfig: {
-    max: 2,
+    max: getProvisionLockPoolMax(),
     idleTimeoutMillis: 1_000,
     connectionTimeoutMillis: Number.parseInt(process.env.POSTGRES_CONNECT_TIMEOUT || '30000'),
     application_name: 'kilocode-web-kiloclaw-provision-lock',

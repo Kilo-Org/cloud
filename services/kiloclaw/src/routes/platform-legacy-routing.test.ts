@@ -141,6 +141,30 @@ describe('legacy platform DO routing', () => {
     ).resolves.toBe(legacyDoKey);
   });
 
+  it('caches explicit instance DO-key resolution across repeated calls', async () => {
+    const legacyInstanceId = '44444444-4444-4444-8444-444444444444';
+    vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue({
+      id: legacyInstanceId,
+      sandboxId: legacySandboxId,
+      userId: currentUserId,
+      orgId: null,
+      inboundEmailEnabled: true,
+    });
+
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgresql://fake' },
+    } as never;
+
+    await expect(resolveInstanceDoKey(env, currentUserId, legacyInstanceId)).resolves.toBe(
+      legacyDoKey
+    );
+    await expect(resolveInstanceDoKey(env, currentUserId, legacyInstanceId)).resolves.toBe(
+      legacyDoKey
+    );
+
+    expect(getInstanceByIdIncludingDestroyed).toHaveBeenCalledTimes(1);
+  });
+
   it('destroys preexisting legacy registry rows keyed by the migrated user id', async () => {
     vi.mocked(getActivePersonalInstance).mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',

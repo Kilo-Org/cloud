@@ -192,6 +192,26 @@ type PersonalBillingInstanceRow = {
   destroyed_at: string | null;
 };
 
+async function getLatestPersonalBillingInstance(
+  userId: string,
+  executor: typeof db | DrizzleTransaction = db
+): Promise<PersonalBillingInstanceRow | null> {
+  const [instance] = await executor
+    .select({
+      id: kiloclaw_instances.id,
+      destroyed_at: kiloclaw_instances.destroyed_at,
+    })
+    .from(kiloclaw_instances)
+    .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.organization_id)))
+    .orderBy(
+      sql`CASE WHEN ${kiloclaw_instances.destroyed_at} IS NULL THEN 0 ELSE 1 END`,
+      desc(kiloclaw_instances.created_at)
+    )
+    .limit(1);
+
+  return instance ?? null;
+}
+
 async function resolvePersonalBillingAnchor(params: {
   userId: string;
   instanceId?: string;
@@ -206,6 +226,11 @@ async function resolvePersonalBillingAnchor(params: {
   const activeInstance = await getActiveInstance(params.userId, executor);
   const earlybird = await getEarlybirdPurchaseRow(params.userId, executor);
   const hasActiveEarlybirdAccess = !!earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now;
+  const [anySubscription] = await executor
+    .select({ id: kiloclaw_subscriptions.id })
+    .from(kiloclaw_subscriptions)
+    .where(eq(kiloclaw_subscriptions.user_id, params.userId))
+    .limit(1);
 
   let currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
   try {
@@ -225,7 +250,7 @@ async function resolvePersonalBillingAnchor(params: {
       })
     : null;
 
-  if (activeInstance && !currentRow && !hasActiveEarlybirdAccess) {
+  if (activeInstance && !currentRow && !hasActiveEarlybirdAccess && anySubscription) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Active KiloClaw instance is missing its current billing row.',
@@ -321,14 +346,15 @@ async function getDisplayedPersonalKiloclawSubscription(params: {
   } catch (error) {
     mapCurrentSubscriptionResolutionError(error);
   }
+  const fallbackInstance = currentRow?.instance
+    ? {
+        id: currentRow.instance.id,
+        destroyed_at: currentRow.instance.destroyedAt,
+      }
+    : await getLatestPersonalBillingInstance(params.userId, db);
 
   return {
-    currentPersonalInstance: currentRow?.instance
-      ? {
-          id: currentRow.instance.id,
-          destroyed_at: currentRow.instance.destroyedAt,
-        }
-      : null,
+    currentPersonalInstance: fallbackInstance,
     subscription: currentRow?.subscription ?? null,
   };
 }
@@ -805,6 +831,11 @@ async function ensureProvisionAccess(
       userId,
       executor,
     });
+  const [anySubscription] = await executor
+    .select({ id: kiloclaw_subscriptions.id })
+    .from(kiloclaw_subscriptions)
+    .where(eq(kiloclaw_subscriptions.user_id, userId))
+    .limit(1);
   let currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
   try {
     currentRow = await resolveCurrentPersonalSubscriptionRow({
@@ -821,6 +852,13 @@ async function ensureProvisionAccess(
     !detachedAccessGrantingSubscription &&
     !hasActiveEarlybirdAccess
   ) {
+    if (!anySubscription) {
+      return {
+        instanceId: activeInstance.id,
+        bootstrapSubscription: true,
+        shouldEnqueueTrialStartAffiliate: true,
+      };
+    }
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Active KiloClaw instance is missing its current billing row.',
@@ -857,12 +895,6 @@ async function ensureProvisionAccess(
       shouldEnqueueTrialStartAffiliate: false,
     };
   }
-
-  const [anySubscription] = await executor
-    .select({ id: kiloclaw_subscriptions.id })
-    .from(kiloclaw_subscriptions)
-    .where(eq(kiloclaw_subscriptions.user_id, userId))
-    .limit(1);
 
   if (!anySubscription && !earlybird) {
     return {
@@ -2963,8 +2995,7 @@ export const kiloclawRouter = createTRPCRouter({
     return {
       hasAccess,
       accessReason,
-      trialEligible:
-        !currentPersonalInstance && !anyPersonalInstance && !anySubscription && !earlybird,
+      trialEligible: !anyPersonalInstance && !anySubscription && !earlybird,
       creditBalanceMicrodollars,
       creditIntroEligible,
       hasActiveKiloPass,

@@ -302,6 +302,7 @@ async function clearTransferredStripeOwnership(params: {
   const [after] = await params.tx
     .update(kiloclaw_subscriptions)
     .set({
+      payment_source: 'credits',
       stripe_subscription_id: null,
       stripe_schedule_id: null,
       cancel_at_period_end: false,

@@ -289,6 +289,7 @@ async function createSuccessorPersonalSubscription(params: {
       .set({
         status: 'canceled',
         transferred_to_subscription_id: insertedSuccessor.id,
+        payment_source: 'credits',
         stripe_subscription_id: null,
         stripe_schedule_id: null,
         credit_renewal_at: null,

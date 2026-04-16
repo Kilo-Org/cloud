@@ -82,6 +82,42 @@ const KiloCliRunConflictSchema = z.object({
 const platform = new Hono<AppEnv>();
 type KiloClawInstanceStub = ReturnType<AppEnv['Bindings']['KILOCLAW_INSTANCE']['get']>;
 
+const EXPLICIT_INSTANCE_DO_KEY_CACHE_TTL_MS = 5 * 60 * 1000;
+const EXPLICIT_INSTANCE_DO_KEY_CACHE_MAX = 1000;
+const explicitInstanceDoKeyCache = new Map<
+  string,
+  {
+    doKey: string;
+    expiresAt: number;
+  }
+>();
+
+function getCachedExplicitInstanceDoKey(instanceId: string): string | null {
+  const cached = explicitInstanceDoKeyCache.get(instanceId);
+  if (!cached) {
+    return null;
+  }
+  if (cached.expiresAt <= Date.now()) {
+    explicitInstanceDoKeyCache.delete(instanceId);
+    return null;
+  }
+  return cached.doKey;
+}
+
+function cacheExplicitInstanceDoKey(instanceId: string, doKey: string): string {
+  if (explicitInstanceDoKeyCache.size >= EXPLICIT_INSTANCE_DO_KEY_CACHE_MAX) {
+    const oldestKey = explicitInstanceDoKeyCache.keys().next().value;
+    if (typeof oldestKey === 'string') {
+      explicitInstanceDoKeyCache.delete(oldestKey);
+    }
+  }
+  explicitInstanceDoKeyCache.set(instanceId, {
+    doKey,
+    expiresAt: Date.now() + EXPLICIT_INSTANCE_DO_KEY_CACHE_TTL_MS,
+  });
+  return doKey;
+}
+
 type BillingPlatformLogFields = {
   billingFlow?: string;
   billingRunId?: string;
@@ -236,13 +272,17 @@ export async function resolveInstanceDoKey(
   instanceId?: string
 ): Promise<string> {
   if (instanceId) {
+    const cached = getCachedExplicitInstanceDoKey(instanceId);
+    if (cached) {
+      return cached;
+    }
     const connectionString = env.HYPERDRIVE?.connectionString;
     if (!connectionString) {
       console.warn(
         '[platform] Missing database connection for explicit instance DO-key resolution, using instanceId',
         { userId, instanceId }
       );
-      return instanceId;
+      return cacheExplicitInstanceDoKey(instanceId, instanceId);
     }
 
     try {
@@ -258,16 +298,16 @@ export async function resolveInstanceDoKey(
           '[platform] Instance not found during explicit DO-key resolution, using instanceId',
           { userId, instanceId }
         );
-        return instanceId;
+        return cacheExplicitInstanceDoKey(instanceId, instanceId);
       }
-      return doKeyFromActiveInstance(instance);
+      return cacheExplicitInstanceDoKey(instanceId, doKeyFromActiveInstance(instance));
     } catch (err) {
       console.warn('[platform] Failed to resolve DO key for explicit instance, using instanceId', {
         userId,
         instanceId,
         error: err instanceof Error ? err.message : String(err),
       });
-      return instanceId;
+      return cacheExplicitInstanceDoKey(instanceId, instanceId);
     }
   }
 

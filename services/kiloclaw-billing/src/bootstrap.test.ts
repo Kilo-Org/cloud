@@ -200,6 +200,7 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
     expect(updateSets[0]).toEqual(
       expect.objectContaining({
         transferred_to_subscription_id: insertedSuccessor.id,
+        payment_source: 'credits',
         stripe_subscription_id: null,
         stripe_schedule_id: null,
       })

@@ -51,9 +51,8 @@
                     font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
                   "
                 >
-                  Your KiloClaw subscription has ended and your instance has been stopped. If no
-                  action is taken, your instance will be permanently deleted on
-                  <strong style="color: #d1d5db">{{ destruction_date }}</strong>.
+                  Your KiloClaw subscription has ended and your instance has been stopped.
+                  Resubscribe to restore your instance.
                 </p>
                 <!-- CTA Button -->
                 <table width="100%" cellpadding="0" cellspacing="0">
@@ -73,11 +72,23 @@
                           font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
                         "
                       >
-                        Manage Your Instance
+                        Resubscribe
                       </a>
                     </td>
                   </tr>
                 </table>
+                <p
+                  style="
+                    margin: 0 0 16px;
+                    font-size: 14px;
+                    line-height: 20px;
+                    color: #9ca3af;
+                    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+                  "
+                >
+                  If no action is taken, your instance will be permanently deleted on
+                  <strong style="color: #d1d5db">{{ destruction_date }}</strong>.
+                </p>
                 <p
                   style="
                     margin: 0;

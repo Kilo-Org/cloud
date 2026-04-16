@@ -48,6 +48,12 @@ const CACHE_TTL_MS = process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000;
 
 let cached: { data: LoadedSecurityAdvisorContent; expiresAt: number } | null = null;
 
+const EMPTY_CONTENT: LoadedSecurityAdvisorContent = {
+  checkCatalog: new Map(),
+  kiloclawCoverage: [],
+  content: new Map(),
+};
+
 /**
  * Load security advisor content from the DB, served from an in-process TTL cache.
  *
@@ -60,9 +66,19 @@ export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisor
   if (cached !== null && now < cached.expiresAt) {
     return cached.data;
   }
-  const data = await loadFromDb();
-  cached = { data, expiresAt: now + CACHE_TTL_MS };
-  return data;
+  try {
+    const data = await loadFromDb();
+    cached = { data, expiresAt: now + CACHE_TTL_MS };
+    return data;
+  } catch (err) {
+    // Degrade gracefully on transient DB failures (e.g. read replica blip).
+    // The report generator uses client-reported values for findings and omits
+    // coverage text when the loader returns empty, so the request still
+    // succeeds — just without server-overridden copy.
+    // Intentionally NOT caching the empty result, so the next request retries.
+    console.error('[SecurityAdvisor] content-loader failed; returning empty content', err);
+    return EMPTY_CONTENT;
+  }
 }
 
 /** Invalidate the in-process cache, forcing the next call to re-query. */
@@ -132,10 +148,30 @@ async function loadFromDb(): Promise<LoadedSecurityAdvisorContent> {
 /**
  * Find the KiloClaw coverage entry that covers a given checkId.
  * Returns null if no active coverage entry covers this checkId.
+ *
+ * Each `checkId` is expected to be covered by at most one area — the admin
+ * UI's convention is one-area-per-check. The DB schema doesn't enforce this
+ * (match_check_ids is a per-row array), so if an admin accidentally lists
+ * the same checkId under multiple active areas we pick deterministically:
+ * sort by `area` alphabetically, and log a warning so the duplicate can be
+ * found and resolved. Without this, row-insertion-order would decide which
+ * coverage shows up in the report, silently flipping between entries.
  */
 export function findCoverageForCheckId(
   checkId: string,
   areas: KiloClawCoverageArea[]
 ): KiloClawCoverageArea | null {
-  return areas.find(a => a.matchCheckIds.includes(checkId)) ?? null;
+  const matches = areas.filter(a => a.matchCheckIds.includes(checkId));
+  if (matches.length === 0) return null;
+  if (matches.length > 1) {
+    console.warn(
+      `[SecurityAdvisor] checkId "${checkId}" is covered by ${matches.length} active areas: ${matches
+        .map(a => a.area)
+        .join(
+          ', '
+        )}. Picking the alphabetically-first area for determinism. Resolve the overlap in the admin UI.`
+    );
+  }
+  matches.sort((a, b) => a.area.localeCompare(b.area));
+  return matches[0] ?? null;
 }

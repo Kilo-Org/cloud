@@ -8,9 +8,9 @@ import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
-} from '../providers/openrouter/types';
-import { fetchGeneration } from '../providers';
-import PROVIDERS from '../providers/provider-definitions';
+} from './providers/openrouter/types';
+import { fetchGeneration } from './providers';
+import PROVIDERS from './providers/provider-definitions';
 import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
@@ -20,7 +20,7 @@ import type { SQL } from 'drizzle-orm';
 import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
-import type { ProviderId } from '@/lib/providers/types';
+import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import { findKiloExclusiveModel, isFreeModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
@@ -54,9 +54,9 @@ import {
 } from '@/lib/ai-gateway/processUsage.messages';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
 import { computeOpenRouterCostFields, drainSseStream } from '@/lib/ai-gateway/processUsage.shared';
-import { isAnthropicModel } from '@/lib/providers/anthropic';
-import { isMinimaxModel } from '@/lib/providers/minimax';
-import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
+import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic';
+import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 const posthogClient = PostHogClient();
 

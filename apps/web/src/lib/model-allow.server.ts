@@ -1,6 +1,6 @@
 import 'server-only';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { getProviderSlugsForModel } from '@/lib/providers/openrouter/models-by-provider-index.server';
+import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 export type ProviderAwareAllowPredicate = (modelId: string) => Promise<boolean>;
 

@@ -17,7 +17,7 @@ import type {
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
   GatewayRequest,
-} from '@/lib/providers/openrouter/types';
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   type FraudDetectionHeaders,
   getFraudDetectionHeaders,
@@ -26,7 +26,7 @@ import {
 } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
-import { normalizeModelId } from '@/lib/providers/openrouter';
+import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
 import { isKiloStealthModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
@@ -35,9 +35,9 @@ import type {
   MicrodollarUsageStats,
   PromptInfo,
 } from '@/lib/ai-gateway/processUsage.types';
-import { getMaxTokens } from '@/lib/providers/openrouter/request-helpers';
+import { getMaxTokens } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
-import type { GatewayChatApiKind, ProviderId } from '@/lib/providers/types';
+import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 export { proxyErrorTypeSchema, ProxyErrorType } from '@/lib/proxy-error-types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 

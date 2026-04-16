@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { getRawOpenRouterModels, getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
+import {
+  getRawOpenRouterModels,
+  getEnhancedOpenRouterModels,
+} from '@/lib/ai-gateway/providers/openrouter';
 import { syncArtificialAnalysisBenchmarks } from '@/lib/model-stats/sync-artificial-analysis';
 import { syncOpenRouterModels } from '@/lib/model-stats/sync-openrouter';
 import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';

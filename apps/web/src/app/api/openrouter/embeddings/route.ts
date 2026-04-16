@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { getEmbeddingProvider } from '@/lib/providers';
+import { getEmbeddingProvider } from '@/lib/ai-gateway/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
@@ -35,9 +35,9 @@ import {
   buildUpstreamBody,
   type EmbeddingProxyRequest,
 } from '@/lib/ai-gateway/embeddings/embedding-request';
-import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
-import { getVercelInferenceProviderConfigForUserByok } from '@/lib/providers/vercel';
-import type { Provider } from '@/lib/providers/types';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
+import type { Provider } from '@/lib/ai-gateway/providers/types';
 
 export const maxDuration = 300;
 

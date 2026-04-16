@@ -1,8 +1,8 @@
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
-import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
+import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
 import { listAvailableCustomLlms } from '@/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
-import { getDirectByokModelsForOrganization } from '@/lib/providers/direct-byok';
+import { getDirectByokModelsForOrganization } from '@/lib/ai-gateway/providers/direct-byok';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 
 export async function getAvailableModelsForOrganization(

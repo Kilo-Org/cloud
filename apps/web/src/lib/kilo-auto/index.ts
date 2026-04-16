@@ -3,10 +3,10 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/providers/anthropic.constants';
-import { minimax_m25_free_model } from '@/lib/providers/minimax';
-import { qwen36_plus_model } from '@/lib/providers/qwen';
-import type { OpenRouterReasoningConfig } from '@/lib/providers/openrouter/types';
+} from '@/lib/ai-gateway/providers/anthropic.constants';
+import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
+import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 
 type AutoModel = {

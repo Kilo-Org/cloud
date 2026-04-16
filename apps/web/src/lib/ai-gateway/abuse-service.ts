@@ -15,12 +15,15 @@ import type {
   GatewayRequest,
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
-} from '@/lib/providers/openrouter/types';
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import { extractInputItemTextContent } from '@/lib/ai-gateway/processUsage.responses';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import type { FeatureValue } from '@/lib/feature-detection';
 import 'server-only';
-import { getMaxTokens, hasMiddleOutTransform } from '@/lib/providers/openrouter/request-helpers';
+import {
+  getMaxTokens,
+  hasMiddleOutTransform,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 
 /**
  * Extract full prompts from a GatewayRequest (chat completions, responses, or messages API).

@@ -12,17 +12,20 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/providers/anthropic.constants';
-import { trinity_large_thinking_free_model } from '@/lib/providers/arcee';
-import { seed_20_pro_free_model } from '@/lib/providers/bytedance';
-import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
-import { MINIMAX_CURRENT_MODEL_ID, minimax_m25_free_model } from '@/lib/providers/minimax';
-import { KIMI_CURRENT_MODEL_ID } from '@/lib/providers/moonshotai';
-import { morph_warp_grep_free_model } from '@/lib/providers/morph';
-import { gpt_oss_20b_free_model } from '@/lib/providers/openai';
-import { qwen36_plus_model } from '@/lib/providers/qwen';
-import { stepfun_35_flash_free_model } from '@/lib/providers/stepfun';
-import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
+} from '@/lib/ai-gateway/providers/anthropic.constants';
+import { trinity_large_thinking_free_model } from '@/lib/ai-gateway/providers/arcee';
+import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  MINIMAX_CURRENT_MODEL_ID,
+  minimax_m25_free_model,
+} from '@/lib/ai-gateway/providers/minimax';
+import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
+import { gpt_oss_20b_free_model } from '@/lib/ai-gateway/providers/openai';
+import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
+import { grok_code_fast_1_optimized_free_model } from '@/lib/ai-gateway/providers/xai';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 

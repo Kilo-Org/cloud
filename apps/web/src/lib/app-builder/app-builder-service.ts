@@ -33,7 +33,7 @@ import { generateImageMCPToken } from '@/lib/app-builder/image-mcp-token';
 import { buildImageContextFromAttachments } from '@/lib/app-builder/image-context';
 import { deleteProjectAssets } from '@/lib/r2/app-builder-assets';
 import { getEnvVariable } from '@/lib/dotenvx';
-import { modelSupportsImages } from '@/lib/providers/model-capabilities';
+import { modelSupportsImages } from '@/lib/ai-gateway/providers/model-capabilities';
 
 import type {
   AppBuilderProject,

@@ -1,4 +1,4 @@
-import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
+import type { OpenRouterChatCompletionRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { repairTools } from './tool-calling';
 
 function createRequest(

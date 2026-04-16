@@ -14,8 +14,12 @@ import type {
   GatewayResponsesRequest,
   GatewayMessagesRequest,
   GatewayRequest,
-} from '@/lib/providers/openrouter/types';
-import { applyProviderSpecificLogic, getProvider, openRouterRequest } from '@/lib/providers';
+} from '@/lib/ai-gateway/providers/openrouter/types';
+import {
+  applyProviderSpecificLogic,
+  getProvider,
+  openRouterRequest,
+} from '@/lib/ai-gateway/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
@@ -49,7 +53,7 @@ import {
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/ai-gateway/tool-calling';
-import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
+import { isFreePromptTrainingAllowed } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   rewriteFreeModelResponse_ChatCompletions,
   rewriteFreeModelResponse_Messages,
@@ -80,7 +84,7 @@ import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { isKiloAutoModel } from '@/lib/kilo-auto';
 import { applyResolvedAutoModel } from '@/lib/kilo-auto/resolution';
-import { fixOpenCodeDuplicateReasoning } from '@/lib/providers/fixOpenCodeDuplicateReasoning';
+import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/processUsage.types';
 import { extractResponsesPromptInfo } from '@/lib/ai-gateway/processUsage.responses';
 import { extractMessagesPromptInfo } from '@/lib/ai-gateway/processUsage.messages';
@@ -88,7 +92,7 @@ import {
   fixResponsesRequest,
   getMaxTokens,
   hasMiddleOutTransform,
-} from '@/lib/providers/openrouter/request-helpers';
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 
 export const maxDuration = 800;
 

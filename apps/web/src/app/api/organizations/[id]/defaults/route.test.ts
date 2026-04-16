@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
-import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
+import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { db } from '@/lib/drizzle';
@@ -11,7 +11,7 @@ import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 
 jest.mock('@/lib/organizations/organization-auth');
-jest.mock('@/lib/providers/openrouter');
+jest.mock('@/lib/ai-gateway/providers/openrouter');
 
 const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContext);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);

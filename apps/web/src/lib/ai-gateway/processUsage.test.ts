@@ -8,7 +8,7 @@ import {
   logMicrodollarUsage,
   processOpenRouterUsage,
 } from './processUsage';
-import type { OpenRouterGeneration } from '@/lib/providers/openrouter/types';
+import type { OpenRouterGeneration } from '@/lib/ai-gateway/providers/openrouter/types';
 import { verifyApproval } from '../../tests/helpers/approval.helper';
 import { insertTestUser } from '../../tests/helpers/user.helper';
 import { insertUsageWithOverrides } from '../../tests/helpers/microdollar-usage.helper';

@@ -1,4 +1,4 @@
-import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
+import type { OpenRouterChatCompletionRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import {
@@ -43,8 +43,8 @@ import {
 } from '@kilocode/db/schema-types';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type OpenAI from 'openai';
-import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
-import PROVIDERS from '@/lib/providers/provider-definitions';
+import { grok_code_fast_1_optimized_free_model } from '@/lib/ai-gateway/providers/xai';
+import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 
 type CustomLlm = {
   public_id: string;

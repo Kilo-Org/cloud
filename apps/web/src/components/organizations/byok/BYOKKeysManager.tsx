@@ -42,8 +42,8 @@ import {
   DirectUserByokInferenceProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
   AwsCredentialsSchema,
-} from '@/lib/providers/openrouter/inference-provider-id';
-import DIRECT_BYOK_PROVIDERS from '@/lib/providers/direct-byok/direct-byok-definitions';
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import * as z from 'zod';
 
 // Hardcoded BYOK providers list

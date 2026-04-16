@@ -1,4 +1,4 @@
-import PROVIDERS from '@/lib/providers/provider-definitions';
+import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { generateProviderSpecificHash } from './providerHash';
 
 describe('generateProviderSpecificHash', () => {

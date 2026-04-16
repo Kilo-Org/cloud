@@ -8,11 +8,11 @@ import {
   UserByokProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
   type UserByokProviderId,
-} from '@/lib/providers/openrouter/inference-provider-id';
-import { isCodestralModel } from '@/lib/providers/mistral';
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
 import { unstable_cache } from 'next/cache';
-import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
-import type { BYOKResult } from '@/lib/providers/types';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
 
 const getModelUserByokProviders_cached = unstable_cache(
   async (modelId: string) => {

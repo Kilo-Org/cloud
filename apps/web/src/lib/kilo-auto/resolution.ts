@@ -1,10 +1,10 @@
 import type { FeatureValue } from '@/lib/feature-detection';
-import { minimax_m25_free_model } from '@/lib/providers/minimax';
-import { gpt_oss_20b_free_model, GPT_5_NANO_ID } from '@/lib/providers/openai';
+import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
+import { gpt_oss_20b_free_model, GPT_5_NANO_ID } from '@/lib/ai-gateway/providers/openai';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
-} from '@/lib/providers/openrouter/types';
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
 import type { User } from '@kilocode/db';
 import {

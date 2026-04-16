@@ -1,6 +1,6 @@
 import { test, expect, describe } from '@jest/globals';
 import { extractPromptInfo } from '../lib/ai-gateway/processUsage';
-import type { OpenRouterChatCompletionRequest } from '../lib/providers/openrouter/types';
+import type { OpenRouterChatCompletionRequest } from '../lib/ai-gateway/providers/openrouter/types';
 
 /**
  * These tests cover various API formats:

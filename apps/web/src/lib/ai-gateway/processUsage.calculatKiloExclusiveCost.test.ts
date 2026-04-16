@@ -1,8 +1,8 @@
 import { test, describe, expect } from '@jest/globals';
 import { calculateKiloExclusiveCost_mUsd } from './processUsage';
 import type { JustTheCostsUsageStats } from './processUsage.types';
-import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
-import { qwen36_plus_model } from '@/lib/providers/qwen';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 
 describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   // Pre-discount prices from Qwen pricing page (35% Kilo discount applied in code):

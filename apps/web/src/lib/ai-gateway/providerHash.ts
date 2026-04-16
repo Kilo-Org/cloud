@@ -1,8 +1,8 @@
 import crypto from 'crypto';
-import { type Provider } from '@/lib/providers/types';
-import PROVIDERS from '@/lib/providers/provider-definitions';
+import { type Provider } from '@/lib/ai-gateway/providers/types';
+import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getEnvVariable } from '@/lib/dotenvx';
-import type { GatewayRequest } from '@/lib/providers/openrouter/types';
+import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 /**
  * Generates a service-specific SHA256 hash.

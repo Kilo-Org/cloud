@@ -22,17 +22,20 @@ import {
   UserByokProviderIdSchema,
   UserByokTestModels,
   VercelUserByokInferenceProviderIdSchema,
-} from '@/lib/providers/openrouter/inference-provider-id';
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { unstable_cache } from 'next/cache';
-import { StoredModelSchema } from '@/lib/providers/vercel/types';
+import { StoredModelSchema } from '@/lib/ai-gateway/providers/vercel/types';
 import { createGateway, generateText } from 'ai';
-import PROVIDERS from '@/lib/providers/provider-definitions';
-import { getVercelInferenceProviderConfigForUserByok } from '@/lib/providers/vercel';
+import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import { decryptByokRow } from '@/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
-import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
-import DIRECT_BYOK_PROVIDERS from '@/lib/providers/direct-byok/direct-byok-definitions';
-import { createAiSdkProvider, formatDirectByokModelId } from '@/lib/providers/direct-byok';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
+import {
+  createAiSdkProvider,
+  formatDirectByokModelId,
+} from '@/lib/ai-gateway/providers/direct-byok';
 
 const fetchSupportedModels = unstable_cache(
   async (): Promise<Record<string, string[]>> => {

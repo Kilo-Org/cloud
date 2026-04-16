@@ -1,7 +1,7 @@
 import type OpenAI from 'openai';
 import type { FeatureValue } from '@/lib/feature-detection';
 import { sendProxiedChatCompletion } from '@/lib/ai-gateway/llm-proxy-helpers';
-import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
+import type { OpenRouterChatCompletionRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 type ChatCompletionResponse = OpenAI.Chat.Completions.ChatCompletion;

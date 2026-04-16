@@ -2,7 +2,7 @@ import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { sentryRootSpan } from '../getRootSpan';
-import type { ProviderId } from '@/lib/providers/types';
+import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
   MicrodollarUsageStats,
@@ -10,7 +10,7 @@ import type {
   PromptInfo,
   VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
-import type { GatewayMessagesRequest } from '@/lib/providers/openrouter/types';
+import type { GatewayMessagesRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   computeOpenRouterCostFields,
   computeVercelCostMicrodollars,

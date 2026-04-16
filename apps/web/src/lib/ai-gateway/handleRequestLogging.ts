@@ -2,7 +2,7 @@ import { api_request_log, type User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { logExceptInTest } from '@/lib/utils.server';
 import { after } from 'next/server';
-import type { GatewayRequest } from '@/lib/providers/openrouter/types';
+import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { kilologHash } from '@/lib/ai-gateway/kilologHash';
 import { createHash } from 'crypto';
 import { redisSet } from '@/lib/redis';

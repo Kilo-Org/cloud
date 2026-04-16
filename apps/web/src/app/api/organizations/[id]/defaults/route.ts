@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import type { NextRequest } from 'next/server';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
-import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
+import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
-import { getModelIdToProviderSlugsIndex } from '@/lib/providers/openrouter/models-by-provider-index.server';
+import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 

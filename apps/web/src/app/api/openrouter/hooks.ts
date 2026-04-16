@@ -11,7 +11,7 @@ import {
 import {
   NormalizedOpenRouterResponse,
   type OpenRouterModel,
-} from '@/lib/providers/openrouter/openrouter-types';
+} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import * as z from 'zod';
 
 interface OpenRouterProvider {

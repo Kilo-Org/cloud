@@ -178,7 +178,7 @@ function currentPersonalSubscriptions(
       return false;
     }
     const instance = instancesById.get(subscription.instance_id);
-    return !instance || instance.organizationId === null;
+    return !!instance && instance.organizationId === null;
   });
 }
 

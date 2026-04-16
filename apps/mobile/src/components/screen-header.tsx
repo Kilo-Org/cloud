@@ -10,20 +10,26 @@ type ScreenHeaderProps = {
   title: string;
   headerRight?: React.ReactNode;
   modal?: boolean;
+  showBackButton?: boolean;
 };
 
-export function ScreenHeader({ title, headerRight, modal }: Readonly<ScreenHeaderProps>) {
+export function ScreenHeader({
+  title,
+  headerRight,
+  modal,
+  showBackButton,
+}: Readonly<ScreenHeaderProps>) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const canGoBack = router.canGoBack();
+  const canGoBack = showBackButton ?? router.canGoBack();
 
   // iOS modals are presented as cards already inset from the status bar
   const paddingTop = modal && Platform.OS === 'ios' ? 32 : insets.top + 8;
 
   return (
     <View className="bg-background px-4 pb-3" style={{ paddingTop }}>
-      <View className="flex-row items-center justify-between">
+      <View className="flex-row items-center">
         <View className="flex-1 flex-row items-center gap-1">
           {canGoBack && (
             <Pressable
@@ -41,11 +47,11 @@ export function ScreenHeader({ title, headerRight, modal }: Readonly<ScreenHeade
               )}
             </Pressable>
           )}
-          <Text className="text-lg font-semibold" numberOfLines={1}>
+          <Text className="shrink text-lg font-semibold" numberOfLines={1}>
             {title}
           </Text>
         </View>
-        {headerRight}
+        {headerRight ? <View className="ml-3 shrink-0">{headerRight}</View> : null}
       </View>
     </View>
   );

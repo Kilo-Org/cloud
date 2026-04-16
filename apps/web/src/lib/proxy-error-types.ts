@@ -29,3 +29,5 @@ export const proxyErrorTypeSchema = z.enum([
 ]);
 
 export type ProxyErrorType = z.infer<typeof proxyErrorTypeSchema>;
+
+export const ProxyErrorType = proxyErrorTypeSchema.enum;

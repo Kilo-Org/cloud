@@ -46,7 +46,7 @@ import {
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
 } from '@/lib/llm-proxy-helpers';
-import type { ProxyErrorType } from '@/lib/proxy-error-types';
+import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
@@ -142,7 +142,7 @@ async function resolveRateLimit(
       return NextResponse.json(
         {
           error: 'Authentication required for this feature',
-          error_type: 'authentication_required' satisfies ProxyErrorType,
+          error_type: ProxyErrorType.authentication_required,
         },
         { status: 401 }
       );
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return NextResponse.json(
       {
         error: 'Unable to determine client IP',
-        error_type: 'missing_client_ip' satisfies ProxyErrorType,
+        error_type: ProxyErrorType.missing_client_ip,
       },
       { status: 400 }
     );
@@ -268,7 +268,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       return NextResponse.json(
         {
           error: 'Rate limit exceeded',
-          error_type: 'rate_limit_exceeded' satisfies ProxyErrorType,
+          error_type: ProxyErrorType.rate_limit_exceeded,
           message:
             'Free model usage limit reached. Please try again later or upgrade to a paid model.',
         },
@@ -303,7 +303,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
             code: PAID_MODEL_AUTH_REQUIRED,
             message: 'You need to sign in to use this model.',
           },
-          error_type: 'paid_model_auth_required' satisfies ProxyErrorType,
+          error_type: ProxyErrorType.paid_model_auth_required,
         },
         { status: 401 }
       );
@@ -327,7 +327,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
               'Sign up for free to continue and explore 500 other models. ' +
               'Takes 2 minutes, no credit card required. Or come back later.',
           },
-          error_type: 'promotion_limit_reached' satisfies ProxyErrorType,
+          error_type: ProxyErrorType.promotion_limit_reached,
         },
         { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
       );

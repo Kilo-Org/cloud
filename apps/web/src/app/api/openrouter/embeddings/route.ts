@@ -22,7 +22,7 @@ import {
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
 } from '@/lib/llm-proxy-helpers';
-import type { ProxyErrorType } from '@/lib/proxy-error-types';
+import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import {
   createAnonymousContext,
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return NextResponse.json(
       {
         error: 'Unable to determine client IP',
-        error_type: 'missing_client_ip' satisfies ProxyErrorType,
+        error_type: ProxyErrorType.missing_client_ip,
       },
       { status: 400 }
     );
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
             code: PAID_MODEL_AUTH_REQUIRED,
             message: 'You need to sign in to use this model.',
           },
-          error_type: 'paid_model_auth_required' satisfies ProxyErrorType,
+          error_type: ProxyErrorType.paid_model_auth_required,
         },
         { status: 401 }
       );

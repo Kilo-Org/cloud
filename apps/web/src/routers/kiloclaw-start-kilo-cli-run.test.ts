@@ -219,6 +219,24 @@ describe('kiloclaw.startKiloCliRun error translation', () => {
       initiated_by_admin_id: null,
       prompt: 'fix the config',
       status: 'running',
+      started_at: startedAt,
+      completed_at: null,
+      output: null,
+      exit_code: null,
+    });
+
+    const rows = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, result.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      user_id: user.id,
+      instance_id: expect.any(String),
+      initiated_by_admin_id: null,
+      prompt: 'fix the config',
+      status: 'running',
+      started_at: startedAt,
       completed_at: null,
       output: null,
       exit_code: null,
@@ -321,6 +339,24 @@ describe('organizations.kiloclaw.startKiloCliRun error translation', () => {
       initiated_by_admin_id: null,
       prompt: 'fix the org config',
       status: 'running',
+      started_at: startedAt,
+      completed_at: null,
+      output: null,
+      exit_code: null,
+    });
+
+    const rows = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, result.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      user_id: user.id,
+      instance_id: expect.any(String),
+      initiated_by_admin_id: null,
+      prompt: 'fix the config',
+      status: 'running',
+      started_at: startedAt,
       completed_at: null,
       output: null,
       exit_code: null,

@@ -1,3 +1,4 @@
+import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
 import { isGemini3Model, isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
@@ -56,7 +57,17 @@ export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
 } as const;
 
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
-  // Inlined to avoid importing anthropic.ts (which transitively pulls in Node.js crypto)
+  // Uses anthropic.constants.ts (not anthropic.ts which transitively pulls in Node.js crypto)
+  if (model === CLAUDE_OPUS_CURRENT_MODEL_ID) {
+    return {
+      none: { reasoning: { enabled: false, effort: 'none' } },
+      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+      max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
+      xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
+    };
+  }
   if (model.startsWith('anthropic/')) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },

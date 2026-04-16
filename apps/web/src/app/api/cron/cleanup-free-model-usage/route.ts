@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
-import { lt, inArray, sql } from 'drizzle-orm';
+import { lt, inArray } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 
 const RETENTION_DAYS = 7;

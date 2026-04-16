@@ -129,8 +129,8 @@ export function ContentKeysPanel() {
             <strong>Each entry has:</strong> a Key (referenced by the report generator), a Value
             (the actual text), and an optional Description (an editor note). Values can contain{' '}
             <code>{'{placeholder}'}</code> tokens — supported ones are <code>{'{summary}'}</code>,{' '}
-            <code>{'{detail}'}</code>, <code>{'{title}'}</code>, <code>{'{checkId}'}</code>, and{' '}
-            <code>{'{PRIORITY}'}</code>, substituted at render time.
+            <code>{'{detail}'}</code>, <code>{'{title}'}</code>, and <code>{'{checkId}'}</code>,
+            substituted at render time.
           </p>
         </div>
         <Button onClick={openCreate}>

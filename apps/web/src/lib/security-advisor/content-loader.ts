@@ -48,6 +48,13 @@ const CACHE_TTL_MS = process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000;
 
 let cached: { data: LoadedSecurityAdvisorContent; expiresAt: number } | null = null;
 
+// Singleflight: when the cache is expired, the first request starts a DB load
+// and stashes its promise here. Subsequent requests that arrive before the
+// load resolves await the same promise instead of kicking off their own
+// parallel query. Without this, a burst of requests right after expiry would
+// each fire its own loadFromDb().
+let inFlight: Promise<LoadedSecurityAdvisorContent> | null = null;
+
 /**
  * Fresh empty content for the degraded-fallback path. Returned as a new
  * object on every call so a downstream caller that accidentally mutates
@@ -67,25 +74,37 @@ function emptyContent(): LoadedSecurityAdvisorContent {
  * Uses the read replica. Falls back to empty maps/arrays if the DB is unreachable,
  * so the report generator can still produce output (using client-reported values and
  * missing coverage text) rather than failing the whole request.
+ *
+ * Concurrent requests after cache expiry are coalesced onto a single in-flight
+ * DB load via `inFlight` (singleflight pattern) so a burst never fans out
+ * into N parallel queries.
  */
 export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisorContent> {
   const now = Date.now();
   if (cached !== null && now < cached.expiresAt) {
     return cached.data;
   }
-  try {
-    const data = await loadFromDb();
-    cached = { data, expiresAt: now + CACHE_TTL_MS };
-    return data;
-  } catch (err) {
-    // Degrade gracefully on transient DB failures (e.g. read replica blip).
-    // The report generator uses client-reported values for findings and omits
-    // coverage text when the loader returns empty, so the request still
-    // succeeds — just without server-overridden copy.
-    // Intentionally NOT caching the empty result, so the next request retries.
-    console.error('[SecurityAdvisor] content-loader failed; returning empty content', err);
-    return emptyContent();
+  if (inFlight !== null) {
+    return inFlight;
   }
+  inFlight = (async () => {
+    try {
+      const data = await loadFromDb();
+      cached = { data, expiresAt: Date.now() + CACHE_TTL_MS };
+      return data;
+    } catch (err) {
+      // Degrade gracefully on transient DB failures (e.g. read replica blip).
+      // The report generator uses client-reported values for findings and omits
+      // coverage text when the loader returns empty, so the request still
+      // succeeds — just without server-overridden copy.
+      // Intentionally NOT caching the empty result, so the next request retries.
+      console.error('[SecurityAdvisor] content-loader failed; returning empty content', err);
+      return emptyContent();
+    } finally {
+      inFlight = null;
+    }
+  })();
+  return inFlight;
 }
 
 /** Invalidate the in-process cache, forcing the next call to re-query. */
@@ -127,13 +146,20 @@ async function loadFromDb(): Promise<LoadedSecurityAdvisorContent> {
   const checkCatalog = new Map<string, CatalogCheck>();
   for (const row of catalogRows) {
     // Validate that severity is one of the known values; skip rows with invalid data
-    // rather than letting an invalid DB value crash the report generator.
+    // rather than letting an invalid DB value crash the report generator. The DB
+    // CHECK constraint should prevent this, so a skip here is a signal that
+    // something has gone wrong (bad seed, manual SQL edit, etc.) — log the
+    // check_id so an operator can find and fix the bad row.
     if (row.severity === 'critical' || row.severity === 'warn' || row.severity === 'info') {
       checkCatalog.set(row.check_id, {
         severity: row.severity,
         explanation: row.explanation,
         risk: row.risk,
       });
+    } else {
+      console.warn(
+        `[SecurityAdvisor] skipping check_id="${row.check_id}" with invalid severity="${row.severity}". Valid values: critical, warn, info.`
+      );
     }
   }
 

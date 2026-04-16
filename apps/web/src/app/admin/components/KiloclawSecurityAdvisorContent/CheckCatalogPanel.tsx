@@ -35,13 +35,14 @@ import { toast } from 'sonner';
 import { Plus, Pencil } from 'lucide-react';
 
 type Severity = 'critical' | 'warn' | 'info';
-const VALID_SEVERITIES: readonly Severity[] = ['critical', 'warn', 'info'];
 
-/** Narrow the DB-returned severity string to the Severity union, falling back
- * to 'warn' on unexpected values. The DB has a CHECK constraint, but we avoid
- * a bare `as` cast per the repo's type-safety standards. */
+/** Narrow the DB-returned severity string to the Severity union via a
+ * discriminated check, falling back to 'warn' on unexpected values.
+ * The DB has a CHECK constraint, but we avoid a bare `as` cast per the
+ * repo's type-safety standards. */
 function toSeverity(value: string): Severity {
-  return (VALID_SEVERITIES as readonly string[]).includes(value) ? (value as Severity) : 'warn';
+  if (value === 'critical' || value === 'warn' || value === 'info') return value;
+  return 'warn';
 }
 
 type EditorState = {

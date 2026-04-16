@@ -3,15 +3,10 @@
  *
  * The plugin (running in the same Fly container) hits these routes on
  * localhost with OPENCLAW_GATEWAY_TOKEN. The controller re-sends the same
- * token upstream — it's the per-sandbox HMAC token and the kiloclaw CF
- * Worker verifies it with `deriveGatewayToken(sandboxId, secret)`. From
- * there the worker dispatches to kilo-chat via a trusted service binding.
+ * token upstream — it's the per-sandbox HMAC token and the kilo-chat CF
+ * Worker verifies it with `deriveGatewayToken(sandboxId, secret)`.
  *
- *   Plugin ─bearer=gatewayToken──> Controller ─bearer=gatewayToken──> kiloclaw Worker
- *                                                                        │
- *                                                                        │ service binding
- *                                                                        ▼
- *                                                                    kilo-chat Worker
+ *   Plugin ─bearer=gatewayToken──> Controller ─bearer=gatewayToken──> kilo-chat Worker
  */
 
 import type { Context, Hono } from 'hono';
@@ -23,8 +18,8 @@ export type KiloChatRouteOptions = {
   expectedToken: string;
   /** Sandbox identifier. Embedded in the upstream URL path. */
   sandboxId: string;
-  /** Base URL of the kiloclaw CF Worker (e.g. https://claw.kilosessions.ai). */
-  kiloclawBaseUrl: string;
+  /** Base URL of the kilo-chat Worker (e.g. https://chat.kiloapps.io). */
+  kiloChatBaseUrl: string;
   fetchImpl?: typeof fetch;
 };
 
@@ -44,7 +39,7 @@ function authorize(c: Context, options: KiloChatRouteOptions): Response | null {
 }
 
 function upstreamUrl(options: KiloChatRouteOptions, suffix: string): string {
-  return `${options.kiloclawBaseUrl}/api/kilo-chat/sandboxes/${encodeURIComponent(options.sandboxId)}${suffix}`;
+  return `${options.kiloChatBaseUrl}/bot/v1/sandboxes/${encodeURIComponent(options.sandboxId)}${suffix}`;
 }
 
 function outboundHeaders(options: KiloChatRouteOptions, contentType?: string): HeadersInit {

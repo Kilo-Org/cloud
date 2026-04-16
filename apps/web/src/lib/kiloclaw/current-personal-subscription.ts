@@ -47,40 +47,6 @@ function personalCurrentSubscriptionWhere(params: { userId: string; instanceId?:
   );
 }
 
-function parseTimestamp(value: string | null | undefined): number {
-  if (!value) return 0;
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function destroyedSubscriptionPriority(
-  subscription: typeof kiloclaw_subscriptions.$inferSelect,
-  now: Date
-): number {
-  if (subscription.status === 'active') return 0;
-  if (subscription.status === 'past_due' && !subscription.suspended_at) return 1;
-  if (
-    subscription.status === 'trialing' &&
-    subscription.trial_ends_at &&
-    new Date(subscription.trial_ends_at) > now
-  ) {
-    return 2;
-  }
-  return 3;
-}
-
-function destroyedSubscriptionRecency(
-  subscription: typeof kiloclaw_subscriptions.$inferSelect
-): number {
-  return Math.max(
-    parseTimestamp(subscription.current_period_end),
-    parseTimestamp(subscription.credit_renewal_at),
-    parseTimestamp(subscription.trial_ends_at),
-    parseTimestamp(subscription.updated_at),
-    parseTimestamp(subscription.created_at)
-  );
-}
-
 export async function listCurrentPersonalSubscriptionRows(params: {
   userId: string;
   dbOrTx?: PersonalSubscriptionResolverDb;
@@ -109,7 +75,6 @@ export async function resolveCurrentPersonalSubscriptionRow(params: {
   instanceId?: string;
   dbOrTx?: PersonalSubscriptionResolverDb;
 }): Promise<CurrentPersonalSubscriptionRow | null> {
-  const now = new Date();
   const executor = params.dbOrTx ?? db;
   const rows = await executor
     .select({
@@ -146,24 +111,9 @@ export async function resolveCurrentPersonalSubscriptionRow(params: {
   if (rows.length <= 1) {
     return rows[0] ?? null;
   }
-
-  return (
-    [...rows].sort((left, right) => {
-      const priorityDiff =
-        destroyedSubscriptionPriority(left.subscription, now) -
-        destroyedSubscriptionPriority(right.subscription, now);
-      if (priorityDiff !== 0) {
-        return priorityDiff;
-      }
-
-      const recencyDiff =
-        destroyedSubscriptionRecency(right.subscription) -
-        destroyedSubscriptionRecency(left.subscription);
-      if (recencyDiff !== 0) {
-        return recencyDiff;
-      }
-
-      return right.subscription.id.localeCompare(left.subscription.id);
-    })[0] ?? null
-  );
+  throw new CurrentPersonalSubscriptionResolutionError({
+    userId: params.userId,
+    instanceId: params.instanceId,
+    count: rows.length,
+  });
 }

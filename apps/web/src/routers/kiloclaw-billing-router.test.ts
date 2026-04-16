@@ -35,6 +35,10 @@ import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
 
+type KiloclawInternalClientMockShape = {
+  __provisionMock: AnyMock;
+};
+
 jest.setTimeout(15_000);
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
@@ -96,11 +100,12 @@ jest.mock('next/server', () => {
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const fn = jest.fn as (...args: unknown[]) => AnyMock;
+  const provisionMock = fn().mockResolvedValue({});
   return {
     KiloClawInternalClient: fn().mockImplementation(() => ({
       start: fn().mockResolvedValue(undefined),
       stop: fn().mockResolvedValue(undefined),
-      provision: fn().mockResolvedValue({}),
+      provision: provisionMock,
       getStatus: fn().mockResolvedValue({}),
     })),
     KiloClawApiError: class KiloClawApiError extends Error {
@@ -112,6 +117,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
         this.responseBody = responseBody;
       }
     },
+    __provisionMock: provisionMock,
   };
 });
 
@@ -132,6 +138,9 @@ type StripeMockShape = {
 const stripeMock = jest.requireMock<{ __stripeMock: StripeMockShape }>(
   '@/lib/stripe-client'
 ).__stripeMock;
+const kiloclawInternalClientMock = jest.requireMock<KiloclawInternalClientMockShape>(
+  '@/lib/kiloclaw/kiloclaw-internal-client'
+);
 
 beforeAll(async () => {
   const mod = await import('@/routers/test-utils');
@@ -165,6 +174,8 @@ beforeEach(async () => {
   stripeMock.subscriptionSchedules.retrieve.mockReset();
   stripeMock.invoices.list.mockReset();
   stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
+  kiloclawInternalClientMock.__provisionMock.mockReset();
+  kiloclawInternalClientMock.__provisionMock.mockResolvedValue({});
 
   // Default mock returns for live-fetch calls
   stripeMock.subscriptions.retrieve.mockResolvedValue({
@@ -492,6 +503,56 @@ describe('getBillingStatus', () => {
       .from(kiloclaw_subscriptions)
       .where(eq(kiloclaw_subscriptions.instance_id, trialInstance.id));
     expect(adoptedTrialRows).toHaveLength(1);
+  });
+});
+
+describe('provision detached personal billing recovery', () => {
+  it('allows reprovisioning when only detached access-granting row remains', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: null,
+      stripe_subscription_id: 'sub_detached_reprovision',
+      payment_source: 'stripe',
+      plan: 'standard',
+      status: 'active',
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.provision({})).resolves.toEqual({});
+
+    expect(kiloclawInternalClientMock.__provisionMock).toHaveBeenCalledWith(
+      user.id,
+      expect.any(Object),
+      undefined
+    );
+  });
+
+  it('bootstraps detached access-granting row onto active instance when active row missing', async () => {
+    const activeInstance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: null,
+      stripe_subscription_id: 'sub_detached_active_instance',
+      payment_source: 'stripe',
+      plan: 'standard',
+      status: 'active',
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.provision({})).resolves.toEqual({});
+
+    expect(kiloclawInternalClientMock.__provisionMock).toHaveBeenCalledWith(
+      user.id,
+      expect.any(Object),
+      {
+        instanceId: activeInstance.id,
+        bootstrapSubscription: true,
+      }
+    );
   });
 });
 

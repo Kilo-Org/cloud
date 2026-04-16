@@ -111,6 +111,11 @@ INNER JOIN "kiloclaw_subscriptions" AS "target"
 WHERE "target"."stripe_subscription_id" IS NULL
   AND "target"."payment_source" IS NULL
   AND "target"."plan" = 'trial'
+  AND (
+    "detached"."status" = 'active'
+    OR ("detached"."status" = 'past_due' AND "detached"."suspended_at" IS NULL)
+    OR ("detached"."status" = 'trialing' AND "detached"."trial_ends_at" > NOW())
+  )
   AND NOT EXISTS (
     SELECT 1
     FROM "kiloclaw_subscriptions" AS "conflict"

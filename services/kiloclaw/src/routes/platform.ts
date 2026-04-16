@@ -400,7 +400,10 @@ async function markProvisionedInstanceDestroyed(params: {
 }): Promise<void> {
   const connectionString = params.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
-    return;
+    console.error('[platform] HYPERDRIVE missing during instance destroy compensation', {
+      instanceId: params.instanceId,
+    });
+    throw new Error('HYPERDRIVE is not configured during instance destroy compensation');
   }
 
   const db = getWorkerDb(connectionString);
@@ -817,6 +820,15 @@ platform.post('/provision', async c => {
             markErr
           );
         });
+      } else {
+        console.error(
+          '[platform] Subscription bootstrap failed after reprovisioning existing instance; leaving Durable Object provisioned for retry/manual recovery',
+          {
+            userId,
+            instanceId: provisionedInstanceId,
+            doKey: provisionDoKey,
+          }
+        );
       }
       const { message, status } = sanitizeError(persistErr, 'post-provision bootstrap');
       return jsonError(message, status);

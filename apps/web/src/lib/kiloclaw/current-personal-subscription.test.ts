@@ -139,4 +139,43 @@ describe('resolveCurrentPersonalSubscriptionRow', () => {
 
     expect(row?.subscription.instance_id).toBe(activeInstance?.id ?? null);
   });
+
+  it('throws when multiple destroyed current rows remain', async () => {
+    const [olderDestroyedInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: `destroyed-older-${crypto.randomUUID()}`,
+        destroyed_at: '2026-04-01T00:00:00.000Z',
+      })
+      .returning();
+    const [newerDestroyedInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: `destroyed-newer-${crypto.randomUUID()}`,
+        destroyed_at: '2026-04-10T00:00:00.000Z',
+      })
+      .returning();
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: olderDestroyedInstance?.id,
+      plan: 'standard',
+      status: 'canceled',
+      current_period_end: '2026-03-01T00:00:00.000Z',
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: newerDestroyedInstance?.id,
+      plan: 'standard',
+      status: 'active',
+      stripe_subscription_id: 'sub_destroyed_ambiguous',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+    });
+
+    await expect(resolveCurrentPersonalSubscriptionRow({ userId: user.id })).rejects.toThrow(
+      `Expected at most one current personal subscription row for user ${user.id}, found 2`
+    );
+  });
 });

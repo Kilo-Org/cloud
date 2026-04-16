@@ -87,7 +87,7 @@ function logQuarantinedStripeEvent(
 async function insertStripeSubscriptionChangeLog(
   tx: SubscriptionLogWriter,
   params: {
-    subscriptionId: string;
+    subscriptionId: string | null | undefined;
     action:
       | 'created'
       | 'status_changed'
@@ -101,7 +101,7 @@ async function insertStripeSubscriptionChangeLog(
     bestEffort?: boolean;
   }
 ) {
-  if (!params.after) {
+  if (!params.after || !params.subscriptionId) {
     return;
   }
 
@@ -979,7 +979,7 @@ export async function handleKiloClawSubscriptionUpdated(params: {
       .where(eq(kiloclaw_subscriptions.id, preRead.id))
       .returning();
     await insertStripeSubscriptionChangeLog(db, {
-      subscriptionId: after?.id ?? before?.id ?? '',
+      subscriptionId: after?.id ?? before?.id,
       action: 'status_changed',
       reason: 'stripe_subscription_updated_hybrid',
       before: before ?? null,
@@ -1051,7 +1051,7 @@ export async function handleKiloClawSubscriptionUpdated(params: {
       .returning();
 
     await insertStripeSubscriptionChangeLog(db, {
-      subscriptionId: after?.id ?? before?.id ?? '',
+      subscriptionId: after?.id ?? before?.id,
       action: 'status_changed',
       reason: 'stripe_subscription_updated',
       before: before ?? null,
@@ -1148,7 +1148,7 @@ export async function handleKiloClawSubscriptionDeleted(params: {
       .returning();
 
     await insertStripeSubscriptionChangeLog(db, {
-      subscriptionId: after?.id ?? before?.id ?? '',
+      subscriptionId: after?.id ?? before?.id,
       action: 'payment_source_changed',
       reason: 'stripe_subscription_deleted_convert_to_credits',
       before: before ?? null,
@@ -1181,7 +1181,7 @@ export async function handleKiloClawSubscriptionDeleted(params: {
       .returning();
 
     await insertStripeSubscriptionChangeLog(db, {
-      subscriptionId: after?.id ?? before?.id ?? '',
+      subscriptionId: after?.id ?? before?.id,
       action: 'canceled',
       reason: 'stripe_subscription_deleted',
       before: before ?? null,
@@ -1273,7 +1273,7 @@ export async function handleKiloClawScheduleEvent(params: {
       .returning();
 
     await insertStripeSubscriptionChangeLog(db, {
-      subscriptionId: after?.id ?? before?.id ?? '',
+      subscriptionId: after?.id ?? before?.id,
       action:
         scheduleStatus === 'completed' && !!updateSet.plan ? 'plan_switched' : 'schedule_changed',
       reason: `stripe_schedule_${scheduleStatus}`,

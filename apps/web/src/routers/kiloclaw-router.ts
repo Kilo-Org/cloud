@@ -126,6 +126,36 @@ async function getEarlybirdPurchaseRow(
   return earlybird ?? null;
 }
 
+async function resolveDetachedAccessGrantingPersonalSubscription(params: {
+  userId: string;
+  executor?: typeof db | DrizzleTransaction;
+}) {
+  const executor = params.executor ?? db;
+  const now = new Date();
+  const rows = await executor
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        isNull(kiloclaw_subscriptions.instance_id),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+      )
+    );
+
+  const accessGrantingRows = rows.filter(
+    row => getKiloClawSubscriptionAccessReason(row, now) !== null
+  );
+  if (accessGrantingRows.length > 1) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'KiloClaw billing state needs support review before continuing.',
+    });
+  }
+
+  return accessGrantingRows[0] ?? null;
+}
+
 async function getOwnedPersonalInstanceAnchorRow(params: {
   userId: string;
   instanceId: string;
@@ -770,6 +800,11 @@ async function ensureProvisionAccess(
   const activeInstance = await getActiveInstance(userId, executor);
   const earlybird = await getEarlybirdPurchaseRow(userId, executor);
   const hasActiveEarlybirdAccess = !!earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now;
+  const detachedAccessGrantingSubscription =
+    await resolveDetachedAccessGrantingPersonalSubscription({
+      userId,
+      executor,
+    });
   let currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
   try {
     currentRow = await resolveCurrentPersonalSubscriptionRow({
@@ -780,14 +815,19 @@ async function ensureProvisionAccess(
     mapCurrentSubscriptionResolutionError(error);
   }
 
-  if (activeInstance && !currentRow && !hasActiveEarlybirdAccess) {
+  if (
+    activeInstance &&
+    !currentRow &&
+    !detachedAccessGrantingSubscription &&
+    !hasActiveEarlybirdAccess
+  ) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Active KiloClaw instance is missing its current billing row.',
     });
   }
 
-  if (activeInstance && currentRow?.instance?.id !== activeInstance.id) {
+  if (activeInstance && currentRow && currentRow.instance?.id !== activeInstance.id) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Active KiloClaw instance does not match current billing row.',
@@ -806,6 +846,14 @@ async function ensureProvisionAccess(
     return {
       instanceId: activeInstance?.id ?? null,
       bootstrapSubscription: false,
+      shouldEnqueueTrialStartAffiliate: false,
+    };
+  }
+
+  if (detachedAccessGrantingSubscription) {
+    return {
+      instanceId: activeInstance?.id ?? null,
+      bootstrapSubscription: activeInstance !== null,
       shouldEnqueueTrialStartAffiliate: false,
     };
   }
@@ -1825,18 +1873,13 @@ export const kiloclawRouter = createTRPCRouter({
   provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
     return await withKiloclawProvisionContextLock(
       getPersonalProvisionLockKey(ctx.user.id),
-      async tx => {
+      async () => {
         const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
-          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email, tx);
-        const result = await provisionInstance(
-          ctx.user,
-          input,
-          {
-            instanceId,
-            bootstrapSubscription,
-          },
-          tx
-        );
+          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
+        const result = await provisionInstance(ctx.user, input, {
+          instanceId,
+          bootstrapSubscription,
+        });
         if (shouldEnqueueTrialStartAffiliate) {
           await enqueueProvisionTrialStartAffiliateEvent({
             userId: ctx.user.id,
@@ -1859,18 +1902,13 @@ export const kiloclawRouter = createTRPCRouter({
   updateConfig: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
     return await withKiloclawProvisionContextLock(
       getPersonalProvisionLockKey(ctx.user.id),
-      async tx => {
+      async () => {
         const { instanceId, bootstrapSubscription, shouldEnqueueTrialStartAffiliate } =
-          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email, tx);
-        const result = await provisionInstance(
-          ctx.user,
-          input,
-          {
-            instanceId,
-            bootstrapSubscription,
-          },
-          tx
-        );
+          await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
+        const result = await provisionInstance(ctx.user, input, {
+          instanceId,
+          bootstrapSubscription,
+        });
         if (shouldEnqueueTrialStartAffiliate) {
           await enqueueProvisionTrialStartAffiliateEvent({
             userId: ctx.user.id,

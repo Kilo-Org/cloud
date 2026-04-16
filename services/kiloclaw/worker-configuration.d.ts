@@ -35,7 +35,6 @@ declare namespace Cloudflare {
 		DOCKER_LOCAL_API_BASE: string;
 		DOCKER_LOCAL_IMAGE: string;
 		DOCKER_LOCAL_PORT_RANGE: string;
-		KILOCHAT_ENABLED: string;
 		KILOCHAT_REACTION_LEVEL: string;
 		KILOCLAW_INSTANCE: DurableObjectNamespace<import("./src/index").KiloClawInstance>;
 		KILOCLAW_APP: DurableObjectNamespace<import("./src/index").KiloClawApp>;

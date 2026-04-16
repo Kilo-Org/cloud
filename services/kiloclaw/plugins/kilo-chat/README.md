@@ -21,10 +21,9 @@ on the Fly machine:
 - `KILOCLAW_CONTROLLER_URL` (optional) — controller localhost URL;
   defaults to `http://127.0.0.1:18789`.
 
-Operator-facing channel toggles (set on the kiloclaw worker, not the
-sandbox) are `KILOCHAT_ENABLED` (gates the channel) and
-`KILOCHAT_REACTION_LEVEL` (`off` | `ack` | `minimal` | `extensive`,
-default `minimal`).
+The kilo-chat channel is always enabled. `KILOCHAT_REACTION_LEVEL`
+(`off` | `ack` | `minimal` | `extensive`, default `minimal`) controls
+reaction behavior.
 
 ## Streaming
 

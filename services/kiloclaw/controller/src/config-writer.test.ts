@@ -764,10 +764,9 @@ describe('generateBaseConfig', () => {
 
   // ─── Kilo Chat ───────────────────────────────────────────────────────────
 
-  it('configures kilo-chat channel and plugin when KILOCHAT_ENABLED=true', () => {
+  it('always configures kilo-chat channel and plugin', () => {
     const { deps } = fakeDeps();
-    const env = { ...minimalEnv(), KILOCHAT_ENABLED: 'true' };
-    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
     expect(config.channels['kilo-chat'].enabled).toBe(true);
     // reactionLevel provides the non-`enabled` key required by OpenClaw's
@@ -781,7 +780,6 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps();
     const env = {
       ...minimalEnv(),
-      KILOCHAT_ENABLED: 'true',
       KILOCHAT_REACTION_LEVEL: 'extensive',
     };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
@@ -790,8 +788,7 @@ describe('generateBaseConfig', () => {
 
   it('defaults reactionLevel to minimal when KILOCHAT_REACTION_LEVEL is unset', () => {
     const { deps } = fakeDeps();
-    const env = { ...minimalEnv(), KILOCHAT_ENABLED: 'true' };
-    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
     expect(config.channels['kilo-chat'].reactionLevel).toBe('minimal');
   });
 
@@ -799,7 +796,6 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps();
     const env = {
       ...minimalEnv(),
-      KILOCHAT_ENABLED: 'true',
       KILOCHAT_REACTION_LEVEL: 'bogus',
     };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
@@ -811,25 +807,11 @@ describe('generateBaseConfig', () => {
       const { deps } = fakeDeps();
       const env = {
         ...minimalEnv(),
-        KILOCHAT_ENABLED: 'true',
         KILOCHAT_REACTION_LEVEL: level,
       };
       const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
       expect(config.channels['kilo-chat'].reactionLevel).toBe(level);
     }
-  });
-
-  it('leaves kilo-chat channel unconfigured when KILOCHAT_ENABLED is missing', () => {
-    const { deps } = fakeDeps();
-    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
-    expect(config.channels?.['kilo-chat']).toBeUndefined();
-  });
-
-  it('leaves kilo-chat channel unconfigured when KILOCHAT_ENABLED is not "true"', () => {
-    const { deps } = fakeDeps();
-    const env = { ...minimalEnv(), KILOCHAT_ENABLED: 'false' };
-    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
-    expect(config.channels?.['kilo-chat']).toBeUndefined();
   });
 
   it('does not duplicate the plugin path on repeated generateBaseConfig calls', () => {

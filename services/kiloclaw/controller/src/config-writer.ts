@@ -458,9 +458,7 @@ export function generateBaseConfig(
     config.plugins.entries[scEntry].enabled = true;
   }
 
-  // Kilo Chat (pre-provisioned channel — no setup wizard). Gated by a single
-  // operator-controlled worker-level toggle so rollout can be flipped
-  // independently of image deploys. The plugin's outbound path reaches
+  // Kilo Chat — always enabled. The plugin's outbound path reaches
   // kilo-chat via controller proxy → kiloclaw Worker → service binding, so
   // nothing else needs to be provisioned per sandbox.
   //
@@ -469,27 +467,25 @@ export function generateBaseConfig(
   // without some key other than `enabled`, hasMeaningfulChannelConfig
   // returns false and the plugin loads in `setup-runtime` mode instead of
   // `full`, which skips registerFull and the webhook HTTP route.
-  if (env.KILOCHAT_ENABLED === 'true') {
-    config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
-    config.channels['kilo-chat'].enabled = true;
-    // Load-bearing: also the marker key for isChannelConfigured — do not
-    // remove without replacing with another non-`enabled` config key.
-    config.channels['kilo-chat'].reactionLevel = resolveReactionLevel(env.KILOCHAT_REACTION_LEVEL);
+  config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
+  config.channels['kilo-chat'].enabled = true;
+  // Load-bearing: also the marker key for isChannelConfigured — do not
+  // remove without replacing with another non-`enabled` config key.
+  config.channels['kilo-chat'].reactionLevel = resolveReactionLevel(env.KILOCHAT_REACTION_LEVEL);
 
-    config.plugins = config.plugins ?? {};
-    config.plugins.load = config.plugins.load ?? {};
-    config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
-      ? config.plugins.load.paths
-      : [];
-    const kiloChatPluginPath = '/usr/local/lib/node_modules/@kiloclaw/kilo-chat';
-    if (!(config.plugins.load.paths as string[]).includes(kiloChatPluginPath)) {
-      (config.plugins.load.paths as string[]).push(kiloChatPluginPath);
-    }
-
-    config.plugins.entries = config.plugins.entries ?? {};
-    config.plugins.entries['kilo-chat'] = config.plugins.entries['kilo-chat'] ?? {};
-    config.plugins.entries['kilo-chat'].enabled = true;
+  config.plugins = config.plugins ?? {};
+  config.plugins.load = config.plugins.load ?? {};
+  config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
+    ? config.plugins.load.paths
+    : [];
+  const kiloChatPluginPath = '/usr/local/lib/node_modules/@kiloclaw/kilo-chat';
+  if (!(config.plugins.load.paths as string[]).includes(kiloChatPluginPath)) {
+    (config.plugins.load.paths as string[]).push(kiloChatPluginPath);
   }
+
+  config.plugins.entries = config.plugins.entries ?? {};
+  config.plugins.entries['kilo-chat'] = config.plugins.entries['kilo-chat'] ?? {};
+  config.plugins.entries['kilo-chat'].enabled = true;
 
   // Webhook hooks configuration for controller-mediated inbound events.
   // hooks.token stays local to the machine; external Workers authenticate to

@@ -66,8 +66,6 @@ export type KiloClawEnv = {
   // Outbound traffic goes plugin → controller proxy → kiloclaw Worker (this
   // worker!) → kilo-chat via service binding, authenticated by the
   // per-sandbox gateway token. No shared token crosses the internet.
-  /** Enable the kilo-chat channel on new/restarted machines. "true" to enable. */
-  KILOCHAT_ENABLED?: string;
   /** Reaction feature level forwarded to the plugin's channel config. */
   KILOCHAT_REACTION_LEVEL?: string;
 

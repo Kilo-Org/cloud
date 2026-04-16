@@ -364,6 +364,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     let prevAct = '';
     let prevSk = '';
     let prevCsk = '';
+    let prevCloudStatusHadIndicator = false;
     const sKey = (s: AgentStatus) => (s.type === 'autocommit' ? `${s.type}:${s.step}` : s.type);
     const csKey = (cs: CloudStatus | null) =>
       cs === null
@@ -414,16 +415,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (cs && cs.type !== 'ready') {
         if (csk !== prevCsk) {
           const cloudInd = indicatorForCloudStatus(cs);
-          if (cloudInd) setIndicator(cloudInd);
+          if (cloudInd) {
+            setIndicator(cloudInd);
+            prevCloudStatusHadIndicator = true;
+          }
           prevCsk = csk;
         }
       } else {
+        const shouldClearCloudIndicator = prevCloudStatusHadIndicator;
         if (csk !== prevCsk) prevCsk = csk;
+        prevCloudStatusHadIndicator = false;
         // Fall through to existing agent status indicator logic
         const sk = sKey(st);
-        if (sk !== prevSk) {
+        if (sk !== prevSk || shouldClearCloudIndicator) {
           const ind = indicatorForStatus(st);
-          if (ind !== null) setIndicator(ind);
+          if (ind !== null || shouldClearCloudIndicator) setIndicator(ind);
           prevSk = sk;
         }
       }

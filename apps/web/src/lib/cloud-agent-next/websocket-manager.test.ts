@@ -134,7 +134,7 @@ describe('cloud-agent-next websocket-manager', () => {
     );
   });
 
-  it('does not refresh again or create a third socket after repeated ambiguous 1006', async () => {
+  it('falls back to timer reconnect after repeated ambiguous 1006', async () => {
     const onRefreshTicket = jest.fn().mockResolvedValue('new-ticket');
     const onStateChange = jest.fn();
     const manager = createWebSocketManager(createConfig({ onRefreshTicket, onStateChange }));
@@ -156,15 +156,28 @@ describe('cloud-agent-next websocket-manager', () => {
     }
 
     secondWs.simulateClose(1006, '');
-    await flushPromises();
 
     expect(onRefreshTicket).toHaveBeenCalledTimes(1);
-    expect(MockWebSocket.instances).toHaveLength(2);
     expect(onStateChange).toHaveBeenCalledWith({
+      status: 'reconnecting',
+      lastEventId: 0,
+      attempt: 1,
+    });
+    expect(onStateChange).not.toHaveBeenCalledWith({
       status: 'error',
       error: 'Authentication failed after ticket refresh. Check server configuration.',
       retryable: false,
     });
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    jest.advanceTimersByTime(1000);
+
+    expect(MockWebSocket.instances).toHaveLength(3);
+    const thirdWs = MockWebSocket.instances[2];
+    if (thirdWs === undefined) {
+      throw new Error('Expected reconnected WebSocket');
+    }
+    expect(thirdWs.url).toContain('ticket=new-ticket');
   });
 
   it('uses timer reconnect with the same ticket on normal non-auth close', async () => {

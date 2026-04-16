@@ -10,7 +10,7 @@ import { createCloudAgentSession } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import type { AssistantMessage, UserMessage } from '@/types/opencode.gen';
 import { kiloId, cloudAgentId, stubUserMessage } from './test-helpers';
-import type { ResolvedSession } from './types';
+import type { CloudStatus, ResolvedSession } from './types';
 
 // ---------------------------------------------------------------------------
 // Mock createCloudAgentSession — prevents real WebSocket connections
@@ -34,7 +34,7 @@ const mockSession = {
     }),
     getActivity: jest.fn(() => ({ type: 'idle' as const })),
     getStatus: jest.fn<{ type: 'idle' | 'disconnected' }, []>(() => ({ type: 'idle' })),
-    getCloudStatus: jest.fn(() => null),
+    getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
@@ -204,6 +204,7 @@ describe('createSessionManager', () => {
       return () => {};
     });
     mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
+    mockSession.state.getCloudStatus.mockReturnValue(null);
     mockSession.storage = latestStorage;
     latestStorage = null;
     mockSessionCallbacks.onQuestionAsked = undefined;
@@ -382,6 +383,43 @@ describe('createSessionManager', () => {
         variant?: string | null;
       }>(config.store, mgr.atoms.sessionConfig);
       expect(sessionConfig?.variant).toBe(null);
+    });
+
+    it('clears cloud status indicator when cloud status returns to ready', async () => {
+      let subscriptionCallback = (): void => {
+        throw new Error('Expected service state subscription callback');
+      };
+      let cloudStatus: CloudStatus | null = {
+        type: 'preparing',
+        message: 'Setting up environment...',
+      };
+      mockSession.state.getCloudStatus.mockImplementation(() => cloudStatus);
+      mockSession.state.subscribe.mockImplementation(callback => {
+        subscriptionCallback = callback;
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(
+        expect.objectContaining({
+          type: 'progress',
+          message: 'Setting up environment...',
+        })
+      );
+
+      cloudStatus = { type: 'ready' };
+      subscriptionCallback();
+
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toBeNull();
     });
   });
 

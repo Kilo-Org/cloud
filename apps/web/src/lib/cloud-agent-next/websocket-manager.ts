@@ -272,9 +272,9 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
 
       // If we already tried refreshing the ticket and still get an explicit auth close,
       // don't keep retrying - the issue is likely not the ticket.
-      if (shouldRefreshTicket && ticketRefreshAttempted) {
+      if (isAuthFailure && ticketRefreshAttempted) {
         console.log(
-          '[WebSocketManager] Auth-like failure after ticket refresh - stopping retries (likely origin/config issue)'
+          '[WebSocketManager] Explicit auth failure after ticket refresh - stopping retries (likely origin/config issue)'
         );
         setState({
           status: 'error',

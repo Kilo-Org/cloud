@@ -74,8 +74,8 @@ const userManagementItems: MenuItem[] = [
     icon: () => <Shield />,
   },
   {
-    title: () => 'Safety Identifiers',
-    url: '/admin/safety-identifiers',
+    title: () => 'Backfills',
+    url: '/admin/backfills',
     icon: () => <KeyRound />,
   },
 ];

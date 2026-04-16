@@ -19,6 +19,7 @@ import {
   captureProxyError,
   extractHeaderAndLimitLength,
 } from '@/lib/llm-proxy-helpers';
+import type { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { readDb } from '@/lib/drizzle';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
@@ -119,7 +120,10 @@ export async function POST(request: NextRequest) {
   const resolved = resolveFimProvider(requestBody.model);
   if (!resolved) {
     return NextResponse.json(
-      { error: requestBody.model + ' is not a supported FIM model' },
+      {
+        error: requestBody.model + ' is not a supported FIM model',
+        error_type: 'unsupported_fim_model' satisfies ProxyErrorType,
+      },
       { status: 400 }
     );
   }
@@ -177,7 +181,13 @@ export async function POST(request: NextRequest) {
   const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
-    return NextResponse.json({ error: { message: 'Insufficient credits' } }, { status: 402 });
+    return NextResponse.json(
+      {
+        error: { message: 'Insufficient credits' },
+        error_type: 'insufficient_credits' satisfies ProxyErrorType,
+      },
+      { status: 402 }
+    );
   }
 
   // Use shared helper for organization model restrictions
@@ -195,6 +205,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Provider not allowed for your team.',
+        error_type: 'provider_not_allowed' satisfies ProxyErrorType,
         message: `The provider "${fimProvider}" is not allowed for your team.`,
       },
       { status: 403 }
@@ -208,6 +219,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'This model requires a BYOK API key. Please configure your API key in settings.',
+        error_type: 'byok_key_required' satisfies ProxyErrorType,
       },
       { status: 400 }
     );
@@ -237,7 +249,13 @@ export async function POST(request: NextRequest) {
   usageContext.status_code = proxyRes.status;
 
   if (!proxyRes.body) {
-    return NextResponse.json({ error: 'No body returned from upstream' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'No body returned from upstream',
+        error_type: 'upstream_error' satisfies ProxyErrorType,
+      },
+      { status: 500 }
+    );
   }
 
   // Handle errors

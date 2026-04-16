@@ -38,27 +38,8 @@ import type {
 import { getMaxTokens } from '@/lib/providers/openrouter/request-helpers';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/providers/types';
-import * as z from 'zod';
-
-export const proxyErrorTypeSchema = z.enum([
-  'invalid_path',
-  'invalid_request',
-  'temporarily_unavailable',
-  'upgrade_required',
-  'usage_limit_exceeded',
-  'data_collection_required',
-  'api_kind_not_supported',
-  'stealth_model_error',
-  'byok_error',
-  'context_length_exceeded',
-  'model_not_allowed',
-  'forbidden_free_model',
-  'model_not_found',
-  'feature_exclusive_model',
-  'unsupported_field',
-]);
-
-export type ProxyErrorType = z.infer<typeof proxyErrorTypeSchema>;
+export { proxyErrorTypeSchema, type ProxyErrorType } from '@/lib/proxy-error-types';
+import type { ProxyErrorType } from '@/lib/proxy-error-types';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests
@@ -250,7 +231,7 @@ export function forbiddenFreeModelResponse(
   header: FraudDetectionHeaders,
   feature: FeatureValue | null
 ) {
-  const errorType = 'forbidden_free_model' satisfies ProxyErrorType;
+  const errorType = 'discontinued_free_model' satisfies ProxyErrorType;
   if (feature === 'kiloclaw' || feature === 'openclaw') {
     const error = `The free period of this model ended. Please use ${KILO_AUTO_FREE_MODEL.name} to continue, switch using: /model kilocode/${KILO_AUTO_FREE_MODEL.id}`;
     return NextResponse.json({ error, error_type: errorType, message: error }, { status: 404 });

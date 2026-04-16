@@ -79,7 +79,7 @@ export type CancelCliRunParams = {
 };
 
 export type CancelCliRunResult =
-  | { ok: boolean; runFound: true; cancelled: boolean }
+  | { ok: boolean; runFound: true; cancelled: boolean; instanceId: string | null }
   | { ok: false; runFound: false; cancelled: false };
 
 export type CliRunStatusResult = KiloCliRunStatusResponse & {
@@ -194,7 +194,7 @@ export async function cancelCliRun(params: {
   }
 
   if (row.status !== 'running') {
-    return { ok: true, runFound: true, cancelled: false };
+    return { ok: true, runFound: true, cancelled: false, instanceId: row.instance_id };
   }
 
   const effectiveWorkerInstanceId =
@@ -241,7 +241,7 @@ export async function cancelCliRun(params: {
         completedAt: new Date().toISOString(),
       },
     });
-    return { ok: true, runFound: true, cancelled: false };
+    return { ok: true, runFound: true, cancelled: false, instanceId: row.instance_id };
   }
 
   if (!isControllerStatusForRun(row, controllerStatus)) {
@@ -258,7 +258,7 @@ export async function cancelCliRun(params: {
         completedAt: new Date().toISOString(),
       },
     });
-    return { ok: true, runFound: true, cancelled: false };
+    return { ok: true, runFound: true, cancelled: false, instanceId: row.instance_id };
   }
 
   // The controller already reached a terminal state for this run — persist it
@@ -270,7 +270,7 @@ export async function cancelCliRun(params: {
       instanceId: row.instance_id,
       controllerStatus,
     });
-    return { ok: true, runFound: true, cancelled: false };
+    return { ok: true, runFound: true, cancelled: false, instanceId: row.instance_id };
   }
 
   const result = await cancelControllerRun(params.userId, effectiveWorkerInstanceId);
@@ -281,7 +281,7 @@ export async function cancelCliRun(params: {
     // stays 'running' so the caller can retry or poll again — the next
     // getKiloCliRunStatus call will pick up the terminal state from the
     // controller and persist it.
-    return { ok: false, runFound: true, cancelled: false };
+    return { ok: false, runFound: true, cancelled: false, instanceId: row.instance_id };
   }
 
   const didUpdate = await markCliRunCancelled({
@@ -293,7 +293,7 @@ export async function cancelCliRun(params: {
   // didUpdate is false when the row left 'running' between our SELECT and
   // this UPDATE (e.g. a concurrent getCliRunStatus poll persisted a terminal
   // state, or another cancel request won the race).
-  return { ok: true, runFound: true, cancelled: didUpdate };
+  return { ok: true, runFound: true, cancelled: didUpdate, instanceId: row.instance_id };
 }
 
 /**

@@ -166,7 +166,7 @@ describe('cancelCliRun', () => {
         }),
         cancelControllerRun,
       })
-    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false });
+    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false, instanceId });
 
     expect(cancelControllerRun).not.toHaveBeenCalled();
     await expect(getRunStatus(runId)).resolves.toEqual({
@@ -204,7 +204,7 @@ describe('cancelCliRun', () => {
         }),
         cancelControllerRun,
       })
-    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false });
+    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false, instanceId });
 
     expect(cancelControllerRun).not.toHaveBeenCalled();
 
@@ -245,7 +245,7 @@ describe('cancelCliRun', () => {
         }),
         cancelControllerRun,
       })
-    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false });
+    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false, instanceId });
 
     expect(cancelControllerRun).not.toHaveBeenCalled();
 
@@ -291,7 +291,7 @@ describe('cancelCliRun', () => {
         }),
         cancelControllerRun,
       })
-    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false });
+    ).resolves.toEqual({ ok: true, runFound: true, cancelled: false, instanceId });
 
     expect(cancelControllerRun).not.toHaveBeenCalled();
 
@@ -339,7 +339,7 @@ describe('cancelCliRun', () => {
       cancelControllerRun: async () => ({ ok: true }),
     });
 
-    expect(result).toEqual({ ok: true, runFound: true, cancelled: false });
+    expect(result).toEqual({ ok: true, runFound: true, cancelled: false, instanceId });
     await expect(getRunStatus(runId)).resolves.toEqual({
       status: 'completed',
       completed_at: '2026-04-12T12:01:00.000Z',
@@ -376,7 +376,7 @@ describe('cancelCliRun', () => {
       cancelControllerRun: async () => ({ ok: false }),
     });
 
-    expect(result).toEqual({ ok: false, runFound: true, cancelled: false });
+    expect(result).toEqual({ ok: false, runFound: true, cancelled: false, instanceId });
 
     // The DB row should remain 'running' so the caller can retry or poll.
     await expect(getRunStatus(runId)).resolves.toEqual({

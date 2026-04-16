@@ -959,7 +959,7 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
       expect(logs[0].target_user_id).toBe(cliRunUser.id);
       expect(logs[0].message).toBe('CLI run cancelled');
       expect(logs[0].metadata).toEqual({
-        instanceId: null,
+        instanceId: destroyedInstance.id,
         requestedInstanceId: destroyedInstance.id,
         routerInstanceMissing: true,
         runId: staleRun.id,

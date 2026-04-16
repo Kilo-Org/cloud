@@ -771,7 +771,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         }
 
         if (result.cancelled) {
-          const resolvedInstanceId = instance?.id ?? null;
           try {
             await createKiloClawAdminAuditLog({
               action: 'kiloclaw.cli_run.cancel',
@@ -781,12 +780,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               target_user_id: input.userId,
               message: 'CLI run cancelled',
               metadata: {
-                instanceId: resolvedInstanceId,
+                instanceId: result.instanceId,
                 requestedInstanceId: input.instanceId ?? null,
                 // Whether the router resolved an instance for the user. Note:
                 // even when true, cancelCliRun may still reach the controller
                 // via the run row's own instance_id.
-                routerInstanceMissing: !resolvedInstanceId,
+                routerInstanceMissing: !instance,
                 runId: input.runId,
               },
             });

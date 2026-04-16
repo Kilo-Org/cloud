@@ -23,7 +23,7 @@ import {
   type AnyPgColumn,
   bigserial,
 } from 'drizzle-orm/pg-core';
-import { isNotNull, isNull, sql } from 'drizzle-orm';
+import { isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   KiloPassTier,
@@ -234,6 +234,8 @@ export const kilocode_users = pgTable(
     vercel_downstream_safety_identifier: text(),
     customer_source: text(),
     account_deletion_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
+
+    normalized_email: text(),
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
@@ -245,6 +247,7 @@ export const kilocode_users = pgTable(
     uniqueIndex('UQ_kilocode_users_vercel_downstream_safety_identifier')
       .on(table.vercel_downstream_safety_identifier)
       .where(sql`${table.vercel_downstream_safety_identifier} IS NOT NULL`),
+    index('IDX_kilocode_users_normalized_email').on(table.normalized_email),
   ]
 );
 

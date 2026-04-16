@@ -10,6 +10,9 @@ import {
   runOnboardOrDoctor,
   formatBotIdentityMarkdown,
   writeBotIdentityFile,
+  formatUserProfileMarkdown,
+  setUserMdTimezone,
+  writeUserProfileTimezoneFile,
   updateToolsMdSection,
   GOG_SECTION_CONFIG,
   KILO_CLI_SECTION_CONFIG,
@@ -588,6 +591,80 @@ describe('writeBotIdentityFile', () => {
   });
 });
 
+// ---- user profile file ----
+
+describe('formatUserProfileMarkdown', () => {
+  it('renders the user profile markdown with timezone', () => {
+    const result = formatUserProfileMarkdown('Europe/Amsterdam');
+
+    expect(result).toContain('# USER.md - About Your Human');
+    expect(result).toContain('- Timezone: Europe/Amsterdam');
+  });
+});
+
+describe('setUserMdTimezone', () => {
+  it('updates a plain timezone field', () => {
+    const result = setUserMdTimezone('# USER\n- Timezone:\n- Notes:\n', 'Europe/Amsterdam');
+
+    expect(result).toContain('- Timezone: Europe/Amsterdam');
+    expect(result).toContain('- Notes:');
+  });
+
+  it('updates a bold timezone field', () => {
+    const result = setUserMdTimezone(
+      '# USER\n- **Timezone:** [America/New_York, Europe/London, etc.]\n',
+      'Europe/Amsterdam'
+    );
+
+    expect(result).toContain('- **Timezone:** Europe/Amsterdam');
+  });
+
+  it('appends a timezone field when none exists', () => {
+    const result = setUserMdTimezone('# USER\n- Name:\n', 'Europe/Amsterdam');
+
+    expect(result).toContain('- Name:');
+    expect(result).toContain('- Timezone: Europe/Amsterdam');
+  });
+});
+
+describe('writeUserProfileTimezoneFile', () => {
+  it('creates workspace/USER.md when timezone is configured', () => {
+    const harness = fakeDeps();
+
+    writeUserProfileTimezoneFile({ KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam' }, harness.deps);
+
+    const userWrite = harness.writeCalls.find(call => call.path.includes('USER.md'));
+    expect(userWrite?.data).toContain('- Timezone: Europe/Amsterdam');
+    expect(harness.renameCalls.some(call => call.to === '/root/.openclaw/workspace/USER.md')).toBe(
+      true
+    );
+  });
+
+  it('updates existing workspace/USER.md when timezone is configured', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === '/root/.openclaw/workspace/USER.md'
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# USER\n- Timezone:\n- Notes:\n'
+    );
+
+    writeUserProfileTimezoneFile({ KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam' }, harness.deps);
+
+    const userWrite = harness.writeCalls.find(call => call.path.includes('USER.md'));
+    expect(userWrite?.data).toContain('- Timezone: Europe/Amsterdam');
+    expect(userWrite?.data).toContain('- Notes:');
+  });
+
+  it('does not write workspace/USER.md when timezone is unset', () => {
+    const harness = fakeDeps();
+
+    writeUserProfileTimezoneFile({}, harness.deps);
+
+    expect(harness.writeCalls.some(call => call.path.includes('USER.md'))).toBe(false);
+  });
+});
+
 // ---- runOnboardOrDoctor ----
 
 describe('runOnboardOrDoctor', () => {
@@ -623,12 +700,13 @@ describe('runOnboardOrDoctor', () => {
     expect(onboardCalled).toBe(true);
   });
 
-  it('seeds TOOLS.md on fresh install', () => {
+  it('seeds TOOLS.md and USER.md timezone on fresh install', () => {
     const harness = fakeDeps();
     const env: Record<string, string | undefined> = {
       KILOCODE_API_KEY: 'test-key',
       OPENCLAW_GATEWAY_TOKEN: 'test-token',
       AUTO_APPROVE_DEVICES: 'true',
+      KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam',
     };
 
     (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
@@ -640,6 +718,10 @@ describe('runOnboardOrDoctor', () => {
     const toolsCopy = harness.copyCalls.find(c => c.dest.endsWith('TOOLS.md'));
     expect(toolsCopy).toBeDefined();
     expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/IDENTITY.md'))).toBe(true);
+    expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/USER.md'))).toBe(true);
+    expect(
+      harness.writeCalls.some(call => call.data.includes('- Timezone: Europe/Amsterdam'))
+    ).toBe(true);
   });
 
   it('runs doctor when config exists', () => {

@@ -321,6 +321,9 @@ config --global user.name`. When `GITHUB_EMAIL` is set, the
 3. On first boot, the controller MUST seed
    `/root/.openclaw/workspace/TOOLS.md` from the image-baked copy at
    `/usr/local/share/kiloclaw/TOOLS.md`.
+4. When `KILOCLAW_USER_TIMEZONE` is set, the controller MUST create or
+   update `/root/.openclaw/workspace/USER.md` so its `Timezone` field is
+   set to that IANA timezone.
 
 ### Config Patching
 

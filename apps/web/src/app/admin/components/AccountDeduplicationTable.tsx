@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,13 +25,18 @@ const DEFAULT_MIN_ACCOUNTS = 2;
 export function AccountDeduplicationTable() {
   const [page, setPage] = useState(1);
   const [minAccounts, setMinAccounts] = useState(DEFAULT_MIN_ACCOUNTS);
+  const [hideAllBlocked, setHideAllBlocked] = useState(false);
 
   const { data, isLoading } = useQuery<AccountDeduplicationResponse>({
-    queryKey: ['account-deduplication', page, minAccounts],
+    queryKey: ['account-deduplication', page, minAccounts, hideAllBlocked],
     queryFn: async () => {
-      const res = await fetch(
-        `/admin/api/account-deduplication?page=${page}&limit=${PAGE_SIZE}&minAccounts=${minAccounts}`
-      );
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(PAGE_SIZE),
+        minAccounts: String(minAccounts),
+        hideAllBlocked: String(hideAllBlocked),
+      });
+      const res = await fetch(`/admin/api/account-deduplication?${params}`);
       return res.json() as Promise<AccountDeduplicationResponse>;
     },
   });
@@ -54,7 +60,7 @@ export function AccountDeduplicationTable() {
         )}
       </div>
 
-      <div className="flex items-end gap-3">
+      <div className="flex items-end gap-4">
         <div className="space-y-1">
           <Label htmlFor="min-accounts">Min. accounts per email</Label>
           <Input
@@ -71,6 +77,19 @@ export function AccountDeduplicationTable() {
             }}
             className="w-28"
           />
+        </div>
+        <div className="flex items-center gap-2 pb-1">
+          <Checkbox
+            id="hide-all-blocked"
+            checked={hideAllBlocked}
+            onCheckedChange={checked => {
+              setHideAllBlocked(checked);
+              setPage(1);
+            }}
+          />
+          <Label htmlFor="hide-all-blocked" className="cursor-pointer text-sm font-normal">
+            Hide fully blocked groups
+          </Label>
         </div>
       </div>
 

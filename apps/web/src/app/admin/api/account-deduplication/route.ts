@@ -41,10 +41,16 @@ export async function GET(
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)));
   const minAccounts = Math.max(2, parseInt(searchParams.get('minAccounts') ?? '2', 10));
+  const hideAllBlocked = searchParams.get('hideAllBlocked') === 'true';
 
-  const havingClause = sql`count(*) >= ${minAccounts}`;
+  const havingClauses = [sql`count(*) >= ${minAccounts}`];
+  if (hideAllBlocked) {
+    // Exclude groups where every user is blocked
+    havingClauses.push(sql`count(*) FILTER (WHERE ${kilocode_users.blocked_reason} IS NULL) > 0`);
+  }
+  const havingClause = sql.join(havingClauses, sql` AND `);
 
-  // Count distinct normalized_email values that appear minAccounts or more times
+  // Count distinct normalized_email values that meet the filter criteria
   const countRows = await db
     .select({ normalized_email: kilocode_users.normalized_email })
     .from(kilocode_users)

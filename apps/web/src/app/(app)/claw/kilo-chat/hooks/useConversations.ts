@@ -9,13 +9,12 @@ import { useKiloChatClient } from './useKiloChatClient';
 
 const POLL_INTERVAL = 30_000;
 
-export function useConversations(getToken: () => Promise<string>, sandboxId: string | null) {
+export function useConversations(getToken: () => Promise<string>) {
   const client = useKiloChatClient(getToken);
 
   return useQuery({
-    queryKey: ['kilo-chat', 'conversations', sandboxId],
+    queryKey: ['kilo-chat', 'conversations'],
     queryFn: () => client.fetch<ConversationListResponse>('/v1/conversations'),
-    enabled: !!sandboxId,
     refetchInterval: POLL_INTERVAL,
   });
 }

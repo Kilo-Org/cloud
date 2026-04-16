@@ -98,11 +98,11 @@ export function useDeleteMessage(getToken: () => Promise<string>) {
  */
 export function useMessageCacheUpdater(conversationId: string | null) {
   const queryClient = useQueryClient();
-  const queryKey = ['kilo-chat', 'messages', conversationId];
 
   return useCallback(
     (event: { type: string; data: unknown }) => {
       if (!conversationId) return;
+      const queryKey = ['kilo-chat', 'messages', conversationId];
 
       switch (event.type) {
         case 'message.created': {
@@ -159,6 +159,6 @@ export function useMessageCacheUpdater(conversationId: string | null) {
         }
       }
     },
-    [conversationId, queryClient, queryKey]
+    [conversationId, queryClient]
   );
 }

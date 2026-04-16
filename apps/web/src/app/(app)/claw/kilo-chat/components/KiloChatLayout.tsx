@@ -42,7 +42,7 @@ export function KiloChatLayout({
     instances[0]?.sandboxId ?? null
   );
 
-  const { data, isLoading } = useConversations(getToken, selectedSandboxId);
+  const { data, isLoading } = useConversations(getToken);
   const createConversation = useCreateConversation(getToken);
 
   const handleNewConversation = useCallback(() => {

@@ -39,7 +39,6 @@ import {
   CustomLlmExtraHeadersSchema,
   InterleavedFormatSchema,
   ReasoningEffortSchema,
-  VerbositySchema,
 } from '@kilocode/db/schema-types';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type OpenAI from 'openai';

@@ -236,20 +236,24 @@ export async function resolveInstanceDoKey(
   instanceId?: string
 ): Promise<string> {
   if (instanceId) {
-    try {
-      const resolved = await resolveDoKeyForInstance(env.HYPERDRIVE?.connectionString, instanceId);
-      if (resolved) return resolved;
-    } catch (err) {
-      console.warn(
-        '[platform] Failed to resolve DO key from instanceId, falling back to raw UUID',
-        {
-          userId,
-          instanceId,
-          error: err instanceof Error ? err.message : String(err),
-        }
-      );
+    if (!env.HYPERDRIVE?.connectionString) {
+      throw new Error('Missing database connection for instance DO-key resolution');
     }
-    return instanceId;
+
+    try {
+      const resolved = await resolveDoKeyForInstance(env.HYPERDRIVE.connectionString, instanceId);
+      if (!resolved) {
+        throw new Error(`Instance ${instanceId} not found during DO-key resolution`);
+      }
+      return resolved;
+    } catch (err) {
+      console.warn('[platform] Failed to resolve DO key for instance, aborting request', {
+        userId,
+        instanceId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err instanceof Error ? err : new Error(String(err));
+    }
   }
 
   try {

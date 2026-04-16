@@ -283,7 +283,10 @@ async function bootstrapPersonalSubscription(
     return updated;
   }
 
-  if (personalSubscriptions.length > 0) {
+  const hasActiveEarlybirdAccess =
+    !!earlybirdPurchase && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE).getTime() > now.getTime();
+
+  if (personalSubscriptions.length > 0 && !hasActiveEarlybirdAccess) {
     throw new Error(
       'Cannot bootstrap personal subscription with existing non-access-granting rows'
     );

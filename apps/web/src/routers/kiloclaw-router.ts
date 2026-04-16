@@ -853,8 +853,11 @@ async function ensureProvisionAccess(
       status: kiloclaw_subscriptions.status,
       trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
       suspended_at: kiloclaw_subscriptions.suspended_at,
+      instance_id: kiloclaw_subscriptions.instance_id,
+      organization_id: kiloclaw_instances.organization_id,
     })
     .from(kiloclaw_subscriptions)
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
     .where(eq(kiloclaw_subscriptions.user_id, userId));
 
   if (subscriptions.length === 0 && !earlybird) {
@@ -867,9 +870,13 @@ async function ensureProvisionAccess(
 
   const hasDetachedAccess = subscriptions.some(
     subscription =>
+      subscription.organization_id === null &&
       subscription.status === 'active' ||
-      (subscription.status === 'past_due' && !subscription.suspended_at) ||
-      (subscription.status === 'trialing' &&
+      (subscription.organization_id === null &&
+        subscription.status === 'past_due' &&
+        !subscription.suspended_at) ||
+      (subscription.organization_id === null &&
+        subscription.status === 'trialing' &&
         !!subscription.trial_ends_at &&
         new Date(subscription.trial_ends_at) > now)
   );

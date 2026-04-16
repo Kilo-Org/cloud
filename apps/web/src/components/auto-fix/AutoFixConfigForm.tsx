@@ -20,7 +20,7 @@ import {
   RepositoryMultiSelect,
   type Repository,
 } from '@/components/code-reviews/RepositoryMultiSelect';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 
 type AutoFixConfigFormProps = {
   organizationId?: string;

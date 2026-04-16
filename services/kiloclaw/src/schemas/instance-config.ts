@@ -85,12 +85,29 @@ export type ProviderState = z.infer<typeof ProviderStateSchema>;
 export const KiloExaSearchModeSchema = z.enum(['kilo-proxy', 'disabled']);
 export type KiloExaSearchMode = z.infer<typeof KiloExaSearchModeSchema>;
 
+function isValidUserTimezone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date(0));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const UserTimezoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(100)
+  .refine(isValidUserTimezone, 'Must be a valid IANA timezone');
+
 export const InstanceConfigSchema = z.object({
   envVars: z.record(envVarNameSchema, z.string()).optional(),
   encryptedSecrets: z.record(envVarNameSchema, EncryptedEnvelopeSchema).optional(),
   kilocodeApiKey: z.string().nullable().optional(),
   kilocodeApiKeyExpiresAt: z.string().nullable().optional(),
   kilocodeDefaultModel: z.string().nullable().optional(),
+  userTimezone: UserTimezoneSchema.nullable().optional(),
   webSearch: z
     .object({
       exaMode: KiloExaSearchModeSchema.optional(),
@@ -209,6 +226,7 @@ export const PersistedStateSchema = z.object({
   kilocodeApiKey: z.string().nullable().default(null),
   kilocodeApiKeyExpiresAt: z.string().nullable().default(null),
   kilocodeDefaultModel: z.string().nullable().default(null),
+  userTimezone: UserTimezoneSchema.nullable().default(null),
   kiloExaSearchMode: KiloExaSearchModeSchema.nullable().default(null),
   channels: z
     .object({

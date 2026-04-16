@@ -262,6 +262,32 @@ describe('CloudAgentTransport ticket handling', () => {
 
     transport.destroy();
   });
+
+  it('refreshes an expiring ticket before opening the websocket', async () => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const getTicket = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ticket: 'expiring-ticket',
+        expiresAt: nowSeconds + 5,
+      })
+      .mockResolvedValueOnce({
+        ticket: 'fresh-ticket',
+        expiresAt: nowSeconds + 60,
+      });
+    const { transport } = createTransportWithSinks(getTicket);
+
+    transport.connect();
+    await flushPromises();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(getTicket).toHaveBeenCalledTimes(2);
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+    expect(webSocketConstructor.mock.calls[0]?.[0]).toContain('ticket=fresh-ticket');
+
+    transport.destroy();
+  });
 });
 
 describe('CloudAgentTransport lifecycle', () => {

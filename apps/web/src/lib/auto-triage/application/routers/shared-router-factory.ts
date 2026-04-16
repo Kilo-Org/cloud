@@ -3,7 +3,7 @@ import type { TRPCContext } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type { AutoTriageAgentConfig } from '@/lib/auto-triage/core/schemas';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { DEFAULT_AUTO_TRIAGE_CONFIG } from '@/lib/auto-triage/core/defaults';
 import { AUTO_TRIAGE_CONSTANTS } from '@/lib/auto-triage/core/constants';
 import {

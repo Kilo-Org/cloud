@@ -1,7 +1,7 @@
 import { generateMock } from '@anatine/zod-mock';
 import type { OpenRouterProvider } from '@/components/models/util';
-import type { OpenRouterModel } from '@/lib/providers/openrouter/openrouter-types';
-import { OpenRouterModel as OpenRouterModelSchema } from '@/lib/providers/openrouter/openrouter-types';
+import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { OpenRouterModel as OpenRouterModelSchema } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { mockDataRng as rng, randomChoice, randomBoolean, randomInt } from './random';
 import {
   MODELS,

@@ -5209,6 +5209,134 @@ describe('kilo CLI run routing', () => {
     fetchSpy.mockRestore();
   });
 
+  it('returns { conflict } from startKiloCliRun when instance is not running', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage); // status: 'provisioned', not 'running'
+
+    const result = await instance.startKiloCliRun('fix something');
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_instance_not_running',
+        error: 'Instance is not running',
+      },
+    });
+  });
+
+  it('returns { conflict } from startKiloCliRun when controller returns 409', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'kilo_cli_run_already_active',
+          error: 'A Kilo CLI run is already in progress',
+        }),
+        {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    const result = await instance.startKiloCliRun('fix something');
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_already_active',
+        error: 'A Kilo CLI run is already in progress',
+      },
+    });
+    fetchSpy.mockRestore();
+  });
+
+  it('uses the start-specific code when controller start returns an unstructured 409', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'A Kilo CLI run is already in progress' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.startKiloCliRun('fix something');
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_already_active',
+        error: 'A Kilo CLI run is already in progress',
+      },
+    });
+    fetchSpy.mockRestore();
+  });
+
+  it('returns { conflict } from cancelKiloCliRun when instance is not running', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage); // status: 'provisioned', not 'running'
+
+    const result = await instance.cancelKiloCliRun();
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_instance_not_running',
+        error: 'Instance is not running',
+      },
+    });
+  });
+
+  it('returns { conflict } from cancelKiloCliRun when controller returns 409', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'kilo_cli_run_no_active_run',
+          error: 'No active run to cancel',
+        }),
+        {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    const result = await instance.cancelKiloCliRun();
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_no_active_run',
+        error: 'No active run to cancel',
+      },
+    });
+    fetchSpy.mockRestore();
+  });
+
+  it('uses the cancel-specific code when controller cancel returns an unrecognized 409', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'No active run to cancel' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.cancelKiloCliRun();
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_no_active_run',
+        error: 'No active run to cancel',
+      },
+    });
+    fetchSpy.mockRestore();
+  });
+
   it('cancels a Kilo CLI run for docker-local via controller without flyMachineId', async () => {
     const { instance, storage } = createInstance();
     await seedDockerInstance(storage, { status: 'running' });
@@ -5261,6 +5389,27 @@ describe('provision: auto-start after fresh provision', () => {
       volumeId: 'vol-1',
       region: 'iad',
     });
+  });
+
+  it('persists user timezone from provision config', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', { userTimezone: 'Europe/Amsterdam' });
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('userTimezone')).toBe('Europe/Amsterdam');
+
+    await instance.provision('user-1', { userTimezone: null });
+
+    expect(storage._store.get('userTimezone')).toBeNull();
   });
 
   it('creates the initial volume in the freshly ensured Fly app', async () => {

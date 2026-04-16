@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { OpenRouterModel } from '@/lib/providers/openrouter/openrouter-types';
+import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';

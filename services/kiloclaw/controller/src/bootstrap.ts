@@ -24,6 +24,7 @@ const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
 const TOOLS_MD_DEST = '/root/.openclaw/workspace/TOOLS.md';
 const IDENTITY_MD_DEST = '/root/.openclaw/workspace/IDENTITY.md';
+const USER_MD_DEST = '/root/.openclaw/workspace/USER.md';
 const LEGACY_BOT_IDENTITY_DESTS = ['/root/.openclaw/workspace/BOOTSTRAP.md'];
 
 const ENC_PREFIX = 'KILOCLAW_ENC_';
@@ -297,6 +298,78 @@ export function writeBotIdentityFile(
   }
 }
 
+export function formatUserProfileMarkdown(timezone: string): string {
+  return [
+    '# USER.md - About Your Human',
+    '',
+    'Learn about the person you are helping. Update this as you go.',
+    '',
+    '- Name:',
+    '- What to call them:',
+    '- Pronouns: (optional)',
+    `- Timezone: ${timezone}`,
+    '- Notes:',
+    '',
+    '## Context',
+    '',
+    'What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.',
+    '',
+    '---',
+    '',
+    'The more you know, the better you can help. But remember -- you are learning about a person, not building a dossier. Respect the difference.',
+    '',
+  ].join('\n');
+}
+
+export function setUserMdTimezone(content: string, timezone: string): string {
+  const lines = content.split('\n');
+  const plainTimezoneLine = /^(\s*-\s*Timezone:)\s*.*/i;
+  const boldTimezoneLine = /^(\s*-\s*\*\*Timezone:\*\*)\s*.*/i;
+
+  const updatedLines = lines.map(line => {
+    if (plainTimezoneLine.test(line)) {
+      return line.replace(plainTimezoneLine, `$1 ${timezone}`);
+    }
+    if (boldTimezoneLine.test(line)) {
+      return line.replace(boldTimezoneLine, `$1 ${timezone}`);
+    }
+    return line;
+  });
+
+  if (updatedLines.some((line, index) => line !== lines[index])) {
+    return updatedLines.join('\n');
+  }
+
+  const separator = content.endsWith('\n') ? '' : '\n';
+  return `${content}${separator}\n- Timezone: ${timezone}\n`;
+}
+
+export function writeUserProfileTimezoneFile(
+  env: EnvLike,
+  deps: Pick<
+    BootstrapDeps,
+    'mkdirSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'existsSync' | 'readFileSync'
+  > = defaultDeps
+): void {
+  const timezone = env.KILOCLAW_USER_TIMEZONE;
+  if (!timezone) return;
+
+  deps.mkdirSync(path.dirname(USER_MD_DEST), { recursive: true });
+  const userMdExists = deps.existsSync(USER_MD_DEST);
+  const content = userMdExists
+    ? deps.readFileSync(USER_MD_DEST, 'utf8')
+    : formatUserProfileMarkdown(timezone);
+  const nextContent = userMdExists ? setUserMdTimezone(content, timezone) : content;
+
+  if (userMdExists && nextContent === content) return;
+
+  atomicWrite(USER_MD_DEST, nextContent, {
+    writeFileSync: deps.writeFileSync,
+    renameSync: deps.renameSync,
+    unlinkSync: deps.unlinkSync,
+  });
+}
+
 // ---- Step 5: GitHub config ----
 
 /**
@@ -444,6 +517,7 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   }
 
   writeBotIdentityFile(env, deps);
+  writeUserProfileTimezoneFile(env, deps);
 }
 
 // ---- TOOLS.md bounded-section helper ----

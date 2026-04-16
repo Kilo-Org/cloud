@@ -1269,8 +1269,8 @@ importers:
   services/cloud-agent-next/wrapper:
     dependencies:
       '@kilocode/sdk':
-        specifier: 7.1.17
-        version: 7.1.17
+        specifier: 7.1.23
+        version: 7.1.23
     devDependencies:
       '@types/bun':
         specifier: latest
@@ -4129,9 +4129,6 @@ packages:
 
   '@kilocode/plugin@7.1.23':
     resolution: {integrity: sha512-sFI0rlgQg3mzYP05/gg09IE1mN4QyAXyOlJjM36CFoVKi1bPYz/dqEqr6ddmMNmB577A4gDu0D07hr0pGIFrBA==}
-
-  '@kilocode/sdk@7.1.17':
-    resolution: {integrity: sha512-OMe11pt8m72rUIOrgUn9OEwSl+KlQzOlGD3zDyFutHqxylqXOr0/9IfYtAP5F5fUWYCtYE7SJbXcEbWvIyVhTg==}
 
   '@kilocode/sdk@7.1.23':
     resolution: {integrity: sha512-moSKXqpwE+ozVbNE1aYIUb5Kd7fesOicRUn90WiMlp+8lRhqQc6ZTTIaIB9ZzD7Dak//4bSuo++bb+Jtw3U4Fg==}
@@ -17712,8 +17709,6 @@ snapshots:
     dependencies:
       '@kilocode/sdk': 7.1.23
       zod: 4.1.8
-
-  '@kilocode/sdk@7.1.17': {}
 
   '@kilocode/sdk@7.1.23': {}
 

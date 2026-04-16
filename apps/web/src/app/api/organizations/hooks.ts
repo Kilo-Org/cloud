@@ -7,7 +7,7 @@ import {
   getOrgTrialStatusFromDays,
 } from '@/lib/organizations/trial-utils';
 import { z } from 'zod';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 
 export function useOrganizationWithMembers(id: string, options?: { enabled?: boolean }) {
   const trpc = useTRPC();

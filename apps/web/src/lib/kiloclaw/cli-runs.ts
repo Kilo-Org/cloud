@@ -1,7 +1,7 @@
 import { db } from '@/lib/drizzle';
 import { and, eq, isNull, type SQL } from 'drizzle-orm';
 import { kiloclaw_cli_runs } from '@kilocode/db/schema';
-import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { resolveWorkerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import type { KiloCliRunStatusResponse } from '@/lib/kiloclaw/types';
 
@@ -156,6 +156,19 @@ export function getEmptyCliRunStatus(): CliRunStatusResult {
   };
 }
 
+/**
+ * Cancel a running CLI run, reconciling controller and DB state.
+ *
+ * Limitation: when the controller reports `hasRun: false`, the run's actual
+ * terminal state is already evicted from controller memory. We record the row
+ * as `'failed'` with a sentinel output, even though the run may have completed
+ * successfully just before the cancel arrived. A re-poll cannot recover the
+ * real outcome because the controller has already discarded it. This is a
+ * strict improvement over leaving the row stuck in `'running'` forever, but
+ * callers should be aware that a `'failed'` status with the
+ * `LOST_CONTROLLER_RUN_OUTPUT` sentinel does not necessarily mean the run
+ * actually failed — it means the outcome is unknown.
+ */
 export async function cancelCliRun(params: {
   runId: string;
   userId: string;
@@ -200,12 +213,37 @@ export async function cancelCliRun(params: {
     });
   const cancelControllerRun =
     params.cancelControllerRun ??
-    ((userId: string, workerInstanceId: string | undefined) => {
+    (async (userId: string, workerInstanceId: string | undefined) => {
       if (!client) throw new Error('KiloClaw internal client is not available');
-      return client.cancelKiloCliRun(userId, workerInstanceId);
+      try {
+        return await client.cancelKiloCliRun(userId, workerInstanceId);
+      } catch (err) {
+        // The run finished between our status poll and the cancel request —
+        // the controller rejects with 409. Translate to { ok: false } so the
+        // caller can retry or poll for the terminal state.
+        if (err instanceof KiloClawApiError && err.statusCode === 409) {
+          return { ok: false };
+        }
+        throw err;
+      }
     });
 
   const controllerStatus = await getControllerStatus(params.userId, effectiveWorkerInstanceId);
+  if (!controllerStatus.hasRun) {
+    await persistCliRunControllerStatus({
+      runId: params.runId,
+      userId: params.userId,
+      instanceId: row.instance_id,
+      controllerStatus: {
+        status: 'failed',
+        exitCode: row.exit_code,
+        output: row.output ?? LOST_CONTROLLER_RUN_OUTPUT,
+        completedAt: new Date().toISOString(),
+      },
+    });
+    return { ok: true, runFound: true, cancelled: false };
+  }
+
   if (!isControllerStatusForRun(row, controllerStatus)) {
     // Controller has moved on — persist 'failed' so the row doesn't stay
     // 'running' forever, then report not-cancelled (there's nothing to cancel).
@@ -258,6 +296,14 @@ export async function cancelCliRun(params: {
   return { ok: true, runFound: true, cancelled: didUpdate };
 }
 
+/**
+ * Poll the status of a CLI run, reconciling controller and DB state.
+ *
+ * Limitation: when the controller reports `hasRun: false`, the run's actual
+ * terminal state is already evicted from controller memory. We record the row
+ * as `'failed'` with a sentinel output, even though the run may have completed
+ * successfully. See {@link cancelCliRun} for the same limitation and rationale.
+ */
 export async function getCliRunStatus(params: {
   runId: string;
   userId: string;

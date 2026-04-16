@@ -1,24 +1,13 @@
 import { describe, expect, test } from '@jest/globals';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import {
+  CLAW_ONBOARDING_ERROR_STATUSES,
+  CLAW_ONBOARDING_PROVISIONING_STATUSES,
   type ClawOnboardingFlowStateInput,
   getClawOnboardingFlowState,
   hasPopulatedStatus,
   isPairingChannel,
 } from './ClawOnboardingFlow.state';
-
-const machineStatuses = [
-  'provisioned',
-  'starting',
-  'restarting',
-  'recovering',
-  'running',
-  'stopped',
-  'destroying',
-  'restoring',
-] satisfies NonNullable<KiloClawDashboardStatus['status']>[];
-
-const waitingMachineStatuses = machineStatuses.filter(status => status !== 'running');
 
 function createStatus(status: KiloClawDashboardStatus['status']): KiloClawDashboardStatus {
   return {
@@ -98,15 +87,17 @@ describe('ClawOnboardingFlow state machine', () => {
     expect(state.instanceStatus).toBeNull();
   });
 
-  test('renders identity after provisioning has been requested', () => {
+  test('renders identity immediately after provisioning is requested before status is available', () => {
     const state = getClawOnboardingFlowState(
       createInput({
         createSetupStarted: true,
+        status: undefined,
       })
     );
 
     expect(state.renderStep).toBe('identity');
     expect(state.createSetupActive).toBe(true);
+    expect(state.instanceStatus).toBeNull();
   });
 
   test('keeps create setup active once an instance status exists', () => {
@@ -187,7 +178,7 @@ describe('ClawOnboardingFlow state machine', () => {
     expect(getClawOnboardingFlowState(createInput()).totalSteps).toBe(5);
   });
 
-  test.each(waitingMachineStatuses)(
+  test.each(CLAW_ONBOARDING_PROVISIONING_STATUSES)(
     'renders the post-provisioning spinner while machine status is %s',
     status => {
       const state = getClawOnboardingFlowState(
@@ -199,6 +190,31 @@ describe('ClawOnboardingFlow state machine', () => {
 
       expect(state.renderStep).toBe('provisioning');
       expect(state.postProvisioningReady).toBe(false);
+    }
+  );
+
+  test.each(CLAW_ONBOARDING_ERROR_STATUSES)(
+    'renders an error when machine status is %s',
+    status => {
+      expect(
+        getClawOnboardingFlowState(
+          createInput({
+            mode: 'post-provisioning',
+            status: createStatus(status),
+          })
+        ).renderStep
+      ).toBe('error');
+      expect(
+        getClawOnboardingFlowState(
+          createInput({
+            createSetupStarted: true,
+            onboardingStep: 'provisioning',
+            hasBotIdentity: true,
+            selectedPreset: 'always-ask',
+            status: createStatus(status),
+          })
+        ).renderStep
+      ).toBe('error');
     }
   );
 

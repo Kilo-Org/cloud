@@ -574,6 +574,7 @@ export class SessionService {
       KILOCODE_TOKEN: kilocodeToken,
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
+      KILO_DISABLE_AUTOUPDATE: 'true',
       // Feature attribution for microdollar usage tracking
       KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent',
     };
@@ -660,6 +661,7 @@ export class SessionService {
           options: providerOptions,
         },
       },
+      autoupdate: false,
     };
     // MCP configs are already in CLI-native format — pass through directly
     if (mcpServers && Object.keys(mcpServers).length > 0) {

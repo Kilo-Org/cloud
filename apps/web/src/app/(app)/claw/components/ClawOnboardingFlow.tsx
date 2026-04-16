@@ -54,12 +54,14 @@ export function ClawOnboardingFlow({
   status,
   mode,
   organizationId,
+  createFlowStarted = false,
   onCreateFlowStarted,
   onCreateFlowFailed,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   organizationId?: string;
+  createFlowStarted?: boolean;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
 }) {
@@ -68,6 +70,7 @@ export function ClawOnboardingFlow({
       <ClawOnboardingFlowInner
         status={status}
         mode={mode}
+        createFlowStarted={createFlowStarted}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
       />
@@ -78,11 +81,13 @@ export function ClawOnboardingFlow({
 function ClawOnboardingFlowInner({
   status,
   mode,
+  createFlowStarted,
   onCreateFlowStarted,
   onCreateFlowFailed,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
+  createFlowStarted: boolean;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
 }) {
@@ -99,9 +104,10 @@ function ClawOnboardingFlowInner({
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
-  const [createSetupStarted, setCreateSetupStarted] = useState(false);
+  const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
   const hasCapturedIdentityView = useRef(false);
   const hasCapturedDoneView = useRef(false);
+  const createSetupStarted = createFlowStarted || localCreateSetupStarted;
 
   const stateInput = {
     status,
@@ -115,6 +121,7 @@ function ClawOnboardingFlowInner({
   const preGatewayFlowState = getClawOnboardingFlowState({
     ...stateInput,
     gatewayState: null,
+    debugLogSource: 'pre-gateway',
   });
 
   const personalGateway = useKiloClawGatewayStatus(
@@ -128,6 +135,7 @@ function ClawOnboardingFlowInner({
   const flowState = getClawOnboardingFlowState({
     ...stateInput,
     gatewayState: gatewayStatus?.state ?? null,
+    debugLogSource: 'gateway',
   });
 
   const { data: isServiceDegraded } = useClawServiceDegraded();
@@ -160,13 +168,13 @@ function ClawOnboardingFlowInner({
   }, []);
 
   const handleCreateFlowStarted = useCallback(() => {
-    setCreateSetupStarted(true);
+    setLocalCreateSetupStarted(true);
     resetWizardSelections();
     onCreateFlowStarted?.();
   }, [onCreateFlowStarted, resetWizardSelections]);
 
   const handleCreateFlowFailed = useCallback(() => {
-    setCreateSetupStarted(false);
+    setLocalCreateSetupStarted(false);
     hasCapturedIdentityView.current = false;
     resetWizardSelections();
     onCreateFlowFailed?.();
@@ -304,6 +312,10 @@ function ClawOnboardingFlowInner({
     );
   }
 
+  function renderErrorStep() {
+    return <ClawSetupErrorStep basePath={basePath} />;
+  }
+
   function renderStepContent() {
     const renderStep = flowState.renderStep;
 
@@ -322,6 +334,8 @@ function ClawOnboardingFlowInner({
         return renderPairingStep();
       case 'complete':
         return renderCompleteStep();
+      case 'error':
+        return renderErrorStep();
       default:
         return assertNever(renderStep);
     }
@@ -364,6 +378,42 @@ function ClawOnboardingFlowInner({
         {renderStepContent()}
       </MaybeBillingWrapper>
     </div>
+  );
+}
+
+export function ClawSetupErrorStep({ basePath }: { basePath: string }) {
+  return (
+    <Card className="mt-6 overflow-hidden">
+      <CardContent className="flex flex-col items-center justify-center gap-6 pt-12">
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-destructive/30 bg-destructive/10">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-destructive">
+            <TriangleAlert className="h-6 w-6 text-destructive" />
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center gap-2">
+          <h2 className="text-2xl font-bold">Something went wrong</h2>
+          <p className="text-muted-foreground max-w-md text-center">
+            Your KiloClaw instance stopped during setup. Please reach out to support for help
+            getting it back online.
+          </p>
+        </div>
+
+        <div className="flex w-full flex-col gap-3">
+          <Button asChild variant="primary" className="w-full min-w-[180px] py-6 text-base">
+            <a href="https://kilo.ai/support" target="_blank" rel="noopener noreferrer">
+              Contact Support
+            </a>
+          </Button>
+          <Button asChild className="w-full py-6 text-base" variant="outline">
+            <Link href={basePath}>
+              <X className="mr-2 h-4 w-4" />
+              Close Wizard
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

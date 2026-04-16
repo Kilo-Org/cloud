@@ -256,7 +256,10 @@ function RunDetail({
 }) {
   const trpc = useTRPC();
   const { data, isLoading } = useQuery(
-    trpc.admin.kiloclawInstances.getCliRunOutput.queryOptions({ runId: run.id })
+    trpc.admin.kiloclawInstances.getCliRunOutput.queryOptions({
+      userId: run.user_id,
+      runId: run.id,
+    })
   );
   const output = data?.output ?? null;
 

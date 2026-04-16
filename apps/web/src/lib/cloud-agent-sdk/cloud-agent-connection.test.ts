@@ -18,12 +18,27 @@ function createDeferred<T>() {
   return { promise, resolve };
 }
 
+class MockCloseEvent extends Event {
+  code: number;
+  reason: string;
+  wasClean: boolean;
+
+  constructor(init: { code: number; reason: string; wasClean: boolean }) {
+    super('close');
+    this.code = init.code;
+    this.reason = init.reason;
+    this.wasClean = init.wasClean;
+  }
+}
+
 function emitClose(socket: MockWebSocket, close: Partial<CloseEvent>): void {
-  socket.onclose?.({
-    code: close.code ?? 1006,
-    reason: close.reason ?? '',
-    wasClean: close.wasClean ?? false,
-  } as CloseEvent);
+  socket.onclose?.(
+    new MockCloseEvent({
+      code: close.code ?? 1006,
+      reason: close.reason ?? '',
+      wasClean: close.wasClean ?? false,
+    })
+  );
 }
 
 describe('createConnection', () => {
@@ -86,6 +101,69 @@ describe('createConnection', () => {
     connection.destroy();
 
     expect(webSocketMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes an expiring ticket before opening the websocket', async () => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const onRefreshTicket = jest.fn().mockResolvedValue({
+      ticket: 'new-ticket',
+      expiresAt: nowSeconds + 60,
+    });
+
+    const connection = createConnection({
+      websocketUrl: 'ws://localhost:9999/stream',
+      ticket: {
+        ticket: 'old-ticket',
+        expiresAt: nowSeconds + 5,
+      },
+      onEvent: jest.fn(),
+      onConnected: jest.fn(),
+      onDisconnected: jest.fn(),
+      onRefreshTicket,
+    });
+
+    connection.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onRefreshTicket).toHaveBeenCalledTimes(1);
+    expect(webSocketMock).toHaveBeenCalledTimes(1);
+    expect(sockets[0]?.url).toContain('ticket=new-ticket');
+    expect(sockets[0]?.url).not.toContain('ticket=old-ticket');
+
+    connection.destroy();
+  });
+
+  it('treats ambiguous 1006 as a reconnectable transport failure', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const onRefreshTicket = jest.fn().mockResolvedValue('new-ticket');
+
+    const connection = createConnection({
+      websocketUrl: 'ws://localhost:9999/stream',
+      ticket: 'old-ticket',
+      onEvent: jest.fn(),
+      onConnected: jest.fn(),
+      onDisconnected: jest.fn(),
+      onRefreshTicket,
+    });
+
+    connection.connect();
+
+    const firstSocket = sockets[0];
+    if (firstSocket === undefined) {
+      throw new Error('Expected initial WebSocket');
+    }
+    emitClose(firstSocket, { code: 1006, reason: '' });
+
+    expect(onRefreshTicket).not.toHaveBeenCalled();
+    expect(webSocketMock).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(500);
+
+    expect(webSocketMock).toHaveBeenCalledTimes(2);
+    expect(sockets[1]?.url).toContain('ticket=old-ticket');
+
+    connection.destroy();
   });
 
   it('manual connect() must cancel pending reconnect timer', () => {

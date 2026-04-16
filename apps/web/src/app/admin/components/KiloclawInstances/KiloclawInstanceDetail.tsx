@@ -1014,21 +1014,14 @@ function EventsTable({ rows }: { rows: KiloclawEventRow[] }) {
 
 type InstanceEventsCardProps = {
   sandboxId: string;
-  userId: string;
   flyAppName?: string | null;
   flyMachineId?: string | null;
 };
 
-function AllEventsTabContent({
-  sandboxId,
-  userId,
-  flyAppName,
-  flyMachineId,
-}: InstanceEventsCardProps) {
+function AllEventsTabContent({ sandboxId, flyAppName, flyMachineId }: InstanceEventsCardProps) {
   const [offset, setOffset] = useState(0);
   const { data, isLoading, error } = useKiloclawAllEvents({
     sandboxId,
-    userId,
     flyAppName,
     flyMachineId,
     offset,
@@ -1089,12 +1082,7 @@ function AllEventsTabContent({
   );
 }
 
-function InstanceEventsCard({
-  sandboxId,
-  userId,
-  flyAppName,
-  flyMachineId,
-}: InstanceEventsCardProps) {
+function InstanceEventsCard({ sandboxId, flyAppName, flyMachineId }: InstanceEventsCardProps) {
   const { data, isLoading, error } = useKiloclawInstanceEvents(sandboxId);
 
   return (
@@ -1142,7 +1130,6 @@ function InstanceEventsCard({
           <TabsContent value="all">
             <AllEventsTabContent
               sandboxId={sandboxId}
-              userId={userId}
               flyAppName={flyAppName}
               flyMachineId={flyMachineId}
             />
@@ -1812,19 +1799,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 {formatVolumeUsage(diskUsed, diskTotal, 'used-total')}
               </DetailField>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Technical Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Technical Details</CardTitle>
-            <CardDescription>Internal identifiers</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <DetailField label="Instance ID">
-              <code className="text-sm">{data.id}</code>
-            </DetailField>
             <DetailField label="Type">
               {data.organization_id ? (
                 <Badge
@@ -1842,25 +1817,34 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 </Badge>
               )}
             </DetailField>
+
+            <DetailField label="Instance ID">
+              <code className="text-sm">{data.id}</code>
+            </DetailField>
+
             <DetailField label="User ID">
               <code className="text-sm">{data.user_id}</code>
             </DetailField>
+
             {data.organization_id && (
               <DetailField label="Organization ID">
                 <code className="text-sm">{data.organization_id}</code>
               </DetailField>
             )}
-            <DetailField label="Derived Fly App">
-              <a
-                href={`https://fly.io/apps/${data.derived_fly_app_name}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-blue-600 hover:underline"
-              >
-                <code className="text-sm">{data.derived_fly_app_name}</code>
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </DetailField>
+
+            {data.workerStatus?.flyAppName && (
+              <DetailField label="Fly App">
+                <a
+                  href={`https://fly.io/apps/${data.workerStatus.flyAppName}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                >
+                  <code className="text-sm">{data.workerStatus.flyAppName}</code>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </DetailField>
+            )}
           </CardContent>
         </Card>
 
@@ -2289,12 +2273,95 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <DetailField label="Next Alarm">
                   {formatEpochTime(data.workerStatus.alarmScheduledAt)}
                 </DetailField>
+
+                <DetailField label="App DO Key">
+                  <code className="text-xs">{data.workerStatus.envKeyAppDOKey ?? '—'}</code>
+                </DetailField>
+
+                <DetailField label="App DO Fly App Name">
+                  {data.workerStatus.envKeyAppDOFlyAppName ? (
+                    <code className="text-xs">{data.workerStatus.envKeyAppDOFlyAppName}</code>
+                  ) : (
+                    <span className="text-destructive text-xs font-medium">
+                      null (no Fly secret sync!)
+                    </span>
+                  )}
+                </DetailField>
+
+                <DetailField label="App DO envKeySet">
+                  {data.workerStatus.envKeyAppDOKeySet === null
+                    ? '—'
+                    : data.workerStatus.envKeyAppDOKeySet
+                      ? 'true'
+                      : 'false'}
+                </DetailField>
+
+                {data.workerStatus.envKeyAppDOFlyAppName !== null &&
+                  data.workerStatus.flyAppName !== null &&
+                  data.workerStatus.envKeyAppDOFlyAppName !== data.workerStatus.flyAppName && (
+                    <div className="bg-destructive/10 border-destructive/30 col-span-full rounded-md border p-3">
+                      <p className="text-destructive text-sm font-medium">
+                        Fly app name mismatch: App DO thinks it&apos;s{' '}
+                        <code>{data.workerStatus.envKeyAppDOFlyAppName}</code> but Instance DO has{' '}
+                        <code>{data.workerStatus.flyAppName}</code>. The App DO will set the Fly
+                        secret on the wrong app.
+                      </p>
+                    </div>
+                  )}
+
+                {data.workerStatus.envKeyAppDOFlyAppName === null &&
+                  data.workerStatus.flyAppName !== null && (
+                    <div className="bg-destructive/10 border-destructive/30 col-span-full rounded-md border p-3">
+                      <p className="text-destructive text-sm font-medium">
+                        App DO has no flyAppName — ensureEnvKey() will not call setAppSecret().
+                        Encrypted env vars will use the App DO&apos;s key but the Fly secret will be
+                        stale or missing.
+                      </p>
+                    </div>
+                  )}
               </div>
             ) : !data.workerStatusError ? (
               <p className="text-muted-foreground text-sm">No worker status available</p>
             ) : null}
           </CardContent>
         </Card>
+
+        {data.workerStatus &&
+          (data.workerStatus.lastStartErrorMessage ||
+            data.workerStatus.lastRestartErrorMessage) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Start / Restart Errors</CardTitle>
+                <CardDescription>Most recent start or restart failure</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {data.workerStatus.lastStartErrorMessage && (
+                    <DetailField label="Last Start Error">
+                      <span className="text-destructive text-xs">
+                        <code>{data.workerStatus.lastStartErrorMessage}</code>
+                        <br />
+                        <span className="text-muted-foreground">
+                          {formatEpochTime(data.workerStatus.lastStartErrorAt)}
+                        </span>
+                      </span>
+                    </DetailField>
+                  )}
+                  {data.workerStatus.lastRestartErrorMessage && (
+                    <DetailField label="Last Restart Error">
+                      <span className="text-destructive text-xs">
+                        <code>{data.workerStatus.lastRestartErrorMessage}</code>
+                        <br />
+                        <span className="text-muted-foreground">
+                          {formatEpochTime(data.workerStatus.lastRestartErrorAt)}
+                        </span>
+                      </span>
+                    </DetailField>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
         {data.workerStatus && (
           <Card>
@@ -2389,8 +2456,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         {data.sandbox_id && (
           <InstanceEventsCard
             sandboxId={data.sandbox_id}
-            userId={data.user_id}
-            flyAppName={data.workerStatus?.flyAppName ?? data.derived_fly_app_name}
+            flyAppName={data.workerStatus?.flyAppName}
             flyMachineId={data.workerStatus?.flyMachineId}
           />
         )}

@@ -907,3 +907,67 @@ describe('credit renewal sweep affiliate tracking', () => {
     ]);
   });
 });
+
+describe('soft-deleted user lifecycle exclusion', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('skips subscription expiry processing for soft-deleted users', async () => {
+    const { db, updates, inserts } = createMockDb([
+      [
+        {
+          id: 'sub-1',
+          user_id: 'user-1',
+          instance_id: '11111111-1111-4111-8111-111111111111',
+          sandbox_id: 'ki_11111111111141118111111111111111',
+          email: 'deleted+user-1@deleted.invalid',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '34343434-3434-4434-8434-343434343434',
+        sweep: 'subscription_expiry',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep2_subscription_expiry).toBe(0);
+    expect(updates).toEqual([]);
+    expect(inserts).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('skips earlybird warnings for soft-deleted users', async () => {
+    const { db, inserts } = createMockDb([
+      [{ user_id: 'user-1', email: 'deleted+user-1@deleted.invalid' }],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '56565656-5656-4656-8656-565656565656',
+        sweep: 'earlybird_warning',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.earlybird_warnings).toBe(0);
+    expect(inserts).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

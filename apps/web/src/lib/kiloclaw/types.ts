@@ -24,6 +24,7 @@ export type ProvisionInput = {
   kilocodeApiKey?: string;
   kilocodeApiKeyExpiresAt?: string;
   kilocodeDefaultModel?: string;
+  userTimezone?: string;
   pinnedImageTag?: string;
   provider?: KiloClawProviderId;
 };
@@ -222,6 +223,8 @@ export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   lastDestroyErrorStatus: number | null;
   lastDestroyErrorMessage: string | null;
   lastDestroyErrorAt: number | null;
+  lastStartErrorMessage: string | null;
+  lastStartErrorAt: number | null;
   lastRestartErrorMessage: string | null;
   lastRestartErrorAt: number | null;
   recoveryStartedAt: number | null;
@@ -234,6 +237,10 @@ export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   restoreStartedAt: string | null;
   pendingRestoreVolumeId: string | null;
   instanceReadyEmailSent: boolean;
+  // Env key diagnostics from the App DO
+  envKeyAppDOKey: string | null;
+  envKeyAppDOFlyAppName: string | null;
+  envKeyAppDOKeySet: boolean | null;
 };
 
 export type CleanupRecoveryPreviousVolumeResponse = {

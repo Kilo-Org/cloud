@@ -77,7 +77,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
         return { type: 'read-only', kiloSessionId };
       },
 
-      getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
+      getTicket: async (sessionId: CloudAgentSessionId) => {
         const body: Record<string, string> = { cloudAgentSessionId: sessionId };
         if (organizationId) body.organizationId = organizationId;
         const response = await fetch('/api/cloud-agent-next/sessions/stream-ticket', {
@@ -89,8 +89,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           const errorData = (await response.json()) as { error?: string };
           throw new Error(errorData.error ?? 'Failed to get stream ticket');
         }
-        const result = (await response.json()) as { ticket: string };
-        return result.ticket;
+        return (await response.json()) as { ticket: string; expiresAt: number };
       },
 
       fetchSnapshot: async (id: KiloSessionId) => {

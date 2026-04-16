@@ -11,7 +11,7 @@ type DeviceAuthClientProps = {
 };
 
 export function DeviceAuthClient({ code }: DeviceAuthClientProps) {
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'denied' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const handleAuthorize = async (approved: boolean) => {
@@ -46,6 +46,8 @@ export function DeviceAuthClient({ code }: DeviceAuthClientProps) {
         setErrorMessage(data.error || 'Failed to deny device');
         return;
       }
+      setStatus('denied');
+      return;
     }
     setStatus('success');
   };
@@ -59,6 +61,22 @@ export function DeviceAuthClient({ code }: DeviceAuthClientProps) {
               <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
             </div>
             <CardTitle>Authorization Successful</CardTitle>
+            <CardDescription>You can now close this window</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  if (status === 'denied') {
+    return (
+      <div className="bg-background flex min-h-screen items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900">
+              <XCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
+            </div>
+            <CardTitle>Authorization Denied</CardTitle>
             <CardDescription>You can now close this window</CardDescription>
           </CardHeader>
         </Card>

@@ -1,5 +1,5 @@
 {
-  "id": "594432d5-5994-4207-92e2-cda0099beb46",
+  "id": "ec1a5d28-f965-490a-be3f-d435b11eb768",
   "prevId": "ab8570b8-8cd3-49c2-ad8f-f5c5a99ad4c6",
   "version": "7",
   "dialect": "postgresql",
@@ -8592,7 +8592,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -8641,6 +8641,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "email_type": {
           "name": "email_type",
           "type": "text",
@@ -8656,8 +8662,8 @@
         }
       },
       "indexes": {
-        "UQ_kiloclaw_email_log_user_type": {
-          "name": "UQ_kiloclaw_email_log_user_type",
+        "UQ_kiloclaw_email_log_user_type_global": {
+          "name": "UQ_kiloclaw_email_log_user_type_global",
           "columns": [
             {
               "expression": "user_id",
@@ -8673,6 +8679,35 @@
             }
           ],
           "isUnique": true,
+          "where": "\"kiloclaw_email_log\".\"instance_id\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_kiloclaw_email_log_user_instance_type": {
+          "name": "UQ_kiloclaw_email_log_user_instance_type",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "instance_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "email_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"kiloclaw_email_log\".\"instance_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -8689,7 +8724,20 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "kiloclaw_email_log_instance_id_kiloclaw_instances_id_fk": {
+          "name": "kiloclaw_email_log_instance_id_kiloclaw_instances_id_fk",
+          "tableFrom": "kiloclaw_email_log",
+          "tableTo": "kiloclaw_instances",
+          "columnsFrom": [
+            "instance_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -8962,13 +9010,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'fly'"
-        },
         "organization_id": {
           "name": "organization_id",
           "type": "uuid",
@@ -9024,6 +9065,44 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "IDX_kiloclaw_instances_active_personal_by_user": {
+          "name": "IDX_kiloclaw_instances_active_personal_by_user",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kiloclaw_instances\".\"organization_id\" IS NULL AND \"kiloclaw_instances\".\"destroyed_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_instances_active_org_by_user_org": {
+          "name": "IDX_kiloclaw_instances_active_org_by_user_org",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kiloclaw_instances\".\"organization_id\" IS NOT NULL AND \"kiloclaw_instances\".\"destroyed_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -9037,7 +9116,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "no action",
           "onUpdate": "no action"
         },
         "kiloclaw_instances_organization_id_organizations_id_fk": {
@@ -9057,44 +9136,25 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "kiloclaw_instances_provider_check": {
-          "name": "kiloclaw_instances_provider_check",
-          "value": "\"kiloclaw_instances\".\"provider\" IN ('fly', 'docker-local', 'northflank')"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.kiloclaw_providers": {
-      "name": "kiloclaw_providers",
+    "public.kiloclaw_subscription_change_log": {
+      "name": "kiloclaw_subscription_change_log",
       "schema": "",
       "columns": {
-        "provider": {
-          "name": "provider",
-          "type": "text",
+        "id": {
+          "name": "id",
+          "type": "uuid",
           "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "subscription_id": {
+          "name": "subscription_id",
+          "type": "uuid",
+          "primaryKey": false,
           "notNull": true
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "personal_traffic_percent": {
-          "name": "personal_traffic_percent",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "organization_traffic_percent": {
-          "name": "organization_traffic_percent",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
         },
         "created_at": {
           "name": "created_at",
@@ -9103,31 +9163,107 @@
           "notNull": true,
           "default": "now()"
         },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
+        "actor_type": {
+          "name": "actor_type",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "before_state": {
+          "name": "before_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "after_state": {
+          "name": "after_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
+      "indexes": {
+        "IDX_kiloclaw_subscription_change_log_subscription_created_at": {
+          "name": "IDX_kiloclaw_subscription_change_log_subscription_created_at",
+          "columns": [
+            {
+              "expression": "subscription_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_subscription_change_log_created_at": {
+          "name": "IDX_kiloclaw_subscription_change_log_created_at",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "kiloclaw_subscription_change_log_subscription_id_kiloclaw_subscriptions_id_fk": {
+          "name": "kiloclaw_subscription_change_log_subscription_id_kiloclaw_subscriptions_id_fk",
+          "tableFrom": "kiloclaw_subscription_change_log",
+          "tableTo": "kiloclaw_subscriptions",
+          "columnsFrom": [
+            "subscription_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "kiloclaw_providers_provider_check": {
-          "name": "kiloclaw_providers_provider_check",
-          "value": "\"kiloclaw_providers\".\"provider\" IN ('fly', 'docker-local', 'northflank')"
+        "kiloclaw_subscription_change_log_actor_type_check": {
+          "name": "kiloclaw_subscription_change_log_actor_type_check",
+          "value": "\"kiloclaw_subscription_change_log\".\"actor_type\" IN ('user', 'system')"
         },
-        "kiloclaw_providers_personal_traffic_percent_check": {
-          "name": "kiloclaw_providers_personal_traffic_percent_check",
-          "value": "\"kiloclaw_providers\".\"personal_traffic_percent\" >= 0 AND \"kiloclaw_providers\".\"personal_traffic_percent\" <= 100"
-        },
-        "kiloclaw_providers_organization_traffic_percent_check": {
-          "name": "kiloclaw_providers_organization_traffic_percent_check",
-          "value": "\"kiloclaw_providers\".\"organization_traffic_percent\" >= 0 AND \"kiloclaw_providers\".\"organization_traffic_percent\" <= 100"
+        "kiloclaw_subscription_change_log_action_check": {
+          "name": "kiloclaw_subscription_change_log_action_check",
+          "value": "\"kiloclaw_subscription_change_log\".\"action\" IN ('created', 'status_changed', 'plan_switched', 'period_advanced', 'canceled', 'reactivated', 'suspended', 'destruction_scheduled', 'reassigned', 'backfilled', 'payment_source_changed', 'schedule_changed', 'admin_override')"
         }
       },
       "isRLSEnabled": false
@@ -9164,6 +9300,12 @@
         "instance_id": {
           "name": "instance_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "access_origin": {
+          "name": "access_origin",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -9321,6 +9463,42 @@
           "method": "btree",
           "with": {}
         },
+        "IDX_kiloclaw_subscriptions_user_id": {
+          "name": "IDX_kiloclaw_subscriptions_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_subscriptions_user_status": {
+          "name": "IDX_kiloclaw_subscriptions_user_status",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "IDX_kiloclaw_subscriptions_stripe_schedule_id": {
           "name": "IDX_kiloclaw_subscriptions_stripe_schedule_id",
           "columns": [
@@ -9366,6 +9544,28 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "IDX_kiloclaw_subscriptions_earlybird_origin": {
+          "name": "IDX_kiloclaw_subscriptions_earlybird_origin",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "access_origin",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kiloclaw_subscriptions\".\"access_origin\" = 'earlybird'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -9379,7 +9579,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "no action",
           "onUpdate": "no action"
         },
         "kiloclaw_subscriptions_instance_id_kiloclaw_instances_id_fk": {
@@ -9423,6 +9623,10 @@
         "kiloclaw_subscriptions_status_check": {
           "name": "kiloclaw_subscriptions_status_check",
           "value": "\"kiloclaw_subscriptions\".\"status\" IN ('trialing', 'active', 'past_due', 'canceled', 'unpaid')"
+        },
+        "kiloclaw_subscriptions_access_origin_check": {
+          "name": "kiloclaw_subscriptions_access_origin_check",
+          "value": "\"kiloclaw_subscriptions\".\"access_origin\" IN ('earlybird')"
         },
         "kiloclaw_subscriptions_payment_source_check": {
           "name": "kiloclaw_subscriptions_payment_source_check",
@@ -9493,7 +9697,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "no action",
           "onUpdate": "no action"
         },
         "kiloclaw_version_pins_image_tag_kiloclaw_image_catalog_image_tag_fk": {

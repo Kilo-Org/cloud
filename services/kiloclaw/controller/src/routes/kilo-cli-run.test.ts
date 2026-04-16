@@ -6,6 +6,7 @@ import {
   buildRunPrompt,
   _getActiveRun,
   _resetActiveRun,
+  _resetStartQueue,
 } from './kilo-cli-run';
 
 // Mock child_process.spawn
@@ -62,6 +63,7 @@ describe('/_kilo/cli-run routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     _resetActiveRun();
+    _resetStartQueue();
     app = new Hono();
     registerKiloCliRunRoutes(app, 'test-token');
     // Set env vars needed by the routes
@@ -187,17 +189,25 @@ describe('/_kilo/cli-run routes', () => {
     });
     expect(resp.status).toBe(409);
     const body = (await resp.json()) as Record<string, unknown>;
-    expect(body.error).toContain('already in progress');
+    expect(body).toMatchObject({
+      code: 'kilo_cli_run_already_active',
+      error: expect.stringContaining('already in progress'),
+    });
   });
 
   // ── POST /_kilo/cli-run/cancel ──────────────────────────────────────
 
-  it('returns 404 when cancelling with no active run', async () => {
+  it('returns 409 when cancelling with no active run', async () => {
     const resp = await app.request('/_kilo/cli-run/cancel', {
       method: 'POST',
       headers: authHeaders(),
     });
-    expect(resp.status).toBe(404);
+    expect(resp.status).toBe(409);
+    const body = (await resp.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      code: 'kilo_cli_run_no_active_run',
+      error: 'No active run to cancel',
+    });
   });
 
   it('cancels an active run', async () => {
@@ -220,6 +230,55 @@ describe('/_kilo/cli-run routes', () => {
     const run = _getActiveRun();
     expect(run?.status).toBe('cancelled');
     expect(mockKill).toHaveBeenCalledWith('SIGTERM');
+  });
+
+  // ── Serialized concurrent starts ────────────────────────────────────
+
+  it('serializes concurrent starts: exactly one 200 and one 409', async () => {
+    const [r1, r2] = await Promise.all([
+      app.request('/_kilo/cli-run/start', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ prompt: 'task A' }),
+      }),
+      app.request('/_kilo/cli-run/start', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ prompt: 'task B' }),
+      }),
+    ]);
+
+    const statuses = [r1.status, r2.status].sort((a, b) => a - b);
+    expect(statuses).toEqual([200, 409]);
+  });
+
+  it('queue continues after a failed start attempt', async () => {
+    // Make the first spawn call throw synchronously
+    const spawnMock = vi.mocked(spawn);
+    spawnMock.mockImplementationOnce(() => {
+      throw new Error('spawn failed intentionally');
+    });
+
+    const r1 = await app.request('/_kilo/cli-run/start', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ prompt: 'failing task' }),
+    });
+    // Should get a 500 (spawn threw)
+    expect(r1.status).toBe(500);
+
+    // Run state should not be set to running after the failure
+    expect(_getActiveRun()).toBeNull();
+
+    // Now restore the default spawn mock and try a valid start
+    const r2 = await app.request('/_kilo/cli-run/start', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ prompt: 'recovery task' }),
+    });
+    expect(r2.status).toBe(200);
+    const body = (await r2.json()) as Record<string, unknown>;
+    expect(body.ok).toBe(true);
   });
 
   // ── GET /_kilo/cli-run/status (with active run) ────────────────────

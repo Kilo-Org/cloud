@@ -64,6 +64,17 @@ const WebSearchConfigPatchSchema = z.object({
   exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
 });
 
+const KiloCliRunConflictSchema = z.object({
+  conflict: z.object({
+    code: z.enum([
+      'kilo_cli_run_instance_not_running',
+      'kilo_cli_run_already_active',
+      'kilo_cli_run_no_active_run',
+    ]),
+    error: z.string().min(1),
+  }),
+});
+
 const platform = new Hono<AppEnv>();
 type KiloClawInstanceStub = ReturnType<AppEnv['Bindings']['KILOCLAW_INSTANCE']['get']>;
 
@@ -303,15 +314,31 @@ async function requireProviderCapability(
   return jsonError(`${operation} is not supported for provider ${metadata.provider}`, 400);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isHttpStatus(value: unknown): value is { status: number } {
+  return isRecord(value) && typeof value.status === 'number';
+}
+
+function hasStringCode(value: unknown): value is { code: string } {
+  return isRecord(value) && typeof value.code === 'string';
+}
+
+/** Extract a string `code` from an error or its `.cause`, if present. */
+function getErrorCode(err: unknown): string | undefined {
+  if (hasStringCode(err)) return err.code;
+  if (err instanceof Error && hasStringCode(err.cause)) return err.cause.code;
+  return undefined;
+}
+
 function statusCodeFromError(err: unknown): number {
-  if (
-    typeof err === 'object' &&
-    err !== null &&
-    'status' in err &&
-    typeof (err as { status: unknown }).status === 'number'
-  ) {
-    const status = (err as { status: number }).status;
-    if (status >= 400 && status < 600) return status;
+  // Extract a valid HTTP status from the error or its cause, defaulting to 500.
+  for (const candidate of [err, err instanceof Error ? err.cause : undefined]) {
+    if (isHttpStatus(candidate) && candidate.status >= 400 && candidate.status < 600) {
+      return candidate.status;
+    }
   }
   return 500;
 }
@@ -321,6 +348,20 @@ function jsonError(message: string, status: number, code?: string): Response {
     status,
     headers: { 'content-type': 'application/json' },
   });
+}
+
+function kiloCliRunConflictResponse(response: unknown): Response | undefined {
+  const result = KiloCliRunConflictSchema.safeParse(response);
+  if (result.success) {
+    const { code, error } = result.data.conflict;
+    return jsonError(error, 409, code);
+  }
+
+  if (isRecord(response) && 'conflict' in response) {
+    return jsonError('Invalid Kilo CLI conflict response', 502, 'upstream_invalid_response');
+  }
+
+  return undefined;
 }
 
 /**
@@ -400,13 +441,7 @@ function sanitizeOpenclawConfigError(
   const raw = err instanceof Error ? err.message : 'Unknown error';
   const status = statusCodeFromError(err);
   const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
-  const code =
-    typeof err === 'object' &&
-    err !== null &&
-    'code' in err &&
-    typeof (err as { code?: unknown }).code === 'string'
-      ? (err as { code: string }).code
-      : undefined;
+  const code = getErrorCode(err);
 
   console.error(`[platform] ${operation} failed:`, raw);
 
@@ -479,6 +514,7 @@ platform.post('/provision', async c => {
     kilocodeApiKey,
     kilocodeApiKeyExpiresAt,
     kilocodeDefaultModel,
+    userTimezone,
     machineSize,
     region,
     pinnedImageTag,
@@ -503,6 +539,7 @@ platform.post('/provision', async c => {
             kilocodeApiKey,
             kilocodeApiKeyExpiresAt,
             kilocodeDefaultModel,
+            userTimezone,
             machineSize,
             region,
             pinnedImageTag,
@@ -1394,11 +1431,15 @@ platform.post('/kilo-cli-run/start', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    // The DO returns a discriminated union: success | { conflict } | null.
+    // CF Workers' RPC type wrapping turns this into `Promise<A> | Promise<B>`
+    // instead of `Promise<A | B>`, which breaks narrowing. The `.then(r => r)`
+    // collapses the RPC wrapper back to a plain Promise union.
     const response = await withResolvedDORetry(
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.startKiloCliRun(result.data.prompt),
+      stub => stub.startKiloCliRun(result.data.prompt).then(r => r),
       'startKiloCliRun'
     );
     if (!response) {
@@ -1408,6 +1449,8 @@ platform.post('/kilo-cli-run/start', async c => {
         'controller_route_unavailable'
       );
     }
+    const conflictResponse = kiloCliRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'kilo-cli-run start');
@@ -1445,13 +1488,17 @@ platform.post('/kilo-cli-run/cancel', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    // The DO returns a discriminated union: success | { conflict }.
+    // See startKiloCliRun for the same pattern and the reason for .then(r => r).
     const response = await withResolvedDORetry(
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.cancelKiloCliRun(),
+      stub => stub.cancelKiloCliRun().then(r => r),
       'cancelKiloCliRun'
     );
+    const conflictResponse = kiloCliRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
     return c.json(response, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'kilo-cli-run cancel');

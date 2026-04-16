@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { CRON_SECRET } from '@/lib/config.server';
-import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
+import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
 
 const BETTERSTACK_HEARTBEAT_URL =
   'https://uptime.betterstack.com/api/v1/heartbeat/ofE8LJrqEGcDzh6GTvXK6vWG';

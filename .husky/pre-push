@@ -1,3 +1,48 @@
+if [ "${KILO_CLOUD_AGENT:-}" = "1" ] || [ "${KILO_CLOUD_AGENT:-}" = "true" ]; then
+  base=$(git merge-base origin/main HEAD 2>/dev/null || true)
+
+  if [ -n "$base" ]; then
+    pnpm format:changed
+    scripts/lint-changed.sh "$base"
+
+    if git diff --name-only "$base" --diff-filter=ACMDR -- \
+      '*.ts' \
+      '*.tsx' \
+      '**/tsconfig*.json' \
+      '**/package.json' \
+      'pnpm-workspace.yaml' \
+      | grep -q .; then
+      scripts/typecheck-all.sh --changes-only
+    else
+      echo "[pre-push] KILO_CLOUD_AGENT: no TS/config changes, skipping typecheck"
+    fi
+  else
+    echo "[pre-push] KILO_CLOUD_AGENT: no merge base found, running default checks"
+    pnpm format:check &
+    pid_format=$!
+
+    scripts/lint-all.sh &
+    pid_lint=$!
+
+    scripts/typecheck-all.sh --changes-only &
+    pid_typecheck=$!
+
+    failed=""
+    wait $pid_format || failed="$failed format:check"
+    wait $pid_lint || failed="$failed lint"
+    wait $pid_typecheck || failed="$failed typecheck"
+
+    if [ -n "$failed" ]; then
+      printf >&2 "\npre-push checks failed:%s\n" "$failed"
+      exit 1
+    fi
+  fi
+
+  command -v git-lfs >/dev/null 2>&1 || { printf >&2 "\nThis repository is configured for Git LFS but 'git-lfs' was not found on your path.\n\n"; exit 2; }
+  git lfs pre-push "$@"
+  exit $?
+fi
+
 pnpm format:check &
 pid_format=$!
 
@@ -8,9 +53,9 @@ scripts/typecheck-all.sh --changes-only &
 pid_typecheck=$!
 
 failed=""
-wait $pid_format      || failed="$failed format:check"
-wait $pid_lint        || failed="$failed lint"
-wait $pid_typecheck   || failed="$failed typecheck"
+wait $pid_format || failed="$failed format:check"
+wait $pid_lint || failed="$failed lint"
+wait $pid_typecheck || failed="$failed typecheck"
 
 if [ -n "$failed" ]; then
   printf >&2 "\npre-push checks failed:%s\n" "$failed"

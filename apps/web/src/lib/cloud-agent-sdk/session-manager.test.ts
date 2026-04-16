@@ -10,7 +10,7 @@ import { createCloudAgentSession } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import type { AssistantMessage, UserMessage } from '@/types/opencode.gen';
 import { kiloId, cloudAgentId, stubUserMessage } from './test-helpers';
-import type { ResolvedSession } from './types';
+import type { CloudStatus, ResolvedSession } from './types';
 
 // ---------------------------------------------------------------------------
 // Mock createCloudAgentSession — prevents real WebSocket connections
@@ -33,8 +33,8 @@ const mockSession = {
       return () => {};
     }),
     getActivity: jest.fn(() => ({ type: 'idle' as const })),
-    getStatus: jest.fn(() => ({ type: 'idle' as const })),
-    getCloudStatus: jest.fn(() => null),
+    getStatus: jest.fn<{ type: 'idle' | 'disconnected' }, []>(() => ({ type: 'idle' })),
+    getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
@@ -203,6 +203,8 @@ describe('createSessionManager', () => {
       callback();
       return () => {};
     });
+    mockSession.state.getStatus.mockReturnValue({ type: 'idle' });
+    mockSession.state.getCloudStatus.mockReturnValue(null);
     mockSession.storage = latestStorage;
     latestStorage = null;
     mockSessionCallbacks.onQuestionAsked = undefined;
@@ -381,6 +383,43 @@ describe('createSessionManager', () => {
         variant?: string | null;
       }>(config.store, mgr.atoms.sessionConfig);
       expect(sessionConfig?.variant).toBe(null);
+    });
+
+    it('clears cloud status indicator when cloud status returns to ready', async () => {
+      let subscriptionCallback = (): void => {
+        throw new Error('Expected service state subscription callback');
+      };
+      let cloudStatus: CloudStatus | null = {
+        type: 'preparing',
+        message: 'Setting up environment...',
+      };
+      mockSession.state.getCloudStatus.mockImplementation(() => cloudStatus);
+      mockSession.state.subscribe.mockImplementation(callback => {
+        subscriptionCallback = callback;
+        callback();
+        return () => {};
+      });
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(
+        expect.objectContaining({
+          type: 'progress',
+          message: 'Setting up environment...',
+        })
+      );
+
+      cloudStatus = { type: 'ready' };
+      subscriptionCallback();
+
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toBeNull();
     });
   });
 
@@ -611,6 +650,47 @@ describe('createSessionManager', () => {
       await mgr.send({ prompt: 'My prompt', mode: 'code', model: 'claude-3-5-sonnet' });
 
       expect(onSendFailed).toHaveBeenCalledWith('My prompt');
+    });
+
+    it('preserves disconnected status indicator when send fails after transport disconnect', async () => {
+      const onSendFailed = jest.fn();
+      const config = createMockConfig({ onSendFailed });
+      const mgr = createSessionManager(config);
+
+      mockSession.state.getStatus.mockReturnValue({ type: 'disconnected' });
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+      const disconnectedIndicator = atomValue<{ type: string; message: string } | null>(
+        config.store,
+        mgr.atoms.statusIndicator
+      );
+      expect(disconnectedIndicator).toEqual(
+        expect.objectContaining({
+          type: 'error',
+          message: 'Agent connection lost',
+        })
+      );
+
+      mockSession.send.mockRejectedValue(new Error('Transport disconnected'));
+      const accepted = await mgr.send({
+        prompt: 'My prompt',
+        mode: 'code',
+        model: 'claude-3-5-sonnet',
+      });
+
+      expect(accepted).toBe(false);
+      expect(onSendFailed).toHaveBeenCalledWith('My prompt');
+      expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('My prompt');
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(
+        expect.objectContaining({
+          type: 'error',
+          message: 'Agent connection lost',
+        })
+      );
     });
 
     it('passes variant through to session.send', async () => {

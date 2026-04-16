@@ -68,6 +68,7 @@ ${userPrompt}`;
 // ── Module-level state (one run at a time per machine) ────────────────
 
 let activeRun: RunState | null = null;
+let startQueue: Promise<void> = Promise.resolve();
 
 // ── Request schemas ───────────────────────────────────────────────────
 
@@ -97,6 +98,21 @@ function cleanupRun(
   // Don't null out activeRun — keep it for status queries until a new run starts
 }
 
+/**
+ * This chains each start attempt behind the previous one.
+ *
+ * `then(fn, fn)` ensures the next attempt runs regardless of whether the
+ * previous one resolved or rejected — the queue must never stall.
+ */
+function runStartExclusive<T>(fn: () => Promise<T>): Promise<T> {
+  const next = startQueue.then(fn, fn);
+  startQueue = next.then(
+    () => undefined,
+    () => undefined
+  );
+  return next;
+}
+
 // ── Route registration ────────────────────────────────────────────────
 
 export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void {
@@ -119,11 +135,6 @@ export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void
       return c.json({ error: 'KILO_API_KEY is not configured' }, 400);
     }
 
-    // Enforce one-at-a-time
-    if (activeRun?.status === 'running') {
-      return c.json({ error: 'A kilo CLI run is already in progress' }, 409);
-    }
-
     let body: unknown;
     try {
       body = await c.req.json();
@@ -133,62 +144,75 @@ export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void
 
     const parsed = StartRunBodySchema.safeParse(body);
     if (!parsed.success) {
-      return c.json({ error: 'Invalid request body', details: parsed.error.flatten() }, 400);
+      return c.json({ error: 'Invalid request body', details: z.treeifyError(parsed.error) }, 400);
     }
 
     const { prompt } = parsed.data;
-    const fullPrompt = buildRunPrompt(prompt);
 
-    // Spawn the kilo CLI process
-    // The prompt is passed as a separate argument to avoid shell injection
-    const child = spawn('kilo', ['run', '--auto', fullPrompt], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: process.env,
-    });
-
-    const run: RunState = {
-      process: child,
-      output: '',
-      status: 'running',
-      exitCode: null,
-      startedAt: new Date().toISOString(),
-      completedAt: null,
-      prompt,
-    };
-
-    activeRun = run;
-
-    // Capture stdout
-    child.stdout?.on('data', (chunk: Buffer | string) => {
-      const text = typeof chunk === 'string' ? chunk : chunk.toString();
-      appendOutput(run, text);
-    });
-
-    // Capture stderr (merge into same output buffer)
-    child.stderr?.on('data', (chunk: Buffer | string) => {
-      const text = typeof chunk === 'string' ? chunk : chunk.toString();
-      appendOutput(run, text);
-    });
-
-    child.once('error', err => {
-      console.error('[kilo-cli-run] Process error:', err.message);
-      if (run.status === 'running') {
-        appendOutput(run, `\n[process error: ${err.message}]\n`);
-        cleanupRun(run, null, 'failed');
+    return runStartExclusive(async () => {
+      if (activeRun?.status === 'running') {
+        return c.json(
+          {
+            code: 'kilo_cli_run_already_active',
+            error: 'A Kilo CLI run is already in progress',
+          },
+          409
+        );
       }
-    });
 
-    child.once('close', (code, signal) => {
-      if (run.status !== 'running') return; // already handled by error event
-      console.log(`[kilo-cli-run] Process exited: code=${code} signal=${signal}`);
-      cleanupRun(run, code, code === 0 ? 'completed' : 'failed');
-    });
+      const fullPrompt = buildRunPrompt(prompt);
 
-    console.log(`[kilo-cli-run] Started: pid=${child.pid}, prompt="${prompt.slice(0, 100)}..."`);
+      // Spawn the kilo CLI process
+      // The prompt is passed as a separate argument to avoid shell injection
+      const child = spawn('kilo', ['run', '--auto', fullPrompt], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: process.env,
+      });
 
-    return c.json({
-      ok: true,
-      startedAt: run.startedAt,
+      const run: RunState = {
+        process: child,
+        output: '',
+        status: 'running',
+        exitCode: null,
+        startedAt: new Date().toISOString(),
+        completedAt: null,
+        prompt,
+      };
+
+      activeRun = run;
+
+      // Capture stdout
+      child.stdout?.on('data', (chunk: Buffer | string) => {
+        const text = typeof chunk === 'string' ? chunk : chunk.toString();
+        appendOutput(run, text);
+      });
+
+      // Capture stderr (merge into same output buffer)
+      child.stderr?.on('data', (chunk: Buffer | string) => {
+        const text = typeof chunk === 'string' ? chunk : chunk.toString();
+        appendOutput(run, text);
+      });
+
+      child.once('error', err => {
+        console.error('[kilo-cli-run] Process error:', err.message);
+        if (run.status === 'running') {
+          appendOutput(run, `\n[process error: ${err.message}]\n`);
+          cleanupRun(run, null, 'failed');
+        }
+      });
+
+      child.once('close', (code, signal) => {
+        if (run.status !== 'running') return; // already handled by error event
+        console.log(`[kilo-cli-run] Process exited: code=${code} signal=${signal}`);
+        cleanupRun(run, code, code === 0 ? 'completed' : 'failed');
+      });
+
+      console.log(`[kilo-cli-run] Started: pid=${child.pid}, prompt="${prompt.slice(0, 100)}..."`);
+
+      return c.json({
+        ok: true,
+        startedAt: run.startedAt,
+      });
     });
   });
 
@@ -220,7 +244,7 @@ export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void
   // POST /_kilo/cli-run/cancel — kill the active run
   app.post('/_kilo/cli-run/cancel', c => {
     if (!activeRun || activeRun.status !== 'running') {
-      return c.json({ error: 'No active run to cancel' }, 404);
+      return c.json({ code: 'kilo_cli_run_no_active_run', error: 'No active run to cancel' }, 409);
     }
 
     try {
@@ -251,4 +275,9 @@ export function _getActiveRun(): RunState | null {
 /** Exported for testing. */
 export function _resetActiveRun(): void {
   activeRun = null;
+}
+
+/** Exported for testing. */
+export function _resetStartQueue(): void {
+  startQueue = Promise.resolve();
 }

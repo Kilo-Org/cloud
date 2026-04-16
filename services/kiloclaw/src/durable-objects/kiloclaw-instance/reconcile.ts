@@ -211,7 +211,11 @@ async function reconcileApiKeyExpiry(
 
     const appKey = getAppKey({ userId, sandboxId: state.sandboxId });
     const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
-    const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(appKey);
+    const knownFlyAppName =
+      (state.providerState?.provider === 'fly' ? state.providerState.appName : null) ??
+      state.flyAppName ??
+      undefined;
+    const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(appKey, knownFlyAppName);
     updatedEnv[`${ENCRYPTED_ENV_PREFIX}KILOCODE_API_KEY`] = encryptEnvValue(envKey, freshKey.token);
 
     await fly.updateMachine(

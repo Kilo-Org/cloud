@@ -1,0 +1,83 @@
+import { describe, it, expect } from 'vitest';
+import { Hono } from 'hono';
+import type { AuthContext } from '../auth';
+import { botAuthMiddleware } from '../auth-bot';
+import { deriveGatewayToken } from '../lib/gateway-token';
+
+const SECRET = 'test-gateway-secret';
+
+function createApp() {
+  const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+  app.use('/bot/v1/sandboxes/:sandboxId/*', botAuthMiddleware);
+  app.post('/bot/v1/sandboxes/:sandboxId/messages', c =>
+    c.json({ callerId: c.get('callerId'), callerKind: c.get('callerKind') })
+  );
+  return app;
+}
+
+function mockEnv(overrides: Partial<Env> = {}): Env {
+  return { GATEWAY_TOKEN_SECRET: SECRET, ...overrides } as unknown as Env;
+}
+
+describe('botAuthMiddleware', () => {
+  it('returns 401 when no Authorization header', async () => {
+    const app = createApp();
+    const res = await app.fetch(
+      new Request('http://x/bot/v1/sandboxes/sbx1/messages', { method: 'POST' }),
+      mockEnv()
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 401 when token does not match', async () => {
+    const app = createApp();
+    const res = await app.fetch(
+      new Request('http://x/bot/v1/sandboxes/sbx1/messages', {
+        method: 'POST',
+        headers: { authorization: 'Bearer wrong-token' },
+      }),
+      mockEnv()
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 503 when GATEWAY_TOKEN_SECRET is missing', async () => {
+    const app = createApp();
+    const res = await app.fetch(
+      new Request('http://x/bot/v1/sandboxes/sbx1/messages', {
+        method: 'POST',
+        headers: { authorization: 'Bearer some-token' },
+      }),
+      mockEnv({ GATEWAY_TOKEN_SECRET: undefined as unknown as string })
+    );
+    expect(res.status).toBe(503);
+  });
+
+  it('returns 400 for invalid sandboxId', async () => {
+    const app = createApp();
+    const token = await deriveGatewayToken('../etc/passwd', SECRET);
+    const res = await app.fetch(
+      new Request('http://x/bot/v1/sandboxes/../etc/passwd/messages', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      mockEnv()
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('sets callerId and callerKind on valid token', async () => {
+    const app = createApp();
+    const token = await deriveGatewayToken('sbx1', SECRET);
+    const res = await app.fetch(
+      new Request('http://x/bot/v1/sandboxes/sbx1/messages', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      mockEnv()
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ callerId: 'bot:kiloclaw:sbx1', callerKind: 'bot' });
+  });
+});

@@ -17,7 +17,7 @@ import { ChannelPairingStepView } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
-import { ClawSetupCompleteStep } from './ClawOnboardingFlow';
+import { ClawSetupCompleteStep, ClawSetupErrorStep } from './ClawOnboardingFlow';
 import { CreateInstanceCardView } from './CreateInstanceCard';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStepView } from './ProvisioningStep';
@@ -30,6 +30,7 @@ const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
   provisioning: 'Provisioning',
   pairing: 'Pairing',
   complete: 'Complete',
+  error: 'Error',
 };
 
 const fakeStatus = {
@@ -242,5 +243,7 @@ function renderFakeStep({
       );
     case 'complete':
       return <ClawSetupCompleteStep status={fakeStatus} gatewayReady basePath={basePath} />;
+    case 'error':
+      return <ClawSetupErrorStep basePath={basePath} />;
   }
 }

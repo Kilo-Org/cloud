@@ -18,7 +18,9 @@ const machineStatuses = [
   'restoring',
 ] satisfies NonNullable<KiloClawDashboardStatus['status']>[];
 
-const waitingMachineStatuses = machineStatuses.filter(status => status !== 'running');
+const waitingMachineStatuses = machineStatuses.filter(
+  status => status !== 'running' && status !== 'stopped'
+);
 
 function createStatus(status: KiloClawDashboardStatus['status']): KiloClawDashboardStatus {
   return {
@@ -98,15 +100,17 @@ describe('ClawOnboardingFlow state machine', () => {
     expect(state.instanceStatus).toBeNull();
   });
 
-  test('renders identity after provisioning has been requested', () => {
+  test('renders identity immediately after provisioning is requested before status is available', () => {
     const state = getClawOnboardingFlowState(
       createInput({
         createSetupStarted: true,
+        status: undefined,
       })
     );
 
     expect(state.renderStep).toBe('identity');
     expect(state.createSetupActive).toBe(true);
+    expect(state.instanceStatus).toBeNull();
   });
 
   test('keeps create setup active once an instance status exists', () => {
@@ -201,6 +205,28 @@ describe('ClawOnboardingFlow state machine', () => {
       expect(state.postProvisioningReady).toBe(false);
     }
   );
+
+  test('renders an error when the instance is stopped', () => {
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          mode: 'post-provisioning',
+          status: createStatus('stopped'),
+        })
+      ).renderStep
+    ).toBe('error');
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          createSetupStarted: true,
+          onboardingStep: 'provisioning',
+          hasBotIdentity: true,
+          selectedPreset: 'always-ask',
+          status: createStatus('stopped'),
+        })
+      ).renderStep
+    ).toBe('error');
+  });
 
   test('renders create-instance when post-provisioning has no provisioned DO', () => {
     // status undefined — no DO state at all (e.g. credit enrollment created DB

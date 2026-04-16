@@ -82,7 +82,7 @@ export async function applyResolvedAutoModel(
     if (request.kind === 'messages') {
       request.body.thinking = { type: resolved.reasoning.enabled ? 'adaptive' : 'disabled' };
     } else {
-      request.body.reasoning = resolved.reasoning;
+      request.body.reasoning = { ...resolved.reasoning };
     }
   }
   if (resolved.verbosity) {

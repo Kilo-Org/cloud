@@ -37,6 +37,13 @@ const UpsertContentSchema = z.object({
 
 const DeleteByIdSchema = z.object({ id: z.string().uuid() });
 
+// Explicit timestamp for DO UPDATE SET on conflict-update paths — the
+// $onUpdateFn defined on the schema only fires for Drizzle ORM update()
+// calls, not for the DO UPDATE SET branch of INSERT ... ON CONFLICT.
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
 export const adminSecurityAdvisorContentRouter = createTRPCRouter({
   // ---- Check catalog ----
   checkCatalog: createTRPCRouter({
@@ -49,29 +56,29 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
     }),
 
     upsert: adminProcedure.input(UpsertCheckSchema).mutation(async ({ input }) => {
-      const existing = await db.query.security_advisor_check_catalog.findFirst({
-        where: eq(security_advisor_check_catalog.check_id, input.check_id),
-      });
-
-      let row;
-      if (existing) {
-        const [updated] = await db
-          .update(security_advisor_check_catalog)
-          .set({
+      // Atomic upsert — avoids the TOCTOU race between two concurrent admin
+      // saves for the same check_id (a read-then-write pattern would have
+      // both branches see "no existing row" and both try to insert).
+      const [row] = await db
+        .insert(security_advisor_check_catalog)
+        .values(input)
+        .onConflictDoUpdate({
+          target: security_advisor_check_catalog.check_id,
+          set: {
             severity: input.severity,
             explanation: input.explanation,
             risk: input.risk,
             is_active: input.is_active,
-          })
-          .where(eq(security_advisor_check_catalog.check_id, input.check_id))
-          .returning();
-        row = updated;
-      } else {
-        const [inserted] = await db
-          .insert(security_advisor_check_catalog)
-          .values(input)
-          .returning();
-        row = inserted;
+            updated_at: nowIso(),
+          },
+        })
+        .returning();
+
+      if (!row) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to upsert check catalog entry',
+        });
       }
 
       invalidateSecurityAdvisorContentCache();
@@ -103,29 +110,26 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
     }),
 
     upsert: adminProcedure.input(UpsertCoverageSchema).mutation(async ({ input }) => {
-      const existing = await db.query.security_advisor_kiloclaw_coverage.findFirst({
-        where: eq(security_advisor_kiloclaw_coverage.area, input.area),
-      });
-
-      let row;
-      if (existing) {
-        const [updated] = await db
-          .update(security_advisor_kiloclaw_coverage)
-          .set({
+      const [row] = await db
+        .insert(security_advisor_kiloclaw_coverage)
+        .values(input)
+        .onConflictDoUpdate({
+          target: security_advisor_kiloclaw_coverage.area,
+          set: {
             summary: input.summary,
             detail: input.detail,
             match_check_ids: input.match_check_ids,
             is_active: input.is_active,
-          })
-          .where(eq(security_advisor_kiloclaw_coverage.area, input.area))
-          .returning();
-        row = updated;
-      } else {
-        const [inserted] = await db
-          .insert(security_advisor_kiloclaw_coverage)
-          .values(input)
-          .returning();
-        row = inserted;
+            updated_at: nowIso(),
+          },
+        })
+        .returning();
+
+      if (!row) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to upsert KiloClaw coverage entry',
+        });
       }
 
       invalidateSecurityAdvisorContentCache();
@@ -157,25 +161,25 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
     }),
 
     upsert: adminProcedure.input(UpsertContentSchema).mutation(async ({ input }) => {
-      const existing = await db.query.security_advisor_content.findFirst({
-        where: eq(security_advisor_content.key, input.key),
-      });
-
-      let row;
-      if (existing) {
-        const [updated] = await db
-          .update(security_advisor_content)
-          .set({
+      const [row] = await db
+        .insert(security_advisor_content)
+        .values(input)
+        .onConflictDoUpdate({
+          target: security_advisor_content.key,
+          set: {
             value: input.value,
             description: input.description,
             is_active: input.is_active,
-          })
-          .where(eq(security_advisor_content.key, input.key))
-          .returning();
-        row = updated;
-      } else {
-        const [inserted] = await db.insert(security_advisor_content).values(input).returning();
-        row = inserted;
+            updated_at: nowIso(),
+          },
+        })
+        .returning();
+
+      if (!row) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to upsert content entry',
+        });
       }
 
       invalidateSecurityAdvisorContentCache();

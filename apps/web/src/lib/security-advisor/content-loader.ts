@@ -48,11 +48,18 @@ const CACHE_TTL_MS = process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000;
 
 let cached: { data: LoadedSecurityAdvisorContent; expiresAt: number } | null = null;
 
-const EMPTY_CONTENT: LoadedSecurityAdvisorContent = {
-  checkCatalog: new Map(),
-  kiloclawCoverage: [],
-  content: new Map(),
-};
+/**
+ * Fresh empty content for the degraded-fallback path. Returned as a new
+ * object on every call so a downstream caller that accidentally mutates
+ * the Maps or arrays can't corrupt a shared singleton.
+ */
+function emptyContent(): LoadedSecurityAdvisorContent {
+  return {
+    checkCatalog: new Map(),
+    kiloclawCoverage: [],
+    content: new Map(),
+  };
+}
 
 /**
  * Load security advisor content from the DB, served from an in-process TTL cache.
@@ -77,7 +84,7 @@ export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisor
     // succeeds — just without server-overridden copy.
     // Intentionally NOT caching the empty result, so the next request retries.
     console.error('[SecurityAdvisor] content-loader failed; returning empty content', err);
-    return EMPTY_CONTENT;
+    return emptyContent();
   }
 }
 

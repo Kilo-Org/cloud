@@ -35,6 +35,14 @@ import { toast } from 'sonner';
 import { Plus, Pencil } from 'lucide-react';
 
 type Severity = 'critical' | 'warn' | 'info';
+const VALID_SEVERITIES: readonly Severity[] = ['critical', 'warn', 'info'];
+
+/** Narrow the DB-returned severity string to the Severity union, falling back
+ * to 'warn' on unexpected values. The DB has a CHECK constraint, but we avoid
+ * a bare `as` cast per the repo's type-safety standards. */
+function toSeverity(value: string): Severity {
+  return (VALID_SEVERITIES as readonly string[]).includes(value) ? (value as Severity) : 'warn';
+}
 
 type EditorState = {
   open: boolean;
@@ -94,7 +102,7 @@ export function CheckCatalogPanel() {
         mode: 'edit',
         id: row.id,
         check_id: row.check_id,
-        severity: (row.severity as Severity) ?? 'warn',
+        severity: toSeverity(row.severity),
         explanation: row.explanation,
         risk: row.risk,
         is_active: row.is_active,

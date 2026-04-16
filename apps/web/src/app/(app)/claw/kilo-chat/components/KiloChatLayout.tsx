@@ -39,7 +39,7 @@ export function KiloChatLayout({
 }: KiloChatLayoutProps) {
   const router = useRouter();
   const [selectedSandboxId, setSelectedSandboxId] = useState<string | null>(
-    instances[0]?.sandboxId ?? null,
+    instances[0]?.sandboxId ?? null
   );
 
   const { data, isLoading } = useConversations(getToken, selectedSandboxId);
@@ -50,10 +50,10 @@ export function KiloChatLayout({
     createConversation.mutate(
       { sandboxId: selectedSandboxId },
       {
-        onSuccess: (res) => {
+        onSuccess: res => {
           router.push(`/claw/kilo-chat/${res.conversationId}`);
         },
-      },
+      }
     );
   }, [selectedSandboxId, createConversation, router]);
 

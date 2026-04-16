@@ -92,7 +92,7 @@ export function useSSE({ conversationId, token, onEvent }: UseSSEOptions) {
               }
             }
           }
-        } catch (e) {
+        } catch {
           if (aborted) return;
           await new Promise(r => setTimeout(r, 3000));
         }

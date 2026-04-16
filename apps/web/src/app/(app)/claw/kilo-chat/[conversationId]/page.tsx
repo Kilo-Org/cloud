@@ -1,16 +1,19 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useKiloChatContext } from '../components/KiloChatLayout';
+import { MessageArea } from '../components/MessageArea';
 
-// Placeholder — Task 12 will wire this to MessageArea via useKiloChatContext
 export default function KiloChatConversationPage() {
   const params = useParams<{ conversationId: string }>();
+  const { getToken, currentUserId, token } = useKiloChatContext();
 
   return (
-    <div className="flex h-full items-center justify-center">
-      <p className="text-muted-foreground text-sm">
-        Conversation: {params.conversationId}
-      </p>
-    </div>
+    <MessageArea
+      conversationId={params.conversationId}
+      currentUserId={currentUserId}
+      getToken={getToken}
+      token={token}
+    />
   );
 }

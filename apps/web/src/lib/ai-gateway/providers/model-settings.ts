@@ -57,6 +57,15 @@ export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
 
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   // Inlined to avoid importing anthropic.ts (which transitively pulls in Node.js crypto)
+  if (model === 'anthropic/claude-sonnet-4.7') {
+    return {
+      none: { reasoning: { enabled: false, effort: 'none' } },
+      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
+      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
+      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
+      xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
+    };
+  }
   if (model.startsWith('anthropic/')) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },

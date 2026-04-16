@@ -70,9 +70,9 @@ export default function KiloCliRunPage() {
         icon={<KiloCrabIcon className="text-muted-foreground h-4 w-4" />}
       />
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/claw')}>
+        <Button variant="ghost" size="sm" onClick={() => router.push('/claw/settings')}>
           <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
+          Back to Settings
         </Button>
       </div>
 
@@ -123,8 +123,8 @@ export default function KiloCliRunPage() {
             <p className="text-sm text-red-400">
               {statusQuery.error?.message ?? 'Failed to load run status'}
             </p>
-            <Button variant="outline" size="sm" onClick={() => router.push('/claw')}>
-              Back to Dashboard
+            <Button variant="outline" size="sm" onClick={() => router.push('/claw/settings')}>
+              Back to Settings
             </Button>
           </div>
         )}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Check,
   Cpu,
@@ -30,6 +31,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useKiloCliRunHistory } from '@/hooks/useKiloClaw';
 import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
@@ -85,6 +87,9 @@ export function InstanceControls({
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [confirmRedeploy, setConfirmRedeploy] = useState(false);
   const [redeployMode, setRedeployMode] = useState<'redeploy' | 'upgrade'>('redeploy');
+
+  const router = useRouter();
+  const runHistory = useKiloCliRunHistory(isRunning);
 
   const { updateAvailable, catalogNewerThanImage, latestAvailableVersion, latestVersion } =
     useClawUpdateAvailable(status);
@@ -212,18 +217,18 @@ export function InstanceControls({
           </Badge>
         </div>
       </div>
-      {showUpgradeBanner && (
-        <KiloClawUpdateAvailableBanner
-          className="mb-4"
-          catalogNewerThanImage={catalogNewerThanImage}
-          onUpgrade={() => {
-            setRedeployMode('upgrade');
-            setConfirmRedeploy(true);
-          }}
-          onDismiss={dismissBanner}
-        />
-      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        {showUpgradeBanner && (
+          <KiloClawUpdateAvailableBanner
+            className="w-full"
+            catalogNewerThanImage={catalogNewerThanImage}
+            onUpgrade={() => {
+              setRedeployMode('upgrade');
+              setConfirmRedeploy(true);
+            }}
+            onDismiss={dismissBanner}
+          />
+        )}
         <OpenClawButton
           canShow={isRunning && !!gatewayReady}
           gatewayUrl={gatewayUrl}
@@ -329,8 +334,13 @@ export function InstanceControls({
           variant="outline"
           className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
           disabled={!isRunning || isDestroying || isStarting || isRestarting || isRecovering}
-          onClick={() => {
+          onClick={async () => {
             posthog?.capture('claw_kilo_run_clicked', { instance_status: status.status });
+            const existingRun = runHistory.data?.runs.find(r => r.status === 'running');
+            if (existingRun) {
+              router.push(`/claw/kilo-cli-run/${existingRun.id}`);
+              return;
+            }
             setKiloRunOpen(true);
           }}
         >

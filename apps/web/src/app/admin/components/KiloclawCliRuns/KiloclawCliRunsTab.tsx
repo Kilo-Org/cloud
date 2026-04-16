@@ -22,6 +22,7 @@ import {
   Square,
   Clock,
   Terminal,
+  ShieldAlert,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,7 @@ import { stripAnsi } from '@/lib/stripAnsi';
 const PAGE_SIZE = 25;
 
 type RunStatus = 'all' | 'running' | 'completed' | 'failed' | 'cancelled';
+type InitiatedByFilter = 'all' | 'admin' | 'user';
 
 function StatusBadge({ status }: { status: string }) {
   switch (status) {
@@ -82,6 +84,7 @@ export function CliRunsTab() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RunStatus>('all');
+  const [initiatedByFilter, setInitiatedByFilter] = useState<InitiatedByFilter>('all');
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
@@ -103,6 +106,7 @@ export function CliRunsTab() {
         limit: PAGE_SIZE,
         search: debouncedSearch || undefined,
         status: statusFilter,
+        initiatedBy: initiatedByFilter,
       },
       { staleTime: 10_000 }
     )
@@ -140,6 +144,22 @@ export function CliRunsTab() {
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+        <Select
+          value={initiatedByFilter}
+          onValueChange={v => {
+            setInitiatedByFilter(v as InitiatedByFilter);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="w-[150px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All sources</SelectItem>
+            <SelectItem value="admin">Admin only</SelectItem>
+            <SelectItem value="user">User only</SelectItem>
+          </SelectContent>
+        </Select>
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
         {pagination && (
           <span className="text-muted-foreground ml-auto text-sm">
@@ -167,8 +187,17 @@ export function CliRunsTab() {
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-mono text-xs">
+                  <span className="flex items-center gap-1.5 truncate font-mono text-xs">
                     {run.user_email ?? run.user_id}
+                    {run.initiated_by_admin_id && (
+                      <Badge
+                        variant="outline"
+                        className="border-purple-500/30 px-1 py-0 text-[10px] text-purple-400"
+                      >
+                        <ShieldAlert className="mr-0.5 h-2.5 w-2.5" />
+                        Admin
+                      </Badge>
+                    )}
                   </span>
                   <StatusBadge status={run.status} />
                 </div>
@@ -247,6 +276,8 @@ function RunDetail({
     id: string;
     user_id: string;
     user_email: string | null;
+    initiated_by_admin_id: string | null;
+    initiated_by_admin_email: string | null;
     prompt: string;
     status: string;
     exit_code: number | null;
@@ -268,9 +299,25 @@ function RunDetail({
       {/* Header */}
       <div className="space-y-2 border-b px-4 py-3">
         <div className="flex items-center justify-between">
-          <span className="truncate font-mono text-xs">{run.user_email ?? run.user_id}</span>
+          <span className="flex items-center gap-1.5 truncate font-mono text-xs">
+            {run.user_email ?? run.user_id}
+            {run.initiated_by_admin_id && (
+              <Badge
+                variant="outline"
+                className="border-purple-500/30 px-1 py-0 text-[10px] text-purple-400"
+              >
+                <ShieldAlert className="mr-0.5 h-2.5 w-2.5" />
+                Admin
+              </Badge>
+            )}
+          </span>
           <StatusBadge status={run.status} />
         </div>
+        {run.initiated_by_admin_email && (
+          <p className="text-muted-foreground text-xs">
+            Initiated by: {run.initiated_by_admin_email}
+          </p>
+        )}
         <p className="text-sm">{run.prompt}</p>
         <div className="text-muted-foreground flex items-center gap-2 text-xs">
           <span>Started {formatDistanceToNow(new Date(run.started_at), { addSuffix: true })}</span>

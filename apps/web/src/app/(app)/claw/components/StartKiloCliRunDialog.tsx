@@ -18,16 +18,12 @@ import { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import type { PlatformStatusResponse } from '@/lib/kiloclaw/types';
 import { AnimatedDots } from './AnimatedDots';
 
-function isNeedsRedeployError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'data' in error &&
-    typeof (error as { data?: unknown }).data === 'object' &&
-    (error as { data?: { upstreamCode?: unknown } }).data !== null &&
-    (error as { data: { upstreamCode?: unknown } }).data.upstreamCode ===
-      'controller_route_unavailable'
-  );
+function getErrorUpstreamCode(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('data' in error)) return undefined;
+  const data = (error as Record<string, unknown>).data;
+  if (typeof data !== 'object' || data === null) return undefined;
+  const code = (data as Record<string, unknown>).upstreamCode;
+  return typeof code === 'string' ? code : undefined;
 }
 
 export function StartKiloCliRunDialog({
@@ -45,7 +41,9 @@ export function StartKiloCliRunDialog({
   const startMutation = mutations.startKiloCliRun;
   const redeployMutation = mutations.restartMachine;
 
-  const needsRedeploy = startMutation.isError && isNeedsRedeployError(startMutation.error);
+  const needsRedeploy =
+    startMutation.isError &&
+    getErrorUpstreamCode(startMutation.error) === 'controller_route_unavailable';
   const machineReady = machineStatus === 'running';
 
   // Clear stale "needs redeploy" error when the machine status changes away
@@ -66,6 +64,12 @@ export function StartKiloCliRunDialog({
         onSuccess: data => {
           onOpenChange(false);
           router.push(`/claw/kilo-cli-run/${data.id}`);
+        },
+        onError: err => {
+          // controller_route_unavailable triggers the inline redeploy UI; skip the toast to avoid duplicating it
+          if (getErrorUpstreamCode(err) !== 'controller_route_unavailable') {
+            toast.error(err.message);
+          }
         },
       }
     );
@@ -168,7 +172,7 @@ export function StartKiloCliRunDialog({
                 onKeyDown={e => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault();
-                    handleStart();
+                    void handleStart();
                   }
                 }}
               />

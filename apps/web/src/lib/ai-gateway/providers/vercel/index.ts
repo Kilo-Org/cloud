@@ -6,6 +6,7 @@ import {
   openRouterToVercelInferenceProviderId,
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import type {
   OpenRouterProviderConfig,
   GatewayRequest,
@@ -83,6 +84,13 @@ export async function shouldRouteToVercel(
   if ((request.body.provider?.ignore?.length ?? 0) > 0) {
     console.debug(
       `[shouldRouteToVercel] not routing to Vercel because provider.ignore is not supported`
+    );
+    return false;
+  }
+
+  if (isGemmaModel(requestedModel)) {
+    console.debug(
+      `[shouldRouteToVercel] not routing to Vercel because Gemma preferred provider (novita) has no Vercel mapping`
     );
     return false;
   }

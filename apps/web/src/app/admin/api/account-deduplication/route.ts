@@ -40,14 +40,17 @@ export async function GET(
   const searchParams = request.nextUrl.searchParams;
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)));
+  const minAccounts = Math.max(2, parseInt(searchParams.get('minAccounts') ?? '2', 10));
 
-  // Count distinct normalized_email values that appear more than once
+  const havingClause = sql`count(*) >= ${minAccounts}`;
+
+  // Count distinct normalized_email values that appear minAccounts or more times
   const countRows = await db
     .select({ normalized_email: kilocode_users.normalized_email })
     .from(kilocode_users)
     .where(isNotNull(kilocode_users.normalized_email))
     .groupBy(kilocode_users.normalized_email)
-    .having(sql`count(*) > 1`);
+    .having(havingClause);
 
   const total = countRows.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -59,7 +62,7 @@ export async function GET(
     .from(kilocode_users)
     .where(isNotNull(kilocode_users.normalized_email))
     .groupBy(kilocode_users.normalized_email)
-    .having(sql`count(*) > 1`)
+    .having(havingClause)
     .orderBy(kilocode_users.normalized_email)
     .limit(limit)
     .offset(offset);

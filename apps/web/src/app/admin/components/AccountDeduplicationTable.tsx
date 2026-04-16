@@ -12,19 +12,25 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatRelativeTime, formatMicrodollars } from '@/lib/admin-utils';
 import type { AccountDeduplicationResponse } from '../api/account-deduplication/route';
 
 const PAGE_SIZE = 20;
+const DEFAULT_MIN_ACCOUNTS = 2;
 
 export function AccountDeduplicationTable() {
   const [page, setPage] = useState(1);
+  const [minAccounts, setMinAccounts] = useState(DEFAULT_MIN_ACCOUNTS);
 
   const { data, isLoading } = useQuery<AccountDeduplicationResponse>({
-    queryKey: ['account-deduplication', page],
+    queryKey: ['account-deduplication', page, minAccounts],
     queryFn: async () => {
-      const res = await fetch(`/admin/api/account-deduplication?page=${page}&limit=${PAGE_SIZE}`);
+      const res = await fetch(
+        `/admin/api/account-deduplication?page=${page}&limit=${PAGE_SIZE}&minAccounts=${minAccounts}`
+      );
       return res.json() as Promise<AccountDeduplicationResponse>;
     },
   });
@@ -46,6 +52,26 @@ export function AccountDeduplicationTable() {
             {pagination.total.toLocaleString()} duplicate group{pagination.total !== 1 ? 's' : ''}
           </Badge>
         )}
+      </div>
+
+      <div className="flex items-end gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="min-accounts">Min. accounts per email</Label>
+          <Input
+            id="min-accounts"
+            type="number"
+            min={2}
+            value={minAccounts}
+            onChange={e => {
+              const val = parseInt(e.target.value, 10);
+              if (val >= 2) {
+                setMinAccounts(val);
+                setPage(1);
+              }
+            }}
+            className="w-28"
+          />
+        </div>
       </div>
 
       <div className="rounded-lg border">

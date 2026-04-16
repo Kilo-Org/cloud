@@ -3,13 +3,14 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import {
+  kilocode_users,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
 } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { UpstreamApiError } from '@/lib/trpc/init';
 
@@ -136,11 +137,15 @@ beforeEach(async () => {
 
 /* eslint-disable drizzle/enforce-delete-with-where */
 afterEach(async () => {
+  const userIds = [regularUser.id, adminUser.id, cliRunUser.id];
   await db
     .delete(kiloclaw_admin_audit_logs)
     .where(eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id));
-  await db.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.id, cliRunId));
-  await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, cliRunInstanceId));
+  // Delete cli_runs before instances (cli_runs.instance_id FK → instances)
+  await db.delete(kiloclaw_cli_runs).where(inArray(kiloclaw_cli_runs.user_id, userIds));
+  // Deleting instances cascades to inbound email aliases
+  await db.delete(kiloclaw_instances).where(inArray(kiloclaw_instances.user_id, userIds));
+  await db.delete(kilocode_users).where(inArray(kilocode_users.id, userIds));
 });
 /* eslint-enable drizzle/enforce-delete-with-where */
 

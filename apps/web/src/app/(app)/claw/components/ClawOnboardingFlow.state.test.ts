@@ -1,26 +1,13 @@
 import { describe, expect, test } from '@jest/globals';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import {
+  CLAW_ONBOARDING_ERROR_STATUSES,
+  CLAW_ONBOARDING_PROVISIONING_STATUSES,
   type ClawOnboardingFlowStateInput,
   getClawOnboardingFlowState,
   hasPopulatedStatus,
   isPairingChannel,
 } from './ClawOnboardingFlow.state';
-
-const machineStatuses = [
-  'provisioned',
-  'starting',
-  'restarting',
-  'recovering',
-  'running',
-  'stopped',
-  'destroying',
-  'restoring',
-] satisfies NonNullable<KiloClawDashboardStatus['status']>[];
-
-const waitingMachineStatuses = machineStatuses.filter(
-  status => status !== 'running' && status !== 'stopped'
-);
 
 function createStatus(status: KiloClawDashboardStatus['status']): KiloClawDashboardStatus {
   return {
@@ -191,7 +178,7 @@ describe('ClawOnboardingFlow state machine', () => {
     expect(getClawOnboardingFlowState(createInput()).totalSteps).toBe(5);
   });
 
-  test.each(waitingMachineStatuses)(
+  test.each(CLAW_ONBOARDING_PROVISIONING_STATUSES)(
     'renders the post-provisioning spinner while machine status is %s',
     status => {
       const state = getClawOnboardingFlowState(
@@ -206,27 +193,30 @@ describe('ClawOnboardingFlow state machine', () => {
     }
   );
 
-  test('renders an error when the instance is stopped', () => {
-    expect(
-      getClawOnboardingFlowState(
-        createInput({
-          mode: 'post-provisioning',
-          status: createStatus('stopped'),
-        })
-      ).renderStep
-    ).toBe('error');
-    expect(
-      getClawOnboardingFlowState(
-        createInput({
-          createSetupStarted: true,
-          onboardingStep: 'provisioning',
-          hasBotIdentity: true,
-          selectedPreset: 'always-ask',
-          status: createStatus('stopped'),
-        })
-      ).renderStep
-    ).toBe('error');
-  });
+  test.each(CLAW_ONBOARDING_ERROR_STATUSES)(
+    'renders an error when machine status is %s',
+    status => {
+      expect(
+        getClawOnboardingFlowState(
+          createInput({
+            mode: 'post-provisioning',
+            status: createStatus(status),
+          })
+        ).renderStep
+      ).toBe('error');
+      expect(
+        getClawOnboardingFlowState(
+          createInput({
+            createSetupStarted: true,
+            onboardingStep: 'provisioning',
+            hasBotIdentity: true,
+            selectedPreset: 'always-ask',
+            status: createStatus(status),
+          })
+        ).renderStep
+      ).toBe('error');
+    }
+  );
 
   test('renders create-instance when post-provisioning has no provisioned DO', () => {
     // status undefined — no DO state at all (e.g. credit enrollment created DB

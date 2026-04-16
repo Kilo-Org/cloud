@@ -40,6 +40,17 @@ export const CLAW_ONBOARDING_FAKE_STEPS = [
   'error',
 ] satisfies ClawOnboardingRenderStep[];
 
+export const CLAW_ONBOARDING_PROVISIONING_STATUSES = [
+  'provisioned',
+  'starting',
+  'restarting',
+  'recovering',
+  'destroying',
+  'restoring',
+] satisfies PopulatedClawStatus['status'][];
+
+export const CLAW_ONBOARDING_ERROR_STATUSES = ['stopped'] satisfies PopulatedClawStatus['status'][];
+
 export function parseClawOnboardingFakeStep(value: string | null): ClawOnboardingRenderStep | null {
   for (const step of CLAW_ONBOARDING_FAKE_STEPS) {
     if (value === step) return step;
@@ -79,6 +90,13 @@ export function hasPopulatedStatus(
 
 export function isPairingChannel(channelId: string | null): channelId is PairingChannelId {
   return channelId === 'telegram' || channelId === 'discord';
+}
+
+export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status']): boolean {
+  for (const errorStatus of CLAW_ONBOARDING_ERROR_STATUSES) {
+    if (status === errorStatus) return true;
+  }
+  return false;
 }
 
 export function getClawOnboardingFlowState({
@@ -193,10 +211,10 @@ function getRenderStepDecision({
   hasBotIdentity,
   hasPairingStep,
 }: RenderStepInput): RenderStepDecision {
-  if (instanceStatus?.status === 'stopped') {
+  if (instanceStatus && isClawOnboardingErrorStatus(instanceStatus.status)) {
     return {
       renderStep: 'error',
-      reason: 'instance status is stopped, so setup cannot continue automatically',
+      reason: `instance status is ${instanceStatus.status}, so setup cannot continue automatically`,
     };
   }
 

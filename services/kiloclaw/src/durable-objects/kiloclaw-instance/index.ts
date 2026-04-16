@@ -639,6 +639,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
+    const userTimezone = config.userTimezone ?? this.s.userTimezone ?? null;
+
     const configFields = {
       userId,
       sandboxId,
@@ -650,6 +652,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeApiKey: config.kilocodeApiKey ?? null,
       kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
       kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
+      userTimezone,
       kiloExaSearchMode: config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null,
       channels: config.channels ?? null,
       machineSize: config.machineSize ?? this.s.machineSize ?? null,
@@ -708,6 +711,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.kilocodeApiKey = config.kilocodeApiKey ?? null;
     this.s.kilocodeApiKeyExpiresAt = config.kilocodeApiKeyExpiresAt ?? null;
     this.s.kilocodeDefaultModel = config.kilocodeDefaultModel ?? null;
+    this.s.userTimezone = userTimezone;
     this.s.kiloExaSearchMode = config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null;
     this.s.channels = config.channels ?? null;
     this.s.machineSize = config.machineSize ?? this.s.machineSize ?? null;
@@ -2087,6 +2091,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeApiKey: this.s.kilocodeApiKey ?? undefined,
       kilocodeApiKeyExpiresAt: this.s.kilocodeApiKeyExpiresAt ?? undefined,
       kilocodeDefaultModel: this.s.kilocodeDefaultModel ?? undefined,
+      userTimezone: this.s.userTimezone ?? undefined,
       webSearch: this.s.kiloExaSearchMode
         ? {
             exaMode: this.s.kiloExaSearchMode,

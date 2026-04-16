@@ -134,6 +134,22 @@ const kilocodeDefaultModelSchema = z
     'kilocodeDefaultModel must start with kilocode/ and include a provider'
   );
 
+function isValidUserTimezone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date(0));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const userTimezoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(100)
+  .refine(isValidUserTimezone, 'userTimezone must be a valid IANA timezone');
+
 const channelsSchema = z
   .object({
     telegramBotToken: z.string().optional(),
@@ -149,6 +165,7 @@ const updateConfigSchema = z.object({
   secrets: z.record(z.string(), z.string()).optional(),
   channels: channelsSchema,
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
+  userTimezone: userTimezoneSchema.nullable().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
@@ -407,6 +424,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
             kilocodeApiKey,
             kilocodeApiKeyExpiresAt,
             kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+            userTimezone: input.userTimezone ?? undefined,
             pinnedImageTag: pin?.image_tag,
           },
           { instanceId: instanceRow.id, orgId: input.organizationId }
@@ -469,6 +487,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
           kilocodeApiKey,
           kilocodeApiKeyExpiresAt,
           kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+          userTimezone: input.userTimezone ?? undefined,
           pinnedImageTag: pin?.image_tag,
         },
         { instanceId: instance.id, orgId: input.organizationId }

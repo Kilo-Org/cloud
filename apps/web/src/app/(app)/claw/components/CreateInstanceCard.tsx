@@ -11,6 +11,15 @@ import { Card, CardContent } from '@/components/ui/card';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
+function getBrowserTimeZone(): string | undefined {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return typeof timeZone === 'string' && timeZone.trim() ? timeZone : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 type CreateInstanceCardViewProps = {
   isPending?: boolean;
   onCreate?: () => void;
@@ -135,6 +144,7 @@ export function CreateInstanceCard({
     mutations.provision.mutate(
       {
         kilocodeDefaultModel: `kilocode/${selectedModel}`,
+        userTimezone: getBrowserTimeZone(),
       },
       {
         onError: err => {

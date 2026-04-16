@@ -335,16 +335,17 @@ patches to `openclaw.json`. The patches MUST include:
    URLs).
 6. KiloCode API base URL override from `KILOCODE_API_BASE_URL`.
 7. Default model from `KILOCODE_DEFAULT_MODEL`.
-8. Remove `agents.defaults.models` allowlist (KiloClaw users see all
+8. Agent default user timezone from `KILOCLAW_USER_TIMEZONE`.
+9. Remove `agents.defaults.models` allowlist (KiloClaw users see all
    models).
-9. `tools.profile`: MUST be set to `full` on fresh install or config
-   restore. MUST be preserved on subsequent boots.
-10. Exec policy: host `gateway`, security `allowlist`, ask `on-miss`.
-11. Browser: enabled, headless, noSandbox.
-12. Channel configuration from `TELEGRAM_BOT_TOKEN`,
+10. `tools.profile`: MUST be set to `full` on fresh install or config
+    restore. MUST be preserved on subsequent boots.
+11. Exec policy: host `gateway`, security `allowlist`, ask `on-miss`.
+12. Browser: enabled, headless, noSandbox.
+13. Channel configuration from `TELEGRAM_BOT_TOKEN`,
     `DISCORD_BOT_TOKEN`, `SLACK_BOT_TOKEN`/`SLACK_APP_TOKEN`, with
     corresponding plugin enablement.
-13. Hooks configuration from `KILOCLAW_HOOKS_TOKEN`: enabled,
+14. Hooks configuration from `KILOCLAW_HOOKS_TOKEN`: enabled,
     token, inbound email mapping. When Gmail credentials are present, the
     gmail preset MUST also be enabled.
 

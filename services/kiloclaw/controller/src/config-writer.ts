@@ -270,6 +270,12 @@ export function generateBaseConfig(
     console.log(`Overriding default model: ${env.KILOCODE_DEFAULT_MODEL}`);
   }
 
+  if (env.KILOCLAW_USER_TIMEZONE) {
+    config.agents = config.agents ?? {};
+    config.agents.defaults = config.agents.defaults ?? {};
+    config.agents.defaults.userTimezone = env.KILOCLAW_USER_TIMEZONE;
+  }
+
   // Remove the agents.defaults.models allowlist that `openclaw onboard` creates.
   // When non-empty it restricts visible models to only those listed, hiding the
   // rest of the kilocode catalog. KiloClaw users should see all available models.

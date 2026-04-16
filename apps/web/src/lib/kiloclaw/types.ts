@@ -23,6 +23,7 @@ export type ProvisionInput = {
   kilocodeApiKey?: string;
   kilocodeApiKeyExpiresAt?: string;
   kilocodeDefaultModel?: string;
+  userTimezone?: string;
   pinnedImageTag?: string;
 };
 

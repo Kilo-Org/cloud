@@ -556,6 +556,24 @@ describe('generateBaseConfig', () => {
     expect(config.agents).toBeUndefined();
   });
 
+  it('sets agent user timezone from KILOCLAW_USER_TIMEZONE', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.agents.defaults.userTimezone).toBe('Europe/Amsterdam');
+  });
+
+  it('preserves existing agent user timezone when KILOCLAW_USER_TIMEZONE is not set', () => {
+    const existing = JSON.stringify({
+      agents: { defaults: { userTimezone: 'Asia/Tokyo' } },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.agents.defaults.userTimezone).toBe('Asia/Tokyo');
+  });
+
   it('configures allowed origins from env', () => {
     const { deps } = fakeDeps();
     const env = {

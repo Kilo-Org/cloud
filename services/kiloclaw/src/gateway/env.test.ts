@@ -132,6 +132,23 @@ describe('buildEnvVars', () => {
     expect(result.env.KILOCODE_DEFAULT_MODEL).toBeUndefined();
   });
 
+  it('passes user timezone in env bucket', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      userTimezone: 'Europe/Amsterdam',
+    });
+
+    expect(result.env.KILOCLAW_USER_TIMEZONE).toBe('Europe/Amsterdam');
+    expect(result.sensitive.KILOCLAW_USER_TIMEZONE).toBeUndefined();
+  });
+
+  it('does not set KILOCLAW_USER_TIMEZONE when absent', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {});
+
+    expect(result.env.KILOCLAW_USER_TIMEZONE).toBeUndefined();
+  });
+
   it('puts decrypted secrets in sensitive bucket', async () => {
     const env = createMockEnv({
       AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,

@@ -5391,6 +5391,23 @@ describe('provision: auto-start after fresh provision', () => {
     });
   });
 
+  it('persists user timezone from provision config', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', { userTimezone: 'Europe/Amsterdam' });
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('userTimezone')).toBe('Europe/Amsterdam');
+  });
+
   it('creates the initial volume in the freshly ensured Fly app', async () => {
     const env = createFakeEnv();
     const { instance, waitUntilPromises } = createInstance(undefined, env);

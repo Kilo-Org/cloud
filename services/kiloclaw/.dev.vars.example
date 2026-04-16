@@ -2,7 +2,7 @@
 # The dev-start script creates .dev.vars from this file on first run.
 #
 # Most values below are working defaults. The script auto-manages:
-#   NEXTAUTH_SECRET, INTERNAL_API_SECRET  (synced from Vercel)
+#   NEXTAUTH_SECRET, KILOCLAW_INTERNAL_API_SECRET  (synced from Vercel)
 #   FLY_API_TOKEN                         (auto-created once in .env.local)
 #   KILOCODE_API_BASE_URL                 (set from tunnel URL)
 #
@@ -17,8 +17,8 @@
 # @from NEXTAUTH_SECRET
 NEXTAUTH_SECRET=dev-secret-change-me
 # Platform API authentication key (for internal service-to-service calls)
-# @from INTERNAL_API_SECRET
-INTERNAL_API_SECRET=dev-internal-secret
+# @from KILOCLAW_INTERNAL_API_SECRET
+KILOCLAW_INTERNAL_API_SECRET=dev-internal-secret
 
 # Auth (static defaults — these work as-is for local dev)
 # HMAC secret for deriving per-sandbox gateway tokens (machine authentication)

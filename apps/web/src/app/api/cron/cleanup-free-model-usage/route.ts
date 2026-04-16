@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
-import { asc, lt, lte } from 'drizzle-orm';
+import { asc, lt } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 
 const RETENTION_DAYS = 7;
@@ -30,7 +30,6 @@ export async function GET(request: Request) {
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     // Find the created_at of the BATCH_SIZE-th oldest expired row to use as a batch boundary.
-    // This avoids passing 50k IDs and lets the DELETE use the created_at index directly.
     const boundary = await db
       .select({ created_at: free_model_usage.created_at })
       .from(free_model_usage)
@@ -39,23 +38,15 @@ export async function GET(request: Request) {
       .offset(BATCH_SIZE - 1)
       .limit(1);
 
-    // No boundary row means fewer than BATCH_SIZE expired rows remain — this is the final batch
-    const isFinalBatch = boundary.length === 0;
-    const batchCutoff = isFinalBatch ? cutoffDate : boundary[0].created_at;
+    const batchCutoff = boundary.length > 0 ? boundary[0].created_at : cutoffDate;
 
-    const result = await db
-      .delete(free_model_usage)
-      .where(
-        isFinalBatch
-          ? lt(free_model_usage.created_at, batchCutoff)
-          : lte(free_model_usage.created_at, batchCutoff)
-      );
+    const result = await db.delete(free_model_usage).where(lt(free_model_usage.created_at, batchCutoff));
 
     const deleted = result.rowCount ?? 0;
     totalDeleted += deleted;
     iterations++;
 
-    if (isFinalBatch || deleted === 0) {
+    if (boundary.length === 0 || deleted === 0) {
       break;
     }
 

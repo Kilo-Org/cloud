@@ -33,8 +33,6 @@ export function normalizeToolCallIds(
   }
 }
 
-export const ENABLE_TOOL_REPAIR = true;
-
 function groupByAssistantMessage(messages: OpenAI.ChatCompletionMessageParam[]) {
   const groups = new Array<{
     assistantMessage?: OpenAI.ChatCompletionAssistantMessageParam;

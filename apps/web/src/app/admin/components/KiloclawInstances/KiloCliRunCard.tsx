@@ -171,6 +171,14 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
       },
       onError: err => {
         toast.error(`Failed to start CLI run: ${err.message}`);
+        // On conflict (a run is already in progress), immediately refetch the
+        // run list so the existing running run is discovered and polling kicks in.
+        if (err.data?.code === 'CONFLICT') {
+          setOutputOpen(true);
+          void queryClient.invalidateQueries({
+            queryKey: trpc.admin.kiloclawInstances.listKiloCliRuns.queryKey(),
+          });
+        }
       },
     })
   );

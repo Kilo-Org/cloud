@@ -119,17 +119,20 @@ export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisor
       // Intentionally NOT caching the empty result, so the next request retries.
       console.error('[SecurityAdvisor] content-loader failed; returning empty content', err);
       return emptyContent();
-    } finally {
-      // Only clear inFlight if it still points at THIS load. If an
-      // invalidation happened mid-load, a newer load may have replaced
-      // inFlight; clearing it unconditionally would wipe the newer load
-      // and let subsequent callers fan out into extra parallel queries.
-      if (inFlight === thisLoad) {
-        inFlight = null;
-      }
     }
   })();
   inFlight = thisLoad;
+  // Clear inFlight only if it still points at THIS load. If an invalidation
+  // happened mid-load, a newer load may have replaced inFlight; clearing it
+  // unconditionally would wipe the newer load and let subsequent callers
+  // fan out into extra parallel queries. Attached as a chained .finally
+  // rather than inside the IIFE so `thisLoad` is definitely assigned by the
+  // time the callback reads it (avoids TS2454 self-reference).
+  void thisLoad.finally(() => {
+    if (inFlight === thisLoad) {
+      inFlight = null;
+    }
+  });
   return thisLoad;
 }
 

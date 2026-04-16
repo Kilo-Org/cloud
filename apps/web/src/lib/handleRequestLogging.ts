@@ -4,6 +4,8 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { after } from 'next/server';
 import type { GatewayRequest } from '@/lib/providers/openrouter/types';
 import { kilologHash } from '@/lib/kilologHash';
+import { createHash } from 'crypto';
+import { redisSet } from '@/lib/redis';
 
 const users = [
   '992891e9fe987b8960a05ed0bc9cc456979d1d71410d467f212e6233dbc0a523', // christiaan
@@ -69,10 +71,10 @@ export async function handleRequestLogging(params: {
         //ignore
       }
       try {
-        logExceptInTest(
-          '[handleRequestLogging] request (truncated): ' +
-            JSON.stringify(request.body).substring(0, 4000)
-        );
+        const serialized = JSON.stringify(request.body);
+        const hash = createHash('sha256').update(serialized).digest('hex');
+        await redisSet(`handle-request-logging:${hash}`, serialized, 604800);
+        logExceptInTest('[handleRequestLogging] request hash: ' + hash);
       } catch {
         //ignore
       }

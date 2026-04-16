@@ -134,4 +134,30 @@ describe('KiloChatSSE', () => {
     sse.disconnect();
     expect(sse.isConnected()).toBe(false);
   });
+
+  it('clears lastEventId on disconnect', async () => {
+    const sseData = JSON.stringify({ messageId: 'm1' });
+    const stream1 = createMockStream([`event: message.deleted\nid: evt-99\ndata: ${sseData}\n\n`]);
+    const stream2 = createMockStream([]);
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, body: stream1 })
+      .mockResolvedValueOnce({ ok: true, body: stream2 });
+
+    const sse = new KiloChatSSE(createMockConfig(fetch));
+
+    // Connect to first conversation, receive event with id
+    sse.connect('conv-1', { onMessageDeleted: vi.fn() });
+    await new Promise(r => setTimeout(r, 50));
+    sse.disconnect();
+
+    // Connect to different conversation
+    sse.connect('conv-2', {});
+    await new Promise(r => setTimeout(r, 50));
+    sse.disconnect();
+
+    // Second connect should NOT send Last-Event-ID from first conversation
+    const secondCall = fetch.mock.calls[1];
+    expect(secondCall[1].headers).not.toHaveProperty('Last-Event-ID');
+  });
 });

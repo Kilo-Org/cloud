@@ -1,6 +1,8 @@
-/** Extract the millisecond timestamp encoded in a ULID's first 10 characters. */
+import { decodeTime } from 'ulid';
+
+/** Extract the millisecond timestamp encoded in a ULID. */
 export function ulidToTimestamp(ulid: string): number {
-  return parseInt(ulid.slice(0, 10), 36);
+  return decodeTime(ulid);
 }
 
 /** Extract plain text from an array of content blocks. */

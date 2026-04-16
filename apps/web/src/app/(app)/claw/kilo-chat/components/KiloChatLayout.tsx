@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, createContext, useContext } from 'react';
+import { useState, useCallback, createContext, useContext, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { InstanceSwitcher } from './InstanceSwitcher';
 import { ConversationList } from './ConversationList';
@@ -38,6 +38,12 @@ export function KiloChatLayout({
   const [selectedSandboxId, setSelectedSandboxId] = useState<string | null>(
     instances[0]?.sandboxId ?? null
   );
+
+  useEffect(() => {
+    if (!selectedSandboxId && instances.length > 0) {
+      setSelectedSandboxId(instances[0].sandboxId);
+    }
+  }, [instances, selectedSandboxId]);
 
   const { data, isLoading } = useConversations(getToken);
   const createConversation = useCreateConversation(getToken);

@@ -99,7 +99,9 @@ export function useMessageCacheUpdater(conversationId: string | null) {
               ...data,
               pages: data.pages.map(page =>
                 page.map(msg =>
-                  msg.id === e.messageId ? { ...msg, content: e.content, version: e.version } : msg
+                  msg.id === e.messageId
+                    ? { ...msg, content: e.content, version: e.version, updatedAt: Date.now() }
+                    : msg
                 )
               ),
             };

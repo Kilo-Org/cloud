@@ -13,6 +13,9 @@
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/kilo-chat/src"
   },
+  "dependencies": {
+    "ulid": "3.0.1"
+  },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",

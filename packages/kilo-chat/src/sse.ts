@@ -25,6 +25,7 @@ export class KiloChatSSE {
     this.connected = false;
     this.abortController?.abort();
     this.abortController = null;
+    this.lastEventId = null;
   }
 
   isConnected(): boolean {

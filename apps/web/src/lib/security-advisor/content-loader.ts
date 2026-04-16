@@ -95,7 +95,7 @@ export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisor
     return inFlight;
   }
   const startVersion = cacheVersion;
-  inFlight = (async () => {
+  const thisLoad: Promise<LoadedSecurityAdvisorContent> = (async () => {
     try {
       const data = await loadFromDb();
       // Only write back to `cached` if no invalidation happened while we
@@ -116,10 +116,17 @@ export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisor
       console.error('[SecurityAdvisor] content-loader failed; returning empty content', err);
       return emptyContent();
     } finally {
-      inFlight = null;
+      // Only clear inFlight if it still points at THIS load. If an
+      // invalidation happened mid-load, a newer load may have replaced
+      // inFlight; clearing it unconditionally would wipe the newer load
+      // and let subsequent callers fan out into extra parallel queries.
+      if (inFlight === thisLoad) {
+        inFlight = null;
+      }
     }
   })();
-  return inFlight;
+  inFlight = thisLoad;
+  return thisLoad;
 }
 
 /** Invalidate the in-process cache, forcing the next call to re-query.

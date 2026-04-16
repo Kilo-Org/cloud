@@ -6,7 +6,7 @@ import {
   security_advisor_content,
 } from '@kilocode/db/schema';
 import { invalidateSecurityAdvisorContentCache } from '@/lib/security-advisor/content-loader';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
@@ -110,6 +110,40 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
     }),
 
     upsert: adminProcedure.input(UpsertCoverageSchema).mutation(async ({ input }) => {
+      // Reject if any incoming checkId is already claimed by a different
+      // active coverage row. The load-side `findCoverageForCheckId` picks
+      // deterministically when overlaps exist, but overlaps make the
+      // report content surprising to edit, so catch the mistake at save
+      // time. Uses PostgreSQL array-overlap (&&) for a single indexed
+      // query rather than N per-checkId lookups.
+      if (input.is_active && input.match_check_ids.length > 0) {
+        const conflicting = await db
+          .select({
+            area: security_advisor_kiloclaw_coverage.area,
+            match_check_ids: security_advisor_kiloclaw_coverage.match_check_ids,
+          })
+          .from(security_advisor_kiloclaw_coverage)
+          .where(
+            and(
+              eq(security_advisor_kiloclaw_coverage.is_active, true),
+              ne(security_advisor_kiloclaw_coverage.area, input.area),
+              sql`${security_advisor_kiloclaw_coverage.match_check_ids} && ${input.match_check_ids}::text[]`
+            )
+          );
+        if (conflicting.length > 0) {
+          const overlaps = conflicting
+            .map(c => {
+              const shared = c.match_check_ids.filter(id => input.match_check_ids.includes(id));
+              return `"${c.area}" (shares: ${shared.join(', ')})`;
+            })
+            .join('; ');
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `One or more checkIds are already covered by another active area: ${overlaps}. Remove them from the other area first, or deactivate it.`,
+          });
+        }
+      }
+
       const [row] = await db
         .insert(security_advisor_kiloclaw_coverage)
         .values(input)

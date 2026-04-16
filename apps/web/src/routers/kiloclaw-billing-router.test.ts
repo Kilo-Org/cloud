@@ -356,11 +356,24 @@ describe('getBillingStatus', () => {
     expect(result.trialEligible).toBe(true);
   });
 
-  it('returns trialEligible false when user has an instance row (including destroyed)', async () => {
+  it('returns trialEligible true when user only has a destroyed personal instance row', async () => {
     await db.insert(kiloclaw_instances).values({
       user_id: user.id,
       sandbox_id: 'sandbox-destroyed',
       destroyed_at: new Date().toISOString(),
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result).not.toBeNull();
+    expect(result.trialEligible).toBe(true);
+  });
+
+  it('returns trialEligible false when user has an active personal instance row', async () => {
+    await db.insert(kiloclaw_instances).values({
+      user_id: user.id,
+      sandbox_id: 'sandbox-active',
     });
 
     const caller = await createCallerForUser(user.id);
@@ -1359,6 +1372,36 @@ describe('handleKiloClawSubscriptionCreated', () => {
     expect(row.status).toBe('active');
   });
 
+  it('attaches pre-deploy subscription.created without instanceId metadata to current personal row', async () => {
+    await createWebhookAnchor();
+
+    const subscription = makeStripeSubscription({
+      id: 'sub_predeploy_created',
+      metadata: {
+        type: 'kiloclaw',
+        plan: 'standard',
+        kiloUserId: user.id,
+      },
+      status: 'active',
+      priceId: 'price_standard',
+    });
+
+    await handleKiloClawSubscriptionCreated({
+      eventId: 'evt_predeploy_created',
+      subscription,
+    });
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(row.stripe_subscription_id).toBe('sub_predeploy_created');
+    expect(row.plan).toBe('standard');
+    expect(row.status).toBe('active');
+  });
+
   it('enqueues trial_end affiliate events when a Stripe subscription upgrades a delivered trial', async () => {
     await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
     const instance = await createWebhookAnchor();
@@ -1865,6 +1908,75 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
         }),
       })
     );
+  });
+
+  it('settles pre-deploy invoice.paid without instanceId metadata onto current personal row', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: '2026-04-10T00:00:00.000Z',
+      trial_ends_at: '2026-04-17T00:00:00.000Z',
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      metadata: {
+        type: 'kiloclaw',
+        plan: 'standard',
+        kiloUserId: user.id,
+      },
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+
+    await handleKiloClawInvoicePaid({
+      eventId: 'evt_predeploy_invoice_paid',
+      invoice: {
+        id: 'in_predeploy_paid',
+        amount_paid: 900,
+        currency: 'usd',
+        charge: 'ch_predeploy_paid',
+        parent: {
+          subscription_details: {
+            subscription: 'sub_predeploy_invoice',
+          },
+        },
+        lines: {
+          data: [
+            {
+              pricing: {
+                price_details: {
+                  price: 'price_standard',
+                },
+              },
+              period: {
+                start: Math.floor(new Date('2026-04-01T00:00:00.000Z').getTime() / 1000),
+                end: Math.floor(new Date('2026-05-01T00:00:00.000Z').getTime() / 1000),
+              },
+            },
+          ],
+        },
+        status_transitions: {
+          paid_at: Math.floor(new Date('2026-04-09T10:00:00.000Z').getTime() / 1000),
+        },
+      } as unknown as Stripe.Invoice,
+    });
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(row).toMatchObject({
+      stripe_subscription_id: 'sub_predeploy_invoice',
+      payment_source: 'credits',
+      plan: 'standard',
+      status: 'active',
+      instance_id: instance.id,
+    });
   });
 
   it('settles invoice.paid onto current successor row and clears predecessor Stripe ownership', async () => {

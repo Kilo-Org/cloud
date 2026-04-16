@@ -2862,8 +2862,9 @@ export const kiloclawRouter = createTRPCRouter({
       };
     }
 
-    // Trial eligibility must match ensureProvisionAccess (spec Trial Eligibility
-    // rule 2): no subscription of any kind, including org-backed ones.
+    // Trial eligibility must match ensureProvisionAccess: any subscription of
+    // any kind disqualifies, and only an active personal instance row blocks a
+    // first-time personal trial path.
     const [anySubscription, anyPersonalInstance] = await Promise.all([
       db
         .select({ id: kiloclaw_subscriptions.id })
@@ -2877,7 +2878,8 @@ export const kiloclawRouter = createTRPCRouter({
         .where(
           and(
             eq(kiloclaw_instances.user_id, ctx.user.id),
-            isNull(kiloclaw_instances.organization_id)
+            isNull(kiloclaw_instances.organization_id),
+            isNull(kiloclaw_instances.destroyed_at)
           )
         )
         .limit(1)

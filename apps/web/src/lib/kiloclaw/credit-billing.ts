@@ -36,6 +36,10 @@ import {
   getStripePriceIdForClawPlan,
   getStripePriceIdForClawPlanIntro,
 } from '@/lib/kiloclaw/stripe-price-ids.server';
+import {
+  CurrentPersonalSubscriptionResolutionError,
+  resolveCurrentPersonalSubscriptionRow,
+} from '@/lib/kiloclaw/current-personal-subscription';
 
 const logInfo = sentryLogger('kiloclaw-credit-billing', 'info');
 const logWarning = sentryLogger('kiloclaw-credit-billing', 'warning');
@@ -122,6 +126,30 @@ async function selectCreditSettlementRowByInstanceId(params: {
     .limit(1);
 
   return row ?? null;
+}
+
+async function selectCurrentCreditSettlementRow(
+  tx: CreditBillingTx,
+  userId: string
+): Promise<CreditSettlementPersonalRow | null> {
+  try {
+    const row = await resolveCurrentPersonalSubscriptionRow({ userId, dbOrTx: tx });
+    if (!row) {
+      return null;
+    }
+    return {
+      subscription: row.subscription,
+      organizationId: row.instance?.organizationId ?? null,
+    };
+  } catch (error) {
+    if (error instanceof CurrentPersonalSubscriptionResolutionError) {
+      throw new CreditSettlementResolutionError('multiple_current_rows', {
+        user_id: userId,
+        instance_id: error.instanceId,
+      });
+    }
+    throw error;
+  }
 }
 
 function assertCreditSettlementPersonalRow(
@@ -430,6 +458,15 @@ export async function applyStripeFundedKiloClawPeriod(params: {
           resolvedTarget = await followTransferredCreditSettlementRow({
             tx,
             start: metadataRow,
+            userId,
+          });
+        }
+      } else {
+        const currentRow = await selectCurrentCreditSettlementRow(tx, userId);
+        if (currentRow) {
+          resolvedTarget = await followTransferredCreditSettlementRow({
+            tx,
+            start: currentRow,
             userId,
           });
         }

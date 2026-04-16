@@ -23,6 +23,10 @@ import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import { client as stripe } from '@/lib/stripe-client';
 import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
+import {
+  CurrentPersonalSubscriptionResolutionError,
+  resolveCurrentPersonalSubscriptionRow,
+} from '@/lib/kiloclaw/current-personal-subscription';
 
 const logInfo = sentryLogger('kiloclaw-stripe', 'info');
 const logWarning = sentryLogger('kiloclaw-stripe', 'warning');
@@ -198,6 +202,30 @@ async function selectPersonalSubscriptionByInstanceId(params: {
     .limit(1);
 
   return row ?? null;
+}
+
+async function selectCurrentPersonalSubscriptionTarget(
+  tx: DbTransaction,
+  userId: string
+): Promise<PersonalSubscriptionWithContext | null> {
+  try {
+    const row = await resolveCurrentPersonalSubscriptionRow({ userId, dbOrTx: tx });
+    if (!row) {
+      return null;
+    }
+    return {
+      subscription: row.subscription,
+      organizationId: row.instance?.organizationId ?? null,
+    };
+  } catch (error) {
+    if (error instanceof CurrentPersonalSubscriptionResolutionError) {
+      throw new PersonalStripeResolutionError('multiple_current_rows', {
+        user_id: userId,
+        instance_id: error.instanceId,
+      });
+    }
+    throw error;
+  }
 }
 
 function assertPersonalStripeRow(
@@ -709,6 +737,15 @@ export async function handleKiloClawSubscriptionCreated(params: {
           resolvedTarget = await followTransferredPersonalSubscription({
             tx,
             start: metadataRow,
+            userId: kiloUserId,
+          });
+        }
+      } else {
+        const currentRow = await selectCurrentPersonalSubscriptionTarget(tx, kiloUserId);
+        if (currentRow) {
+          resolvedTarget = await followTransferredPersonalSubscription({
+            tx,
+            start: currentRow,
             userId: kiloUserId,
           });
         }

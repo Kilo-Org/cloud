@@ -2,7 +2,7 @@
 
 import { Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import type { ConversationListItem } from '../types';
+import type { ConversationListItem } from '@kilocode/kilo-chat';
 import { ConversationItem } from './ConversationItem';
 
 type ConversationListProps = {

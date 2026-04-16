@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { Pencil, Trash2, Reply } from 'lucide-react';
-import type { Message, ContentBlock } from '../types';
-import { ulidToTimestamp, contentBlocksToText } from '../utils';
+import type { Message, ContentBlock } from '@kilocode/kilo-chat';
+import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 
 type MessageBubbleProps = {
   message: Message;

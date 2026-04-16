@@ -33,7 +33,11 @@ export class KiloChatClient {
 
   private async request<T>(
     path: string,
-    opts: { method?: string; body?: unknown; query?: Record<string, string | number | undefined> } = {},
+    opts: {
+      method?: string;
+      body?: unknown;
+      query?: Record<string, string | number | undefined>;
+    } = {}
   ): Promise<T> {
     const token = await this.getToken();
     let url = `${this.baseUrl}${path}`;
@@ -77,10 +81,13 @@ export class KiloChatClient {
     return this.request('/v1/conversations', { method: 'POST', body: req });
   }
 
-  async listMessages(conversationId: string, opts?: { before?: string; limit?: number }): Promise<Message[]> {
+  async listMessages(
+    conversationId: string,
+    opts?: { before?: string; limit?: number }
+  ): Promise<Message[]> {
     const res = await this.request<MessageListResponse>(
       `/v1/conversations/${conversationId}/messages`,
-      { query: { before: opts?.before, limit: opts?.limit } },
+      { query: { before: opts?.before, limit: opts?.limit } }
     );
     return res.messages.map(parseMessageRow);
   }

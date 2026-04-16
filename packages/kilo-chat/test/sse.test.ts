@@ -43,7 +43,7 @@ describe('KiloChatSSE', () => {
     const fetch = vi.fn().mockResolvedValueOnce({ ok: true, body: stream });
     const sse = new KiloChatSSE(createMockConfig(fetch));
     sse.connect('conv-1', { onMessageCreated });
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 50));
     sse.disconnect();
     expect(onMessageCreated).toHaveBeenCalledWith({
       messageId: 'm1',
@@ -65,7 +65,7 @@ describe('KiloChatSSE', () => {
     const fetch = vi.fn().mockResolvedValueOnce({ ok: true, body: stream });
     const sse = new KiloChatSSE(createMockConfig(fetch));
     sse.connect('conv-1', { onMessageUpdated });
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 50));
     sse.disconnect();
     expect(onMessageUpdated).toHaveBeenCalledWith({
       messageId: 'm1',
@@ -81,7 +81,7 @@ describe('KiloChatSSE', () => {
     const fetch = vi.fn().mockResolvedValueOnce({ ok: true, body: stream });
     const sse = new KiloChatSSE(createMockConfig(fetch));
     sse.connect('conv-1', { onMessageDeleted });
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 50));
     sse.disconnect();
     expect(onMessageDeleted).toHaveBeenCalledWith({ messageId: 'm1' });
   });
@@ -93,7 +93,7 @@ describe('KiloChatSSE', () => {
     const fetch = vi.fn().mockResolvedValueOnce({ ok: true, body: stream });
     const sse = new KiloChatSSE(createMockConfig(fetch));
     sse.connect('conv-1', { onTyping });
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 50));
     sse.disconnect();
     expect(onTyping).toHaveBeenCalledWith({ memberId: 'bot:kiloclaw:sb1' });
   });
@@ -103,13 +103,13 @@ describe('KiloChatSSE', () => {
     const fetch = vi.fn().mockResolvedValue({ ok: true, body: stream });
     const sse = new KiloChatSSE(createMockConfig(fetch));
     sse.connect('conv-1', {});
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 50));
     sse.disconnect();
     expect(fetch).toHaveBeenCalledWith(
       'https://chat.example.com/v1/conversations/conv-1/events',
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
-      }),
+      })
     );
   });
 
@@ -119,7 +119,7 @@ describe('KiloChatSSE', () => {
     const fetch = vi.fn().mockResolvedValue({ ok: true, body: stream });
     const sse = new KiloChatSSE({ baseUrl: 'https://chat.example.com', getToken, fetch });
     sse.connect('conv-1', {});
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 50));
     sse.disconnect();
     expect(getToken).toHaveBeenCalled();
   });
@@ -129,7 +129,7 @@ describe('KiloChatSSE', () => {
     const fetch = vi.fn().mockResolvedValue({ ok: true, body: stream });
     const sse = new KiloChatSSE(createMockConfig(fetch));
     sse.connect('conv-1', {});
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 50));
     expect(sse.isConnected()).toBe(true);
     sse.disconnect();
     expect(sse.isConnected()).toBe(false);

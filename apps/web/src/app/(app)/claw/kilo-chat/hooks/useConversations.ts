@@ -1,20 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type {
-  ConversationListResponse,
-  ConversationDetailResponse,
-  CreateConversationRequest,
-  CreateConversationResponse,
-} from '../types';
-import { useKiloChatClient } from './useKiloChatClient';
+import { KiloChatClient } from '@kilocode/kilo-chat';
+import type { CreateConversationRequest } from '@kilocode/kilo-chat';
+import { useMemo } from 'react';
+import { KILO_CHAT_URL } from '@/lib/constants';
 
 const POLL_INTERVAL = 30_000;
 
-export function useConversations(getToken: () => Promise<string>) {
-  const client = useKiloChatClient(getToken);
+function useClient(getToken: () => Promise<string>) {
+  return useMemo(() => new KiloChatClient({ baseUrl: KILO_CHAT_URL, getToken }), [getToken]);
+}
 
+export function useConversations(getToken: () => Promise<string>) {
+  const client = useClient(getToken);
   return useQuery({
     queryKey: ['kilo-chat', 'conversations'],
-    queryFn: () => client.fetch<ConversationListResponse>('/v1/conversations'),
+    queryFn: () => client.listConversations(),
     refetchInterval: POLL_INTERVAL,
   });
 }
@@ -23,29 +23,21 @@ export function useConversationDetail(
   getToken: () => Promise<string>,
   conversationId: string | null
 ) {
-  const client = useKiloChatClient(getToken);
-
+  const client = useClient(getToken);
   return useQuery({
     queryKey: ['kilo-chat', 'conversation', conversationId],
-    queryFn: () => client.fetch<ConversationDetailResponse>(`/v1/conversations/${conversationId}`),
+    queryFn: () => client.getConversation(conversationId ?? ''),
     enabled: !!conversationId,
   });
 }
 
 export function useCreateConversation(getToken: () => Promise<string>) {
-  const client = useKiloChatClient(getToken);
+  const client = useClient(getToken);
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (req: CreateConversationRequest) =>
-      client.fetch<CreateConversationResponse>('/v1/conversations', {
-        method: 'POST',
-        body: req,
-      }),
+    mutationFn: (req: CreateConversationRequest) => client.createConversation(req),
     onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ['kilo-chat', 'conversations'],
-      });
+      void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
     },
   });
 }

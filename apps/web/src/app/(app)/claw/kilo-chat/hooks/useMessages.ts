@@ -1,46 +1,29 @@
 import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { KiloChatClient } from '@kilocode/kilo-chat';
 import type {
-  MessageListResponse,
   Message,
-  MessageRow,
-  ContentBlock,
   CreateMessageRequest,
-  CreateMessageResponse,
   EditMessageRequest,
-  EditMessageResponse,
   DeleteMessageRequest,
   MessageCreatedEvent,
   MessageUpdatedEvent,
   MessageDeletedEvent,
-} from '../types';
-import { useKiloChatClient } from './useKiloChatClient';
-import { useCallback } from 'react';
+} from '@kilocode/kilo-chat';
+import { useCallback, useMemo } from 'react';
+import { KILO_CHAT_URL } from '@/lib/constants';
 
 const PAGE_SIZE = 50;
 
-function parseMessageRow(row: MessageRow): Message {
-  return {
-    ...row,
-    content: JSON.parse(row.content) as ContentBlock[],
-  };
+function useClient(getToken: () => Promise<string>) {
+  return useMemo(() => new KiloChatClient({ baseUrl: KILO_CHAT_URL, getToken }), [getToken]);
 }
 
 export function useMessages(getToken: () => Promise<string>, conversationId: string | null) {
-  const client = useKiloChatClient(getToken);
-
+  const client = useClient(getToken);
   return useInfiniteQuery({
     queryKey: ['kilo-chat', 'messages', conversationId],
     queryFn: async ({ pageParam }) => {
-      const res = await client.fetch<MessageListResponse>(
-        `/v1/conversations/${conversationId}/messages`,
-        {
-          query: {
-            ...(pageParam ? { before: pageParam } : {}),
-            limit: String(PAGE_SIZE),
-          },
-        }
-      );
-      return res.messages.map(parseMessageRow);
+      return client.listMessages(conversationId ?? '', { before: pageParam, limit: PAGE_SIZE });
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: lastPage => {
@@ -50,46 +33,31 @@ export function useMessages(getToken: () => Promise<string>, conversationId: str
     enabled: !!conversationId,
     select: data => ({
       ...data,
-      // Flatten pages and reverse so oldest first
       messages: data.pages.flatMap(p => p).reverse(),
     }),
   });
 }
 
 export function useSendMessage(getToken: () => Promise<string>) {
-  const client = useKiloChatClient(getToken);
-
+  const client = useClient(getToken);
   return useMutation({
-    mutationFn: (req: CreateMessageRequest) =>
-      client.fetch<CreateMessageResponse>('/v1/messages', {
-        method: 'POST',
-        body: req,
-      }),
-    // Don't invalidate — SSE will push the new message into cache
+    mutationFn: (req: CreateMessageRequest) => client.sendMessage(req),
   });
 }
 
 export function useEditMessage(getToken: () => Promise<string>) {
-  const client = useKiloChatClient(getToken);
-
+  const client = useClient(getToken);
   return useMutation({
     mutationFn: ({ messageId, ...req }: EditMessageRequest & { messageId: string }) =>
-      client.fetch<EditMessageResponse>(`/v1/messages/${messageId}`, {
-        method: 'PATCH',
-        body: req,
-      }),
+      client.editMessage(messageId, req),
   });
 }
 
 export function useDeleteMessage(getToken: () => Promise<string>) {
-  const client = useKiloChatClient(getToken);
-
+  const client = useClient(getToken);
   return useMutation({
     mutationFn: ({ messageId, ...req }: DeleteMessageRequest & { messageId: string }) =>
-      client.fetch<void>(`/v1/messages/${messageId}`, {
-        method: 'DELETE',
-        body: req,
-      }),
+      client.deleteMessage(messageId, req),
   });
 }
 
@@ -98,12 +66,10 @@ export function useDeleteMessage(getToken: () => Promise<string>) {
  */
 export function useMessageCacheUpdater(conversationId: string | null) {
   const queryClient = useQueryClient();
-
   return useCallback(
     (event: { type: string; data: unknown }) => {
       if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
-
       switch (event.type) {
         case 'message.created': {
           const e = event.data as MessageCreatedEvent;
@@ -120,10 +86,7 @@ export function useMessageCacheUpdater(conversationId: string | null) {
             if (!old || typeof old !== 'object') return old;
             const data = old as { pages: Message[][]; pageParams: unknown[] };
             const firstPage = data.pages[0] ?? [];
-            return {
-              ...data,
-              pages: [[newMessage, ...firstPage], ...data.pages.slice(1)],
-            };
+            return { ...data, pages: [[newMessage, ...firstPage], ...data.pages.slice(1)] };
           });
           break;
         }

@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import type { ConversationListItem } from '../types';
-import { ulidToTimestamp } from '../utils';
+import type { ConversationListItem } from '@kilocode/kilo-chat';
+import { ulidToTimestamp } from '@kilocode/kilo-chat';
 
 type ConversationItemProps = {
   conversation: ConversationListItem;

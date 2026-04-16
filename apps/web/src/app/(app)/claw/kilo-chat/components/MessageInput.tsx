@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Send } from 'lucide-react';
-import type { Message } from '../types';
+import type { Message } from '@kilocode/kilo-chat';
 import { ReplyPreview } from './ReplyPreview';
 
 type MessageInputProps = {

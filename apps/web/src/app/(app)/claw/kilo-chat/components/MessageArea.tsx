@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { Message, ContentBlock } from '../types';
+import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import {
   useMessages,
   useSendMessage,
@@ -16,7 +16,7 @@ import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
 import { BotStatus } from './BotStatus';
-import { KiloChatApiError } from '../hooks/useKiloChatClient';
+import { KiloChatApiError } from '@kilocode/kilo-chat';
 
 type MessageAreaProps = {
   conversationId: string;

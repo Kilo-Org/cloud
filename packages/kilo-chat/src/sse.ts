@@ -103,17 +103,17 @@ export class KiloChatSSE {
     switch (event) {
       case 'message.created':
         handlers.onMessageCreated?.(
-          data as Parameters<NonNullable<SSEEventHandler['onMessageCreated']>>[0],
+          data as Parameters<NonNullable<SSEEventHandler['onMessageCreated']>>[0]
         );
         break;
       case 'message.updated':
         handlers.onMessageUpdated?.(
-          data as Parameters<NonNullable<SSEEventHandler['onMessageUpdated']>>[0],
+          data as Parameters<NonNullable<SSEEventHandler['onMessageUpdated']>>[0]
         );
         break;
       case 'message.deleted':
         handlers.onMessageDeleted?.(
-          data as Parameters<NonNullable<SSEEventHandler['onMessageDeleted']>>[0],
+          data as Parameters<NonNullable<SSEEventHandler['onMessageDeleted']>>[0]
         );
         break;
       case 'typing':
@@ -123,6 +123,6 @@ export class KiloChatSSE {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise((r) => setTimeout(r, ms));
+    return new Promise(r => setTimeout(r, ms));
   }
 }

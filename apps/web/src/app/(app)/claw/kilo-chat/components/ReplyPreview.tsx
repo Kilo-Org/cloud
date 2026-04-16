@@ -1,8 +1,8 @@
 'use client';
 
 import { X } from 'lucide-react';
-import type { Message } from '../types';
-import { contentBlocksToText } from '../utils';
+import type { Message } from '@kilocode/kilo-chat';
+import { contentBlocksToText } from '@kilocode/kilo-chat';
 
 type ReplyPreviewProps = {
   message: Message;

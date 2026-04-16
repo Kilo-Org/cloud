@@ -5,12 +5,29 @@ type GoogleOAuthTokenResponse = {
   scopes: string[];
 };
 
+export type GoogleOAuthAccountStatus = {
+  email: string;
+  client: string;
+  services: string[];
+  scopes: string[];
+  created_at: string;
+  auth: string;
+  profile: 'legacy' | 'kilo_owned';
+  status: string;
+};
+
+type GoogleOAuthStatusResponse = {
+  connected: boolean;
+  accounts: GoogleOAuthAccountStatus[];
+};
+
 type GoogleOAuthTokenProviderOptions = {
   getApiKey: () => string;
   getGatewayToken: () => string;
   getSandboxId: () => string;
   getCheckinUrl: () => string;
   refreshSkewSeconds?: number;
+  migrateLegacy?: () => Promise<boolean>;
 };
 
 type CachedToken = GoogleOAuthTokenResponse & {
@@ -86,12 +103,52 @@ async function fetchFreshToken(
   };
 }
 
+async function fetchStatus(
+  endpoint: string,
+  options: {
+    apiKey: string;
+    gatewayToken: string;
+    sandboxId: string;
+  }
+): Promise<GoogleOAuthStatusResponse> {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${options.apiKey}`,
+      'x-kiloclaw-gateway-token': options.gatewayToken,
+    },
+    body: JSON.stringify({ sandboxId: options.sandboxId }),
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!response.ok) {
+    const error = typeof payload.error === 'string' ? payload.error : 'google_oauth_status_failed';
+    throw new Error(error);
+  }
+
+  const accounts = Array.isArray(payload.accounts)
+    ? payload.accounts.filter((item): item is GoogleOAuthAccountStatus => {
+        if (!item || typeof item !== 'object') return false;
+        const obj = item as Record<string, unknown>;
+        return typeof obj.email === 'string' && typeof obj.client === 'string';
+      })
+    : [];
+
+  return {
+    connected: payload.connected === true,
+    accounts,
+  };
+}
+
 export class GoogleOAuthTokenProvider {
   private readonly refreshSkewMs: number;
 
   private readonly cache = new Map<string, CachedToken>();
 
   private readonly inflight = new Map<string, Promise<CachedToken>>();
+
+  private migrationAttempted = false;
 
   constructor(private readonly options: GoogleOAuthTokenProviderOptions) {
     this.refreshSkewMs = (options.refreshSkewSeconds ?? 300) * 1000;
@@ -129,6 +186,34 @@ export class GoogleOAuthTokenProvider {
       sandboxId: this.options.getSandboxId(),
       capabilities: normalizedCapabilities,
     })
+      .catch(async error => {
+        const message = error instanceof Error ? error.message : String(error);
+        const shouldTryMigration =
+          !this.migrationAttempted &&
+          typeof this.options.migrateLegacy === 'function' &&
+          (message.includes('Google OAuth is not connected for this instance') ||
+            message.includes('google_oauth_broker_failed'));
+
+        if (shouldTryMigration) {
+          this.migrationAttempted = true;
+          const migrateLegacy = this.options.migrateLegacy;
+          if (!migrateLegacy) {
+            throw error;
+          }
+
+          const migrated = await migrateLegacy();
+          if (migrated) {
+            return await fetchFreshToken(endpoint, {
+              apiKey: this.options.getApiKey(),
+              gatewayToken: this.options.getGatewayToken(),
+              sandboxId: this.options.getSandboxId(),
+              capabilities: normalizedCapabilities,
+            });
+          }
+        }
+
+        throw error;
+      })
       .then(token => {
         this.cache.set(key, token);
         return token;
@@ -158,5 +243,15 @@ export class GoogleOAuthTokenProvider {
       }
       throw error;
     }
+  }
+
+  async getStatus(): Promise<GoogleOAuthStatusResponse> {
+    const base = resolveControllerApiUrl(this.options.getCheckinUrl());
+    const endpoint = base.replace('/google/token', '/google/status');
+    return await fetchStatus(endpoint, {
+      apiKey: this.options.getApiKey(),
+      gatewayToken: this.options.getGatewayToken(),
+      sandboxId: this.options.getSandboxId(),
+    });
   }
 }

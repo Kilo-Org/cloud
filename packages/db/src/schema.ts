@@ -3742,6 +3742,7 @@ export const kiloclaw_instances = pgTable(
 export type KiloClawInstance = typeof kiloclaw_instances.$inferSelect;
 
 export type KiloClawGoogleOAuthStatus = 'active' | 'action_required' | 'disconnected';
+export type KiloClawGoogleOAuthCredentialProfile = 'legacy' | 'kilo_owned';
 
 export const kiloclaw_google_oauth_connections = pgTable(
   'kiloclaw_google_oauth_connections',
@@ -3757,6 +3758,11 @@ export const kiloclaw_google_oauth_connections = pgTable(
     account_email: text().notNull(),
     account_subject: text().notNull(),
     oauth_client_id: text().notNull(),
+    oauth_client_secret_encrypted: text(),
+    credential_profile: text()
+      .$type<KiloClawGoogleOAuthCredentialProfile>()
+      .notNull()
+      .default('kilo_owned'),
     refresh_token_encrypted: text().notNull(),
     scopes: text().array().notNull().default(sql`'{}'::text[]`),
     capabilities: text().array().notNull().default(sql`'{}'::text[]`),
@@ -3777,6 +3783,10 @@ export const kiloclaw_google_oauth_connections = pgTable(
     check(
       'kiloclaw_google_oauth_connections_status_check',
       sql`${table.status} IN ('active', 'action_required', 'disconnected')`
+    ),
+    check(
+      'kiloclaw_google_oauth_connections_credential_profile_check',
+      sql`${table.credential_profile} IN ('legacy', 'kilo_owned')`
     ),
   ]
 );

@@ -27,6 +27,7 @@ import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
 import { writeGogCredentials } from './gog-credentials';
 import { installGogShim } from './gog-shim';
+import { migrateLegacyGoogleCredentialsToBroker } from './legacy-google-migration';
 import { startWatchRenewal, stopWatchRenewal } from './gmail-watch-renewal';
 import { bootstrapCritical, bootstrapNonCritical } from './bootstrap';
 import type { ControllerStateRef, ControllerState } from './bootstrap';
@@ -315,6 +316,13 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     getGatewayToken: () => config.expectedToken,
     getSandboxId: () => env.KILOCLAW_SANDBOX_ID ?? '',
     getCheckinUrl: () => env.KILOCLAW_CHECKIN_URL ?? '',
+    migrateLegacy: async () =>
+      await migrateLegacyGoogleCredentialsToBroker({
+        apiKey: env.KILOCODE_API_KEY ?? '',
+        gatewayToken: config.expectedToken,
+        sandboxId: env.KILOCLAW_SANDBOX_ID ?? '',
+        checkinUrl: env.KILOCLAW_CHECKIN_URL ?? '',
+      }),
   });
 
   supervisor = createSupervisor({
@@ -423,6 +431,17 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     await writeGogCredentials(env as Record<string, string | undefined>);
   } catch (err) {
     console.error('[gog] Failed to write credentials:', err);
+  }
+
+  try {
+    await migrateLegacyGoogleCredentialsToBroker({
+      apiKey: env.KILOCODE_API_KEY ?? '',
+      gatewayToken: config.expectedToken,
+      sandboxId: env.KILOCLAW_SANDBOX_ID ?? '',
+      checkinUrl: env.KILOCLAW_CHECKIN_URL ?? '',
+    });
+  } catch (err) {
+    console.error('[gog] Legacy Google migration failed:', err);
   }
 
   try {

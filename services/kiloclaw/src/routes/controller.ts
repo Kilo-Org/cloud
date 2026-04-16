@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { z } from 'zod';
+import { sql } from 'drizzle-orm';
 import { decryptWithSymmetricKey, encryptWithSymmetricKey, timingSafeEqual } from '@kilocode/encryption';
 import type { AppEnv } from '../types';
 import { userIdFromSandboxId } from '../auth/sandbox-id';
@@ -67,9 +68,25 @@ const GoogleTokenRequestSchema = z.object({
   capabilities: z.array(z.string().min(1)).default(['calendar_read']),
 });
 
+const GoogleStatusRequestSchema = z.object({
+  sandboxId: z.string().min(1),
+});
+
+const GoogleMigrateLegacyRequestSchema = z.object({
+  sandboxId: z.string().min(1),
+  accountEmail: z.string().email(),
+  accountSubject: z.string().min(1),
+  refreshToken: z.string().min(1),
+  oauthClientId: z.string().min(1),
+  oauthClientSecret: z.string().min(1),
+  scopes: z.array(z.string().min(1)).default([]),
+  capabilities: z.array(z.string().min(1)).default([]),
+});
+
 const GOOGLE_CAPABILITY_SCOPES: Record<string, readonly string[]> = {
   calendar_read: ['https://www.googleapis.com/auth/calendar.readonly'],
 };
+
 
 /**
  * Return the backend app origin for internal API calls.
@@ -192,6 +209,57 @@ async function refreshGoogleAccessToken(input: {
     scopes,
     refreshToken: typeof payload.refresh_token === 'string' ? payload.refresh_token : undefined,
   };
+}
+
+async function authorizeGoogleControllerRequest(c: Context<AppEnv>, sandboxId: string) {
+  const authHeader = c.req.header('authorization');
+  const apiKey = authHeader?.toLowerCase().startsWith('bearer ')
+    ? authHeader.substring(7)
+    : undefined;
+
+  const gatewayToken = c.req.header('x-kiloclaw-gateway-token');
+  if (!apiKey || !gatewayToken) {
+    return { error: c.json({ error: 'Unauthorized' }, 401) };
+  }
+
+  if (!c.env.GATEWAY_TOKEN_SECRET) {
+    return { error: c.json({ error: 'Configuration error' }, 503) };
+  }
+
+  const expectedGatewayToken = await deriveGatewayToken(sandboxId, c.env.GATEWAY_TOKEN_SECRET);
+  if (!timingSafeEqual(gatewayToken, expectedGatewayToken)) {
+    return { error: c.json({ error: 'Forbidden' }, 403) };
+  }
+
+  let doKey: string;
+  if (isInstanceKeyedSandboxId(sandboxId)) {
+    doKey = instanceIdFromSandboxId(sandboxId);
+  } else {
+    try {
+      doKey = userIdFromSandboxId(sandboxId);
+    } catch {
+      return { error: c.json({ error: 'Invalid sandboxId' }, 400) };
+    }
+  }
+
+  const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+  const config = await stub.getConfig().catch(() => null);
+  if (!config?.kilocodeApiKey || !timingSafeEqual(apiKey, config.kilocodeApiKey)) {
+    return { error: c.json({ error: 'Forbidden' }, 403) };
+  }
+
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    return { error: c.json({ error: 'Database unavailable' }, 503) };
+  }
+
+  const db = getWorkerDb(connectionString);
+  const instance = await getInstanceBySandboxId(db, sandboxId);
+  if (!instance) {
+    return { error: c.json({ error: 'Instance not found' }, 404) };
+  }
+
+  return { apiKey, gatewayToken, db, instance, stub };
 }
 
 controller.post('/checkin', async (c: Context<AppEnv>) => {
@@ -350,16 +418,6 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
 });
 
 controller.post('/google/token', async (c: Context<AppEnv>) => {
-  const authHeader = c.req.header('authorization');
-  const apiKey = authHeader?.toLowerCase().startsWith('bearer ')
-    ? authHeader.substring(7)
-    : undefined;
-
-  const gatewayToken = c.req.header('x-kiloclaw-gateway-token');
-  if (!apiKey || !gatewayToken) {
-    return c.json({ error: 'Unauthorized' }, 401);
-  }
-
   const rawBody: unknown = await c.req.json().catch((): unknown => null);
   const parsed = GoogleTokenRequestSchema.safeParse(rawBody);
   if (!parsed.success) {
@@ -367,43 +425,12 @@ controller.post('/google/token', async (c: Context<AppEnv>) => {
   }
 
   const { sandboxId, capabilities } = parsed.data;
-
-  if (!c.env.GATEWAY_TOKEN_SECRET) {
-    return c.json({ error: 'Configuration error' }, 503);
+  const authorized = await authorizeGoogleControllerRequest(c, sandboxId);
+  if ('error' in authorized) {
+    return authorized.error;
   }
 
-  const expectedGatewayToken = await deriveGatewayToken(sandboxId, c.env.GATEWAY_TOKEN_SECRET);
-  if (!timingSafeEqual(gatewayToken, expectedGatewayToken)) {
-    return c.json({ error: 'Forbidden' }, 403);
-  }
-
-  let doKey: string;
-  if (isInstanceKeyedSandboxId(sandboxId)) {
-    doKey = instanceIdFromSandboxId(sandboxId);
-  } else {
-    try {
-      doKey = userIdFromSandboxId(sandboxId);
-    } catch {
-      return c.json({ error: 'Invalid sandboxId' }, 400);
-    }
-  }
-
-  const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
-  const config = await stub.getConfig().catch(() => null);
-  if (!config?.kilocodeApiKey || !timingSafeEqual(apiKey, config.kilocodeApiKey)) {
-    return c.json({ error: 'Forbidden' }, 403);
-  }
-
-  const connectionString = c.env.HYPERDRIVE?.connectionString;
-  if (!connectionString) {
-    return c.json({ error: 'Database unavailable' }, 503);
-  }
-
-  const db = getWorkerDb(connectionString);
-  const instance = await getInstanceBySandboxId(db, sandboxId);
-  if (!instance) {
-    return c.json({ error: 'Instance not found' }, 404);
-  }
+  const { db, instance, stub } = authorized;
 
   const connection = await getGoogleOAuthConnectionByInstanceId(db, instance.id);
   if (!connection || connection.provider !== 'google') {
@@ -424,16 +451,28 @@ controller.post('/google/token', async (c: Context<AppEnv>) => {
   }
 
   const encryptionKey = c.env.GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY;
-  const clientId = c.env.GOOGLE_WORKSPACE_OAUTH_CLIENT_ID;
-  const clientSecret = c.env.GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET;
-
-  if (!encryptionKey || !clientId || !clientSecret) {
+  if (!encryptionKey) {
     return c.json({ error: 'Google OAuth broker is not configured' }, 503);
+  }
+
+  const profile = connection.credential_profile === 'legacy' ? 'legacy' : 'kilo_owned';
+  const clientId =
+    profile === 'legacy' ? connection.oauth_client_id : c.env.GOOGLE_WORKSPACE_OAUTH_CLIENT_ID;
+  let clientSecret =
+    profile === 'legacy'
+      ? (connection.oauth_client_secret_encrypted ?? '')
+      : (c.env.GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET ?? '');
+
+  if (!clientId || !clientSecret) {
+    return c.json({ error: `Google OAuth broker profile ${profile} is not configured` }, 503);
   }
 
   let refreshToken: string;
   try {
     refreshToken = decryptWithSymmetricKey(connection.refresh_token_encrypted, encryptionKey);
+    if (profile === 'legacy') {
+      clientSecret = decryptWithSymmetricKey(clientSecret, encryptionKey);
+    }
   } catch (error) {
     console.error('[controller] Failed to decrypt Google refresh token:', error);
     await updateGoogleOAuthConnectionTokenData(db, instance.id, {
@@ -484,6 +523,7 @@ controller.post('/google/token', async (c: Context<AppEnv>) => {
       expiresAt: refreshed.expiresAt,
       accountEmail: connection.account_email,
       scopes: nextScopes,
+      profile,
     });
   } catch (error) {
     const mapped = mapGoogleRefreshError(error);
@@ -511,6 +551,154 @@ controller.post('/google/token', async (c: Context<AppEnv>) => {
     console.error('[controller] Google OAuth refresh failed:', mapped);
     return c.json({ error: 'Google OAuth token refresh failed', reason: mapped.code }, 502);
   }
+});
+
+controller.post('/google/status', async (c: Context<AppEnv>) => {
+  const rawBody: unknown = await c.req.json().catch((): unknown => null);
+  const parsed = GoogleStatusRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid body', details: parsed.error.flatten().fieldErrors }, 400);
+  }
+
+  const authorized = await authorizeGoogleControllerRequest(c, parsed.data.sandboxId);
+  if ('error' in authorized) {
+    return authorized.error;
+  }
+
+  const { db, instance } = authorized;
+  const connection = await getGoogleOAuthConnectionByInstanceId(db, instance.id);
+  if (!connection) {
+    return c.json({ connected: false, accounts: [] }, 200);
+  }
+
+  const account = {
+    email: connection.account_email,
+    client: connection.oauth_client_id,
+    services: connection.capabilities,
+    scopes: connection.scopes,
+    created_at: connection.connected_at,
+    auth: connection.credential_profile === 'legacy' ? 'oauth-legacy' : 'oauth',
+    profile: connection.credential_profile,
+    status: connection.status,
+  };
+
+  return c.json({ connected: connection.status === 'active', accounts: [account] }, 200);
+});
+
+controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
+  const rawBody: unknown = await c.req.json().catch((): unknown => null);
+  const parsed = GoogleMigrateLegacyRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid body', details: parsed.error.flatten().fieldErrors }, 400);
+  }
+
+  const authorized = await authorizeGoogleControllerRequest(c, parsed.data.sandboxId);
+  if ('error' in authorized) {
+    return authorized.error;
+  }
+
+  const { db, instance, stub } = authorized;
+  const existing = await getGoogleOAuthConnectionByInstanceId(db, instance.id);
+
+  if (existing && existing.credential_profile === 'kilo_owned') {
+    return c.json({ migrated: false, reason: 'kilo_owned_already_active' }, 200);
+  }
+
+  const encryptionKey = c.env.GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY;
+  if (!encryptionKey) {
+    return c.json({ error: 'Google OAuth broker is not configured' }, 503);
+  }
+
+  const now = new Date().toISOString();
+  const scopes = [...new Set(parsed.data.scopes)].sort();
+  const capabilities = [...new Set(parsed.data.capabilities)].sort();
+
+  if (existing) {
+    await updateGoogleOAuthConnectionTokenData(db, instance.id, {
+      oauthClientId: parsed.data.oauthClientId,
+      oauthClientSecretEncrypted: encryptWithSymmetricKey(parsed.data.oauthClientSecret, encryptionKey),
+      credentialProfile: 'legacy',
+      refreshTokenEncrypted: encryptWithSymmetricKey(parsed.data.refreshToken, encryptionKey),
+      scopes,
+      status: 'active',
+      lastError: null,
+      lastErrorAt: null,
+    });
+
+    await db.execute(sql`
+      UPDATE kiloclaw_google_oauth_connections
+      SET
+        account_email = ${parsed.data.accountEmail},
+        account_subject = ${parsed.data.accountSubject},
+        capabilities = ${capabilities},
+        connected_at = ${now},
+        updated_at = ${now}
+      WHERE instance_id = ${instance.id}
+    `);
+  }
+
+  // Ensure row exists if it was previously missing.
+  if (!existing) {
+    await db.execute(sql`
+      INSERT INTO kiloclaw_google_oauth_connections (
+        instance_id,
+        provider,
+        account_email,
+        account_subject,
+        oauth_client_id,
+        oauth_client_secret_encrypted,
+        credential_profile,
+        refresh_token_encrypted,
+        scopes,
+        capabilities,
+        status,
+        connected_at,
+        created_at,
+        updated_at
+      ) VALUES (
+        ${instance.id},
+        'google',
+        ${parsed.data.accountEmail},
+        ${parsed.data.accountSubject},
+        ${parsed.data.oauthClientId},
+        ${encryptWithSymmetricKey(parsed.data.oauthClientSecret, encryptionKey)},
+        'legacy',
+        ${encryptWithSymmetricKey(parsed.data.refreshToken, encryptionKey)},
+        ${scopes},
+        ${capabilities},
+        'active',
+        ${now},
+        ${now},
+        ${now}
+      )
+      ON CONFLICT (instance_id)
+      DO UPDATE SET
+        account_email = EXCLUDED.account_email,
+        account_subject = EXCLUDED.account_subject,
+        oauth_client_id = EXCLUDED.oauth_client_id,
+        oauth_client_secret_encrypted = EXCLUDED.oauth_client_secret_encrypted,
+        credential_profile = EXCLUDED.credential_profile,
+        refresh_token_encrypted = EXCLUDED.refresh_token_encrypted,
+        scopes = EXCLUDED.scopes,
+        capabilities = EXCLUDED.capabilities,
+        status = EXCLUDED.status,
+        last_error = NULL,
+        last_error_at = NULL,
+        connected_at = EXCLUDED.connected_at,
+        updated_at = EXCLUDED.updated_at
+    `);
+  }
+
+  await stub.updateGoogleOAuthConnection({
+    status: 'active',
+    accountEmail: parsed.data.accountEmail,
+    accountSubject: parsed.data.accountSubject,
+    scopes,
+    capabilities,
+    lastError: null,
+  });
+
+  return c.json({ migrated: true, profile: 'legacy' }, 200);
 });
 
 export { controller };

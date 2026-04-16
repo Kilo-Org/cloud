@@ -211,6 +211,9 @@ export async function updateGoogleOAuthConnectionTokenData(
   instanceId: string,
   patch: {
     refreshTokenEncrypted?: string;
+    oauthClientId?: string;
+    oauthClientSecretEncrypted?: string | null;
+    credentialProfile?: 'legacy' | 'kilo_owned';
     scopes?: string[];
     status?: 'active' | 'action_required' | 'disconnected';
     lastError?: string | null;
@@ -223,6 +226,18 @@ export async function updateGoogleOAuthConnectionTokenData(
 
   if (patch.refreshTokenEncrypted !== undefined) {
     update.refresh_token_encrypted = patch.refreshTokenEncrypted;
+  }
+
+  if (patch.oauthClientId !== undefined) {
+    update.oauth_client_id = patch.oauthClientId;
+  }
+
+  if (patch.oauthClientSecretEncrypted !== undefined) {
+    update.oauth_client_secret_encrypted = patch.oauthClientSecretEncrypted;
+  }
+
+  if (patch.credentialProfile !== undefined) {
+    update.credential_profile = patch.credentialProfile;
   }
 
   if (patch.scopes !== undefined) {

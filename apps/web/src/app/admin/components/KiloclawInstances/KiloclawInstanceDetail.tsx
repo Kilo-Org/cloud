@@ -2995,7 +2995,6 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           </Card>
         )}
 
-        {/* CLI Run (admin-initiated recovery) */}
         {isActive && <KiloCliRunCard userId={data.user_id} instanceId={data.id} />}
 
         {/* Volume Reassociation (danger zone) */}

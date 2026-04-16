@@ -217,18 +217,18 @@ export function InstanceControls({
           </Badge>
         </div>
       </div>
+      {showUpgradeBanner && (
+        <KiloClawUpdateAvailableBanner
+          className="mb-4"
+          catalogNewerThanImage={catalogNewerThanImage}
+          onUpgrade={() => {
+            setRedeployMode('upgrade');
+            setConfirmRedeploy(true);
+          }}
+          onDismiss={dismissBanner}
+        />
+      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        {showUpgradeBanner && (
-          <KiloClawUpdateAvailableBanner
-            className="w-full"
-            catalogNewerThanImage={catalogNewerThanImage}
-            onUpgrade={() => {
-              setRedeployMode('upgrade');
-              setConfirmRedeploy(true);
-            }}
-            onDismiss={dismissBanner}
-          />
-        )}
         <OpenClawButton
           canShow={isRunning && !!gatewayReady}
           gatewayUrl={gatewayUrl}

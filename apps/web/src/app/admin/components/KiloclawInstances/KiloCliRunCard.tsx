@@ -101,7 +101,6 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
     }
   }, [trackedRunStatus]);
 
-  // Auto-scroll output
   useEffect(() => {
     if (outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
@@ -184,7 +183,6 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Start new run */}
         {!trackedRunId && (
           <div className="space-y-2">
             <Textarea
@@ -197,7 +195,7 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
               onKeyDown={e => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
-                  void handleStart();
+                  handleStart();
                 }
               }}
             />
@@ -226,7 +224,6 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
           </div>
         )}
 
-        {/* Active/tracked run viewer */}
         {trackedRunId && runStatus && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -271,7 +268,6 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
           </div>
         )}
 
-        {/* Recent runs list */}
         {runsData && runsData.runs.length > 0 && (
           <details className="mt-2">
             <summary className="text-muted-foreground cursor-pointer text-xs font-medium">

@@ -172,7 +172,7 @@ export function StartKiloCliRunDialog({
                 onKeyDown={e => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault();
-                    void handleStart();
+                    handleStart();
                   }
                 }}
               />

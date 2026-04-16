@@ -10,6 +10,7 @@ import {
   type KiloClawSubscription,
 } from '@kilocode/db';
 import type { BillingWorkerEnv } from './types.js';
+import { logger } from './logger.js';
 
 const KILOCLAW_EARLYBIRD_EXPIRY_DATE = '2026-09-26';
 const PERSONAL_TRIAL_DURATION_DAYS = 7;
@@ -106,9 +107,15 @@ async function bootstrapOrganizationSubscription(
   ]);
 
   if (existing) {
+    logger
+      .withFields({ decision: 'existing_for_instance' })
+      .info('Org bootstrap: subscription already exists for instance, returning');
     return existing;
   }
   if (!organization) {
+    logger
+      .withFields({ decision: 'organization_not_found' })
+      .error('Org bootstrap: organization row not found');
     throw new Error('Organization not found during subscription bootstrap');
   }
 
@@ -117,6 +124,18 @@ async function bootstrapOrganizationSubscription(
     !organization.requireSeats ||
     organization.settings.oss_sponsorship_tier != null ||
     !!organization.settings.suppress_trial_messaging;
+
+  logger
+    .withFields({
+      decision: hasManagedActiveAccess ? 'org_managed_active' : 'org_trial',
+      seatPurchaseStatus: latestSeatPurchase?.subscriptionStatus ?? null,
+      requireSeats: organization.requireSeats,
+    })
+    .info(
+      hasManagedActiveAccess
+        ? 'Org bootstrap: creating managed active subscription'
+        : 'Org bootstrap: creating trial subscription'
+    );
   const trialEndsAt =
     organization.freeTrialEndAt ??
     new Date(
@@ -345,6 +364,14 @@ async function createSuccessorPersonalSubscription(params: {
       after: successor,
     });
 
+    logger
+      .withFields({
+        decision: 'successor_transfer_completed',
+        predecessorSubscriptionId: predecessor.id,
+        kiloclawSubscriptionId: successor.id,
+      })
+      .info('Successor personal subscription created; predecessor marked canceled');
+
     return successor;
   });
 }
@@ -444,6 +471,9 @@ async function bootstrapPersonalSubscription(
   ]);
 
   if (existingForInstance) {
+    logger
+      .withFields({ decision: 'existing_for_instance' })
+      .info('Personal bootstrap: subscription already exists for instance, returning');
     return existingForInstance;
   }
 
@@ -475,6 +505,12 @@ async function bootstrapPersonalSubscription(
       currentPersonalSubscription.instance_id &&
       currentPersonalSubscription.instance_id === input.instanceId
     ) {
+      logger
+        .withFields({
+          decision: 'current_matches_target',
+          kiloclawSubscriptionId: currentPersonalSubscription.id,
+        })
+        .info('Personal bootstrap: current subscription already linked to target instance');
       return currentPersonalSubscription;
     }
 
@@ -485,6 +521,12 @@ async function bootstrapPersonalSubscription(
       currentInstance?.destroyedAt &&
       isAccessGrantingSubscription(currentPersonalSubscription, now)
     ) {
+      logger
+        .withFields({
+          decision: 'successor_from_destroyed',
+          sourceSubscriptionId: currentPersonalSubscription.id,
+        })
+        .info('Personal bootstrap: creating successor from destroyed-instance subscription');
       return await createSuccessorPersonalSubscription({
         db,
         env,
@@ -499,6 +541,12 @@ async function bootstrapPersonalSubscription(
     now
   );
   if (detachedAccessGrantingSubscription) {
+    logger
+      .withFields({
+        decision: 'successor_from_detached',
+        sourceSubscriptionId: detachedAccessGrantingSubscription.id,
+      })
+      .info('Personal bootstrap: creating successor from detached access-granting subscription');
     return await createSuccessorPersonalSubscription({
       db,
       env,
@@ -511,10 +559,28 @@ async function bootstrapPersonalSubscription(
     !!earlybirdPurchase && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE).getTime() > now.getTime();
 
   if (personalSubscriptions.length > 0 && !hasActiveEarlybirdAccess) {
+    logger
+      .withFields({
+        decision: 'rejected_non_access_granting_rows_present',
+        existingCount: personalSubscriptions.length,
+      })
+      .error(
+        'Personal bootstrap: refusing to create trial — non-access-granting rows already exist'
+      );
     throw new Error(
       'Cannot bootstrap personal subscription with existing non-access-granting rows'
     );
   }
+
+  logger
+    .withFields({
+      decision: earlybirdPurchase ? 'fresh_earlybird_row' : 'fresh_trial_row',
+    })
+    .info(
+      earlybirdPurchase
+        ? 'Personal bootstrap: creating earlybird row'
+        : 'Personal bootstrap: creating fresh trial row'
+    );
 
   const [created] = await db
     .insert(kiloclaw_subscriptions)
@@ -549,6 +615,9 @@ async function bootstrapPersonalSubscription(
     .returning();
 
   if (!created) {
+    logger
+      .withFields({ decision: 'insert_returned_no_row' })
+      .error('Personal bootstrap: insert returned no row');
     throw new Error('Failed to create personal provision subscription row');
   }
 

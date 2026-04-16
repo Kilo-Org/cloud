@@ -154,6 +154,38 @@ function logBillingPlatform(
   console.log(record);
 }
 
+type ProvisionWriteLogFields = {
+  event: 'instance_record_insert' | 'instance_record_destroy' | 'subscription_bootstrap';
+  outcome: 'started' | 'completed' | 'failed';
+  userId?: string;
+  instanceId?: string;
+  orgId?: string | null;
+  sandboxId?: string;
+  durationMs?: number;
+  statusCode?: number;
+  inserted?: boolean;
+  error?: string;
+};
+
+function logProvisionWrite(
+  level: 'info' | 'error',
+  message: string,
+  fields: ProvisionWriteLogFields
+) {
+  const record = JSON.stringify({
+    level,
+    message,
+    billingComponent: 'kiloclaw_platform',
+    ...fields,
+  });
+
+  if (level === 'error') {
+    console.error(record);
+    return;
+  }
+  console.log(record);
+}
+
 // Analytics middleware — runs for every platform route. Captures timing and
 // error state. Skips emitting for routes with no user context (e.g. /versions)
 // unless an error occurred.
@@ -363,75 +395,135 @@ async function insertProvisionedInstanceRecord(params: {
 }): Promise<ProvisionedInstanceRecord> {
   const connectionString = params.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
+    logProvisionWrite('error', 'Instance record insert aborted: HYPERDRIVE not configured', {
+      event: 'instance_record_insert',
+      outcome: 'failed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      error: 'HYPERDRIVE is not configured',
+    });
     throw new Error('HYPERDRIVE is not configured');
   }
 
-  const db = getWorkerDb(connectionString);
-  const alias = buildDefaultInboundEmailAlias(params.instanceId);
-  const created = await db.transaction(async tx => {
-    const [createdInstance] = await tx
-      .insert(kiloclaw_instances)
-      .values({
-        id: params.instanceId,
-        user_id: params.userId,
-        sandbox_id: params.sandboxId,
-        organization_id: params.orgId,
-      })
-      .onConflictDoNothing({ target: kiloclaw_instances.id })
-      .returning({
-        id: kiloclaw_instances.id,
-        sandboxId: kiloclaw_instances.sandbox_id,
-      });
-
-    const [existingAlias] = await tx
-      .select({ alias: kiloclaw_inbound_email_aliases.alias })
-      .from(kiloclaw_inbound_email_aliases)
-      .where(
-        and(
-          eq(kiloclaw_inbound_email_aliases.instance_id, params.instanceId),
-          isNull(kiloclaw_inbound_email_aliases.retired_at)
-        )
-      )
-      .limit(1);
-
-    if (!existingAlias) {
-      await tx
-        .insert(kiloclaw_inbound_email_reserved_aliases)
-        .values({ alias })
-        .onConflictDoNothing();
-
-      await tx
-        .insert(kiloclaw_inbound_email_aliases)
-        .values({
-          alias,
-          instance_id: params.instanceId,
-        })
-        .onConflictDoNothing({
-          target: kiloclaw_inbound_email_aliases.alias,
-        });
-    }
-
-    return createdInstance ?? null;
+  const start = performance.now();
+  logProvisionWrite('info', 'Inserting provisioned instance record', {
+    event: 'instance_record_insert',
+    outcome: 'started',
+    userId: params.userId,
+    instanceId: params.instanceId,
+    orgId: params.orgId,
+    sandboxId: params.sandboxId,
   });
 
-  if (created) {
-    return created;
+  const db = getWorkerDb(connectionString);
+  const alias = buildDefaultInboundEmailAlias(params.instanceId);
+  try {
+    const created = await db.transaction(async tx => {
+      const [createdInstance] = await tx
+        .insert(kiloclaw_instances)
+        .values({
+          id: params.instanceId,
+          user_id: params.userId,
+          sandbox_id: params.sandboxId,
+          organization_id: params.orgId,
+        })
+        .onConflictDoNothing({ target: kiloclaw_instances.id })
+        .returning({
+          id: kiloclaw_instances.id,
+          sandboxId: kiloclaw_instances.sandbox_id,
+        });
+
+      const [existingAlias] = await tx
+        .select({ alias: kiloclaw_inbound_email_aliases.alias })
+        .from(kiloclaw_inbound_email_aliases)
+        .where(
+          and(
+            eq(kiloclaw_inbound_email_aliases.instance_id, params.instanceId),
+            isNull(kiloclaw_inbound_email_aliases.retired_at)
+          )
+        )
+        .limit(1);
+
+      if (!existingAlias) {
+        await tx
+          .insert(kiloclaw_inbound_email_reserved_aliases)
+          .values({ alias })
+          .onConflictDoNothing();
+
+        await tx
+          .insert(kiloclaw_inbound_email_aliases)
+          .values({
+            alias,
+            instance_id: params.instanceId,
+          })
+          .onConflictDoNothing({
+            target: kiloclaw_inbound_email_aliases.alias,
+          });
+      }
+
+      return createdInstance ?? null;
+    });
+
+    if (created) {
+      logProvisionWrite('info', 'Instance record inserted', {
+        event: 'instance_record_insert',
+        outcome: 'completed',
+        userId: params.userId,
+        instanceId: params.instanceId,
+        orgId: params.orgId,
+        sandboxId: params.sandboxId,
+        durationMs: performance.now() - start,
+        inserted: true,
+      });
+      return created;
+    }
+
+    const [existing] = await db
+      .select({
+        id: kiloclaw_instances.id,
+        sandboxId: kiloclaw_instances.sandbox_id,
+      })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, params.instanceId))
+      .limit(1);
+
+    if (!existing) {
+      logProvisionWrite('error', 'Instance record insert reported conflict but row not found', {
+        event: 'instance_record_insert',
+        outcome: 'failed',
+        userId: params.userId,
+        instanceId: params.instanceId,
+        orgId: params.orgId,
+        durationMs: performance.now() - start,
+        error: 'row_missing_after_conflict',
+      });
+      throw new Error('Failed to insert provisioned instance record');
+    }
+
+    logProvisionWrite('info', 'Instance record already existed (onConflictDoNothing hit)', {
+      event: 'instance_record_insert',
+      outcome: 'completed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      sandboxId: existing.sandboxId,
+      durationMs: performance.now() - start,
+      inserted: false,
+    });
+    return existing;
+  } catch (err) {
+    logProvisionWrite('error', 'Instance record insert failed', {
+      event: 'instance_record_insert',
+      outcome: 'failed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      durationMs: performance.now() - start,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
   }
-
-  const [existing] = await db
-    .select({
-      id: kiloclaw_instances.id,
-      sandboxId: kiloclaw_instances.sandbox_id,
-    })
-    .from(kiloclaw_instances)
-    .where(eq(kiloclaw_instances.id, params.instanceId))
-    .limit(1);
-
-  if (!existing) {
-    throw new Error('Failed to insert provisioned instance record');
-  }
-
-  return existing;
 }
 
 async function markProvisionedInstanceDestroyed(params: {
@@ -440,19 +532,47 @@ async function markProvisionedInstanceDestroyed(params: {
 }): Promise<void> {
   const connectionString = params.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
-    console.error('[platform] HYPERDRIVE missing during instance destroy compensation', {
+    logProvisionWrite('error', 'Instance destroy compensation aborted: HYPERDRIVE not configured', {
+      event: 'instance_record_destroy',
+      outcome: 'failed',
       instanceId: params.instanceId,
+      error: 'HYPERDRIVE is not configured',
     });
     throw new Error('HYPERDRIVE is not configured during instance destroy compensation');
   }
 
+  const start = performance.now();
+  logProvisionWrite('info', 'Marking provisioned instance destroyed', {
+    event: 'instance_record_destroy',
+    outcome: 'started',
+    instanceId: params.instanceId,
+  });
+
   const db = getWorkerDb(connectionString);
-  await db
-    .update(kiloclaw_instances)
-    .set({ destroyed_at: sql`NOW()` })
-    .where(
-      and(eq(kiloclaw_instances.id, params.instanceId), isNull(kiloclaw_instances.destroyed_at))
-    );
+  try {
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: sql`NOW()` })
+      .where(
+        and(eq(kiloclaw_instances.id, params.instanceId), isNull(kiloclaw_instances.destroyed_at))
+      );
+
+    logProvisionWrite('info', 'Instance record marked destroyed', {
+      event: 'instance_record_destroy',
+      outcome: 'completed',
+      instanceId: params.instanceId,
+      durationMs: performance.now() - start,
+    });
+  } catch (err) {
+    logProvisionWrite('error', 'Instance destroy compensation failed', {
+      event: 'instance_record_destroy',
+      outcome: 'failed',
+      instanceId: params.instanceId,
+      durationMs: performance.now() - start,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 async function bootstrapProvisionedSubscription(params: {
@@ -462,11 +582,40 @@ async function bootstrapProvisionedSubscription(params: {
   orgId: string | null;
 }): Promise<void> {
   if (!params.env.KILOCLAW_BILLING) {
+    logProvisionWrite('error', 'Subscription bootstrap aborted: KILOCLAW_BILLING not configured', {
+      event: 'subscription_bootstrap',
+      outcome: 'failed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      error: 'KILOCLAW_BILLING service binding is not configured',
+    });
     throw new Error('KILOCLAW_BILLING service binding is not configured');
   }
   if (!params.env.KILOCLAW_INTERNAL_API_SECRET) {
+    logProvisionWrite(
+      'error',
+      'Subscription bootstrap aborted: KILOCLAW_INTERNAL_API_SECRET not configured',
+      {
+        event: 'subscription_bootstrap',
+        outcome: 'failed',
+        userId: params.userId,
+        instanceId: params.instanceId,
+        orgId: params.orgId,
+        error: 'KILOCLAW_INTERNAL_API_SECRET is not configured',
+      }
+    );
     throw new Error('KILOCLAW_INTERNAL_API_SECRET is not configured');
   }
+
+  const start = performance.now();
+  logProvisionWrite('info', 'Calling billing worker to bootstrap subscription', {
+    event: 'subscription_bootstrap',
+    outcome: 'started',
+    userId: params.userId,
+    instanceId: params.instanceId,
+    orgId: params.orgId,
+  });
 
   const response = await params.env.KILOCLAW_BILLING.fetch(
     new Request('https://kiloclaw-billing/bootstrap-subscription', {
@@ -485,8 +634,28 @@ async function bootstrapProvisionedSubscription(params: {
 
   if (!response.ok) {
     const body = await response.text();
+    logProvisionWrite('error', 'Subscription bootstrap returned non-2xx', {
+      event: 'subscription_bootstrap',
+      outcome: 'failed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      durationMs: performance.now() - start,
+      statusCode: response.status,
+      error: body.slice(0, 500),
+    });
     throw new Error(`Subscription bootstrap failed (${response.status}): ${body}`);
   }
+
+  logProvisionWrite('info', 'Subscription bootstrap completed', {
+    event: 'subscription_bootstrap',
+    outcome: 'completed',
+    userId: params.userId,
+    instanceId: params.instanceId,
+    orgId: params.orgId,
+    durationMs: performance.now() - start,
+    statusCode: response.status,
+  });
 }
 
 /** Parse and validate optional ?instanceId= query param. Returns 400 on invalid format. */

@@ -47,6 +47,13 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingSweepMessage> = {
     const url = new URL(request.url);
     if (request.method === 'POST' && url.pathname === '/bootstrap-subscription') {
       if (!env.KILOCLAW_INTERNAL_API_SECRET) {
+        log('error', 'bootstrap-subscription rejected: missing internal api secret', {
+          billingFlow: BILLING_FLOW,
+          billingComponent: 'worker',
+          event: 'bootstrap_subscription',
+          outcome: 'failed',
+          statusCode: 500,
+        });
         return Response.json(
           { error: 'KILOCLAW_INTERNAL_API_SECRET is not configured' },
           { status: 500 }
@@ -55,6 +62,13 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingSweepMessage> = {
 
       const providedSecret = request.headers.get('x-internal-api-key');
       if (!providedSecret || providedSecret !== env.KILOCLAW_INTERNAL_API_SECRET) {
+        log('warn', 'bootstrap-subscription rejected: unauthorized', {
+          billingFlow: BILLING_FLOW,
+          billingComponent: 'worker',
+          event: 'bootstrap_subscription',
+          outcome: 'failed',
+          statusCode: 401,
+        });
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
       }
 
@@ -62,34 +76,84 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingSweepMessage> = {
       try {
         body = await request.json();
       } catch {
+        log('warn', 'bootstrap-subscription rejected: malformed JSON', {
+          billingFlow: BILLING_FLOW,
+          billingComponent: 'worker',
+          event: 'bootstrap_subscription',
+          outcome: 'failed',
+          statusCode: 400,
+        });
         return Response.json({ error: 'Malformed JSON body' }, { status: 400 });
       }
 
       const parsed = BootstrapProvisionSubscriptionSchema.safeParse(body);
       if (!parsed.success) {
+        log('warn', 'bootstrap-subscription rejected: invalid request', {
+          billingFlow: BILLING_FLOW,
+          billingComponent: 'worker',
+          event: 'bootstrap_subscription',
+          outcome: 'failed',
+          statusCode: 400,
+          error: parsed.error.message,
+        });
         return Response.json(
           { error: 'Invalid request', details: parsed.error.flatten().fieldErrors },
           { status: 400 }
         );
       }
 
-      try {
-        const subscription = await bootstrapProvisionSubscription(env, {
-          userId: parsed.data.userId,
-          instanceId: parsed.data.instanceId,
-          orgId: parsed.data.orgId ?? null,
-        });
+      const orgId = parsed.data.orgId ?? null;
+      return await withLogTags(
+        {
+          source: 'fetch',
+          tags: {
+            billingFlow: BILLING_FLOW,
+            billingComponent: 'worker',
+            userId: parsed.data.userId,
+            instanceId: parsed.data.instanceId,
+          },
+        },
+        async () => {
+          const start = Date.now();
+          log('info', 'bootstrap-subscription started', {
+            event: 'bootstrap_subscription',
+            outcome: 'started',
+            orgId,
+          });
+          try {
+            const subscription = await bootstrapProvisionSubscription(env, {
+              userId: parsed.data.userId,
+              instanceId: parsed.data.instanceId,
+              orgId,
+            });
 
-        return Response.json({
-          ok: true,
-          subscriptionId: subscription.id,
-        });
-      } catch (error) {
-        return Response.json(
-          { error: error instanceof Error ? error.message : String(error) },
-          { status: 500 }
-        );
-      }
+            log('info', 'bootstrap-subscription completed', {
+              event: 'bootstrap_subscription',
+              outcome: 'completed',
+              orgId,
+              statusCode: 200,
+              durationMs: Date.now() - start,
+              kiloclawSubscriptionId: subscription.id,
+            });
+
+            return Response.json({
+              ok: true,
+              subscriptionId: subscription.id,
+            });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            log('error', 'bootstrap-subscription failed', {
+              event: 'bootstrap_subscription',
+              outcome: 'failed',
+              orgId,
+              statusCode: 500,
+              durationMs: Date.now() - start,
+              error: errorMessage,
+            });
+            return Response.json({ error: errorMessage }, { status: 500 });
+          }
+        }
+      );
     }
 
     return Response.json({

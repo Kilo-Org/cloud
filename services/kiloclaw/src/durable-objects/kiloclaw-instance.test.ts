@@ -5406,6 +5406,10 @@ describe('provision: auto-start after fresh provision', () => {
     await Promise.all(waitUntilPromises);
 
     expect(storage._store.get('userTimezone')).toBe('Europe/Amsterdam');
+
+    await instance.provision('user-1', { userTimezone: null });
+
+    expect(storage._store.get('userTimezone')).toBeNull();
   });
 
   it('creates the initial volume in the freshly ensured Fly app', async () => {

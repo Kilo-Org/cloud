@@ -639,7 +639,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
-    const userTimezone = config.userTimezone ?? this.s.userTimezone ?? null;
+    const userTimezone =
+      config.userTimezone === undefined ? (this.s.userTimezone ?? null) : config.userTimezone;
 
     const configFields = {
       userId,

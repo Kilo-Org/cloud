@@ -1,0 +1,85 @@
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { captureException, captureMessage } from '@sentry/nextjs';
+import { APP_URL } from '@/lib/constants';
+import { getUserFromAuth } from '@/lib/user.server';
+import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
+import { clearKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
+import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+
+const OrganizationIdSchema = z.string().uuid();
+
+function buildDisconnectPath(organizationId: string | undefined, queryParam: string): string {
+  if (organizationId) {
+    return `/organizations/${organizationId}/claw/settings?${queryParam}`;
+  }
+
+  return `/claw/settings?${queryParam}`;
+}
+
+export async function GET(request: NextRequest) {
+  let organizationId: string | undefined;
+
+  try {
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    if (authFailedResponse) {
+      return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
+    }
+
+    const organizationIdParam = request.nextUrl.searchParams.get('organizationId');
+    if (organizationIdParam) {
+      const parsedOrgId = OrganizationIdSchema.safeParse(organizationIdParam);
+      if (!parsedOrgId.success) {
+        return NextResponse.redirect(new URL('/claw/settings?error=invalid_organization', APP_URL));
+      }
+      organizationId = parsedOrgId.data;
+      await ensureOrganizationAccess({ user }, organizationId);
+    }
+
+    const instance = organizationId
+      ? await getActiveOrgInstance(user.id, organizationId)
+      : await getActiveInstance(user.id);
+
+    if (!instance) {
+      captureMessage('Google disconnect missing active KiloClaw instance', {
+        level: 'warning',
+        tags: { endpoint: 'google/disconnect', source: 'google_oauth' },
+        extra: {
+          userId: user.id,
+          organizationId,
+        },
+      });
+
+      return NextResponse.redirect(
+        new URL(buildDisconnectPath(organizationId, 'error=missing_instance'), APP_URL)
+      );
+    }
+
+    await clearKiloClawGoogleOAuthConnection(instance.id);
+
+    const kiloclawClient = new KiloClawInternalClient();
+    await kiloclawClient.clearGoogleOAuthConnection(user.id, instance.id);
+
+    return NextResponse.redirect(
+      new URL(buildDisconnectPath(organizationId, 'success=google_disconnected'), APP_URL)
+    );
+  } catch (error) {
+    console.error('Error disconnecting Google OAuth:', error);
+
+    captureException(error, {
+      tags: {
+        endpoint: 'google/disconnect',
+        source: 'google_oauth',
+      },
+      extra: {
+        organizationId,
+      },
+    });
+
+    return NextResponse.redirect(
+      new URL(buildDisconnectPath(organizationId, 'error=disconnect_failed'), APP_URL)
+    );
+  }
+}

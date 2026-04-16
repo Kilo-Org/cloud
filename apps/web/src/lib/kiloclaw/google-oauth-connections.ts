@@ -142,3 +142,14 @@ export async function setKiloClawGoogleOAuthConnectionError(
       )
     );
 }
+
+export async function clearKiloClawGoogleOAuthConnection(instanceId: string): Promise<void> {
+  await db
+    .delete(kiloclaw_google_oauth_connections)
+    .where(
+      and(
+        eq(kiloclaw_google_oauth_connections.instance_id, instanceId),
+        eq(kiloclaw_google_oauth_connections.provider, 'google')
+      )
+    );
+}

@@ -890,6 +890,17 @@ export function SettingsTab({
 
     return `/api/integrations/google/connect?${params.toString()}`;
   }, [organizationId]);
+  const googleCalendarDisconnectHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (organizationId) {
+      params.set('organizationId', organizationId);
+    }
+
+    const qs = params.toString();
+    return qs.length > 0
+      ? `/api/integrations/google/disconnect?${qs}`
+      : '/api/integrations/google/disconnect';
+  }, [organizationId]);
 
   function handleCycleInboundEmailAddress() {
     mutations.cycleInboundEmailAddress.mutate(undefined, {
@@ -1112,8 +1123,8 @@ export function SettingsTab({
             </div>
           </div>
           {status.googleOAuthConnected ? (
-            <Button variant="outline" size="sm" onClick={() => {}}>
-              Disconnect
+            <Button asChild variant="outline" size="sm">
+              <a href={googleCalendarDisconnectHref}>Disconnect</a>
             </Button>
           ) : (
             <Button asChild variant="outline" size="sm">

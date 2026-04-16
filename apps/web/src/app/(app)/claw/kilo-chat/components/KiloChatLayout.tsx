@@ -10,7 +10,6 @@ import { useConversations, useCreateConversation } from '../hooks/useConversatio
 type KiloChatContextValue = {
   getToken: () => Promise<string>;
   currentUserId: string;
-  token: string | null;
 };
 
 const KiloChatContext = createContext<KiloChatContextValue | null>(null);
@@ -25,7 +24,6 @@ export function useKiloChatContext() {
 type KiloChatLayoutProps = {
   getToken: () => Promise<string>;
   currentUserId: string;
-  token: string | null;
   instances: Array<{ sandboxId: string; label: string }>;
   children: React.ReactNode;
 };
@@ -33,7 +31,6 @@ type KiloChatLayoutProps = {
 export function KiloChatLayout({
   getToken,
   currentUserId,
-  token,
   instances,
   children,
 }: KiloChatLayoutProps) {
@@ -58,7 +55,7 @@ export function KiloChatLayout({
   }, [selectedSandboxId, createConversation, router]);
 
   return (
-    <KiloChatContext.Provider value={{ getToken, currentUserId, token }}>
+    <KiloChatContext.Provider value={{ getToken, currentUserId }}>
       <div className="flex h-[calc(100vh-3.5rem)]">
         {/* Conversation sidebar */}
         <div className="border-border w-64 shrink-0 border-r">

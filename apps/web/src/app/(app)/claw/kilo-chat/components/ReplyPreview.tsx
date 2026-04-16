@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import type { Message } from '../types';
+import { contentBlocksToText } from '../utils';
 
 type ReplyPreviewProps = {
   message: Message;
@@ -9,11 +10,7 @@ type ReplyPreviewProps = {
 };
 
 export function ReplyPreview({ message, onCancel }: ReplyPreviewProps) {
-  const text = message.content
-    .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-    .map(b => b.text)
-    .join(' ')
-    .slice(0, 100);
+  const text = contentBlocksToText(message.content).slice(0, 100);
 
   return (
     <div className="border-border bg-muted/50 flex items-center gap-2 border-t px-4 py-2">

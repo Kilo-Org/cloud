@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { ConversationListItem } from '../types';
+import { ulidToTimestamp } from '../utils';
 
 type ConversationItemProps = {
   conversation: ConversationListItem;
@@ -10,7 +11,7 @@ type ConversationItemProps = {
 
 export function ConversationItem({ conversation, isActive }: ConversationItemProps) {
   const lastMessageTime = conversation.lastMessageId
-    ? new Date(parseInt(conversation.lastMessageId.slice(0, 10), 36)).toLocaleTimeString([], {
+    ? new Date(ulidToTimestamp(conversation.lastMessageId)).toLocaleTimeString([], {
         hour: 'numeric',
         minute: '2-digit',
       })

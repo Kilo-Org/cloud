@@ -15,17 +15,19 @@ type SSEEvent =
 
 type UseSSEOptions = {
   conversationId: string | null;
-  token: string | null;
+  getToken: () => Promise<string>;
   onEvent: (event: SSEEvent) => void;
 };
 
-export function useSSE({ conversationId, token, onEvent }: UseSSEOptions) {
+export function useSSE({ conversationId, getToken, onEvent }: UseSSEOptions) {
   const lastEventIdRef = useRef<string | null>(null);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
 
   useEffect(() => {
-    if (!conversationId || !token) return;
+    if (!conversationId) return;
 
     let aborted = false;
     const controller = new AbortController();
@@ -33,6 +35,7 @@ export function useSSE({ conversationId, token, onEvent }: UseSSEOptions) {
     async function connect() {
       while (!aborted) {
         try {
+          const token = await getTokenRef.current();
           const url = `${KILO_CHAT_URL}/v1/conversations/${conversationId}/events`;
           const headers: Record<string, string> = {
             Authorization: `Bearer ${token}`,
@@ -105,5 +108,5 @@ export function useSSE({ conversationId, token, onEvent }: UseSSEOptions) {
       aborted = true;
       controller.abort();
     };
-  }, [conversationId, token]);
+  }, [conversationId]);
 }

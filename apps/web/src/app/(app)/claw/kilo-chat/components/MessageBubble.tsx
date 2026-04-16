@@ -3,13 +3,17 @@
 import { useState } from 'react';
 import { Pencil, Trash2, Reply } from 'lucide-react';
 import type { Message, ContentBlock } from '../types';
+import { ulidToTimestamp, contentBlocksToText } from '../utils';
 
 type MessageBubbleProps = {
   message: Message;
   isOwn: boolean;
   replyToMessage?: Message | null;
+  pendingDeleteId: string | null;
   onEdit: (messageId: string, content: ContentBlock[], version: number) => void;
   onDelete: (messageId: string) => void;
+  onConfirmDelete: (messageId: string) => void;
+  onCancelDelete: () => void;
   onReply: (message: Message) => void;
 };
 
@@ -17,8 +21,11 @@ export function MessageBubble({
   message,
   isOwn,
   replyToMessage,
+  pendingDeleteId,
   onEdit,
   onDelete,
+  onConfirmDelete,
+  onCancelDelete,
   onReply,
 }: MessageBubbleProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -33,10 +40,7 @@ export function MessageBubble({
     );
   }
 
-  const textContent = message.content
-    .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-    .map(b => b.text)
-    .join('\n');
+  const textContent = contentBlocksToText(message.content);
 
   function handleStartEdit() {
     setEditText(textContent);
@@ -54,10 +58,7 @@ export function MessageBubble({
     setEditText('');
   }
 
-  const timestamp = new Date(
-    // ULID encodes timestamp in first 10 chars
-    parseInt(message.id.slice(0, 10), 36)
-  );
+  const timestamp = new Date(ulidToTimestamp(message.id));
   const timeStr = timestamp.toLocaleTimeString([], {
     hour: 'numeric',
     minute: '2-digit',
@@ -74,17 +75,10 @@ export function MessageBubble({
           <Reply className="h-3 w-3" />
           <span>
             Replying to{' '}
-            {replyToMessage.content
-              .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-              .map(b => b.text)
-              .join(' ')
-              .slice(0, 60)}
-            {(replyToMessage.content
-              .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-              .map(b => b.text)
-              .join(' ').length ?? 0) > 60
-              ? '...'
-              : ''}
+            {(() => {
+              const preview = contentBlocksToText(replyToMessage.content);
+              return preview.length > 60 ? `${preview.slice(0, 60)}...` : preview;
+            })()}
           </span>
         </div>
       )}
@@ -132,7 +126,22 @@ export function MessageBubble({
           )}
         </div>
 
-        {showActions && isOwn && !isEditing && (
+        {pendingDeleteId === message.id && (
+          <div className="bg-background border-border flex items-center gap-1.5 rounded border px-2 py-1 text-xs shadow-sm">
+            <span>Delete?</span>
+            <button
+              onClick={() => onConfirmDelete(message.id)}
+              className="text-destructive hover:underline font-medium"
+            >
+              Yes
+            </button>
+            <button onClick={onCancelDelete} className="text-muted-foreground hover:underline">
+              No
+            </button>
+          </div>
+        )}
+
+        {showActions && isOwn && !isEditing && pendingDeleteId !== message.id && (
           <div className="bg-background border-border flex items-center gap-0.5 rounded border p-0.5 shadow-sm">
             <button onClick={handleStartEdit} className="hover:bg-muted rounded p-1" title="Edit">
               <Pencil className="h-3.5 w-3.5" />

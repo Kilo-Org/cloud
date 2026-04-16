@@ -22,12 +22,12 @@ type MessageAreaProps = {
   conversationId: string;
   currentUserId: string;
   getToken: () => Promise<string>;
-  token: string | null;
 };
 
-export function MessageArea({ conversationId, currentUserId, getToken, token }: MessageAreaProps) {
+export function MessageArea({ conversationId, currentUserId, getToken }: MessageAreaProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
     getToken,
@@ -47,7 +47,7 @@ export function MessageArea({ conversationId, currentUserId, getToken, token }: 
   // SSE connection
   useSSE({
     conversationId,
-    token,
+    getToken,
     onEvent: useCallback(
       event => {
         if (event.type === 'typing') {
@@ -101,8 +101,16 @@ export function MessageArea({ conversationId, currentUserId, getToken, token }: 
   }
 
   function handleDelete(messageId: string) {
-    if (!confirm('Delete this message?')) return;
+    setPendingDeleteId(messageId);
+  }
+
+  function handleConfirmDelete(messageId: string) {
     deleteMessage.mutate({ messageId, conversationId });
+    setPendingDeleteId(null);
+  }
+
+  function handleCancelDelete() {
+    setPendingDeleteId(null);
   }
 
   const messageMap = new Map(messages.map(m => [m.id, m]));
@@ -134,8 +142,11 @@ export function MessageArea({ conversationId, currentUserId, getToken, token }: 
             replyToMessage={
               msg.inReplyToMessageId ? (messageMap.get(msg.inReplyToMessageId) ?? null) : null
             }
+            pendingDeleteId={pendingDeleteId}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onConfirmDelete={handleConfirmDelete}
+            onCancelDelete={handleCancelDelete}
             onReply={setReplyingTo}
           />
         ))}

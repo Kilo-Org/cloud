@@ -34,7 +34,7 @@ import {
   credit_transactions,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, ne, desc, isNotNull, isNull, inArray, sql, like, or } from 'drizzle-orm';
+import { and, eq, ne, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';

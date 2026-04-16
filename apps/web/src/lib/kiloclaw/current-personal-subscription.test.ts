@@ -3,8 +3,9 @@ import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { kiloclaw_instances, kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
+import type { resolveCurrentPersonalSubscriptionRow as ResolveCurrentFn } from './current-personal-subscription';
 
-let resolveCurrentPersonalSubscriptionRow: typeof import('./current-personal-subscription').resolveCurrentPersonalSubscriptionRow;
+let resolveCurrentPersonalSubscriptionRow: typeof ResolveCurrentFn;
 
 describe('resolveCurrentPersonalSubscriptionRow', () => {
   let user: User;

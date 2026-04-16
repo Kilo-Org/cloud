@@ -1,7 +1,7 @@
 import 'server-only';
 
 import type Stripe from 'stripe';
-import { eq, and, isNotNull, isNull, sql } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import { addMonths } from 'date-fns';
 
 import { db } from '@/lib/drizzle';

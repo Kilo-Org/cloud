@@ -21,6 +21,7 @@ import {
   Bell,
   Network,
   KeyRound,
+  Copy,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -77,6 +78,11 @@ const userManagementItems: MenuItem[] = [
     title: () => 'Backfills',
     url: '/admin/backfills',
     icon: () => <KeyRound />,
+  },
+  {
+    title: () => 'Account Deduplication',
+    url: '/admin/account-deduplication',
+    icon: () => <Copy />,
   },
 ];
 

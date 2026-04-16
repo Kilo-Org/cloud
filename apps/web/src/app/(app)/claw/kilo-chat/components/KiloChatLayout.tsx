@@ -40,7 +40,9 @@ export function KiloChatLayout({
   );
 
   useEffect(() => {
-    if (!selectedSandboxId && instances.length > 0) {
+    if (instances.length === 0) return;
+    const stillValid = selectedSandboxId && instances.some(i => i.sandboxId === selectedSandboxId);
+    if (!stillValid) {
       setSelectedSandboxId(instances[0].sandboxId);
     }
   }, [instances, selectedSandboxId]);

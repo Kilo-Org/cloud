@@ -23,7 +23,7 @@ import {
   type AnyPgColumn,
   bigserial,
 } from 'drizzle-orm/pg-core';
-import { isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { isNotNull, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   KiloPassTier,

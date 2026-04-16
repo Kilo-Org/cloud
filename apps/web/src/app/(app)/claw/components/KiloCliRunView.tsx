@@ -4,8 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, Loader2, XCircle, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useKiloClawMutations } from '@/hooks/useKiloClaw';
-import { useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
+import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { useClawContext } from './ClawContext';
@@ -48,14 +47,16 @@ function StatusBadge({ status }: { status: string | null }) {
   }
 }
 
-export function KiloCliRunView({ runId }: { runId: string }) {
+export function KiloCliRunView({
+  runId,
+  mutations,
+}: {
+  runId: string;
+  mutations: ReturnType<typeof useKiloClawMutations>;
+}) {
   const router = useRouter();
   const { organizationId } = useClawContext();
   const outputRef = useRef<HTMLPreElement>(null);
-
-  const personalMutations = useKiloClawMutations();
-  const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
-  const mutations = organizationId ? orgMutations : personalMutations;
 
   const statusQuery = useClawKiloCliRunStatus(runId);
   const runStatus = statusQuery.data;

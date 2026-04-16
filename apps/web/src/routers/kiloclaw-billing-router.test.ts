@@ -18,6 +18,7 @@ import {
   kiloclaw_subscriptions,
   kiloclaw_instances,
   kiloclaw_earlybird_purchases,
+  kiloclaw_subscription_change_log,
   kilocode_users,
   credit_transactions,
   kilo_pass_subscriptions,
@@ -2240,6 +2241,30 @@ describe('cancelSubscription', () => {
       .limit(1);
 
     expect(row.cancel_at_period_end).toBe(true);
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, row.id));
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toEqual(
+      expect.objectContaining({
+        actor_type: 'user',
+        actor_id: user.id,
+        action: 'canceled',
+        reason: 'user_requested_cancellation',
+      })
+    );
+    expect(logs[0]?.before_state).toEqual(
+      expect.objectContaining({
+        cancel_at_period_end: false,
+      })
+    );
+    expect(logs[0]?.after_state).toEqual(
+      expect.objectContaining({
+        cancel_at_period_end: true,
+      })
+    );
   });
 
   it('cancels the effective paid subscription when a canceled trial also exists', async () => {
@@ -2405,6 +2430,30 @@ describe('reactivateSubscription', () => {
     expect(row.cancel_at_period_end).toBe(false);
     // commit_ends_at preserved (compare as dates to avoid format mismatch)
     expect(new Date(row.commit_ends_at!).getTime()).toBe(new Date(futureCommitEnd).getTime());
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, row.id));
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toEqual(
+      expect.objectContaining({
+        actor_type: 'user',
+        actor_id: user.id,
+        action: 'reactivated',
+        reason: 'user_reactivated_subscription',
+      })
+    );
+    expect(logs[0]?.before_state).toEqual(
+      expect.objectContaining({
+        cancel_at_period_end: true,
+      })
+    );
+    expect(logs[0]?.after_state).toEqual(
+      expect.objectContaining({
+        cancel_at_period_end: false,
+      })
+    );
   });
 
   it('restores auto intro schedule after reactivating a standard intro-price subscription', async () => {
@@ -2534,6 +2583,34 @@ describe('switchPlan', () => {
     expect(dbRow.stripe_schedule_id).toBe('sub_sched_new');
     expect(dbRow.scheduled_plan).toBe('commit');
     expect(dbRow.scheduled_by).toBe('user');
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, dbRow.id));
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toEqual(
+      expect.objectContaining({
+        actor_type: 'user',
+        actor_id: user.id,
+        action: 'schedule_changed',
+        reason: 'user_requested_plan_switch',
+      })
+    );
+    expect(logs[0]?.before_state).toEqual(
+      expect.objectContaining({
+        scheduled_plan: null,
+        scheduled_by: null,
+        stripe_schedule_id: null,
+      })
+    );
+    expect(logs[0]?.after_state).toEqual(
+      expect.objectContaining({
+        scheduled_plan: 'commit',
+        scheduled_by: 'user',
+        stripe_schedule_id: 'sub_sched_new',
+      })
+    );
   });
 
   it('switches the effective paid subscription when a canceled trial also exists', async () => {
@@ -2812,6 +2889,34 @@ describe('cancelPlanSwitch', () => {
     expect(row.stripe_schedule_id).toBeNull();
     expect(row.scheduled_plan).toBeNull();
     expect(row.scheduled_by).toBeNull();
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, row.id));
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toEqual(
+      expect.objectContaining({
+        actor_type: 'user',
+        actor_id: user.id,
+        action: 'schedule_changed',
+        reason: 'user_canceled_plan_switch',
+      })
+    );
+    expect(logs[0]?.before_state).toEqual(
+      expect.objectContaining({
+        scheduled_plan: 'commit',
+        scheduled_by: 'user',
+        stripe_schedule_id: 'sched_user_switch',
+      })
+    );
+    expect(logs[0]?.after_state).toEqual(
+      expect.objectContaining({
+        scheduled_plan: null,
+        scheduled_by: null,
+        stripe_schedule_id: null,
+      })
+    );
   });
 
   it('cancels the effective paid plan switch when a canceled trial also exists', async () => {
@@ -3772,6 +3877,33 @@ describe('enrollWithCredits', () => {
 
     expect(updatedUser.acquired).toBe(50_000_000);
     expect(updatedUser.used).toBe(4_000_000);
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, sub.id));
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toEqual(
+      expect.objectContaining({
+        actor_type: 'user',
+        actor_id: user.id,
+        action: 'payment_source_changed',
+        reason: 'credit_enrollment',
+      })
+    );
+    expect(logs[0]?.before_state).toEqual(
+      expect.objectContaining({
+        plan: 'trial',
+        status: 'trialing',
+      })
+    );
+    expect(logs[0]?.after_state).toEqual(
+      expect.objectContaining({
+        payment_source: 'credits',
+        plan: 'standard',
+        status: 'active',
+      })
+    );
   });
 
   it('enrolls with credits for commit plan when balance sufficient', async () => {
@@ -4393,6 +4525,32 @@ describe('pure credit cancel/reactivate', () => {
 
     expect(row.scheduled_plan).toBe('commit');
     expect(row.scheduled_by).toBe('user');
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, row.id));
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toEqual(
+      expect.objectContaining({
+        actor_type: 'user',
+        actor_id: user.id,
+        action: 'schedule_changed',
+        reason: 'user_requested_plan_switch',
+      })
+    );
+    expect(logs[0]?.before_state).toEqual(
+      expect.objectContaining({
+        scheduled_plan: null,
+        scheduled_by: null,
+      })
+    );
+    expect(logs[0]?.after_state).toEqual(
+      expect.objectContaining({
+        scheduled_plan: 'commit',
+        scheduled_by: 'user',
+      })
+    );
   });
 
   it('cancels plan switch for pure credit subscription locally', async () => {
@@ -4417,6 +4575,32 @@ describe('pure credit cancel/reactivate', () => {
 
     expect(row.scheduled_plan).toBeNull();
     expect(row.scheduled_by).toBeNull();
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, row.id));
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toEqual(
+      expect.objectContaining({
+        actor_type: 'user',
+        actor_id: user.id,
+        action: 'schedule_changed',
+        reason: 'user_canceled_plan_switch',
+      })
+    );
+    expect(logs[0]?.before_state).toEqual(
+      expect.objectContaining({
+        scheduled_plan: 'commit',
+        scheduled_by: 'user',
+      })
+    );
+    expect(logs[0]?.after_state).toEqual(
+      expect.objectContaining({
+        scheduled_plan: null,
+        scheduled_by: null,
+      })
+    );
   });
 });
 
@@ -4469,6 +4653,48 @@ describe('acceptConversion', () => {
 
     expect(row.cancel_at_period_end).toBe(true);
     expect(row.pending_conversion).toBe(true);
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, row.id));
+    expect(logs).toHaveLength(2);
+    expect(logs.map(log => `${log.action}:${log.reason}`).sort()).toEqual([
+      'canceled:user_requested_conversion',
+      'status_changed:user_requested_conversion_prepare',
+    ]);
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actor_type: 'user',
+          actor_id: user.id,
+          action: 'status_changed',
+          reason: 'user_requested_conversion_prepare',
+          before_state: expect.objectContaining({
+            pending_conversion: false,
+            cancel_at_period_end: false,
+          }),
+          after_state: expect.objectContaining({
+            pending_conversion: true,
+            cancel_at_period_end: false,
+          }),
+        }),
+        expect.objectContaining({
+          actor_type: 'user',
+          actor_id: user.id,
+          action: 'canceled',
+          reason: 'user_requested_conversion',
+          before_state: expect.objectContaining({
+            pending_conversion: true,
+            cancel_at_period_end: false,
+          }),
+          after_state: expect.objectContaining({
+            pending_conversion: true,
+            cancel_at_period_end: true,
+          }),
+        }),
+      ])
+    );
   });
 
   it('releases schedule before setting cancel_at_period_end', async () => {

@@ -7,6 +7,7 @@ import { db } from '@/lib/drizzle';
 import {
   insertKiloClawSubscriptionChangeLog,
   type KiloClawSubscriptionChangeAction,
+  type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
 import {
   credit_transactions,
@@ -641,6 +642,7 @@ export async function enrollWithCredits(params: {
   instanceId: string;
   plan: 'commit' | 'standard';
   hadPaidSubscription: boolean;
+  actor?: KiloClawSubscriptionChangeActor;
 }): Promise<void> {
   const { userId, instanceId, plan, hadPaidSubscription } = params;
 
@@ -833,7 +835,7 @@ export async function enrollWithCredits(params: {
         : 'created';
       await insertKiloClawSubscriptionChangeLog(tx, {
         subscriptionId: mutatedSubscription.id,
-        actor: CREDIT_BILLING_ACTOR,
+        actor: params.actor ?? CREDIT_BILLING_ACTOR,
         action,
         reason: 'credit_enrollment',
         before: currentSubscription ?? null,

@@ -906,7 +906,7 @@ export const OpenCodeFamilySchema = z.enum(['claude', 'gpt', 'gemini', 'llama', 
 
 export type OpenCodeFamily = z.infer<typeof OpenCodeFamilySchema>;
 
-export const VerbositySchema = z.enum(['low', 'medium', 'high', 'max']);
+export const VerbositySchema = z.enum(['low', 'medium', 'high', 'xhigh', 'max']);
 
 export type Verbosity = z.infer<typeof VerbositySchema>;
 

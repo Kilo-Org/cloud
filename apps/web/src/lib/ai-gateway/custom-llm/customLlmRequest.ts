@@ -593,13 +593,11 @@ function buildCommonParams(
     providerOptions: {
       anthropic: {
         thinking: { type: 'adaptive' },
-        effort: verbosity,
         disableParallelToolUse: request.parallel_tool_calls === false || isLegacyExtension,
       } satisfies AnthropicProviderOptions,
       openai: {
         forceReasoning: (reasoningEffort !== 'none' && customLlm.force_reasoning) || undefined,
         reasoningSummary: 'auto',
-        textVerbosity: verbosity === 'max' ? 'high' : verbosity,
         reasoningEffort: reasoningEffort,
         include: ['reasoning.encrypted_content'],
         parallelToolCalls: (request.parallel_tool_calls ?? true) && !isLegacyExtension,

@@ -50,6 +50,7 @@ minimumReleaseAgeExclude:
   - 'babel-preset-expo'
   - 'react-native'
   - 'react-native-*'
+  - '@anthropic-ai/sdk'
 
 onlyBuiltDependencies:
   - '@swc/core'

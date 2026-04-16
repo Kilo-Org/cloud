@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { execFile } from 'node:child_process';
-import { Duplex, Readable } from 'node:stream';
+import { Readable } from 'node:stream';
+import type { Duplex } from 'node:stream';
 import { Hono } from 'hono';
 import {
   DEFAULT_MAX_WS_CONNS,
@@ -17,6 +18,7 @@ import { registerConfigRoutes } from './routes/config';
 import { registerPairingRoutes } from './routes/pairing';
 import { createPairingCache } from './pairing-cache';
 import { registerEnvRoutes } from './routes/env';
+import { registerGoogleOAuthTokenRoutes } from './routes/google-oauth-token';
 import { registerGmailPushRoute } from './routes/gmail-push';
 import { registerInboundEmailRoute } from './routes/inbound-email';
 import { registerFileRoutes } from './routes/files';
@@ -24,12 +26,14 @@ import { registerKiloCliRunRoutes } from './routes/kilo-cli-run';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
 import { writeGogCredentials } from './gog-credentials';
+import { installGogShim } from './gog-shim';
 import { startWatchRenewal, stopWatchRenewal } from './gmail-watch-renewal';
 import { bootstrapCritical, bootstrapNonCritical } from './bootstrap';
 import type { ControllerStateRef, ControllerState } from './bootstrap';
 import { getOpenclawVersion } from './openclaw-version';
 import { startCheckin } from './checkin';
 import { collectProductTelemetry } from './product-telemetry';
+import { GoogleOAuthTokenProvider } from './google-oauth-token-provider';
 
 export type RuntimeConfig = {
   port: number;
@@ -59,7 +63,7 @@ function parseGatewayArgs(value: string | undefined): string[] {
   if (!Array.isArray(parsed) || parsed.some(v => typeof v !== 'string')) {
     throw new Error('KILOCLAW_GATEWAY_ARGS must be a JSON array of strings');
   }
-  return parsed;
+  return parsed as string[];
 }
 
 function parsePositiveInt(value: string | undefined, fallback: number, label: string): number {
@@ -235,8 +239,10 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
 
   // Register shutdown handlers early so degraded mode can still be killed cleanly.
   let shuttingDown = false;
+  // eslint-disable-next-line prefer-const -- assigned after critical bootstrap completes
   let supervisor: Supervisor | undefined;
   let gmailWatchSupervisor: Supervisor | undefined;
+  // eslint-disable-next-line prefer-const -- assigned after pairing cache is created
   let pairingCache: ReturnType<typeof createPairingCache> | undefined;
   let stopCheckin: (() => void) | undefined;
 
@@ -304,6 +310,13 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   const pc = createPairingCache();
   pairingCache = pc;
 
+  const googleOAuthTokenProvider = new GoogleOAuthTokenProvider({
+    getApiKey: () => env.KILOCODE_API_KEY ?? '',
+    getGatewayToken: () => config.expectedToken,
+    getSandboxId: () => env.KILOCLAW_SANDBOX_ID ?? '',
+    getCheckinUrl: () => env.KILOCLAW_CHECKIN_URL ?? '',
+  });
+
   supervisor = createSupervisor({
     args: ['gateway', ...config.gatewayArgs],
     onStdoutLine: line => pc.onPairingLogLine(line),
@@ -322,7 +335,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     } else {
       googleAccountEmail = email;
       gmailWatchSupervisor = createSupervisor({
-        command: 'gog',
+        command: '/usr/local/bin/gog',
         args: [
           'gmail',
           'watch',
@@ -355,6 +368,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   registerConfigRoutes(honoApp, supervisor, config.expectedToken);
   registerPairingRoutes(honoApp, pairingCache, config.expectedToken);
   registerEnvRoutes(honoApp, supervisor, config.expectedToken);
+  registerGoogleOAuthTokenRoutes(honoApp, config.expectedToken, googleOAuthTokenProvider);
   registerGmailPushRoute(honoApp, gmailWatchSupervisor ?? null, config.expectedToken);
   registerInboundEmailRoute(honoApp, supervisor, config.expectedToken, config.hooksToken);
   registerFileRoutes(honoApp, config.expectedToken, '/root/.openclaw');
@@ -409,6 +423,12 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     await writeGogCredentials(env as Record<string, string | undefined>);
   } catch (err) {
     console.error('[gog] Failed to write credentials:', err);
+  }
+
+  try {
+    installGogShim();
+  } catch (err) {
+    console.error('[gog] Failed to install shim:', err);
   }
 
   // ── Phase 7: Start gateway ──────────────────────────────────────────

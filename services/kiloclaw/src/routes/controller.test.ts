@@ -1,6 +1,7 @@
-import { describe, expect, it, vi, type Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { controller } from './controller';
 import { deriveGatewayToken } from '../auth/gateway-token';
+import { encryptWithSymmetricKey } from '@kilocode/encryption';
 
 type AnalyticsEngineDataPoint = {
   blobs: string[];
@@ -12,9 +13,24 @@ vi.mock('cloudflare:workers', () => ({
   waitUntil: (p: Promise<unknown>) => p,
 }));
 
+const {
+  mockFindEmailByUserId,
+  mockGetInstanceBySandboxId,
+  mockGetGoogleOAuthConnectionByInstanceId,
+  mockUpdateGoogleOAuthConnectionTokenData,
+} = vi.hoisted(() => ({
+  mockFindEmailByUserId: vi.fn().mockResolvedValue('user@example.com'),
+  mockGetInstanceBySandboxId: vi.fn(),
+  mockGetGoogleOAuthConnectionByInstanceId: vi.fn(),
+  mockUpdateGoogleOAuthConnectionTokenData: vi.fn(),
+}));
+
 vi.mock('../db', () => ({
   getWorkerDb: () => ({}),
-  findEmailByUserId: vi.fn().mockResolvedValue('user@example.com'),
+  findEmailByUserId: mockFindEmailByUserId,
+  getInstanceBySandboxId: mockGetInstanceBySandboxId,
+  getGoogleOAuthConnectionByInstanceId: mockGetGoogleOAuthConnectionByInstanceId,
+  updateGoogleOAuthConnectionTokenData: mockUpdateGoogleOAuthConnectionTokenData,
 }));
 
 type CaptureEventArg = {
@@ -42,6 +58,9 @@ function makeEnv(options?: {
   workerEnv?: string;
   tryMarkInstanceReady?: Mock;
   internalApiSecret?: string;
+  googleWorkspaceOauthClientId?: string;
+  googleWorkspaceOauthClientSecret?: string;
+  googleWorkspaceRefreshTokenEncryptionKey?: string;
 }) {
   const getConfig = vi.fn().mockResolvedValue({
     kilocodeApiKey: options?.kilocodeApiKey ?? 'kilo-key-1',
@@ -56,6 +75,10 @@ function makeEnv(options?: {
   const tryMarkInstanceReady =
     options?.tryMarkInstanceReady ??
     vi.fn().mockResolvedValue({ shouldNotify: false, userId: null });
+  const updateGoogleOAuthConnection = vi.fn().mockResolvedValue({
+    googleOAuthConnected: true,
+    googleOAuthStatus: 'active',
+  });
 
   return {
     GATEWAY_TOKEN_SECRET: options?.gatewayTokenSecret ?? 'gateway-secret',
@@ -63,7 +86,7 @@ function makeEnv(options?: {
     INTERNAL_API_SECRET: options?.internalApiSecret,
     KILOCLAW_INSTANCE: {
       idFromName: (userId: string) => userId,
-      get: () => ({ getConfig, getStatus, tryMarkInstanceReady }),
+      get: () => ({ getConfig, getStatus, tryMarkInstanceReady, updateGoogleOAuthConnection }),
     },
     KILOCLAW_CONTROLLER_AE: options?.writeDataPoint
       ? {
@@ -75,6 +98,13 @@ function makeEnv(options?: {
     HYPERDRIVE: options?.hyperdriveConnectionString
       ? { connectionString: options.hyperdriveConnectionString }
       : undefined,
+    GOOGLE_WORKSPACE_OAUTH_CLIENT_ID:
+      options?.googleWorkspaceOauthClientId ?? 'test-google-client-id',
+    GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET:
+      options?.googleWorkspaceOauthClientSecret ?? 'test-google-client-secret',
+    GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY:
+      options?.googleWorkspaceRefreshTokenEncryptionKey ??
+      Buffer.alloc(32, 7).toString('base64'),
   } as never;
 }
 
@@ -131,6 +161,17 @@ function firstAnalyticsEvent(writeDataPoint: Mock): AnalyticsEngineDataPoint {
 }
 
 describe('POST /checkin', () => {
+  beforeEach(() => {
+    mockFindEmailByUserId.mockReset().mockResolvedValue('user@example.com');
+    mockGetInstanceBySandboxId.mockReset();
+    mockGetGoogleOAuthConnectionByInstanceId.mockReset();
+    mockUpdateGoogleOAuthConnectionTokenData.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('returns 401 when required auth headers are missing', async () => {
     const response = await controller.request(
       '/checkin',
@@ -527,6 +568,123 @@ describe('POST /checkin', () => {
           shouldNotify: false,
         }),
       }
+    );
+  });
+});
+
+describe('POST /google/token', () => {
+  beforeEach(() => {
+    mockGetInstanceBySandboxId.mockReset();
+    mockGetGoogleOAuthConnectionByInstanceId.mockReset();
+    mockUpdateGoogleOAuthConnectionTokenData.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns an access token for active calendar oauth connections', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue({
+      instance_id: 'instance-1',
+      provider: 'google',
+      account_email: 'user@example.com',
+      account_subject: 'google-subject-1',
+      refresh_token_encrypted: encryptWithSymmetricKey('refresh-token-1', encryptionKey),
+      capabilities: ['calendar_read'],
+      scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+      status: 'active',
+    });
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          access_token: 'ya29.test',
+          expires_in: 3600,
+          scope: 'https://www.googleapis.com/auth/calendar.readonly',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId, capabilities: ['calendar_read'] }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload).toEqual(
+      expect.objectContaining({
+        accessToken: 'ya29.test',
+        accountEmail: 'user@example.com',
+      })
+    );
+    const scopes = (payload as { scopes?: unknown }).scopes;
+    expect(Array.isArray(scopes)).toBe(true);
+    expect(mockUpdateGoogleOAuthConnectionTokenData).toHaveBeenCalledWith(
+      {},
+      'instance-1',
+      expect.objectContaining({ status: 'active' })
+    );
+  });
+
+  it('marks oauth connection action_required on invalid_grant', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue({
+      instance_id: 'instance-1',
+      provider: 'google',
+      account_email: 'user@example.com',
+      account_subject: 'google-subject-1',
+      refresh_token_encrypted: encryptWithSymmetricKey('refresh-token-1', encryptionKey),
+      capabilities: ['calendar_read'],
+      scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+      status: 'active',
+    });
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: 'invalid_grant', error_description: 'Token has been expired' }),
+        { status: 400, headers: { 'content-type': 'application/json' } }
+      )
+    );
+
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId, capabilities: ['calendar_read'] }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(409);
+    const payload = await response.json();
+    expect(payload).toEqual(expect.objectContaining({ reason: 'invalid_grant' }));
+    expect(mockUpdateGoogleOAuthConnectionTokenData).toHaveBeenCalledWith(
+      {},
+      'instance-1',
+      expect.objectContaining({ status: 'action_required' })
     );
   });
 });

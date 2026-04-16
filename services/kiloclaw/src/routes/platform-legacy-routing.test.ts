@@ -12,12 +12,13 @@ vi.mock('../db', async importOriginal => {
     ...actual,
     getWorkerDb: vi.fn(() => ({})),
     getActivePersonalInstance: vi.fn(),
+    getInstanceById: vi.fn(),
   };
 });
 
 import { platform, resolveInstanceDoKey } from './platform';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
-import { getActivePersonalInstance } from '../db';
+import { getActivePersonalInstance, getInstanceById } from '../db';
 
 const currentUserId = '199e2b19-aa40-488d-9442-9a18a620ba68';
 const legacyDoKey = 'oauth/google:117453785559478190551';
@@ -153,5 +154,53 @@ describe('legacy platform DO routing', () => {
       `user:${currentUserId}`,
       '11111111-1111-4111-8111-111111111111'
     );
+  });
+});
+
+describe('resolveInstanceDoKey with instanceId', () => {
+  const env = {
+    HYPERDRIVE: { connectionString: 'postgresql://fake' },
+  } as never;
+  const instanceId = '11111111-1111-4111-8111-111111111111';
+  const newSandboxId = 'ki_11111111111141118111111111111111';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('translates the UUID to the legacy userId DO key when the instance row is legacy', async () => {
+    vi.mocked(getInstanceById).mockResolvedValue({
+      id: instanceId,
+      sandboxId: legacySandboxId,
+      userId: currentUserId,
+      orgId: null,
+      inboundEmailEnabled: false,
+    });
+
+    await expect(resolveInstanceDoKey(env, currentUserId, instanceId)).resolves.toBe(legacyDoKey);
+  });
+
+  it('returns the raw UUID when the instance row is instance-keyed', async () => {
+    vi.mocked(getInstanceById).mockResolvedValue({
+      id: instanceId,
+      sandboxId: newSandboxId,
+      userId: currentUserId,
+      orgId: null,
+      inboundEmailEnabled: false,
+    });
+
+    await expect(resolveInstanceDoKey(env, currentUserId, instanceId)).resolves.toBe(instanceId);
+  });
+
+  it('falls back to the raw UUID when the instance row is missing', async () => {
+    vi.mocked(getInstanceById).mockResolvedValue(null);
+
+    await expect(resolveInstanceDoKey(env, currentUserId, instanceId)).resolves.toBe(instanceId);
+  });
+
+  it('falls back to the raw UUID when the Hyperdrive lookup throws', async () => {
+    vi.mocked(getInstanceById).mockRejectedValue(new Error('hyperdrive down'));
+
+    await expect(resolveInstanceDoKey(env, currentUserId, instanceId)).resolves.toBe(instanceId);
   });
 });

@@ -35,7 +35,11 @@ import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
 import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
-import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
+import {
+  doKeyFromActiveInstance,
+  resolveDoKeyForInstance,
+  resolveDoKeyForUser,
+} from '../lib/instance-routing';
 import { getInstanceById, getWorkerDb } from '../db';
 import { kiloclaw_inbound_email_aliases } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -216,16 +220,32 @@ function setValidatedQueryUserId(c: Context<AppEnv>): string | null {
 /**
  * Resolve the DO key for a platform request.
  *
- * When instanceId is provided, it is always authoritative. Otherwise the
- * active Postgres row is the source of truth so legacy sandboxes continue to
- * route to the original userId-keyed DO after kilocode_users.id migrations.
+ * When instanceId is provided, the Postgres row is still consulted so legacy
+ * sandboxes (sandbox_id not starting with `ki_`) route to the original
+ * userId-keyed DO instead of a brand-new DO keyed by the row's UUID. If the
+ * lookup fails or the row is missing, we fall back to the raw UUID — correct
+ * for instance-keyed rows and a no-regression path for legacy rows.
  */
 export async function resolveInstanceDoKey(
   env: AppEnv['Bindings'],
   userId: string,
   instanceId?: string
 ): Promise<string> {
-  if (instanceId) return instanceId;
+  if (instanceId) {
+    try {
+      const resolved = await resolveDoKeyForInstance(env.HYPERDRIVE?.connectionString, instanceId);
+      if (resolved) return resolved;
+    } catch (err) {
+      console.warn(
+        '[platform] Failed to resolve DO key from instanceId, falling back to raw UUID',
+        {
+          instanceId,
+          error: err instanceof Error ? err.message : String(err),
+        }
+      );
+    }
+    return instanceId;
+  }
 
   try {
     return (await resolveDoKeyForUser(env.HYPERDRIVE?.connectionString, userId)) ?? userId;

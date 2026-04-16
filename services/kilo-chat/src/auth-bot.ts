@@ -6,8 +6,20 @@ import type { AuthContext } from './auth';
 /** Timing-safe string comparison using Web Crypto. */
 async function timingSafeEqual(a: string, b: string): Promise<boolean> {
   const enc = new TextEncoder();
-  const ka = await crypto.subtle.importKey('raw', enc.encode(a), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const kb = await crypto.subtle.importKey('raw', enc.encode(b), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const ka = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(a),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const kb = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(b),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
   const msg = enc.encode('kilo-chat:timing');
   const [sa, sb] = await Promise.all([
     crypto.subtle.sign('HMAC', ka, msg),

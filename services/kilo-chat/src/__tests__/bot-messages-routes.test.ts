@@ -297,7 +297,7 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 403 when editing another bot\'s message', async () => {
+  it("returns 403 when editing another bot's message", async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-edit-forbidden');
     // messageId was created by the user in setupData; the bot is a member but didn't author it
     const app = makeBotApp();
@@ -371,7 +371,7 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 403 when deleting another user\'s message', async () => {
+  it("returns 403 when deleting another user's message", async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-del-forbidden');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);

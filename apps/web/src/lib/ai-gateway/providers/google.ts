@@ -9,6 +9,10 @@ export function isGemini3Model(model: string) {
   return model.startsWith('google/gemini-3');
 }
 
+export function isGemmaModel(model: string) {
+  return model.startsWith('google/gemma');
+}
+
 type ReadFileParametersSchema = {
   properties?: {
     files?: {

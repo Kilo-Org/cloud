@@ -334,7 +334,7 @@ export function InstanceControls({
           variant="outline"
           className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
           disabled={!isRunning || isDestroying || isStarting || isRestarting || isRecovering}
-          onClick={async () => {
+          onClick={() => {
             posthog?.capture('claw_kilo_run_clicked', { instance_status: status.status });
             const existingRun = runHistory.data?.runs.find(r => r.status === 'running');
             if (existingRun) {

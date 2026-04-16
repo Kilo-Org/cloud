@@ -11,7 +11,6 @@ import { CheckCircle2, Clock, Loader2, Square, Terminal, XCircle } from 'lucide-
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { stripAnsi } from '@/lib/stripAnsi';
-import { DetailField } from './shared';
 
 // Nil UUID used as cache key for disabled queries. react-query requires a stable
 // queryKey even when the query is disabled; a nil UUID avoids colliding with
@@ -95,11 +94,12 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
   });
 
   // Clear activeRunId when the tracked run reaches a terminal state
+  const trackedRunStatus = runStatus?.status ?? null;
   useEffect(() => {
-    if (runStatus && runStatus.status !== null && runStatus.status !== 'running') {
+    if (trackedRunStatus !== null && trackedRunStatus !== 'running') {
       setActiveRunId(null);
     }
-  }, [runStatus?.status]);
+  }, [trackedRunStatus]);
 
   // Auto-scroll output
   useEffect(() => {
@@ -282,11 +282,7 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
                 <button
                   key={run.id}
                   type="button"
-                  onClick={() => {
-                    if (run.status === 'running') {
-                      setActiveRunId(run.id);
-                    }
-                  }}
+                  onClick={() => setActiveRunId(run.id)}
                   className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-muted/50"
                 >
                   <RunStatusBadge status={run.status} />

@@ -8,8 +8,9 @@ export default async function ClawLayout({ children }: { children: React.ReactNo
   return (
     <>
       {children}
-      <PylonWidget />
-      <PylonSupportButton />
+      <PylonWidget>
+        <PylonSupportButton />
+      </PylonWidget>
     </>
   );
 }

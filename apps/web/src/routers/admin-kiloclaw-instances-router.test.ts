@@ -3,14 +3,13 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import {
-  kilocode_users,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
 } from '@kilocode/db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { UpstreamApiError } from '@/lib/trpc/init';
 
@@ -137,17 +136,76 @@ beforeEach(async () => {
 
 /* eslint-disable drizzle/enforce-delete-with-where */
 afterEach(async () => {
-  const userIds = [regularUser.id, adminUser.id, cliRunUser.id];
   await db
     .delete(kiloclaw_admin_audit_logs)
     .where(eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id));
-  // Delete cli_runs before instances (cli_runs.instance_id FK → instances)
-  await db.delete(kiloclaw_cli_runs).where(inArray(kiloclaw_cli_runs.user_id, userIds));
-  // Deleting instances cascades to inbound email aliases
-  await db.delete(kiloclaw_instances).where(inArray(kiloclaw_instances.user_id, userIds));
-  await db.delete(kilocode_users).where(inArray(kilocode_users.id, userIds));
+  await db.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.id, cliRunId));
+  await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, cliRunInstanceId));
 });
 /* eslint-enable drizzle/enforce-delete-with-where */
+
+describe('admin.kiloclawInstances.listKiloCliRuns', () => {
+  it('returns all runs for a user when instanceId is omitted', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.listKiloCliRuns({
+      userId: cliRunUser.id,
+    });
+
+    expect(result.runs).toHaveLength(1);
+    expect(result.runs[0]).toMatchObject({ id: cliRunId });
+  });
+
+  it('scopes runs to a specific instance when instanceId is provided', async () => {
+    const secondInstanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: secondInstanceId,
+      user_id: cliRunUser.id,
+      sandbox_id: `ki_${secondInstanceId.replace(/-/g, '')}`,
+    });
+
+    const [secondRun] = await db
+      .insert(kiloclaw_cli_runs)
+      .values({
+        user_id: cliRunUser.id,
+        instance_id: secondInstanceId,
+        prompt: 'run on second instance',
+        status: 'running',
+        started_at: '2026-04-08T13:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_cli_runs.id });
+
+    try {
+      const caller = await createCallerForUser(adminUser.id);
+
+      // Without instanceId — returns both
+      const allResult = await caller.admin.kiloclawInstances.listKiloCliRuns({
+        userId: cliRunUser.id,
+      });
+      expect(allResult.runs).toHaveLength(2);
+
+      // With first instanceId — returns only the first run
+      const firstResult = await caller.admin.kiloclawInstances.listKiloCliRuns({
+        userId: cliRunUser.id,
+        instanceId: cliRunInstanceId,
+      });
+      expect(firstResult.runs).toHaveLength(1);
+      expect(firstResult.runs[0]).toMatchObject({ id: cliRunId });
+
+      // With second instanceId — returns only the second run
+      const secondResult = await caller.admin.kiloclawInstances.listKiloCliRuns({
+        userId: cliRunUser.id,
+        instanceId: secondInstanceId,
+      });
+      expect(secondResult.runs).toHaveLength(1);
+      expect(secondResult.runs[0]).toMatchObject({ id: secondRun.id });
+    } finally {
+      /* eslint-disable drizzle/enforce-delete-with-where */
+      await db.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.id, secondRun.id));
+      await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, secondInstanceId));
+      /* eslint-enable drizzle/enforce-delete-with-where */
+    }
+  });
+});
 
 describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   it('throws FORBIDDEN for non-admin users', async () => {
@@ -894,7 +952,7 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
     expect(logs[0].metadata).toEqual({
       instanceId: cliRunInstanceId,
       requestedInstanceId: cliRunInstanceId,
-      routerInstanceMissing: false,
+      usedFallback: false,
       runId: cliRunId,
     });
   });
@@ -961,7 +1019,7 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
       expect(logs[0].metadata).toEqual({
         instanceId: destroyedInstance.id,
         requestedInstanceId: destroyedInstance.id,
-        routerInstanceMissing: true,
+        usedFallback: true,
         runId: staleRun.id,
       });
     } finally {

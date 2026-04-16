@@ -193,20 +193,19 @@ function throwKiloclawAdminError(
  * Otherwise fall back to the user's active (personal) instance.
  */
 async function resolveInstance(userId: string, instanceId?: string) {
-  const instance = instanceId ? await getInstanceById(instanceId) : await getActiveInstance(userId);
-
-  if (!instance) {
-    if (instanceId) {
+  if (instanceId) {
+    const instance = await getInstanceById(instanceId);
+    if (!instance) {
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: `Instance ${instanceId} not found`,
         cause: new UpstreamApiError('instance_not_found'),
       });
     }
-    return null;
+    return instance;
   }
 
-  return instance;
+  return getActiveInstance(userId);
 }
 
 function assertInstanceBelongsToUser(
@@ -782,10 +781,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               metadata: {
                 instanceId: result.instanceId,
                 requestedInstanceId: input.instanceId ?? null,
-                // Whether the router resolved an instance for the user. Note:
-                // even when true, cancelCliRun may still reach the controller
-                // via the run row's own instance_id.
-                routerInstanceMissing: !instance,
+                usedFallback: !instance,
                 runId: input.runId,
               },
             });

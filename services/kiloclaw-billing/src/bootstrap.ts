@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import {
   getWorkerDb,
   insertKiloClawSubscriptionChangeLog,
@@ -166,34 +166,184 @@ async function bootstrapOrganizationSubscription(
   return created;
 }
 
-function chooseAdoptablePersonalSubscription(
+function currentPersonalSubscriptions(
   subscriptions: KiloClawSubscription[],
-  instancesById: Map<string, { destroyedAt: string | null; organizationId: string | null }>,
-  now: Date
-): KiloClawSubscription | null {
-  const candidates = subscriptions.filter(subscription => {
-    if (!isAccessGrantingSubscription(subscription, now)) {
+  instancesById: Map<string, { destroyedAt: string | null; organizationId: string | null }>
+): KiloClawSubscription[] {
+  return subscriptions.filter(subscription => {
+    if (subscription.transferred_to_subscription_id) {
       return false;
     }
-    if (subscription.instance_id === null) {
-      return true;
+    if (!subscription.instance_id) {
+      return false;
     }
     const instance = instancesById.get(subscription.instance_id);
-    return !!instance && instance.organizationId === null && !!instance.destroyedAt;
+    return !instance || instance.organizationId === null;
   });
+}
 
-  if (candidates.length === 0) {
+async function createSuccessorPersonalSubscription(params: {
+  db: ReturnType<typeof getWorkerDb>;
+  env: BillingWorkerEnv;
+  source: KiloClawSubscription;
+  targetInstanceId: string;
+}) {
+  return await params.db.transaction(async tx => {
+    const [before] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.id, params.source.id),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+        )
+      )
+      .limit(1)
+      .for('update');
+
+    if (!before) {
+      throw new Error('Failed to load source subscription for successor transfer');
+    }
+
+    const [lockedTargetInstance] = await tx
+      .select({ id: kiloclaw_instances.id })
+      .from(kiloclaw_instances)
+      .where(
+        and(
+          eq(kiloclaw_instances.id, params.targetInstanceId),
+          eq(kiloclaw_instances.user_id, before.user_id),
+          isNull(kiloclaw_instances.organization_id)
+        )
+      )
+      .limit(1)
+      .for('update');
+
+    if (!lockedTargetInstance) {
+      throw new Error('Failed to lock target personal instance for successor transfer');
+    }
+
+    const [existingTargetRow] = await tx
+      .select({ id: kiloclaw_subscriptions.id })
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, params.targetInstanceId))
+      .limit(1)
+      .for('update');
+
+    if (existingTargetRow) {
+      throw new Error('Target instance already has a subscription row');
+    }
+
+    const [insertedSuccessor] = await tx
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: before.user_id,
+        instance_id: params.targetInstanceId,
+        stripe_subscription_id: null,
+        stripe_schedule_id: null,
+        access_origin: before.access_origin,
+        payment_source: before.payment_source,
+        plan: before.plan,
+        scheduled_plan: before.scheduled_plan,
+        scheduled_by: before.scheduled_by,
+        status: before.status,
+        cancel_at_period_end: before.cancel_at_period_end,
+        pending_conversion: before.pending_conversion,
+        trial_started_at: before.trial_started_at,
+        trial_ends_at: before.trial_ends_at,
+        current_period_start: before.current_period_start,
+        current_period_end: before.current_period_end,
+        credit_renewal_at: before.credit_renewal_at,
+        commit_ends_at: before.commit_ends_at,
+        past_due_since: before.past_due_since,
+        suspended_at: before.suspended_at,
+        destruction_deadline: before.destruction_deadline,
+        auto_resume_requested_at: before.auto_resume_requested_at,
+        auto_resume_retry_after: before.auto_resume_retry_after,
+        auto_resume_attempt_count: before.auto_resume_attempt_count,
+        auto_top_up_triggered_for_period: before.auto_top_up_triggered_for_period,
+      })
+      .returning();
+
+    if (!insertedSuccessor) {
+      throw new Error('Failed to create successor personal subscription row');
+    }
+
+    const [predecessor] = await tx
+      .update(kiloclaw_subscriptions)
+      .set({
+        status: 'canceled',
+        transferred_to_subscription_id: insertedSuccessor.id,
+        stripe_subscription_id: null,
+        stripe_schedule_id: null,
+        credit_renewal_at: null,
+        cancel_at_period_end: false,
+        pending_conversion: false,
+        scheduled_plan: null,
+        scheduled_by: null,
+        auto_resume_requested_at: null,
+        auto_resume_retry_after: null,
+        auto_resume_attempt_count: 0,
+        auto_top_up_triggered_for_period: null,
+        destruction_deadline: null,
+      })
+      .where(eq(kiloclaw_subscriptions.id, before.id))
+      .returning();
+
+    if (!predecessor) {
+      throw new Error('Failed to update predecessor personal subscription row');
+    }
+
+    const successor =
+      before.stripe_subscription_id || before.stripe_schedule_id
+        ? await tx
+            .update(kiloclaw_subscriptions)
+            .set({
+              stripe_subscription_id: before.stripe_subscription_id,
+              stripe_schedule_id: before.stripe_schedule_id,
+            })
+            .where(eq(kiloclaw_subscriptions.id, insertedSuccessor.id))
+            .returning()
+            .then(rows => rows[0] ?? null)
+        : insertedSuccessor;
+
+    if (!successor) {
+      throw new Error('Failed to restore successor Stripe ownership');
+    }
+
+    await insertKiloClawSubscriptionChangeLog(tx, {
+      subscriptionId: predecessor.id,
+      actor: BOOTSTRAP_ACTOR,
+      action: 'reassigned',
+      reason: 'subscription_transfer_out',
+      before,
+      after: predecessor,
+    });
+
+    await insertKiloClawSubscriptionChangeLog(tx, {
+      subscriptionId: successor.id,
+      actor: BOOTSTRAP_ACTOR,
+      action: 'created',
+      reason: 'subscription_transfer_in',
+      before: null,
+      after: successor,
+    });
+
+    return successor;
+  });
+}
+
+function resolveExactCurrentPersonalSubscription(
+  subscriptions: KiloClawSubscription[],
+  instancesById: Map<string, { destroyedAt: string | null; organizationId: string | null }>
+): KiloClawSubscription | null {
+  const currentRows = currentPersonalSubscriptions(subscriptions, instancesById);
+  if (currentRows.length === 0) {
     return null;
   }
-
-  return (
-    [...candidates].sort((left, right) => {
-      if (left.plan !== right.plan) {
-        return left.plan === 'trial' ? 1 : -1;
-      }
-      return right.created_at.localeCompare(left.created_at);
-    })[0] ?? null
-  );
+  if (currentRows.length > 1) {
+    throw new Error('Multiple current personal subscription rows found during bootstrap');
+  }
+  return currentRows[0] ?? null;
 }
 
 async function bootstrapPersonalSubscription(
@@ -255,32 +405,32 @@ async function bootstrapPersonalSubscription(
     return !instance || instance.organizationId === null;
   });
 
-  const adoptable = chooseAdoptablePersonalSubscription(personalSubscriptions, instancesById, now);
-  if (adoptable) {
-    const before = adoptable;
-    const [updated] = await db
-      .update(kiloclaw_subscriptions)
-      .set({ instance_id: input.instanceId })
-      .where(eq(kiloclaw_subscriptions.id, adoptable.id))
-      .returning();
-
-    if (!updated) {
-      throw new Error('Failed to reassign provision bootstrap subscription');
+  const currentPersonalSubscription = resolveExactCurrentPersonalSubscription(
+    personalSubscriptions,
+    instancesById
+  );
+  if (currentPersonalSubscription) {
+    if (
+      currentPersonalSubscription.instance_id &&
+      currentPersonalSubscription.instance_id === input.instanceId
+    ) {
+      return currentPersonalSubscription;
     }
 
-    await writeBootstrapChangeLogBestEffort(env, {
-      subscriptionId: updated.id,
-      actor: BOOTSTRAP_ACTOR,
-      action: 'reassigned',
-      reason:
-        before.instance_id === null
-          ? 'personal_provision_adopt_detached'
-          : 'personal_provision_reassign_destroyed',
-      before,
-      after: updated,
-    });
-
-    return updated;
+    const currentInstance = currentPersonalSubscription.instance_id
+      ? instancesById.get(currentPersonalSubscription.instance_id)
+      : null;
+    if (
+      currentInstance?.destroyedAt &&
+      isAccessGrantingSubscription(currentPersonalSubscription, now)
+    ) {
+      return await createSuccessorPersonalSubscription({
+        db,
+        env,
+        source: currentPersonalSubscription,
+        targetInstanceId: input.instanceId,
+      });
+    }
   }
 
   const hasActiveEarlybirdAccess =

@@ -1,0 +1,224 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { mockGetWorkerDb, mockInsertKiloClawSubscriptionChangeLog } = vi.hoisted(() => ({
+  mockGetWorkerDb: vi.fn(),
+  mockInsertKiloClawSubscriptionChangeLog: vi.fn(async () => undefined),
+}));
+
+vi.mock('@kilocode/db', () => ({
+  getWorkerDb: mockGetWorkerDb,
+  insertKiloClawSubscriptionChangeLog: mockInsertKiloClawSubscriptionChangeLog,
+  kiloclaw_earlybird_purchases: {},
+  kiloclaw_instances: {},
+  kiloclaw_subscriptions: {},
+  organizations: {},
+  organization_seats_purchases: {},
+}));
+
+import { bootstrapProvisionSubscription } from './bootstrap.js';
+import type { BillingWorkerEnv } from './types.js';
+
+type SelectBuilder<T> = PromiseLike<T[]> & {
+  from: ReturnType<typeof vi.fn>;
+  where: ReturnType<typeof vi.fn>;
+  limit: ReturnType<typeof vi.fn>;
+  for: ReturnType<typeof vi.fn>;
+  then: Promise<T[]>['then'];
+};
+
+function createSelectBuilder<T>(rows: T[]): SelectBuilder<T> {
+  const promise = Promise.resolve(rows);
+  const builder = {
+    from: vi.fn(),
+    where: vi.fn(),
+    limit: vi.fn(),
+    for: vi.fn(async () => rows),
+    then: promise.then.bind(promise),
+  } as SelectBuilder<T>;
+  builder.from.mockReturnValue(builder);
+  builder.where.mockReturnValue(builder);
+  builder.limit.mockReturnValue(builder);
+  return builder;
+}
+
+function createMockDb(params: {
+  selectRows: unknown[][];
+  txSelectRows: unknown[][];
+  insertReturningRows: unknown[][];
+  updateReturningRows: unknown[][];
+}) {
+  const topLevelSelectQueue = [...params.selectRows];
+  const txSelectQueue = [...params.txSelectRows];
+  const insertQueue = [...params.insertReturningRows];
+  const updateQueue = [...params.updateReturningRows];
+  const insertValues: Array<Record<string, unknown>> = [];
+  const updateSets: Array<Record<string, unknown>> = [];
+
+  const db = {
+    select: vi.fn(() => createSelectBuilder(topLevelSelectQueue.shift() ?? [])),
+    transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        select: vi.fn(() => createSelectBuilder(txSelectQueue.shift() ?? [])),
+        insert: vi.fn(() => ({
+          values: vi.fn((values: Record<string, unknown>) => {
+            insertValues.push(values);
+            return {
+              returning: vi.fn(async () => insertQueue.shift() ?? []),
+            };
+          }),
+        })),
+        update: vi.fn(() => ({
+          set: vi.fn((values: Record<string, unknown>) => {
+            updateSets.push(values);
+            return {
+              where: vi.fn(() => ({
+                returning: vi.fn(async () => updateQueue.shift() ?? []),
+              })),
+            };
+          }),
+        })),
+      };
+
+      return await callback(tx);
+    }),
+  };
+
+  return { db, insertValues, updateSets };
+}
+
+function createEnv(): BillingWorkerEnv {
+  return {
+    HYPERDRIVE: { connectionString: 'postgres://test' },
+    LIFECYCLE_QUEUE: {
+      send: vi.fn(),
+    } as unknown as BillingWorkerEnv['LIFECYCLE_QUEUE'],
+    KILOCLAW: {
+      fetch: vi.fn(),
+    },
+    KILOCODE_BACKEND_BASE_URL: 'https://app.kilo.ai',
+    STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
+    STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
+    STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
+    INTERNAL_API_SECRET: 'next-secret',
+    KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+  };
+}
+
+describe('bootstrapProvisionSubscription successor transfer', () => {
+  beforeEach(() => {
+    mockGetWorkerDb.mockReset();
+    mockInsertKiloClawSubscriptionChangeLog.mockReset();
+  });
+
+  it('clears predecessor Stripe ownership before restoring it on successor row', async () => {
+    const source = {
+      id: 'sub-source',
+      user_id: 'user-1',
+      instance_id: 'instance-old',
+      stripe_subscription_id: 'stripe-live',
+      stripe_schedule_id: 'schedule-live',
+      transferred_to_subscription_id: null,
+      access_origin: null,
+      payment_source: 'stripe',
+      plan: 'standard',
+      scheduled_plan: null,
+      scheduled_by: null,
+      status: 'active',
+      cancel_at_period_end: false,
+      pending_conversion: false,
+      trial_started_at: null,
+      trial_ends_at: null,
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+      credit_renewal_at: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-04-01T00:00:00.000Z',
+      updated_at: '2026-04-01T00:00:00.000Z',
+    };
+    const insertedSuccessor = {
+      ...source,
+      id: 'sub-successor',
+      instance_id: 'instance-new',
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+      created_at: '2026-04-10T00:00:00.000Z',
+      updated_at: '2026-04-10T00:00:00.000Z',
+    };
+    const predecessorAfter = {
+      ...source,
+      status: 'canceled',
+      transferred_to_subscription_id: insertedSuccessor.id,
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+      updated_at: '2026-04-10T00:00:01.000Z',
+    };
+    const restoredSuccessor = {
+      ...insertedSuccessor,
+      stripe_subscription_id: source.stripe_subscription_id,
+      stripe_schedule_id: source.stripe_schedule_id,
+      updated_at: '2026-04-10T00:00:02.000Z',
+    };
+
+    const { db, insertValues, updateSets } = createMockDb({
+      selectRows: [
+        [],
+        [source],
+        [
+          { id: 'instance-old', destroyedAt: '2026-04-09T00:00:00.000Z', organizationId: null },
+          { id: 'instance-new', destroyedAt: null, organizationId: null },
+        ],
+        [],
+      ],
+      txSelectRows: [[source], [{ id: 'instance-new' }], []],
+      insertReturningRows: [[insertedSuccessor]],
+      updateReturningRows: [[predecessorAfter], [restoredSuccessor]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const result = await bootstrapProvisionSubscription(createEnv(), {
+      userId: source.user_id,
+      instanceId: 'instance-new',
+      orgId: null,
+    });
+
+    expect(insertValues).toHaveLength(1);
+    expect(insertValues[0]).toEqual(
+      expect.objectContaining({
+        instance_id: 'instance-new',
+        stripe_subscription_id: null,
+        stripe_schedule_id: null,
+      })
+    );
+    expect(updateSets).toHaveLength(2);
+    expect(updateSets[0]).toEqual(
+      expect.objectContaining({
+        transferred_to_subscription_id: insertedSuccessor.id,
+        stripe_subscription_id: null,
+        stripe_schedule_id: null,
+      })
+    );
+    expect(updateSets[1]).toEqual(
+      expect.objectContaining({
+        stripe_subscription_id: source.stripe_subscription_id,
+        stripe_schedule_id: source.stripe_schedule_id,
+      })
+    );
+    expect(result).toEqual(restoredSuccessor);
+    expect(mockInsertKiloClawSubscriptionChangeLog).toHaveBeenCalledTimes(2);
+    expect(mockInsertKiloClawSubscriptionChangeLog).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({
+        subscriptionId: restoredSuccessor.id,
+        after: restoredSuccessor,
+      })
+    );
+  });
+});

@@ -19,6 +19,7 @@ Updated 2026-03-20 -- Stripe-to-credits hybrid billing model.
 Updated 2026-03-24 -- credits-first billing, per-instance subscriptions,
 Kilo Pass upsell checkout.
 Updated 2026-03-27 -- subscription reassignment on re-provision.
+Updated 2026-04-16 -- successor subscription rows on personal reprovision.
 
 ## Conventions
 
@@ -219,15 +220,38 @@ rules resolve conflicts.
 4. The system MUST NOT require a credit card to start a trial.
 5. When a user provisions a new instance and the user's existing
    subscription references a destroyed instance, the system MUST
-   reassign the subscription to the newly provisioned instance,
-   provided the subscription still grants access (active,
-   non-suspended past-due, or trialing with a future end date). This
-   preserves the user's remaining subscription time when they destroy
-   and re-create an instance. The reassignment MUST occur during the
-   provisioning access check, before the instance is fully
-   provisioned. This rule applies to all subscription statuses that
-   grant access, not only trials, and satisfies the per-instance
-   invariant in Plans rule 5.
+   create a successor subscription row on the newly provisioned
+   instance, provided the current personal subscription row still
+   grants access (active, non-suspended past-due, or trialing with a
+   future end date). The predecessor row on the destroyed instance
+   MUST remain as historical record and MUST be marked non-live via
+   `transferred_to_subscription_id`. The successor row MUST inherit
+   the remaining entitlement and any live payment-provider ownership.
+   This preserves the user's remaining subscription time when they
+   destroy and re-create an instance while keeping one subscription
+   row per instance.
+
+### Personal Reprovision Transfer
+
+1. In personal context, the current subscription row is the personal
+   subscription row whose `transferred_to_subscription_id` is null.
+2. Live personal runtime MUST have at most one current subscription
+   row per user personal context. If more than one exists, runtime
+   MUST fail closed and quarantine/manual-review the user rather than
+   choose heuristically.
+3. Transferred-out predecessor rows MUST NOT participate in live
+   access checks, checkout duplicate guards, credit enrollment,
+   Stripe webhook mutation, invoice settlement, renewal, dunning,
+   lifecycle sweeps, or email warnings.
+4. Webhook and settlement routing MUST first resolve by Stripe
+   subscription ID. If resolved row has
+   `transferred_to_subscription_id`, runtime MUST follow predecessor
+   to successor until current row is reached. If Stripe ownership or
+   lineage resolution is ambiguous, missing, cyclic, or crosses the
+   personal/organization boundary, runtime MUST quarantine rather than
+   mutate a row.
+5. Personal paid flows MUST always carry an instance billing anchor.
+   The system MUST NOT create new detached personal subscription rows.
 
 ### Access Control
 

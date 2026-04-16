@@ -3892,6 +3892,7 @@ export const kiloclaw_subscriptions = pgTable(
       .references(() => kilocode_users.id),
     stripe_subscription_id: text().unique(),
     stripe_schedule_id: text(),
+    transferred_to_subscription_id: uuid().references((): AnyPgColumn => kiloclaw_subscriptions.id),
     instance_id: uuid().references(() => kiloclaw_instances.id),
     access_origin: text().$type<KiloClawSubscriptionAccessOrigin>(),
     payment_source: text().$type<KiloClawPaymentSource>(),
@@ -3924,6 +3925,7 @@ export const kiloclaw_subscriptions = pgTable(
     index('IDX_kiloclaw_subscriptions_status').on(table.status),
     index('IDX_kiloclaw_subscriptions_user_id').on(table.user_id),
     index('IDX_kiloclaw_subscriptions_user_status').on(table.user_id, table.status),
+    index('IDX_kiloclaw_subscriptions_transferred_to').on(table.transferred_to_subscription_id),
     index('IDX_kiloclaw_subscriptions_stripe_schedule_id').on(table.stripe_schedule_id),
     index('IDX_kiloclaw_subscriptions_auto_resume_retry_after').on(table.auto_resume_retry_after),
     enumCheck('kiloclaw_subscriptions_plan_check', table.plan, KiloClawPlan),
@@ -3942,6 +3944,9 @@ export const kiloclaw_subscriptions = pgTable(
     uniqueIndex('UQ_kiloclaw_subscriptions_instance')
       .on(table.instance_id)
       .where(isNotNull(table.instance_id)),
+    uniqueIndex('UQ_kiloclaw_subscriptions_transferred_to')
+      .on(table.transferred_to_subscription_id)
+      .where(isNotNull(table.transferred_to_subscription_id)),
     index('IDX_kiloclaw_subscriptions_earlybird_origin')
       .on(table.user_id, table.access_origin)
       .where(sql`${table.access_origin} = 'earlybird'`),

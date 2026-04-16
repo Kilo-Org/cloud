@@ -89,7 +89,7 @@ export async function applyResolvedAutoModel(
     if (request.kind === 'messages') {
       request.body.output_config = {
         ...request.body.output_config,
-        effort: resolved.verbosity,
+        effort: resolved.verbosity === 'xhigh' ? 'max' : resolved.verbosity,
       };
     } else if (request.kind === 'responses') {
       request.body.text = {

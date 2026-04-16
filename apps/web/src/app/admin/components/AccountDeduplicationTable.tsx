@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   Table,
@@ -23,9 +24,27 @@ const PAGE_SIZE = 20;
 const DEFAULT_MIN_ACCOUNTS = 2;
 
 export function AccountDeduplicationTable() {
-  const [page, setPage] = useState(1);
-  const [minAccounts, setMinAccounts] = useState(DEFAULT_MIN_ACCOUNTS);
-  const [hideAllBlocked, setHideAllBlocked] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
+  const minAccounts = Math.max(
+    2,
+    parseInt(searchParams.get('minAccounts') ?? String(DEFAULT_MIN_ACCOUNTS), 10)
+  );
+  const hideAllBlocked = searchParams.get('hideAllBlocked') === 'true';
+
+  const updateParams = useCallback(
+    (updates: Record<string, string>) => {
+      const params = new URLSearchParams(searchParams);
+      for (const [key, value] of Object.entries(updates)) {
+        params.set(key, value);
+      }
+      router.replace(`${pathname}?${params}`);
+    },
+    [searchParams, router, pathname]
+  );
 
   const { data, isLoading } = useQuery<AccountDeduplicationResponse>({
     queryKey: ['account-deduplication', page, minAccounts, hideAllBlocked],
@@ -71,8 +90,7 @@ export function AccountDeduplicationTable() {
             onChange={e => {
               const val = parseInt(e.target.value, 10);
               if (val >= 2) {
-                setMinAccounts(val);
-                setPage(1);
+                updateParams({ minAccounts: String(val), page: '1' });
               }
             }}
             className="w-28"
@@ -83,8 +101,7 @@ export function AccountDeduplicationTable() {
             id="hide-all-blocked"
             checked={hideAllBlocked}
             onCheckedChange={checked => {
-              setHideAllBlocked(checked);
-              setPage(1);
+              updateParams({ hideAllBlocked: String(checked), page: '1' });
             }}
           />
           <Label htmlFor="hide-all-blocked" className="cursor-pointer text-sm font-normal">
@@ -146,7 +163,7 @@ export function AccountDeduplicationTable() {
               variant="outline"
               size="sm"
               disabled={!hasPrev}
-              onClick={() => setPage(p => p - 1)}
+              onClick={() => updateParams({ page: String(page - 1) })}
             >
               Previous
             </Button>
@@ -154,7 +171,7 @@ export function AccountDeduplicationTable() {
               variant="outline"
               size="sm"
               disabled={!hasNext}
-              onClick={() => setPage(p => p + 1)}
+              onClick={() => updateParams({ page: String(page + 1) })}
             >
               Next
             </Button>

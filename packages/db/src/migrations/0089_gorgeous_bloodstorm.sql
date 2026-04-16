@@ -5,6 +5,8 @@ CREATE TABLE "kiloclaw_google_oauth_connections" (
 	"account_email" text NOT NULL,
 	"account_subject" text NOT NULL,
 	"oauth_client_id" text NOT NULL,
+	"oauth_client_secret_encrypted" text,
+	"credential_profile" text DEFAULT 'kilo_owned' NOT NULL,
 	"refresh_token_encrypted" text NOT NULL,
 	"scopes" text[] DEFAULT '{}'::text[] NOT NULL,
 	"capabilities" text[] DEFAULT '{}'::text[] NOT NULL,
@@ -14,7 +16,8 @@ CREATE TABLE "kiloclaw_google_oauth_connections" (
 	"connected_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "kiloclaw_google_oauth_connections_status_check" CHECK ("kiloclaw_google_oauth_connections"."status" IN ('active', 'action_required', 'disconnected'))
+	CONSTRAINT "kiloclaw_google_oauth_connections_status_check" CHECK ("kiloclaw_google_oauth_connections"."status" IN ('active', 'action_required', 'disconnected')),
+	CONSTRAINT "kiloclaw_google_oauth_connections_credential_profile_check" CHECK ("kiloclaw_google_oauth_connections"."credential_profile" IN ('legacy', 'kilo_owned'))
 );
 --> statement-breakpoint
 ALTER TABLE "kiloclaw_google_oauth_connections" ADD CONSTRAINT "kiloclaw_google_oauth_connections_instance_id_kiloclaw_instances_id_fk" FOREIGN KEY ("instance_id") REFERENCES "public"."kiloclaw_instances"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

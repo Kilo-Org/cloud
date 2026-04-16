@@ -4262,6 +4262,12 @@ export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
 // coverage blurbs, CTA copy) do not require a code deploy. Edited via the
 // admin UI under /admin/kiloclaw?tab=security-advisor-content. Rows can be
 // soft-disabled via is_active.
+//
+// Note on `updated_at`: `.$onUpdateFn(() => sql\`now()\`)` only fires on
+// `db.update()` calls — NOT on the SET clause of `INSERT ... ON CONFLICT
+// DO UPDATE`. All writes in the admin router go through `onConflictDoUpdate`
+// and explicitly set `updated_at: nowIso()`. The $onUpdateFn here is a
+// safety net for any future direct `.update()` call we might add.
 
 export const security_advisor_check_catalog = pgTable(
   'security_advisor_check_catalog',

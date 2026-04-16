@@ -44,6 +44,10 @@ export type LoadedSecurityAdvisorContent = {
 // --- TTL cache ---
 
 // 5 minutes in prod; 0 in dev so content changes are visible immediately.
+// A 0-TTL doesn't disable caching entirely — requests within the same event
+// loop tick still coalesce onto the same singleflight promise — but any call
+// arriving after a resolved load will find cached.expiresAt <= now and
+// re-query. That's the intended dev behavior.
 const CACHE_TTL_MS = process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000;
 
 let cached: { data: LoadedSecurityAdvisorContent; expiresAt: number } | null = null;
@@ -130,6 +134,15 @@ export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisor
 }
 
 /** Invalidate the in-process cache, forcing the next call to re-query.
+ *
+ * We also clear `inFlight` and bump `cacheVersion`. This has one intentional
+ * cost: an in-flight pre-write load keeps running to completion (we can't
+ * cancel it) — so a caller arriving between invalidation and the post-write
+ * load starting WILL launch a second parallel query. Both loads run
+ * concurrently for a moment; the older one's result is discarded by the
+ * cacheVersion check, and its `finally` block leaves inFlight alone
+ * because it no longer points at itself. Benign, no stale-cache risk.
+ *
  * Also clears `inFlight` so a new request after invalidation starts a
  * fresh DB load (rather than coalescing onto a pre-write load whose
  * result is about to be discarded by the cacheVersion check). */

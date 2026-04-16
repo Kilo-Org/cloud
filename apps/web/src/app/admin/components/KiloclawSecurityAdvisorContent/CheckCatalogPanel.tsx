@@ -39,9 +39,16 @@ type Severity = 'critical' | 'warn' | 'info';
 /** Narrow the DB-returned severity string to the Severity union via a
  * discriminated check, falling back to 'warn' on unexpected values.
  * The DB has a CHECK constraint, but we avoid a bare `as` cast per the
- * repo's type-safety standards. */
+ * repo's type-safety standards.
+ *
+ * If the fallback ever fires, something has gone wrong (manual SQL edit,
+ * schema drift). Surface it so the admin doesn't silently save 'warn'
+ * back over whatever-invalid-value the row actually holds. */
 function toSeverity(value: string): Severity {
   if (value === 'critical' || value === 'warn' || value === 'info') return value;
+  console.warn(
+    `[SecurityAdvisor] CheckCatalogPanel: row has invalid severity "${value}"; displaying 'warn' as fallback. Verify the row in the DB and re-save to correct.`
+  );
   return 'warn';
 }
 

@@ -56,9 +56,17 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
     }),
 
     upsert: adminProcedure.input(UpsertCheckSchema).mutation(async ({ input }) => {
-      // Atomic upsert — avoids the TOCTOU race between two concurrent admin
-      // saves for the same check_id (a read-then-write pattern would have
-      // both branches see "no existing row" and both try to insert).
+      // Atomic upsert keyed on check_id — avoids the TOCTOU race between two
+      // concurrent admin saves for the same check_id (a read-then-write
+      // pattern would have both branches see "no existing row" and both try
+      // to insert).
+      //
+      // By design, `check_id` is the natural key: creating a record with an
+      // existing check_id overwrites it, and there is no separate `id`-based
+      // rename path. The admin UI disables the check_id input in edit mode,
+      // so the only way to "rename" a check via this endpoint is to create
+      // a new one and delete the old. Keep in mind if the endpoint grows
+      // non-admin callers.
       const [row] = await db
         .insert(security_advisor_check_catalog)
         .values(input)
@@ -110,12 +118,20 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
     }),
 
     upsert: adminProcedure.input(UpsertCoverageSchema).mutation(async ({ input }) => {
-      // Reject if any incoming checkId is already claimed by a different
-      // active coverage row. The load-side `findCoverageForCheckId` picks
-      // deterministically when overlaps exist, but overlaps make the
-      // report content surprising to edit, so catch the mistake at save
-      // time. Uses PostgreSQL array-overlap (&&) for a single indexed
-      // query rather than N per-checkId lookups.
+      // Best-effort UX validation: reject if any incoming checkId is already
+      // claimed by a different active coverage row. The load-side
+      // `findCoverageForCheckId` already picks deterministically when
+      // overlaps exist, but overlaps make the report content confusing to
+      // edit, so catch the mistake at save time. Uses PostgreSQL array-
+      // overlap (&&) for a single indexed query rather than N per-checkId
+      // lookups.
+      //
+      // NOTE: This is a read-then-write check with a TOCTOU window — two
+      // concurrent admin saves for different areas that each introduce an
+      // overlap the other is about to introduce can both pass and both
+      // land. The load-side deterministic pick still keeps the report
+      // coherent; this check is a UX guardrail, not a DB-enforced
+      // invariant. Acceptable given admin-UI concurrency is low.
       if (input.is_active && input.match_check_ids.length > 0) {
         const conflicting = await db
           .select({

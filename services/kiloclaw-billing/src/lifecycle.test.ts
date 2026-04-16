@@ -146,7 +146,7 @@ function createEnv(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch']): BillingWor
     STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
     STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
     STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
-    INTERNAL_API_SECRET: 'next-secret',
+    INTERNAL_API_SECRET: 'next-internal-api-secret',
     KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
   };
 }

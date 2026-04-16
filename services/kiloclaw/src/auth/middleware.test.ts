@@ -245,7 +245,7 @@ describe('internalApiMiddleware', () => {
       '/internal/status',
       { headers: { 'x-internal-api-key': 'wrong-key' } },
       {
-        INTERNAL_API_SECRET: 'next-secret',
+        INTERNAL_API_SECRET: 'next-internal-api-secret',
         KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
       } as never
     );
@@ -257,7 +257,7 @@ describe('internalApiMiddleware', () => {
       '/internal/status',
       { headers: { 'x-internal-api-key': 'claw-secret' } },
       {
-        INTERNAL_API_SECRET: 'next-secret',
+        INTERNAL_API_SECRET: 'next-internal-api-secret',
         KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
       } as never
     );

@@ -79,7 +79,7 @@ describe('platform route env validation', () => {
         body: JSON.stringify({ userId: 'user-1' }),
       }),
       {
-        INTERNAL_API_SECRET: 'next-secret',
+        INTERNAL_API_SECRET: 'next-internal-api-secret',
         HYPERDRIVE: { connectionString: 'postgresql://fake' },
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
@@ -108,7 +108,7 @@ describe('platform route env validation', () => {
         body: JSON.stringify({ userId: 'user-1' }),
       }),
       {
-        INTERNAL_API_SECRET: 'next-secret',
+        INTERNAL_API_SECRET: 'next-internal-api-secret',
         KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
         HYPERDRIVE: { connectionString: 'postgresql://fake' },
         GATEWAY_TOKEN_SECRET: 'gateway-secret',

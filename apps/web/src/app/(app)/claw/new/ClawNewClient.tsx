@@ -74,6 +74,7 @@ function ClawNewLoader({
       mode={mode}
       createFlowStarted={createFlowStartedAt !== null}
       onCreateFlowStarted={onCreateFlowStarted}
+      onCreateFlowFailed={onCreateFlowFailed}
     />
   );
 }

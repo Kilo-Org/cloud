@@ -68,6 +68,7 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
         organizationId={organizationId}
         createFlowStarted={createFlowStartedAt !== null}
         onCreateFlowStarted={onCreateFlowStarted}
+        onCreateFlowFailed={onCreateFlowFailed}
       />
     );
   }
@@ -82,6 +83,7 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
         organizationId={organizationId}
         createFlowStarted={createFlowStartedAt !== null}
         onCreateFlowStarted={onCreateFlowStarted}
+        onCreateFlowFailed={onCreateFlowFailed}
       />
     );
   }
@@ -97,6 +99,7 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
       organizationId={organizationId}
       createFlowStarted={createFlowStartedAt !== null}
       onCreateFlowStarted={onCreateFlowStarted}
+      onCreateFlowFailed={onCreateFlowFailed}
     />
   );
 }

@@ -26,7 +26,7 @@ import {
   formatGitLabRepositoriesForPrompt,
   getGitLabRepositoryContext,
 } from '@/lib/slack-bot/gitlab-repository-context';
-import { isFreeModel } from '@/lib/models';
+import { isFreeModel } from '@/lib/ai-gateway/models';
 import { generateApiToken } from '@/lib/tokens';
 import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';

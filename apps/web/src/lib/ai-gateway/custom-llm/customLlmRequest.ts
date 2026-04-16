@@ -33,7 +33,7 @@ import { PhaseSchema, type ChatCompletionChunk, type ChatCompletionChunkChoice }
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { debugSaveLog, inStreamDebugMode } from '@/lib/debugUtils';
-import { ReasoningFormat } from '@/lib/custom-llm/format';
+import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
 import {
   CustomLlmExtraBodySchema,
   CustomLlmExtraHeadersSchema,

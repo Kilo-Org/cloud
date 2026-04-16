@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { EXA_API_KEY } from '@/lib/config.server';
 import { after } from 'next/server';
-import { wrapInSafeNextResponse } from '@/lib/llm-proxy-helpers';
+import { wrapInSafeNextResponse } from '@/lib/ai-gateway/llm-proxy-helpers';
 import {
   getExaMonthlyUsage,
   getExaFreeAllowanceMicrodollars,

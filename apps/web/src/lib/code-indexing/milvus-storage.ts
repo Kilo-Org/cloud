@@ -1,4 +1,4 @@
-import type { EmbeddingService } from '@/lib/embeddings/embedding-providers';
+import type { EmbeddingService } from '@/lib/ai-gateway/embeddings/embedding-providers';
 import { getMilvusClient } from './milvus';
 import type {
   ChunkWithMetadata,

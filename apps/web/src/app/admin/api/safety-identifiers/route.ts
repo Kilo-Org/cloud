@@ -5,7 +5,7 @@ import { kilocode_users } from '@kilocode/db';
 import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
-} from '@/lib/providerHash';
+} from '@/lib/ai-gateway/providerHash';
 import { isNull, count, or, desc, sql } from 'drizzle-orm';
 
 const missingEither = or(

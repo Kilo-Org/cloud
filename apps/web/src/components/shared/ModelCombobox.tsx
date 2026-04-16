@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/command';
 import { ChevronsUpDown, Check, Image } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { preferredModels } from '@/lib/models';
+import { preferredModels } from '@/lib/ai-gateway/models';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 

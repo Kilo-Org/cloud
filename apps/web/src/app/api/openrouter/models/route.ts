@@ -8,7 +8,7 @@ import { getDirectByokModelsForUser } from '@/lib/providers/direct-byok';
 import { unstable_cache } from 'next/cache';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
-import { filterByFeature } from '@/lib/models';
+import { filterByFeature } from '@/lib/ai-gateway/models';
 
 const getDirectByokModels = unstable_cache(
   (userId: string) => getDirectByokModelsForUser(userId),

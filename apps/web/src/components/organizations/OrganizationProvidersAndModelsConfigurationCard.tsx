@@ -13,7 +13,7 @@ import { AvailableModelsDialog } from './providers-and-models/AvailableModelsDia
 import { useOrganizationConfiguration } from './providers-and-models/useOrganizationConfiguration';
 import { useOpenRouterModelsAndProviders } from '@/app/api/openrouter/hooks';
 import type { ProviderSelection } from '@/components/models/util';
-import { normalizeModelId } from '@/lib/model-utils';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 type OrganizationProvidersAndModelsConfigurationCardProps = {
   organizationId: string;

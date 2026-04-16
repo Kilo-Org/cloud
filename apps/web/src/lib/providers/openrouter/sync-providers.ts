@@ -1,5 +1,5 @@
 import pLimit from 'p-limit';
-import { kiloExclusiveModels } from '@/lib/models';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import { normalizeModelId } from '@/lib/providers/openrouter';
 import { convertFromKiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 import type {

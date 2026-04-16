@@ -1,6 +1,6 @@
 import { isKiloAutoModel } from '@/lib/kilo-auto';
 import { resolveAutoModel } from '@/lib/kilo-auto/resolution';
-import { preferredModels } from '@/lib/models';
+import { preferredModels } from '@/lib/ai-gateway/models';
 
 export async function getMonitoredModels() {
   const set = new Set<string>();

@@ -1,4 +1,4 @@
-import { PRIMARY_DEFAULT_MODEL, preferredModels } from '@/lib/models';
+import { PRIMARY_DEFAULT_MODEL, preferredModels } from '@/lib/ai-gateway/models';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';

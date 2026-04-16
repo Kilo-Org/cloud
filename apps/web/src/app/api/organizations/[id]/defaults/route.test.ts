@@ -8,7 +8,7 @@ import { createOrganization } from '@/lib/organizations/organizations';
 import { db } from '@/lib/drizzle';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 
 jest.mock('@/lib/organizations/organization-auth');
 jest.mock('@/lib/providers/openrouter');

@@ -1,4 +1,4 @@
-import { kiloExclusiveModels } from '@/lib/models';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/providers/openrouter/inference-provider-id';
 
 const vercelModelIdMapping: Record<string, string | undefined> = {

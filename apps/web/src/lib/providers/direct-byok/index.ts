@@ -5,9 +5,9 @@ import {
   type DirectByokProvider,
 } from '@/lib/providers/direct-byok/types';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
-import { getBYOKforOrganization, getBYOKforUser } from '@/lib/byok';
+import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 import { readDb } from '@/lib/drizzle';
-import { preferredModels } from '@/lib/models';
+import { preferredModels } from '@/lib/ai-gateway/models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { OpenCodeSettings } from '@kilocode/db';
 

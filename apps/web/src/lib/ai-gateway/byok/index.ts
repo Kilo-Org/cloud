@@ -1,8 +1,8 @@
 import { readDb, type db } from '@/lib/drizzle';
 import { byok_api_keys, modelsByProvider } from '@kilocode/db/schema';
 import { eq, and, inArray, desc } from 'drizzle-orm';
-import type { EncryptedData } from '@/lib/byok/encryption';
-import { decryptApiKey } from '@/lib/byok/encryption';
+import type { EncryptedData } from '@/lib/ai-gateway/byok/encryption';
+import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import {
   UserByokProviderIdSchema,

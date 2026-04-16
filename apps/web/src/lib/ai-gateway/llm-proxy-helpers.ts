@@ -1,6 +1,6 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { FEATURE_HEADER, type FeatureValue } from '@/lib/feature-detection';
-import { countAndStoreUsage, logMicrodollarUsage } from '@/lib/processUsage';
+import { countAndStoreUsage, logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
@@ -28,13 +28,13 @@ import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/providers/openrouter';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
-import { sentryRootSpan } from './getRootSpan';
-import { isKiloStealthModel, kiloExclusiveModels } from '@/lib/models';
+import { sentryRootSpan } from '../getRootSpan';
+import { isKiloStealthModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
   PromptInfo,
-} from '@/lib/processUsage.types';
+} from '@/lib/ai-gateway/processUsage.types';
 import { getMaxTokens } from '@/lib/providers/openrouter/request-helpers';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/providers/types';

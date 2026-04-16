@@ -16,7 +16,7 @@ import type {
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
 } from '@/lib/providers/openrouter/types';
-import { extractInputItemTextContent } from '@/lib/processUsage.responses';
+import { extractInputItemTextContent } from '@/lib/ai-gateway/processUsage.responses';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import type { FeatureValue } from '@/lib/feature-detection';
 import 'server-only';

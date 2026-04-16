@@ -1,8 +1,8 @@
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { isOpenCodeBasedClient, isRooCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
-import { applyTrackingIds } from '@/lib/providerHash';
-import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/processUsage';
+import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
+import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/ai-gateway/processUsage';
 import {
   validateFeatureHeader,
   FEATURE_HEADER,
@@ -26,7 +26,7 @@ import {
   isExcludedForFeature,
   isKiloExclusiveFreeModel,
   isKiloStealthModel,
-} from '@/lib/models';
+} from '@/lib/ai-gateway/models';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
@@ -45,10 +45,10 @@ import {
   forbiddenFreeModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
-} from '@/lib/llm-proxy-helpers';
+} from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
+import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/ai-gateway/tool-calling';
 import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
 import {
   rewriteFreeModelResponse_ChatCompletions,
@@ -67,23 +67,23 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { handleRequestLogging } from '@/lib/handleRequestLogging';
-import { classifyAbuse } from '@/lib/abuse-service';
+import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
+import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
 import {
   emitApiMetricsForResponse,
   getToolsAvailable,
   getToolsUsed,
-} from '@/lib/o11y/api-metrics.server';
-import { grokCodeFastOptimizedRequest } from '@/lib/custom-llm/customLlmRequest';
-import { normalizeModelId } from '@/lib/model-utils';
-import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
+} from '@/lib/ai-gateway/o11y/api-metrics.server';
+import { grokCodeFastOptimizedRequest } from '@/lib/ai-gateway/custom-llm/customLlmRequest';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { isKiloAutoModel } from '@/lib/kilo-auto';
 import { applyResolvedAutoModel } from '@/lib/kilo-auto/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/providers/fixOpenCodeDuplicateReasoning';
-import type { MicrodollarUsageContext, PromptInfo } from '@/lib/processUsage.types';
-import { extractResponsesPromptInfo } from '@/lib/processUsage.responses';
-import { extractMessagesPromptInfo } from '@/lib/processUsage.messages';
+import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/processUsage.types';
+import { extractResponsesPromptInfo } from '@/lib/ai-gateway/processUsage.responses';
+import { extractMessagesPromptInfo } from '@/lib/ai-gateway/processUsage.messages';
 import {
   fixResponsesRequest,
   getMaxTokens,

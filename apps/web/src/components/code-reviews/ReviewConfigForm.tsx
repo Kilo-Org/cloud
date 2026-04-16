@@ -30,7 +30,7 @@ import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganiz
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect, type Repository } from './RepositoryMultiSelect';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import {
   getAvailableThinkingEfforts,
   thinkingEffortLabel,

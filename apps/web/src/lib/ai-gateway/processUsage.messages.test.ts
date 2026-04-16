@@ -4,7 +4,7 @@ import {
   parseMessagesMicrodollarUsageFromString,
   processMessagesApiUsage,
 } from './processUsage.messages';
-import { verifyApproval } from '../tests/helpers/approval.helper';
+import { verifyApproval } from '../../tests/helpers/approval.helper';
 import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';

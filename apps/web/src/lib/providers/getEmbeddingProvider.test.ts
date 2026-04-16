@@ -2,10 +2,14 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import { getEmbeddingProvider } from '@/lib/providers';
 import PROVIDERS from '@/lib/providers/provider-definitions';
 import { createAnonymousContext } from '@/lib/anonymous';
-import { getModelUserByokProviders, getBYOKforUser, getBYOKforOrganization } from '@/lib/byok';
+import {
+  getModelUserByokProviders,
+  getBYOKforUser,
+  getBYOKforOrganization,
+} from '@/lib/ai-gateway/byok';
 import type { User } from '@kilocode/db/schema';
 
-jest.mock('@/lib/byok');
+jest.mock('@/lib/ai-gateway/byok');
 
 const mockedGetModelUserByokProviders = getModelUserByokProviders as jest.Mock;
 const mockedGetBYOKforUser = getBYOKforUser as jest.Mock;

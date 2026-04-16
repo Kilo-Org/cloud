@@ -3,9 +3,9 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
-import type { MicrodollarUsageContext } from '@/lib/processUsage.types';
+import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { isFreeModel } from '@/lib/models';
+import { isFreeModel } from '@/lib/ai-gateway/models';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user.server';
 import {
@@ -18,13 +18,13 @@ import {
   wrapInSafeNextResponse,
   captureProxyError,
   extractHeaderAndLimitLength,
-} from '@/lib/llm-proxy-helpers';
+} from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { readDb } from '@/lib/drizzle';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { sentryLogger } from '@/lib/utils.server';
-import { getBYOKforOrganization, getBYOKforUser } from '@/lib/byok';
+import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 
 const MISTRAL_FIM_URL = 'https://api.mistral.ai/v1/fim/completions';
 const INCEPTION_FIM_URL = 'https://api.inceptionlabs.ai/v1/fim/completions';

@@ -1,8 +1,11 @@
 import { captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
-import { toMicrodollars } from './utils';
-import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/processUsage.constants';
-import type { NotYetCostedUsageStats, VercelProviderMetaData } from '@/lib/processUsage.types';
+import { toMicrodollars } from '../utils';
+import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
+import type {
+  NotYetCostedUsageStats,
+  VercelProviderMetaData,
+} from '@/lib/ai-gateway/processUsage.types';
 
 type OpenRouterCostFields = {
   cost?: number;

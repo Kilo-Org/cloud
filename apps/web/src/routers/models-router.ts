@@ -1,5 +1,5 @@
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { preferredModels } from '@/lib/models';
+import { preferredModels } from '@/lib/ai-gateway/models';
 import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 
 const preferredSet = new Set(preferredModels);

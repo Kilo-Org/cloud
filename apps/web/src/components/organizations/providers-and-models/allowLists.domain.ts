@@ -1,4 +1,4 @@
-import { normalizeModelId } from '@/lib/model-utils';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 export type OpenRouterModelSlugSnapshot = {
   slug: string;

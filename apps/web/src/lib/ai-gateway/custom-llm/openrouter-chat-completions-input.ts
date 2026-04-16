@@ -1,4 +1,4 @@
-import type { Phase } from '@/lib/custom-llm/schemas';
+import type { Phase } from '@/lib/ai-gateway/custom-llm/schemas';
 import type { FileAnnotation } from './provider-metadata';
 import type { ReasoningDetailUnion } from './reasoning-details';
 

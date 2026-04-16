@@ -1,7 +1,7 @@
 import type OpenAI from 'openai';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
-import type { ReasoningDetailUnion } from '@/lib/custom-llm/reasoning-details';
+import type { ReasoningDetailUnion } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import type { AwsCredentials } from '@/lib/providers/openrouter/inference-provider-id';
 import type Anthropic from '@anthropic-ai/sdk';
 

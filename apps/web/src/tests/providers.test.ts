@@ -1,5 +1,5 @@
 import { test, expect, describe } from '@jest/globals';
-import { extractPromptInfo } from '../lib/processUsage';
+import { extractPromptInfo } from '../lib/ai-gateway/processUsage';
 import type { OpenRouterChatCompletionRequest } from '../lib/providers/openrouter/types';
 
 /**

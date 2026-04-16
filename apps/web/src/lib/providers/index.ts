@@ -11,16 +11,20 @@ import type {
 import { applyMistralModelSettings, isMistralModel } from '@/lib/providers/mistral';
 import { applyXaiModelSettings, isXaiModel } from '@/lib/providers/xai';
 import { shouldRouteToVercel } from '@/lib/providers/vercel';
-import { kiloExclusiveModels } from '@/lib/models';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import {
   applyAnthropicModelSettings,
   isAnthropicModel,
   isHaikuModel,
 } from '@/lib/providers/anthropic';
-import { getBYOKforOrganization, getBYOKforUser, getModelUserByokProviders } from '@/lib/byok';
+import {
+  getBYOKforOrganization,
+  getBYOKforUser,
+  getModelUserByokProviders,
+} from '@/lib/ai-gateway/byok';
 import { custom_llm2, type User } from '@kilocode/db/schema';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/providers/openrouter/inference-provider-id';
-import { hasAttemptCompletionTool } from '@/lib/tool-calling';
+import { hasAttemptCompletionTool } from '@/lib/ai-gateway/tool-calling';
 import { applyGoogleModelSettings, isGeminiModel } from '@/lib/providers/google';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';

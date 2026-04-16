@@ -7,7 +7,7 @@ import { db } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
-import { reportAuthEvent } from '@/lib/abuse-service';
+import { reportAuthEvent } from '@/lib/ai-gateway/abuse-service';
 import {
   payment_methods,
   kilocode_users,
@@ -76,7 +76,7 @@ import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
-} from '@/lib/providerHash';
+} from '@/lib/ai-gateway/providerHash';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
 
 const workos = new WorkOS(WORKOS_API_KEY);

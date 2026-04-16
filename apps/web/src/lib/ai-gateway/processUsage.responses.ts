@@ -2,7 +2,7 @@ import type { OpenAI } from 'openai';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
-import { sentryRootSpan } from './getRootSpan';
+import { sentryRootSpan } from '../getRootSpan';
 import type { ProviderId } from '@/lib/providers/types';
 import type {
   JustTheCostsUsageStats,
@@ -10,13 +10,13 @@ import type {
   NotYetCostedUsageStats,
   PromptInfo,
   VercelProviderMetaData,
-} from '@/lib/processUsage.types';
+} from '@/lib/ai-gateway/processUsage.types';
 import type { GatewayResponsesRequest } from '@/lib/providers/openrouter/types';
 import {
   computeOpenRouterCostFields,
   computeVercelCostMicrodollars,
   drainSseStream,
-} from '@/lib/processUsage.shared';
+} from '@/lib/ai-gateway/processUsage.shared';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format

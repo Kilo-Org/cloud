@@ -1,4 +1,4 @@
-import { ReasoningDetailType } from '@/lib/custom-llm/reasoning-details';
+import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import { isAnthropicModel } from '@/lib/providers/anthropic';
 import type {
   MessageWithReasoning,

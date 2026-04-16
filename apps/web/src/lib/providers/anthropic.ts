@@ -1,6 +1,6 @@
 import { addCacheBreakpoints } from '@/lib/providers/openrouter/request-helpers';
 import type { GatewayRequest } from '@/lib/providers/openrouter/types';
-import { normalizeToolCallIds } from '@/lib/tool-calling';
+import { normalizeToolCallIds } from '@/lib/ai-gateway/tool-calling';
 
 export function isAnthropicModel(requestedModel: string) {
   return requestedModel.startsWith('anthropic/');

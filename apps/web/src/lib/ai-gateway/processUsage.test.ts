@@ -9,18 +9,18 @@ import {
   processOpenRouterUsage,
 } from './processUsage';
 import type { OpenRouterGeneration } from '@/lib/providers/openrouter/types';
-import { verifyApproval } from '../tests/helpers/approval.helper';
-import { insertTestUser } from '../tests/helpers/user.helper';
-import { insertUsageWithOverrides } from '../tests/helpers/microdollar-usage.helper';
+import { verifyApproval } from '../../tests/helpers/approval.helper';
+import { insertTestUser } from '../../tests/helpers/user.helper';
+import { insertUsageWithOverrides } from '../../tests/helpers/microdollar-usage.helper';
 import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { db } from '@/lib/drizzle';
 import { microdollar_usage, microdollar_usage_metadata } from '@kilocode/db/schema';
 import { eq, getTableColumns } from 'drizzle-orm';
-import { findUserById } from './user';
+import { findUserById } from '../user';
 import { Readable } from 'node:stream';
-import { getFraudDetectionHeaders, toMicrodollars } from './utils';
+import { getFraudDetectionHeaders, toMicrodollars } from '../utils';
 
 // Note: Legacy banned_ja4/whitelist_ja4 tests removed - abuse classification
 // is now handled by the external abuse detection service (src/lib/abuse-service.ts)

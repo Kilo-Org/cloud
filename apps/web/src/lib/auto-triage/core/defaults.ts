@@ -1,4 +1,4 @@
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { AUTO_TRIAGE_CONSTANTS } from './constants';
 
 export const DEFAULT_AUTO_TRIAGE_CONFIG = {

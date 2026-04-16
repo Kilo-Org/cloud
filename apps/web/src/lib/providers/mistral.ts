@@ -3,7 +3,7 @@ import {
   dropToolStrictProperties,
   hasAttemptCompletionTool,
   normalizeToolCallIds,
-} from '@/lib/tool-calling';
+} from '@/lib/ai-gateway/tool-calling';
 
 export function isMistralModel(model: string) {
   return model.startsWith('mistralai/');

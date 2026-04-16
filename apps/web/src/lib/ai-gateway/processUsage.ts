@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { db } from './drizzle';
+import { db } from '../drizzle';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@/lib/timer';
@@ -8,26 +8,26 @@ import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
-} from './providers/openrouter/types';
-import { fetchGeneration } from './providers';
-import PROVIDERS from './providers/provider-definitions';
-import { toMicrodollars } from './utils';
+} from '../providers/openrouter/types';
+import { fetchGeneration } from '../providers';
+import PROVIDERS from '../providers/provider-definitions';
+import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';
 import { hasPaymentMethod } from '@/lib/admin-utils-serverside';
 import type { SQL } from 'drizzle-orm';
 import { eq, sql } from 'drizzle-orm';
-import { sentryRootSpan } from './getRootSpan';
+import { sentryRootSpan } from '../getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import type { ProviderId } from '@/lib/providers/types';
-import { findKiloExclusiveModel, isFreeModel, isKiloStealthModel } from '@/lib/models';
+import { findKiloExclusiveModel, isFreeModel, isKiloStealthModel } from '@/lib/ai-gateway/models';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
-import { reportAbuseCost } from '@/lib/abuse-service';
+import { reportAbuseCost } from '@/lib/ai-gateway/abuse-service';
 import type {
   BalanceUpdateResult,
   ChatCompletionChunk,
@@ -43,17 +43,17 @@ import type {
   OpenRouterUsage,
   PromptInfo,
   UsageMetaData,
-} from '@/lib/processUsage.types';
+} from '@/lib/ai-gateway/processUsage.types';
 import {
   parseResponsesMicrodollarUsageFromStream,
   parseResponsesMicrodollarUsageFromString,
-} from '@/lib/processUsage.responses';
+} from '@/lib/ai-gateway/processUsage.responses';
 import {
   parseMessagesMicrodollarUsageFromStream,
   parseMessagesMicrodollarUsageFromString,
-} from '@/lib/processUsage.messages';
-import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/processUsage.constants';
-import { computeOpenRouterCostFields, drainSseStream } from '@/lib/processUsage.shared';
+} from '@/lib/ai-gateway/processUsage.messages';
+import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
+import { computeOpenRouterCostFields, drainSseStream } from '@/lib/ai-gateway/processUsage.shared';
 import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { isMinimaxModel } from '@/lib/providers/minimax';
 import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';

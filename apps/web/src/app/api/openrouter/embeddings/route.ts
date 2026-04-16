@@ -1,14 +1,14 @@
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { generateProviderSpecificHash } from '@/lib/providerHash';
-import type { MicrodollarUsageContext } from '@/lib/processUsage.types';
+import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
+import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import { getEmbeddingProvider } from '@/lib/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
-import { isFreeModel } from '@/lib/models';
+import { isFreeModel } from '@/lib/ai-gateway/models';
 import {
   captureProxyError,
   checkOrganizationModelRestrictions,
@@ -21,7 +21,7 @@ import {
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
-} from '@/lib/llm-proxy-helpers';
+} from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import {
@@ -29,9 +29,12 @@ import {
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@/lib/anonymous';
-import { emitApiMetricsForResponse } from '@/lib/o11y/api-metrics.server';
-import { normalizeModelId } from '@/lib/model-utils';
-import { buildUpstreamBody, type EmbeddingProxyRequest } from '@/lib/embeddings/embedding-request';
+import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import {
+  buildUpstreamBody,
+  type EmbeddingProxyRequest,
+} from '@/lib/ai-gateway/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/providers/vercel';
 import type { Provider } from '@/lib/providers/types';

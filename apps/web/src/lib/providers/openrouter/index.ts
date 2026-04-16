@@ -1,4 +1,4 @@
-import { isFreeModel, kiloExclusiveModels, preferredModels } from '@/lib/models';
+import { isFreeModel, kiloExclusiveModels, preferredModels } from '@/lib/ai-gateway/models';
 import PROVIDERS from '@/lib/providers/provider-definitions';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
@@ -8,7 +8,7 @@ import {
 import { errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { convertFromKiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
-import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
+import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import {
   getModelSettings,
   getOpenClawSettings,
@@ -18,7 +18,7 @@ import {
 import { AUTO_MODELS } from '@/lib/kilo-auto';
 
 // Re-export from shared module for backwards compatibility
-export { normalizeModelId } from '@/lib/model-utils';
+export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 function buildAutoModels(): OpenRouterModel[] {
   return AUTO_MODELS.map(m => ({

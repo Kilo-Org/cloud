@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { kilologHash } from '@/lib/kilologHash';
+import { kilologHash } from '@/lib/ai-gateway/kilologHash';
 
 export function SafetyIdentifierHashGenerator() {
   const [id, setId] = useState('');

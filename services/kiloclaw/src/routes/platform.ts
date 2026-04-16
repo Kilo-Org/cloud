@@ -424,8 +424,8 @@ async function bootstrapProvisionedSubscription(params: {
   if (!params.env.KILOCLAW_BILLING) {
     throw new Error('KILOCLAW_BILLING service binding is not configured');
   }
-  if (!params.env.INTERNAL_API_SECRET) {
-    throw new Error('INTERNAL_API_SECRET is not configured');
+  if (!params.env.KILOCLAW_INTERNAL_API_SECRET) {
+    throw new Error('KILOCLAW_INTERNAL_API_SECRET is not configured');
   }
 
   const response = await params.env.KILOCLAW_BILLING.fetch(
@@ -433,7 +433,7 @@ async function bootstrapProvisionedSubscription(params: {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-internal-api-key': params.env.INTERNAL_API_SECRET,
+        'x-internal-api-key': params.env.KILOCLAW_INTERNAL_API_SECRET,
       },
       body: JSON.stringify({
         userId: params.userId,

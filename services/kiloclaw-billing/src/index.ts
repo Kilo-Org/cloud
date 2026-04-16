@@ -46,12 +46,15 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingSweepMessage> = {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === 'POST' && url.pathname === '/bootstrap-subscription') {
-      if (!env.INTERNAL_API_SECRET) {
-        return Response.json({ error: 'INTERNAL_API_SECRET is not configured' }, { status: 500 });
+      if (!env.KILOCLAW_INTERNAL_API_SECRET) {
+        return Response.json(
+          { error: 'KILOCLAW_INTERNAL_API_SECRET is not configured' },
+          { status: 500 }
+        );
       }
 
       const providedSecret = request.headers.get('x-internal-api-key');
-      if (!providedSecret || providedSecret !== env.INTERNAL_API_SECRET) {
+      if (!providedSecret || providedSecret !== env.KILOCLAW_INTERNAL_API_SECRET) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
       }
 

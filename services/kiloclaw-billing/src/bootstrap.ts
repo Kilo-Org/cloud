@@ -372,6 +372,9 @@ function resolveExactCurrentPersonalSubscription(
   if (destroyedAccessRows.length === 0) {
     return null;
   }
+  if (destroyedAccessRows.length > 1) {
+    throw new Error('Multiple current personal subscription rows found during bootstrap');
+  }
   return (
     [...destroyedAccessRows].sort((left, right) => {
       const recencyDiff = currentSubscriptionRecency(right) - currentSubscriptionRecency(left);

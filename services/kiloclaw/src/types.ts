@@ -23,6 +23,7 @@ export type KiloClawEnv = {
   // Auth secrets
   NEXTAUTH_SECRET?: string;
   INTERNAL_API_SECRET?: string;
+  KILOCLAW_INTERNAL_API_SECRET?: string;
   GATEWAY_TOKEN_SECRET?: string;
   WORKER_ENV?: string; // e.g. 'production' or 'development' -- for JWT env validation
   KILOCLAW_DEFAULT_PROVIDER?: string;

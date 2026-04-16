@@ -4,7 +4,12 @@ vi.mock('./lifecycle.js', () => ({
   runSweep: vi.fn(),
 }));
 
+vi.mock('./bootstrap.js', () => ({
+  bootstrapProvisionSubscription: vi.fn(),
+}));
+
 import { handler } from './index.js';
+import { bootstrapProvisionSubscription } from './bootstrap.js';
 import { runSweep } from './lifecycle.js';
 import type { BillingSweepMessage, BillingWorkerEnv } from './types.js';
 
@@ -180,6 +185,48 @@ describe('kiloclaw billing worker handler', () => {
         billingRunId: '11111111-1111-4111-8111-111111111111',
         billingSweep: 'complementary_inference_ended',
         billingAttempt: 1,
+      })
+    );
+  });
+
+  it('accepts bootstrap requests signed with KiloClaw internal secret', async () => {
+    vi.mocked(bootstrapProvisionSubscription).mockResolvedValueOnce({
+      id: 'sub-bootstrap',
+    } as Awaited<ReturnType<typeof bootstrapProvisionSubscription>>);
+    const { env } = createEnv();
+    const fetchHandler = handler.fetch;
+    const kiloclawSecret = env.KILOCLAW_INTERNAL_API_SECRET;
+    if (!fetchHandler) {
+      throw new Error('Expected billing worker fetch handler');
+    }
+    if (!kiloclawSecret) {
+      throw new Error('Expected KiloClaw internal secret');
+    }
+
+    const response = await fetchHandler(
+      new Request('https://kiloclaw-billing/bootstrap-subscription', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': kiloclawSecret,
+        },
+        body: JSON.stringify({
+          userId: 'user-1',
+          instanceId: '11111111-1111-4111-8111-111111111111',
+          orgId: null,
+        }),
+      }),
+      env,
+      {} as ExecutionContext
+    );
+
+    expect(response.status).toBe(200);
+    expect(bootstrapProvisionSubscription).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        userId: 'user-1',
+        instanceId: '11111111-1111-4111-8111-111111111111',
+        orgId: null,
       })
     );
   });

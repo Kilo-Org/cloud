@@ -411,4 +411,76 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
     );
     expect(result).toEqual(restoredSuccessor);
   });
+
+  it('fails closed when multiple destroyed current access-granting rows remain', async () => {
+    const destroyedA = {
+      id: 'sub-destroyed-a',
+      user_id: 'user-1',
+      instance_id: 'instance-old-a',
+      stripe_subscription_id: 'stripe-a',
+      stripe_schedule_id: null,
+      transferred_to_subscription_id: null,
+      access_origin: null,
+      payment_source: 'stripe',
+      plan: 'standard',
+      scheduled_plan: null,
+      scheduled_by: null,
+      status: 'active',
+      cancel_at_period_end: false,
+      pending_conversion: false,
+      trial_started_at: null,
+      trial_ends_at: null,
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+      credit_renewal_at: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-04-01T00:00:00.000Z',
+      updated_at: '2026-04-05T00:00:00.000Z',
+    };
+    const destroyedB = {
+      ...destroyedA,
+      id: 'sub-destroyed-b',
+      instance_id: 'instance-old-b',
+      stripe_subscription_id: 'stripe-b',
+      current_period_start: '2026-04-10T00:00:00.000Z',
+      current_period_end: '2026-05-10T00:00:00.000Z',
+      created_at: '2026-04-10T00:00:00.000Z',
+      updated_at: '2026-04-11T00:00:00.000Z',
+    };
+
+    const { db, insertValues, updateSets } = createMockDb({
+      selectRows: [
+        [],
+        [destroyedA, destroyedB],
+        [
+          { id: 'instance-old-a', destroyedAt: '2026-04-06T00:00:00.000Z', organizationId: null },
+          { id: 'instance-old-b', destroyedAt: '2026-04-12T00:00:00.000Z', organizationId: null },
+          { id: 'instance-new', destroyedAt: null, organizationId: null },
+        ],
+        [],
+      ],
+      txSelectRows: [],
+      insertReturningRows: [],
+      updateReturningRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    await expect(
+      bootstrapProvisionSubscription(createEnv(), {
+        userId: destroyedA.user_id,
+        instanceId: 'instance-new',
+        orgId: null,
+      })
+    ).rejects.toThrow('Multiple current personal subscription rows found during bootstrap');
+
+    expect(insertValues).toHaveLength(0);
+    expect(updateSets).toHaveLength(0);
+  });
 });

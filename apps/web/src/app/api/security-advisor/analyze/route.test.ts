@@ -8,6 +8,7 @@ import {
   recordSecurityAdvisorScan,
 } from '@/lib/security-advisor/rate-limiter';
 import { trackSecurityAdvisorScanCompleted } from '@/lib/security-advisor/posthog-tracking';
+import { getSecurityAdvisorContent } from '@/lib/security-advisor/content-loader';
 import { RATE_LIMIT_PER_DAY } from '@/lib/security-advisor/schemas';
 
 // Capture after() callbacks so we can flush them in tests
@@ -29,10 +30,78 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
+// The real content-loader queries the DB. In CI, workerSetup.ts runs
+// `cleanupDbForTest()` after migrations, which truncates every table —
+// including our seeded content. Mock the loader here so the route tests
+// exercise deterministic content that mirrors the migration seed, without
+// depending on whether the cleanup happened to preserve the seed rows.
+// Fixture is installed per-test in beforeEach (resetAllMocks wipes it).
+jest.mock('@/lib/security-advisor/content-loader', () => {
+  const actual = jest.requireActual('@/lib/security-advisor/content-loader');
+  return {
+    ...actual,
+    getSecurityAdvisorContent: jest.fn(),
+  };
+});
+
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedCheckRateLimit = jest.mocked(checkSecurityAdvisorRateLimit);
 const mockedRecordScan = jest.mocked(recordSecurityAdvisorScan);
 const mockedTrackScan = jest.mocked(trackSecurityAdvisorScanCompleted);
+const mockedGetContent = jest.mocked(getSecurityAdvisorContent);
+
+// Seed-equivalent content used by the route-level tests. `jest.resetAllMocks`
+// in beforeEach clears mock return values; setSecurityAdvisorContentFixture()
+// re-installs this value before each test.
+const TEST_CONTENT = {
+  checkCatalog: new Map([
+    [
+      'fs.config.perms_world_readable',
+      {
+        severity: 'critical' as const,
+        explanation: 'The OpenClaw configuration file is readable by all users.',
+        risk: 'Any process can read your secrets.',
+      },
+    ],
+    [
+      'summary.attack_surface',
+      {
+        severity: 'info' as const,
+        explanation: 'Summary of the attack surface.',
+        risk: 'More entry points mean more risk.',
+      },
+    ],
+  ]),
+  kiloclawCoverage: [
+    {
+      area: 'config_permissions',
+      summary: 'Config files are restricted to owner only access',
+      detail: 'KiloClaw provisions strict file permissions.',
+      matchCheckIds: ['fs.config.perms_world_readable', 'fs.config.perms_group_readable'],
+    },
+    {
+      area: 'gateway_exposure',
+      summary: 'Gateway bound to localhost only',
+      detail: 'Reverse proxy handles external access.',
+      matchCheckIds: ['summary.attack_surface'],
+    },
+  ],
+  content: new Map([
+    ['framing.openclaw', '**How KiloClaw handles this:** {summary}. {detail}'],
+    [
+      'framing.kiloclaw',
+      '**KiloClaw default:** {summary}. Your instance has diverged from this default configuration.',
+    ],
+    ['fallback.risk', 'Review this finding: {detail}'],
+    ['fallback.recommendation_action', 'Address finding: {title} ({checkId})'],
+    ['section.next_step', '## Next step: try KiloClaw free'],
+    ['cta.body', '**Start a free trial at [kilo.ai/kiloclaw](https://kilo.ai/kiloclaw).**'],
+  ]),
+};
+
+function setSecurityAdvisorContentFixture() {
+  mockedGetContent.mockResolvedValue(TEST_CONTENT);
+}
 
 function setUserAuth(id = 'user-123') {
   mockedGetUserFromAuth.mockResolvedValue({
@@ -98,6 +167,7 @@ describe('POST /api/security-advisor/analyze', () => {
     jest.resetAllMocks();
     afterCallbacks = [];
     mockedRecordScan.mockResolvedValue(undefined);
+    setSecurityAdvisorContentFixture();
   });
 
   it('returns 401 when not authenticated', async () => {

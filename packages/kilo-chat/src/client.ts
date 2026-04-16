@@ -61,7 +61,7 @@ export class KiloChatClient {
     });
 
     if (!res.ok) {
-      const body = await res.json().catch(() => null);
+      const body: unknown = await res.json().catch(() => null);
       throw new KiloChatApiError(res.status, body);
     }
 

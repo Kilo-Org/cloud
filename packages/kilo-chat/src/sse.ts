@@ -80,7 +80,7 @@ export class KiloChatSSE {
               if (currentEvent && currentData) {
                 if (currentId) this.lastEventId = currentId;
                 try {
-                  const data = JSON.parse(currentData);
+                  const data: unknown = JSON.parse(currentData);
                   this.dispatch(currentEvent, data, handlers);
                 } catch {
                   /* skip malformed */

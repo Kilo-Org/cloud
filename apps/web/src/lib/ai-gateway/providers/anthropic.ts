@@ -1,5 +1,8 @@
 import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayRequest,
+  OpenRouterChatCompletionRequest,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import { normalizeToolCallIds } from '@/lib/ai-gateway/tool-calling';
 
 export function isAnthropicModel(requestedModel: string) {
@@ -16,6 +19,21 @@ function appendAnthropicBetaHeader(extraHeaders: Record<string, string>, betaFla
   }
 }
 
+// Anthropic does not accept a trailing assistant message through the chat_completions API path
+// (the native Messages API does, as an assistant prefill, but some upstream routes reject it).
+// Append a minimal placeholder user message so the request is valid.
+export function appendPlaceholderUserMessageIfLastIsAssistant(
+  request: OpenRouterChatCompletionRequest
+) {
+  const lastMessage = request.messages.at(-1);
+  if (lastMessage?.role === 'assistant') {
+    console.debug(
+      '[appendPlaceholderUserMessageIfLastIsAssistant] appending placeholder user message'
+    );
+    request.messages.push({ role: 'user', content: 'Continue.' });
+  }
+}
+
 export function applyAnthropicModelSettings(
   requestToMutate: GatewayRequest,
   extraHeaders: Record<string, string>
@@ -27,9 +45,10 @@ export function applyAnthropicModelSettings(
   // we may want to gate this for Kilo-clients at some point
   addCacheBreakpoints(requestToMutate);
 
-  // anthropic doesn't allow '.' in tool call ids
   if (requestToMutate.kind === 'chat_completions') {
+    // anthropic doesn't allow '.' in tool call ids
     // we can fix this later for the responses api if it's still a problem
     normalizeToolCallIds(requestToMutate.body, toolCallId => toolCallId.includes('.'), undefined);
+    appendPlaceholderUserMessageIfLastIsAssistant(requestToMutate.body);
   }
 }

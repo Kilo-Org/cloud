@@ -85,7 +85,7 @@ export function KiloCliRunView({
         </Button>
       </div>
 
-      <ClawConfigServiceBannerWithStatus />
+      <ClawConfigServiceBannerWithStatus organizationId={organizationId} />
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">

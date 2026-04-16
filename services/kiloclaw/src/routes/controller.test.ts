@@ -100,7 +100,7 @@ function makeBody(overrides?: Record<string, unknown>) {
 function makeProductTelemetry() {
   return {
     openclawVersion: '2026.3.13',
-    defaultModel: 'kilocode/anthropic/claude-opus-4.6',
+    defaultModel: 'kilocode/anthropic/claude-opus-4.7',
     channelCount: 2,
     enabledChannels: ['telegram', 'discord'],
     toolsProfile: 'full',
@@ -349,7 +349,7 @@ describe('POST /checkin', () => {
     expect(captured.apiKey).toBe('phc_test');
     expect(captured.distinctId).toBe('user@example.com');
     expect(captured.event).toBe('kc_instance_product_telemetry');
-    expect(captured.properties?.defaultModel).toBe('kilocode/anthropic/claude-opus-4.6');
+    expect(captured.properties?.defaultModel).toBe('kilocode/anthropic/claude-opus-4.7');
     expect(captured.properties?.channelCount).toBe(2);
     expect(captured.properties?.enabledChannels).toEqual(['telegram', 'discord']);
     expect(captured.properties?.sandboxId).toBe(sandboxId);

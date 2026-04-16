@@ -115,11 +115,11 @@ describe('buildEnvVars', () => {
     const env = createMockEnv({ AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
       kilocodeApiKey: 'kc-user-key',
-      kilocodeDefaultModel: 'kilocode/anthropic/claude-opus-4.6',
+      kilocodeDefaultModel: 'kilocode/anthropic/claude-opus-4.7',
     });
 
     expect(result.sensitive.KILOCODE_API_KEY).toBe('kc-user-key');
-    expect(result.env.KILOCODE_DEFAULT_MODEL).toBe('kilocode/anthropic/claude-opus-4.6');
+    expect(result.env.KILOCODE_DEFAULT_MODEL).toBe('kilocode/anthropic/claude-opus-4.7');
     // Model catalog is handled natively by OpenClaw's kilocode provider
     expect(result.env.KILOCODE_MODELS_JSON).toBeUndefined();
   });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { collectProductTelemetry, detectChannels } from './product-telemetry';
 
 const fullConfig = {
-  agents: { defaults: { model: { primary: 'kilocode/anthropic/claude-opus-4.6' } } },
+  agents: { defaults: { model: { primary: 'kilocode/anthropic/claude-opus-4.7' } } },
   channels: {
     telegram: { enabled: true, botToken: 'tg-tok' },
     discord: { enabled: true, token: 'dc-tok' },
@@ -65,7 +65,7 @@ describe('collectProductTelemetry', () => {
 
     expect(result).toEqual({
       openclawVersion: '2026.3.13',
-      defaultModel: 'kilocode/anthropic/claude-opus-4.6',
+      defaultModel: 'kilocode/anthropic/claude-opus-4.7',
       channelCount: 3,
       enabledChannels: ['telegram', 'discord', 'slack'],
       toolsProfile: 'full',

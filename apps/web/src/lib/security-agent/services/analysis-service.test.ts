@@ -182,7 +182,7 @@ describe('analysis-service', () => {
       githubRepo: 'acme/repo',
       githubToken: 'gh-token',
       triageModel: 'anthropic/claude-sonnet-4',
-      analysisModel: 'anthropic/claude-opus-4.6',
+      analysisModel: 'anthropic/claude-opus-4.7',
       organizationId,
     });
 
@@ -194,7 +194,7 @@ describe('analysis-service', () => {
         githubRepo: 'acme/repo',
         githubToken: 'gh-token',
         mode: 'code',
-        model: 'anthropic/claude-opus-4.6',
+        model: 'anthropic/claude-opus-4.7',
         callbackTarget: expect.objectContaining({
           url: expect.stringContaining(`/api/internal/security-analysis-callback/${findingId}`),
           headers: expect.objectContaining({ 'X-Internal-Secret': expect.any(String) }),
@@ -460,7 +460,7 @@ describe('analysis-service', () => {
       githubRepo: 'acme/repo',
       githubToken: 'gh-token',
       triageModel: 'anthropic/claude-sonnet-4' as const,
-      analysisModel: 'anthropic/claude-opus-4.6' as const,
+      analysisModel: 'anthropic/claude-opus-4.7' as const,
     };
 
     beforeEach(() => {

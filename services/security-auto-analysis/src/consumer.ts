@@ -484,7 +484,7 @@ async function processOwnerMessage(params: {
         findingId: finding.id,
         actorUser: actorResolution.user,
         githubToken,
-        model: claim.config.model_slug ?? 'anthropic/claude-opus-4.6',
+        model: claim.config.model_slug ?? 'anthropic/claude-opus-4.7',
         analysisMode: claim.config.analysis_mode,
         organizationId: launchOwner.type === 'org' ? launchOwner.id : undefined,
         nextAuthSecret,

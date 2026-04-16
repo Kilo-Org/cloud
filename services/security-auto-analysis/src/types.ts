@@ -19,7 +19,7 @@ export type AnalysisMode = SecurityAgentConfig['analysis_mode'];
 export type AutoAnalysisMinSeverity = SecurityAgentConfig['auto_analysis_min_severity'];
 
 export const DEFAULT_SECURITY_AGENT_CONFIG: SecurityAgentConfig = {
-  model_slug: 'anthropic/claude-opus-4.6',
+  model_slug: 'anthropic/claude-opus-4.7',
   analysis_mode: 'auto',
   auto_analysis_enabled: false,
   auto_analysis_min_severity: 'high',

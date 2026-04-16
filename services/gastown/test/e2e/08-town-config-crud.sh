@@ -16,15 +16,15 @@ assert_status "200" "get config"
 assert_json "$HTTP_BODY" ".success" "true" "config response success"
 
 echo "  Updating config with env vars and model..."
-api_call PATCH "/api/towns/${TOWN_ID}/config" '{"env_vars":{"MY_VAR":"hello"},"default_model":"anthropic/claude-opus-4.6"}'
+api_call PATCH "/api/towns/${TOWN_ID}/config" '{"env_vars":{"MY_VAR":"hello"},"default_model":"anthropic/claude-opus-4.7"}'
 assert_status "200" "update config"
 assert_json "$HTTP_BODY" ".data.env_vars.MY_VAR" "hello" "env var should be set"
-assert_json "$HTTP_BODY" ".data.default_model" "anthropic/claude-opus-4.6" "model should be set"
+assert_json "$HTTP_BODY" ".data.default_model" "anthropic/claude-opus-4.7" "model should be set"
 
 echo "  Verifying config persisted..."
 api_get "/api/towns/${TOWN_ID}/config"
 assert_status "200" "re-get config"
 assert_json "$HTTP_BODY" ".data.env_vars.MY_VAR" "hello" "env var should persist"
-assert_json "$HTTP_BODY" ".data.default_model" "anthropic/claude-opus-4.6" "model should persist"
+assert_json "$HTTP_BODY" ".data.default_model" "anthropic/claude-opus-4.7" "model should persist"
 
 echo "  Town config CRUD OK"

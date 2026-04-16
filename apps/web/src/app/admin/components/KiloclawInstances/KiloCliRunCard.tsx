@@ -110,6 +110,7 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
   const { data: runsData } = useQuery({
     ...trpc.admin.kiloclawInstances.listKiloCliRuns.queryOptions({
       userId,
+      instanceId,
       limit: 1,
     }),
     refetchInterval: query => {

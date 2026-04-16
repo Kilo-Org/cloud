@@ -803,12 +803,24 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   listKiloCliRuns: adminProcedure
-    .input(z.object({ userId: z.string().min(1), limit: z.number().min(1).max(50).default(20) }))
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.uuid().optional(),
+        limit: z.number().min(1).max(50).default(20),
+      })
+    )
     .query(async ({ input }) => {
+      const conditions: SQL[] = [eq(kiloclaw_cli_runs.user_id, input.userId)];
+
+      if (input.instanceId) {
+        conditions.push(eq(kiloclaw_cli_runs.instance_id, input.instanceId));
+      }
+
       const runs = await db
         .select()
         .from(kiloclaw_cli_runs)
-        .where(eq(kiloclaw_cli_runs.user_id, input.userId))
+        .where(and(...conditions))
         .orderBy(desc(kiloclaw_cli_runs.started_at))
         .limit(input.limit);
 

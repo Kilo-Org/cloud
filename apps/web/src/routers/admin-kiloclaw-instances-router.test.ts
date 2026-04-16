@@ -601,6 +601,65 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
   });
 });
 
+describe('admin.kiloclawInstances.listKiloCliRuns', () => {
+  it('scopes results to the given instanceId', async () => {
+    // Create a second instance for the same user with its own CLI run
+    const [otherInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: cliRunUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    const [otherRun] = await db
+      .insert(kiloclaw_cli_runs)
+      .values({
+        user_id: cliRunUser.id,
+        instance_id: otherInstance.id,
+        prompt: 'run on other instance',
+        status: 'completed',
+        started_at: '2026-04-08T13:00:00.000Z',
+        completed_at: '2026-04-08T13:05:00.000Z',
+        exit_code: 0,
+        initiated_by_admin_id: null,
+      })
+      .returning({ id: kiloclaw_cli_runs.id });
+
+    try {
+      const caller = await createCallerForUser(adminUser.id);
+
+      // Without instanceId — returns runs from both instances
+      const allRuns = await caller.admin.kiloclawInstances.listKiloCliRuns({
+        userId: cliRunUser.id,
+      });
+      const allIds = allRuns.runs.map(r => r.id);
+      expect(allIds).toContain(cliRunId);
+      expect(allIds).toContain(otherRun.id);
+
+      // Scoped to the original instance — only its run
+      const scopedOriginal = await caller.admin.kiloclawInstances.listKiloCliRuns({
+        userId: cliRunUser.id,
+        instanceId: cliRunInstanceId,
+      });
+      expect(scopedOriginal.runs.map(r => r.id)).toEqual([cliRunId]);
+
+      // Scoped to the other instance — only its run
+      const scopedOther = await caller.admin.kiloclawInstances.listKiloCliRuns({
+        userId: cliRunUser.id,
+        instanceId: otherInstance.id,
+      });
+      expect(scopedOther.runs.map(r => r.id)).toEqual([otherRun.id]);
+    } finally {
+      /* eslint-disable drizzle/enforce-delete-with-where */
+      await db.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.id, otherRun.id));
+      await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, otherInstance.id));
+      /* eslint-enable drizzle/enforce-delete-with-where */
+    }
+  });
+});
+
 describe('admin.kiloclawInstances inbound email controls', () => {
   it('cycles the active alias and writes an audit log', async () => {
     const { instanceId, alias } = await insertInboundEmailInstance();

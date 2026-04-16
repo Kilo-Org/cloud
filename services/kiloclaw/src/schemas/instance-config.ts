@@ -139,6 +139,10 @@ export const InstanceConfigSchema = z.object({
     .optional(),
   googleCredentials: GoogleCredentialsSchema.optional(),
   googleOAuthConnection: GoogleOAuthConnectionSchema.optional(),
+  googleWorkspaceToolsEnabled: z.boolean().optional(),
+  googleWorkspaceConfigSyncPending: z.boolean().optional(),
+  googleWorkspaceConfigSyncError: z.string().nullable().optional(),
+  googleWorkspaceConfigSyncedAt: z.number().nullable().optional(),
   machineSize: MachineSizeSchema.optional(),
   // Region for Fly Volume/Machine. Comma-separated priority list of region codes or aliases.
   // Examples: "us,eu" (try US first, then Europe), "lhr" (London only).
@@ -197,7 +201,14 @@ export const ProvisionRequestSchema = z.object({
   /** Bootstrap subscription against an existing instance row during migration cleanup. */
   bootstrapSubscription: z.boolean().optional(),
   provider: ProviderIdSchema.optional(),
-  ...InstanceConfigSchema.omit({ googleCredentials: true, googleOAuthConnection: true }).shape,
+  ...InstanceConfigSchema.omit({
+    googleCredentials: true,
+    googleOAuthConnection: true,
+    googleWorkspaceToolsEnabled: true,
+    googleWorkspaceConfigSyncPending: true,
+    googleWorkspaceConfigSyncError: true,
+    googleWorkspaceConfigSyncedAt: true,
+  }).shape,
 });
 
 export type ProvisionRequest = z.infer<typeof ProvisionRequestSchema>;
@@ -255,6 +266,10 @@ export const PersistedStateSchema = z.object({
     .default(null),
   googleCredentials: GoogleCredentialsSchema.nullable().default(null),
   googleOAuthConnection: GoogleOAuthConnectionSchema.nullable().default(null),
+  googleWorkspaceToolsEnabled: z.boolean().default(false),
+  googleWorkspaceConfigSyncPending: z.boolean().default(false),
+  googleWorkspaceConfigSyncError: z.string().nullable().default(null),
+  googleWorkspaceConfigSyncedAt: z.number().nullable().default(null),
   provisionedAt: z.number().nullable().default(null),
   startingAt: z.number().nullable().default(null),
   restartingAt: z.number().nullable().default(null),

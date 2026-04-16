@@ -198,6 +198,11 @@ export type PlatformStatusResponse = {
   googleOAuthStatus: 'active' | 'action_required' | 'disconnected';
   googleOAuthAccountEmail: string | null;
   googleOAuthCapabilities: string[];
+  googleWorkspaceToolsEnabled?: boolean;
+  googleWorkspaceConfigSyncPending?: boolean;
+  googleWorkspaceConfigSyncError?: string | null;
+  googleWorkspaceConfigReady?: boolean;
+  googleWorkspaceConfigSyncedAt?: number | null;
   gmailNotificationsEnabled: boolean;
   execSecurity: string | null;
   execAsk: string | null;

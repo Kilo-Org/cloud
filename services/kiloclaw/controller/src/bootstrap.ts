@@ -776,8 +776,10 @@ export async function bootstrapNonCritical(
     {
       phase: 'tools-md',
       run: () => {
+        const googleWorkspaceToolsEnabled =
+          env.KILOCLAW_GOOGLE_WORKSPACE_ENABLED === 'true' || !!env.KILOCLAW_GOG_CONFIG_TARBALL;
         updateToolsMdSection(true, KILO_CLI_SECTION_CONFIG, deps);
-        updateToolsMdSection(!!env.KILOCLAW_GOG_CONFIG_TARBALL, GOG_SECTION_CONFIG, deps);
+        updateToolsMdSection(googleWorkspaceToolsEnabled, GOG_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
         // Always-on: agent context about KiloClaw-mitigated audit findings

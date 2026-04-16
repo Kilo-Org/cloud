@@ -67,6 +67,10 @@ export type InstanceMutableState = {
   channels: PersistedState['channels'];
   googleCredentials: GoogleCredentials | null;
   googleOAuthConnection: GoogleOAuthConnection | null;
+  googleWorkspaceToolsEnabled: boolean;
+  googleWorkspaceConfigSyncPending: boolean;
+  googleWorkspaceConfigSyncError: string | null;
+  googleWorkspaceConfigSyncedAt: number | null;
   provisionedAt: number | null;
   startingAt: number | null;
   restartingAt: number | null;

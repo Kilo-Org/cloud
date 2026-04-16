@@ -230,6 +230,10 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.channels = d.channels;
     s.googleCredentials = d.googleCredentials;
     s.googleOAuthConnection = d.googleOAuthConnection;
+    s.googleWorkspaceToolsEnabled = d.googleWorkspaceToolsEnabled;
+    s.googleWorkspaceConfigSyncPending = d.googleWorkspaceConfigSyncPending;
+    s.googleWorkspaceConfigSyncError = d.googleWorkspaceConfigSyncError;
+    s.googleWorkspaceConfigSyncedAt = d.googleWorkspaceConfigSyncedAt;
     s.provisionedAt = d.provisionedAt;
     s.startingAt = d.startingAt;
     s.restartingAt = d.restartingAt;
@@ -329,6 +333,10 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.channels = null;
   s.googleCredentials = null;
   s.googleOAuthConnection = null;
+  s.googleWorkspaceToolsEnabled = false;
+  s.googleWorkspaceConfigSyncPending = false;
+  s.googleWorkspaceConfigSyncError = null;
+  s.googleWorkspaceConfigSyncedAt = null;
   s.provisionedAt = null;
   s.startingAt = null;
   s.restartingAt = null;
@@ -410,6 +418,10 @@ export function createMutableState(): InstanceMutableState {
     channels: null,
     googleCredentials: null,
     googleOAuthConnection: null,
+    googleWorkspaceToolsEnabled: false,
+    googleWorkspaceConfigSyncPending: false,
+    googleWorkspaceConfigSyncError: null,
+    googleWorkspaceConfigSyncedAt: null,
     provisionedAt: null,
     startingAt: null,
     restartingAt: null,

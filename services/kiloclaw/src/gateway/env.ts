@@ -7,6 +7,7 @@ import type {
   EncryptedEnvelope,
   EncryptedChannelTokens,
   GoogleCredentials,
+  GoogleOAuthConnection,
   KiloExaSearchMode,
 } from '../schemas/instance-config';
 import { deriveGatewayToken } from '../auth/gateway-token';
@@ -30,6 +31,7 @@ export type UserConfig = {
   kiloExaSearchMode?: KiloExaSearchMode | null;
   channels?: EncryptedChannelTokens;
   googleCredentials?: GoogleCredentials;
+  googleOAuthConnection?: GoogleOAuthConnection | null;
   instanceFeatures?: string[];
   execSecurity?: string | null;
   execAsk?: string | null;
@@ -181,10 +183,10 @@ export async function buildEnvVars(
       Object.assign(sensitive, channelEnv);
     }
 
-    // Layer 4b: Decrypt Google credentials (gog config tarball) and pass as env var.
-    // Wrapped in try/catch so corrupted credentials don't block container startup —
-    // the machine starts without Google access instead of failing entirely.
-    if (userConfig.googleCredentials && env.AGENT_ENV_VARS_PRIVATE_KEY) {
+  // Layer 4b: Decrypt Google credentials (gog config tarball) and pass as env var.
+  // Wrapped in try/catch so corrupted credentials don't block container startup —
+  // the machine starts without Google access instead of failing entirely.
+  if (userConfig.googleCredentials && env.AGENT_ENV_VARS_PRIVATE_KEY) {
       try {
         const tarballBase64 = decryptWithPrivateKey(
           userConfig.googleCredentials.gogConfigTarball,
@@ -198,6 +200,13 @@ export async function buildEnvVars(
         console.warn('Failed to decrypt Google credentials, starting without Google access:', err);
       }
     }
+  }
+
+  if (
+    userConfig?.googleCredentials ||
+    (userConfig?.googleOAuthConnection && userConfig.googleOAuthConnection.status === 'active')
+  ) {
+    plainEnv.KILOCLAW_GOOGLE_WORKSPACE_ENABLED = 'true';
   }
 
   // Org identity (non-sensitive, plaintext)

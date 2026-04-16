@@ -221,4 +221,194 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
       })
     );
   });
+
+  it('adopts detached paid personal row onto new provisioned instance', async () => {
+    const source = {
+      id: 'sub-detached',
+      user_id: 'user-1',
+      instance_id: null,
+      stripe_subscription_id: 'stripe-detached',
+      stripe_schedule_id: null,
+      transferred_to_subscription_id: null,
+      access_origin: null,
+      payment_source: 'stripe',
+      plan: 'standard',
+      scheduled_plan: null,
+      scheduled_by: null,
+      status: 'active',
+      cancel_at_period_end: false,
+      pending_conversion: false,
+      trial_started_at: null,
+      trial_ends_at: null,
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+      credit_renewal_at: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-04-01T00:00:00.000Z',
+      updated_at: '2026-04-01T00:00:00.000Z',
+    };
+    const insertedSuccessor = {
+      ...source,
+      id: 'sub-attached',
+      instance_id: 'instance-new',
+      stripe_subscription_id: null,
+      created_at: '2026-04-10T00:00:00.000Z',
+      updated_at: '2026-04-10T00:00:00.000Z',
+    };
+    const predecessorAfter = {
+      ...source,
+      status: 'canceled',
+      transferred_to_subscription_id: insertedSuccessor.id,
+      stripe_subscription_id: null,
+      updated_at: '2026-04-10T00:00:01.000Z',
+    };
+    const restoredSuccessor = {
+      ...insertedSuccessor,
+      stripe_subscription_id: source.stripe_subscription_id,
+      updated_at: '2026-04-10T00:00:02.000Z',
+    };
+
+    const { db, insertValues, updateSets } = createMockDb({
+      selectRows: [
+        [],
+        [source],
+        [{ id: 'instance-new', destroyedAt: null, organizationId: null }],
+        [],
+      ],
+      txSelectRows: [[source], [{ id: 'instance-new' }], []],
+      insertReturningRows: [[insertedSuccessor]],
+      updateReturningRows: [[predecessorAfter], [restoredSuccessor]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const result = await bootstrapProvisionSubscription(createEnv(), {
+      userId: source.user_id,
+      instanceId: 'instance-new',
+      orgId: null,
+    });
+
+    expect(insertValues).toHaveLength(1);
+    expect(insertValues[0]).toEqual(
+      expect.objectContaining({
+        instance_id: 'instance-new',
+        stripe_subscription_id: null,
+      })
+    );
+    expect(updateSets).toHaveLength(2);
+    expect(updateSets[0]).toEqual(
+      expect.objectContaining({
+        transferred_to_subscription_id: insertedSuccessor.id,
+        stripe_subscription_id: null,
+      })
+    );
+    expect(updateSets[1]).toEqual(
+      expect.objectContaining({
+        stripe_subscription_id: source.stripe_subscription_id,
+      })
+    );
+    expect(result).toEqual(restoredSuccessor);
+  });
+
+  it('ignores historical destroyed canceled rows when choosing destroyed successor source', async () => {
+    const historicalRow = {
+      id: 'sub-historical',
+      user_id: 'user-1',
+      instance_id: 'instance-older',
+      stripe_subscription_id: 'stripe-old',
+      stripe_schedule_id: null,
+      transferred_to_subscription_id: null,
+      access_origin: null,
+      payment_source: 'stripe',
+      plan: 'standard',
+      scheduled_plan: null,
+      scheduled_by: null,
+      status: 'canceled',
+      cancel_at_period_end: false,
+      pending_conversion: false,
+      trial_started_at: null,
+      trial_ends_at: null,
+      current_period_start: '2026-02-01T00:00:00.000Z',
+      current_period_end: '2026-03-01T00:00:00.000Z',
+      credit_renewal_at: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-02-01T00:00:00.000Z',
+      updated_at: '2026-03-01T00:00:00.000Z',
+    };
+    const source = {
+      ...historicalRow,
+      id: 'sub-current-destroyed',
+      instance_id: 'instance-old',
+      stripe_subscription_id: 'stripe-live',
+      status: 'active',
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+      created_at: '2026-04-01T00:00:00.000Z',
+      updated_at: '2026-04-10T00:00:00.000Z',
+    };
+    const insertedSuccessor = {
+      ...source,
+      id: 'sub-successor-new',
+      instance_id: 'instance-new',
+      stripe_subscription_id: null,
+      created_at: '2026-04-11T00:00:00.000Z',
+      updated_at: '2026-04-11T00:00:00.000Z',
+    };
+    const predecessorAfter = {
+      ...source,
+      status: 'canceled',
+      transferred_to_subscription_id: insertedSuccessor.id,
+      stripe_subscription_id: null,
+      updated_at: '2026-04-11T00:00:01.000Z',
+    };
+    const restoredSuccessor = {
+      ...insertedSuccessor,
+      stripe_subscription_id: source.stripe_subscription_id,
+      updated_at: '2026-04-11T00:00:02.000Z',
+    };
+
+    const { db, insertValues, updateSets } = createMockDb({
+      selectRows: [
+        [],
+        [historicalRow, source],
+        [
+          { id: 'instance-older', destroyedAt: '2026-03-05T00:00:00.000Z', organizationId: null },
+          { id: 'instance-old', destroyedAt: '2026-04-10T00:00:00.000Z', organizationId: null },
+          { id: 'instance-new', destroyedAt: null, organizationId: null },
+        ],
+        [],
+      ],
+      txSelectRows: [[source], [{ id: 'instance-new' }], []],
+      insertReturningRows: [[insertedSuccessor]],
+      updateReturningRows: [[predecessorAfter], [restoredSuccessor]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const result = await bootstrapProvisionSubscription(createEnv(), {
+      userId: source.user_id,
+      instanceId: 'instance-new',
+      orgId: null,
+    });
+
+    expect(insertValues).toHaveLength(1);
+    expect(updateSets[0]).toEqual(
+      expect.objectContaining({
+        transferred_to_subscription_id: insertedSuccessor.id,
+      })
+    );
+    expect(result).toEqual(restoredSuccessor);
+  });
 });

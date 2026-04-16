@@ -182,6 +182,22 @@ function currentPersonalSubscriptions(
   });
 }
 
+function parseSubscriptionTimestamp(value: string | null | undefined): number {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function currentSubscriptionRecency(subscription: KiloClawSubscription): number {
+  return Math.max(
+    parseSubscriptionTimestamp(subscription.current_period_end),
+    parseSubscriptionTimestamp(subscription.credit_renewal_at),
+    parseSubscriptionTimestamp(subscription.trial_ends_at),
+    parseSubscriptionTimestamp(subscription.updated_at),
+    parseSubscriptionTimestamp(subscription.created_at)
+  );
+}
+
 async function createSuccessorPersonalSubscription(params: {
   db: ReturnType<typeof getWorkerDb>;
   env: BillingWorkerEnv;
@@ -334,16 +350,56 @@ async function createSuccessorPersonalSubscription(params: {
 
 function resolveExactCurrentPersonalSubscription(
   subscriptions: KiloClawSubscription[],
-  instancesById: Map<string, { destroyedAt: string | null; organizationId: string | null }>
+  instancesById: Map<string, { destroyedAt: string | null; organizationId: string | null }>,
+  now: Date
 ): KiloClawSubscription | null {
   const currentRows = currentPersonalSubscriptions(subscriptions, instancesById);
-  if (currentRows.length === 0) {
-    return null;
-  }
-  if (currentRows.length > 1) {
+  const liveRows = currentRows.filter(row => {
+    const instance = row.instance_id ? instancesById.get(row.instance_id) : null;
+    return !instance?.destroyedAt;
+  });
+  if (liveRows.length > 1) {
     throw new Error('Multiple current personal subscription rows found during bootstrap');
   }
-  return currentRows[0] ?? null;
+  if (liveRows[0]) {
+    return liveRows[0];
+  }
+
+  const destroyedAccessRows = currentRows.filter(row => {
+    const instance = row.instance_id ? instancesById.get(row.instance_id) : null;
+    return !!instance?.destroyedAt && isAccessGrantingSubscription(row, now);
+  });
+  if (destroyedAccessRows.length === 0) {
+    return null;
+  }
+  return (
+    [...destroyedAccessRows].sort((left, right) => {
+      const recencyDiff = currentSubscriptionRecency(right) - currentSubscriptionRecency(left);
+      if (recencyDiff !== 0) {
+        return recencyDiff;
+      }
+      return right.id.localeCompare(left.id);
+    })[0] ?? null
+  );
+}
+
+function resolveDetachedAccessGrantingPersonalSubscription(
+  subscriptions: KiloClawSubscription[],
+  now: Date
+): KiloClawSubscription | null {
+  const detachedRows = subscriptions.filter(
+    subscription =>
+      !subscription.transferred_to_subscription_id &&
+      subscription.instance_id === null &&
+      isAccessGrantingSubscription(subscription, now)
+  );
+  if (detachedRows.length === 0) {
+    return null;
+  }
+  if (detachedRows.length > 1) {
+    throw new Error('Multiple detached access-granting personal subscription rows found');
+  }
+  return detachedRows[0] ?? null;
 }
 
 async function bootstrapPersonalSubscription(
@@ -407,7 +463,8 @@ async function bootstrapPersonalSubscription(
 
   const currentPersonalSubscription = resolveExactCurrentPersonalSubscription(
     personalSubscriptions,
-    instancesById
+    instancesById,
+    now
   );
   if (currentPersonalSubscription) {
     if (
@@ -431,6 +488,19 @@ async function bootstrapPersonalSubscription(
         targetInstanceId: input.instanceId,
       });
     }
+  }
+
+  const detachedAccessGrantingSubscription = resolveDetachedAccessGrantingPersonalSubscription(
+    personalSubscriptions,
+    now
+  );
+  if (detachedAccessGrantingSubscription) {
+    return await createSuccessorPersonalSubscription({
+      db,
+      env,
+      source: detachedAccessGrantingSubscription,
+      targetInstanceId: input.instanceId,
+    });
   }
 
   const hasActiveEarlybirdAccess =

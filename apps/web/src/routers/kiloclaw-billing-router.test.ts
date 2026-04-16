@@ -502,10 +502,10 @@ describe('requireKiloClawAccess', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     try {
-      const destroyedInstance = await createKiloclawInstance(user.id, '2026-04-01T00:00:00.000Z');
+      const instance = await createKiloclawInstance(user.id);
       await db.insert(kiloclaw_subscriptions).values({
         user_id: user.id,
-        instance_id: destroyedInstance.id,
+        instance_id: instance.id,
         plan: 'standard',
         status: 'canceled',
         current_period_end: '2026-04-01T00:00:00.000Z',
@@ -547,7 +547,7 @@ describe('requireKiloClawAccess', () => {
         status: 'canceled',
         plan: 'standard',
         suspended_at: expect.stringContaining('2026-04-02'),
-        instance_id: destroyedInstance.id,
+        instance_id: instance.id,
       });
     } finally {
       warnSpy.mockRestore();
@@ -933,6 +933,31 @@ describe('subscription center procedures', () => {
 });
 
 describe('createSubscriptionCheckout', () => {
+  it('allows checkout for legacy earlybird instance with no subscription row', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_earlybird_purchases).values({
+      user_id: user.id,
+      amount_cents: 2500,
+    });
+
+    stripeMock.checkout.sessions.create.mockResolvedValue({
+      url: 'https://checkout.stripe.com/test',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.createSubscriptionCheckout({ plan: 'standard' })).resolves.toEqual(
+      { url: 'https://checkout.stripe.com/test' }
+    );
+
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          instanceId: instance.id,
+        }),
+      })
+    );
+  });
+
   it('uses the intro price and allow_promotion_codes for new standard subscribers', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_subscriptions).values({

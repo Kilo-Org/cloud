@@ -19,6 +19,7 @@ WITH "detached_current" AS (
   INNER JOIN "kiloclaw_instances" AS "instance"
     ON "instance"."id" = "sub"."instance_id"
    AND "instance"."organization_id" IS NULL
+   AND "instance"."destroyed_at" IS NULL
   WHERE "sub"."transferred_to_subscription_id" IS NULL
 ), "attach_candidates" AS (
   SELECT
@@ -30,6 +31,7 @@ WITH "detached_current" AS (
   INNER JOIN "kiloclaw_instances" AS "instance"
     ON "instance"."user_id" = "single_detached_users"."user_id"
    AND "instance"."organization_id" IS NULL
+   AND "instance"."destroyed_at" IS NULL
   LEFT JOIN "kiloclaw_subscriptions" AS "existing_instance_row"
     ON "existing_instance_row"."instance_id" = "instance"."id"
   LEFT JOIN "current_personal_rows" AS "current_personal"
@@ -65,6 +67,7 @@ WITH "detached_current" AS (
   INNER JOIN "kiloclaw_instances" AS "instance"
     ON "instance"."id" = "sub"."instance_id"
    AND "instance"."organization_id" IS NULL
+   AND "instance"."destroyed_at" IS NULL
   WHERE "sub"."transferred_to_subscription_id" IS NULL
 ), "single_current_personal_rows" AS (
   SELECT MIN(("current_personal"."id")::text)::uuid AS "target_id", "current_personal"."user_id"

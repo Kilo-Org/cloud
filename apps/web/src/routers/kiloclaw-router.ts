@@ -114,6 +114,18 @@ function mapCurrentSubscriptionResolutionError(error: unknown): never {
   throw error;
 }
 
+async function getEarlybirdPurchaseRow(
+  userId: string,
+  executor: typeof db | DrizzleTransaction = db
+): Promise<{ id: string } | null> {
+  const [earlybird] = await executor
+    .select({ id: kiloclaw_earlybird_purchases.id })
+    .from(kiloclaw_earlybird_purchases)
+    .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
+    .limit(1);
+  return earlybird ?? null;
+}
+
 async function getOwnedPersonalInstanceAnchorRow(params: {
   userId: string;
   instanceId: string;
@@ -160,7 +172,10 @@ async function resolvePersonalBillingAnchor(params: {
   currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
 }> {
   const executor = params.executor ?? db;
+  const now = new Date();
   const activeInstance = await getActiveInstance(params.userId, executor);
+  const earlybird = await getEarlybirdPurchaseRow(params.userId, executor);
+  const hasActiveEarlybirdAccess = !!earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now;
 
   let currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
   try {
@@ -180,7 +195,7 @@ async function resolvePersonalBillingAnchor(params: {
       })
     : null;
 
-  if (activeInstance && !currentRow) {
+  if (activeInstance && !currentRow && !hasActiveEarlybirdAccess) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Active KiloClaw instance is missing its current billing row.',
@@ -753,6 +768,8 @@ async function ensureProvisionAccess(
 }> {
   const now = new Date();
   const activeInstance = await getActiveInstance(userId, executor);
+  const earlybird = await getEarlybirdPurchaseRow(userId, executor);
+  const hasActiveEarlybirdAccess = !!earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now;
   let currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
   try {
     currentRow = await resolveCurrentPersonalSubscriptionRow({
@@ -763,7 +780,7 @@ async function ensureProvisionAccess(
     mapCurrentSubscriptionResolutionError(error);
   }
 
-  if (activeInstance && !currentRow) {
+  if (activeInstance && !currentRow && !hasActiveEarlybirdAccess) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Active KiloClaw instance is missing its current billing row.',
@@ -785,19 +802,12 @@ async function ensureProvisionAccess(
     };
   }
 
-  const [earlybird] = await executor
-    .select({ id: kiloclaw_earlybird_purchases.id })
-    .from(kiloclaw_earlybird_purchases)
-    .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
-    .limit(1);
-  if (earlybird) {
-    if (new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now) {
-      return {
-        instanceId: activeInstance?.id ?? null,
-        bootstrapSubscription: false,
-        shouldEnqueueTrialStartAffiliate: false,
-      };
-    }
+  if (hasActiveEarlybirdAccess) {
+    return {
+      instanceId: activeInstance?.id ?? null,
+      bootstrapSubscription: false,
+      shouldEnqueueTrialStartAffiliate: false,
+    };
   }
 
   const [anySubscription] = await executor

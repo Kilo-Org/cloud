@@ -71,4 +71,72 @@ describe('resolveCurrentPersonalSubscriptionRow', () => {
 
     expect(row).toBeNull();
   });
+
+  it('returns destroyed current row when it is the only personal billing row', async () => {
+    const [destroyedInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: `destroyed-current-${crypto.randomUUID()}`,
+        destroyed_at: '2026-04-12T00:00:00.000Z',
+      })
+      .returning();
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: destroyedInstance?.id,
+      plan: 'standard',
+      status: 'active',
+      stripe_subscription_id: 'sub_destroyed_current',
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+    });
+
+    const row = await resolveCurrentPersonalSubscriptionRow({ userId: user.id });
+
+    expect(row?.subscription.instance_id).toBe(destroyedInstance?.id ?? null);
+    expect(new Date(row?.instance?.destroyedAt ?? '').toISOString()).toBe(
+      '2026-04-12T00:00:00.000Z'
+    );
+  });
+
+  it('ignores destroyed historical rows when a live personal row also exists', async () => {
+    const [destroyedInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: `destroyed-sandbox-${crypto.randomUUID()}`,
+        destroyed_at: '2026-04-09T00:00:00.000Z',
+      })
+      .returning();
+    const [activeInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: `active-sandbox-${crypto.randomUUID()}`,
+      })
+      .returning();
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: destroyedInstance?.id,
+      plan: 'standard',
+      status: 'canceled',
+      stripe_subscription_id: 'sub_destroyed_history',
+      current_period_start: '2026-03-01T00:00:00.000Z',
+      current_period_end: '2026-04-01T00:00:00.000Z',
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: activeInstance?.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: '2026-04-10T00:00:00.000Z',
+      trial_ends_at: '2026-04-17T00:00:00.000Z',
+    });
+
+    const row = await resolveCurrentPersonalSubscriptionRow({ userId: user.id });
+
+    expect(row?.subscription.instance_id).toBe(activeInstance?.id ?? null);
+  });
 });

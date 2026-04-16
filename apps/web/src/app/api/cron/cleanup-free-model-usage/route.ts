@@ -40,7 +40,9 @@ export async function GET(request: Request) {
 
     const batchCutoff = boundary.length > 0 ? boundary[0].created_at : cutoffDate;
 
-    const result = await db.delete(free_model_usage).where(lt(free_model_usage.created_at, batchCutoff));
+    const result = await db
+      .delete(free_model_usage)
+      .where(lt(free_model_usage.created_at, batchCutoff));
 
     const deleted = result.rowCount ?? 0;
     totalDeleted += deleted;

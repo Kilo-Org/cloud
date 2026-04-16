@@ -14,9 +14,9 @@ export const GEMMA_4_31B_IT_ID = 'google/gemma-4-31b-it';
 
 export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   public_id: 'google/gemma-4-26b-a4b-it:free',
-  display_name: 'Google: Gemma 4 26B A4B IT (free)',
+  display_name: 'Google: Gemma 4 26B A4B (free)',
   description:
-    'Gemma 4 26B A4B IT is a lightweight mixture-of-experts model from Google with 26B total parameters and ~4B active parameters per forward pass, supporting text and image inputs with a 262K context window.',
+    'Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind. Despite 25.2B total parameters, only 3.8B activate per token during inference — delivering near-31B quality at a fraction of the compute cost.',
   context_length: 262144,
   max_completion_tokens: 32768,
   status: 'hidden', // usable through kilo-auto

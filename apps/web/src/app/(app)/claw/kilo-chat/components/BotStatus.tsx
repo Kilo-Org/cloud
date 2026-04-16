@@ -10,9 +10,7 @@ export function BotStatus({ isTyping }: BotStatusProps) {
       <div
         className={`h-2 w-2 rounded-full ${isTyping ? 'bg-green-500' : 'bg-muted-foreground/50'}`}
       />
-      <span className="text-muted-foreground text-xs">
-        {isTyping ? 'Active' : 'Offline'}
-      </span>
+      <span className="text-muted-foreground text-xs">{isTyping ? 'Active' : 'Offline'}</span>
     </div>
   );
 }

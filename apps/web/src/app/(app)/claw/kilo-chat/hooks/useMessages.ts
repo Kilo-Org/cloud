@@ -25,10 +25,7 @@ function parseMessageRow(row: MessageRow): Message {
   };
 }
 
-export function useMessages(
-  getToken: () => Promise<string>,
-  conversationId: string | null,
-) {
+export function useMessages(getToken: () => Promise<string>, conversationId: string | null) {
   const client = useKiloChatClient(getToken);
 
   return useInfiniteQuery({
@@ -41,20 +38,20 @@ export function useMessages(
             ...(pageParam ? { before: pageParam } : {}),
             limit: String(PAGE_SIZE),
           },
-        },
+        }
       );
       return res.messages.map(parseMessageRow);
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => {
+    getNextPageParam: lastPage => {
       if (lastPage.length < PAGE_SIZE) return undefined;
       return lastPage[lastPage.length - 1]?.id;
     },
     enabled: !!conversationId,
-    select: (data) => ({
+    select: data => ({
       ...data,
       // Flatten pages and reverse so oldest first
-      messages: data.pages.flatMap((p) => p).reverse(),
+      messages: data.pages.flatMap(p => p).reverse(),
     }),
   });
 }
@@ -76,10 +73,7 @@ export function useEditMessage(getToken: () => Promise<string>) {
   const client = useKiloChatClient(getToken);
 
   return useMutation({
-    mutationFn: ({
-      messageId,
-      ...req
-    }: EditMessageRequest & { messageId: string }) =>
+    mutationFn: ({ messageId, ...req }: EditMessageRequest & { messageId: string }) =>
       client.fetch<EditMessageResponse>(`/v1/messages/${messageId}`, {
         method: 'PATCH',
         body: req,
@@ -91,10 +85,7 @@ export function useDeleteMessage(getToken: () => Promise<string>) {
   const client = useKiloChatClient(getToken);
 
   return useMutation({
-    mutationFn: ({
-      messageId,
-      ...req
-    }: DeleteMessageRequest & { messageId: string }) =>
+    mutationFn: ({ messageId, ...req }: DeleteMessageRequest & { messageId: string }) =>
       client.fetch<void>(`/v1/messages/${messageId}`, {
         method: 'DELETE',
         body: req,
@@ -143,12 +134,10 @@ export function useMessageCacheUpdater(conversationId: string | null) {
             const data = old as { pages: Message[][]; pageParams: unknown[] };
             return {
               ...data,
-              pages: data.pages.map((page) =>
-                page.map((msg) =>
-                  msg.id === e.messageId
-                    ? { ...msg, content: e.content, version: e.version }
-                    : msg,
-                ),
+              pages: data.pages.map(page =>
+                page.map(msg =>
+                  msg.id === e.messageId ? { ...msg, content: e.content, version: e.version } : msg
+                )
               ),
             };
           });
@@ -161,10 +150,8 @@ export function useMessageCacheUpdater(conversationId: string | null) {
             const data = old as { pages: Message[][]; pageParams: unknown[] };
             return {
               ...data,
-              pages: data.pages.map((page) =>
-                page.map((msg) =>
-                  msg.id === e.messageId ? { ...msg, deleted: true } : msg,
-                ),
+              pages: data.pages.map(page =>
+                page.map(msg => (msg.id === e.messageId ? { ...msg, deleted: true } : msg))
               ),
             };
           });
@@ -172,6 +159,6 @@ export function useMessageCacheUpdater(conversationId: string | null) {
         }
       }
     },
-    [conversationId, queryClient, queryKey],
+    [conversationId, queryClient, queryKey]
   );
 }

@@ -25,17 +25,14 @@ type MessageAreaProps = {
   token: string | null;
 };
 
-export function MessageArea({
-  conversationId,
-  currentUserId,
-  getToken,
-  token,
-}: MessageAreaProps) {
+export function MessageArea({ conversationId, currentUserId, getToken, token }: MessageAreaProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useMessages(getToken, conversationId);
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
+    getToken,
+    conversationId
+  );
   const messages = data?.messages ?? [];
 
   const conversationDetail = useConversationDetail(getToken, conversationId);
@@ -52,14 +49,14 @@ export function MessageArea({
     conversationId,
     token,
     onEvent: useCallback(
-      (event) => {
+      event => {
         if (event.type === 'typing') {
           handleTypingEvent(event.data);
         } else {
           updateCache(event);
         }
       },
-      [handleTypingEvent, updateCache],
+      [handleTypingEvent, updateCache]
     ),
   });
 
@@ -67,8 +64,7 @@ export function MessageArea({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const isNearBottom =
-      el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
     if (isNearBottom) {
       el.scrollTop = el.scrollHeight;
     }
@@ -91,20 +87,16 @@ export function MessageArea({
     });
   }
 
-  function handleEdit(
-    messageId: string,
-    content: ContentBlock[],
-    version: number,
-  ) {
+  function handleEdit(messageId: string, content: ContentBlock[], version: number) {
     editMessage.mutate(
       { messageId, conversationId, content, version },
       {
-        onError: (err) => {
+        onError: err => {
           if (err instanceof KiloChatApiError && err.status === 409) {
             // Version conflict — could show toast here
           }
         },
-      },
+      }
     );
   }
 
@@ -113,11 +105,9 @@ export function MessageArea({
     deleteMessage.mutate({ messageId, conversationId });
   }
 
-  const messageMap = new Map(messages.map((m) => [m.id, m]));
+  const messageMap = new Map(messages.map(m => [m.id, m]));
 
-  const botIsTyping = Array.from(typingMembers.keys()).some((id) =>
-    id.startsWith('bot:'),
-  );
+  const botIsTyping = Array.from(typingMembers.keys()).some(id => id.startsWith('bot:'));
 
   const title = conversationDetail.data?.title ?? 'Conversation';
 
@@ -130,25 +120,19 @@ export function MessageArea({
       </div>
 
       {/* Messages */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto py-4"
-        onScroll={handleScroll}
-      >
+      <div ref={scrollRef} className="flex-1 overflow-y-auto py-4" onScroll={handleScroll}>
         {isFetchingNextPage && (
           <div className="text-muted-foreground py-2 text-center text-xs">
             Loading older messages...
           </div>
         )}
-        {messages.map((msg) => (
+        {messages.map(msg => (
           <MessageBubble
             key={msg.id}
             message={msg}
             isOwn={msg.senderId === currentUserId}
             replyToMessage={
-              msg.inReplyToMessageId
-                ? messageMap.get(msg.inReplyToMessageId) ?? null
-                : null
+              msg.inReplyToMessageId ? (messageMap.get(msg.inReplyToMessageId) ?? null) : null
             }
             onEdit={handleEdit}
             onDelete={handleDelete}

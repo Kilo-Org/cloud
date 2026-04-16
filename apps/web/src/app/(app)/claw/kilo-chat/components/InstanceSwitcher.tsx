@@ -14,11 +14,7 @@ type InstanceSwitcherProps = {
   onSelect: (sandboxId: string) => void;
 };
 
-export function InstanceSwitcher({
-  instances,
-  selectedId,
-  onSelect,
-}: InstanceSwitcherProps) {
+export function InstanceSwitcher({ instances, selectedId, onSelect }: InstanceSwitcherProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -32,7 +28,7 @@ export function InstanceSwitcher({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const selected = instances.find((i) => i.sandboxId === selectedId);
+  const selected = instances.find(i => i.sandboxId === selectedId);
 
   if (instances.length === 0) return null;
 
@@ -43,9 +39,7 @@ export function InstanceSwitcher({
         className="border-border bg-background flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm"
       >
         <div>
-          <div className="text-muted-foreground text-[10px] uppercase">
-            Instance
-          </div>
+          <div className="text-muted-foreground text-[10px] uppercase">Instance</div>
           <div className="font-medium">{selected?.label ?? 'Select...'}</div>
         </div>
         <ChevronDown className="text-muted-foreground h-4 w-4" />
@@ -53,7 +47,7 @@ export function InstanceSwitcher({
 
       {open && (
         <div className="border-border bg-popover absolute left-3 right-3 z-10 mt-1 rounded-md border py-1 shadow-lg">
-          {instances.map((inst) => (
+          {instances.map(inst => (
             <button
               key={inst.sandboxId}
               onClick={() => {

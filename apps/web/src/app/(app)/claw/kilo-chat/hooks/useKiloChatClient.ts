@@ -4,7 +4,7 @@ import { KILO_CHAT_URL } from '@/lib/constants';
 export class KiloChatApiError extends Error {
   constructor(
     public status: number,
-    public body: unknown,
+    public body: unknown
   ) {
     super(`Kilo Chat API error: ${status}`);
     this.name = 'KiloChatApiError';
@@ -18,11 +18,7 @@ type FetchOptions = {
   headers?: Record<string, string>;
 };
 
-async function kiloChatFetch<T>(
-  path: string,
-  token: string,
-  opts: FetchOptions = {},
-): Promise<T> {
+async function kiloChatFetch<T>(path: string, token: string, opts: FetchOptions = {}): Promise<T> {
   const url = new URL(path, KILO_CHAT_URL);
   if (opts.query) {
     for (const [k, v] of Object.entries(opts.query)) {

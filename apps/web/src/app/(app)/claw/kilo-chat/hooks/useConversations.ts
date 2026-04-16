@@ -9,16 +9,12 @@ import { useKiloChatClient } from './useKiloChatClient';
 
 const POLL_INTERVAL = 30_000;
 
-export function useConversations(
-  getToken: () => Promise<string>,
-  sandboxId: string | null,
-) {
+export function useConversations(getToken: () => Promise<string>, sandboxId: string | null) {
   const client = useKiloChatClient(getToken);
 
   return useQuery({
     queryKey: ['kilo-chat', 'conversations', sandboxId],
-    queryFn: () =>
-      client.fetch<ConversationListResponse>('/v1/conversations'),
+    queryFn: () => client.fetch<ConversationListResponse>('/v1/conversations'),
     enabled: !!sandboxId,
     refetchInterval: POLL_INTERVAL,
   });
@@ -26,16 +22,13 @@ export function useConversations(
 
 export function useConversationDetail(
   getToken: () => Promise<string>,
-  conversationId: string | null,
+  conversationId: string | null
 ) {
   const client = useKiloChatClient(getToken);
 
   return useQuery({
     queryKey: ['kilo-chat', 'conversation', conversationId],
-    queryFn: () =>
-      client.fetch<ConversationDetailResponse>(
-        `/v1/conversations/${conversationId}`,
-      ),
+    queryFn: () => client.fetch<ConversationDetailResponse>(`/v1/conversations/${conversationId}`),
     enabled: !!conversationId,
   });
 }

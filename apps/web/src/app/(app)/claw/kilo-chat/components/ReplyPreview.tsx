@@ -11,7 +11,7 @@ type ReplyPreviewProps = {
 export function ReplyPreview({ message, onCancel }: ReplyPreviewProps) {
   const text = message.content
     .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
-    .map((b) => b.text)
+    .map(b => b.text)
     .join(' ')
     .slice(0, 100);
 
@@ -20,16 +20,11 @@ export function ReplyPreview({ message, onCancel }: ReplyPreviewProps) {
       <div className="bg-primary h-full w-0.5 rounded" />
       <div className="min-w-0 flex-1">
         <p className="text-muted-foreground text-xs font-medium">
-          Replying to{' '}
-          {message.senderId.startsWith('bot:') ? 'KiloClaw' : 'yourself'}
+          Replying to {message.senderId.startsWith('bot:') ? 'KiloClaw' : 'yourself'}
         </p>
         <p className="text-muted-foreground truncate text-xs">{text}</p>
       </div>
-      <button
-        onClick={onCancel}
-        className="hover:bg-muted rounded p-1"
-        title="Cancel reply"
-      >
+      <button onClick={onCancel} className="hover:bg-muted rounded p-1" title="Cancel reply">
         <X className="h-3.5 w-3.5" />
       </button>
     </div>

@@ -45,16 +45,14 @@ export function MessageInput({
 
   return (
     <div className="border-border border-t">
-      {replyingTo && (
-        <ReplyPreview message={replyingTo} onCancel={onCancelReply} />
-      )}
+      {replyingTo && <ReplyPreview message={replyingTo} onCancel={onCancelReply} />}
       <div className="flex items-end gap-2 p-4">
         <textarea
           ref={textareaRef}
           className="border-input bg-background flex-1 resize-none rounded-lg border px-3 py-2 text-sm"
           placeholder="Type a message..."
           value={text}
-          onChange={(e) => {
+          onChange={e => {
             setText(e.target.value);
             onTyping();
           }}

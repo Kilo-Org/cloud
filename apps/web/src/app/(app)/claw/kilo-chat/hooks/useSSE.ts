@@ -47,7 +47,7 @@ export function useSSE({ conversationId, token, onEvent }: UseSSEOptions) {
           });
 
           if (!res.ok || !res.body) {
-            await new Promise((r) => setTimeout(r, 3000));
+            await new Promise(r => setTimeout(r, 3000));
             continue;
           }
 
@@ -94,7 +94,7 @@ export function useSSE({ conversationId, token, onEvent }: UseSSEOptions) {
           }
         } catch (e) {
           if (aborted) return;
-          await new Promise((r) => setTimeout(r, 3000));
+          await new Promise(r => setTimeout(r, 3000));
         }
       }
     }

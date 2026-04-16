@@ -8,10 +8,7 @@ const TYPING_DISPLAY_TIMEOUT = 4000;
 /**
  * Sends typing indicator pings (debounced, 3s cooldown).
  */
-export function useTypingSender(
-  getToken: () => Promise<string>,
-  conversationId: string | null,
-) {
+export function useTypingSender(getToken: () => Promise<string>, conversationId: string | null) {
   const client = useKiloChatClient(getToken);
   const lastSentRef = useRef(0);
 
@@ -31,19 +28,15 @@ export function useTypingSender(
  * Clears a member's typing state after 4s of no pings.
  */
 export function useTypingState(currentUserId: string | null) {
-  const [typingMembers, setTypingMembers] = useState<Map<string, number>>(
-    new Map(),
-  );
-  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-    new Map(),
-  );
+  const [typingMembers, setTypingMembers] = useState<Map<string, number>>(new Map());
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const handleTypingEvent = useCallback(
     (event: TypingEvent) => {
       // Don't show own typing
       if (event.memberId === currentUserId) return;
 
-      setTypingMembers((prev) => {
+      setTypingMembers(prev => {
         const next = new Map(prev);
         next.set(event.memberId, Date.now());
         return next;
@@ -55,7 +48,7 @@ export function useTypingState(currentUserId: string | null) {
 
       // Set new timer to remove typing state
       const timer = setTimeout(() => {
-        setTypingMembers((prev) => {
+        setTypingMembers(prev => {
           const next = new Map(prev);
           next.delete(event.memberId);
           return next;
@@ -64,7 +57,7 @@ export function useTypingState(currentUserId: string | null) {
       }, TYPING_DISPLAY_TIMEOUT);
       timersRef.current.set(event.memberId, timer);
     },
-    [currentUserId],
+    [currentUserId]
   );
 
   return { typingMembers, handleTypingEvent };

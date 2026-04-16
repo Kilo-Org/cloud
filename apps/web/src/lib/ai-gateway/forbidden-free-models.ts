@@ -13,7 +13,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'google/gemma-3-4b-it:free',
   'google/gemma-3n-e2b-it:free',
   'google/gemma-3n-e4b-it:free',
-  'google/gemma-4-26b-a4b-it:free',
+  'google/gemma-4-26b-a4b-it:free', // usable through kilo-auto
   'google/gemma-4-31b-it:free',
   'kilo/auto-free', // discontinued variant of kilo-auto/free
   'liquid/lfm-2.5-1.2b-instruct:free',
@@ -29,7 +29,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'nvidia/nemotron-nano-12b-v2-vl:free',
   'nvidia/nemotron-nano-9b-v2:free',
   'openai/gpt-oss-120b:free',
-  'openai/gpt-oss-20b:free', // usable through kilo-auto
+  'openai/gpt-oss-20b:free',
   'qwen/qwen3-4b:free',
   'qwen/qwen3-coder:free',
   'qwen/qwen3-next-80b-a3b-instruct:free',

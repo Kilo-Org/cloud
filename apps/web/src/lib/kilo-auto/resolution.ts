@@ -1,6 +1,9 @@
 import type { FeatureValue } from '@/lib/feature-detection';
 import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
-import { gpt_oss_20b_free_model, GPT_5_NANO_ID } from '@/lib/ai-gateway/providers/openai';
+import {
+  gemma_4_26b_a4b_it_free_model,
+  GEMMA_4_31B_IT_ID,
+} from '@/lib/ai-gateway/providers/google';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
@@ -35,7 +38,8 @@ export async function resolveAutoModel(
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {
-      model: (await balancePromise) > 0 ? GPT_5_NANO_ID : gpt_oss_20b_free_model.public_id,
+      model:
+        (await balancePromise) > 0 ? GEMMA_4_31B_IT_ID : gemma_4_26b_a4b_it_free_model.public_id,
     };
   }
   const modeResult = modeSchema.safeParse(modeHeader?.trim() ?? '');

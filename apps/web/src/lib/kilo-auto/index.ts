@@ -182,17 +182,15 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   id: 'kilo-auto/small',
   name: 'Kilo Auto Small',
   description: 'Automatically routes your request to a small model.',
-  context_length: 131072,
+  context_length: 262144,
   max_completion_tokens: 32768,
   prompt_price: '0.00000005',
   completion_price: '0.0000004',
   input_cache_read_price: '0.000000005',
   input_cache_write_price: undefined,
-  supports_images: false,
+  supports_images: true,
   roocode_settings: undefined,
-  opencode_settings: {
-    ai_sdk_provider: 'openai',
-  },
+  opencode_settings: undefined,
 };
 
 export const AUTO_MODELS = [

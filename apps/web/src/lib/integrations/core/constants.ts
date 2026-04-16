@@ -148,7 +148,6 @@ export const PLATFORM = {
   SLACK: 'slack',
   DISCORD: 'discord',
   SLACK_NEXT: 'slack-next',
-  GOOGLE_WORKSPACE: 'google-workspace',
 } as const;
 
 /**

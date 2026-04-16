@@ -1,6 +1,7 @@
 import type { KiloClawEnv } from '../../types';
 import type {
   GoogleCredentials,
+  GoogleOAuthConnection,
   PersistedState,
   MachineSize,
   ProviderId,
@@ -65,6 +66,7 @@ export type InstanceMutableState = {
   kiloExaSearchMode: PersistedState['kiloExaSearchMode'];
   channels: PersistedState['channels'];
   googleCredentials: GoogleCredentials | null;
+  googleOAuthConnection: GoogleOAuthConnection | null;
   provisionedAt: number | null;
   startingAt: number | null;
   restartingAt: number | null;

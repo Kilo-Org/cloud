@@ -194,6 +194,10 @@ export type PlatformStatusResponse = {
   trackedImageTag: string | null;
   trackedImageDigest: string | null;
   googleConnected: boolean;
+  googleOAuthConnected: boolean;
+  googleOAuthStatus: 'active' | 'action_required' | 'disconnected';
+  googleOAuthAccountEmail: string | null;
+  googleOAuthCapabilities: string[];
   gmailNotificationsEnabled: boolean;
   execSecurity: string | null;
   execAsk: string | null;
@@ -374,6 +378,24 @@ export type GoogleCredentialsInput = {
 /** Response from POST/DELETE /api/platform/google-credentials */
 export type GoogleCredentialsResponse = {
   googleConnected: boolean;
+};
+
+/** Input to POST /api/platform/google-oauth-connection */
+export type GoogleOAuthConnectionInput = {
+  googleOAuthConnection: {
+    accountEmail: string | null;
+    accountSubject: string | null;
+    capabilities: string[];
+    scopes: string[];
+    status: 'active' | 'action_required' | 'disconnected';
+    lastError?: string | null;
+  };
+};
+
+/** Response from POST/DELETE /api/platform/google-oauth-connection */
+export type GoogleOAuthConnectionResponse = {
+  googleOAuthConnected: boolean;
+  googleOAuthStatus: 'active' | 'action_required' | 'disconnected';
 };
 
 /** Response from POST/DELETE /api/platform/gmail-notifications */

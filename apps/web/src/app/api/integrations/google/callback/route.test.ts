@@ -2,10 +2,8 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getInstanceById } from '@/lib/kiloclaw/instance-registry';
-import {
-  exchangeGoogleOAuthCode,
-  upsertGoogleOAuthIntegration,
-} from '@/lib/integrations/google-service';
+import { exchangeGoogleOAuthCode } from '@/lib/integrations/google-service';
+import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
 import { verifyGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { failureResult } from '@/lib/maybe-result';
@@ -17,7 +15,14 @@ jest.mock('@/routers/organizations/utils', () => ({
 }));
 jest.mock('@/lib/kiloclaw/instance-registry');
 jest.mock('@/lib/integrations/google-service');
+jest.mock('@/lib/kiloclaw/google-oauth-connections');
 jest.mock('@/lib/integrations/google/oauth-state');
+const mockedUpdateGoogleOAuthConnection = jest.fn();
+jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
+  KiloClawInternalClient: jest.fn().mockImplementation(() => ({
+    updateGoogleOAuthConnection: mockedUpdateGoogleOAuthConnection,
+  })),
+}));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
@@ -26,7 +31,7 @@ jest.mock('@sentry/nextjs', () => ({
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetInstanceById = jest.mocked(getInstanceById);
 const mockedExchangeGoogleOAuthCode = jest.mocked(exchangeGoogleOAuthCode);
-const mockedUpsertGoogleOAuthIntegration = jest.mocked(upsertGoogleOAuthIntegration);
+const mockedUpsertKiloClawGoogleOAuthConnection = jest.mocked(upsertKiloClawGoogleOAuthConnection);
 const mockedVerifyGoogleOAuthState = jest.mocked(verifyGoogleOAuthState);
 const mockedCaptureMessage = jest.mocked(captureMessage);
 const mockedCaptureException = jest.mocked(captureException);
@@ -48,7 +53,7 @@ function expectRedirectLocation(response: Response, expectedPathWithQuery: strin
 
 describe('GET /api/integrations/google/callback', () => {
   beforeEach(() => {
-    jest.resetAllMocks();
+    jest.clearAllMocks();
 
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: USER_ID },
@@ -80,7 +85,20 @@ describe('GET /api/integrations/google/callback', () => {
       expiresAt: null,
     });
 
-    mockedUpsertGoogleOAuthIntegration.mockResolvedValue();
+    mockedUpsertKiloClawGoogleOAuthConnection.mockResolvedValue({
+      status: 'active',
+      accountEmail: 'user@example.com',
+      scopes: [
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/userinfo.email',
+        'openid',
+      ],
+      capabilities: ['calendar_read'],
+    });
+    mockedUpdateGoogleOAuthConnection.mockResolvedValue({
+      googleOAuthConnected: true,
+      googleOAuthStatus: 'active',
+    });
   });
 
   test('redirects to sign-in when auth fails', async () => {
@@ -107,11 +125,20 @@ describe('GET /api/integrations/google/callback', () => {
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/claw/settings?success=google_connected');
     expect(mockedExchangeGoogleOAuthCode).toHaveBeenCalledWith('abc', ['calendar_read']);
-    expect(mockedUpsertGoogleOAuthIntegration).toHaveBeenCalledWith(
+    expect(mockedUpsertKiloClawGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({
-        owner: { type: 'user', id: USER_ID },
         instanceId: INSTANCE_ID,
       })
+    );
+    expect(mockedUpdateGoogleOAuthConnection).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({
+        googleOAuthConnection: expect.objectContaining({
+          status: 'active',
+          accountEmail: 'user@example.com',
+        }),
+      }),
+      INSTANCE_ID
     );
   });
 

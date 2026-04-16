@@ -5,11 +5,10 @@ import { APP_URL } from '@/lib/constants';
 import { getUserFromAuth } from '@/lib/user.server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { getInstanceById } from '@/lib/kiloclaw/instance-registry';
-import {
-  exchangeGoogleOAuthCode,
-  upsertGoogleOAuthIntegration,
-} from '@/lib/integrations/google-service';
+import { exchangeGoogleOAuthCode } from '@/lib/integrations/google-service';
 import { verifyGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
+import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
+import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 
 function buildGoogleRedirectPath(state: string | null, queryParam: string): string {
   const verified = verifyGoogleOAuthState(state);
@@ -30,7 +29,7 @@ function buildGoogleRedirectPath(state: string | null, queryParam: string): stri
  * Google OAuth callback.
  *
  * Validates signed state, exchanges authorization code for tokens, and stores
- * encrypted token linkage in `platform_integrations`.
+ * encrypted token linkage in KiloClaw-owned OAuth storage.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -144,16 +143,29 @@ export async function GET(request: NextRequest) {
 
     const oauthData = await exchangeGoogleOAuthCode(code, verifiedState.capabilities);
 
-    await upsertGoogleOAuthIntegration({
-      owner: verifiedState.owner,
-      createdByUserId: user.id,
+    const persisted = await upsertKiloClawGoogleOAuthConnection({
       instanceId: verifiedState.instanceId,
-      googleSubject: oauthData.googleSubject,
-      googleEmail: oauthData.googleEmail,
-      grantedScopes: oauthData.grantedScopes,
+      accountSubject: oauthData.googleSubject,
+      accountEmail: oauthData.googleEmail,
+      scopes: oauthData.grantedScopes,
       capabilities: verifiedState.capabilities,
       refreshToken: oauthData.refreshToken,
     });
+
+    const kiloclawClient = new KiloClawInternalClient();
+    await kiloclawClient.updateGoogleOAuthConnection(
+      user.id,
+      {
+        googleOAuthConnection: {
+          status: persisted.status,
+          accountEmail: persisted.accountEmail,
+          accountSubject: oauthData.googleSubject,
+          scopes: persisted.scopes,
+          capabilities: persisted.capabilities,
+        },
+      },
+      verifiedState.instanceId
+    );
 
     const successPath =
       verifiedState.owner.type === 'org'

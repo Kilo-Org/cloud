@@ -229,6 +229,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.kiloExaSearchMode = d.kiloExaSearchMode;
     s.channels = d.channels;
     s.googleCredentials = d.googleCredentials;
+    s.googleOAuthConnection = d.googleOAuthConnection;
     s.provisionedAt = d.provisionedAt;
     s.startingAt = d.startingAt;
     s.restartingAt = d.restartingAt;
@@ -327,6 +328,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.kiloExaSearchMode = null;
   s.channels = null;
   s.googleCredentials = null;
+  s.googleOAuthConnection = null;
   s.provisionedAt = null;
   s.startingAt = null;
   s.restartingAt = null;
@@ -407,6 +409,7 @@ export function createMutableState(): InstanceMutableState {
     kiloExaSearchMode: null,
     channels: null,
     googleCredentials: null,
+    googleOAuthConnection: null,
     provisionedAt: null,
     startingAt: null,
     restartingAt: null,

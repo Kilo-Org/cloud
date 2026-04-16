@@ -1105,11 +1105,13 @@ export function SettingsTab({
             <div>
               <p className="text-sm font-medium">Google Calendar</p>
               <div className="text-muted-foreground text-xs">
-                {status.googleConnected ? 'Connected' : 'Not connected'}
+                {status.googleOAuthConnected
+                  ? `Connected${status.googleOAuthAccountEmail ? ` as ${status.googleOAuthAccountEmail}` : ''}`
+                  : 'Not connected'}
               </div>
             </div>
           </div>
-          {status.googleConnected ? (
+          {status.googleOAuthConnected ? (
             <Button variant="outline" size="sm" onClick={() => {}}>
               Disconnect
             </Button>

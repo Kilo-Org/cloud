@@ -15,6 +15,7 @@ import type {
   PersistedState,
   EncryptedEnvelope,
   GoogleCredentials,
+  GoogleOAuthConnection,
   MachineSize,
   CustomSecretMeta,
   ProviderId,
@@ -1152,6 +1153,58 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return { googleConnected: false };
   }
 
+  async updateGoogleOAuthConnection(connection: {
+    status: GoogleOAuthConnection['status'];
+    accountEmail: string | null;
+    accountSubject: string | null;
+    scopes: string[];
+    capabilities: string[];
+    lastError?: string | null;
+  }): Promise<{ googleOAuthConnected: boolean; googleOAuthStatus: GoogleOAuthConnection['status'] }> {
+    await this.loadState();
+
+    const now = Date.now();
+    const previous = this.s.googleOAuthConnection;
+    const isActive = connection.status === 'active';
+
+    this.s.googleOAuthConnection = {
+      accountEmail: connection.accountEmail,
+      accountSubject: connection.accountSubject,
+      scopes: [...new Set(connection.scopes)].sort(),
+      capabilities: [...new Set(connection.capabilities)].sort(),
+      status: connection.status,
+      lastError: connection.lastError ?? null,
+      connectedAt: isActive
+        ? previous?.connectedAt ?? now
+        : previous?.connectedAt ?? null,
+      updatedAt: now,
+    };
+
+    await this.persist({
+      googleOAuthConnection: this.s.googleOAuthConnection,
+    });
+
+    return {
+      googleOAuthConnected: isActive,
+      googleOAuthStatus: connection.status,
+    };
+  }
+
+  async clearGoogleOAuthConnection(): Promise<{
+    googleOAuthConnected: boolean;
+    googleOAuthStatus: GoogleOAuthConnection['status'];
+  }> {
+    await this.loadState();
+
+    this.s.googleOAuthConnection = null;
+    await this.persist({ googleOAuthConnection: null });
+
+    return {
+      googleOAuthConnected: false,
+      googleOAuthStatus: 'disconnected',
+    };
+  }
+
   /**
    * Update the last-seen Gmail history ID.
    * Only writes if the new value is numerically greater than the stored one,
@@ -1865,6 +1918,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     trackedImageTag: string | null;
     trackedImageDigest: string | null;
     googleConnected: boolean;
+    googleOAuthConnected: boolean;
+    googleOAuthStatus: GoogleOAuthConnection['status'];
+    googleOAuthAccountEmail: string | null;
+    googleOAuthCapabilities: string[];
     gmailNotificationsEnabled: boolean;
     execSecurity: string | null;
     execAsk: string | null;
@@ -1913,6 +1970,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       trackedImageTag: this.s.trackedImageTag,
       trackedImageDigest: this.s.trackedImageDigest,
       googleConnected: this.s.googleCredentials !== null,
+      googleOAuthConnected: this.s.googleOAuthConnection?.status === 'active',
+      googleOAuthStatus: this.s.googleOAuthConnection?.status ?? 'disconnected',
+      googleOAuthAccountEmail: this.s.googleOAuthConnection?.accountEmail ?? null,
+      googleOAuthCapabilities: this.s.googleOAuthConnection?.capabilities ?? [],
       gmailNotificationsEnabled: this.s.gmailNotificationsEnabled,
       execSecurity: this.s.execSecurity,
       execAsk: this.s.execAsk,
@@ -1980,6 +2041,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     trackedImageTag: string | null;
     trackedImageDigest: string | null;
     googleConnected: boolean;
+    googleOAuthConnected: boolean;
+    googleOAuthStatus: GoogleOAuthConnection['status'];
+    googleOAuthAccountEmail: string | null;
+    googleOAuthCapabilities: string[];
     gmailNotificationsEnabled: boolean;
     pendingDestroyMachineId: string | null;
     pendingDestroyVolumeId: string | null;
@@ -2056,6 +2121,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       trackedImageTag: this.s.trackedImageTag,
       trackedImageDigest: this.s.trackedImageDigest,
       googleConnected: this.s.googleCredentials !== null,
+      googleOAuthConnected: this.s.googleOAuthConnection?.status === 'active',
+      googleOAuthStatus: this.s.googleOAuthConnection?.status ?? 'disconnected',
+      googleOAuthAccountEmail: this.s.googleOAuthConnection?.accountEmail ?? null,
+      googleOAuthCapabilities: this.s.googleOAuthConnection?.capabilities ?? [],
       gmailNotificationsEnabled: this.s.gmailNotificationsEnabled,
       pendingDestroyMachineId: this.s.pendingDestroyMachineId,
       pendingDestroyVolumeId: this.s.pendingDestroyVolumeId,

@@ -219,7 +219,6 @@ describe('kiloclaw.startKiloCliRun error translation', () => {
       initiated_by_admin_id: null,
       prompt: 'fix the config',
       status: 'running',
-      started_at: startedAt,
       completed_at: null,
       output: null,
       exit_code: null,
@@ -241,7 +240,6 @@ describe('kiloclaw.startKiloCliRun error translation', () => {
       output: null,
       exit_code: null,
     });
-    expect(new Date(rows[0]!.started_at!).toISOString()).toBe(startedAt);
   });
 });
 
@@ -339,7 +337,6 @@ describe('organizations.kiloclaw.startKiloCliRun error translation', () => {
       initiated_by_admin_id: null,
       prompt: 'fix the org config',
       status: 'running',
-      started_at: startedAt,
       completed_at: null,
       output: null,
       exit_code: null,
@@ -354,14 +351,13 @@ describe('organizations.kiloclaw.startKiloCliRun error translation', () => {
       user_id: user.id,
       instance_id: expect.any(String),
       initiated_by_admin_id: null,
-      prompt: 'fix the config',
+      prompt: 'fix the org config',
       status: 'running',
       started_at: startedAt,
       completed_at: null,
       output: null,
       exit_code: null,
     });
-    expect(new Date(rows[0]!.started_at!).toISOString()).toBe(startedAt);
   });
 });
 

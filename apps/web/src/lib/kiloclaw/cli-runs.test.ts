@@ -55,7 +55,12 @@ async function getRunStatus(runId: string) {
 async function getRunRow(runId: string) {
   const [row] = await db
     .select({
+      user_id: kiloclaw_cli_runs.user_id,
+      instance_id: kiloclaw_cli_runs.instance_id,
+      initiated_by_admin_id: kiloclaw_cli_runs.initiated_by_admin_id,
+      prompt: kiloclaw_cli_runs.prompt,
       status: kiloclaw_cli_runs.status,
+      started_at: kiloclaw_cli_runs.started_at,
       completed_at: kiloclaw_cli_runs.completed_at,
       output: kiloclaw_cli_runs.output,
       exit_code: kiloclaw_cli_runs.exit_code,
@@ -70,9 +75,65 @@ async function getRunRow(runId: string) {
 
   return {
     ...row,
+    started_at: row.started_at ? new Date(row.started_at).toISOString() : null,
     completed_at: row.completed_at ? new Date(row.completed_at).toISOString() : null,
   };
 }
+
+describe('createCliRun', () => {
+  it('creates a user-started running CLI run and returns its id', async () => {
+    const user = await insertTestUser();
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'user-started run',
+      startedAt,
+      initiatedByAdminId: null,
+    });
+
+    await expect(getRunRow(runId)).resolves.toMatchObject({
+      user_id: user.id,
+      instance_id: instanceId,
+      initiated_by_admin_id: null,
+      prompt: 'user-started run',
+      status: 'running',
+      started_at: startedAt,
+      completed_at: null,
+      output: null,
+      exit_code: null,
+    });
+  });
+
+  it('stores the initiating admin for admin-started CLI runs', async () => {
+    const user = await insertTestUser();
+    const admin = await insertTestUser({ is_admin: true });
+    const instanceId = await createTestInstance(user.id);
+    const startedAt = '2026-04-12T12:00:00.000Z';
+
+    const runId = await createCliRun({
+      userId: user.id,
+      instanceId,
+      prompt: 'admin-started run',
+      startedAt,
+      initiatedByAdminId: admin.id,
+    });
+
+    await expect(getRunRow(runId)).resolves.toMatchObject({
+      user_id: user.id,
+      instance_id: instanceId,
+      initiated_by_admin_id: admin.id,
+      prompt: 'admin-started run',
+      status: 'running',
+      started_at: startedAt,
+      completed_at: null,
+      output: null,
+      exit_code: null,
+    });
+  });
+});
 
 describe('cancelCliRun', () => {
   it('persists terminal controller status without calling cancel when the run already finished', async () => {

@@ -1,3 +1,4 @@
+import { WorkerEntrypoint } from 'cloudflare:workers';
 import { z } from 'zod';
 import { BILLING_FLOW } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
@@ -42,120 +43,73 @@ function log(level: 'info' | 'warn' | 'error', message: string, fields: BillingL
   logger.withFields(fields).info(message);
 }
 
-export const handler: ExportedHandler<BillingWorkerEnv, BillingSweepMessage> = {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (request.method === 'POST' && url.pathname === '/bootstrap-subscription') {
-      if (!env.KILOCLAW_INTERNAL_API_SECRET) {
-        log('error', 'bootstrap-subscription rejected: missing internal api secret', {
+/**
+ * RPC entrypoint invoked by other Workers over a service binding.
+ *
+ * Callers authenticate implicitly via the binding topology — only Workers
+ * explicitly bound to `kiloclaw-billing` with `entrypoint: "KiloClawBillingService"`
+ * can reach these methods. No shared secret is needed across the boundary.
+ */
+export class KiloClawBillingService extends WorkerEntrypoint<BillingWorkerEnv> {
+  async bootstrapProvisionSubscription(params: {
+    userId: string;
+    instanceId: string;
+    orgId?: string | null;
+  }): Promise<{ subscriptionId: string }> {
+    const parsed = BootstrapProvisionSubscriptionSchema.parse(params);
+    const orgId = parsed.orgId ?? null;
+
+    return await withLogTags(
+      {
+        source: 'rpc',
+        tags: {
           billingFlow: BILLING_FLOW,
           billingComponent: 'worker',
-          event: 'bootstrap_subscription',
-          outcome: 'failed',
-          statusCode: 500,
-        });
-        return Response.json(
-          { error: 'KILOCLAW_INTERNAL_API_SECRET is not configured' },
-          { status: 500 }
-        );
-      }
-
-      const providedSecret = request.headers.get('x-internal-api-key');
-      if (!providedSecret || providedSecret !== env.KILOCLAW_INTERNAL_API_SECRET) {
-        log('warn', 'bootstrap-subscription rejected: unauthorized', {
-          billingFlow: BILLING_FLOW,
-          billingComponent: 'worker',
-          event: 'bootstrap_subscription',
-          outcome: 'failed',
-          statusCode: 401,
-        });
-        return Response.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      let body: unknown;
-      try {
-        body = await request.json();
-      } catch {
-        log('warn', 'bootstrap-subscription rejected: malformed JSON', {
-          billingFlow: BILLING_FLOW,
-          billingComponent: 'worker',
-          event: 'bootstrap_subscription',
-          outcome: 'failed',
-          statusCode: 400,
-        });
-        return Response.json({ error: 'Malformed JSON body' }, { status: 400 });
-      }
-
-      const parsed = BootstrapProvisionSubscriptionSchema.safeParse(body);
-      if (!parsed.success) {
-        log('warn', 'bootstrap-subscription rejected: invalid request', {
-          billingFlow: BILLING_FLOW,
-          billingComponent: 'worker',
-          event: 'bootstrap_subscription',
-          outcome: 'failed',
-          statusCode: 400,
-          error: parsed.error.message,
-        });
-        return Response.json(
-          { error: 'Invalid request', details: parsed.error.flatten().fieldErrors },
-          { status: 400 }
-        );
-      }
-
-      const orgId = parsed.data.orgId ?? null;
-      return await withLogTags(
-        {
-          source: 'fetch',
-          tags: {
-            billingFlow: BILLING_FLOW,
-            billingComponent: 'worker',
-            userId: parsed.data.userId,
-            instanceId: parsed.data.instanceId,
-          },
+          userId: parsed.userId,
+          instanceId: parsed.instanceId,
         },
-        async () => {
-          const start = Date.now();
-          log('info', 'bootstrap-subscription started', {
-            event: 'bootstrap_subscription',
-            outcome: 'started',
+      },
+      async () => {
+        const start = Date.now();
+        log('info', 'bootstrap-subscription started', {
+          event: 'bootstrap_subscription',
+          outcome: 'started',
+          orgId,
+        });
+        try {
+          const subscription = await bootstrapProvisionSubscription(this.env, {
+            userId: parsed.userId,
+            instanceId: parsed.instanceId,
             orgId,
           });
-          try {
-            const subscription = await bootstrapProvisionSubscription(env, {
-              userId: parsed.data.userId,
-              instanceId: parsed.data.instanceId,
-              orgId,
-            });
 
-            log('info', 'bootstrap-subscription completed', {
-              event: 'bootstrap_subscription',
-              outcome: 'completed',
-              orgId,
-              statusCode: 200,
-              durationMs: Date.now() - start,
-              kiloclawSubscriptionId: subscription.id,
-            });
+          log('info', 'bootstrap-subscription completed', {
+            event: 'bootstrap_subscription',
+            outcome: 'completed',
+            orgId,
+            durationMs: Date.now() - start,
+            kiloclawSubscriptionId: subscription.id,
+          });
 
-            return Response.json({
-              ok: true,
-              subscriptionId: subscription.id,
-            });
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            log('error', 'bootstrap-subscription failed', {
-              event: 'bootstrap_subscription',
-              outcome: 'failed',
-              orgId,
-              statusCode: 500,
-              durationMs: Date.now() - start,
-              error: errorMessage,
-            });
-            return Response.json({ error: errorMessage }, { status: 500 });
-          }
+          return { subscriptionId: subscription.id };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          log('error', 'bootstrap-subscription failed', {
+            event: 'bootstrap_subscription',
+            outcome: 'failed',
+            orgId,
+            durationMs: Date.now() - start,
+            error: errorMessage,
+          });
+          throw error;
         }
-      );
-    }
+      }
+    );
+  }
+}
 
+export const handler: ExportedHandler<BillingWorkerEnv, BillingSweepMessage> = {
+  async fetch() {
     return Response.json({
       ok: true,
       service: 'kiloclaw-billing',

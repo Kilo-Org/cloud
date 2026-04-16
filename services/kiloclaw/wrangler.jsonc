@@ -104,6 +104,7 @@
     {
       "binding": "KILOCLAW_BILLING",
       "service": "kiloclaw-billing",
+      "entrypoint": "KiloClawBillingService",
     },
   ],
   "vars": {

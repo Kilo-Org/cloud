@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('cloudflare:workers', () => ({
+  WorkerEntrypoint: class WorkerEntrypoint {
+    ctx: ExecutionContext;
+    env: unknown;
+    constructor(ctx: ExecutionContext, env: unknown) {
+      this.ctx = ctx;
+      this.env = env;
+    }
+  },
+}));
+
 vi.mock('./lifecycle.js', () => ({
   runSweep: vi.fn(),
 }));
@@ -8,7 +19,7 @@ vi.mock('./bootstrap.js', () => ({
   bootstrapProvisionSubscription: vi.fn(),
 }));
 
-import { handler } from './index.js';
+import { handler, KiloClawBillingService } from './index.js';
 import { bootstrapProvisionSubscription } from './bootstrap.js';
 import { runSweep } from './lifecycle.js';
 import type { BillingSweepMessage, BillingWorkerEnv } from './types.js';
@@ -44,7 +55,7 @@ function createEnv(): { env: BillingWorkerEnv; send: ReturnType<typeof vi.fn> } 
       STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
       STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
       STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
-      INTERNAL_API_SECRET: 'next-secret',
+      INTERNAL_API_SECRET: 'next-internal-api-secret',
       KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
     },
     send,
@@ -189,38 +200,20 @@ describe('kiloclaw billing worker handler', () => {
     );
   });
 
-  it('accepts bootstrap requests signed with KiloClaw internal secret', async () => {
+  it('bootstrapProvisionSubscription RPC delegates to bootstrap module and returns subscriptionId', async () => {
     vi.mocked(bootstrapProvisionSubscription).mockResolvedValueOnce({
       id: 'sub-bootstrap',
     } as Awaited<ReturnType<typeof bootstrapProvisionSubscription>>);
     const { env } = createEnv();
-    const fetchHandler = handler.fetch;
-    const kiloclawSecret = env.KILOCLAW_INTERNAL_API_SECRET;
-    if (!fetchHandler) {
-      throw new Error('Expected billing worker fetch handler');
-    }
-    if (!kiloclawSecret) {
-      throw new Error('Expected KiloClaw internal secret');
-    }
+    const service = new KiloClawBillingService({} as ExecutionContext, env);
 
-    const response = await fetchHandler(
-      new Request('https://kiloclaw-billing/bootstrap-subscription', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-internal-api-key': kiloclawSecret,
-        },
-        body: JSON.stringify({
-          userId: 'user-1',
-          instanceId: '11111111-1111-4111-8111-111111111111',
-          orgId: null,
-        }),
-      }),
-      env,
-      {} as ExecutionContext
-    );
+    const result = await service.bootstrapProvisionSubscription({
+      userId: 'user-1',
+      instanceId: '11111111-1111-4111-8111-111111111111',
+      orgId: null,
+    });
 
-    expect(response.status).toBe(200);
+    expect(result).toEqual({ subscriptionId: 'sub-bootstrap' });
     expect(bootstrapProvisionSubscription).toHaveBeenCalledWith(
       env,
       expect.objectContaining({
@@ -229,6 +222,20 @@ describe('kiloclaw billing worker handler', () => {
         orgId: null,
       })
     );
+  });
+
+  it('bootstrapProvisionSubscription RPC rejects invalid input with Zod error', async () => {
+    const { env } = createEnv();
+    const service = new KiloClawBillingService({} as ExecutionContext, env);
+
+    await expect(
+      service.bootstrapProvisionSubscription({
+        userId: '',
+        instanceId: 'not-a-uuid',
+        orgId: null,
+      })
+    ).rejects.toThrow();
+    expect(bootstrapProvisionSubscription).not.toHaveBeenCalled();
   });
 
   it('logs a terminal run failure before DLQ on the last retry', async () => {

@@ -82,42 +82,6 @@ const KiloCliRunConflictSchema = z.object({
 const platform = new Hono<AppEnv>();
 type KiloClawInstanceStub = ReturnType<AppEnv['Bindings']['KILOCLAW_INSTANCE']['get']>;
 
-const EXPLICIT_INSTANCE_DO_KEY_CACHE_TTL_MS = 5 * 60 * 1000;
-const EXPLICIT_INSTANCE_DO_KEY_CACHE_MAX = 1000;
-const explicitInstanceDoKeyCache = new Map<
-  string,
-  {
-    doKey: string;
-    expiresAt: number;
-  }
->();
-
-function getCachedExplicitInstanceDoKey(instanceId: string): string | null {
-  const cached = explicitInstanceDoKeyCache.get(instanceId);
-  if (!cached) {
-    return null;
-  }
-  if (cached.expiresAt <= Date.now()) {
-    explicitInstanceDoKeyCache.delete(instanceId);
-    return null;
-  }
-  return cached.doKey;
-}
-
-function cacheExplicitInstanceDoKey(instanceId: string, doKey: string): string {
-  if (explicitInstanceDoKeyCache.size >= EXPLICIT_INSTANCE_DO_KEY_CACHE_MAX) {
-    const oldestKey = explicitInstanceDoKeyCache.keys().next().value;
-    if (typeof oldestKey === 'string') {
-      explicitInstanceDoKeyCache.delete(oldestKey);
-    }
-  }
-  explicitInstanceDoKeyCache.set(instanceId, {
-    doKey,
-    expiresAt: Date.now() + EXPLICIT_INSTANCE_DO_KEY_CACHE_TTL_MS,
-  });
-  return doKey;
-}
-
 type BillingPlatformLogFields = {
   billingFlow?: string;
   billingRunId?: string;
@@ -304,17 +268,13 @@ export async function resolveInstanceDoKey(
   instanceId?: string
 ): Promise<string> {
   if (instanceId) {
-    const cached = getCachedExplicitInstanceDoKey(instanceId);
-    if (cached) {
-      return cached;
-    }
     const connectionString = env.HYPERDRIVE?.connectionString;
     if (!connectionString) {
       console.warn(
         '[platform] Missing database connection for explicit instance DO-key resolution, using instanceId',
         { userId, instanceId }
       );
-      return cacheExplicitInstanceDoKey(instanceId, instanceId);
+      return instanceId;
     }
 
     try {
@@ -330,16 +290,16 @@ export async function resolveInstanceDoKey(
           '[platform] Instance not found during explicit DO-key resolution, using instanceId',
           { userId, instanceId }
         );
-        return cacheExplicitInstanceDoKey(instanceId, instanceId);
+        return instanceId;
       }
-      return cacheExplicitInstanceDoKey(instanceId, doKeyFromActiveInstance(instance));
+      return doKeyFromActiveInstance(instance);
     } catch (err) {
       console.warn('[platform] Failed to resolve DO key for explicit instance, using instanceId', {
         userId,
         instanceId,
         error: err instanceof Error ? err.message : String(err),
       });
-      return cacheExplicitInstanceDoKey(instanceId, instanceId);
+      return instanceId;
     }
   }
 
@@ -592,21 +552,6 @@ async function bootstrapProvisionedSubscription(params: {
     });
     throw new Error('KILOCLAW_BILLING service binding is not configured');
   }
-  if (!params.env.KILOCLAW_INTERNAL_API_SECRET) {
-    logProvisionWrite(
-      'error',
-      'Subscription bootstrap aborted: KILOCLAW_INTERNAL_API_SECRET not configured',
-      {
-        event: 'subscription_bootstrap',
-        outcome: 'failed',
-        userId: params.userId,
-        instanceId: params.instanceId,
-        orgId: params.orgId,
-        error: 'KILOCLAW_INTERNAL_API_SECRET is not configured',
-      }
-    );
-    throw new Error('KILOCLAW_INTERNAL_API_SECRET is not configured');
-  }
 
   const start = performance.now();
   logProvisionWrite('info', 'Calling billing worker to bootstrap subscription', {
@@ -617,34 +562,24 @@ async function bootstrapProvisionedSubscription(params: {
     orgId: params.orgId,
   });
 
-  const response = await params.env.KILOCLAW_BILLING.fetch(
-    new Request('https://kiloclaw-billing/bootstrap-subscription', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-internal-api-key': params.env.KILOCLAW_INTERNAL_API_SECRET,
-      },
-      body: JSON.stringify({
-        userId: params.userId,
-        instanceId: params.instanceId,
-        orgId: params.orgId,
-      }),
-    })
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
-    logProvisionWrite('error', 'Subscription bootstrap returned non-2xx', {
+  try {
+    await params.env.KILOCLAW_BILLING.bootstrapProvisionSubscription({
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logProvisionWrite('error', 'Subscription bootstrap RPC failed', {
       event: 'subscription_bootstrap',
       outcome: 'failed',
       userId: params.userId,
       instanceId: params.instanceId,
       orgId: params.orgId,
       durationMs: performance.now() - start,
-      statusCode: response.status,
-      error: body.slice(0, 500),
+      error: message.slice(0, 500),
     });
-    throw new Error(`Subscription bootstrap failed (${response.status}): ${body}`);
+    throw err;
   }
 
   logProvisionWrite('info', 'Subscription bootstrap completed', {
@@ -654,7 +589,6 @@ async function bootstrapProvisionedSubscription(params: {
     instanceId: params.instanceId,
     orgId: params.orgId,
     durationMs: performance.now() - start,
-    statusCode: response.status,
   });
 }
 
@@ -921,6 +855,7 @@ platform.post('/provision', async c => {
   const shouldInsertInstanceRecord = !instanceId;
   const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
   const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
+  const provisionRoute = '/api/platform/provision';
 
   let provision;
   try {
@@ -961,6 +896,7 @@ platform.post('/provision', async c => {
   }
 
   if (shouldInsertInstanceRecord) {
+    const insertStartedAt = performance.now();
     try {
       await insertProvisionedInstanceRecord({
         env: c.env,
@@ -969,8 +905,30 @@ platform.post('/provision', async c => {
         sandboxId: provision.sandboxId,
         orgId: orgId ?? null,
       });
+      writeEvent(c.env, {
+        event: 'instance.record_inserted',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        durationMs: performance.now() - insertStartedAt,
+      });
     } catch (persistErr) {
       console.error('[platform] Provision post-processing failed:', persistErr);
+      const { message, status } = sanitizeError(persistErr, 'post-provision bootstrap');
+      writeEvent(c.env, {
+        event: 'instance.record_insert_failed',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        error: message,
+        durationMs: performance.now() - insertStartedAt,
+      });
       await withResolvedDORetry(
         c.env,
         userId,
@@ -992,12 +950,12 @@ platform.post('/provision', async c => {
           markErr
         );
       });
-      const { message, status } = sanitizeError(persistErr, 'post-provision bootstrap');
       return jsonError(message, status);
     }
   }
 
   if (shouldBootstrapSubscription) {
+    const bootstrapStartedAt = performance.now();
     try {
       await bootstrapProvisionedSubscription({
         env: c.env,
@@ -1005,8 +963,30 @@ platform.post('/provision', async c => {
         instanceId: provisionedInstanceId,
         orgId: orgId ?? null,
       });
+      writeEvent(c.env, {
+        event: 'instance.subscription_bootstrapped',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        durationMs: performance.now() - bootstrapStartedAt,
+      });
     } catch (persistErr) {
       console.error('[platform] Provision post-processing failed:', persistErr);
+      const { message, status } = sanitizeError(persistErr, 'post-provision bootstrap');
+      writeEvent(c.env, {
+        event: 'instance.subscription_bootstrap_failed',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        error: message,
+        durationMs: performance.now() - bootstrapStartedAt,
+      });
       if (shouldInsertInstanceRecord) {
         await withResolvedDORetry(
           c.env,
@@ -1039,7 +1019,6 @@ platform.post('/provision', async c => {
           }
         );
       }
-      const { message, status } = sanitizeError(persistErr, 'post-provision bootstrap');
       return jsonError(message, status);
     }
   }

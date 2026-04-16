@@ -1,5 +1,6 @@
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import type { KiloExclusiveModel } from './kilo-exclusive-model';
 
 export function isGeminiModel(model: string) {
   return model.startsWith('google/gemini');
@@ -46,3 +47,19 @@ export function applyGoogleModelSettings(provider: ProviderId, requestToMutate: 
     delete lineRanges.items;
   }
 }
+
+export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
+  public_id: 'google/gemma-4-26b-a4b-it',
+  display_name: 'Google: Gemma 4 26B (free)',
+  description:
+    'Google Gemma 4 26B parameter model, free for freeloaders via kilo-auto/small. Supports images and long context.',
+  context_length: 262144,
+  max_completion_tokens: 32768,
+  status: 'hidden',
+  flags: ['vision'],
+  gateway: 'openrouter',
+  internal_id: 'google/gemma-4-26b-a4b-it',
+  inference_provider: null,
+  pricing: null,
+  exclusive_to: [],
+};

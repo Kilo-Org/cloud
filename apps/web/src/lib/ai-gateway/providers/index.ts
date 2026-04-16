@@ -268,6 +268,12 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isZaiModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.novita];
   }
+  if (
+    requestedModel === 'google/gemma-4-26b-a4b-it' ||
+    requestedModel === 'google/gemma-4-31b-it'
+  ) {
+    return [OpenRouterInferenceProviderIdSchema.enum.novita];
+  }
   if (isOpenAiOssModel(requestedModel)) {
     return [
       OpenRouterInferenceProviderIdSchema.enum.novita,

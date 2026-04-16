@@ -2003,7 +2003,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     envKeyAppDOKey: string | null;
     envKeyAppDOFlyAppName: string | null;
     envKeyAppDOKeySet: boolean | null;
-    envKeyAppDOFingerprint: string | null;
   }> {
     await this.loadState();
     const alarmScheduledAt = await this.ctx.storage.getAlarm();
@@ -2012,7 +2011,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     let envKeyDiag: {
       flyAppName: string | null;
       envKeySet: boolean;
-      envKeyFingerprint: string | null;
     } | null = null;
     let envKeyAppDOKey: string | null = null;
     try {
@@ -2080,7 +2078,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       envKeyAppDOKey,
       envKeyAppDOFlyAppName: envKeyDiag?.flyAppName ?? null,
       envKeyAppDOKeySet: envKeyDiag?.envKeySet ?? null,
-      envKeyAppDOFingerprint: envKeyDiag?.envKeyFingerprint ?? null,
     };
   }
 

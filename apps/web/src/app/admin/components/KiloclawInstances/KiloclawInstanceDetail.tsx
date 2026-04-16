@@ -2273,23 +2273,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <DetailField label="Next Alarm">
                   {formatEpochTime(data.workerStatus.alarmScheduledAt)}
                 </DetailField>
-              </div>
-            ) : !data.workerStatusError ? (
-              <p className="text-muted-foreground text-sm">No worker status available</p>
-            ) : null}
-          </CardContent>
-        </Card>
 
-        {data.workerStatus && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Env Key Diagnostics</CardTitle>
-              <CardDescription>
-                Encryption key state from the App DO — helps debug boot decryption failures
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <DetailField label="App DO Key">
                   <code className="text-xs">{data.workerStatus.envKeyAppDOKey ?? '—'}</code>
                 </DetailField>
@@ -2304,24 +2288,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   )}
                 </DetailField>
 
-                <DetailField label="Instance DO Fly App Name">
-                  <code className="text-xs">{data.workerStatus.flyAppName ?? '—'}</code>
-                </DetailField>
-
                 <DetailField label="App DO envKeySet">
                   {data.workerStatus.envKeyAppDOKeySet === null
                     ? '—'
                     : data.workerStatus.envKeyAppDOKeySet
                       ? 'true'
                       : 'false'}
-                </DetailField>
-
-                <DetailField label="Env Key Fingerprint">
-                  {data.workerStatus.envKeyAppDOFingerprint ? (
-                    <code className="text-xs">{data.workerStatus.envKeyAppDOFingerprint}...</code>
-                  ) : (
-                    <span className="text-destructive text-xs font-medium">no key</span>
-                  )}
                 </DetailField>
 
                 {data.workerStatus.envKeyAppDOFlyAppName !== null &&
@@ -2348,9 +2320,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     </div>
                   )}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            ) : !data.workerStatusError ? (
+              <p className="text-muted-foreground text-sm">No worker status available</p>
+            ) : null}
+          </CardContent>
+        </Card>
 
         {data.workerStatus &&
           (data.workerStatus.lastStartErrorMessage ||

@@ -240,7 +240,6 @@ export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   envKeyAppDOKey: string | null;
   envKeyAppDOFlyAppName: string | null;
   envKeyAppDOKeySet: boolean | null;
-  envKeyAppDOFingerprint: string | null;
 };
 
 export type CleanupRecoveryPreviousVolumeResponse = {

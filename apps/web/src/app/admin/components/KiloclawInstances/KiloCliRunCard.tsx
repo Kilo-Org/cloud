@@ -320,7 +320,7 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
             </div>
             <div>
               <p className="text-muted-foreground mb-0.5 text-xs">Prompt</p>
-              <p className="text-sm">{latestRun.prompt}</p>
+              <p className="text-sm truncate">{latestRun.prompt}</p>
             </div>
 
             {/* CLI output — use live runStatus output when actively tracking, otherwise latestRun */}

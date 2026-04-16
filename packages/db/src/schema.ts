@@ -4255,6 +4255,87 @@ export const security_advisor_scans = pgTable(
 
 export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
 
+// ============ SECURITY ADVISOR CONTENT ============
+// Customer-visible report content for the security advisor feature.
+// Three tables are read together by a TTL-cached content loader and injected
+// into the report generator so copy changes (check descriptions, KiloClaw
+// coverage blurbs, CTA copy) do not require a code deploy. Edited via the
+// admin UI under /admin/kiloclaw?tab=security-advisor-content. Rows can be
+// soft-disabled via is_active.
+
+export const security_advisor_check_catalog = pgTable(
+  'security_advisor_check_catalog',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    check_id: text().notNull().unique(),
+    severity: text().notNull(), // 'critical' | 'warn' | 'info' — server-authoritative override
+    explanation: text().notNull(),
+    risk: text().notNull(),
+    is_active: boolean().notNull().default(true),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'security_advisor_check_catalog_severity_check',
+      sql`${table.severity} in ('critical', 'warn', 'info')`
+    ),
+  ]
+);
+
+export type SecurityAdvisorCheck = typeof security_advisor_check_catalog.$inferSelect;
+export type NewSecurityAdvisorCheck = typeof security_advisor_check_catalog.$inferInsert;
+
+export const security_advisor_kiloclaw_coverage = pgTable('security_advisor_kiloclaw_coverage', {
+  id: uuid()
+    .notNull()
+    .default(sql`pg_catalog.gen_random_uuid()`)
+    .primaryKey(),
+  area: text().notNull().unique(),
+  summary: text().notNull(),
+  detail: text().notNull(),
+  match_check_ids: text()
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  is_active: boolean().notNull().default(true),
+  created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
+export type SecurityAdvisorKiloClawCoverage =
+  typeof security_advisor_kiloclaw_coverage.$inferSelect;
+export type NewSecurityAdvisorKiloClawCoverage =
+  typeof security_advisor_kiloclaw_coverage.$inferInsert;
+
+export const security_advisor_content = pgTable('security_advisor_content', {
+  id: uuid()
+    .notNull()
+    .default(sql`pg_catalog.gen_random_uuid()`)
+    .primaryKey(),
+  key: text().notNull().unique(),
+  value: text().notNull(),
+  description: text().notNull().default(''),
+  is_active: boolean().notNull().default(true),
+  created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
+export type SecurityAdvisorContent = typeof security_advisor_content.$inferSelect;
+export type NewSecurityAdvisorContent = typeof security_advisor_content.$inferInsert;
+
 // ============ CHANNEL BADGE COUNTS ============
 // Per-user per-channel unread notification counts for mobile app badge display.
 // (user_id, channel_id) is the composite PK — one row per user per chat channel.

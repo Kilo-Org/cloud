@@ -6,109 +6,7 @@ import type {
   RecommendationPriority,
   FindingSeverity,
 } from './schemas';
-import { findComparisonForCheckId } from './kiloclaw-comparison';
-
-// --- Known checkId explanations ---
-
-interface CheckIdTemplate {
-  severity: FindingSeverity;
-  explanation: string;
-  risk: string;
-}
-
-/**
- * Templates for known checkIds. When the audit produces a finding with one of these
- * checkIds, we use the server-assigned severity, explanation, and risk instead of
- * the client-reported values.
- *
- * Server-assigned severity is authoritative for known checkIds. This prevents:
- * - A misconfigured/outdated client binary from downgrading real critical findings
- * - A malicious payload from inflating everything to critical to manipulate the report
- *
- * For unknown checkIds (not in this map), we fall back to client-reported severity
- * since the server has no independent opinion.
- */
-const KNOWN_CHECK_TEMPLATES: Record<string, CheckIdTemplate> = {
-  'fs.config.perms_world_readable': {
-    severity: 'critical',
-    explanation:
-      'The OpenClaw configuration file is readable by all users on the system. ' +
-      'This file typically contains API keys, auth tokens, and other secrets.',
-    risk:
-      'Any process or user on this machine can read your secrets. ' +
-      'A compromised or malicious process gains immediate access to all stored credentials.',
-  },
-  'fs.config.perms_group_readable': {
-    severity: 'warn',
-    explanation:
-      'The OpenClaw configuration file is readable by users in the same group. ' +
-      'This may expose secrets to other services running under the same group.',
-    risk:
-      'Other processes sharing the group can read stored credentials. ' +
-      'This is especially risky on shared hosting or multi-tenant servers.',
-  },
-  'auth.no_authentication': {
-    severity: 'critical',
-    explanation:
-      'The OpenClaw instance has no authentication configured. ' +
-      'Anyone who can reach the gateway can use it without credentials.',
-    risk:
-      'Unauthorized users can execute commands, access conversations, and consume API credits. ' +
-      'This is the highest risk configuration for an internet exposed instance.',
-  },
-  'net.gateway_exposed': {
-    severity: 'warn',
-    explanation:
-      'The OpenClaw gateway is bound to a non localhost address, making it reachable from the network.',
-    risk:
-      'Network adjacent attackers can connect directly to the gateway. ' +
-      'Combined with weak or no authentication, this enables unauthorized access.',
-  },
-  'net.gateway_open_to_world': {
-    severity: 'critical',
-    explanation:
-      'The OpenClaw gateway is bound to 0.0.0.0, accepting connections from any IP address.',
-    risk:
-      'The instance is accessible from the entire internet. Without proper authentication and ' +
-      'allow listing, this exposes the instance to brute force attacks, credential stuffing, and abuse.',
-  },
-  'net.no_tls': {
-    severity: 'warn',
-    explanation: 'Traffic to the OpenClaw gateway is not encrypted with TLS.',
-    risk:
-      'API keys, auth tokens, and conversation content are transmitted in plaintext. ' +
-      'Anyone on the network path can intercept and read this traffic.',
-  },
-  'net.no_allowlist': {
-    severity: 'warn',
-    explanation:
-      'No IP allow list is configured. The gateway accepts connections from any source IP.',
-    risk:
-      'There is no network layer restriction on who can attempt to connect. ' +
-      'Authentication is the only barrier to unauthorized access.',
-  },
-  'secrets.plaintext_in_config': {
-    severity: 'critical',
-    explanation: 'API keys or secrets are stored in plaintext in the configuration file.',
-    risk:
-      'If the config file is compromised (via file permission issues, backup exposure, or ' +
-      'accidental commit), all secrets are immediately usable by an attacker.',
-  },
-  'version.outdated': {
-    severity: 'warn',
-    explanation: 'The OpenClaw version is behind the latest release.',
-    risk:
-      'Older versions may contain known security vulnerabilities that have been patched in newer releases. ' +
-      'Running outdated software increases exposure to known exploits.',
-  },
-  'summary.attack_surface': {
-    severity: 'info',
-    explanation:
-      'This is a summary of the overall attack surface — network exposure, open ports, ' +
-      'and access controls in aggregate.',
-    risk: 'A larger attack surface means more potential entry points for attackers.',
-  },
-};
+import { findCoverageForCheckId, type LoadedSecurityAdvisorContent } from './content-loader';
 
 // --- Report generation ---
 
@@ -117,6 +15,8 @@ interface GenerateReportOptions {
   publicIp?: string;
   /** If true, omit KiloClaw comparison text (for KiloClaw-sourced requests) */
   isKiloClaw: boolean;
+  /** All customer-visible strings. Loaded via getSecurityAdvisorContent(). */
+  content: LoadedSecurityAdvisorContent;
 }
 
 interface GeneratedReport {
@@ -127,10 +27,10 @@ interface GeneratedReport {
 }
 
 export function generateSecurityReport(options: GenerateReportOptions): GeneratedReport {
-  const { audit, publicIp, isKiloClaw } = options;
+  const { audit, publicIp, isKiloClaw, content } = options;
 
-  const findings = audit.findings.map(f => mapFinding(f, isKiloClaw));
-  const recommendations = generateRecommendations(findings);
+  const findings = audit.findings.map(f => mapFinding(f, isKiloClaw, content));
+  const recommendations = generateRecommendations(findings, content);
 
   // Count passed deep-scan checks. Only deep scan results have a clear pass/fail
   // signal (ok: true/false). Standard findings only report failures, so we can't
@@ -150,53 +50,77 @@ export function generateSecurityReport(options: GenerateReportOptions): Generate
     passed,
   };
 
-  const markdown = renderMarkdown({ findings, recommendations, summary, publicIp, isKiloClaw });
+  const markdown = renderMarkdown({
+    findings,
+    recommendations,
+    summary,
+    publicIp,
+    isKiloClaw,
+    content,
+  });
 
   return { markdown, summary, findings, recommendations };
 }
 
-function mapFinding(finding: AuditFinding, isKiloClaw: boolean): ReportFinding {
-  const template = KNOWN_CHECK_TEMPLATES[finding.checkId];
-  const comparison = findComparisonForCheckId(finding.checkId);
+function mapFinding(
+  finding: AuditFinding,
+  isKiloClaw: boolean,
+  content: LoadedSecurityAdvisorContent
+): ReportFinding {
+  const catalogEntry = content.checkCatalog.get(finding.checkId);
+  const coverage = findCoverageForCheckId(finding.checkId, content.kiloclawCoverage);
 
   // Server-assigned severity for known checkIds; client-reported for unknown
-  const severity = template?.severity ?? finding.severity;
+  const severity = catalogEntry?.severity ?? finding.severity;
 
   return {
     checkId: finding.checkId,
     severity,
     title: finding.title,
-    explanation: template?.explanation ?? finding.detail,
+    explanation: catalogEntry?.explanation ?? finding.detail,
     risk:
-      template?.risk ??
-      `Your OpenClaw instance reports this finding and should be reviewed: ${finding.detail}`,
+      catalogEntry?.risk ??
+      interpolate(getContent(content, 'fallback.risk', 'Review this finding: {detail}'), {
+        detail: finding.detail,
+      }),
     fix: finding.remediation ?? null,
-    kiloClawComparison: formatComparison(comparison, isKiloClaw),
+    kiloClawComparison: formatCoverage(coverage, isKiloClaw, content),
   };
 }
 
-function formatComparison(
-  comparison: { summary: string; detail: string } | null,
-  isKiloClaw: boolean
+function formatCoverage(
+  coverage: { summary: string; detail: string } | null,
+  isKiloClaw: boolean,
+  content: LoadedSecurityAdvisorContent
 ): string | null {
-  if (!comparison) return null;
+  if (!coverage) return null;
 
-  if (isKiloClaw) {
-    // Divergence warning: KiloClaw user has a finding that shouldn't exist
-    return (
-      `**KiloClaw default:** ${comparison.summary}. ` +
-      `Your instance has diverged from this default configuration. ` +
-      `This may indicate a manual change or misconfiguration that should be reviewed.`
-    );
-  }
+  const template = isKiloClaw
+    ? getContent(
+        content,
+        'framing.kiloclaw',
+        '**KiloClaw default:** {summary}. Your instance has diverged.'
+      )
+    : getContent(content, 'framing.openclaw', '**How KiloClaw handles this:** {summary}. {detail}');
 
-  // Sales comparison: show what KiloClaw provides
-  return `**How KiloClaw handles this:** ${comparison.summary}. ${comparison.detail}`;
+  return interpolate(template, {
+    summary: coverage.summary,
+    detail: coverage.detail,
+  });
 }
 
-function generateRecommendations(findings: ReportFinding[]): Recommendation[] {
+function generateRecommendations(
+  findings: ReportFinding[],
+  content: LoadedSecurityAdvisorContent
+): Recommendation[] {
   const recommendations: Recommendation[] = [];
   const seen = new Set<string>();
+
+  const fallbackActionTemplate = getContent(
+    content,
+    'fallback.recommendation_action',
+    'Address finding: {title} ({checkId})'
+  );
 
   for (const finding of findings) {
     if (finding.severity === 'info') continue;
@@ -204,7 +128,12 @@ function generateRecommendations(findings: ReportFinding[]): Recommendation[] {
     seen.add(finding.checkId);
 
     const priority = severityToPriority(finding.severity);
-    const action = finding.fix ?? `Address finding: ${finding.title} (${finding.checkId})`;
+    const action =
+      finding.fix ??
+      interpolate(fallbackActionTemplate, {
+        title: finding.title,
+        checkId: finding.checkId,
+      });
 
     recommendations.push({ priority, action });
   }
@@ -240,10 +169,12 @@ interface RenderOptions {
   summary: { critical: number; warn: number; info: number; passed: number };
   publicIp?: string;
   isKiloClaw: boolean;
+  content: LoadedSecurityAdvisorContent;
 }
 
 function renderMarkdown(opts: RenderOptions): string {
-  const { findings, recommendations, summary, publicIp, isKiloClaw } = opts;
+  const { findings, recommendations, summary, publicIp, isKiloClaw, content } = opts;
+  const get = (key: string, fallback: string) => getContent(content, key, fallback);
   const lines: string[] = [];
 
   // Header
@@ -254,10 +185,18 @@ function renderMarkdown(opts: RenderOptions): string {
   lines.push('## Summary');
   lines.push('');
   const parts: string[] = [];
-  if (summary.critical > 0) parts.push(`**${summary.critical} critical**`);
-  if (summary.warn > 0) parts.push(`${summary.warn} warning${summary.warn !== 1 ? 's' : ''}`);
-  if (summary.info > 0) parts.push(`${summary.info} informational`);
-  if (summary.passed > 0) parts.push(`${summary.passed} passed`);
+  if (summary.critical > 0) {
+    parts.push(`**${summary.critical} critical**`);
+  }
+  if (summary.warn > 0) {
+    parts.push(`${summary.warn} warning${summary.warn !== 1 ? 's' : ''}`);
+  }
+  if (summary.info > 0) {
+    parts.push(`${summary.info} informational`);
+  }
+  if (summary.passed > 0) {
+    parts.push(`${summary.passed} passed`);
+  }
   lines.push(parts.join(' | '));
   lines.push('');
 
@@ -301,8 +240,7 @@ function renderMarkdown(opts: RenderOptions): string {
     lines.push('## Recommendations');
     lines.push('');
     for (const rec of recommendations) {
-      const badge = `[${rec.priority.toUpperCase()}]`;
-      lines.push(`- ${badge} ${rec.action}`);
+      lines.push(`- [${rec.priority.toUpperCase()}] ${rec.action}`);
     }
     lines.push('');
   }
@@ -315,12 +253,13 @@ function renderMarkdown(opts: RenderOptions): string {
   if (!isKiloClaw) {
     lines.push('---');
     lines.push('');
-    lines.push('## Next step: try KiloClaw free');
+    lines.push(get('section.next_step', '## Next step: try KiloClaw free'));
     lines.push('');
     lines.push(
-      '**Want these issues handled automatically?** ' +
-        'KiloClaw manages security configuration, patching, and monitoring out of the box. ' +
-        '**Start a free trial at [kilo.ai/kiloclaw](https://kilo.ai/kiloclaw).**'
+      get(
+        'cta.body',
+        '**Want these issues handled automatically?** Start a free trial at [kilo.ai/kiloclaw](https://kilo.ai/kiloclaw).'
+      )
     );
     lines.push('');
   }
@@ -347,4 +286,21 @@ function renderFinding(lines: string[], finding: ReportFinding): void {
     lines.push(finding.kiloClawComparison);
     lines.push('');
   }
+}
+
+// --- Helpers ---
+
+function getContent(content: LoadedSecurityAdvisorContent, key: string, fallback: string): string {
+  return content.content.get(key) ?? fallback;
+}
+
+/**
+ * Replace `{name}` placeholders in `template` with the corresponding values.
+ * Values are coerced to strings. Placeholders without a matching value are
+ * left as-is so copy-editors can diagnose missing interpolations visually.
+ */
+function interpolate(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => {
+    return Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match;
+  });
 }

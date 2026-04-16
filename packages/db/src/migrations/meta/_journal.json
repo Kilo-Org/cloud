@@ -652,6 +652,13 @@
       "when": 1776424147392,
       "tag": "0092_sudden_alice",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1776433446928,
+      "tag": "0093_living_living_lightning",
+      "breakpoints": true
     }
   ]
 }

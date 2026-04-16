@@ -183,46 +183,44 @@ export function KiloCliRunCard({ userId, instanceId }: { userId: string; instanc
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!trackedRunId && (
-          <div className="space-y-2">
-            <Textarea
-              placeholder="Describe the problem to diagnose and fix..."
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              className="min-h-20 resize-none"
-              maxLength={10_000}
-              disabled={startMutation.isPending || hasActiveRun}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  handleStart();
-                }
-              }}
-            />
-            <div className="flex items-center justify-between">
-              <p className="text-muted-foreground text-xs">
-                Cmd+Enter to start. Runs as admin-initiated recovery.
-              </p>
-              <Button
-                size="sm"
-                onClick={handleStart}
-                disabled={!prompt.trim() || startMutation.isPending || hasActiveRun}
-              >
-                {startMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    Starting...
-                  </>
-                ) : (
-                  <>
-                    <Terminal className="mr-1 h-3 w-3" />
-                    Start Run
-                  </>
-                )}
-              </Button>
-            </div>
+        <div className="space-y-2">
+          <Textarea
+            placeholder="Describe the problem to diagnose and fix..."
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            className="min-h-20 resize-none"
+            maxLength={10_000}
+            disabled={startMutation.isPending || isRunning}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                handleStart();
+              }
+            }}
+          />
+          <div className="flex items-center justify-between">
+            <p className="text-muted-foreground text-xs">
+              Cmd+Enter to start. Runs as admin-initiated recovery.
+            </p>
+            <Button
+              size="sm"
+              onClick={handleStart}
+              disabled={!prompt.trim() || startMutation.isPending || isRunning}
+            >
+              {startMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  Starting...
+                </>
+              ) : (
+                <>
+                  <Terminal className="mr-1 h-3 w-3" />
+                  Start Run
+                </>
+              )}
+            </Button>
           </div>
-        )}
+        </div>
 
         {trackedRunId && runStatus && (
           <div className="space-y-3">

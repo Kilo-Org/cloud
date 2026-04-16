@@ -99,7 +99,7 @@ function createEnv(): BillingWorkerEnv {
     STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
     STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
     STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
-    INTERNAL_API_SECRET: 'next-secret',
+    INTERNAL_API_SECRET: 'next-internal-api-secret',
     KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
   };
 }
@@ -575,5 +575,197 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
       })
     );
     expect(result).toEqual(restoredSuccessor);
+  });
+});
+
+type FreshInsertDbParams = {
+  selectRows: unknown[][];
+  insertFirstReturningRows: unknown[];
+  reselectAfterConflictRows: unknown[];
+};
+
+function createFreshInsertSelectBuilder<T>(rows: T[]) {
+  const promise = Promise.resolve(rows);
+  const builder: {
+    from: ReturnType<typeof vi.fn>;
+    where: ReturnType<typeof vi.fn>;
+    orderBy: ReturnType<typeof vi.fn>;
+    limit: ReturnType<typeof vi.fn>;
+    then: Promise<T[]>['then'];
+  } = {
+    from: vi.fn(),
+    where: vi.fn(),
+    orderBy: vi.fn(),
+    limit: vi.fn(),
+    then: promise.then.bind(promise),
+  };
+  builder.from.mockReturnValue(builder);
+  builder.where.mockReturnValue(builder);
+  builder.orderBy.mockReturnValue(builder);
+  builder.limit.mockReturnValue(builder);
+  return builder;
+}
+
+function createFreshInsertDb(params: FreshInsertDbParams) {
+  const selectQueue = [...params.selectRows];
+  const insertValues: Array<Record<string, unknown>> = [];
+  const onConflictCalls: Array<unknown> = [];
+  let firstInsert = true;
+
+  const db = {
+    select: vi.fn(() => createFreshInsertSelectBuilder(selectQueue.shift() ?? [])),
+    insert: vi.fn(() => ({
+      values: vi.fn((values: Record<string, unknown>) => {
+        insertValues.push(values);
+        return {
+          onConflictDoNothing: vi.fn((target: unknown) => {
+            onConflictCalls.push(target);
+            return {
+              returning: vi.fn(async () => {
+                if (firstInsert) {
+                  firstInsert = false;
+                  return params.insertFirstReturningRows;
+                }
+                return [];
+              }),
+            };
+          }),
+        };
+      }),
+    })),
+  };
+
+  return { db, insertValues, onConflictCalls };
+}
+
+describe('bootstrapProvisionSubscription concurrent insert race', () => {
+  beforeEach(() => {
+    mockGetWorkerDb.mockReset();
+    mockInsertKiloClawSubscriptionChangeLog.mockReset();
+  });
+
+  it('personal fresh-insert: loser of insert race returns winner row instead of throwing', async () => {
+    const winnerRow = {
+      id: 'sub-winner',
+      user_id: 'user-1',
+      instance_id: 'instance-new',
+      plan: 'trial',
+      status: 'trialing',
+      access_origin: null,
+      payment_source: null,
+      cancel_at_period_end: false,
+      trial_started_at: '2026-04-16T00:00:00.000Z',
+      trial_ends_at: '2026-04-23T00:00:00.000Z',
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+      transferred_to_subscription_id: null,
+      scheduled_plan: null,
+      scheduled_by: null,
+      pending_conversion: false,
+      current_period_start: null,
+      current_period_end: null,
+      credit_renewal_at: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-04-16T00:00:00.000Z',
+      updated_at: '2026-04-16T00:00:00.000Z',
+    };
+    const { db, insertValues } = createFreshInsertDb({
+      selectRows: [
+        [], // existingForInstance (none seen yet — TOCTOU window)
+        [], // subscriptions for user
+        [], // instances for user
+        [], // earlybirdPurchase
+        [winnerRow], // reselect after conflict
+      ],
+      insertFirstReturningRows: [], // onConflictDoNothing swallowed our insert
+      reselectAfterConflictRows: [winnerRow],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const result = await bootstrapProvisionSubscription(createEnv(), {
+      userId: 'user-1',
+      instanceId: 'instance-new',
+      orgId: null,
+    });
+
+    expect(result).toEqual(winnerRow);
+    expect(insertValues).toHaveLength(1);
+    expect(insertValues[0]).toEqual(
+      expect.objectContaining({
+        instance_id: 'instance-new',
+      })
+    );
+    // Race loser must not write a change-log row (winner already logged it).
+    expect(mockInsertKiloClawSubscriptionChangeLog).not.toHaveBeenCalled();
+  });
+
+  it('org fresh-insert: loser of insert race returns winner row instead of throwing', async () => {
+    const winnerRow = {
+      id: 'sub-org-winner',
+      user_id: 'user-1',
+      instance_id: 'instance-new',
+      plan: 'standard',
+      status: 'active',
+      access_origin: null,
+      payment_source: 'credits',
+      cancel_at_period_end: false,
+      trial_started_at: null,
+      trial_ends_at: null,
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+      transferred_to_subscription_id: null,
+      scheduled_plan: null,
+      scheduled_by: null,
+      pending_conversion: false,
+      current_period_start: null,
+      current_period_end: null,
+      credit_renewal_at: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      created_at: '2026-04-16T00:00:00.000Z',
+      updated_at: '2026-04-16T00:00:00.000Z',
+    };
+    const { db, insertValues, onConflictCalls } = createFreshInsertDb({
+      selectRows: [
+        [], // existing subscription for instance (none yet — TOCTOU window)
+        [
+          {
+            createdAt: '2026-04-01T00:00:00.000Z',
+            freeTrialEndAt: null,
+            requireSeats: false,
+            settings: {},
+          },
+        ], // organization row
+        [], // latestSeatPurchase
+        [winnerRow], // reselect after conflict
+      ],
+      insertFirstReturningRows: [], // onConflictDoNothing swallowed our insert
+      reselectAfterConflictRows: [winnerRow],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const result = await bootstrapProvisionSubscription(createEnv(), {
+      userId: 'user-1',
+      instanceId: 'instance-new',
+      orgId: '22222222-2222-4222-8222-222222222222',
+    });
+
+    expect(result).toEqual(winnerRow);
+    expect(insertValues).toHaveLength(1);
+    expect(onConflictCalls).toHaveLength(1);
+    expect(mockInsertKiloClawSubscriptionChangeLog).not.toHaveBeenCalled();
   });
 });

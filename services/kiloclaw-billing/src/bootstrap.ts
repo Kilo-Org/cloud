@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import {
   getWorkerDb,
   insertKiloClawSubscriptionChangeLog,
@@ -8,6 +8,7 @@ import {
   organizations,
   organization_seats_purchases,
   type KiloClawSubscription,
+  type NewKiloClawSubscription,
 } from '@kilocode/db';
 import type { BillingWorkerEnv } from './types.js';
 import { logger } from './logger.js';
@@ -25,6 +26,48 @@ type BootstrapProvisionInput = {
   instanceId: string;
   orgId: string | null;
 };
+
+/**
+ * Insert a subscription row for an instanceId, returning the winning row if
+ * a concurrent caller raced us and already inserted one.
+ *
+ * Guards against the TOCTOU between the `existing` select above and the insert
+ * below. The partial unique index UQ_kiloclaw_subscriptions_instance
+ * (instance_id WHERE instance_id IS NOT NULL) lets us express this as
+ * onConflictDoNothing + reselect. Returns { row, created }: created=false when
+ * another caller won the race.
+ */
+async function insertSubscriptionIdempotent(
+  db: ReturnType<typeof getWorkerDb>,
+  values: NewKiloClawSubscription & { instance_id: string }
+): Promise<{ row: KiloClawSubscription; created: boolean }> {
+  // The target index is partial (instance_id WHERE instance_id IS NOT NULL),
+  // so Postgres requires the predicate to be restated in the ON CONFLICT clause
+  // for arbiter inference to select this index.
+  const [inserted] = await db
+    .insert(kiloclaw_subscriptions)
+    .values(values)
+    .onConflictDoNothing({
+      target: kiloclaw_subscriptions.instance_id,
+      where: isNotNull(kiloclaw_subscriptions.instance_id),
+    })
+    .returning();
+
+  if (inserted) {
+    return { row: inserted, created: true };
+  }
+
+  const [existing] = await db
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(eq(kiloclaw_subscriptions.instance_id, values.instance_id))
+    .limit(1);
+
+  if (!existing) {
+    throw new Error('Subscription insert reported conflict but no row exists for instance_id');
+  }
+  return { row: existing, created: false };
+}
 
 async function writeBootstrapChangeLogBestEffort(
   env: BillingWorkerEnv,
@@ -143,34 +186,38 @@ async function bootstrapOrganizationSubscription(
         ORGANIZATION_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
     ).toISOString();
 
-  const [created] = await db
-    .insert(kiloclaw_subscriptions)
-    .values(
-      hasManagedActiveAccess
-        ? {
-            user_id: input.userId,
-            instance_id: input.instanceId,
-            plan: 'standard',
-            status: 'active',
-            payment_source: 'credits',
-            cancel_at_period_end: false,
-          }
-        : {
-            user_id: input.userId,
-            instance_id: input.instanceId,
-            plan: 'trial',
-            status: new Date(trialEndsAt).getTime() > now.getTime() ? 'trialing' : 'canceled',
-            access_origin: null,
-            payment_source: null,
-            cancel_at_period_end: false,
-            trial_started_at: organization.createdAt,
-            trial_ends_at: trialEndsAt,
-          }
-    )
-    .returning();
+  const { row: created, created: wasInserted } = await insertSubscriptionIdempotent(
+    db,
+    hasManagedActiveAccess
+      ? {
+          user_id: input.userId,
+          instance_id: input.instanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+        }
+      : {
+          user_id: input.userId,
+          instance_id: input.instanceId,
+          plan: 'trial',
+          status: new Date(trialEndsAt).getTime() > now.getTime() ? 'trialing' : 'canceled',
+          access_origin: null,
+          payment_source: null,
+          cancel_at_period_end: false,
+          trial_started_at: organization.createdAt,
+          trial_ends_at: trialEndsAt,
+        }
+  );
 
-  if (!created) {
-    throw new Error('Failed to create organization subscription row');
+  if (!wasInserted) {
+    logger
+      .withFields({
+        decision: 'existing_for_instance_race',
+        kiloclawSubscriptionId: created.id,
+      })
+      .info('Org bootstrap: lost insert race; returning row created by concurrent caller');
+    return created;
   }
 
   await writeBootstrapChangeLogBestEffort(env, {
@@ -582,43 +629,44 @@ async function bootstrapPersonalSubscription(
         : 'Personal bootstrap: creating fresh trial row'
     );
 
-  const [created] = await db
-    .insert(kiloclaw_subscriptions)
-    .values(
-      earlybirdPurchase
-        ? {
-            user_id: input.userId,
-            instance_id: input.instanceId,
-            plan: 'trial',
-            status:
-              new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE).getTime() > now.getTime()
-                ? 'trialing'
-                : 'canceled',
-            access_origin: 'earlybird',
-            payment_source: null,
-            cancel_at_period_end: false,
-            trial_started_at: earlybirdPurchase.createdAt,
-            trial_ends_at: KILOCLAW_EARLYBIRD_EXPIRY_DATE,
-          }
-        : {
-            user_id: input.userId,
-            instance_id: input.instanceId,
-            plan: 'trial',
-            status: 'trialing',
-            access_origin: null,
-            payment_source: null,
-            cancel_at_period_end: false,
-            trial_started_at: now.toISOString(),
-            trial_ends_at: getTrialEndsAt(now),
-          }
-    )
-    .returning();
+  const { row: created, created: wasInserted } = await insertSubscriptionIdempotent(
+    db,
+    earlybirdPurchase
+      ? {
+          user_id: input.userId,
+          instance_id: input.instanceId,
+          plan: 'trial',
+          status:
+            new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE).getTime() > now.getTime()
+              ? 'trialing'
+              : 'canceled',
+          access_origin: 'earlybird',
+          payment_source: null,
+          cancel_at_period_end: false,
+          trial_started_at: earlybirdPurchase.createdAt,
+          trial_ends_at: KILOCLAW_EARLYBIRD_EXPIRY_DATE,
+        }
+      : {
+          user_id: input.userId,
+          instance_id: input.instanceId,
+          plan: 'trial',
+          status: 'trialing',
+          access_origin: null,
+          payment_source: null,
+          cancel_at_period_end: false,
+          trial_started_at: now.toISOString(),
+          trial_ends_at: getTrialEndsAt(now),
+        }
+  );
 
-  if (!created) {
+  if (!wasInserted) {
     logger
-      .withFields({ decision: 'insert_returned_no_row' })
-      .error('Personal bootstrap: insert returned no row');
-    throw new Error('Failed to create personal provision subscription row');
+      .withFields({
+        decision: 'existing_for_instance_race',
+        kiloclawSubscriptionId: created.id,
+      })
+      .info('Personal bootstrap: lost insert race; returning row created by concurrent caller');
+    return created;
   }
 
   await writeBootstrapChangeLogBestEffort(env, {

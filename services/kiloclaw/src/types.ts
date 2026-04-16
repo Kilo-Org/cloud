@@ -66,6 +66,8 @@ export type KiloClawEnv = {
   // Outbound traffic goes plugin → controller proxy → kiloclaw Worker (this
   // worker!) → kilo-chat via service binding, authenticated by the
   // per-sandbox gateway token. No shared token crosses the internet.
+  /** Base URL of the kilo-chat worker for bot HTTP routes. */
+  KILOCHAT_BASE_URL?: string;
   /** Reaction feature level forwarded to the plugin's channel config. */
   KILOCHAT_REACTION_LEVEL?: string;
 

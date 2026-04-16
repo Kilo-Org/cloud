@@ -115,6 +115,7 @@
     "BACKEND_API_URL": "https://app.kilo.ai",
     "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
     "KILOCLAW_CHECKIN_URL": "https://claw.kilosessions.ai/api/controller/checkin",
+    "KILOCHAT_BASE_URL": "https://chat.kiloapps.io",
     "REQUIRE_PROXY_TOKEN": "true",
     // Proactive API key refresh: trigger when key expires within this many hours. Default: 72 (3 days).
     "PROACTIVE_REFRESH_THRESHOLD_HOURS": "72",

@@ -55,9 +55,9 @@ describe('botAuthMiddleware', () => {
 
   it('returns 400 for invalid sandboxId', async () => {
     const app = createApp();
-    const token = await deriveGatewayToken('../etc/passwd', SECRET);
+    const token = await deriveGatewayToken('sbx!invalid', SECRET);
     const res = await app.fetch(
-      new Request('http://x/bot/v1/sandboxes/../etc/passwd/messages', {
+      new Request('http://x/bot/v1/sandboxes/sbx%21invalid/messages', {
         method: 'POST',
         headers: { authorization: `Bearer ${token}` },
       }),

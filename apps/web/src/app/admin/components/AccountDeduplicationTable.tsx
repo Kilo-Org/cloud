@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatRelativeTime, formatMicrodollars } from '@/lib/admin-utils';
+import { CopyTextButton } from '@/components/admin/CopyEmailButton';
 import type { AccountDeduplicationResponse } from '../api/account-deduplication/route';
 
 const PAGE_SIZE = 20;
@@ -198,10 +199,13 @@ function DuplicateGroupRows({
         >
           {i === 0 ? (
             <TableCell rowSpan={users.length} className="align-top font-mono text-xs">
-              {normalizedEmail}
-              <Badge variant="secondary" className="ml-2">
-                {users.length}
-              </Badge>
+              <div className="flex flex-col gap-1">
+                <span>{normalizedEmail}</span>
+                <div className="flex items-center gap-1">
+                  <Badge variant="secondary">{users.length}</Badge>
+                  <CopyTextButton text={users.map(u => u.google_user_email).join('\n')} showText />
+                </div>
+              </div>
             </TableCell>
           ) : null}
           <TableCell>

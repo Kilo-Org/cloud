@@ -662,6 +662,59 @@ describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
     expect(run?.initiated_by_admin_email).toBe(adminUser.google_user_email);
     expect(run).not.toHaveProperty('initiated_by_admin_name');
   });
+
+  it('returns the instance_id on each run', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.listAllCliRuns({
+      offset: 0,
+      limit: 10,
+      initiatedBy: 'all',
+      status: 'all',
+    });
+
+    const run = result.runs.find(row => row.id === cliRunId);
+    expect(run?.instance_id).toBe(cliRunInstanceId);
+  });
+
+  it('finds runs when searching by full instance_id', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.listAllCliRuns({
+      offset: 0,
+      limit: 10,
+      initiatedBy: 'all',
+      status: 'all',
+      search: cliRunInstanceId,
+    });
+
+    expect(result.runs.map(r => r.id)).toContain(cliRunId);
+  });
+
+  it('finds runs when searching by a substring of the instance_id', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const fragment = cliRunInstanceId.slice(0, 8);
+    const result = await caller.admin.kiloclawInstances.listAllCliRuns({
+      offset: 0,
+      limit: 10,
+      initiatedBy: 'all',
+      status: 'all',
+      search: fragment,
+    });
+
+    expect(result.runs.map(r => r.id)).toContain(cliRunId);
+  });
+
+  it('returns no runs when searching by an instance_id that does not match', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.listAllCliRuns({
+      offset: 0,
+      limit: 10,
+      initiatedBy: 'all',
+      status: 'all',
+      search: '00000000-0000-0000-0000-000000000000',
+    });
+
+    expect(result.runs.map(r => r.id)).not.toContain(cliRunId);
+  });
 });
 
 describe('admin.kiloclawInstances.listKiloCliRuns', () => {

@@ -854,7 +854,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         const pattern = `%${escaped}%`;
         const searchCond = or(
           ilike(kilocode_users.google_user_email, pattern),
-          ilike(kiloclaw_cli_runs.prompt, pattern)
+          ilike(kiloclaw_cli_runs.prompt, pattern),
+          ilike(sql`${kiloclaw_cli_runs.instance_id}::text`, pattern)
         );
         if (searchCond) conditions.push(searchCond);
       }
@@ -867,6 +868,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             id: kiloclaw_cli_runs.id,
             user_id: kiloclaw_cli_runs.user_id,
             user_email: kilocode_users.google_user_email,
+            instance_id: kiloclaw_cli_runs.instance_id,
             initiated_by_admin_id: kiloclaw_cli_runs.initiated_by_admin_id,
             initiated_by_admin_email: initiatingAdminUsers.google_user_email,
             prompt: kiloclaw_cli_runs.prompt,

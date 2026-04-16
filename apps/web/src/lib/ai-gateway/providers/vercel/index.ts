@@ -13,7 +13,6 @@ import type {
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import * as crypto from 'crypto';
 import { unstable_cache } from 'next/cache';
 import { readDb } from '@/lib/drizzle';
 import { modelsByProvider } from '@kilocode/db/schema';
@@ -27,10 +26,7 @@ import {
   GatewayPercentageSchema,
   DEFAULT_VERCEL_PERCENTAGE,
 } from '@/lib/gateway-config';
-
-function getRandomNumberLessThan100(randomSeed: string) {
-  return crypto.createHash('sha256').update(randomSeed).digest().readUInt32BE(0) % 100;
-}
+import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {

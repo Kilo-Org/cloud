@@ -222,14 +222,18 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
+  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
     await applyResolvedAutoModel(
-      requestedModelLowerCased,
+      {
+        model: requestedModelLowerCased,
+        modeHeader,
+        featureHeader: feature,
+        sessionId: taskId ?? null,
+      },
       requestBodyParsed,
-      modeHeader,
-      feature,
       authPromise.then(res => res.user),
       balanceAndSettingsPromise.then(res => res.balance)
     );
@@ -364,7 +368,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
-  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   const { provider, userByok, bypassAccessCheck } = await getProvider(
     originalModelIdLowerCased,
     requestBodyParsed,

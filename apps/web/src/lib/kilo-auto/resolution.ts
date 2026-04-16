@@ -14,23 +14,38 @@ import {
   modeSchema,
   BALANCED_CLAW_SETUP_MODEL,
   BALANCED_CODEX_MODEL,
-  BALANCED_QWEN_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
   KILO_AUTO_LEGACY_MODEL,
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
+import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
+import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
 
-const ENABLE_QWEN_KILOCLAW_MODEL = false;
+const STEP_FLASH_ROUTING_PERCENTAGE = 10;
+
+type ResolveAutoModelParams = {
+  model: string;
+  modeHeader: string | null;
+  featureHeader: FeatureValue | null;
+  sessionId: string | null;
+};
 
 export async function resolveAutoModel(
-  model: string,
-  modeHeader: string | null,
+  params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ): Promise<ResolvedAutoModel> {
+  const { model, modeHeader, featureHeader, sessionId } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
+    if (
+      sessionId &&
+      stepfun_35_flash_free_model.status === 'public' &&
+      getRandomNumberLessThan100('step_routing_' + sessionId) < STEP_FLASH_ROUTING_PERCENTAGE
+    ) {
+      return { model: stepfun_35_flash_free_model.public_id };
+    }
     return { model: minimax_m25_free_model.public_id };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
@@ -38,16 +53,16 @@ export async function resolveAutoModel(
       model: (await balancePromise) > 0 ? GPT_5_NANO_ID : gpt_oss_20b_free_model.public_id,
     };
   }
-  const modeResult = modeSchema.safeParse(modeHeader?.trim() ?? '');
+  const modeResult =
+    featureHeader === 'kiloclaw' || featureHeader === 'openclaw'
+      ? { success: true, data: 'KiloClaw' as const }
+      : modeSchema.safeParse(modeHeader?.trim() ?? '');
   const mode = modeResult.success ? modeResult.data : null;
   if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
-    if (mode === modeSchema.enum.KiloClaw) {
+    if (featureHeader === 'kiloclaw') {
       const user = await userPromise;
       if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
         return BALANCED_CLAW_SETUP_MODEL;
-      }
-      if (ENABLE_QWEN_KILOCLAW_MODEL) {
-        return BALANCED_QWEN_MODEL;
       }
     }
     return BALANCED_CODEX_MODEL;
@@ -56,19 +71,12 @@ export async function resolveAutoModel(
 }
 
 export async function applyResolvedAutoModel(
-  model: string,
+  params: ResolveAutoModelParams,
   request: GatewayRequest,
-  modeHeader: string | null,
-  featureHeader: FeatureValue | null,
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ) {
-  const resolved = await resolveAutoModel(
-    model,
-    featureHeader === 'kiloclaw' || featureHeader === 'openclaw' ? 'KiloClaw' : modeHeader,
-    userPromise,
-    balancePromise
-  );
+  const resolved = await resolveAutoModel(params, userPromise, balancePromise);
   request.body.model = resolved.model;
   if (resolved.reasoning) {
     if (request.kind === 'messages') {

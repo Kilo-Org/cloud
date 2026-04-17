@@ -52,7 +52,7 @@ import type { GatewayProcessStatus } from '../gateway-controller-types';
 
 // Domain modules
 import type { InstanceMutableState, InstanceStatus, DestroyResult } from './types';
-import { getFlyConfig } from './types';
+import { getAppKey, getFlyConfig } from './types';
 import {
   applyProviderState,
   createMutableState,
@@ -96,7 +96,7 @@ import {
   createShortLivedUserToken,
   deactivateStreamChatUsers,
 } from '../../stream-chat/client';
-import { writeEvent } from '../../utils/analytics';
+import { writeEvent, safeInstanceIdFromSandboxId } from '../../utils/analytics';
 import type { KiloClawEventData, KiloClawEventName } from '../../utils/analytics';
 import { getProviderAdapter, resolveDefaultProvider } from '../../providers';
 import type {
@@ -436,6 +436,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       | 'openclawVersion'
       | 'imageTag'
       | 'flyRegion'
+      | 'orgId'
+      | 'instanceId'
     > & { event: KiloClawEventName }
   ): void {
     doLog(this.s, data.event, {
@@ -455,6 +457,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       openclawVersion: this.s.openclawVersion ?? undefined,
       imageTag: this.s.trackedImageTag ?? undefined,
       flyRegion: this.s.flyRegion ?? undefined,
+      orgId: this.s.orgId ?? undefined,
+      instanceId: safeInstanceIdFromSandboxId(this.s.sandboxId ?? undefined),
       status: data.status ?? this.s.status ?? undefined,
     });
   }
@@ -635,6 +639,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
+    const userTimezone =
+      config.userTimezone === undefined ? (this.s.userTimezone ?? null) : config.userTimezone;
+
     const configFields = {
       userId,
       sandboxId,
@@ -646,6 +653,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeApiKey: config.kilocodeApiKey ?? null,
       kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
       kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
+      userTimezone,
       kiloExaSearchMode: config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null,
       channels: config.channels ?? null,
       machineSize: config.machineSize ?? this.s.machineSize ?? null,
@@ -704,6 +712,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.kilocodeApiKey = config.kilocodeApiKey ?? null;
     this.s.kilocodeApiKeyExpiresAt = config.kilocodeApiKeyExpiresAt ?? null;
     this.s.kilocodeDefaultModel = config.kilocodeDefaultModel ?? null;
+    this.s.userTimezone = userTimezone;
     this.s.kiloExaSearchMode = config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null;
     this.s.channels = config.channels ?? null;
     this.s.machineSize = config.machineSize ?? this.s.machineSize ?? null;
@@ -1990,9 +1999,29 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     restoreStartedAt: string | null;
     pendingRestoreVolumeId: string | null;
     instanceReadyEmailSent: boolean;
+    // --- env key diagnostics ---
+    envKeyAppDOKey: string | null;
+    envKeyAppDOFlyAppName: string | null;
+    envKeyAppDOKeySet: boolean | null;
   }> {
     await this.loadState();
     const alarmScheduledAt = await this.ctx.storage.getAlarm();
+
+    // Fetch env key diagnostics from the App DO (best-effort, don't fail the whole response).
+    let envKeyDiag: {
+      flyAppName: string | null;
+      envKeySet: boolean;
+    } | null = null;
+    let envKeyAppDOKey: string | null = null;
+    try {
+      if (this.s.userId || this.s.sandboxId) {
+        envKeyAppDOKey = getAppKey({ userId: this.s.userId, sandboxId: this.s.sandboxId });
+        const appStub = this.env.KILOCLAW_APP.get(this.env.KILOCLAW_APP.idFromName(envKeyAppDOKey));
+        envKeyDiag = await appStub.getDiagnostics();
+      }
+    } catch {
+      // Swallow — diagnostics are best-effort.
+    }
 
     return {
       userId: this.s.userId,
@@ -2046,6 +2075,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       restoreStartedAt: this.s.restoreStartedAt,
       pendingRestoreVolumeId: this.s.pendingRestoreVolumeId,
       instanceReadyEmailSent: this.s.instanceReadyEmailSent,
+      envKeyAppDOKey,
+      envKeyAppDOFlyAppName: envKeyDiag?.flyAppName ?? null,
+      envKeyAppDOKeySet: envKeyDiag?.envKeySet ?? null,
     };
   }
 
@@ -2057,6 +2089,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeApiKey: this.s.kilocodeApiKey ?? undefined,
       kilocodeApiKeyExpiresAt: this.s.kilocodeApiKeyExpiresAt ?? undefined,
       kilocodeDefaultModel: this.s.kilocodeDefaultModel ?? undefined,
+      userTimezone: this.s.userTimezone ?? undefined,
       webSearch: this.s.kiloExaSearchMode
         ? {
             exaMode: this.s.kiloExaSearchMode,

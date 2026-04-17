@@ -3,10 +3,10 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { findUserById } from '@/lib/user';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
-import { countAndStoreUsage } from '@/lib/processUsage';
+import { countAndStoreUsage } from '@/lib/ai-gateway/processUsage';
 import { captureException } from '@sentry/nextjs';
 import { getFraudDetectionHeaders } from '@/lib/utils';
-import type { MicrodollarUsageContext } from '@/lib/processUsage.types';
+import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Check if we're in development mode

@@ -439,8 +439,8 @@ importers:
         specifier: ^2.0.35
         version: 2.0.35(zod@4.3.6)
       '@anthropic-ai/sdk':
-        specifier: ^0.78.0
-        version: 0.78.0(zod@4.3.6)
+        specifier: ^0.90.0
+        version: 0.90.0(zod@4.3.6)
       '@aws-sdk/client-s3':
         specifier: ^3.1009.0
         version: 3.1009.0
@@ -1288,8 +1288,8 @@ importers:
   services/cloud-agent-next/wrapper:
     dependencies:
       '@kilocode/sdk':
-        specifier: 7.1.17
-        version: 7.1.17
+        specifier: 7.1.23
+        version: 7.1.23
     devDependencies:
       '@types/bun':
         specifier: latest
@@ -2126,8 +2126,8 @@ packages:
       '@faker-js/faker': ^7.0.0 || ^8.0.0 || ^9.0.0
       zod: ^3.21.4
 
-  '@anthropic-ai/sdk@0.78.0':
-    resolution: {integrity: sha512-PzQhR715td/m1UaaN5hHXjYB8Gl2lF9UVhrrGrZeysiF6Rb74Wc9GCB8hzLdzmQtBd1qe89F9OptgB9Za1Ib5w==}
+  '@anthropic-ai/sdk@0.90.0':
+    resolution: {integrity: sha512-MzZtPabJF1b0FTDl6Z6H5ljphPwACLGP13lu8MTiB8jXaW/YXlpOp+Po2cVou3MPM5+f5toyLnul9whKCy7fBg==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -4181,9 +4181,6 @@ packages:
 
   '@kilocode/plugin@7.1.23':
     resolution: {integrity: sha512-sFI0rlgQg3mzYP05/gg09IE1mN4QyAXyOlJjM36CFoVKi1bPYz/dqEqr6ddmMNmB577A4gDu0D07hr0pGIFrBA==}
-
-  '@kilocode/sdk@7.1.17':
-    resolution: {integrity: sha512-OMe11pt8m72rUIOrgUn9OEwSl+KlQzOlGD3zDyFutHqxylqXOr0/9IfYtAP5F5fUWYCtYE7SJbXcEbWvIyVhTg==}
 
   '@kilocode/sdk@7.1.23':
     resolution: {integrity: sha512-moSKXqpwE+ozVbNE1aYIUb5Kd7fesOicRUn90WiMlp+8lRhqQc6ZTTIaIB9ZzD7Dak//4bSuo++bb+Jtw3U4Fg==}
@@ -14904,7 +14901,7 @@ snapshots:
       randexp: 0.5.3
       zod: 4.3.6
 
-  '@anthropic-ai/sdk@0.78.0(zod@4.3.6)':
+  '@anthropic-ai/sdk@0.90.0(zod@4.3.6)':
     dependencies:
       json-schema-to-ts: 3.1.1
     optionalDependencies:
@@ -17701,8 +17698,6 @@ snapshots:
     dependencies:
       '@kilocode/sdk': 7.1.23
       zod: 4.1.8
-
-  '@kilocode/sdk@7.1.17': {}
 
   '@kilocode/sdk@7.1.23': {}
 

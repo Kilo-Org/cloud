@@ -13,13 +13,13 @@ import type {
 import type { User, Organization } from '@kilocode/db/schema';
 import { randomUUID } from 'crypto';
 
-jest.mock('@/lib/providers/openrouter', () => {
+jest.mock('@/lib/ai-gateway/providers/openrouter', () => {
   return {
     getEnhancedOpenRouterModels: jest.fn(),
   };
 });
 
-import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
+import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 
 // Test users and organizations will be created dynamically
 let owner: User;

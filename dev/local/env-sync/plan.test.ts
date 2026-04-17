@@ -105,6 +105,38 @@ test('treats top-level wrangler vars as satisfied when no environment is selecte
   }
 });
 
+test('writes example defaults to .dev.vars when they override wrangler vars', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'env-sync-plan-'));
+  try {
+    writeFile(root, '.env.local', '');
+    writeFile(
+      root,
+      `${workerDir}/package.json`,
+      JSON.stringify({ scripts: { dev: 'wrangler dev' } })
+    );
+    writeFile(
+      root,
+      `${workerDir}/wrangler.jsonc`,
+      `{
+        "vars": {
+          "FLY_ORG_SLUG": "kilo-679"
+        }
+      }`
+    );
+    writeFile(root, `${workerDir}/.dev.vars.example`, 'FLY_ORG_SLUG=kilo-dev\n');
+
+    const plan = computePlan(root, new Set(['cloud-agent-next']));
+    assert.equal(plan.missingEnvLocal, false);
+    assert.equal(plan.devVarsChanges.length, 1);
+    const [change] = plan.devVarsChanges;
+    assert.ok(change);
+    assert.equal(change.isNew, true);
+    assert.ok(change.newFileContent?.includes('FLY_ORG_SLUG=kilo-dev'));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('keeps .env.local values ahead of wrangler vars for local overrides', () => {
   const repo = createCloudAgentNextRepo({
     envLocal: 'R2_ATTACHMENTS_BUCKET=local-attachments\n',

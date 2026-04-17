@@ -65,10 +65,8 @@ const nextConfig = {
     return {
       beforeFiles: globalApiRewrites,
       afterFiles: [
-        {
-          source: '/config.json',
-          destination: 'https://opencode.ai/config.json',
-        },
+        // /config.json is handled by src/app/config.json/route.ts which merges
+        // Kilo-specific schema additions on top of the upstream opencode schema.
         // PostHog reverse proxy rewrites — specific routes MUST come before the catch-all
         {
           source: '/ingest/static/:path*',

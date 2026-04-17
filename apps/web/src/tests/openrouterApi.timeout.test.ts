@@ -1,5 +1,5 @@
-import { openRouterRequest } from '../lib/providers';
-import PROVIDERS from '../lib/providers/provider-definitions';
+import { openRouterRequest } from '../lib/ai-gateway/providers';
+import PROVIDERS from '../lib/ai-gateway/providers/provider-definitions';
 
 describe('openRouterRequest timeout', () => {
   it('should abort after timeout', async () => {

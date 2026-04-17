@@ -150,19 +150,23 @@ export function createLifecycleManager(
     if (perTurn.autoCommit) {
       logToFile('running auto-commit');
       try {
-        const autoCommitPromise = runAutoCommit({
+        const autoCommitController = new AbortController();
+        let autoCommitTimedOut = false;
+        const timeout = setTimeout(() => {
+          autoCommitTimedOut = true;
+          logToFile('auto-commit lifecycle timeout reached; aborting in-flight work');
+          autoCommitController.abort();
+        }, AUTO_COMMIT_TIMEOUT_MS);
+        const result = await runAutoCommit({
           workspacePath: config.workspacePath,
           onEvent: event => state.sendToIngest(event),
           kiloClient,
           messageId: state.lastAssistantMessageId ?? undefined,
           upstreamBranch: perTurn.upstreamBranch,
-        });
-        const timeoutPromise = new Promise<'timeout'>(resolve =>
-          setTimeout(() => resolve('timeout'), AUTO_COMMIT_TIMEOUT_MS)
-        );
-        const result = await Promise.race([autoCommitPromise, timeoutPromise]);
-        if (result === 'timeout') {
-          logToFile('auto-commit timed out');
+          signal: autoCommitController.signal,
+        }).finally(() => clearTimeout(timeout));
+        if (autoCommitTimedOut && !result.success) {
+          logToFile('auto-commit aborted by lifecycle timeout');
           state.sendToIngest({
             streamEventType: 'error',
             data: { error: 'Auto-commit timed out', fatal: false },

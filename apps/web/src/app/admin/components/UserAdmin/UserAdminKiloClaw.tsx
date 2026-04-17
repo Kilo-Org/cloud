@@ -386,6 +386,11 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                         value={sub.stripe_subscription_id ?? '—'}
                         mono
                       />
+                      <Field
+                        label="Transferred To"
+                        value={sub.transferred_to_subscription_id ?? '—'}
+                        mono
+                      />
                       <Field label="Instance ID" value={sub.instance_id ?? '—'} mono />
                       <Field
                         label="Instance"

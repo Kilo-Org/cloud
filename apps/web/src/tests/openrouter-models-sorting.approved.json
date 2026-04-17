@@ -754,7 +754,8 @@
       "description": "Automatically routes your request to a small model.",
       "architecture": {
         "input_modalities": [
-          "text"
+          "text",
+          "image"
         ],
         "output_modalities": [
           "text"
@@ -763,7 +764,7 @@
       },
       "top_provider": {
         "is_moderated": false,
-        "context_length": 131072,
+        "context_length": 262144,
         "max_completion_tokens": 32768
       },
       "pricing": {
@@ -775,7 +776,7 @@
         "web_search": "0",
         "internal_reasoning": "0"
       },
-      "context_length": 131072,
+      "context_length": 262144,
       "supported_parameters": [
         "max_tokens",
         "temperature",
@@ -783,9 +784,7 @@
         "reasoning",
         "include_reasoning"
       ],
-      "opencode": {
-        "ai_sdk_provider": "openai"
-      },
+      "opencode": {},
       "isFree": false
     }
   ]

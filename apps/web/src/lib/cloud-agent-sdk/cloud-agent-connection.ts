@@ -5,17 +5,18 @@ import {
   type StreamError,
 } from '@/lib/cloud-agent-next/event-types';
 import { createBaseConnection, type Connection } from './base-connection';
+import type { CloudAgentStreamTicket, CloudAgentStreamTicketResult } from './transport';
 
 export type ConnectionConfig = {
   websocketUrl: string;
-  ticket: string;
+  ticket: CloudAgentStreamTicketResult;
   onEvent: (event: CloudAgentEvent) => void;
   onConnected: () => void;
   onDisconnected: () => void;
   onUnexpectedDisconnect?: () => void;
   onReconnected?: () => void;
   onError?: (error: StreamError) => void;
-  onRefreshTicket?: () => Promise<string>;
+  onRefreshTicket?: () => Promise<CloudAgentStreamTicketResult>;
   heartbeatTimeoutMs?: number;
   reconnectDelayMs?: number;
 };
@@ -25,6 +26,18 @@ export type { Connection };
 type ParsedMessage =
   | { type: 'event'; event: CloudAgentEvent }
   | { type: 'error'; error: StreamError };
+
+const TICKET_EXPIRY_SKEW_SECONDS = 10;
+
+function normalizeTicket(ticket: CloudAgentStreamTicketResult): CloudAgentStreamTicket {
+  return typeof ticket === 'string' ? { ticket, expiresAt: undefined } : ticket;
+}
+
+function isTicketExpiringSoon(expiresAt?: number): boolean {
+  if (!expiresAt) return false;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return expiresAt - nowSeconds <= TICKET_EXPIRY_SKEW_SECONDS;
+}
 
 function parseMessage(data: unknown): ParsedMessage | null {
   if (typeof data !== 'string') {
@@ -47,8 +60,12 @@ function parseMessage(data: unknown): ParsedMessage | null {
 const AUTH_FAILURE_CLOSE_CODES = [1008, 4001] as const;
 const AUTH_FAILURE_KEYWORDS = ['unauthorized', '401', 'auth', 'ticket'] as const;
 
+function isAuthFailureCode(code: number): boolean {
+  return AUTH_FAILURE_CLOSE_CODES.some(authFailureCode => authFailureCode === code);
+}
+
 function isAuthFailureClose(event: CloseEvent): boolean {
-  if (AUTH_FAILURE_CLOSE_CODES.includes(event.code as (typeof AUTH_FAILURE_CLOSE_CODES)[number])) {
+  if (isAuthFailureCode(event.code)) {
     return true;
   }
   const reason = event.reason?.toLowerCase() ?? '';
@@ -56,14 +73,14 @@ function isAuthFailureClose(event: CloseEvent): boolean {
 }
 
 export function createConnection(config: ConnectionConfig): Connection {
-  let currentTicket = config.ticket;
+  let currentTicket = normalizeTicket(config.ticket);
   const refreshTicket = config.onRefreshTicket;
 
   return createBaseConnection({
     stalenessTimeoutMs: config.heartbeatTimeoutMs,
     buildUrl: () => {
       const url = new URL(config.websocketUrl);
-      url.searchParams.set('ticket', currentTicket);
+      url.searchParams.set('ticket', currentTicket.ticket);
       return url.toString();
     },
     parseMessage: (data: unknown) => {
@@ -88,8 +105,9 @@ export function createConnection(config: ConnectionConfig): Connection {
     isAuthFailure: isAuthFailureClose,
     refreshAuth: refreshTicket
       ? async () => {
-          currentTicket = await refreshTicket();
+          currentTicket = normalizeTicket(await refreshTicket());
         }
       : undefined,
+    shouldRefreshAuthBeforeConnect: () => isTicketExpiringSoon(currentTicket.expiresAt),
   });
 }

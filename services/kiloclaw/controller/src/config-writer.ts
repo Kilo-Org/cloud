@@ -280,6 +280,12 @@ export function generateBaseConfig(
     console.log(`Overriding default model: ${env.KILOCODE_DEFAULT_MODEL}`);
   }
 
+  if (env.KILOCLAW_USER_TIMEZONE) {
+    config.agents = config.agents ?? {};
+    config.agents.defaults = config.agents.defaults ?? {};
+    config.agents.defaults.userTimezone = env.KILOCLAW_USER_TIMEZONE;
+  }
+
   // Remove the agents.defaults.models allowlist that `openclaw onboard` creates.
   // When non-empty it restricts visible models to only those listed, hiding the
   // rest of the kilocode catalog. KiloClaw users should see all available models.
@@ -328,6 +334,12 @@ export function generateBaseConfig(
     : [];
   if (!(config.plugins.load.paths as string[]).includes(KILOCLAW_CUSTOMIZER_PLUGIN_PATH)) {
     (config.plugins.load.paths as string[]).push(KILOCLAW_CUSTOMIZER_PLUGIN_PATH);
+  }
+  if (
+    Array.isArray(config.plugins.allow) &&
+    !config.plugins.allow.includes(KILOCLAW_CUSTOMIZER_PLUGIN_ID)
+  ) {
+    config.plugins.allow.push(KILOCLAW_CUSTOMIZER_PLUGIN_ID);
   }
   config.plugins.entries = config.plugins.entries ?? {};
   config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID] =

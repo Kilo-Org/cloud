@@ -1,10 +1,4 @@
-export const deadline_XL_first_topup_bonus = new Date('2025-10-14T08:01Z');
-const XL_first_topup_amount = 24;
-
-export const is_XL_first_topup_bonus_active = (now?: Date) =>
-  (now ?? new Date()) < deadline_XL_first_topup_bonus;
-export const FIRST_TOPUP_BONUS_AMOUNT = (now?: Date) =>
-  is_XL_first_topup_bonus_active(now) ? XL_first_topup_amount : 20;
+export const FIRST_TOPUP_BONUS_AMOUNT: number = 0;
 
 export const REFERRAL_BONUS_AMOUNT = 10;
 

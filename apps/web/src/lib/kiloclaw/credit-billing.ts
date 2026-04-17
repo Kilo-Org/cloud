@@ -5,6 +5,11 @@ import { addMonths, format } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
 import {
+  insertKiloClawSubscriptionChangeLog,
+  type KiloClawSubscriptionChangeAction,
+  type KiloClawSubscriptionChangeActor,
+} from '@kilocode/db';
+import {
   credit_transactions,
   kilocode_users,
   kiloclaw_instances,
@@ -32,10 +37,213 @@ import {
   getStripePriceIdForClawPlan,
   getStripePriceIdForClawPlanIntro,
 } from '@/lib/kiloclaw/stripe-price-ids.server';
+import {
+  CurrentPersonalSubscriptionResolutionError,
+  resolveCurrentPersonalSubscriptionRow,
+} from '@/lib/kiloclaw/current-personal-subscription';
 
 const logInfo = sentryLogger('kiloclaw-credit-billing', 'info');
 const logWarning = sentryLogger('kiloclaw-credit-billing', 'warning');
 const logError = sentryLogger('kiloclaw-credit-billing', 'error');
+const CREDIT_BILLING_ACTOR = {
+  actorType: 'system',
+  actorId: 'kiloclaw-credit-billing',
+} as const;
+
+type CreditSettlementPersonalRow = {
+  subscription: typeof kiloclaw_subscriptions.$inferSelect;
+  organizationId: string | null;
+};
+
+class CreditSettlementResolutionError extends Error {
+  readonly reason: string;
+  readonly details: Record<string, string | number | boolean | null | undefined>;
+
+  constructor(
+    reason: string,
+    details: Record<string, string | number | boolean | null | undefined> = {}
+  ) {
+    super(reason);
+    this.name = 'CreditSettlementResolutionError';
+    this.reason = reason;
+    this.details = details;
+  }
+}
+
+type CreditBillingTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function selectCreditSettlementRowById(
+  tx: CreditBillingTx,
+  subscriptionId: string
+): Promise<CreditSettlementPersonalRow | null> {
+  const [row] = await tx
+    .select({
+      subscription: kiloclaw_subscriptions,
+      organizationId: kiloclaw_instances.organization_id,
+    })
+    .from(kiloclaw_subscriptions)
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(eq(kiloclaw_subscriptions.id, subscriptionId))
+    .limit(1);
+
+  return row ?? null;
+}
+
+async function selectCreditSettlementRowsByStripeId(
+  tx: CreditBillingTx,
+  stripeSubscriptionId: string
+): Promise<CreditSettlementPersonalRow[]> {
+  return await tx
+    .select({
+      subscription: kiloclaw_subscriptions,
+      organizationId: kiloclaw_instances.organization_id,
+    })
+    .from(kiloclaw_subscriptions)
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(eq(kiloclaw_subscriptions.stripe_subscription_id, stripeSubscriptionId))
+    .limit(2);
+}
+
+async function selectCreditSettlementRowByInstanceId(params: {
+  tx: CreditBillingTx;
+  userId: string;
+  instanceId: string;
+}): Promise<CreditSettlementPersonalRow | null> {
+  const [row] = await params.tx
+    .select({
+      subscription: kiloclaw_subscriptions,
+      organizationId: kiloclaw_instances.organization_id,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId),
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_instances.user_id, params.userId),
+        isNull(kiloclaw_instances.organization_id)
+      )
+    )
+    .limit(1);
+
+  return row ?? null;
+}
+
+async function selectCurrentCreditSettlementRow(
+  tx: CreditBillingTx,
+  userId: string
+): Promise<CreditSettlementPersonalRow | null> {
+  try {
+    const row = await resolveCurrentPersonalSubscriptionRow({ userId, dbOrTx: tx });
+    if (!row) {
+      return null;
+    }
+    return {
+      subscription: row.subscription,
+      organizationId: row.instance?.organizationId ?? null,
+    };
+  } catch (error) {
+    if (error instanceof CurrentPersonalSubscriptionResolutionError) {
+      throw new CreditSettlementResolutionError('multiple_current_rows', {
+        user_id: userId,
+        instance_id: error.instanceId,
+      });
+    }
+    throw error;
+  }
+}
+
+function assertCreditSettlementPersonalRow(
+  row: CreditSettlementPersonalRow,
+  userId: string
+): CreditSettlementPersonalRow {
+  if (row.subscription.user_id !== userId) {
+    throw new CreditSettlementResolutionError('user_mismatch', {
+      subscription_id: row.subscription.id,
+      row_user_id: row.subscription.user_id,
+      user_id: userId,
+    });
+  }
+
+  if (row.organizationId !== null) {
+    throw new CreditSettlementResolutionError('org_boundary', {
+      subscription_id: row.subscription.id,
+      organization_id: row.organizationId,
+      user_id: userId,
+    });
+  }
+
+  return row;
+}
+
+async function followTransferredCreditSettlementRow(params: {
+  tx: CreditBillingTx;
+  start: CreditSettlementPersonalRow;
+  userId: string;
+}): Promise<CreditSettlementPersonalRow> {
+  let current = assertCreditSettlementPersonalRow(params.start, params.userId);
+  const seen = new Set([current.subscription.id]);
+
+  for (let hops = 0; hops < 8; hops += 1) {
+    const nextId = current.subscription.transferred_to_subscription_id;
+    if (!nextId) {
+      return current;
+    }
+
+    const next = await selectCreditSettlementRowById(params.tx, nextId);
+    if (!next) {
+      throw new CreditSettlementResolutionError('missing_lineage_target', {
+        subscription_id: current.subscription.id,
+        transferred_to_subscription_id: nextId,
+        user_id: params.userId,
+      });
+    }
+
+    current = assertCreditSettlementPersonalRow(next, params.userId);
+    if (seen.has(current.subscription.id)) {
+      throw new CreditSettlementResolutionError('lineage_cycle', {
+        subscription_id: current.subscription.id,
+        user_id: params.userId,
+      });
+    }
+    seen.add(current.subscription.id);
+  }
+
+  throw new CreditSettlementResolutionError('lineage_hop_limit', {
+    subscription_id: params.start.subscription.id,
+    user_id: params.userId,
+  });
+}
+
+async function clearTransferredSettlementStripeOwnership(params: {
+  tx: CreditBillingTx;
+  row: CreditSettlementPersonalRow;
+  reason: string;
+}) {
+  if (!params.row.subscription.transferred_to_subscription_id) {
+    return;
+  }
+
+  const [after] = await params.tx
+    .update(kiloclaw_subscriptions)
+    .set({
+      payment_source: 'credits',
+      stripe_subscription_id: null,
+      stripe_schedule_id: null,
+      cancel_at_period_end: false,
+    })
+    .where(eq(kiloclaw_subscriptions.id, params.row.subscription.id))
+    .returning();
+
+  await insertKiloClawSubscriptionChangeLog(params.tx, {
+    subscriptionId: params.row.subscription.id,
+    actor: CREDIT_BILLING_ACTOR,
+    action: 'status_changed',
+    reason: params.reason,
+    before: params.row.subscription,
+    after: after ?? null,
+  });
+}
 
 export const KILOCLAW_PLAN_COST_MICRODOLLARS = {
   standard: 9_000_000, // $9/month
@@ -187,15 +395,17 @@ export async function getEffectiveCreditBalancePreview(params: {
  */
 export async function applyStripeFundedKiloClawPeriod(params: {
   userId: string;
+  metadataInstanceId?: string;
   stripeSubscriptionId: string;
   chargeId: string;
   plan: 'commit' | 'standard';
   amountMicrodollars: number;
   periodStart: string;
   periodEnd: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const {
     userId,
+    metadataInstanceId,
     stripeSubscriptionId,
     chargeId,
     plan,
@@ -209,9 +419,9 @@ export async function applyStripeFundedKiloClawPeriod(params: {
 
   let wasSuspended = false;
   let resolvedInstanceId: string | undefined;
+  let applied = false;
 
   await db.transaction(async tx => {
-    // Fetch the user row — processTopUp needs the full User record.
     const user = await tx.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, userId),
     });
@@ -221,8 +431,86 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       return;
     }
 
-    // Step 1a: Create the positive credit deposit via processTopUp.
-    // processTopUp uses stripe_payment_id uniqueness for idempotency.
+    const stripeRows = await selectCreditSettlementRowsByStripeId(tx, stripeSubscriptionId);
+    if (stripeRows.length > 1) {
+      logWarning('Stripe-funded settlement quarantined: duplicate stripe subscription id', {
+        user_id: userId,
+        stripe_subscription_id: stripeSubscriptionId,
+      });
+      return;
+    }
+
+    const stripeOwnerRow = stripeRows[0] ?? null;
+    let resolvedTarget: CreditSettlementPersonalRow | null = null;
+
+    try {
+      if (stripeOwnerRow) {
+        resolvedTarget = await followTransferredCreditSettlementRow({
+          tx,
+          start: stripeOwnerRow,
+          userId,
+        });
+      } else if (metadataInstanceId) {
+        const metadataRow = await selectCreditSettlementRowByInstanceId({
+          tx,
+          userId,
+          instanceId: metadataInstanceId,
+        });
+        if (metadataRow) {
+          resolvedTarget = await followTransferredCreditSettlementRow({
+            tx,
+            start: metadataRow,
+            userId,
+          });
+        }
+      } else {
+        const currentRow = await selectCurrentCreditSettlementRow(tx, userId);
+        if (currentRow) {
+          resolvedTarget = await followTransferredCreditSettlementRow({
+            tx,
+            start: currentRow,
+            userId,
+          });
+        }
+      }
+    } catch (error) {
+      if (error instanceof CreditSettlementResolutionError) {
+        logWarning('Stripe-funded settlement quarantined: lineage resolution failed', {
+          user_id: userId,
+          stripe_subscription_id: stripeSubscriptionId,
+          metadata_instance_id: metadataInstanceId ?? null,
+          reason: error.reason,
+          ...error.details,
+        });
+        return;
+      }
+      throw error;
+    }
+
+    if (!resolvedTarget || !resolvedTarget.subscription.instance_id) {
+      logWarning('Stripe-funded settlement quarantined: missing personal instance target', {
+        user_id: userId,
+        stripe_subscription_id: stripeSubscriptionId,
+        metadata_instance_id: metadataInstanceId ?? null,
+      });
+      return;
+    }
+
+    if (stripeOwnerRow && stripeOwnerRow.subscription.id !== resolvedTarget.subscription.id) {
+      await clearTransferredSettlementStripeOwnership({
+        tx,
+        row: stripeOwnerRow,
+        reason: 'stripe_invoice_settlement_reconciled_to_successor',
+      });
+    }
+
+    const targetRow = resolvedTarget.subscription;
+    wasSuspended = !!targetRow.suspended_at;
+    resolvedInstanceId = targetRow.instance_id ?? undefined;
+
+    const shouldClearSchedule = targetRow.scheduled_plan === plan;
+    const commitEndsAt = plan === 'commit' ? periodEnd : null;
+
     const deposited = await processTopUp(
       user,
       amountCents,
@@ -235,14 +523,12 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     );
 
     if (!deposited) {
-      // Duplicate charge — already processed. Return early (idempotent).
       logInfo('Duplicate charge skipped', { user_id: userId, chargeId });
+      applied = true;
       return;
     }
 
-    // Step 1b: Insert the matching negative credit deduction.
     const deductionCategory = `kiloclaw-settlement:${stripeSubscriptionId}:${periodStartDate}`;
-
     const deductionResult = await tx
       .insert(credit_transactions)
       .values({
@@ -257,13 +543,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       })
       .onConflictDoNothing();
 
-    const deductionIsNew = (deductionResult.rowCount ?? 0) > 0;
-
-    if (deductionIsNew) {
-      // Step 1c: Decrement total_microdollars_acquired to make the operation balance-neutral.
-      // processTopUp already incremented by amountMicrodollars; this reverses it.
-      // Only decrement on new deductions — a duplicate deduction means the prior
-      // transaction already decremented.
+    if ((deductionResult.rowCount ?? 0) > 0) {
       await tx
         .update(kilocode_users)
         .set({
@@ -277,128 +557,50 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       });
     }
 
-    // Step 1d: Read existing subscription row to check for suspension and scheduled plan.
-    // Key on stripe_subscription_id — each Stripe subscription maps to exactly one row.
-    const [existingRow] = await tx
-      .select({
-        instance_id: kiloclaw_subscriptions.instance_id,
-        suspended_at: kiloclaw_subscriptions.suspended_at,
-        scheduled_plan: kiloclaw_subscriptions.scheduled_plan,
-        scheduled_by: kiloclaw_subscriptions.scheduled_by,
-        stripe_schedule_id: kiloclaw_subscriptions.stripe_schedule_id,
-      })
+    const updateSet = {
+      instance_id: targetRow.instance_id,
+      stripe_subscription_id: stripeSubscriptionId,
+      payment_source: 'credits' as const,
+      status: 'active' as const,
+      plan,
+      current_period_start: periodStart,
+      current_period_end: periodEnd,
+      credit_renewal_at: periodEnd,
+      commit_ends_at: commitEndsAt,
+      past_due_since: null,
+      auto_top_up_triggered_for_period: null,
+      ...(shouldClearSchedule
+        ? { scheduled_plan: null, scheduled_by: null, stripe_schedule_id: null }
+        : {}),
+    };
+
+    const [before] = await tx
+      .select()
       .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.stripe_subscription_id, stripeSubscriptionId))
+      .where(eq(kiloclaw_subscriptions.id, targetRow.id))
       .limit(1);
-
-    wasSuspended = !!existingRow?.suspended_at;
-    resolvedInstanceId = existingRow?.instance_id ?? undefined;
-
-    // If a scheduled plan change matches the settled plan, clear the schedule.
-    const shouldClearSchedule = existingRow?.scheduled_plan === plan;
-
-    const commitEndsAt = plan === 'commit' ? periodEnd : null;
-
-    // If the row doesn't exist yet (settlement arrived before subscription.created),
-    // look up the user's active instance so we can populate instance_id.
-    let instanceId = existingRow?.instance_id ?? null;
-    if (!existingRow) {
-      const [activeInstance] = await tx
-        .select({ id: kiloclaw_instances.id })
-        .from(kiloclaw_instances)
-        .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
-        .limit(1);
-      instanceId = activeInstance?.id ?? null;
-
-      // The instance may already have a subscription row (e.g. a trial, or a row
-      // inserted by subscription.created arriving just before us). Inserting a new
-      // row keyed on stripe_subscription_id would violate the partial unique index
-      // UQ_kiloclaw_subscriptions_instance. Update the existing instance row
-      // in-place instead, setting the stripe_subscription_id and converting it to
-      // hybrid state. See KILOCODE-WEB-1JJF.
-      if (instanceId) {
-        const [instanceRow] = await tx
-          .select({
-            suspended_at: kiloclaw_subscriptions.suspended_at,
-            scheduled_plan: kiloclaw_subscriptions.scheduled_plan,
-          })
-          .from(kiloclaw_subscriptions)
-          .where(eq(kiloclaw_subscriptions.instance_id, instanceId))
-          .limit(1);
-
-        if (instanceRow) {
-          wasSuspended = !!instanceRow.suspended_at;
-          resolvedInstanceId = instanceId;
-          const shouldClearSchedule = instanceRow.scheduled_plan === plan;
-
-          await tx
-            .update(kiloclaw_subscriptions)
-            .set({
-              stripe_subscription_id: stripeSubscriptionId,
-              payment_source: 'credits',
-              status: 'active',
-              plan,
-              current_period_start: periodStart,
-              current_period_end: periodEnd,
-              credit_renewal_at: periodEnd,
-              commit_ends_at: commitEndsAt,
-              past_due_since: null,
-              auto_top_up_triggered_for_period: null,
-              ...(shouldClearSchedule
-                ? { scheduled_plan: null, scheduled_by: null, stripe_schedule_id: null }
-                : {}),
-            })
-            .where(eq(kiloclaw_subscriptions.instance_id, instanceId));
-
-          return;
-        }
-      }
+    const [after] = await tx
+      .update(kiloclaw_subscriptions)
+      .set(updateSet)
+      .where(eq(kiloclaw_subscriptions.id, targetRow.id))
+      .returning();
+    if (before && after) {
+      await insertKiloClawSubscriptionChangeLog(tx, {
+        subscriptionId: after.id,
+        actor: CREDIT_BILLING_ACTOR,
+        action: 'period_advanced',
+        reason: 'stripe_invoice_settlement',
+        before,
+        after,
+      });
     }
 
-    // Upsert the subscription row to hybrid state, keyed on stripe_subscription_id.
-    // Reached when: (a) a row already exists for this stripe_subscription_id (normal
-    // renewal), or (b) no row exists for either stripe_subscription_id or instance_id
-    // (first settlement with no prior instance row — rare but possible if the instance
-    // was destroyed between checkout and webhook delivery).
-    await tx
-      .insert(kiloclaw_subscriptions)
-      .values({
-        user_id: userId,
-        instance_id: instanceId,
-        stripe_subscription_id: stripeSubscriptionId,
-        payment_source: 'credits',
-        plan,
-        status: 'active',
-        current_period_start: periodStart,
-        current_period_end: periodEnd,
-        credit_renewal_at: periodEnd,
-        commit_ends_at: commitEndsAt,
-        past_due_since: null,
-        auto_top_up_triggered_for_period: null,
-        ...(shouldClearSchedule
-          ? { scheduled_plan: null, scheduled_by: null, stripe_schedule_id: null }
-          : {}),
-      })
-      .onConflictDoUpdate({
-        target: kiloclaw_subscriptions.stripe_subscription_id,
-        set: {
-          payment_source: 'credits',
-          status: 'active',
-          plan,
-          current_period_start: periodStart,
-          current_period_end: periodEnd,
-          credit_renewal_at: periodEnd,
-          commit_ends_at: commitEndsAt,
-          past_due_since: null,
-          auto_top_up_triggered_for_period: null,
-          ...(shouldClearSchedule
-            ? { scheduled_plan: null, scheduled_by: null, stripe_schedule_id: null }
-            : {}),
-        },
-      });
+    applied = true;
   });
 
-  // Step 2: Post-transaction side effects.
+  if (!applied) {
+    return false;
+  }
 
   if (wasSuspended) {
     await autoResumeIfSuspended(userId, resolvedInstanceId);
@@ -424,6 +626,8 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     chargeId,
     amountMicrodollars,
   });
+
+  return true;
 }
 
 /**
@@ -438,6 +642,7 @@ export async function enrollWithCredits(params: {
   instanceId: string;
   plan: 'commit' | 'standard';
   hadPaidSubscription: boolean;
+  actor?: KiloClawSubscriptionChangeActor;
 }): Promise<void> {
   const { userId, instanceId, plan, hadPaidSubscription } = params;
 
@@ -476,7 +681,15 @@ export async function enrollWithCredits(params: {
       suspended_at: kiloclaw_subscriptions.suspended_at,
     })
     .from(kiloclaw_subscriptions)
-    .where(eq(kiloclaw_subscriptions.instance_id, instanceId))
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        eq(kiloclaw_subscriptions.instance_id, instanceId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
+        isNull(kiloclaw_instances.organization_id)
+      )
+    )
     .limit(1);
 
   // Reject if subscription is active, past_due, or unpaid (spec rule 1)
@@ -563,12 +776,23 @@ export async function enrollWithCredits(params: {
       })
       .where(eq(kilocode_users.id, userId));
 
+    const [currentSubscription] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, userId),
+          eq(kiloclaw_subscriptions.instance_id, instanceId),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+        )
+      )
+      .limit(1);
+
     // 5c: Upsert subscription row as pure credit
     const nowIso = now.toISOString();
     const periodEndIso = periodEnd.toISOString();
     const commitEndsAt = plan === 'commit' ? periodEndIso : null;
-
-    await tx
+    const [mutatedSubscription] = await tx
       .insert(kiloclaw_subscriptions)
       .values({
         user_id: userId,
@@ -602,7 +826,22 @@ export async function enrollWithCredits(params: {
           past_due_since: null,
           cancel_at_period_end: false,
         },
+      })
+      .returning();
+
+    if (mutatedSubscription) {
+      const action: KiloClawSubscriptionChangeAction = currentSubscription
+        ? 'payment_source_changed'
+        : 'created';
+      await insertKiloClawSubscriptionChangeLog(tx, {
+        subscriptionId: mutatedSubscription.id,
+        actor: params.actor ?? CREDIT_BILLING_ACTOR,
+        action,
+        reason: 'credit_enrollment',
+        before: currentSubscription ?? null,
+        after: mutatedSubscription,
       });
+    }
 
     await enqueueCreditEnrollmentAffiliateEvents({
       userId,
@@ -654,7 +893,7 @@ export async function enrollWithCredits(params: {
   }
 
   // Step 5: Auto-resume if suspended (spec rule 7)
-  if (wasSuspended) {
+  if (wasSuspended && instanceId) {
     await autoResumeIfSuspended(userId, instanceId);
   }
 

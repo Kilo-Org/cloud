@@ -1,4 +1,4 @@
-import type { OpenRouterModel } from '@/lib/providers/openrouter/openrouter-types';
+import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 export type FilterState = {
   search: string;

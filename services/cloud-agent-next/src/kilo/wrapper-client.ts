@@ -337,6 +337,7 @@ export class WrapperClient {
       `WORKSPACE_PATH=${workspacePath}`,
       `WRAPPER_LOG_PATH=${wrapperLogPath}`,
       `KILO_SESSION_RETRY_LIMIT=5`,
+      `KILO_CLOUD_AGENT=1`,
     ];
     const argParts = [`--user-id ${this.shellQuote(userId)}`];
     if (sessionId) {

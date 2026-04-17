@@ -12,12 +12,13 @@ vi.mock('../db', async importOriginal => {
     ...actual,
     getWorkerDb: vi.fn(() => ({})),
     getActivePersonalInstance: vi.fn(),
+    getInstanceByIdIncludingDestroyed: vi.fn(),
   };
 });
 
 import { platform, resolveInstanceDoKey } from './platform';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
-import { getActivePersonalInstance } from '../db';
+import { getActivePersonalInstance, getInstanceByIdIncludingDestroyed } from '../db';
 
 const currentUserId = '199e2b19-aa40-488d-9442-9a18a620ba68';
 const legacyDoKey = 'oauth/google:117453785559478190551';
@@ -104,6 +105,42 @@ describe('legacy platform DO routing', () => {
     ).resolves.toBe('11111111-1111-4111-8111-111111111111');
   });
 
+  it('falls back to explicit instanceId when fresh provision row is not persisted yet', async () => {
+    const freshInstanceId = '22222222-2222-4222-8222-222222222222';
+    vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue(null);
+
+    await expect(
+      resolveInstanceDoKey(
+        {
+          HYPERDRIVE: { connectionString: 'postgresql://fake' },
+        } as never,
+        currentUserId,
+        freshInstanceId
+      )
+    ).resolves.toBe(freshInstanceId);
+  });
+
+  it('resolves destroyed legacy rows to original DO key', async () => {
+    const legacyInstanceId = '33333333-3333-4333-8333-333333333333';
+    vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue({
+      id: legacyInstanceId,
+      sandboxId: legacySandboxId,
+      userId: currentUserId,
+      orgId: null,
+      inboundEmailEnabled: true,
+    });
+
+    await expect(
+      resolveInstanceDoKey(
+        {
+          HYPERDRIVE: { connectionString: 'postgresql://fake' },
+        } as never,
+        currentUserId,
+        legacyInstanceId
+      )
+    ).resolves.toBe(legacyDoKey);
+  });
+
   it('destroys preexisting legacy registry rows keyed by the migrated user id', async () => {
     vi.mocked(getActivePersonalInstance).mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
@@ -153,5 +190,53 @@ describe('legacy platform DO routing', () => {
       `user:${currentUserId}`,
       '11111111-1111-4111-8111-111111111111'
     );
+  });
+});
+
+describe('resolveInstanceDoKey with instanceId', () => {
+  const env = {
+    HYPERDRIVE: { connectionString: 'postgresql://fake' },
+  } as never;
+  const instanceId = '11111111-1111-4111-8111-111111111111';
+  const newSandboxId = 'ki_11111111111141118111111111111111';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('translates the UUID to the legacy userId DO key when the instance row is legacy', async () => {
+    vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue({
+      id: instanceId,
+      sandboxId: legacySandboxId,
+      userId: currentUserId,
+      orgId: null,
+      inboundEmailEnabled: false,
+    });
+
+    await expect(resolveInstanceDoKey(env, currentUserId, instanceId)).resolves.toBe(legacyDoKey);
+  });
+
+  it('returns the raw UUID when the instance row is instance-keyed', async () => {
+    vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue({
+      id: instanceId,
+      sandboxId: newSandboxId,
+      userId: currentUserId,
+      orgId: null,
+      inboundEmailEnabled: false,
+    });
+
+    await expect(resolveInstanceDoKey(env, currentUserId, instanceId)).resolves.toBe(instanceId);
+  });
+
+  it('falls back to the raw UUID when the instance row is missing', async () => {
+    vi.mocked(getInstanceByIdIncludingDestroyed).mockResolvedValue(null);
+
+    await expect(resolveInstanceDoKey(env, currentUserId, instanceId)).resolves.toBe(instanceId);
+  });
+
+  it('falls back to the raw UUID when the Hyperdrive lookup throws', async () => {
+    vi.mocked(getInstanceByIdIncludingDestroyed).mockRejectedValue(new Error('hyperdrive down'));
+
+    await expect(resolveInstanceDoKey(env, currentUserId, instanceId)).resolves.toBe(instanceId);
   });
 });

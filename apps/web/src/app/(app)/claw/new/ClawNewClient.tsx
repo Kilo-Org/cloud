@@ -52,6 +52,7 @@ function ClawNewLoader({
       <ClawOnboardingFlow
         status={status}
         mode={mode}
+        createFlowStarted={createFlowStartedAt !== null}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
       />
@@ -71,7 +72,9 @@ function ClawNewLoader({
     <ClawOnboardingWithBoundary
       statusQuery={statusQueryForBoundary}
       mode={mode}
+      createFlowStarted={createFlowStartedAt !== null}
       onCreateFlowStarted={onCreateFlowStarted}
+      onCreateFlowFailed={onCreateFlowFailed}
     />
   );
 }

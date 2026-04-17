@@ -34,9 +34,10 @@ export function GetStartedPage({
           title={title}
           subtitle={
             signUpText ??
-            `After you sign up, you can directly get started with free models, or top up, and get
-            another $${FIRST_TOPUP_BONUS_AMOUNT(new Date(Date.now() + 10 * 60 * 1000))} of AI model
-            usage credits to try the most advanced models.`
+            (FIRST_TOPUP_BONUS_AMOUNT > 0
+              ? `After you sign up, you can directly get started with free models, or top up, and get
+            another $${FIRST_TOPUP_BONUS_AMOUNT} of AI model usage credits to try the most advanced models.`
+              : 'After you sign up, you can directly get started with free models, or top up to try the most advanced AI models.')
           }
         />
       </div>

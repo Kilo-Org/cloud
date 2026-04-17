@@ -1,4 +1,4 @@
-import { createEmbeddingService } from '@/lib/embeddings/embedding-providers';
+import { createEmbeddingService } from '@/lib/ai-gateway/embeddings/embedding-providers';
 import { MilvusIndexStorage } from '@/lib/code-indexing/milvus-storage';
 // import { QdrantIndexStorage } from '@/lib/code-indexing/qdrant-storage';
 

@@ -101,6 +101,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
     vercel_downstream_safety_identifier: null,
     customer_source: null,
     account_deletion_requested_at: null,
+    normalized_email: null,
     ...overrides,
   };
 }

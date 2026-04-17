@@ -2,6 +2,7 @@ import type { KiloClawInstance } from './durable-objects/kiloclaw-instance';
 import type { KiloClawApp } from './durable-objects/kiloclaw-app';
 import type { KiloClawRegistry } from './durable-objects/kiloclaw-registry';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
+import type { KiloClawBillingBinding } from './kiloclaw-billing-binding';
 
 /**
  * Environment bindings for the KiloClaw Worker
@@ -10,6 +11,7 @@ export type KiloClawEnv = {
   KILOCLAW_INSTANCE: DurableObjectNamespace<KiloClawInstance>;
   KILOCLAW_APP: DurableObjectNamespace<KiloClawApp>;
   KILOCLAW_REGISTRY: DurableObjectNamespace<KiloClawRegistry>;
+  KILOCLAW_BILLING?: KiloClawBillingBinding;
   KILOCLAW_AE?: AnalyticsEngineDataset;
   KILOCLAW_CONTROLLER_AE: AnalyticsEngineDataset;
   HYPERDRIVE?: Hyperdrive;
@@ -22,6 +24,7 @@ export type KiloClawEnv = {
   // Auth secrets
   NEXTAUTH_SECRET?: string;
   INTERNAL_API_SECRET?: string;
+  KILOCLAW_INTERNAL_API_SECRET?: string;
   GATEWAY_TOKEN_SECRET?: string;
   WORKER_ENV?: string; // e.g. 'production' or 'development' -- for JWT env validation
   KILOCLAW_DEFAULT_PROVIDER?: string;

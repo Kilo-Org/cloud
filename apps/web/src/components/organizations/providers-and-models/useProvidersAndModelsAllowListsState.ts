@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useReducer } from 'react';
-import { normalizeModelId } from '@/lib/model-utils';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   buildModelProvidersIndex,
   canonicalizeDenyList,

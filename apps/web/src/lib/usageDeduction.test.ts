@@ -8,8 +8,8 @@ import {
   insertUsageRecord,
   toInsertableDbUsageRecord,
   extractUsageContextInfo,
-} from './processUsage';
-import type { MicrodollarUsageStats } from './processUsage.types';
+} from './ai-gateway/processUsage';
+import type { MicrodollarUsageStats } from './ai-gateway/processUsage.types';
 
 function createMockUsageStats(cost_mUsd: number): MicrodollarUsageStats {
   return {

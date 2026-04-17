@@ -5,7 +5,7 @@ import * as z from 'zod';
 import { db, readDb } from '@/lib/drizzle';
 import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL, modelsByProvider } from '@kilocode/db/schema';
 import { desc, eq } from 'drizzle-orm';
-import { encryptApiKey } from '@/lib/byok/encryption';
+import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import {
@@ -17,22 +17,25 @@ import {
   TestBYOKKeyInputSchema,
   BYOKApiKeyResponseSchema,
   type BYOKApiKeyResponse,
-} from '@/lib/byok/types';
+} from '@/lib/ai-gateway/byok/types';
 import {
   UserByokProviderIdSchema,
   UserByokTestModels,
   VercelUserByokInferenceProviderIdSchema,
-} from '@/lib/providers/openrouter/inference-provider-id';
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { unstable_cache } from 'next/cache';
-import { StoredModelSchema } from '@/lib/providers/vercel/types';
+import { StoredModelSchema } from '@/lib/ai-gateway/providers/vercel/types';
 import { createGateway, generateText } from 'ai';
-import PROVIDERS from '@/lib/providers/provider-definitions';
-import { getVercelInferenceProviderConfigForUserByok } from '@/lib/providers/vercel';
-import { decryptByokRow } from '@/lib/byok';
+import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
+import { decryptByokRow } from '@/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
-import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
-import DIRECT_BYOK_PROVIDERS from '@/lib/providers/direct-byok/direct-byok-definitions';
-import { createAiSdkProvider, formatDirectByokModelId } from '@/lib/providers/direct-byok';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
+import {
+  createAiSdkProvider,
+  formatDirectByokModelId,
+} from '@/lib/ai-gateway/providers/direct-byok';
 
 const fetchSupportedModels = unstable_cache(
   async (): Promise<Record<string, string[]>> => {

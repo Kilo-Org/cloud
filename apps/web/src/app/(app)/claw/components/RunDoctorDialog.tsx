@@ -77,7 +77,7 @@ export function RunDoctorDialog({
         )}
 
         {result && !isPending && (
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <div className="flex items-center gap-2">
               {result.success ? (
                 <CheckCircle2 className="h-4 w-4 text-emerald-400" />
@@ -88,7 +88,7 @@ export function RunDoctorDialog({
                 {result.success ? 'Executed successfully' : 'Issues detected'}
               </span>
             </div>
-            <div className="border-border bg-background max-h-[400px] overflow-auto rounded-md border">
+            <div className="border-border bg-background max-h-[400px] min-w-0 overflow-auto rounded-md border">
               {/* prettier-ignore */}
               <pre
                 className="p-3 text-xs leading-relaxed whitespace-pre"

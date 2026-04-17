@@ -49,29 +49,19 @@ export function useKiloclawInstanceEvents(sandboxId: string) {
 
 type AllEventsParams = {
   sandboxId: string;
-  userId: string;
   flyAppName?: string | null;
   flyMachineId?: string | null;
   offset: number;
 };
 
 export function useKiloclawAllEvents(params: AllEventsParams) {
-  const { sandboxId, userId, flyAppName, flyMachineId, offset } = params;
+  const { sandboxId, flyAppName, flyMachineId, offset } = params;
   return useQuery<AnalyticsEngineResponse<KiloclawAllEventRow>>({
-    queryKey: [
-      'kiloclaw-analytics',
-      'all-events',
-      sandboxId,
-      userId,
-      flyAppName,
-      flyMachineId,
-      offset,
-    ],
+    queryKey: ['kiloclaw-analytics', 'all-events', sandboxId, flyAppName, flyMachineId, offset],
     queryFn: async () => {
       const searchParams = new URLSearchParams({
         query: 'all-events',
         sandboxId,
-        userId,
         offset: String(offset),
       });
       if (flyAppName) searchParams.set('flyAppName', flyAppName);
@@ -82,6 +72,6 @@ export function useKiloclawAllEvents(params: AllEventsParams) {
       }
       return response.json() as Promise<AnalyticsEngineResponse<KiloclawAllEventRow>>;
     },
-    enabled: !!sandboxId && !!userId,
+    enabled: !!sandboxId,
   });
 }

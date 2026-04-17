@@ -26,6 +26,7 @@ export type BillingLogTags = BillingCorrelationContext & {
   userId?: string;
   instanceId?: string;
   stripeSubscriptionId?: string;
+  kiloclawSubscriptionId?: string;
   action?: string;
   statusCode?: number;
   durationMs?: number;

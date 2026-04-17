@@ -132,8 +132,8 @@ export class KiloClawInternalClient {
   async provision(
     userId: string,
     config: ProvisionInput,
-    opts?: { instanceId?: string; orgId?: string }
-  ): Promise<{ sandboxId: string }> {
+    opts?: { instanceId?: string; orgId?: string; bootstrapSubscription?: boolean }
+  ): Promise<{ sandboxId: string; instanceId: string }> {
     return this.request(
       '/api/platform/provision',
       {

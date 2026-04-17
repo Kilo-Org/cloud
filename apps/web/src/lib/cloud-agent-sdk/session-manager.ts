@@ -6,7 +6,7 @@ import { createCloudAgentSession } from './session';
 import type { CloudAgentSession } from './session';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
-import type { CloudAgentApi } from './transport';
+import type { CloudAgentApi, CloudAgentStreamTicketResult } from './transport';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
@@ -88,7 +88,9 @@ type PrepareInput = {
 type SessionManagerConfig = {
   store: JotaiStore;
   resolveSession: (kiloSessionId: KiloSessionId) => Promise<ResolvedSession>;
-  getTicket: (sessionId: CloudAgentSessionId) => string | Promise<string>;
+  getTicket: (
+    sessionId: CloudAgentSessionId
+  ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
   fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   getAuthToken: () => string | Promise<string>;
   cliWebsocketUrl?: string;
@@ -362,6 +364,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     let prevAct = '';
     let prevSk = '';
     let prevCsk = '';
+    let prevCloudStatusHadIndicator = false;
     const sKey = (s: AgentStatus) => (s.type === 'autocommit' ? `${s.type}:${s.step}` : s.type);
     const csKey = (cs: CloudStatus | null) =>
       cs === null
@@ -412,16 +415,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (cs && cs.type !== 'ready') {
         if (csk !== prevCsk) {
           const cloudInd = indicatorForCloudStatus(cs);
-          if (cloudInd) setIndicator(cloudInd);
+          if (cloudInd) {
+            setIndicator(cloudInd);
+            prevCloudStatusHadIndicator = true;
+          }
           prevCsk = csk;
         }
       } else {
+        const shouldClearCloudIndicator = prevCloudStatusHadIndicator;
         if (csk !== prevCsk) prevCsk = csk;
+        prevCloudStatusHadIndicator = false;
         // Fall through to existing agent status indicator logic
         const sk = sKey(st);
-        if (sk !== prevSk) {
+        if (sk !== prevSk || shouldClearCloudIndicator) {
           const ind = indicatorForStatus(st);
-          if (ind !== null) setIndicator(ind);
+          if (ind !== null || shouldClearCloudIndicator) setIndicator(ind);
           prevSk = sk;
         }
       }
@@ -594,7 +602,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     images?: Images;
   }): Promise<boolean> {
     store.set(errorAtom, null);
-    setIndicator(null);
+    if (store.get(agentStatusAtom).type !== 'disconnected') {
+      setIndicator(null);
+    }
 
     const storage = store.get(sessionStorageAtom);
     const kiloSessionId = activeSessionId;
@@ -642,7 +652,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       store.set(failedPromptAtom, payload.prompt);
       config.onSendFailed?.(payload.prompt);
-      setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
+      if (store.get(agentStatusAtom).type !== 'disconnected') {
+        setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
+      }
       return false;
     }
   }

@@ -11,6 +11,7 @@ export type BaseConnectionConfig<T = unknown> = {
   onError?: (message: string) => void;
   isAuthFailure?: (event: CloseEvent) => boolean;
   refreshAuth?: () => Promise<void>;
+  shouldRefreshAuthBeforeConnect?: () => boolean;
   onOpen?: (ws: WebSocket) => void;
   /** How long to wait for a server message (e.g. heartbeat) on tab resume before
    *  treating the connection as stale. Should exceed the server's heartbeat interval. */
@@ -47,6 +48,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   let hasConnectedOnce = false;
   let stalenessTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let lastMessageTime = 0;
+  let preconnectAuthRefreshAttempted = false;
   const stalenessTimeoutMs = config.stalenessTimeoutMs ?? DEFAULT_STALENESS_TIMEOUT_MS;
 
   // Bound handler references for event listener cleanup
@@ -73,6 +75,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       return;
     }
 
+    preconnectAuthRefreshAttempted = true;
+
     try {
       await config.refreshAuth();
       if (destroyed || intentionalDisconnect || expectedGeneration !== generation) {
@@ -85,19 +89,31 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
       config.onUnexpectedDisconnect?.();
       scheduleReconnect(0, expectedGeneration);
+    } finally {
+      if (expectedGeneration === generation) {
+        preconnectAuthRefreshAttempted = false;
+      }
     }
   }
 
   async function refreshAndConnect(expectedGeneration: number): Promise<void> {
-    if (config.refreshAuth) {
-      try {
-        await config.refreshAuth();
-      } catch {
-        // Continue with existing auth — the old ticket might still work
+    preconnectAuthRefreshAttempted = true;
+
+    try {
+      if (config.refreshAuth) {
+        try {
+          await config.refreshAuth();
+        } catch {
+          // Continue with existing auth — the old ticket might still work
+        }
+        if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
       }
-      if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+      connectInternal(0, expectedGeneration);
+    } finally {
+      if (expectedGeneration === generation) {
+        preconnectAuthRefreshAttempted = false;
+      }
     }
-    connectInternal(0, expectedGeneration);
   }
 
   function scheduleReconnect(attempt: number, expectedGeneration: number) {
@@ -126,6 +142,15 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
   function connectInternal(attempt = 0, expectedGeneration = generation) {
     if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+
+    if (
+      config.refreshAuth &&
+      (config.shouldRefreshAuthBeforeConnect?.() ?? false) &&
+      !preconnectAuthRefreshAttempted
+    ) {
+      void refreshAndConnect(expectedGeneration);
+      return;
+    }
 
     reconnectAttempt = attempt;
     clearStalenessTimeout();
@@ -366,6 +391,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     intentionalDisconnect = false;
     destroyed = false;
     authRefreshAttempted = false;
+    preconnectAuthRefreshAttempted = false;
     connected = false;
     reconnectAttempt = 0;
     hasConnectedOnce = false;
@@ -380,6 +406,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   function disconnect() {
     intentionalDisconnect = true;
     generation += 1;
+    preconnectAuthRefreshAttempted = false;
 
     clearReconnectTimer();
     clearStalenessTimeout();
@@ -399,6 +426,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   function destroy() {
     destroyed = true;
     generation += 1;
+    preconnectAuthRefreshAttempted = false;
 
     clearReconnectTimer();
     clearStalenessTimeout();

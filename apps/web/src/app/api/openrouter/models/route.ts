@@ -2,13 +2,13 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
-import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
+import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user.server';
-import { getDirectByokModelsForUser } from '@/lib/providers/direct-byok';
+import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
 import { unstable_cache } from 'next/cache';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
-import { filterByFeature } from '@/lib/models';
+import { filterByFeature } from '@/lib/ai-gateway/models';
 
 const getDirectByokModels = unstable_cache(
   (userId: string) => getDirectByokModelsForUser(userId),

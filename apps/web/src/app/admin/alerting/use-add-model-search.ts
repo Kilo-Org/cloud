@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { ModelOption } from '@/app/admin/alerting/types';
 import { OpenRouterModelsResponseSchema } from '@/lib/organizations/organization-types';
-import { normalizeModelId } from '@/lib/model-utils';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { z } from 'zod';
 
 type AddModelSearchResult = {

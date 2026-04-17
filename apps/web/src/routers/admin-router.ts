@@ -18,7 +18,7 @@ import {
 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
-import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
+import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
 import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
@@ -35,6 +35,7 @@ import { adminGastownRouter } from '@/routers/admin/gastown-router';
 import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router';
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
+import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
@@ -1563,4 +1564,5 @@ export const adminRouter = createTRPCRouter({
   extendClawTrial: extendClawTrialRouter,
   customLlm: adminCustomLlmRouter,
   gatewayConfig: adminGatewayConfigRouter,
+  blacklistDomains: adminBlacklistDomainsRouter,
 });

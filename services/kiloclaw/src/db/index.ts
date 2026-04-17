@@ -117,6 +117,18 @@ export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
  * Used for DO restore when the caller knows the instanceId (= DB row id).
  */
 export async function getInstanceById(db: WorkerDb, instanceId: string) {
+  return getInstanceByIdIncludingDestroyed(db, instanceId, { includeDestroyed: false });
+}
+
+export async function getInstanceByIdIncludingDestroyed(
+  db: WorkerDb,
+  instanceId: string,
+  options: { includeDestroyed?: boolean } = {}
+) {
+  const where = options.includeDestroyed
+    ? eq(kiloclaw_instances.id, instanceId)
+    : and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at));
+
   const row = await db
     .select({
       id: kiloclaw_instances.id,
@@ -126,7 +138,7 @@ export async function getInstanceById(db: WorkerDb, instanceId: string) {
       inbound_email_enabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
-    .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
+    .where(where)
     .limit(1)
     .then(rows => rows[0] ?? null);
 

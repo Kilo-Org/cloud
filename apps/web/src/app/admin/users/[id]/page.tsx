@@ -87,7 +87,7 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
     ),
     creditInfo,
     admin_notes: notesWithAdmin,
-    is_blacklisted_by_domain: isUserBlacklistedByDomain({
+    is_blacklisted_by_domain: await isUserBlacklistedByDomain({
       google_user_email: user.google_user_email,
     }),
     organization_memberships: organizationMemberships,

@@ -11,7 +11,7 @@ import { generateBotUserId, generateBotUserEmail, getBotDisplayName } from './ty
 import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
-} from '@/lib/providerHash';
+} from '@/lib/ai-gateway/providerHash';
 
 /**
  * Get the user ID of a bot for an organization

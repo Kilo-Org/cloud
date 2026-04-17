@@ -1,7 +1,7 @@
 import { getMilvusClient } from '@/lib/code-indexing/milvus';
 import { MilvusIndexStorage, DEFAULT_COLLECTION_NAME } from '@/lib/code-indexing/milvus-storage';
 import type { ChunkWithMetadata } from '@/lib/code-indexing/types';
-import { createEmbeddingService } from '@/lib/embeddings/embedding-providers';
+import { createEmbeddingService } from '@/lib/ai-gateway/embeddings/embedding-providers';
 import { NextResponse, type NextRequest } from 'next/server';
 
 const TEST_ORG_ID = 'test-org';

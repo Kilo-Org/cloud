@@ -16,7 +16,7 @@ import {
   fetchGitLabRepositoriesForUser,
   searchGitLabRepositoriesForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   syncWebhooksForRepositories,

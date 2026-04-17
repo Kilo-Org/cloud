@@ -556,6 +556,24 @@ describe('generateBaseConfig', () => {
     expect(config.agents).toBeUndefined();
   });
 
+  it('sets agent user timezone from KILOCLAW_USER_TIMEZONE', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.agents.defaults.userTimezone).toBe('Europe/Amsterdam');
+  });
+
+  it('preserves existing agent user timezone when KILOCLAW_USER_TIMEZONE is not set', () => {
+    const existing = JSON.stringify({
+      agents: { defaults: { userTimezone: 'Asia/Tokyo' } },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.agents.defaults.userTimezone).toBe('Asia/Tokyo');
+  });
+
   it('configures allowed origins from env', () => {
     const { deps } = fakeDeps();
     const env = {
@@ -595,6 +613,18 @@ describe('generateBaseConfig', () => {
     const pluginPath = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
     const paths = config.plugins.load.paths as string[];
     expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
+  });
+
+  it('adds KiloClaw customizer to an existing plugin allowlist', () => {
+    const existing = JSON.stringify({
+      plugins: {
+        allow: ['openclaw-channel-streamchat', 'telegram', 'kilocode', 'browser'],
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.plugins.allow).toContain('kiloclaw-customizer');
   });
 
   it('configures Telegram channel', () => {

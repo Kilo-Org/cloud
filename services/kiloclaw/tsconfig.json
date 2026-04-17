@@ -16,6 +16,7 @@
   "include": [
     "worker-configuration.d.ts",
     "src/**/*.ts",
+    "scripts/**/*.ts",
     "controller/src/**/*.ts",
     "vitest.config.ts",
     "drizzle/**/*"

@@ -5,7 +5,7 @@ import path from 'path';
 import { closeAllDrizzleConnections, db } from '@/lib/drizzle';
 import { shutdownPosthog } from '@/lib/posthog';
 import { sql } from 'drizzle-orm';
-import type { UsageMetaData } from '@/lib/processUsage.types';
+import type { UsageMetaData } from '@/lib/ai-gateway/processUsage.types';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import stats from './stats.json';
 import { GatewayApiKindSchema } from '@kilocode/db';

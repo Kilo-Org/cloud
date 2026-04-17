@@ -79,15 +79,15 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
 /**
  * Internal API middleware for backend-to-backend routes (platform API).
  *
- * 1. Check x-internal-api-key header against INTERNAL_API_SECRET
+ * 1. Check x-internal-api-key header against KILOCLAW_INTERNAL_API_SECRET
  * 2. Applied INSTEAD of authMiddleware (not stacked on top)
  * 3. userId comes from the request body, not from a JWT
  * 4. Users cannot call these routes even with a valid JWT
  */
 export async function internalApiMiddleware(c: Context<AppEnv>, next: Next) {
-  const secret = c.env.INTERNAL_API_SECRET;
+  const secret = c.env.KILOCLAW_INTERNAL_API_SECRET;
   if (!secret) {
-    console.error('[auth] INTERNAL_API_SECRET not configured');
+    console.error('[auth] KILOCLAW_INTERNAL_API_SECRET not configured');
     return c.json({ error: 'Server configuration error' }, 500);
   }
 

@@ -22,7 +22,8 @@ export type ClawOnboardingRenderStep =
   | 'channels'
   | 'provisioning'
   | 'pairing'
-  | 'complete';
+  | 'complete'
+  | 'error';
 
 export type PairingChannelId = 'telegram' | 'discord';
 
@@ -36,7 +37,19 @@ export const CLAW_ONBOARDING_FAKE_STEPS = [
   'provisioning',
   'pairing',
   'complete',
+  'error',
 ] satisfies ClawOnboardingRenderStep[];
+
+export const CLAW_ONBOARDING_PROVISIONING_STATUSES = [
+  'provisioned',
+  'starting',
+  'restarting',
+  'recovering',
+  'destroying',
+  'restoring',
+] satisfies PopulatedClawStatus['status'][];
+
+export const CLAW_ONBOARDING_ERROR_STATUSES = ['stopped'] satisfies PopulatedClawStatus['status'][];
 
 export function parseClawOnboardingFakeStep(value: string | null): ClawOnboardingRenderStep | null {
   for (const step of CLAW_ONBOARDING_FAKE_STEPS) {
@@ -54,6 +67,7 @@ export type ClawOnboardingFlowStateInput = {
   hasBotIdentity: boolean;
   selectedChannelId: string | null;
   gatewayState?: GatewayProcessStatusResponse['state'] | null;
+  debugLogSource?: string;
 };
 
 export type ClawOnboardingFlowState = {
@@ -78,6 +92,13 @@ export function isPairingChannel(channelId: string | null): channelId is Pairing
   return channelId === 'telegram' || channelId === 'discord';
 }
 
+export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status']): boolean {
+  for (const errorStatus of CLAW_ONBOARDING_ERROR_STATUSES) {
+    if (status === errorStatus) return true;
+  }
+  return false;
+}
+
 export function getClawOnboardingFlowState({
   status,
   mode,
@@ -87,6 +108,7 @@ export function getClawOnboardingFlowState({
   hasBotIdentity,
   selectedChannelId,
   gatewayState,
+  debugLogSource = 'default',
 }: ClawOnboardingFlowStateInput): ClawOnboardingFlowState {
   const instanceStatus = hasPopulatedStatus(status) ? status : null;
   const isRunning = instanceStatus?.status === 'running';
@@ -97,18 +119,18 @@ export function getClawOnboardingFlowState({
     mode === 'create-first' && (createSetupStarted || instanceStatus !== null);
   const hasPairingStep = isPairingChannel(selectedChannelId);
   const totalSteps = hasPairingStep ? 6 : 5;
-
-  return {
-    renderStep: getRenderStep({
-      mode,
-      createSetupStarted,
-      instanceStatus,
-      postProvisioningReady,
-      onboardingStep,
-      selectedPreset,
-      hasBotIdentity,
-      hasPairingStep,
-    }),
+  const renderStepDecision = getRenderStepDecision({
+    mode,
+    createSetupStarted,
+    instanceStatus,
+    postProvisioningReady,
+    onboardingStep,
+    selectedPreset,
+    hasBotIdentity,
+    hasPairingStep,
+  });
+  const flowState = {
+    renderStep: renderStepDecision.renderStep,
     instanceStatus,
     isRunning,
     gatewayReady,
@@ -117,7 +139,30 @@ export function getClawOnboardingFlowState({
     postProvisioningReady,
     hasPairingStep,
     totalSteps,
-  };
+  } satisfies ClawOnboardingFlowState;
+
+  logClawOnboardingFlowStateDecision({
+    status,
+    mode,
+    createSetupStarted,
+    onboardingStep,
+    selectedPreset,
+    hasBotIdentity,
+    selectedChannelId,
+    gatewayState,
+    debugLogSource,
+    instanceStatus,
+    isRunning,
+    gatewayReady,
+    instanceRunning,
+    createSetupActive,
+    postProvisioningReady,
+    hasPairingStep,
+    totalSteps,
+    renderStepDecision,
+  });
+
+  return flowState;
 }
 
 type RenderStepInput = Pick<
@@ -129,7 +174,34 @@ type RenderStepInput = Pick<
   hasPairingStep: boolean;
 };
 
-function getRenderStep({
+type RenderStepDecision = {
+  renderStep: ClawOnboardingRenderStep;
+  reason: string;
+};
+
+type ClawOnboardingFlowDebugLogInput = ClawOnboardingFlowStateInput & {
+  debugLogSource: string;
+  instanceStatus: PopulatedClawStatus | null;
+  isRunning: boolean;
+  gatewayReady: boolean;
+  instanceRunning: boolean;
+  createSetupActive: boolean;
+  postProvisioningReady: boolean;
+  hasPairingStep: boolean;
+  totalSteps: number;
+  renderStepDecision: RenderStepDecision;
+};
+
+type ClawOnboardingFlowDebugSnapshot = {
+  input: string;
+  derived: string;
+  decision: string;
+  loggedAtMs: number;
+};
+
+const clawOnboardingFlowDebugSnapshots = new Map<string, ClawOnboardingFlowDebugSnapshot>();
+
+function getRenderStepDecision({
   mode,
   createSetupStarted,
   instanceStatus,
@@ -138,43 +210,177 @@ function getRenderStep({
   selectedPreset,
   hasBotIdentity,
   hasPairingStep,
-}: RenderStepInput): ClawOnboardingRenderStep {
+}: RenderStepInput): RenderStepDecision {
+  if (instanceStatus && isClawOnboardingErrorStatus(instanceStatus.status)) {
+    return {
+      renderStep: 'error',
+      reason: `instance status is ${instanceStatus.status}, so setup cannot continue automatically`,
+    };
+  }
+
   if (mode === 'post-provisioning') {
-    if (postProvisioningReady) return 'complete';
+    if (postProvisioningReady) {
+      return {
+        renderStep: 'complete',
+        reason: 'post-provisioning mode is ready because the instance status is running',
+      };
+    }
     // DB row + subscription exist but no DO provisioned yet (e.g. credit
     // enrollment created the billing records without triggering provision).
     // Show the onboarding entry point so the user can kick off provisioning.
-    if (!instanceStatus) return 'create-instance';
-    return 'provisioning';
+    if (!instanceStatus) {
+      return {
+        renderStep: 'create-instance',
+        reason: 'post-provisioning mode has no populated instance status yet',
+      };
+    }
+    return {
+      renderStep: 'provisioning',
+      reason: 'post-provisioning mode has an instance but it is not running yet',
+    };
   }
 
   if (instanceStatus === null && !createSetupStarted) {
-    return 'create-instance';
+    return {
+      renderStep: 'create-instance',
+      reason: 'create-first mode has no instance status and setup has not started',
+    };
   }
 
   if (onboardingStep === 'done') {
-    return 'complete';
+    return {
+      renderStep: 'complete',
+      reason: 'stored onboarding step is done',
+    };
   }
 
   if (onboardingStep === 'identity' || !hasBotIdentity) {
-    return 'identity';
+    return {
+      renderStep: 'identity',
+      reason: !hasBotIdentity
+        ? 'bot identity is missing, so identity is the earliest safe step'
+        : 'stored onboarding step is identity',
+    };
   }
 
   if (onboardingStep === 'permissions' || selectedPreset === null) {
-    return 'permissions';
+    return {
+      renderStep: 'permissions',
+      reason:
+        selectedPreset === null
+          ? 'exec preset is missing, so permissions is the earliest safe step'
+          : 'stored onboarding step is permissions',
+    };
   }
 
   if (onboardingStep === 'channels') {
-    return 'channels';
+    return {
+      renderStep: 'channels',
+      reason: 'stored onboarding step is channels',
+    };
   }
 
   if (onboardingStep === 'provisioning') {
-    return 'provisioning';
+    return {
+      renderStep: 'provisioning',
+      reason: 'stored onboarding step is provisioning',
+    };
   }
 
   if (onboardingStep === 'pairing' && hasPairingStep) {
-    return 'pairing';
+    return {
+      renderStep: 'pairing',
+      reason: 'stored onboarding step is pairing and the selected channel requires pairing',
+    };
   }
 
-  return 'complete';
+  return {
+    renderStep: 'complete',
+    reason: 'no earlier step matched, so the flow falls through to complete',
+  };
+}
+
+function logClawOnboardingFlowStateDecision({
+  status,
+  mode,
+  createSetupStarted,
+  onboardingStep,
+  selectedPreset,
+  hasBotIdentity,
+  selectedChannelId,
+  gatewayState,
+  debugLogSource,
+  instanceStatus,
+  isRunning,
+  gatewayReady,
+  instanceRunning,
+  createSetupActive,
+  postProvisioningReady,
+  hasPairingStep,
+  totalSteps,
+  renderStepDecision,
+}: ClawOnboardingFlowDebugLogInput): void {
+  if (typeof window === 'undefined') return;
+
+  const input = JSON.stringify(
+    {
+      mode,
+      createSetupStarted,
+      onboardingStep,
+      selectedPreset,
+      hasBotIdentity,
+      selectedChannelId,
+      gatewayState: gatewayState ?? null,
+      status: status?.status ?? null,
+      hasStatusResponse: status !== undefined,
+    },
+    null,
+    2
+  );
+  const derived = JSON.stringify(
+    {
+      instanceStatus: instanceStatus?.status ?? null,
+      isRunning,
+      gatewayReady,
+      instanceRunning,
+      createSetupActive,
+      postProvisioningReady,
+      hasPairingStep,
+      totalSteps,
+    },
+    null,
+    2
+  );
+  const decision = JSON.stringify(renderStepDecision, null, 2);
+  const previousSnapshot = clawOnboardingFlowDebugSnapshots.get(debugLogSource);
+  const inputChanged = previousSnapshot?.input !== input;
+  const derivedChanged = previousSnapshot?.derived !== derived;
+  const decisionChanged = previousSnapshot?.decision !== decision;
+
+  if (!inputChanged && !derivedChanged && !decisionChanged) return;
+
+  const loggedAtMs = window.performance.now();
+  const elapsedMs =
+    previousSnapshot === undefined ? null : loggedAtMs - previousSnapshot.loggedAtMs;
+  const changedSections =
+    previousSnapshot === undefined
+      ? 'initial'
+      : [
+          inputChanged ? 'input' : '',
+          derivedChanged ? 'derived' : '',
+          decisionChanged ? 'decision' : '',
+        ]
+          .filter(section => section !== '')
+          .join(', ');
+
+  clawOnboardingFlowDebugSnapshots.set(debugLogSource, {
+    input,
+    derived,
+    decision,
+    loggedAtMs,
+  });
+
+  console.debug(
+    `[ClawOnboardingFlow:${debugLogSource}] state decision at ${new Date().toISOString()} (${elapsedMs === null ? 'first log' : `+${elapsedMs.toFixed(1)}ms`}; changed: ${changedSections})\ninput:\n${input}\nderived:\n${derived}\ndecision:\n${decision}`
+  );
 }

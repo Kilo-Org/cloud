@@ -1,3 +1,8 @@
+import {
+  isInstanceKeyedSandboxId,
+  instanceIdFromSandboxId,
+} from '@kilocode/worker-utils/instance-id';
+
 /**
  * Cloudflare Analytics Engine instrumentation for KiloClaw.
  *
@@ -19,6 +24,8 @@
  *   blob11 = imageTag (trackedImageTag)
  *   blob12 = flyRegion
  *   blob13 = label (free-form, e.g. reconcile sub-action)
+ *   blob14 = orgId (organization ID, empty for personal instances)
+ *   blob15 = instanceId (kiloclaw_instances.id UUID)
  *
  *   double1 = durationMs (operation wall-clock time)
  *   double2 = value (generic numeric, e.g. machine uptime)
@@ -86,9 +93,10 @@ export type KiloClawEventData = {
   imageTag?: string;
   flyRegion?: string;
   label?: string;
+  orgId?: string;
+  instanceId?: string;
   durationMs?: number;
   value?: number;
-  instanceId?: string;
   channelId?: string;
 };
 
@@ -118,6 +126,8 @@ export function writeEvent(
         data.imageTag ?? '', // blob11
         data.flyRegion ?? '', // blob12
         data.label ?? '', // blob13
+        data.orgId ?? '', // blob14
+        data.instanceId ?? '', // blob15
       ],
       doubles: [data.durationMs ?? 0, data.value ?? 0],
       indexes: [data.event],
@@ -141,21 +151,35 @@ export type EventContextSource = {
   openclawVersion: string | null;
   trackedImageTag: string | null;
   flyRegion: string | null;
+  orgId: string | null;
 };
+
+/** Best-effort instanceId derivation — never throws (analytics is fire-and-forget). */
+export function safeInstanceIdFromSandboxId(sandboxId: string | undefined): string | undefined {
+  if (!sandboxId || !isInstanceKeyedSandboxId(sandboxId)) return undefined;
+  try {
+    return instanceIdFromSandboxId(sandboxId);
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Extract common event dimensions from DO state. Used by reconcile.ts
  * and other extracted modules that receive state as a parameter.
  */
 export function eventContextFromState(state: EventContextSource): Partial<KiloClawEventData> {
+  const sandboxId = state.sandboxId ?? undefined;
   return {
     userId: state.userId ?? undefined,
-    sandboxId: state.sandboxId ?? undefined,
+    sandboxId,
     flyAppName: state.flyAppName ?? undefined,
     flyMachineId: state.flyMachineId ?? undefined,
     status: state.status ?? undefined,
     openclawVersion: state.openclawVersion ?? undefined,
     imageTag: state.trackedImageTag ?? undefined,
     flyRegion: state.flyRegion ?? undefined,
+    orgId: state.orgId ?? undefined,
+    instanceId: safeInstanceIdFromSandboxId(sandboxId),
   };
 }

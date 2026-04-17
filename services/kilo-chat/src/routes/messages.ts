@@ -106,7 +106,7 @@ export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: Auth
       return c.json({ error: result.error }, 500);
     }
     if (result.stale) {
-      return c.json({ messageId: result.messageId, stale: true }, 200);
+      return c.json({ error: 'Edit conflict', messageId: result.messageId }, 409);
     }
     return c.json({ messageId: result.messageId });
   });

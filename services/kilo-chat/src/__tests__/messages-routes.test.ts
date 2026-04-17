@@ -312,7 +312,7 @@ describe('PATCH /v1/messages/:id', () => {
       env
     );
 
-    // Second edit with older timestamp — should be accepted but stale
+    // Second edit with older timestamp — should be rejected as conflict
     const editRes = await userApp.request(
       `/v1/messages/${messageId}`,
       {
@@ -327,9 +327,7 @@ describe('PATCH /v1/messages/:id', () => {
       env
     );
 
-    expect(editRes.status).toBe(200);
-    const body = await editRes.json<{ stale: boolean }>();
-    expect(body.stale).toBe(true);
+    expect(editRes.status).toBe(409);
   });
 
   it('returns 403 when non-sender tries to edit', async () => {

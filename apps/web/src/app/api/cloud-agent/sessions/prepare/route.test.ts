@@ -102,6 +102,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
     customer_source: null,
     account_deletion_requested_at: null,
     normalized_email: null,
+    email_domain: null,
     ...overrides,
   };
 }

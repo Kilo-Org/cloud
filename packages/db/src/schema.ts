@@ -236,6 +236,7 @@ export const kilocode_users = pgTable(
     account_deletion_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
 
     normalized_email: text(),
+    email_domain: text(),
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
@@ -248,6 +249,7 @@ export const kilocode_users = pgTable(
       .on(table.vercel_downstream_safety_identifier)
       .where(sql`${table.vercel_downstream_safety_identifier} IS NOT NULL`),
     index('IDX_kilocode_users_normalized_email').on(table.normalized_email),
+    index('IDX_kilocode_users_email_domain').on(table.email_domain),
   ]
 );
 

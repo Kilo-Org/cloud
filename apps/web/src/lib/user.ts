@@ -77,7 +77,7 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
-import { normalizeEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
 
 const workos = new WorkOS(WORKOS_API_KEY);
@@ -330,6 +330,7 @@ export async function createOrUpdateUser(
     openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
     vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
     normalized_email: normalizeEmail(args.google_user_email),
+    email_domain: getLowerDomainFromEmail(args.google_user_email),
   } satisfies typeof kilocode_users.$inferInsert;
 
   const savedUser = await db.transaction(async tx => {
@@ -567,6 +568,7 @@ export async function softDeleteUser(userId: string) {
       .set({
         google_user_email: `deleted+${userId}@deleted.invalid`,
         normalized_email: null,
+        email_domain: null,
         google_user_name: 'Deleted User',
         google_user_image_url: '',
         hosted_domain: null,

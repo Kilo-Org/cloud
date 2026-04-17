@@ -63,7 +63,7 @@ export function MessageInput({
         <button
           onClick={handleSubmit}
           disabled={disabled || !text.trim()}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg p-2 disabled:opacity-50"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg p-2 disabled:opacity-50 cursor-pointer transition-colors"
           title="Send"
         >
           <Send className="h-4 w-4" />

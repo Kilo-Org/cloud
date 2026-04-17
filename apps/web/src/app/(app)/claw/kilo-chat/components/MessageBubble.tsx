@@ -112,12 +112,15 @@ export function MessageBubble({
                 rows={2}
               />
               <div className="mt-1 flex gap-2 text-xs">
-                <button onClick={handleSaveEdit} className="text-primary hover:underline">
+                <button
+                  onClick={handleSaveEdit}
+                  className="text-primary hover:underline cursor-pointer"
+                >
                   Save
                 </button>
                 <button
                   onClick={handleCancelEdit}
-                  className="text-muted-foreground hover:underline"
+                  className="text-muted-foreground hover:underline cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -142,11 +145,14 @@ export function MessageBubble({
             <span>Delete?</span>
             <button
               onClick={() => onConfirmDelete(message.id)}
-              className="text-destructive font-medium hover:underline"
+              className="text-destructive font-medium hover:underline cursor-pointer"
             >
               Yes
             </button>
-            <button onClick={onCancelDelete} className="text-muted-foreground hover:underline">
+            <button
+              onClick={onCancelDelete}
+              className="text-muted-foreground hover:underline cursor-pointer"
+            >
               No
             </button>
           </div>
@@ -155,19 +161,23 @@ export function MessageBubble({
 
       {showActions && isOwn && !isEditing && pendingDeleteId !== message.id && (
         <div className="bg-background border-border absolute top-1 right-4 flex items-center gap-0.5 rounded border p-0.5 shadow-sm">
-          <button onClick={handleStartEdit} className="hover:bg-muted rounded p-1" title="Edit">
+          <button
+            onClick={handleStartEdit}
+            className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+            title="Edit"
+          >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => onDelete(message.id)}
-            className="hover:bg-muted rounded p-1"
+            className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
             title="Delete"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => onReply(message)}
-            className="hover:bg-muted rounded p-1"
+            className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
             title="Reply"
           >
             <Reply className="h-3.5 w-3.5" />

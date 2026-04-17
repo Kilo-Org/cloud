@@ -121,11 +121,14 @@ export function ConversationItem({
           <span className="flex gap-1.5 text-xs">
             <button
               onClick={handleConfirmLeave}
-              className="text-destructive hover:underline font-medium"
+              className="text-destructive hover:underline font-medium cursor-pointer"
             >
               Yes
             </button>
-            <button onClick={handleCancelLeave} className="text-muted-foreground hover:underline">
+            <button
+              onClick={handleCancelLeave}
+              className="text-muted-foreground hover:underline cursor-pointer"
+            >
               No
             </button>
           </span>
@@ -155,7 +158,7 @@ export function ConversationItem({
                 e.stopPropagation();
                 setMenuOpen(prev => !prev);
               }}
-              className="hover:bg-muted hidden rounded p-0.5 group-hover:block"
+              className="hover:bg-muted hidden rounded p-0.5 group-hover:block cursor-pointer transition-colors"
             >
               <MoreVertical className="h-3.5 w-3.5" />
             </button>
@@ -167,7 +170,7 @@ export function ConversationItem({
                     e.stopPropagation();
                     handleStartRename();
                   }}
-                  className="hover:bg-muted w-full px-3 py-1.5 text-left text-sm"
+                  className="hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
                 >
                   Rename
                 </button>
@@ -177,7 +180,7 @@ export function ConversationItem({
                     e.stopPropagation();
                     handleStartLeave();
                   }}
-                  className="text-destructive hover:bg-muted w-full px-3 py-1.5 text-left text-sm"
+                  className="text-destructive hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
                 >
                   Leave
                 </button>

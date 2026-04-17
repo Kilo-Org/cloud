@@ -21,7 +21,11 @@ export function ReplyPreview({ message, onCancel }: ReplyPreviewProps) {
         </p>
         <p className="text-muted-foreground truncate text-xs">{text}</p>
       </div>
-      <button onClick={onCancel} className="hover:bg-muted rounded p-1" title="Cancel reply">
+      <button
+        onClick={onCancel}
+        className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+        title="Cancel reply"
+      >
         <X className="h-3.5 w-3.5" />
       </button>
     </div>

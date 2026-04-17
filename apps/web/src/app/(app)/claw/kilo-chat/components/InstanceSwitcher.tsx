@@ -36,7 +36,7 @@ export function InstanceSwitcher({ instances, selectedId, onSelect }: InstanceSw
     <div ref={ref} className="relative px-3 py-2">
       <button
         onClick={() => setOpen(!open)}
-        className="border-border bg-background flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm"
+        className="border-border bg-background flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm cursor-pointer hover:bg-muted transition-colors"
       >
         <div>
           <div className="text-muted-foreground text-[10px] uppercase">Instance</div>
@@ -54,7 +54,7 @@ export function InstanceSwitcher({ instances, selectedId, onSelect }: InstanceSw
                 onSelect(inst.sandboxId);
                 setOpen(false);
               }}
-              className={`w-full px-3 py-1.5 text-left text-sm hover:bg-muted ${
+              className={`w-full px-3 py-1.5 text-left text-sm hover:bg-muted cursor-pointer transition-colors ${
                 inst.sandboxId === selectedId ? 'bg-accent' : ''
               }`}
             >

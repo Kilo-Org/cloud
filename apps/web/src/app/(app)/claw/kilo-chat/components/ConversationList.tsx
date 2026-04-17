@@ -74,7 +74,7 @@ export function ConversationList({
         <span className="text-muted-foreground text-xs font-medium uppercase">Conversations</span>
         <button
           onClick={onNewConversation}
-          className="hover:bg-muted rounded p-1"
+          className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
           title="New conversation"
         >
           <Plus className="h-4 w-4" />

@@ -260,6 +260,11 @@ describe('POST /api/security-advisor/analyze', () => {
     expect(data.report.summary.critical).toBe(1);
     expect(data.report.findings).toHaveLength(2);
     expect(data.report.recommendations.length).toBeGreaterThan(0);
+    // Grade fields are populated in both structured + markdown form.
+    expect(['A', 'B', 'C', 'D', 'F']).toContain(data.report.grade);
+    expect(data.report.score).toBeGreaterThanOrEqual(0);
+    expect(data.report.score).toBeLessThanOrEqual(100);
+    expect(data.report.markdown).toContain('## Security Grade:');
   });
 
   it('includes sales comparison for openclaw source', async () => {

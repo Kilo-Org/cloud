@@ -85,6 +85,12 @@ export async function isKnownFingerprintOfOtherUser(
   return false;
 }
 
+export function emailLocalPartHasTooManyDigits(email: string): boolean {
+  const localPart = email.split('@')[0] ?? '';
+  const digitCount = (localPart.match(/\d/g) ?? []).length;
+  return digitCount > 3;
+}
+
 export async function saveFingerprints(
   user: User,
   fingerprintData: FraudFingerprintLookupResponse,
@@ -115,6 +121,7 @@ export async function saveFingerprints(
     ? false
     : inDevModeAndStytchPassEmail ||
       (verdict.action === 'ALLOW' &&
+        !emailLocalPartHasTooManyDigits(user.google_user_email) &&
         !(await isKnownFingerprintOfOtherUser(user.id, fingerprints.visitor_fingerprint)) &&
         !(await domainIsRestrictedFromStytchFreeCredits(user)));
 

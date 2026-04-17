@@ -10,6 +10,7 @@ import {
   isKnownFingerprintOfOtherUser,
   getStoredFingerprint,
   handleSignupPromotion,
+  emailLocalPartHasTooManyDigits,
 } from '@/lib/stytch';
 
 beforeEach(async () => {
@@ -117,7 +118,7 @@ describe('Stytch Fingerprint Functions', () => {
 
   describe('saveFingerprints', () => {
     test('should save fingerprint data correctly', async () => {
-      const user = await insertTestUser();
+      const user = await insertTestUser({ google_user_email: 'fp-save-test@example.com' });
       const fingerprintData = createMockFingerprintData();
       const headers = createMockHeaders();
 
@@ -184,7 +185,7 @@ describe('Stytch Fingerprint Functions', () => {
     });
 
     test('should automatically grant welcome credits and set default model when validation passes', async () => {
-      const user = await insertTestUser();
+      const user = await insertTestUser({ google_user_email: 'fp-credits-test@example.com' });
       const fingerprintData = createMockFingerprintData();
       const headers = createMockHeaders();
 
@@ -201,13 +202,42 @@ describe('Stytch Fingerprint Functions', () => {
       expect(creditTransaction?.credit_category).toBe('automatic-welcome-credits');
       expect(creditTransaction?.amount_microdollars).toBe(2500000); // $2.50 in microdollars
     });
+
+    test('should set kilo_free_tier_allowed to false when email local part has too many digits', async () => {
+      const user = await insertTestUser({ google_user_email: 'user12345@example.com' });
+      const fingerprintData = createMockFingerprintData();
+      const headers = createMockHeaders();
+
+      const result = await saveFingerprints(user, fingerprintData, headers);
+
+      expect(result.kilo_free_tier_allowed).toBe(false);
+    });
+  });
+
+  describe('emailLocalPartHasTooManyDigits', () => {
+    test('should return false for emails with 3 or fewer digits', () => {
+      expect(emailLocalPartHasTooManyDigits('alice@example.com')).toBe(false);
+      expect(emailLocalPartHasTooManyDigits('user1@example.com')).toBe(false);
+      expect(emailLocalPartHasTooManyDigits('test12@example.com')).toBe(false);
+      expect(emailLocalPartHasTooManyDigits('a1b2c3@example.com')).toBe(false);
+    });
+
+    test('should return true for emails with more than 3 digits', () => {
+      expect(emailLocalPartHasTooManyDigits('user1234@example.com')).toBe(true);
+      expect(emailLocalPartHasTooManyDigits('test123456789@example.com')).toBe(true);
+      expect(emailLocalPartHasTooManyDigits('a1b2c3d4@example.com')).toBe(true);
+    });
+
+    test('should only count digits in the local part, not the domain', () => {
+      expect(emailLocalPartHasTooManyDigits('alice@example123456.com')).toBe(false);
+    });
   });
 
   describe('Integration: saveFingerprints -> getStoredFingerprint -> isKnownFingerprintOfOtherUser', () => {
     test('should demonstrate complete workflow with multiple users', async () => {
-      const user1 = await insertTestUser();
-      const user2 = await insertTestUser();
-      const user3 = await insertTestUser();
+      const user1 = await insertTestUser({ google_user_email: 'fp-workflow-alice@example.com' });
+      const user2 = await insertTestUser({ google_user_email: 'fp-workflow-bob@example.com' });
+      const user3 = await insertTestUser({ google_user_email: 'fp-workflow-carol@example.com' });
       const headers = createMockHeaders();
 
       const fingerprintData1 = {

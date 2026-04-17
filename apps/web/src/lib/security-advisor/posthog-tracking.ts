@@ -25,6 +25,10 @@ type SecurityAdvisorScanCompletedEvent = BaseSecurityAdvisorEvent & {
   findingsCritical: number;
   findingsWarn: number;
   findingsInfo: number;
+  /** Overall letter grade (A–F) derived from the finding counts. */
+  grade: 'A' | 'B' | 'C' | 'D' | 'F';
+  /** Numeric score (0–100) that produced the letter grade. */
+  score: number;
   publicIp?: string;
 };
 

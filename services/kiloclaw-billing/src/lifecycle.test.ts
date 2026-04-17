@@ -4,9 +4,13 @@ const { mockGetWorkerDb } = vi.hoisted(() => ({
   mockGetWorkerDb: vi.fn(),
 }));
 
-vi.mock('@kilocode/db', () => ({
-  getWorkerDb: mockGetWorkerDb,
-}));
+vi.mock('@kilocode/db', async importOriginal => {
+  const actual: Record<string, unknown> = await importOriginal();
+  return {
+    ...actual,
+    getWorkerDb: mockGetWorkerDb,
+  };
+});
 
 import { runSweep } from './lifecycle.js';
 import type { BillingWorkerEnv } from './types.js';
@@ -33,7 +37,12 @@ function createSelectResult<T>(rows: T[]): SelectResult<T> {
 
 function createMockDb(
   selectResults: unknown[][],
-  options?: { insertRowCounts?: number[]; txInsertRowCounts?: number[] }
+  options?: {
+    insertRowCounts?: number[];
+    txInsertRowCounts?: number[];
+    updateReturningRows?: unknown[][];
+    txUpdateReturningRows?: unknown[][];
+  }
 ) {
   const updates: Array<Record<string, unknown>> = [];
   const txUpdates: Array<Record<string, unknown>> = [];
@@ -44,7 +53,16 @@ function createMockDb(
   const selectBuilders: SelectBuilder[] = [];
   const insertRowCounts = [...(options?.insertRowCounts ?? [])];
   const txInsertRowCounts = [...(options?.txInsertRowCounts ?? [])];
+  const updateReturningRows = [...(options?.updateReturningRows ?? [])];
+  const txUpdateReturningRows = [...(options?.txUpdateReturningRows ?? [])];
   const nextSelectResult = () => createSelectResult(selectResults.shift() ?? []);
+  const createWhereResult = (returningRows: unknown[]) => {
+    const promise = Promise.resolve(undefined);
+    return {
+      returning: vi.fn(async () => returningRows),
+      then: promise.then.bind(promise),
+    };
+  };
   const createSelectBuilder = (): SelectBuilder => {
     const builder: SelectBuilder = {
       from: vi.fn(() => builder),
@@ -60,8 +78,9 @@ function createMockDb(
   const update = vi.fn(() => ({
     set: vi.fn((values: Record<string, unknown>) => {
       updates.push(values);
+      const whereResult = createWhereResult(updateReturningRows.shift() ?? [{}]);
       return {
-        where: vi.fn(async () => undefined),
+        where: vi.fn(() => whereResult),
       };
     }),
   }));
@@ -107,8 +126,9 @@ function createMockDb(
         update: vi.fn(() => ({
           set: vi.fn((values: Record<string, unknown>) => {
             txUpdates.push(values);
+            const whereResult = createWhereResult(txUpdateReturningRows.shift() ?? [{}]);
             return {
-              where: vi.fn(async () => undefined),
+              where: vi.fn(() => whereResult),
             };
           }),
         })),
@@ -308,6 +328,38 @@ describe('interrupted auto-resume sweep', () => {
       },
     ]);
   });
+
+  it('skips detached rows instead of fan-out updates', async () => {
+    const { db, updates, txUpdates, txDeletes } = createMockDb([
+      [
+        {
+          id: 'sub-1',
+          user_id: 'user-1',
+          instance_id: null,
+          organization_id: null,
+          auto_resume_attempt_count: 0,
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'edededed-eded-4ded-8ded-edededededed',
+        sweep: 'interrupted_auto_resume',
+      },
+      1
+    );
+
+    expect(summary.interrupted_auto_resume_requests).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+    expect(txDeletes).toHaveLength(0);
+  });
 });
 
 describe('destruction warning sweep', () => {
@@ -357,7 +409,13 @@ describe('destruction warning sweep', () => {
     expect(summary.emails_sent).toBe(1);
     expect(selectBuilders[0]?.innerJoin).toHaveBeenCalledTimes(2);
     expect(selectBuilders[0]?.leftJoin).not.toHaveBeenCalled();
-    expect(inserts).toEqual([{ user_id: 'user-1', email_type: 'claw_destruction_warning' }]);
+    expect(inserts).toEqual([
+      {
+        user_id: 'user-1',
+        instance_id: instanceId,
+        email_type: 'claw_destruction_warning',
+      },
+    ]);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
 
     const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
@@ -476,7 +534,13 @@ describe('destruction warning sweep', () => {
     expect(summary.destruction_warnings).toBe(0);
     expect(summary.emails_sent).toBe(0);
     expect(summary.emails_skipped).toBe(1);
-    expect(inserts).toEqual([{ user_id: 'user-1', email_type: 'claw_destruction_warning' }]);
+    expect(inserts).toEqual([
+      {
+        user_id: 'user-1',
+        instance_id: '33333333-3333-4333-8333-333333333333',
+        email_type: 'claw_destruction_warning',
+      },
+    ]);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });
@@ -534,12 +598,20 @@ describe('instance destruction sweep', () => {
     expect(summary.sweep3_instance_destruction).toBe(1);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    expect(inserts).toEqual([
-      {
-        user_id: 'user-1',
-        email_type: 'claw_instance_destroyed',
-      },
-    ]);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          email_type: 'claw_instance_destroyed',
+        },
+        expect.objectContaining({
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'instance_destroyed',
+        }),
+      ])
+    );
     expect(updates).toHaveLength(2);
     expect(updates[0].destroyed_at).toEqual(expect.any(String));
     expect(updates[1]).toEqual({ destruction_deadline: null });
@@ -604,10 +676,25 @@ describe('instance destruction sweep', () => {
         }),
       ])
     );
-    expect(inserts).toEqual([
-      { user_id: 'user-1', email_type: 'claw_instance_destroyed' },
-      { user_id: 'user-2', email_type: 'claw_instance_destroyed' },
-    ]);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        {
+          user_id: 'user-1',
+          instance_id: firstInstanceId,
+          email_type: 'claw_instance_destroyed',
+        },
+        {
+          user_id: 'user-2',
+          instance_id: secondInstanceId,
+          email_type: 'claw_instance_destroyed',
+        },
+        expect.objectContaining({
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'instance_destroyed',
+        }),
+      ])
+    );
     expect(updates).toHaveLength(4);
     expect(updates[0].destroyed_at).toEqual(expect.any(String));
     expect(updates[1]).toEqual({ destruction_deadline: null });
@@ -651,12 +738,20 @@ describe('instance destruction sweep', () => {
     expect(summary.sweep3_instance_destruction).toBe(1);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    expect(inserts).toEqual([
-      {
-        user_id: 'user-1',
-        email_type: 'claw_instance_destroyed',
-      },
-    ]);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          email_type: 'claw_instance_destroyed',
+        },
+        expect.objectContaining({
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'instance_destroyed',
+        }),
+      ])
+    );
     expect(updates).toHaveLength(2);
     expect(updates[0].destroyed_at).toEqual(expect.any(String));
     expect(updates[1]).toEqual({ destruction_deadline: null });
@@ -673,6 +768,39 @@ describe('instance destruction sweep', () => {
         }),
       ])
     );
+  });
+
+  it('skips rows whose linked instance row is missing', async () => {
+    const { db, updates, inserts, deletes } = createMockDb([
+      [
+        {
+          id: 'sub-1',
+          user_id: 'user-1',
+          instance_id: '11111111-1111-4111-8111-111111111111',
+          sandbox_id: null,
+          email: 'user-1@example.com',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '17171717-1717-4717-8717-171717171717',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
   });
 });
 
@@ -692,6 +820,10 @@ describe('credit renewal sweep affiliate tracking', () => {
           user_id: 'user-1',
           email: 'user-1@example.com',
           instance_id: 'instance-1',
+          id: 'sub-1',
+          instance_row_id: 'instance-1',
+          organization_id: null,
+          instance_destroyed_at: null,
           plan: 'standard',
           status: 'active',
           credit_renewal_at: renewalAt,
@@ -753,13 +885,19 @@ describe('credit renewal sweep affiliate tracking', () => {
 
     expect(summary.credit_renewals).toBe(1);
     expect(summary.errors).toBe(0);
-    expect(txInserts).toHaveLength(1);
-    expect(txInserts[0]).toEqual(
-      expect.objectContaining({
-        kilo_user_id: 'user-1',
-        amount_microdollars: -9_000_000,
-        description: 'KiloClaw standard renewal',
-      })
+    expect(txInserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kilo_user_id: 'user-1',
+          amount_microdollars: -9_000_000,
+          description: 'KiloClaw standard renewal',
+        }),
+        expect.objectContaining({
+          actor_id: 'billing-lifecycle-job',
+          action: 'period_advanced',
+          reason: 'credit_renewal',
+        }),
+      ])
     );
     expect(txUpdates).toEqual(
       expect.arrayContaining([
@@ -809,6 +947,10 @@ describe('credit renewal sweep affiliate tracking', () => {
             user_id: 'user-1',
             email: 'user-1@example.com',
             instance_id: 'instance-1',
+            id: 'sub-1',
+            instance_row_id: 'instance-1',
+            organization_id: null,
+            instance_destroyed_at: null,
             plan: 'standard',
             status: 'active',
             credit_renewal_at: renewalAt,
@@ -905,6 +1047,108 @@ describe('credit renewal sweep affiliate tracking', () => {
         },
       },
     ]);
+  });
+
+  it('skips organization-managed rows in personal credit renewal sweep', async () => {
+    const { db, txInserts, txUpdates } = createMockDb([
+      [
+        {
+          id: 'sub-1',
+          user_id: 'user-1',
+          email: 'user-1@example.com',
+          instance_id: 'instance-1',
+          instance_row_id: 'instance-1',
+          organization_id: 'org-1',
+          instance_destroyed_at: null,
+          plan: 'standard',
+          status: 'active',
+          credit_renewal_at: '2026-04-09T10:00:00.000Z',
+          current_period_end: '2026-04-09T10:00:00.000Z',
+          cancel_at_period_end: false,
+          scheduled_plan: null,
+          commit_ends_at: null,
+          past_due_since: null,
+          suspended_at: null,
+          auto_resume_attempt_count: 0,
+          auto_top_up_triggered_for_period: null,
+          total_microdollars_acquired: 50_000_000,
+          microdollars_used: 0,
+          auto_top_up_enabled: false,
+          kilo_pass_threshold: null,
+          next_credit_expiration_at: null,
+          user_updated_at: '2026-04-09T09:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '18181818-1818-4818-8818-181818181818',
+        sweep: 'credit_renewal',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.credit_renewals_skipped_duplicate).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(txInserts).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+  });
+
+  it('sends earlybird warning for legacy purchase rows before canonical backfill', async () => {
+    const nowSpy = vi
+      .spyOn(Date, 'now')
+      .mockReturnValue(new Date('2026-09-12T00:00:00.000Z').getTime());
+    const { db, inserts } = createMockDb([
+      [
+        {
+          user_id: 'user-legacy-earlybird',
+          email: 'legacy-earlybird@example.com',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ sent: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    try {
+      const summary = await runSweep(
+        createEnv(fetch),
+        {
+          runId: '34343434-3434-4434-8434-343434343434',
+          sweep: 'earlybird_warning',
+        },
+        1
+      );
+
+      expect(summary.errors).toBe(0);
+      expect(summary.earlybird_warnings).toBe(1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(inserts).toEqual(
+        expect.arrayContaining([
+          {
+            user_id: 'user-legacy-earlybird',
+            instance_id: null,
+            email_type: 'claw_earlybird_14d',
+          },
+        ])
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });
 

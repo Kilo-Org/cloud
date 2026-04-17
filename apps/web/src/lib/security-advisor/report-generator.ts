@@ -5,8 +5,36 @@ import type {
   Recommendation,
   RecommendationPriority,
   FindingSeverity,
+  ReportGrade,
 } from './schemas';
 import { findCoverageForCheckId, type LoadedSecurityAdvisorContent } from './content-loader';
+
+// --- Grading ---
+
+/**
+ * Per-finding score deductions. Critical findings dominate the grade; warnings
+ * stack up linearly; info is visibility-only and does not affect the score.
+ *
+ * This is the first calibration pass — tuned against a real captured audit
+ * (7 warnings, 0 critical, 1 info) to land at C. Letter cutoffs follow the
+ * US academic 90/80/70/60 convention. Both the weights and the thresholds
+ * are tunable; if product wants to adjust the curve, this is the one place
+ * to edit. The test suite's hardcoded expected scores will need to move in
+ * lockstep — see the "grade computation" describe block.
+ */
+const SCORE_PENALTY_CRITICAL = 35;
+const SCORE_PENALTY_WARN = 4;
+
+function computeGrade(
+  criticalCount: number,
+  warnCount: number
+): { score: number; grade: ReportGrade } {
+  const raw = 100 - SCORE_PENALTY_CRITICAL * criticalCount - SCORE_PENALTY_WARN * warnCount;
+  const score = Math.max(0, Math.round(raw));
+  const grade: ReportGrade =
+    score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+  return { score, grade };
+}
 
 // --- Report generation ---
 
@@ -21,6 +49,8 @@ interface GenerateReportOptions {
 
 interface GeneratedReport {
   markdown: string;
+  grade: ReportGrade;
+  score: number;
   summary: { critical: number; warn: number; info: number; passed: number };
   findings: ReportFinding[];
   recommendations: Recommendation[];
@@ -50,16 +80,20 @@ export function generateSecurityReport(options: GenerateReportOptions): Generate
     passed,
   };
 
+  const { score, grade } = computeGrade(summary.critical, summary.warn);
+
   const markdown = renderMarkdown({
     findings,
     recommendations,
     summary,
+    score,
+    grade,
     publicIp,
     isKiloClaw,
     content,
   });
 
-  return { markdown, summary, findings, recommendations };
+  return { markdown, score, grade, summary, findings, recommendations };
 }
 
 function mapFinding(
@@ -161,24 +195,58 @@ function severityToPriority(severity: FindingSeverity): RecommendationPriority {
   }
 }
 
+/**
+ * Map the stored RecommendationPriority to the user-facing badge text. The
+ * report uses the same severity vocabulary as the "## Critical Findings" /
+ * "## Warnings" section headings so the reader sees one consistent label
+ * set. Only `immediate` and `high` are produced today — `low` is included
+ * because info findings could plausibly earn a recommendation in the future,
+ * and `medium` deliberately throws so that any new caller that starts
+ * producing medium-priority recommendations has to make a conscious labeling
+ * choice rather than silently inheriting `WARNING`.
+ */
+function priorityBadge(priority: RecommendationPriority): string {
+  switch (priority) {
+    case 'immediate':
+      return 'CRITICAL';
+    case 'high':
+      return 'WARNING';
+    case 'low':
+      return 'INFO';
+    case 'medium':
+      throw new Error(
+        '[SecurityAdvisor] priorityBadge: "medium" priority has no defined label yet. Pick one in report-generator.ts before emitting medium-priority recommendations.'
+      );
+  }
+}
+
 // --- Markdown rendering ---
 
 interface RenderOptions {
   findings: ReportFinding[];
   recommendations: Recommendation[];
   summary: { critical: number; warn: number; info: number; passed: number };
+  score: number;
+  grade: ReportGrade;
   publicIp?: string;
   isKiloClaw: boolean;
   content: LoadedSecurityAdvisorContent;
 }
 
 function renderMarkdown(opts: RenderOptions): string {
-  const { findings, recommendations, summary, publicIp, isKiloClaw, content } = opts;
+  const { findings, recommendations, summary, score, grade, publicIp, isKiloClaw, content } = opts;
   const get = (key: string, fallback: string) => getContent(content, key, fallback);
   const lines: string[] = [];
 
   // Header
   lines.push('# Security Audit Report');
+  lines.push('');
+
+  // Overall grade — shown at the top so the user sees a single at-a-glance
+  // answer before diving into the finding list.
+  lines.push(`## Security Grade: ${grade}`);
+  lines.push('');
+  lines.push(`**Score:** ${score} / 100`);
   lines.push('');
 
   // Summary
@@ -235,12 +303,17 @@ function renderMarkdown(opts: RenderOptions): string {
     }
   }
 
-  // Recommendations
+  // Recommendations — render badges using the same vocabulary as the
+  // finding sections ("Critical Findings" / "Warnings") so the user sees
+  // one set of words throughout the report instead of two. We map the
+  // priority enum (immediate/high/...) to the matching severity label
+  // at render time; the structured `priority` field in the response
+  // stays as-is for API stability.
   if (recommendations.length > 0) {
     lines.push('## Recommendations');
     lines.push('');
     for (const rec of recommendations) {
-      lines.push(`- [${rec.priority.toUpperCase()}] ${rec.action}`);
+      lines.push(`- [${priorityBadge(rec.priority)}] ${rec.action}`);
     }
     lines.push('');
   }

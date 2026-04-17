@@ -113,6 +113,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
     subscription.creditRenewalAt ?? subscription.currentPeriodEnd ?? subscription.trialEndsAt,
     'At your next renewal'
   );
+  const hasUserRequestedSwitch = subscription.scheduledBy === 'user';
   const targetPlanLabel = capitalize(otherPlan);
   const targetPlanDetails =
     otherPlan === 'commit'
@@ -306,7 +307,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
       {isKiloclawTerminal(subscription.status) ? null : (
         <div className="flex flex-wrap gap-2">
           {subscription.plan !== 'trial' ? (
-            subscription.scheduledPlan ? (
+            hasUserRequestedSwitch ? (
               <Button variant="outline" onClick={() => setConfirmationAction('cancelPlanSwitch')}>
                 Cancel Plan Switch
               </Button>

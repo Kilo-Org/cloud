@@ -1,6 +1,6 @@
 {
-  "id": "08a80e4a-839b-4728-a945-e0669beb68a8",
-  "prevId": "a2bff895-8be3-4626-b101-e658eed21469",
+  "id": "a6fd72ee-200e-4ac4-80e1-119e929ac628",
+  "prevId": "08a80e4a-839b-4728-a945-e0669beb68a8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -9009,6 +9009,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'fly'"
         },
         "organization_id": {
           "name": "organization_id",

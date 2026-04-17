@@ -100,12 +100,10 @@ export function MessageBubble({
 
   return (
     <div
-      className={`group flex items-start gap-1 px-4 py-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
+      className={`group flex px-4 py-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      {isOwn && actionButtons}
-
       <div className={`flex max-w-[75%] flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
         {isBot && !isOwn && (
           <span className="text-muted-foreground mb-0.5 px-1 text-xs font-medium">{botName}</span>
@@ -123,56 +121,60 @@ export function MessageBubble({
           </div>
         )}
 
-        <div
-          className={`relative rounded-2xl px-3 py-2 ${
-            isOwn
-              ? 'bg-primary text-primary-foreground ml-auto'
-              : 'bg-muted text-foreground mr-auto'
-          }`}
-        >
-          {isEditing ? (
-            <div>
-              <textarea
-                className="border-input bg-background text-foreground w-full rounded border p-2 text-sm"
-                value={editText}
-                onChange={e => setEditText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSaveEdit();
-                  }
-                  if (e.key === 'Escape') handleCancelEdit();
-                }}
-                autoFocus
-                rows={2}
-              />
-              <div className="mt-1 flex gap-2 text-xs">
-                <button
-                  onClick={handleSaveEdit}
-                  className="text-primary hover:underline cursor-pointer"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={handleCancelEdit}
-                  className="text-muted-foreground hover:underline cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm whitespace-pre-wrap">{textContent}</p>
-          )}
-
+        <div className={`flex items-start gap-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
           <div
-            className={`mt-1 flex items-center gap-1 text-[10px] ${
-              isOwn ? 'text-primary-foreground/70 justify-end' : 'text-muted-foreground justify-end'
+            className={`relative rounded-2xl px-3 py-2 ${
+              isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
             }`}
           >
-            {message.updatedAt && <span>(edited)</span>}
-            <span>{timeStr}</span>
+            {isEditing ? (
+              <div>
+                <textarea
+                  className="border-input bg-background text-foreground w-full rounded border p-2 text-sm"
+                  value={editText}
+                  onChange={e => setEditText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSaveEdit();
+                    }
+                    if (e.key === 'Escape') handleCancelEdit();
+                  }}
+                  autoFocus
+                  rows={2}
+                />
+                <div className="mt-1 flex gap-2 text-xs">
+                  <button
+                    onClick={handleSaveEdit}
+                    className="text-primary hover:underline cursor-pointer"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    className="text-muted-foreground hover:underline cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm whitespace-pre-wrap">{textContent}</p>
+            )}
+
+            <div
+              className={`mt-1 flex items-center gap-1 text-[10px] ${
+                isOwn
+                  ? 'text-primary-foreground/70 justify-end'
+                  : 'text-muted-foreground justify-end'
+              }`}
+            >
+              {message.updatedAt && <span>(edited)</span>}
+              <span>{timeStr}</span>
+            </div>
           </div>
+
+          {actionButtons}
         </div>
 
         {pendingDeleteId === message.id && (
@@ -193,8 +195,6 @@ export function MessageBubble({
           </div>
         )}
       </div>
-
-      {!isOwn && actionButtons}
     </div>
   );
 }

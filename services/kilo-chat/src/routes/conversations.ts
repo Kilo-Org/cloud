@@ -5,8 +5,10 @@ import type { AuthContext } from '../auth';
 
 const ulidSchema = z.string().regex(/^[0-9A-Z]{26}$/, 'Invalid ULID');
 
+const SANDBOX_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
 const createConversationSchema = z.object({
-  sandboxId: z.string().min(1),
+  sandboxId: z.string().regex(SANDBOX_ID_PATTERN, 'Invalid sandboxId'),
   title: z.string().optional(),
 });
 

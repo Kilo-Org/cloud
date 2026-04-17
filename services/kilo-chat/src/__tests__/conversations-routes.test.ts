@@ -124,6 +124,23 @@ describe('POST /v1/conversations', () => {
     expect(body.error).toBe('Invalid request');
   });
 
+  it('returns 400 for sandboxId with invalid characters', async () => {
+    const app = makeApp('user-val', 'user');
+
+    for (const bad of ['hello world', '../traversal', 'has:colon', 'a'.repeat(65)]) {
+      const res = await app.request(
+        '/v1/conversations',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ sandboxId: bad }),
+        },
+        env
+      );
+      expect(res.status, `sandboxId "${bad}" should be rejected`).toBe(400);
+    }
+  });
+
   it('returns 400 for invalid JSON', async () => {
     const app = makeApp('user-dave', 'user');
     const res = await app.request(

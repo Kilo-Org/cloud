@@ -49,13 +49,19 @@ The OpenClaw gateway process listens on \`127.0.0.1:3001\` (loopback), managed b
 - Gateway readiness: \`curl -sf http://127.0.0.1:3001/ready\`
 - Controller state: \`curl -sf http://127.0.0.1:18789/_kilo/health\`
 - Process check: \`ps aux | grep openclaw\`
-- Validate config JSON: \`cat /root/.openclaw/openclaw.json | jq .\`
+- Validate config JSON without printing secrets: \`jq empty /root/.openclaw/openclaw.json\`
 - Logs are NOT written to disk — they go to stdout/stderr (Fly log aggregation). The user may paste log excerpts in the task description below.
 - Run \`openclaw doctor\` to check for common issues.
 
+## Managed KiloClaw Config
+
+- The \`kiloclaw-customizer\` plugin is required and maintained by KiloClaw. Do NOT remove \`/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer\` from \`plugins.load.paths\` and do NOT remove \`plugins.entries.kiloclaw-customizer\`.
+- If \`openclaw doctor\` says \`kiloclaw-customizer\` is disabled because it is not in the allowlist, fix the allowlist by adding \`"kiloclaw-customizer"\` to \`plugins.allow\` instead of removing the plugin config.
+- Do not print or summarize secret values from \`openclaw.json\` such as tokens, API keys, auth headers, cookies, or channel credentials.
+
 ## How to Fix
 
-- Edit \`/root/.openclaw/openclaw.json\` to correct config issues.
+- Edit \`/root/.openclaw/openclaw.json\` to correct config issues, preserving managed KiloClaw plugin entries.
 - After config changes, restart the gateway: \`kill -USR1 $(pgrep -f "openclaw gateway")\`
 - The supervisor auto-restarts the gateway on crashes with exponential backoff.
 - If the gateway process is missing entirely, the supervisor will respawn it.

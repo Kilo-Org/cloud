@@ -345,10 +345,12 @@ patches to `openclaw.json`. The patches MUST include:
     restore. MUST be preserved on subsequent boots.
 11. Exec policy: host `gateway`, security `allowlist`, ask `on-miss`.
 12. Browser: enabled, headless, noSandbox.
-13. Channel configuration from `TELEGRAM_BOT_TOKEN`,
+13. KiloClaw customizer plugin: load path and entry MUST be present;
+    when `plugins.allow` exists, it MUST include `kiloclaw-customizer`.
+14. Channel configuration from `TELEGRAM_BOT_TOKEN`,
     `DISCORD_BOT_TOKEN`, `SLACK_BOT_TOKEN`/`SLACK_APP_TOKEN`, with
     corresponding plugin enablement.
-14. Hooks configuration from `KILOCLAW_HOOKS_TOKEN`: enabled,
+15. Hooks configuration from `KILOCLAW_HOOKS_TOKEN`: enabled,
     token, inbound email mapping. When Gmail credentials are present, the
     gmail preset MUST also be enabled.
 

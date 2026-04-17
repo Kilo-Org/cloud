@@ -38,10 +38,15 @@ export function useMessages(getToken: () => Promise<string>, conversationId: str
   });
 }
 
-export function useSendMessage(getToken: () => Promise<string>) {
+export function useSendMessage(getToken: () => Promise<string>, conversationId: string | null) {
   const client = useClient(getToken);
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (req: CreateMessageRequest) => client.sendMessage(req),
+    onSuccess: () => {
+      if (!conversationId) return;
+      void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'messages', conversationId] });
+    },
   });
 }
 

@@ -130,12 +130,13 @@ export function MessageBubble({
               <p className="text-sm italic opacity-50">[deleted message]</p>
             ) : isEditing ? (
               <div>
-                <input
-                  className="bg-transparent w-full text-sm outline-none border-b border-current/20 pb-0.5"
+                <textarea
+                  className="bg-transparent w-full text-sm outline-none border-b border-current/20 pb-0.5 resize-none"
+                  rows={Math.min(editText.split('\n').length, 8)}
                   value={editText}
                   onChange={e => setEditText(e.target.value)}
                   onKeyDown={e => {
-                    if (e.key === 'Enter') {
+                    if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       handleSaveEdit();
                     }

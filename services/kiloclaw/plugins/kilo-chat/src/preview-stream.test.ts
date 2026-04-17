@@ -189,4 +189,31 @@ describe('createPreviewStream', () => {
       vi.useRealTimers();
     }
   });
+
+  it('warns when the finalize PATCH itself is stale', async () => {
+    vi.useFakeTimers();
+    try {
+      const { client, editMessage } = makeClientSpies();
+      const warnings: string[] = [];
+      const stream = createPreviewStream({
+        client,
+        conversationId: 'c1',
+        throttleMs: 100,
+        onWarn: (msg: string) => warnings.push(msg),
+      });
+      stream.update('H');
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Make the finalize PATCH return stale
+      editMessage.mockImplementationOnce(async p => ({
+        messageId: p.messageId,
+        stale: true,
+      }));
+      await stream.finalize('Final');
+      expect(editMessage).toHaveBeenCalledTimes(1);
+      expect(warnings).toContain('final editMessage was stale — remote preview may be outdated');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

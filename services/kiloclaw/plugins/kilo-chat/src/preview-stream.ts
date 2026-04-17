@@ -157,13 +157,17 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       }
       if (finalText !== lastSentText) {
         try {
-          await opts.client.editMessage({
+          const res = await opts.client.editMessage({
             conversationId: opts.conversationId,
             messageId,
             content: [{ type: 'text', text: finalText }],
             timestamp: Date.now(),
           });
-          lastSentText = finalText;
+          if (res.stale) {
+            warn('final editMessage was stale — remote preview may be outdated');
+          } else {
+            lastSentText = finalText;
+          }
         } catch (err) {
           warn('editMessage failed during finalize', err);
           throw err;

@@ -125,10 +125,12 @@ function rateLimitFromHeaders(headers: Headers): NorthflankRateLimitInfo {
   };
 }
 
-function northflankPath(config: NorthflankClientConfig, path: string): string {
+function northflankPath(config: NorthflankClientConfig, path: string, teamScoped = true): string {
   const base = config.apiBase.replace(/\/$/, '');
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  if (!config.teamId || normalizedPath.startsWith('/teams/')) return `${base}${normalizedPath}`;
+  if (!teamScoped || !config.teamId || normalizedPath.startsWith('/teams/')) {
+    return `${base}${normalizedPath}`;
+  }
   return `${base}/teams/${encodeURIComponent(config.teamId)}${normalizedPath}`;
 }
 
@@ -147,11 +149,12 @@ async function requestJson<T>(
   init: RequestInit | undefined,
   schema: z.ZodType<T>,
   expectedStatuses: number[],
-  context: string
+  context: string,
+  options?: { teamScoped?: boolean }
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(northflankPath(config, path), {
+    response = await fetch(northflankPath(config, path, options?.teamScoped), {
       ...init,
       headers: {
         Authorization: `Bearer ${config.apiToken}`,
@@ -210,9 +213,10 @@ async function requestVoid(
   path: string,
   init: RequestInit | undefined,
   expectedStatuses: number[],
-  context: string
+  context: string,
+  options?: { teamScoped?: boolean }
 ): Promise<void> {
-  await requestJson(config, path, init, z.unknown(), expectedStatuses, context);
+  await requestJson(config, path, init, z.unknown(), expectedStatuses, context, options);
 }
 
 function jsonInit(method: string, body: unknown): RequestInit {
@@ -502,7 +506,8 @@ export async function createProjectSecret(
     jsonInit('POST', payload),
     SecretDetailsResponseSchema,
     [200, 201],
-    'createProjectSecret'
+    'createProjectSecret',
+    { teamScoped: false }
   );
   return response.data;
 }
@@ -518,7 +523,8 @@ export async function findProjectSecretByName(
     undefined,
     SecretListResponseSchema,
     [200],
-    'findProjectSecretByName'
+    'findProjectSecretByName',
+    { teamScoped: false }
   );
   return response.data.secrets.find(secret => secret.name === name) ?? null;
 }
@@ -534,7 +540,8 @@ export async function getProjectSecretDetails(
     undefined,
     SecretDetailsResponseSchema,
     [200],
-    'getProjectSecretDetails'
+    'getProjectSecretDetails',
+    { teamScoped: false }
   );
   return response.data;
 }
@@ -551,7 +558,8 @@ export async function putProjectSecret(
     jsonInit('PUT', payload),
     SecretDetailsResponseSchema,
     [200],
-    'putProjectSecret'
+    'putProjectSecret',
+    { teamScoped: false }
   );
   return response.data;
 }
@@ -566,7 +574,8 @@ export async function deleteProjectSecret(
     `/projects/${encodeURIComponent(projectId)}/secrets/${encodeURIComponent(secretId)}`,
     { method: 'DELETE' },
     [200, 202, 204],
-    'deleteProjectSecret'
+    'deleteProjectSecret',
+    { teamScoped: false }
   );
 }
 

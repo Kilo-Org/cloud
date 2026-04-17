@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   NorthflankApiError,
+  createProjectSecret,
   createVolume,
   deleteService,
   findProjectByName,
@@ -156,6 +157,27 @@ describe('Northflank Worker fetch client', () => {
       'https://api.northflank.com/v1/projects/project-1/services/service-1?delete_child_objects=false'
     );
     expect(expectRequestInit(init).method).toBe('DELETE');
+  });
+
+  it('creates project secrets through Northflank project-scoped routes', async () => {
+    const fetchMock = mockFetchSequence([[201, { data: { id: 'secret-1', name: 'kc-ki-test' } }]]);
+
+    await expect(
+      createProjectSecret({ ...config, teamId: 'team-1' }, 'project-1', {
+        name: 'kc-ki-test',
+        type: 'secret',
+        secretType: 'environment',
+        priority: 100,
+        restrictions: {
+          restricted: true,
+          nfObjects: [{ id: 'service-1', type: 'service' }],
+        },
+        secrets: { variables: { KILOCLAW_ENV_KEY: 'env-key-secret' } },
+      })
+    ).resolves.toEqual({ id: 'secret-1', name: 'kc-ki-test' });
+
+    const [url] = firstFetchCall(fetchMock);
+    expect(url).toBe('https://api.northflank.com/v1/projects/project-1/secrets');
   });
 
   it('redacts secret values from API errors', async () => {

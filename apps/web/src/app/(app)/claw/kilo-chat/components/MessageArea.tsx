@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { ulid } from 'ulid';
 import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import {
   useMessages,
@@ -46,7 +47,7 @@ export function MessageArea({
 
   const conversationDetail = useConversationDetail(getToken, conversationId);
   const renameConversation = useRenameConversation(getToken);
-  const sendMessage = useSendMessage(getToken, conversationId);
+  const sendMessage = useSendMessage(getToken, conversationId, currentUserId);
   const editMessage = useEditMessage(getToken, conversationId);
   const deleteMessage = useDeleteMessage(getToken, conversationId);
 
@@ -100,6 +101,7 @@ export function MessageArea({
         conversationId,
         content: [{ type: 'text', text }],
         inReplyToMessageId,
+        clientId: ulid(),
       },
       { onError: () => toast.error('Failed to send message') }
     );

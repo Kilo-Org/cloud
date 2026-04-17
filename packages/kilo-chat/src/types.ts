@@ -96,10 +96,12 @@ export type CreateMessageRequest = {
   conversationId: string;
   content: ContentBlock[];
   inReplyToMessageId?: string;
+  clientId?: string;
 };
 
 export type CreateMessageResponse = {
   messageId: string;
+  clientId?: string;
 };
 
 export type EditMessageRequest = {

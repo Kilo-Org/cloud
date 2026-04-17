@@ -762,6 +762,9 @@ importers:
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
+      ulid:
+        specifier: 3.0.1
+        version: 3.0.1
       uuid:
         specifier: 11.1.0
         version: 11.1.0

@@ -38,14 +38,57 @@ export function useMessages(getToken: () => Promise<string>, conversationId: str
   });
 }
 
-export function useSendMessage(getToken: () => Promise<string>, conversationId: string | null) {
+export type SendMessageVariables = CreateMessageRequest & { clientId: string };
+
+export function useSendMessage(
+  getToken: () => Promise<string>,
+  conversationId: string | null,
+  currentUserId: string
+) {
   const client = useClient(getToken);
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (req: CreateMessageRequest) => client.sendMessage(req),
-    onSuccess: () => {
+    mutationFn: (req: SendMessageVariables) => client.sendMessage(req),
+    onMutate: async (variables: SendMessageVariables) => {
       if (!conversationId) return;
-      void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'messages', conversationId] });
+      const queryKey = ['kilo-chat', 'messages', conversationId];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData(queryKey);
+      const optimisticMessage: Message = {
+        id: `pending-${variables.clientId}`,
+        senderId: currentUserId,
+        content: variables.content,
+        inReplyToMessageId: variables.inReplyToMessageId ?? null,
+        updatedAt: null,
+        clientUpdatedAt: null,
+        deleted: false,
+      };
+      queryClient.setQueryData(queryKey, (old: unknown) => {
+        if (!old || typeof old !== 'object') return old;
+        const data = old as { pages: Message[][]; pageParams: unknown[] };
+        const firstPage = data.pages[0] ?? [];
+        return { ...data, pages: [[optimisticMessage, ...firstPage], ...data.pages.slice(1)] };
+      });
+      return { previous, queryKey, clientId: variables.clientId };
+    },
+    onSuccess: (response, _variables, context) => {
+      if (!context?.queryKey) return;
+      const pendingId = `pending-${context.clientId}`;
+      queryClient.setQueryData(context.queryKey, (old: unknown) => {
+        if (!old || typeof old !== 'object') return old;
+        const data = old as { pages: Message[][]; pageParams: unknown[] };
+        return {
+          ...data,
+          pages: data.pages.map(page =>
+            page.map(msg => (msg.id === pendingId ? { ...msg, id: response.messageId } : msg))
+          ),
+        };
+      });
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
     },
   });
 }
@@ -140,6 +183,10 @@ export function useMessageCacheUpdater(conversationId: string | null) {
           queryClient.setQueryData(queryKey, (old: unknown) => {
             if (!old || typeof old !== 'object') return old;
             const data = old as { pages: Message[][]; pageParams: unknown[] };
+            // Skip if this messageId already exists (optimistic insert already replaced)
+            for (const page of data.pages) {
+              if (page.some(msg => msg.id === e.messageId)) return data;
+            }
             const firstPage = data.pages[0] ?? [];
             return { ...data, pages: [[newMessage, ...firstPage], ...data.pages.slice(1)] };
           });

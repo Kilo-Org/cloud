@@ -10,6 +10,7 @@ export const createMessageSchema = z.object({
   conversationId: ulidSchema,
   content: z.array(contentBlockSchema).min(1).max(20),
   inReplyToMessageId: ulidSchema.optional(),
+  clientId: ulidSchema.optional(),
 });
 
 export const editMessageSchema = z.object({

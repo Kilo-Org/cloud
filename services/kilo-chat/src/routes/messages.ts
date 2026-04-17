@@ -39,7 +39,10 @@ export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: Auth
       if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
       return c.json({ error: result.error }, 500);
     }
-    return c.json({ messageId: result.messageId }, 201);
+    return c.json(
+      { messageId: result.messageId, ...(result.clientId ? { clientId: result.clientId } : {}) },
+      201
+    );
   });
 
   // GET /v1/conversations/:id/messages — list messages

@@ -19,9 +19,10 @@ export type CreateMessageParams = {
   conversationId: string;
   content: ContentBlock[];
   inReplyToMessageId?: string;
+  clientId?: string;
 };
 
-export type CreateMessageOk = { ok: true; messageId: string };
+export type CreateMessageOk = { ok: true; messageId: string; clientId?: string };
 export type CreateMessageErr = {
   ok: false;
   code: 'forbidden' | 'internal';
@@ -35,7 +36,7 @@ export async function createMessageFor(
   params: CreateMessageParams,
   ctx: DeferCtx
 ): Promise<CreateMessageResult> {
-  const { conversationId, content, inReplyToMessageId } = params;
+  const { conversationId, content, inReplyToMessageId, clientId } = params;
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
 
   if (!(await convStub.isMember(callerId))) {
@@ -93,7 +94,7 @@ export async function createMessageFor(
     }
   }
 
-  return { ok: true, messageId };
+  return { ok: true, messageId, clientId };
 }
 
 // ─── editMessage ────────────────────────────────────────────────────────────

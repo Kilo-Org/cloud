@@ -35,7 +35,7 @@ export function MessageBubble({
   const [showActions, setShowActions] = useState(false);
 
   const isBot = message.senderId.startsWith('bot:');
-  const isOptimistic = message.id.startsWith('optimistic-');
+  const isOptimistic = message.id.startsWith('pending-');
   const timestamp = isOptimistic ? new Date() : new Date(ulidToTimestamp(message.id));
   const timeStr = timestamp.toLocaleTimeString([], {
     hour: 'numeric',

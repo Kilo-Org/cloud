@@ -122,10 +122,28 @@ export class ConversationDO extends DurableObject<Env> {
     }
   }
 
-  private sendToMember(memberId: string, event: string, data: unknown): void {
+  private broadcastExcluding(
+    excludeMemberId: string,
+    event: string,
+    data: unknown,
+    id?: string
+  ): void {
+    const text = formatSseEvent(event, data, id);
+    const bytes = this.encoder.encode(text);
+    const excludeConnIds = this.sseClientsByMember.get(excludeMemberId);
+    for (const [connId, writer] of this.sseClients) {
+      if (excludeConnIds?.has(connId)) continue;
+      writer.write(bytes).catch(() => {
+        this.removeSseClient(connId);
+        writer.close().catch(() => {});
+      });
+    }
+  }
+
+  private sendToMember(memberId: string, event: string, data: unknown, id?: string): void {
     const connIds = this.sseClientsByMember.get(memberId);
     if (!connIds) return;
-    const text = formatSseEvent(event, data);
+    const text = formatSseEvent(event, data, id);
     const bytes = this.encoder.encode(text);
     for (const connId of connIds) {
       const writer = this.sseClients.get(connId);
@@ -241,7 +259,8 @@ export class ConversationDO extends DurableObject<Env> {
       throw err;
     }
 
-    this.broadcast(
+    this.broadcastExcluding(
+      params.senderId,
       'message.created',
       {
         messageId,
@@ -340,7 +359,8 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(messages.id, params.messageId))
       .run();
 
-    this.broadcast(
+    this.broadcastExcluding(
+      params.senderId,
       'message.updated',
       {
         messageId: params.messageId,
@@ -357,7 +377,7 @@ export class ConversationDO extends DurableObject<Env> {
     if (!this.isMember(memberId)) {
       return { ok: false, error: 'Not a member' };
     }
-    this.broadcast('typing', { memberId });
+    this.broadcastExcluding(memberId, 'typing', { memberId });
     return { ok: true };
   }
 
@@ -390,7 +410,12 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(messages.id, params.messageId))
       .run();
 
-    this.broadcast('message.deleted', { messageId: params.messageId }, params.messageId);
+    this.broadcastExcluding(
+      params.senderId,
+      'message.deleted',
+      { messageId: params.messageId },
+      params.messageId
+    );
 
     return { ok: true };
   }

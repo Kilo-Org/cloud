@@ -54,6 +54,7 @@ import {
   handleKiloClawScheduleEvent,
   handleKiloClawInvoicePaid,
 } from '@/lib/kiloclaw/stripe-handlers';
+import { enqueueImpactSaleReversalForCharge } from '@/lib/affiliate-events';
 import { invoiceLooksLikeKiloClawByPriceId } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import {
   STRIPE_TEAMS_MONTHLY_PRICE_ID,
@@ -761,6 +762,24 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
+      break;
+    }
+
+    case 'charge.dispute.created': {
+      const dispute = event.data.object;
+      const chargeId =
+        typeof dispute.charge === 'string' ? dispute.charge : (dispute.charge?.id ?? null);
+      if (!chargeId) {
+        break;
+      }
+
+      await enqueueImpactSaleReversalForCharge({
+        stripeChargeId: chargeId,
+        disputeId: dispute.id,
+        amount: dispute.amount / 100,
+        currency: dispute.currency,
+        eventDate: new Date(dispute.created * 1000),
+      });
       break;
     }
 

@@ -1,7 +1,7 @@
 process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
 process.env.TURNSTILE_SECRET_KEY ||= 'test-turnstile-secret';
 
-import { beforeEach, afterEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 describe('impact', () => {
   beforeEach(() => {
@@ -9,6 +9,7 @@ describe('impact', () => {
     process.env.IMPACT_ACCOUNT_SID = 'impact-account-sid';
     process.env.IMPACT_AUTH_TOKEN = 'impact-auth-token';
     process.env.IMPACT_CAMPAIGN_ID = '50754';
+    delete process.env.IMPACT_REVERSAL_DISPOSITION_CODE;
   });
 
   afterEach(() => {
@@ -40,44 +41,131 @@ describe('impact', () => {
     });
   });
 
-  it('sends JSON conversions with basic auth and maps trackingId to ClickId', async () => {
-    const fetchMock = jest.fn<typeof fetch>().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => '',
-    } as Response);
+  it('parses immediate sale success with action mapping', async () => {
+    const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ActionId: '1000.2000.3000',
+          ActionUri: '/Advertisers/impact-account-sid/Actions/1000.2000.3000',
+        }),
+        { status: 200 }
+      )
+    );
     global.fetch = fetchMock;
 
-    const { trackSale } = await import('@/lib/impact');
-    await trackSale({
-      trackingId: 'impact-click-123',
-      customerId: 'user_123',
-      customerEmail: 'user@example.com',
-      orderId: 'in_123',
-      amount: 9,
-      currencyCode: 'usd',
-      eventDate: new Date('2026-04-02T12:00:00.000Z'),
-      itemCategory: 'kiloclaw-standard',
-      itemName: 'KiloClaw Standard Plan',
-      itemSku: 'price_standard',
+    const { buildSalePayload, sendImpactConversionPayload } = await import('@/lib/impact');
+    const result = await sendImpactConversionPayload(
+      buildSalePayload({
+        trackingId: 'impact-click-123',
+        customerId: 'user_123',
+        customerEmailHash: 'hashed-email',
+        orderId: 'in_123',
+        amount: 9,
+        currencyCode: 'usd',
+        eventDate: new Date('2026-04-02T12:00:00.000Z'),
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+      })
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      delivery: 'immediate',
+      actionId: '1000.2000.3000',
+      actionUri: '/Advertisers/impact-account-sid/Actions/1000.2000.3000',
+      responseBody:
+        '{"ActionId":"1000.2000.3000","ActionUri":"/Advertisers/impact-account-sid/Actions/1000.2000.3000"}',
     });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('parses queued sale success with submission URI', async () => {
+    const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          Status: 'QUEUED',
+          QueuedUri: '/Advertisers/impact-account-sid/APISubmissions/A-queued-sale',
+        }),
+        { status: 200 }
+      )
+    );
+    global.fetch = fetchMock;
+
+    const { buildSalePayload, sendImpactConversionPayload } = await import('@/lib/impact');
+    const result = await sendImpactConversionPayload(
+      buildSalePayload({
+        trackingId: 'impact-click-123',
+        customerId: 'user_123',
+        customerEmailHash: 'hashed-email',
+        orderId: 'in_123',
+        amount: 9,
+        currencyCode: 'usd',
+        eventDate: new Date('2026-04-02T12:00:00.000Z'),
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+      })
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      delivery: 'queued',
+      submissionUri: '/Advertisers/impact-account-sid/APISubmissions/A-queued-sale',
+      responseBody:
+        '{"Status":"QUEUED","QueuedUri":"/Advertisers/impact-account-sid/APISubmissions/A-queued-sale"}',
+    });
+  });
+
+  it('builds reversal request with default disposition code', async () => {
+    const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          Status: 'QUEUED',
+          QueuedUri: '/Advertisers/impact-account-sid/APISubmissions/A-reversal',
+        }),
+        { status: 200 }
+      )
+    );
+    global.fetch = fetchMock;
+
+    const { reverseImpactAction } = await import('@/lib/impact');
+    await reverseImpactAction({ actionId: '1000.2000.3000' });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'https://api.impact.com/Advertisers/impact-account-sid/Conversions'
+      'https://api.impact.com/Advertisers/impact-account-sid/Actions'
     );
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
-      method: 'POST',
+      method: 'DELETE',
       headers: expect.objectContaining({
         Authorization:
           'Basic ' + Buffer.from('impact-account-sid:impact-auth-token').toString('base64'),
-        'Content-Type': 'application/json',
         Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
       }),
+      body: expect.stringContaining('ActionId=1000.2000.3000'),
     });
-    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('"ActionTrackerId":71659');
-    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('"OrderId":"in_123"');
-    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('"ClickId":"impact-click-123"');
-    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('"ItemSku1":"price_standard"');
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('DispositionCode=REJECTED');
+  });
+
+  it('honors overridden reversal disposition code', async () => {
+    process.env.IMPACT_REVERSAL_DISPOSITION_CODE = 'CONS_FRAUD';
+    jest.resetModules();
+
+    const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          Status: 'QUEUED',
+          QueuedUri: '/Advertisers/impact-account-sid/APISubmissions/A-reversal',
+        }),
+        { status: 200 }
+      )
+    );
+    global.fetch = fetchMock;
+
+    const { reverseImpactAction } = await import('@/lib/impact');
+    await reverseImpactAction({ actionId: '1000.2000.3000' });
+
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('DispositionCode=CONS_FRAUD');
   });
 });

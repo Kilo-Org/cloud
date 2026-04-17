@@ -201,6 +201,7 @@ export const AffiliateEventType = {
   TrialStart: 'trial_start',
   TrialEnd: 'trial_end',
   Sale: 'sale',
+  SaleReversal: 'sale_reversal',
 } as const;
 
 export type AffiliateEventType = (typeof AffiliateEventType)[keyof typeof AffiliateEventType];

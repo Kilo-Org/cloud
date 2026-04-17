@@ -1,5 +1,5 @@
 {
-  "id": "a2bff895-8be3-4626-b101-e658eed21469",
+  "id": "4ab58ad1-2648-440f-8f61-de3b6c2e1d16",
   "prevId": "64ca6916-6fe0-4f9f-96ce-a52d4072f486",
   "version": "7",
   "dialect": "postgresql",
@@ -12969,226 +12969,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.security_advisor_check_catalog": {
-      "name": "security_advisor_check_catalog",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "check_id": {
-          "name": "check_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "severity": {
-          "name": "severity",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "explanation": {
-          "name": "explanation",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "risk": {
-          "name": "risk",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "security_advisor_check_catalog_check_id_unique": {
-          "name": "security_advisor_check_catalog_check_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "check_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "security_advisor_check_catalog_severity_check": {
-          "name": "security_advisor_check_catalog_severity_check",
-          "value": "\"security_advisor_check_catalog\".\"severity\" in ('critical', 'warn', 'info')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.security_advisor_content": {
-      "name": "security_advisor_content",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "key": {
-          "name": "key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "value": {
-          "name": "value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "security_advisor_content_key_unique": {
-          "name": "security_advisor_content_key_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "key"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.security_advisor_kiloclaw_coverage": {
-      "name": "security_advisor_kiloclaw_coverage",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "area": {
-          "name": "area",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "summary": {
-          "name": "summary",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "detail": {
-          "name": "detail",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "match_check_ids": {
-          "name": "match_check_ids",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "security_advisor_kiloclaw_coverage_area_unique": {
-          "name": "security_advisor_kiloclaw_coverage_area_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "area"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.security_advisor_scans": {
       "name": "security_advisor_scans",
       "schema": "",
@@ -15860,6 +15640,24 @@
           "primaryKey": false,
           "notNull": true
         },
+        "stripe_charge_id": {
+          "name": "stripe_charge_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "impact_action_id": {
+          "name": "impact_action_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "impact_submission_uri": {
+          "name": "impact_submission_uri",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "attempt_count": {
           "name": "attempt_count",
           "type": "integer",
@@ -15935,6 +15733,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "IDX_user_affiliate_events_provider_event_type_charge": {
+          "name": "IDX_user_affiliate_events_provider_event_type_charge",
+          "columns": [
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stripe_charge_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -15983,7 +15808,7 @@
         },
         "user_affiliate_events_event_type_check": {
           "name": "user_affiliate_events_event_type_check",
-          "value": "\"user_affiliate_events\".\"event_type\" IN ('signup', 'trial_start', 'trial_end', 'sale')"
+          "value": "\"user_affiliate_events\".\"event_type\" IN ('signup', 'trial_start', 'trial_end', 'sale', 'sale_reversal')"
         },
         "user_affiliate_events_delivery_state_check": {
           "name": "user_affiliate_events_delivery_state_check",

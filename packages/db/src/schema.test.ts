@@ -120,7 +120,7 @@ describe('database schema', () => {
         'admin_override',
       ],
       AffiliateProvider: ['impact'],
-      AffiliateEventType: ['signup', 'trial_start', 'trial_end', 'sale'],
+      AffiliateEventType: ['signup', 'trial_start', 'trial_end', 'sale', 'sale_reversal'],
       AffiliateEventDeliveryState: ['queued', 'blocked', 'sending', 'delivered', 'failed'],
     };
 

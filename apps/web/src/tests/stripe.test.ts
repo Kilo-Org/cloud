@@ -29,6 +29,13 @@ jest.mock('@/lib/organizations/organization-billing', () => {
     ),
   };
 });
+jest.mock(
+  'tldts',
+  () => ({
+    getDomain: jest.fn((host: string) => host),
+  }),
+  { virtual: true }
+);
 import {
   type StripeTopupMetadata,
   ensurePaymentMethodStored,
@@ -46,6 +53,8 @@ import {
   organizations,
   kilocode_users,
   auto_top_up_configs,
+  user_affiliate_attributions,
+  user_affiliate_events,
 } from '@kilocode/db/schema';
 import { db, auto_deleted_at } from '@/lib/drizzle';
 import { insertTestUser } from './helpers/user.helper';
@@ -159,6 +168,67 @@ const baseStripeEvent = () => ({
   pending_webhooks: 0,
   request: null,
 });
+
+const sampleStripeDispute = (
+  overrides: Partial<Stripe.Dispute> & Pick<Stripe.Dispute, 'id'>
+): Stripe.Dispute => {
+  const { id, ...rest } = overrides;
+
+  return {
+    id,
+    object: 'dispute',
+    amount: 2900,
+    balance_transactions: [],
+    charge: 'ch_test',
+    created: 1712743200,
+    currency: 'usd',
+    enhanced_eligibility_types: [],
+    evidence: {
+      access_activity_log: null,
+      billing_address: null,
+      cancellation_policy: null,
+      cancellation_policy_disclosure: null,
+      cancellation_rebuttal: null,
+      customer_communication: null,
+      customer_email_address: null,
+      customer_name: null,
+      customer_purchase_ip: null,
+      customer_signature: null,
+      duplicate_charge_documentation: null,
+      duplicate_charge_explanation: null,
+      duplicate_charge_id: null,
+      enhanced_evidence: {},
+      product_description: null,
+      receipt: null,
+      refund_policy: null,
+      refund_policy_disclosure: null,
+      refund_refusal_explanation: null,
+      service_date: null,
+      service_documentation: null,
+      shipping_address: null,
+      shipping_carrier: null,
+      shipping_date: null,
+      shipping_documentation: null,
+      shipping_tracking_number: null,
+      uncategorized_file: null,
+      uncategorized_text: null,
+    },
+    evidence_details: {
+      due_by: null,
+      enhanced_eligibility: {},
+      has_evidence: false,
+      past_due: false,
+      submission_count: 0,
+    },
+    is_charge_refundable: false,
+    livemode: false,
+    metadata: {},
+    payment_intent: null,
+    reason: 'fraudulent',
+    status: 'warning_needs_response',
+    ...rest,
+  };
+};
 
 describe('ensurePaymentMethodStored', () => {
   let testUser: User;
@@ -574,6 +644,174 @@ describe('processStripePaymentEventHook', () => {
     });
 
     expect(paymentMethodExists).toBeUndefined();
+  });
+
+  test('charge.dispute.created enqueues sale reversal for matched charge', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+
+    await db.insert(user_affiliate_attributions).values({
+      user_id: testUser.id,
+      provider: 'impact',
+      tracking_id: 'impact-click-123',
+    });
+
+    await db.insert(user_affiliate_events).values({
+      user_id: testUser.id,
+      provider: 'impact',
+      event_type: 'sale',
+      dedupe_key: 'affiliate:impact:sale:invoice-123',
+      delivery_state: 'delivered',
+      payload_json: {
+        trackingId: 'impact-click-123',
+        customerId: testUser.id,
+        customerEmailHash: 'hashed-email',
+        orderId: 'invoice-123',
+        eventDate: '2026-04-09T10:00:00.000Z',
+        amount: 29,
+        currencyCode: 'usd',
+        stripeChargeId: 'ch_dispute_123',
+        impactActionId: '1000.2000.3000',
+      },
+      stripe_charge_id: 'ch_dispute_123',
+      impact_action_id: '1000.2000.3000',
+    });
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_created',
+      type: 'charge.dispute.created',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_123',
+          charge: 'ch_dispute_123',
+        }),
+        previous_attributes: {},
+      },
+    };
+
+    await processStripePaymentEventHook(event);
+
+    const reversalEvents = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.event_type, 'sale_reversal'));
+
+    expect(reversalEvents).toHaveLength(1);
+    expect(reversalEvents[0]).toMatchObject({
+      user_id: testUser.id,
+      parent_event_id: expect.any(String),
+      delivery_state: 'queued',
+      stripe_charge_id: 'ch_dispute_123',
+      dedupe_key: 'affiliate:impact:sale_reversal:ch_dispute_123',
+    });
+    expect(reversalEvents[0]?.payload_json.disputeId).toBe('dp_123');
+  });
+
+  test('charge.dispute.created does nothing for unmatched charge', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_unmatched',
+      type: 'charge.dispute.created',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_unmatched',
+          charge: 'ch_missing',
+        }),
+        previous_attributes: {},
+      },
+    };
+
+    await processStripePaymentEventHook(event);
+
+    const reversalEvents = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.event_type, 'sale_reversal'));
+
+    expect(reversalEvents).toHaveLength(0);
+  });
+
+  test('charge.dispute.created does nothing when charge id is missing', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_missing_charge',
+      type: 'charge.dispute.created',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_missing_charge',
+          charge: '',
+        }),
+        previous_attributes: {},
+      },
+    };
+
+    await processStripePaymentEventHook(event);
+
+    const reversalEvents = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.event_type, 'sale_reversal'));
+
+    expect(reversalEvents).toHaveLength(0);
+  });
+
+  test('charge.dispute.created skips legacy delivered sale without stored mapping', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+
+    await db.insert(user_affiliate_attributions).values({
+      user_id: testUser.id,
+      provider: 'impact',
+      tracking_id: 'impact-click-123',
+    });
+
+    await db.insert(user_affiliate_events).values({
+      user_id: testUser.id,
+      provider: 'impact',
+      event_type: 'sale',
+      dedupe_key: 'affiliate:impact:sale:legacy-invoice-123',
+      delivery_state: 'delivered',
+      payload_json: {
+        trackingId: 'impact-click-123',
+        customerId: testUser.id,
+        customerEmailHash: 'hashed-email',
+        orderId: 'legacy-invoice-123',
+        eventDate: '2026-04-09T10:00:00.000Z',
+        amount: 29,
+        currencyCode: 'usd',
+        stripeChargeId: 'ch_legacy_missing_mapping',
+      },
+      stripe_charge_id: 'ch_legacy_missing_mapping',
+    });
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_legacy',
+      type: 'charge.dispute.created',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_legacy',
+          charge: 'ch_legacy_missing_mapping',
+        }),
+        previous_attributes: {},
+      },
+    };
+
+    await processStripePaymentEventHook(event);
+
+    const reversalEvents = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.event_type, 'sale_reversal'));
+
+    expect(reversalEvents).toHaveLength(0);
   });
 
   describe('subscription_schedule.* (Kilo Pass scheduled changes)', () => {

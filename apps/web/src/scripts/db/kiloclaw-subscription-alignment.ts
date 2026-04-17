@@ -15,11 +15,11 @@
  *   pnpm script db kiloclaw-subscription-alignment apply-changelog-baseline
  */
 
-import { and, desc, eq, inArray, isNull, notExists, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, notExists, or, sql } from 'drizzle-orm';
 
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   kiloclaw_earlybird_purchases,
@@ -32,6 +32,8 @@ import {
   type Organization,
   type OrganizationSeatsPurchase,
 } from '@kilocode/db/schema';
+
+type DbOrTx = typeof db | DrizzleTransaction;
 
 type Mode =
   | 'audit'
@@ -96,6 +98,7 @@ type MissingPersonalCandidate = {
   earlybirdPurchaseCreatedAt: string | null;
   hasEarlybird: boolean;
   totalSubscriptionCount: number;
+  personalContextSubscriptionCount: number;
   detachedTotalCount: number;
   detachedAccessCount: number;
   linkedPersonalTotalCount: number;
@@ -216,34 +219,53 @@ function printSection<T>(label: string, rows: T[]) {
   }
 }
 
-async function insertAlignmentChangeLog(params: {
-  subscriptionId: string;
-  action: 'backfilled' | 'reassigned';
-  reason: string;
-  before: KiloClawSubscription | null;
-  after: KiloClawSubscription | null;
-}) {
+function describeError(error: unknown): string {
+  return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+}
+
+async function insertAlignmentChangeLog(
+  writer: DbOrTx,
+  params: {
+    subscriptionId: string;
+    action: 'backfilled' | 'reassigned';
+    reason: string;
+    before: KiloClawSubscription | null;
+    after: KiloClawSubscription | null;
+  }
+) {
   if (!params.after) {
     return;
   }
 
-  try {
-    await insertKiloClawSubscriptionChangeLog(db, {
-      subscriptionId: params.subscriptionId,
-      actor: ALIGNMENT_SCRIPT_ACTOR,
-      action: params.action,
-      reason: params.reason,
-      before: params.before,
-      after: params.after,
-    });
-  } catch (error) {
-    console.error('Failed to write alignment change log', {
-      subscriptionId: params.subscriptionId,
-      action: params.action,
-      reason: params.reason,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  await insertKiloClawSubscriptionChangeLog(writer, {
+    subscriptionId: params.subscriptionId,
+    actor: ALIGNMENT_SCRIPT_ACTOR,
+    action: params.action,
+    reason: params.reason,
+    before: params.before,
+    after: params.after,
+  });
+}
+
+async function personalContextSubscriptionExistsForUser(
+  executor: DbOrTx,
+  userId: string
+): Promise<boolean> {
+  // Personal-context = detached (no instance) or attached to a personal instance
+  // (no organization). Excludes org-context subscriptions so they don't block
+  // personal backfill decisions.
+  const rows = await executor
+    .select({ id: kiloclaw_subscriptions.id })
+    .from(kiloclaw_subscriptions)
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        or(isNull(kiloclaw_subscriptions.instance_id), isNull(kiloclaw_instances.organization_id))
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
 }
 
 async function listPersonalInstancesWithoutRows(): Promise<PersonalInstanceWithoutRow[]> {
@@ -438,6 +460,10 @@ async function buildMissingPersonalCandidates(): Promise<MissingPersonalCandidat
     const linkedDestroyedAccessRows = linkedDestroyedRows.filter(subscription =>
       isAccessGrantingSubscription(subscription, now)
     );
+    // Personal-context subscriptions: rows linked to a personal instance OR detached
+    // (ambiguous, but treated as personal-intended by the adopt_detached path).
+    // Org-context subs are intentionally excluded so they don't block personal backfill.
+    const personalContextSubscriptionCount = linkedPersonalRows.length + detachedRows.length;
 
     let action: MissingPersonalBackfillAction = 'manual_review';
     let targetSubscriptionId: string | null = null;
@@ -459,9 +485,17 @@ async function buildMissingPersonalCandidates(): Promise<MissingPersonalCandidat
     ) {
       action = 'reassign_destroyed_access_row';
       targetSubscriptionId = linkedDestroyedAccessRows[0]?.id ?? null;
-    } else if (userSubscriptions.length === 0 && earlybirdPurchaseCreatedAt) {
+    } else if (
+      !row.destroyedAt &&
+      personalContextSubscriptionCount === 0 &&
+      earlybirdPurchaseCreatedAt
+    ) {
       action = 'backfill_earlybird_row';
-    } else if (userSubscriptions.length === 0 && !earlybirdPurchaseCreatedAt) {
+    } else if (
+      !row.destroyedAt &&
+      personalContextSubscriptionCount === 0 &&
+      !earlybirdPurchaseCreatedAt
+    ) {
       action = 'bootstrap_trial_row';
     }
 
@@ -475,6 +509,7 @@ async function buildMissingPersonalCandidates(): Promise<MissingPersonalCandidat
       earlybirdPurchaseCreatedAt,
       hasEarlybird: !!earlybirdPurchaseCreatedAt,
       totalSubscriptionCount: userSubscriptions.length,
+      personalContextSubscriptionCount,
       detachedTotalCount: detachedRows.length,
       detachedAccessCount: detachedAccessRows.length,
       linkedPersonalTotalCount: linkedPersonalRows.length,
@@ -549,30 +584,20 @@ async function buildDuplicateActiveInstanceCandidates(): Promise<
     }
   }
 
-  const duplicateRows = [...grouped.values()].flatMap(rows =>
-    rows.length > 1 ? rows.slice(1) : []
-  );
-  const canonicalRows = [...grouped.values()]
-    .filter(rows => rows.length > 1)
-    .map(rows => rows[0])
-    .filter((row): row is ActiveInstanceContextRow => !!row);
-
-  const instanceIds = [
-    ...new Set([
-      ...duplicateRows.map(row => row.instanceId),
-      ...canonicalRows.map(row => row.instanceId),
-    ]),
+  const duplicateGroups = [...grouped.values()].filter(rows => rows.length > 1);
+  const allDuplicateGroupInstanceIds = [
+    ...new Set(duplicateGroups.flatMap(rows => rows.map(row => row.instanceId))),
   ];
   const orgIds = [
     ...new Set(
-      duplicateRows
-        .map(row => row.organizationId)
+      duplicateGroups
+        .flatMap(rows => rows.map(row => row.organizationId))
         .filter((organizationId): organizationId is string => typeof organizationId === 'string')
     ),
   ];
 
   const [subscriptions, orgRows, purchases] = await Promise.all([
-    getSubscriptionsForInstances(instanceIds),
+    getSubscriptionsForInstances(allDuplicateGroupInstanceIds),
     getOrganizationsByIds(orgIds),
     getLatestSeatPurchases(orgIds),
   ]);
@@ -605,18 +630,22 @@ async function buildDuplicateActiveInstanceCandidates(): Promise<
   }
 
   const candidates: DuplicateActiveInstanceCandidate[] = [];
-  for (const rows of grouped.values()) {
-    if (rows.length <= 1) {
-      continue;
-    }
+  for (const rows of duplicateGroups) {
+    // Canonical = instance with the most subscriptions. Tiebreak: oldest created_at.
+    // Input rows are already ordered by created_at ASC, so stable sort preserves tiebreak.
+    const sortedByPreference = [...rows].sort((a, b) => {
+      const aCount = subscriptionsByInstanceId.get(a.instanceId)?.length ?? 0;
+      const bCount = subscriptionsByInstanceId.get(b.instanceId)?.length ?? 0;
+      return bCount - aCount;
+    });
 
-    const canonical = rows[0];
+    const canonical = sortedByPreference[0];
     if (!canonical) {
       continue;
     }
     const canonicalSubscriptions = subscriptionsByInstanceId.get(canonical.instanceId) ?? [];
 
-    for (const duplicate of rows.slice(1)) {
+    for (const duplicate of sortedByPreference.slice(1)) {
       const duplicateSubscriptions = subscriptionsByInstanceId.get(duplicate.instanceId) ?? [];
       const organizationRow =
         typeof duplicate.organizationId === 'string'
@@ -777,6 +806,10 @@ function summarizeDuplicateActiveInstanceCandidates(rows: DuplicateActiveInstanc
   ).map(([action, count]) => ({ action, count }));
 }
 
+// A "baseline" entry is any change-log row with before_state IS NULL — i.e. an
+// action=created/backfilled snapshot that establishes the subscription's initial
+// state. A subscription is missing its baseline if no such entry exists, even if
+// it has later mutation logs (which always carry a before_state).
 async function listSubscriptionsMissingBaselineChangeLog(): Promise<MissingChangelogBaselineRow[]> {
   return await db
     .select()
@@ -786,10 +819,32 @@ async function listSubscriptionsMissingBaselineChangeLog(): Promise<MissingChang
         db
           .select({ id: kiloclaw_subscription_change_log.id })
           .from(kiloclaw_subscription_change_log)
-          .where(eq(kiloclaw_subscription_change_log.subscription_id, kiloclaw_subscriptions.id))
+          .where(
+            and(
+              eq(kiloclaw_subscription_change_log.subscription_id, kiloclaw_subscriptions.id),
+              isNull(kiloclaw_subscription_change_log.before_state)
+            )
+          )
       )
     )
     .orderBy(desc(kiloclaw_subscriptions.created_at));
+}
+
+async function hasBaselineChangeLogEntry(
+  executor: DbOrTx,
+  subscriptionId: string
+): Promise<boolean> {
+  const rows = await executor
+    .select({ id: kiloclaw_subscription_change_log.id })
+    .from(kiloclaw_subscription_change_log)
+    .where(
+      and(
+        eq(kiloclaw_subscription_change_log.subscription_id, subscriptionId),
+        isNull(kiloclaw_subscription_change_log.before_state)
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
 }
 
 async function previewChangelogBaselineBackfill() {
@@ -811,30 +866,48 @@ async function previewChangelogBaselineBackfill() {
 async function applyChangelogBaselineBackfill() {
   const rows = await listSubscriptionsMissingBaselineChangeLog();
   let inserted = 0;
+  const failures: Array<{ subscriptionId: string; userId: string; error: string }> = [];
 
   for (const row of rows) {
-    const [existingLog] = await db
-      .select({ id: kiloclaw_subscription_change_log.id })
-      .from(kiloclaw_subscription_change_log)
-      .where(eq(kiloclaw_subscription_change_log.subscription_id, row.id))
-      .limit(1);
+    try {
+      const wrote = await db.transaction(async tx => {
+        if (await hasBaselineChangeLogEntry(tx, row.id)) {
+          return false;
+        }
 
-    if (existingLog) {
-      continue;
+        await insertAlignmentChangeLog(tx, {
+          subscriptionId: row.id,
+          action: 'backfilled',
+          reason: 'baseline_subscription_snapshot',
+          before: null,
+          after: row,
+        });
+        return true;
+      });
+
+      if (wrote) {
+        inserted += 1;
+      }
+    } catch (error) {
+      console.error('Changelog baseline backfill row failed', {
+        subscriptionId: row.id,
+        userId: row.user_id,
+        error: describeError(error),
+      });
+      failures.push({
+        subscriptionId: row.id,
+        userId: row.user_id,
+        error: describeError(error),
+      });
     }
-
-    await insertAlignmentChangeLog({
-      subscriptionId: row.id,
-      action: 'backfilled',
-      reason: 'baseline_subscription_snapshot',
-      before: null,
-      after: row,
-    });
-    inserted += 1;
   }
 
   console.log('\nChangelog baseline backfill results');
-  console.table([{ action: 'backfilled', count: inserted }]);
+  console.table([
+    { action: 'backfilled', count: inserted },
+    { action: 'failed', count: failures.length },
+  ]);
+  printSection('Changelog baseline rows that failed to backfill', failures);
 }
 
 async function previewMissingPersonalBackfill() {
@@ -904,6 +977,7 @@ async function previewMissingPersonalBackfill() {
         instanceDestroyedAt: row.instanceDestroyedAt,
         earlybirdPurchaseCreatedAt: row.earlybirdPurchaseCreatedAt,
         totalSubscriptionCount: row.totalSubscriptionCount,
+        personalContextSubscriptionCount: row.personalContextSubscriptionCount,
         detachedTotalCount: row.detachedTotalCount,
         detachedAccessCount: row.detachedAccessCount,
         linkedPersonalTotalCount: row.linkedPersonalTotalCount,
@@ -1042,10 +1116,11 @@ async function previewDuplicateActiveInstances() {
 }
 
 async function insertDuplicateTerminalSubscription(
+  tx: DbOrTx,
   row: DuplicateActiveInstanceCandidate
 ): Promise<KiloClawSubscription | null> {
   if (row.contextType === 'personal') {
-    const [inserted] = await db
+    const [inserted] = await tx
       .insert(kiloclaw_subscriptions)
       .values({
         user_id: row.userId,
@@ -1082,7 +1157,7 @@ async function insertDuplicateTerminalSubscription(
       : null,
   });
 
-  const [inserted] = await db
+  const [inserted] = await tx
     .insert(kiloclaw_subscriptions)
     .values(
       hasManagedActiveAccess
@@ -1114,15 +1189,105 @@ async function insertDuplicateTerminalSubscription(
   return inserted ?? null;
 }
 
-async function markDuplicateInstanceDestroyed(instanceId: string): Promise<boolean> {
+async function markDuplicateInstanceDestroyed(tx: DbOrTx, instanceId: string): Promise<boolean> {
   const destroyedAt = new Date().toISOString();
-  const rows = await db
+  const rows = await tx
     .update(kiloclaw_instances)
     .set({ destroyed_at: destroyedAt })
     .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
     .returning({ id: kiloclaw_instances.id });
 
   return rows.length > 0;
+}
+
+type DuplicateApplyOutcome = 'personal_destroyed' | 'org_destroyed' | 'reassigned' | 'skipped';
+
+async function applyDuplicateActiveInstanceRow(
+  row: DuplicateActiveInstanceCandidate
+): Promise<DuplicateApplyOutcome> {
+  return await db.transaction(async tx => {
+    const [canonicalExisting, duplicateExisting] = await Promise.all([
+      tx
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.instance_id, row.canonicalInstanceId)),
+      tx
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.instance_id, row.duplicateInstanceId)),
+    ]);
+
+    if (
+      row.action === 'reassign_to_canonical_and_destroy_duplicate' &&
+      (!row.targetSubscriptionId || canonicalExisting.length > 0 || duplicateExisting.length !== 1)
+    ) {
+      return 'skipped';
+    }
+
+    if (
+      (row.action === 'backfill_destroy_duplicate_personal' ||
+        row.action === 'backfill_destroy_duplicate_org') &&
+      duplicateExisting.length > 0
+    ) {
+      return 'skipped';
+    }
+
+    if (row.action === 'reassign_to_canonical_and_destroy_duplicate') {
+      const before = duplicateExisting[0] ?? null;
+      if (!before || before.id !== row.targetSubscriptionId) {
+        return 'skipped';
+      }
+
+      const [updated] = await tx
+        .update(kiloclaw_subscriptions)
+        .set({ instance_id: row.canonicalInstanceId })
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.id, row.targetSubscriptionId),
+            eq(kiloclaw_subscriptions.instance_id, row.duplicateInstanceId)
+          )
+        )
+        .returning();
+
+      if (!updated) {
+        return 'skipped';
+      }
+
+      await insertAlignmentChangeLog(tx, {
+        subscriptionId: updated.id,
+        action: 'reassigned',
+        reason: 'apply_duplicate_active_reassign_to_canonical',
+        before,
+        after: updated,
+      });
+    }
+
+    const destroyed = await markDuplicateInstanceDestroyed(tx, row.duplicateInstanceId);
+    if (!destroyed) {
+      return 'skipped';
+    }
+
+    const replacement = await insertDuplicateTerminalSubscription(tx, row);
+    if (!replacement) {
+      return 'skipped';
+    }
+
+    await insertAlignmentChangeLog(tx, {
+      subscriptionId: replacement.id,
+      action: 'backfilled',
+      reason:
+        row.contextType === 'personal'
+          ? 'apply_duplicate_active_backfill_personal_terminal'
+          : 'apply_duplicate_active_backfill_org_terminal',
+      before: null,
+      after: replacement,
+    });
+
+    if (row.action === 'reassign_to_canonical_and_destroy_duplicate') {
+      return 'reassigned';
+    }
+    return row.contextType === 'personal' ? 'personal_destroyed' : 'org_destroyed';
+  });
 }
 
 async function applyDuplicateActiveInstances() {
@@ -1135,6 +1300,7 @@ async function applyDuplicateActiveInstances() {
     canonicalInstanceId: string;
     userId: string;
     action: string;
+    error?: string;
   }> = [];
 
   for (const row of rows) {
@@ -1146,124 +1312,45 @@ async function applyDuplicateActiveInstances() {
       continue;
     }
 
-    const [canonicalExisting, duplicateExisting] = await Promise.all([
-      db
-        .select()
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.instance_id, row.canonicalInstanceId)),
-      db
-        .select()
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.instance_id, row.duplicateInstanceId)),
-    ]);
-
-    if (
-      row.action === 'reassign_to_canonical_and_destroy_duplicate' &&
-      (!row.targetSubscriptionId || canonicalExisting.length > 0 || duplicateExisting.length !== 1)
-    ) {
+    let outcome: DuplicateApplyOutcome;
+    try {
+      outcome = await applyDuplicateActiveInstanceRow(row);
+    } catch (error) {
+      console.error('Duplicate active instance apply row failed', {
+        duplicateInstanceId: row.duplicateInstanceId,
+        canonicalInstanceId: row.canonicalInstanceId,
+        userId: row.userId,
+        action: row.action,
+        error: describeError(error),
+      });
       skipped.push({
         duplicateInstanceId: row.duplicateInstanceId,
         canonicalInstanceId: row.canonicalInstanceId,
         userId: row.userId,
         action: row.action,
+        error: describeError(error),
       });
       continue;
     }
 
-    if (
-      (row.action === 'backfill_destroy_duplicate_personal' ||
-        row.action === 'backfill_destroy_duplicate_org') &&
-      duplicateExisting.length > 0
-    ) {
-      skipped.push({
-        duplicateInstanceId: row.duplicateInstanceId,
-        canonicalInstanceId: row.canonicalInstanceId,
-        userId: row.userId,
-        action: row.action,
-      });
-      continue;
-    }
-
-    if (row.action === 'reassign_to_canonical_and_destroy_duplicate') {
-      const before = duplicateExisting[0] ?? null;
-      if (!before || before.id !== row.targetSubscriptionId) {
+    switch (outcome) {
+      case 'personal_destroyed':
+        personalDestroyed += 1;
+        break;
+      case 'org_destroyed':
+        orgDestroyed += 1;
+        break;
+      case 'reassigned':
+        reassigned += 1;
+        break;
+      case 'skipped':
         skipped.push({
           duplicateInstanceId: row.duplicateInstanceId,
           canonicalInstanceId: row.canonicalInstanceId,
           userId: row.userId,
           action: row.action,
         });
-        continue;
-      }
-
-      const [updated] = await db
-        .update(kiloclaw_subscriptions)
-        .set({ instance_id: row.canonicalInstanceId })
-        .where(
-          and(
-            eq(kiloclaw_subscriptions.id, row.targetSubscriptionId),
-            eq(kiloclaw_subscriptions.instance_id, row.duplicateInstanceId)
-          )
-        )
-        .returning();
-
-      if (!updated) {
-        skipped.push({
-          duplicateInstanceId: row.duplicateInstanceId,
-          canonicalInstanceId: row.canonicalInstanceId,
-          userId: row.userId,
-          action: row.action,
-        });
-        continue;
-      }
-
-      await insertAlignmentChangeLog({
-        subscriptionId: updated.id,
-        action: 'reassigned',
-        reason: 'apply_duplicate_active_reassign_to_canonical',
-        before,
-        after: updated,
-      });
-      reassigned += 1;
-    }
-
-    const replacement = await insertDuplicateTerminalSubscription(row);
-    if (!replacement) {
-      skipped.push({
-        duplicateInstanceId: row.duplicateInstanceId,
-        canonicalInstanceId: row.canonicalInstanceId,
-        userId: row.userId,
-        action: row.action,
-      });
-      continue;
-    }
-
-    await insertAlignmentChangeLog({
-      subscriptionId: replacement.id,
-      action: 'backfilled',
-      reason:
-        row.contextType === 'personal'
-          ? 'apply_duplicate_active_backfill_personal_terminal'
-          : 'apply_duplicate_active_backfill_org_terminal',
-      before: null,
-      after: replacement,
-    });
-
-    const destroyed = await markDuplicateInstanceDestroyed(row.duplicateInstanceId);
-    if (!destroyed) {
-      skipped.push({
-        duplicateInstanceId: row.duplicateInstanceId,
-        canonicalInstanceId: row.canonicalInstanceId,
-        userId: row.userId,
-        action: row.action,
-      });
-      continue;
-    }
-
-    if (row.contextType === 'personal') {
-      personalDestroyed += 1;
-    } else {
-      orgDestroyed += 1;
+        break;
     }
   }
 
@@ -1277,28 +1364,33 @@ async function applyDuplicateActiveInstances() {
   printSection('Duplicate active instances skipped during apply', skipped);
 }
 
-async function applyMissingPersonalBackfill() {
-  const rows = await buildMissingPersonalCandidates();
-  let adopted = 0;
-  let reassigned = 0;
-  let bootstrapped = 0;
-  let earlybirdBackfilled = 0;
-  const skipped: Array<{ instanceId: string; userId: string; action: string }> = [];
+type MissingPersonalOutcome =
+  | 'adopted'
+  | 'reassigned'
+  | 'bootstrapped'
+  | 'earlybird_backfilled'
+  | 'skipped'
+  | 'no_op';
 
-  for (const row of rows) {
+async function applyMissingPersonalBackfillRow(
+  row: MissingPersonalCandidate
+): Promise<MissingPersonalOutcome> {
+  if (row.action === 'manual_review') {
+    return 'no_op';
+  }
+  return await db.transaction(async tx => {
     if (row.action === 'adopt_detached_access_row') {
       if (!row.targetSubscriptionId) {
-        skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
-        continue;
+        return 'skipped';
       }
 
-      const result = await db
+      const result = await tx
         .select()
         .from(kiloclaw_subscriptions)
         .where(eq(kiloclaw_subscriptions.id, row.targetSubscriptionId))
         .limit(1);
       const before = result[0] ?? null;
-      const updated = await db
+      const updated = await tx
         .update(kiloclaw_subscriptions)
         .set({ instance_id: row.instanceId })
         .where(
@@ -1310,85 +1402,172 @@ async function applyMissingPersonalBackfill() {
         .returning();
       const updatedRow = updated[0] ?? null;
 
-      if (before && updatedRow) {
-        await insertAlignmentChangeLog({
-          subscriptionId: updatedRow.id,
-          action: 'reassigned',
-          reason: 'apply_missing_personal_adopt_detached',
-          before,
-          after: updatedRow,
-        });
-        adopted += 1;
-      } else {
-        skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
+      if (!before || !updatedRow) {
+        return 'skipped';
       }
-      continue;
+
+      await insertAlignmentChangeLog(tx, {
+        subscriptionId: updatedRow.id,
+        action: 'reassigned',
+        reason: 'apply_missing_personal_adopt_detached',
+        before,
+        after: updatedRow,
+      });
+      return 'adopted';
     }
 
     if (row.action === 'reassign_destroyed_access_row') {
       if (!row.targetSubscriptionId) {
-        skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
-        continue;
+        return 'skipped';
       }
 
-      const existing = await db
+      const existing = await tx
         .select({ id: kiloclaw_subscriptions.id })
         .from(kiloclaw_subscriptions)
         .where(eq(kiloclaw_subscriptions.instance_id, row.instanceId))
         .limit(1);
       if (existing.length > 0) {
-        skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
-        continue;
+        return 'skipped';
       }
 
-      const [before] = await db
+      const [before] = await tx
         .select()
         .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.id, row.targetSubscriptionId))
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.id, row.targetSubscriptionId),
+            isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+          )
+        )
         .limit(1);
-      const updated = await db
-        .update(kiloclaw_subscriptions)
-        .set({ instance_id: row.instanceId })
-        .where(eq(kiloclaw_subscriptions.id, row.targetSubscriptionId))
-        .returning();
-      const updatedRow = updated[0] ?? null;
 
-      if (before && updatedRow) {
-        await insertAlignmentChangeLog({
-          subscriptionId: updatedRow.id,
-          action: 'reassigned',
-          reason: 'apply_missing_personal_reassign_destroyed',
-          before,
-          after: updatedRow,
-        });
-        reassigned += 1;
-      } else {
-        skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
+      if (!before) {
+        return 'skipped';
       }
-      continue;
+
+      // Successor pattern: mirror createSuccessorPersonalSubscription in
+      // services/kiloclaw-billing/src/bootstrap.ts. Create new row on the active
+      // instance, mark the destroyed-instance row canceled + transferred_to. This
+      // preserves history on the destroyed instance and keeps future audits clean.
+      const [insertedSuccessor] = await tx
+        .insert(kiloclaw_subscriptions)
+        .values({
+          user_id: before.user_id,
+          instance_id: row.instanceId,
+          access_origin: before.access_origin,
+          payment_source: before.payment_source,
+          plan: before.plan,
+          scheduled_plan: before.scheduled_plan,
+          scheduled_by: before.scheduled_by,
+          status: before.status,
+          cancel_at_period_end: before.cancel_at_period_end,
+          pending_conversion: before.pending_conversion,
+          trial_started_at: before.trial_started_at,
+          trial_ends_at: before.trial_ends_at,
+          current_period_start: before.current_period_start,
+          current_period_end: before.current_period_end,
+          credit_renewal_at: before.credit_renewal_at,
+          commit_ends_at: before.commit_ends_at,
+          past_due_since: before.past_due_since,
+          suspended_at: before.suspended_at,
+          destruction_deadline: before.destruction_deadline,
+          auto_resume_requested_at: before.auto_resume_requested_at,
+          auto_resume_retry_after: before.auto_resume_retry_after,
+          auto_resume_attempt_count: before.auto_resume_attempt_count,
+          auto_top_up_triggered_for_period: before.auto_top_up_triggered_for_period,
+        })
+        .returning();
+
+      if (!insertedSuccessor) {
+        return 'skipped';
+      }
+
+      const [predecessor] = await tx
+        .update(kiloclaw_subscriptions)
+        .set({
+          status: 'canceled',
+          transferred_to_subscription_id: insertedSuccessor.id,
+          payment_source: 'credits',
+          stripe_subscription_id: null,
+          stripe_schedule_id: null,
+          credit_renewal_at: null,
+          cancel_at_period_end: false,
+          pending_conversion: false,
+          scheduled_plan: null,
+          scheduled_by: null,
+          auto_resume_requested_at: null,
+          auto_resume_retry_after: null,
+          auto_resume_attempt_count: 0,
+          auto_top_up_triggered_for_period: null,
+          destruction_deadline: null,
+        })
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.id, before.id),
+            isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+          )
+        )
+        .returning();
+
+      if (!predecessor) {
+        return 'skipped';
+      }
+
+      const successor =
+        before.stripe_subscription_id || before.stripe_schedule_id
+          ? ((
+              await tx
+                .update(kiloclaw_subscriptions)
+                .set({
+                  stripe_subscription_id: before.stripe_subscription_id,
+                  stripe_schedule_id: before.stripe_schedule_id,
+                })
+                .where(eq(kiloclaw_subscriptions.id, insertedSuccessor.id))
+                .returning()
+            )[0] ?? null)
+          : insertedSuccessor;
+
+      if (!successor) {
+        return 'skipped';
+      }
+
+      await insertAlignmentChangeLog(tx, {
+        subscriptionId: predecessor.id,
+        action: 'reassigned',
+        reason: 'apply_missing_personal_reassign_destroyed_predecessor',
+        before,
+        after: predecessor,
+      });
+      await insertAlignmentChangeLog(tx, {
+        subscriptionId: successor.id,
+        action: 'backfilled',
+        reason: 'apply_missing_personal_reassign_destroyed_successor',
+        before: null,
+        after: successor,
+      });
+      return 'reassigned';
     }
 
     if (row.action === 'bootstrap_trial_row') {
-      const [existingForInstance, existingForUser] = await Promise.all([
-        db
+      if (row.instanceDestroyedAt) {
+        return 'skipped';
+      }
+
+      const [existingForInstance, hasPersonalForUser] = await Promise.all([
+        tx
           .select({ id: kiloclaw_subscriptions.id })
           .from(kiloclaw_subscriptions)
           .where(eq(kiloclaw_subscriptions.instance_id, row.instanceId))
           .limit(1),
-        db
-          .select({ id: kiloclaw_subscriptions.id })
-          .from(kiloclaw_subscriptions)
-          .where(eq(kiloclaw_subscriptions.user_id, row.userId))
-          .limit(1),
+        personalContextSubscriptionExistsForUser(tx, row.userId),
       ]);
 
-      if (existingForInstance.length > 0 || existingForUser.length > 0) {
-        skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
-        continue;
+      if (existingForInstance.length > 0 || hasPersonalForUser) {
+        return 'skipped';
       }
 
       const trialEndsAt = getTrialEndsAt(row.instanceCreatedAt);
-      const [inserted] = await db
+      const [inserted] = await tx
         .insert(kiloclaw_subscriptions)
         .values({
           user_id: row.userId,
@@ -1404,56 +1583,49 @@ async function applyMissingPersonalBackfill() {
         })
         .returning();
 
-      if (inserted) {
-        await insertAlignmentChangeLog({
-          subscriptionId: inserted.id,
-          action: 'backfilled',
-          reason: 'apply_missing_personal_bootstrap_trial',
-          before: null,
-          after: inserted,
-        });
-        bootstrapped += 1;
-      } else {
-        skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
+      if (!inserted) {
+        return 'skipped';
       }
-      continue;
+
+      await insertAlignmentChangeLog(tx, {
+        subscriptionId: inserted.id,
+        action: 'backfilled',
+        reason: 'apply_missing_personal_bootstrap_trial',
+        before: null,
+        after: inserted,
+      });
+      return 'bootstrapped';
     }
 
     if (row.action === 'backfill_earlybird_row') {
-      const [existingForInstance, existingForUser, earlybirdPurchase] = await Promise.all([
-        db
+      if (row.instanceDestroyedAt) {
+        return 'skipped';
+      }
+
+      const [existingForInstance, hasPersonalForUser, earlybirdPurchase] = await Promise.all([
+        tx
           .select({ id: kiloclaw_subscriptions.id })
           .from(kiloclaw_subscriptions)
           .where(eq(kiloclaw_subscriptions.instance_id, row.instanceId))
           .limit(1),
-        db
-          .select({ id: kiloclaw_subscriptions.id })
-          .from(kiloclaw_subscriptions)
-          .where(eq(kiloclaw_subscriptions.user_id, row.userId))
-          .limit(1),
-        db
+        personalContextSubscriptionExistsForUser(tx, row.userId),
+        tx
           .select({ createdAt: kiloclaw_earlybird_purchases.created_at })
           .from(kiloclaw_earlybird_purchases)
           .where(eq(kiloclaw_earlybird_purchases.user_id, row.userId))
           .limit(1),
       ]);
 
-      if (
-        existingForInstance.length > 0 ||
-        existingForUser.length > 0 ||
-        earlybirdPurchase.length === 0
-      ) {
-        skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
-        continue;
+      if (existingForInstance.length > 0 || hasPersonalForUser || earlybirdPurchase.length === 0) {
+        return 'skipped';
       }
 
-      const trialEndsAt = getEarlybirdEndsAt();
       const purchase = earlybirdPurchase[0];
       if (!purchase) {
-        skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
-        continue;
+        return 'skipped';
       }
-      const [inserted] = await db
+      const trialEndsAt = getEarlybirdEndsAt();
+      const [inserted] = await tx
         .insert(kiloclaw_subscriptions)
         .values({
           user_id: row.userId,
@@ -1470,18 +1642,75 @@ async function applyMissingPersonalBackfill() {
         })
         .returning();
 
-      if (inserted) {
-        await insertAlignmentChangeLog({
-          subscriptionId: inserted.id,
-          action: 'backfilled',
-          reason: 'apply_missing_personal_backfill_earlybird',
-          before: null,
-          after: inserted,
-        });
-        earlybirdBackfilled += 1;
-      } else {
-        skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
+      if (!inserted) {
+        return 'skipped';
       }
+
+      await insertAlignmentChangeLog(tx, {
+        subscriptionId: inserted.id,
+        action: 'backfilled',
+        reason: 'apply_missing_personal_backfill_earlybird',
+        before: null,
+        after: inserted,
+      });
+      return 'earlybird_backfilled';
+    }
+
+    return 'no_op';
+  });
+}
+
+async function applyMissingPersonalBackfill() {
+  const rows = await buildMissingPersonalCandidates();
+  let adopted = 0;
+  let reassigned = 0;
+  let bootstrapped = 0;
+  let earlybirdBackfilled = 0;
+  const skipped: Array<{
+    instanceId: string;
+    userId: string;
+    action: string;
+    error?: string;
+  }> = [];
+
+  for (const row of rows) {
+    let outcome: MissingPersonalOutcome;
+    try {
+      outcome = await applyMissingPersonalBackfillRow(row);
+    } catch (error) {
+      console.error('Missing personal backfill row failed', {
+        instanceId: row.instanceId,
+        userId: row.userId,
+        action: row.action,
+        error: describeError(error),
+      });
+      skipped.push({
+        instanceId: row.instanceId,
+        userId: row.userId,
+        action: row.action,
+        error: describeError(error),
+      });
+      continue;
+    }
+
+    switch (outcome) {
+      case 'adopted':
+        adopted += 1;
+        break;
+      case 'reassigned':
+        reassigned += 1;
+        break;
+      case 'bootstrapped':
+        bootstrapped += 1;
+        break;
+      case 'earlybird_backfilled':
+        earlybirdBackfilled += 1;
+        break;
+      case 'skipped':
+        skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
+        break;
+      case 'no_op':
+        break;
     }
   }
 
@@ -1496,38 +1725,29 @@ async function applyMissingPersonalBackfill() {
   printSection('Missing personal rows skipped during apply', skipped);
 }
 
-async function applyOrgBackfill() {
-  const rows = await buildOrgBackfillCandidates();
-  let activeStandardCredits = 0;
-  let activeTrialRows = 0;
-  let destroyedStandardCredits = 0;
-  let destroyedTrialRows = 0;
-  const skipped: Array<{
-    instanceId: string;
-    organizationId: string;
-    userId: string;
-    action: string;
-  }> = [];
+type OrgApplyOutcome = OrgBackfillAction | 'skipped';
 
-  for (const row of rows) {
-    const existing = await db
+const ORG_BACKFILL_REASON: Record<OrgBackfillAction, string> = {
+  backfill_active_standard_credits: 'apply_org_backfill_active_standard_credits',
+  backfill_trial: 'apply_org_backfill_trial',
+  backfill_destroyed_standard_credits: 'apply_org_backfill_destroyed_standard_credits',
+  backfill_destroyed_trial: 'apply_org_backfill_destroyed_trial',
+};
+
+async function applyOrgBackfillRow(row: OrgBackfillCandidate): Promise<OrgApplyOutcome> {
+  return await db.transaction(async tx => {
+    const existing = await tx
       .select({ id: kiloclaw_subscriptions.id })
       .from(kiloclaw_subscriptions)
       .where(eq(kiloclaw_subscriptions.instance_id, row.instanceId))
       .limit(1);
     if (existing.length > 0) {
-      skipped.push({
-        instanceId: row.instanceId,
-        organizationId: row.organizationId,
-        userId: row.userId,
-        action: row.action,
-      });
-      continue;
+      return 'skipped';
     }
 
     const trialEndsAt = row.freeTrialEndAt ?? getTrialEndsAt(row.organizationCreatedAt);
     const trialStatus = new Date(trialEndsAt).getTime() > Date.now() ? 'trialing' : 'canceled';
-    const [inserted] = await db
+    const [inserted] = await tx
       .insert(kiloclaw_subscriptions)
       .values(
         row.action === 'backfill_active_standard_credits'
@@ -1568,60 +1788,79 @@ async function applyOrgBackfill() {
       .returning();
 
     if (!inserted) {
+      return 'skipped';
+    }
+
+    await insertAlignmentChangeLog(tx, {
+      subscriptionId: inserted.id,
+      action: 'backfilled',
+      reason: ORG_BACKFILL_REASON[row.action],
+      before: null,
+      after: inserted,
+    });
+    return row.action;
+  });
+}
+
+async function applyOrgBackfill() {
+  const rows = await buildOrgBackfillCandidates();
+  const counts: Record<OrgBackfillAction, number> = {
+    backfill_active_standard_credits: 0,
+    backfill_trial: 0,
+    backfill_destroyed_standard_credits: 0,
+    backfill_destroyed_trial: 0,
+  };
+  const skipped: Array<{
+    instanceId: string;
+    organizationId: string;
+    userId: string;
+    action: string;
+    error?: string;
+  }> = [];
+
+  for (const row of rows) {
+    let outcome: OrgApplyOutcome;
+    try {
+      outcome = await applyOrgBackfillRow(row);
+    } catch (error) {
+      console.error('Org backfill row failed', {
+        instanceId: row.instanceId,
+        organizationId: row.organizationId,
+        userId: row.userId,
+        action: row.action,
+        error: describeError(error),
+      });
+      skipped.push({
+        instanceId: row.instanceId,
+        organizationId: row.organizationId,
+        userId: row.userId,
+        action: row.action,
+        error: describeError(error),
+      });
+      continue;
+    }
+
+    if (outcome === 'skipped') {
       skipped.push({
         instanceId: row.instanceId,
         organizationId: row.organizationId,
         userId: row.userId,
         action: row.action,
       });
-      continue;
-    }
-
-    if (row.action === 'backfill_active_standard_credits') {
-      await insertAlignmentChangeLog({
-        subscriptionId: inserted.id,
-        action: 'backfilled',
-        reason: 'apply_org_backfill_active_standard_credits',
-        before: null,
-        after: inserted,
-      });
-      activeStandardCredits += 1;
-    } else if (row.action === 'backfill_trial') {
-      await insertAlignmentChangeLog({
-        subscriptionId: inserted.id,
-        action: 'backfilled',
-        reason: 'apply_org_backfill_trial',
-        before: null,
-        after: inserted,
-      });
-      activeTrialRows += 1;
-    } else if (row.action === 'backfill_destroyed_standard_credits') {
-      await insertAlignmentChangeLog({
-        subscriptionId: inserted.id,
-        action: 'backfilled',
-        reason: 'apply_org_backfill_destroyed_standard_credits',
-        before: null,
-        after: inserted,
-      });
-      destroyedStandardCredits += 1;
     } else {
-      await insertAlignmentChangeLog({
-        subscriptionId: inserted.id,
-        action: 'backfilled',
-        reason: 'apply_org_backfill_destroyed_trial',
-        before: null,
-        after: inserted,
-      });
-      destroyedTrialRows += 1;
+      counts[outcome] += 1;
     }
   }
 
   console.log('\nOrg backfill results');
   console.table([
-    { action: 'backfill_active_standard_credits', count: activeStandardCredits },
-    { action: 'backfill_trial', count: activeTrialRows },
-    { action: 'backfill_destroyed_standard_credits', count: destroyedStandardCredits },
-    { action: 'backfill_destroyed_trial', count: destroyedTrialRows },
+    { action: 'backfill_active_standard_credits', count: counts.backfill_active_standard_credits },
+    { action: 'backfill_trial', count: counts.backfill_trial },
+    {
+      action: 'backfill_destroyed_standard_credits',
+      count: counts.backfill_destroyed_standard_credits,
+    },
+    { action: 'backfill_destroyed_trial', count: counts.backfill_destroyed_trial },
     { action: 'skipped', count: skipped.length },
   ]);
   printSection('Org rows skipped during apply', skipped);
@@ -1646,56 +1885,27 @@ function parseMode(inputMode?: string): Mode {
   }
 }
 
+const singleModeHandlers: Partial<Record<Mode, () => Promise<void>>> = {
+  'preview-missing-personal': previewMissingPersonalBackfill,
+  'apply-missing-personal': applyMissingPersonalBackfill,
+  'preview-duplicates': previewDuplicateActiveInstances,
+  'apply-duplicates': applyDuplicateActiveInstances,
+  'preview-org': previewOrgBackfill,
+  'apply-org': applyOrgBackfill,
+  'preview-changelog-baseline': previewChangelogBaselineBackfill,
+  'apply-changelog-baseline': applyChangelogBaselineBackfill,
+};
+
 export async function run(inputMode?: string) {
   const mode = parseMode(inputMode);
 
-  if (mode === 'preview-missing-personal') {
+  const handler = singleModeHandlers[mode];
+  if (handler) {
     console.log(`Mode: ${mode}`);
-    await previewMissingPersonalBackfill();
+    await handler();
     return;
   }
-
-  if (mode === 'apply-missing-personal') {
-    console.log(`Mode: ${mode}`);
-    await applyMissingPersonalBackfill();
-    return;
-  }
-
-  if (mode === 'preview-duplicates') {
-    console.log(`Mode: ${mode}`);
-    await previewDuplicateActiveInstances();
-    return;
-  }
-
-  if (mode === 'apply-duplicates') {
-    console.log(`Mode: ${mode}`);
-    await applyDuplicateActiveInstances();
-    return;
-  }
-
-  if (mode === 'preview-org') {
-    console.log(`Mode: ${mode}`);
-    await previewOrgBackfill();
-    return;
-  }
-
-  if (mode === 'apply-org') {
-    console.log(`Mode: ${mode}`);
-    await applyOrgBackfill();
-    return;
-  }
-
-  if (mode === 'preview-changelog-baseline') {
-    console.log(`Mode: ${mode}`);
-    await previewChangelogBaselineBackfill();
-    return;
-  }
-
-  if (mode === 'apply-changelog-baseline') {
-    console.log(`Mode: ${mode}`);
-    await applyChangelogBaselineBackfill();
-    return;
-  }
+  // Fall through: 'audit' and 'repair-detached' share the full summary output.
 
   const [
     personalRowsWithoutSubscriptions,
@@ -1789,35 +1999,59 @@ export async function run(inputMode?: string) {
   }
 
   let repaired = 0;
+  const failures: Array<{ subscriptionId: string; userId: string; error: string }> = [];
   for (const row of repairable) {
     if (!row.targetInstanceId) continue;
-    const [before] = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.id, row.subscriptionId))
-      .limit(1);
-    const updated = await db
-      .update(kiloclaw_subscriptions)
-      .set({ instance_id: row.targetInstanceId })
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.id, row.subscriptionId),
-          isNull(kiloclaw_subscriptions.instance_id)
-        )
-      )
-      .returning();
-    const updatedRow = updated[0] ?? null;
-    if (before && updatedRow) {
-      await insertAlignmentChangeLog({
-        subscriptionId: updatedRow.id,
-        action: 'reassigned',
-        reason: 'repair_detached_subscription',
-        before,
-        after: updatedRow,
+    const targetInstanceId = row.targetInstanceId;
+    try {
+      const didRepair = await db.transaction(async tx => {
+        const [before] = await tx
+          .select()
+          .from(kiloclaw_subscriptions)
+          .where(eq(kiloclaw_subscriptions.id, row.subscriptionId))
+          .limit(1);
+        const updated = await tx
+          .update(kiloclaw_subscriptions)
+          .set({ instance_id: targetInstanceId })
+          .where(
+            and(
+              eq(kiloclaw_subscriptions.id, row.subscriptionId),
+              isNull(kiloclaw_subscriptions.instance_id)
+            )
+          )
+          .returning();
+        const updatedRow = updated[0] ?? null;
+        if (!before || !updatedRow) {
+          return false;
+        }
+        await insertAlignmentChangeLog(tx, {
+          subscriptionId: updatedRow.id,
+          action: 'reassigned',
+          reason: 'repair_detached_subscription',
+          before,
+          after: updatedRow,
+        });
+        return true;
       });
-      repaired += 1;
+      if (didRepair) {
+        repaired += 1;
+      }
+    } catch (error) {
+      console.error('Detached subscription repair row failed', {
+        subscriptionId: row.subscriptionId,
+        userId: row.userId,
+        error: describeError(error),
+      });
+      failures.push({
+        subscriptionId: row.subscriptionId,
+        userId: row.userId,
+        error: describeError(error),
+      });
     }
   }
 
   console.log(`\nDetached subscriptions repaired: ${repaired}`);
+  if (failures.length > 0) {
+    printSection('Detached subscriptions that failed to repair', failures);
+  }
 }

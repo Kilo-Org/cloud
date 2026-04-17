@@ -1114,15 +1114,19 @@ async function getPersonalBillingStatus(user: {
     : null;
 
   const isEarlybird = sub?.access_origin === 'earlybird';
-  const earlybirdData = isEarlybird
-    ? {
-        purchased: true,
-        expiresAt: sub.trial_ends_at ?? KILOCLAW_EARLYBIRD_EXPIRY_DATE,
-        daysRemaining: sub.trial_ends_at
-          ? Math.ceil((new Date(sub.trial_ends_at).getTime() - Date.now()) / 86_400_000)
-          : 0,
-      }
+  const earlybirdExpiresAt = isEarlybird
+    ? (sub.trial_ends_at ?? KILOCLAW_EARLYBIRD_EXPIRY_DATE)
     : null;
+  const earlybirdData =
+    isEarlybird && earlybirdExpiresAt
+      ? {
+          purchased: true,
+          expiresAt: earlybirdExpiresAt,
+          daysRemaining: Math.ceil(
+            (new Date(earlybirdExpiresAt).getTime() - Date.now()) / 86_400_000
+          ),
+        }
+      : null;
 
   let instanceData: ClawBillingStatus['instance'] = null;
   if (currentPersonalInstance) {

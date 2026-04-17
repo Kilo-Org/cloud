@@ -67,5 +67,6 @@ export const botAuthMiddleware = createMiddleware<{
 
   c.set('callerId', `bot:kiloclaw:${sandboxId}`);
   c.set('callerKind', 'bot');
+  c.set('allowedSandboxIds', []);
   return next();
 });

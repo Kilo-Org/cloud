@@ -29,6 +29,8 @@ export const kiloTokenPayload = z.object({
   orgMemberships: z
     .array(z.object({ orgId: z.string(), role: z.enum(['owner', 'member', 'billing_manager']) }))
     .optional(),
+  // Sandbox IDs the user is allowed to create kilo-chat conversations for
+  kiloChatSandboxIds: z.array(z.string()).optional(),
   // Standard JWT claims
   iat: z.number().optional(),
   exp: z.number().optional(),
@@ -53,6 +55,7 @@ export type SignKiloTokenExtra = Pick<
   | 'tokenSource'
   | 'deviceAuthRequestCode'
   | 'orgMemberships'
+  | 'kiloChatSandboxIds'
 >;
 
 export async function signKiloToken(params: {

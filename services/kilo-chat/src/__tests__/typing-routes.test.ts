@@ -6,10 +6,11 @@ import type { AuthContext } from '../auth';
 import { registerConversationRoutes } from '../routes/conversations';
 import { registerTypingRoutes } from '../routes/typing';
 
-function makeApp(callerId: string, callerKind: 'user' | 'bot') {
+function makeApp(callerId: string, callerKind: 'user' | 'bot', allowedSandboxIds: string[] = []) {
   const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(async (c, next) => {
     c.set('callerId', callerId);
     c.set('callerKind', callerKind);
+    c.set('allowedSandboxIds', allowedSandboxIds);
     await next();
   });
 
@@ -25,7 +26,7 @@ async function createConversation(userSuffix: string) {
   const sandboxId = `sandbox-${userSuffix}`;
   const botId = `bot:kiloclaw:${sandboxId}`;
 
-  const userApp = makeApp(userId, 'user');
+  const userApp = makeApp(userId, 'user', [sandboxId]);
   const botApp = makeApp(botId, 'bot');
 
   const res = await userApp.request(

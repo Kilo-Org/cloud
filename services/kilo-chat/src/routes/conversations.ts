@@ -35,6 +35,11 @@ export function registerConversationRoutes(
     }
 
     const callerId = c.get('callerId');
+    const allowedSandboxIds = c.get('allowedSandboxIds');
+    if (!allowedSandboxIds.includes(body.data.sandboxId)) {
+      return c.json({ error: 'You do not have access to this sandbox' }, 403);
+    }
+
     const conversationId = ulid();
     const now = Date.now();
     const botId = `bot:kiloclaw:${body.data.sandboxId}`;

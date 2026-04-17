@@ -11,10 +11,11 @@ import type { MembershipDO } from '../do/membership-do';
  * Build a test app that bypasses real JWT/API-key auth and injects
  * callerId / callerKind directly so we can unit-test route logic.
  */
-function makeApp(callerId: string, callerKind: 'user' | 'bot') {
+function makeApp(callerId: string, callerKind: 'user' | 'bot', allowedSandboxIds: string[] = []) {
   const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(async (c, next) => {
     c.set('callerId', callerId);
     c.set('callerKind', callerKind);
+    c.set('allowedSandboxIds', allowedSandboxIds);
     await next();
   });
 
@@ -34,7 +35,7 @@ function getMemberStub(memberId: string): DurableObjectStub<MembershipDO> {
 
 describe('POST /v1/conversations', () => {
   it('creates a conversation and returns conversationId', async () => {
-    const app = makeApp('user-alice', 'user');
+    const app = makeApp('user-alice', 'user', ['sandbox-123']);
     const res = await app.request(
       '/v1/conversations',
       {
@@ -53,7 +54,7 @@ describe('POST /v1/conversations', () => {
   });
 
   it('initializes ConversationDO and MembershipDOs on creation', async () => {
-    const app = makeApp('user-bob', 'user');
+    const app = makeApp('user-bob', 'user', ['sandbox-456']);
     const res = await app.request(
       '/v1/conversations',
       {
@@ -105,6 +106,22 @@ describe('POST /v1/conversations', () => {
     expect(res.status).toBe(403);
     const body = await res.json<{ error: string }>();
     expect(body.error).toContain('Only users');
+  });
+
+  it('returns 403 when user does not own the sandbox', async () => {
+    const app = makeApp('user-unauthorized', 'user', ['sandbox-mine']);
+    const res = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sandbox-not-mine' }),
+      },
+      env
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json<{ error: string }>();
+    expect(body.error).toContain('do not have access');
   });
 
   it('returns 400 for missing sandboxId', async () => {
@@ -162,7 +179,7 @@ describe('POST /v1/conversations', () => {
 describe('GET /v1/conversations', () => {
   it('lists conversations for the caller', async () => {
     // First create a couple of conversations via a user app
-    const app = makeApp('user-eve', 'user');
+    const app = makeApp('user-eve', 'user', ['sandbox-eve-1', 'sandbox-eve-2']);
 
     await app.request(
       '/v1/conversations',
@@ -207,7 +224,7 @@ describe('GET /v1/conversations', () => {
 describe('GET /v1/conversations/:id', () => {
   it('returns conversation info for a member', async () => {
     // Create a conversation first
-    const app = makeApp('user-frank', 'user');
+    const app = makeApp('user-frank', 'user', ['sandbox-frank']);
     const createRes = await app.request(
       '/v1/conversations',
       {
@@ -229,7 +246,7 @@ describe('GET /v1/conversations/:id', () => {
 
   it('returns 403 for non-member', async () => {
     // Create conversation as user-grace
-    const gracesApp = makeApp('user-grace', 'user');
+    const gracesApp = makeApp('user-grace', 'user', ['sandbox-grace']);
     const createRes = await gracesApp.request(
       '/v1/conversations',
       {

@@ -7,10 +7,11 @@ import { registerConversationRoutes } from '../routes/conversations';
 import { registerEventsRoutes } from '../routes/events';
 import type { ConversationDO } from '../do/conversation-do';
 
-function makeApp(callerId: string, callerKind: 'user' | 'bot') {
+function makeApp(callerId: string, callerKind: 'user' | 'bot', allowedSandboxIds: string[] = []) {
   const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(async (c, next) => {
     c.set('callerId', callerId);
     c.set('callerKind', callerKind);
+    c.set('allowedSandboxIds', allowedSandboxIds);
     await next();
   });
 
@@ -28,7 +29,7 @@ function getConvStub(convId: string): DurableObjectStub<ConversationDO> {
 async function createConversation(suffix: string) {
   const userId = `user-${suffix}`;
   const sandboxId = `sandbox-${suffix}`;
-  const userApp = makeApp(userId, 'user');
+  const userApp = makeApp(userId, 'user', [sandboxId]);
 
   const res = await userApp.request(
     '/v1/conversations',

@@ -7,10 +7,11 @@ import { registerConversationRoutes } from '../routes/conversations';
 import { registerMessageRoutes } from '../routes/messages';
 import { registerReactionsRoutes } from '../routes/reactions';
 
-function makeApp(callerId: string, callerKind: 'user' | 'bot') {
+function makeApp(callerId: string, callerKind: 'user' | 'bot', allowedSandboxIds: string[] = []) {
   const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(async (c, next) => {
     c.set('callerId', callerId);
     c.set('callerKind', callerKind);
+    c.set('allowedSandboxIds', allowedSandboxIds);
     await next();
   });
   const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
@@ -25,7 +26,7 @@ async function setup(suffix: string) {
   const userId = `user-${suffix}`;
   const sandboxId = `sandbox-${suffix}`;
   const botId = `bot:kiloclaw:${sandboxId}`;
-  const userApp = makeApp(userId, 'user');
+  const userApp = makeApp(userId, 'user', [sandboxId]);
 
   const convRes = await userApp.request(
     '/v1/conversations',

@@ -42,6 +42,7 @@ async function setupData(suffix: string) {
   setupApp.use('*', async (c, next) => {
     c.set('callerId', userId);
     c.set('callerKind', 'user');
+    c.set('allowedSandboxIds', [sandboxId]);
     await next();
   });
   registerConversationRoutes(setupApp);

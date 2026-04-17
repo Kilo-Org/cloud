@@ -18,6 +18,7 @@ export type JWTTokenExtraPayload = {
   createdOnPlatform?: string;
   tokenSource?: string;
   orgMemberships?: Array<{ orgId: string; role: OrganizationRole }>;
+  kiloChatSandboxIds?: string[];
 };
 
 const FIVE_YEARS_IN_SECONDS = 5 * 365 * 24 * 60 * 60;

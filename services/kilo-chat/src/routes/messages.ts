@@ -45,8 +45,8 @@ export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: Auth
   });
 
   // PATCH /v1/messages/:messageId — edit message
-  app.patch('/v1/messages/:messageId', handleEditMessage('messageId'));
+  app.patch('/v1/messages/:messageId', handleEditMessage);
 
   // DELETE /v1/messages/:messageId — soft delete
-  app.delete('/v1/messages/:messageId', handleDeleteMessage('messageId'));
+  app.delete('/v1/messages/:messageId', handleDeleteMessage);
 }

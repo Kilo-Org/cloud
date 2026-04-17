@@ -5,6 +5,6 @@ import { handleAddReaction, handleRemoveReaction } from './handler';
 export function registerReactionsRoutes(
   app: Hono<{ Bindings: Env; Variables: AuthContext }>
 ): void {
-  app.post('/v1/messages/:messageId/reactions', handleAddReaction('messageId'));
-  app.delete('/v1/messages/:messageId/reactions', handleRemoveReaction('messageId'));
+  app.post('/v1/messages/:messageId/reactions', handleAddReaction);
+  app.delete('/v1/messages/:messageId/reactions', handleRemoveReaction);
 }

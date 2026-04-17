@@ -42,10 +42,18 @@ async function parseBody<T>(c: HonoCtx, schema: ZodSchema<T>) {
   return { ok: true as const, data: parsed.data };
 }
 
-function parseParam(c: HonoCtx, name: string, errorMsg: string) {
-  const result = ulidSchema.safeParse(c.req.param(name));
+function parseMessageId(c: HonoCtx) {
+  const result = ulidSchema.safeParse(c.req.param('messageId'));
   if (!result.success) {
-    return { ok: false as const, response: c.json({ error: errorMsg }, 400) };
+    return { ok: false as const, response: c.json({ error: 'Invalid message ID' }, 400) };
+  }
+  return { ok: true as const, data: result.data };
+}
+
+function parseConversationId(c: HonoCtx) {
+  const result = ulidSchema.safeParse(c.req.param('conversationId'));
+  if (!result.success) {
+    return { ok: false as const, response: c.json({ error: 'Invalid conversation ID' }, 400) };
   }
   return { ok: true as const, data: result.data };
 }
@@ -92,116 +100,104 @@ export function handleCreateMessage(includeClientId: boolean) {
 
 // ─── editMessage ────────────────────────────────────────────────────────────
 
-export function handleEditMessage(messageIdParam: string) {
-  return async (c: HonoCtx) => {
-    const msgId = parseParam(c, messageIdParam, 'Invalid message ID');
-    if (!msgId.ok) return msgId.response;
+export async function handleEditMessage(c: HonoCtx) {
+  const msgId = parseMessageId(c);
+  if (!msgId.ok) return msgId.response;
 
-    const body = await parseBody(c, editMessageSchema);
-    if (!body.ok) return body.response;
+  const body = await parseBody(c, editMessageSchema);
+  if (!body.ok) return body.response;
 
-    const callerId = c.get('callerId');
-    const result = await editMessageFor(c.env, callerId, {
-      ...body.data,
-      messageId: msgId.data,
-    });
-    if (!result.ok) {
-      if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
-      if (result.code === 'not_found') return c.json({ error: result.error }, 404);
-      return c.json({ error: result.error }, 500);
-    }
-    if (result.stale) {
-      return c.json({ error: 'Edit conflict', messageId: result.messageId }, 409);
-    }
-    return c.json({ messageId: result.messageId });
-  };
+  const callerId = c.get('callerId');
+  const result = await editMessageFor(c.env, callerId, {
+    ...body.data,
+    messageId: msgId.data,
+  });
+  if (!result.ok) {
+    if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    if (result.code === 'not_found') return c.json({ error: result.error }, 404);
+    return c.json({ error: result.error }, 500);
+  }
+  if (result.stale) {
+    return c.json({ error: 'Edit conflict', messageId: result.messageId }, 409);
+  }
+  return c.json({ messageId: result.messageId });
 }
 
 // ─── deleteMessage ──────────────────────────────────────────────────────────
 
-export function handleDeleteMessage(messageIdParam: string) {
-  return async (c: HonoCtx) => {
-    const msgId = parseParam(c, messageIdParam, 'Invalid message ID');
-    if (!msgId.ok) return msgId.response;
+export async function handleDeleteMessage(c: HonoCtx) {
+  const msgId = parseMessageId(c);
+  if (!msgId.ok) return msgId.response;
 
-    const body = await parseBody(c, deleteMessageSchema);
-    if (!body.ok) return body.response;
+  const body = await parseBody(c, deleteMessageSchema);
+  if (!body.ok) return body.response;
 
-    const callerId = c.get('callerId');
-    const result = await deleteMessageFor(c.env, callerId, {
-      conversationId: body.data.conversationId,
-      messageId: msgId.data,
-    });
-    if (!result.ok) {
-      if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
-      if (result.code === 'not_found') return c.json({ error: result.error }, 404);
-      return c.json({ error: result.error }, 500);
-    }
-    return new Response(null, { status: 204 });
-  };
+  const callerId = c.get('callerId');
+  const result = await deleteMessageFor(c.env, callerId, {
+    conversationId: body.data.conversationId,
+    messageId: msgId.data,
+  });
+  if (!result.ok) {
+    if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    if (result.code === 'not_found') return c.json({ error: result.error }, 404);
+    return c.json({ error: result.error }, 500);
+  }
+  return new Response(null, { status: 204 });
 }
 
 // ─── addReaction ─────────────────────────────────────────────────────────────
 
-export function handleAddReaction(messageIdParam: string) {
-  return async (c: HonoCtx) => {
-    const msgId = parseParam(c, messageIdParam, 'Invalid message ID');
-    if (!msgId.ok) return msgId.response;
+export async function handleAddReaction(c: HonoCtx) {
+  const msgId = parseMessageId(c);
+  if (!msgId.ok) return msgId.response;
 
-    const body = await parseBody(c, reactionBodySchema);
-    if (!body.ok) return body.response;
+  const body = await parseBody(c, reactionBodySchema);
+  if (!body.ok) return body.response;
 
-    const callerId = c.get('callerId');
-    const result = await addReactionFor(c.env, callerId, {
-      conversationId: body.data.conversationId,
-      messageId: msgId.data,
-      emoji: body.data.emoji,
-    });
-    if (!result.ok) {
-      if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
-      return c.json({ error: result.error }, 500);
-    }
-    return c.json({ id: result.id }, result.added ? 201 : 200);
-  };
+  const callerId = c.get('callerId');
+  const result = await addReactionFor(c.env, callerId, {
+    conversationId: body.data.conversationId,
+    messageId: msgId.data,
+    emoji: body.data.emoji,
+  });
+  if (!result.ok) {
+    if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json({ id: result.id }, result.added ? 201 : 200);
 }
 
 // ─── removeReaction ──────────────────────────────────────────────────────────
 
-export function handleRemoveReaction(messageIdParam: string) {
-  return async (c: HonoCtx) => {
-    const msgId = parseParam(c, messageIdParam, 'Invalid message ID');
-    if (!msgId.ok) return msgId.response;
+export async function handleRemoveReaction(c: HonoCtx) {
+  const msgId = parseMessageId(c);
+  if (!msgId.ok) return msgId.response;
 
-    const body = await parseBody(c, reactionBodySchema);
-    if (!body.ok) return body.response;
+  const body = await parseBody(c, reactionBodySchema);
+  if (!body.ok) return body.response;
 
-    const callerId = c.get('callerId');
-    const result = await removeReactionFor(c.env, callerId, {
-      conversationId: body.data.conversationId,
-      messageId: msgId.data,
-      emoji: body.data.emoji,
-    });
-    if (!result.ok) {
-      if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
-      return c.json({ error: result.error }, 500);
-    }
-    return new Response(null, { status: 204 });
-  };
+  const callerId = c.get('callerId');
+  const result = await removeReactionFor(c.env, callerId, {
+    conversationId: body.data.conversationId,
+    messageId: msgId.data,
+    emoji: body.data.emoji,
+  });
+  if (!result.ok) {
+    if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    return c.json({ error: result.error }, 500);
+  }
+  return new Response(null, { status: 204 });
 }
 
 // ─── setTyping ───────────────────────────────────────────────────────────────
 
 /**
- * @param conversationIdParam - name of the URL param holding the conversation ID
  * @param successResponse - factory for the success response (human returns `{}`,
  *                          bot returns 204 No Content)
  */
-export function handleSetTyping(
-  conversationIdParam: string,
-  successResponse: (c: HonoCtx) => Response
-) {
+export function handleSetTyping(successResponse: (c: HonoCtx) => Response) {
   return async (c: HonoCtx) => {
-    const convId = parseParam(c, conversationIdParam, 'Invalid conversation ID');
+    const convId = parseConversationId(c);
     if (!convId.ok) return convId.response;
 
     const callerId = c.get('callerId');

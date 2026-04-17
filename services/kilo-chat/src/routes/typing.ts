@@ -5,7 +5,7 @@ import { handleSetTyping } from './handler';
 export function registerTypingRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
   // Human typing: returns {} (200)
   app.post(
-    '/v1/conversations/:id/typing',
-    handleSetTyping('id', c => c.json({}))
+    '/v1/conversations/:conversationId/typing',
+    handleSetTyping(c => c.json({}))
   );
 }

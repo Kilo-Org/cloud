@@ -3009,6 +3009,7 @@ export const kiloclawRouter = createTRPCRouter({
     if (currentPersonalInstance) {
       const isDestroyed = currentPersonalInstance.destroyed_at !== null;
       instanceData = {
+        id: currentPersonalInstance.id,
         exists: !isDestroyed,
         status: null,
         suspendedAt: sub?.suspended_at ?? null,

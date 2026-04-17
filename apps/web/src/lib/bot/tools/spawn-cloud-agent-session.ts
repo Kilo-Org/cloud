@@ -17,6 +17,7 @@ import {
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { APP_URL } from '@/lib/constants';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
@@ -30,6 +31,12 @@ function deriveBotCallbackToken(botRequestId: string): string {
   return createHmac('sha256', INTERNAL_API_SECRET)
     .update(`bot-callback:${botRequestId}`)
     .digest('hex');
+}
+
+function buildBotCallbackUrl(botRequestId: string, currentStep: number | undefined): string {
+  const url = new URL(`/api/internal/bot-session-callback/${botRequestId}`, APP_URL);
+  url.searchParams.set('currentStep', String(parseBotCallbackStep(String(currentStep ?? 0))));
+  return url.toString();
 }
 
 /**
@@ -83,7 +90,7 @@ export default async function spawnCloudAgentSession(
   ticketUserId: string,
   botRequestId: string | undefined,
   onSessionReady?: RunSessionInput['onSessionReady'],
-  options?: { prSignature?: string; chatPlatform?: string }
+  options?: { prSignature?: string; chatPlatform?: string; currentStep?: number }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
 
@@ -96,7 +103,7 @@ export default async function spawnCloudAgentSession(
   const callbackTarget =
     botRequestId && INTERNAL_API_SECRET
       ? {
-          url: `${APP_URL}/api/internal/bot-session-callback/${botRequestId}`,
+          url: buildBotCallbackUrl(botRequestId, options?.currentStep),
           headers: { 'X-Bot-Callback-Token': deriveBotCallbackToken(botRequestId) },
         }
       : undefined;

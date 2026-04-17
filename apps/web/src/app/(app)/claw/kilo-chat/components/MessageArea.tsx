@@ -45,7 +45,7 @@ export function MessageArea({
 
   const conversationDetail = useConversationDetail(getToken, conversationId);
   const renameConversation = useRenameConversation(getToken);
-  const sendMessage = useSendMessage(getToken);
+  const sendMessage = useSendMessage(getToken, currentUserId);
   const editMessage = useEditMessage(getToken);
   const deleteMessage = useDeleteMessage(getToken);
 

@@ -59,8 +59,11 @@ export function useLeaveConversation(getToken: () => Promise<string>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (conversationId: string) => client.leaveConversation(conversationId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['kilo-chat'] });
+    onSuccess: (_data, conversationId) => {
+      // Remove stale queries for the left conversation before invalidating the list
+      queryClient.removeQueries({ queryKey: ['kilo-chat', 'conversation', conversationId] });
+      queryClient.removeQueries({ queryKey: ['kilo-chat', 'messages', conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
     },
   });
 }

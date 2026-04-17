@@ -26,12 +26,13 @@ export function ConversationItem({
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const lastMessageTime = conversation.lastMessageId
-    ? new Date(ulidToTimestamp(conversation.lastMessageId)).toLocaleTimeString([], {
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-    : null;
+  const timestamp = conversation.lastMessageId
+    ? ulidToTimestamp(conversation.lastMessageId)
+    : conversation.joinedAt;
+  const displayTime = new Date(timestamp).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 
   // Focus input when entering rename mode
   useEffect(() => {
@@ -146,11 +147,7 @@ export function ConversationItem({
           {conversation.conversationTitle ?? 'Untitled'}
         </p>
         <div className="flex shrink-0 items-center gap-1">
-          {lastMessageTime && (
-            <span className="text-muted-foreground text-xs group-hover:hidden">
-              {lastMessageTime}
-            </span>
-          )}
+          <span className="text-muted-foreground text-xs group-hover:hidden">{displayTime}</span>
           <div ref={menuRef} className="relative">
             <button
               onClick={e => {

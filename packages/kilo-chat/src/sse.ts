@@ -11,7 +11,7 @@ export class KiloChatSSE {
   constructor(config: KiloChatConfig) {
     this.baseUrl = config.baseUrl;
     this.getToken = config.getToken;
-    this.fetchFn = config.fetch ?? globalThis.fetch;
+    this.fetchFn = config.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
   connect(conversationId: string, handlers: SSEEventHandler): void {

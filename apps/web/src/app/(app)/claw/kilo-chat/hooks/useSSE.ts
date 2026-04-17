@@ -4,6 +4,7 @@ import type {
   MessageCreatedEvent,
   MessageUpdatedEvent,
   MessageDeletedEvent,
+  MessageDeliveryFailedEvent,
   TypingEvent,
 } from '@kilocode/kilo-chat';
 import { KILO_CHAT_URL } from '@/lib/constants';
@@ -12,6 +13,7 @@ type SSEEvent =
   | { type: 'message.created'; data: MessageCreatedEvent }
   | { type: 'message.updated'; data: MessageUpdatedEvent }
   | { type: 'message.deleted'; data: MessageDeletedEvent }
+  | { type: 'message.delivery_failed'; data: MessageDeliveryFailedEvent }
   | { type: 'typing'; data: TypingEvent };
 
 type UseSSEOptions = {
@@ -32,6 +34,8 @@ export function useSSE({ conversationId, getToken, onEvent }: UseSSEOptions) {
       onMessageCreated: data => onEventRef.current({ type: 'message.created', data }),
       onMessageUpdated: data => onEventRef.current({ type: 'message.updated', data }),
       onMessageDeleted: data => onEventRef.current({ type: 'message.deleted', data }),
+      onMessageDeliveryFailed: data =>
+        onEventRef.current({ type: 'message.delivery_failed', data }),
       onTyping: data => onEventRef.current({ type: 'typing', data }),
     });
     return () => sse.disconnect();

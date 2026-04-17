@@ -129,6 +129,11 @@ export class KiloChatSSE {
           data as Parameters<NonNullable<SSEEventHandler['onMessageDeleted']>>[0]
         );
         break;
+      case 'message.delivery_failed':
+        handlers.onMessageDeliveryFailed?.(
+          data as Parameters<NonNullable<SSEEventHandler['onMessageDeliveryFailed']>>[0]
+        );
+        break;
       case 'typing':
         handlers.onTyping?.(data as Parameters<NonNullable<SSEEventHandler['onTyping']>>[0]);
         break;

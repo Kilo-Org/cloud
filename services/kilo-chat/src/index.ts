@@ -56,6 +56,10 @@ export default class extends WorkerEntrypoint<Env> {
   }
 
   async queue(batch: MessageBatch<WebhookMessage>): Promise<void> {
+    if (batch.queue === 'kilo-chat-webhooks-dlq') {
+      await this.handleDlq(batch);
+      return;
+    }
     for (const msg of batch.messages) {
       try {
         const payload = buildWebhookPayload(msg.body);
@@ -68,6 +72,24 @@ export default class extends WorkerEntrypoint<Env> {
         console.error('Webhook delivery failed, will retry:', err);
         msg.retry();
       }
+    }
+  }
+
+  private async handleDlq(batch: MessageBatch<WebhookMessage>): Promise<void> {
+    for (const msg of batch.messages) {
+      try {
+        const { conversationId, messageId, from: senderId } = msg.body;
+        console.error(
+          `Webhook permanently failed for message ${messageId} in conversation ${conversationId}`
+        );
+        const stub = this.env.CONVERSATION_DO.get(
+          this.env.CONVERSATION_DO.idFromName(conversationId)
+        );
+        stub.notifyDeliveryFailed(messageId, senderId);
+      } catch (err) {
+        console.error('DLQ handler error:', err);
+      }
+      msg.ack();
     }
   }
 }

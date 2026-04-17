@@ -122,6 +122,25 @@ export class ConversationDO extends DurableObject<Env> {
     }
   }
 
+  private sendToMember(memberId: string, event: string, data: unknown): void {
+    const connIds = this.sseClientsByMember.get(memberId);
+    if (!connIds) return;
+    const text = formatSseEvent(event, data);
+    const bytes = this.encoder.encode(text);
+    for (const connId of connIds) {
+      const writer = this.sseClients.get(connId);
+      if (!writer) continue;
+      writer.write(bytes).catch(() => {
+        this.removeSseClient(connId);
+        writer.close().catch(() => {});
+      });
+    }
+  }
+
+  notifyDeliveryFailed(messageId: string, senderId: string): void {
+    this.sendToMember(senderId, 'message.delivery_failed', { messageId });
+  }
+
   initialize(params: InitializeParams): { ok: true } | { ok: false; error: string } {
     try {
       // Insert members before conversation — conversation.created_by has FK to members.id

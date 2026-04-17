@@ -65,6 +65,10 @@ export type MessageDeletedEvent = {
   messageId: string;
 };
 
+export type MessageDeliveryFailedEvent = {
+  messageId: string;
+};
+
 export type TypingEvent = {
   memberId: string;
 };
@@ -73,6 +77,7 @@ export type SSEEventHandler = {
   onMessageCreated?: (event: MessageCreatedEvent) => void;
   onMessageUpdated?: (event: MessageUpdatedEvent) => void;
   onMessageDeleted?: (event: MessageDeletedEvent) => void;
+  onMessageDeliveryFailed?: (event: MessageDeliveryFailedEvent) => void;
   onTyping?: (event: TypingEvent) => void;
   onError?: (error: Error) => void;
 };

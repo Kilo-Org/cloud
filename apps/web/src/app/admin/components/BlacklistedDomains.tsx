@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -18,14 +19,11 @@ import {
 } from '@/components/ui/table';
 import { Shield, Users } from 'lucide-react';
 
-export function BlacklistedDomains() {
+function EditTab() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery(trpc.admin.blacklistDomains.get.queryOptions());
-  const { data: stats, isLoading: statsLoading } = useQuery(
-    trpc.admin.blacklistDomains.stats.queryOptions()
-  );
 
   const [inputValue, setInputValue] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
@@ -55,7 +53,6 @@ export function BlacklistedDomains() {
   );
 
   function handleSave() {
-    // Support both newline and pipe-separated input (e.g. pasting from the env var)
     const domains = inputValue
       .split(/[\n|]/)
       .map(part => part.trim().toLowerCase())
@@ -71,116 +68,152 @@ export function BlacklistedDomains() {
   const domainCount = data?.domains.length ?? 0;
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Editor card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Blacklisted Domains
-              </CardTitle>
-              <CardDescription>
-                Email domains that are blocked from registration and access. Enter one domain per
-                line (or paste a pipe-separated list). Subdomains are automatically blocked (e.g.
-                blocking example.com also blocks sub.example.com).
-              </CardDescription>
-            </div>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Blacklisted Domains
+            </CardTitle>
+            <CardDescription>
+              Email domains that are blocked from registration and access. Enter one domain per line
+              (or paste a pipe-separated list). Subdomains are automatically blocked (e.g. blocking
+              example.com also blocks sub.example.com).
+            </CardDescription>
+          </div>
+          <Badge variant="secondary" className="px-3 py-1">
+            {domainCount} {domainCount === 1 ? 'domain' : 'domains'}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <Textarea
+          placeholder={'example.com\nspam.org\nmalicious.net'}
+          value={inputValue}
+          onChange={e => {
+            setInputValue(e.target.value);
+            setHasChanges(true);
+          }}
+          rows={15}
+          className="font-mono text-sm"
+        />
+
+        <div className="flex items-center gap-3">
+          <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">
+            {mutation.isPending ? 'Saving...' : 'Save'}
+          </Button>
+          {data?.updated_by_email && (
+            <span className="text-muted-foreground text-sm">
+              Last updated by {data.updated_by_email}
+              {data.updated_at && <> at {new Date(data.updated_at).toLocaleString()}</>}
+            </span>
+          )}
+        </div>
+
+        <div className="text-muted-foreground text-xs">
+          <p>
+            Domains are stored in Redis for instant updates. Changes take effect immediately without
+            a deploy. The BLACKLIST_DOMAINS env var is used as a fallback if Redis has no data.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatsTab() {
+  const trpc = useTRPC();
+
+  const { data: stats, isLoading } = useQuery(trpc.admin.blacklistDomains.stats.queryOptions());
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Blocked Users by Domain</CardTitle>
+            <CardDescription>
+              Number of registered users matching each blacklisted domain
+            </CardDescription>
+          </div>
+          {stats && (
             <div className="flex gap-4 text-sm">
               <Badge variant="secondary" className="px-3 py-1">
-                {domainCount} {domainCount === 1 ? 'domain' : 'domains'}
+                {stats.totalDomains} {stats.totalDomains === 1 ? 'domain' : 'domains'}
               </Badge>
-              {stats && (
-                <Badge variant="destructive" className="px-3 py-1">
-                  <Users className="mr-1 h-3 w-3" />
-                  {stats.totalBlockedUsers.toLocaleString()} blocked users
-                </Badge>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <Textarea
-            placeholder={'example.com\nspam.org\nmalicious.net'}
-            value={inputValue}
-            onChange={e => {
-              setInputValue(e.target.value);
-              setHasChanges(true);
-            }}
-            rows={15}
-            className="font-mono text-sm"
-          />
-
-          <div className="flex items-center gap-3">
-            <Button onClick={handleSave} disabled={mutation.isPending || !hasChanges} size="sm">
-              {mutation.isPending ? 'Saving...' : 'Save'}
-            </Button>
-            {data?.updated_by_email && (
-              <span className="text-muted-foreground text-sm">
-                Last updated by {data.updated_by_email}
-                {data.updated_at && <> at {new Date(data.updated_at).toLocaleString()}</>}
-              </span>
-            )}
-          </div>
-
-          <div className="text-muted-foreground text-xs">
-            <p>
-              Domains are stored in Redis for instant updates. Changes take effect immediately
-              without a deploy. The BLACKLIST_DOMAINS env var is used as a fallback if Redis has no
-              data.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Stats table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Blocked Users by Domain</CardTitle>
-          <CardDescription>
-            Number of registered users matching each blacklisted domain
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {statsLoading ? (
-            <div className="text-muted-foreground py-8 text-center text-sm">Loading stats...</div>
-          ) : !stats || stats.domains.length === 0 ? (
-            <div className="text-muted-foreground py-8 text-center">
-              No blacklisted domains configured
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Domain</TableHead>
-                    <TableHead className="text-right">Blocked Users</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stats.domains.map(domain => (
-                    <TableRow key={domain.domain}>
-                      <TableCell className="font-medium">
-                        <code className="bg-muted rounded px-2 py-1 text-sm">{domain.domain}</code>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {domain.blockedCount > 0 ? (
-                          <Badge variant={domain.blockedCount > 100 ? 'destructive' : 'secondary'}>
-                            {domain.blockedCount.toLocaleString()}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">0</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <Badge variant="destructive" className="px-3 py-1">
+                <Users className="mr-1 h-3 w-3" />
+                {stats.totalBlockedUsers.toLocaleString()} blocked users
+              </Badge>
             </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-muted-foreground py-8 text-center text-sm">Loading stats...</div>
+        ) : !stats || stats.domains.length === 0 ? (
+          <div className="text-muted-foreground py-8 text-center">
+            No blacklisted domains configured
+          </div>
+        ) : (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Domain</TableHead>
+                  <TableHead className="text-right">Blocked Users</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stats.domains.map(domain => (
+                  <TableRow key={domain.domain}>
+                    <TableCell className="font-medium">
+                      <code className="bg-muted rounded px-2 py-1 text-sm">{domain.domain}</code>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {domain.blockedCount > 0 ? (
+                        <Badge variant={domain.blockedCount > 100 ? 'destructive' : 'secondary'}>
+                          {domain.blockedCount.toLocaleString()}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">0</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const tabTriggerClass =
+  'text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
+
+export function BlacklistedDomains() {
+  const [activeTab, setActiveTab] = useState('edit');
+
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
+        <TabsTrigger value="edit" className={tabTriggerClass}>
+          Edit
+        </TabsTrigger>
+        <TabsTrigger value="stats" className={tabTriggerClass}>
+          Stats
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="edit" className="mt-4">
+        <EditTab />
+      </TabsContent>
+      <TabsContent value="stats" className="mt-4">
+        {activeTab === 'stats' && <StatsTab />}
+      </TabsContent>
+    </Tabs>
   );
 }

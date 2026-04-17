@@ -38,43 +38,10 @@ export function useMessages(getToken: () => Promise<string>, conversationId: str
   });
 }
 
-export function useSendMessage(getToken: () => Promise<string>, currentUserId?: string) {
+export function useSendMessage(getToken: () => Promise<string>) {
   const client = useClient(getToken);
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (req: CreateMessageRequest) => client.sendMessage(req),
-    onMutate: async (req: CreateMessageRequest) => {
-      if (!currentUserId) return;
-      const queryKey = ['kilo-chat', 'messages', req.conversationId];
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData(queryKey);
-      const optimisticMessage: Message = {
-        id: `optimistic-${Date.now()}`,
-        senderId: currentUserId,
-        content: req.content,
-        inReplyToMessageId: req.inReplyToMessageId ?? null,
-        version: 1,
-        updatedAt: null,
-        deleted: false,
-      };
-      queryClient.setQueryData(queryKey, (old: unknown) => {
-        if (!old || typeof old !== 'object') return old;
-        const data = old as { pages: Message[][]; pageParams: unknown[] };
-        const firstPage = data.pages[0] ?? [];
-        return { ...data, pages: [[optimisticMessage, ...firstPage], ...data.pages.slice(1)] };
-      });
-      return { previous, queryKey };
-    },
-    onError: (_err, _req, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(context.queryKey, context.previous);
-      }
-    },
-    onSettled: (_data, _err, req) => {
-      void queryClient.invalidateQueries({
-        queryKey: ['kilo-chat', 'messages', req.conversationId],
-      });
-    },
   });
 }
 

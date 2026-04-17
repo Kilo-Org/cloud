@@ -815,4 +815,117 @@ describe('kiloclaw-subscription-alignment script', () => {
       ])
     );
   });
+
+  it('destroys duplicate instance whose only sub is a transferred predecessor', async () => {
+    // Builder filters transferred rows from subscriptionsByInstanceId; the
+    // apply existence checks must match. An instance holding only a
+    // transferred-out predecessor has 0 current subs → builder classifies it
+    // as a backfill_destroy_duplicate_personal target. Before this fix, the
+    // apply existence check counted the transferred row as present and
+    // silently skipped — leaving preview and apply forever disagreeing.
+    const user = await insertTestUser({
+      google_user_email: 'duplicate-with-transferred@example.com',
+    });
+
+    const canonicalInstanceId = crypto.randomUUID();
+    const duplicateInstanceId = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: canonicalInstanceId,
+        user_id: user.id,
+        sandbox_id: `ki_${canonicalInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        id: duplicateInstanceId,
+        user_id: user.id,
+        sandbox_id: `ki_${duplicateInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-04-02T00:00:00.000Z',
+      },
+    ]);
+
+    // Canonical has a live current sub.
+    const [canonicalSub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: canonicalInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'stripe',
+        cancel_at_period_end: false,
+        created_at: '2026-04-01T00:00:00.000Z',
+        updated_at: '2026-04-01T00:00:00.000Z',
+      })
+      .returning();
+
+    // Successor elsewhere (detached) so transferred_to points at a real row.
+    const [successor] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: null,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'stripe',
+        cancel_at_period_end: false,
+        created_at: '2026-03-10T00:00:00.000Z',
+        updated_at: '2026-03-10T00:00:00.000Z',
+      })
+      .returning();
+
+    // Duplicate instance ONLY holds a transferred predecessor — runtime-invisible.
+    const [duplicatePredecessor] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: duplicateInstanceId,
+        plan: 'standard',
+        status: 'canceled',
+        payment_source: 'credits',
+        cancel_at_period_end: false,
+        transferred_to_subscription_id: successor?.id,
+        created_at: '2026-03-15T00:00:00.000Z',
+        updated_at: '2026-03-15T00:00:00.000Z',
+      })
+      .returning();
+
+    if (!canonicalSub || !successor || !duplicatePredecessor) {
+      throw new Error('Expected seed subscription rows');
+    }
+
+    await run('apply-duplicates', '--confirm-sandboxes-destroyed');
+
+    // Duplicate instance MUST have been destroyed with a canceled terminal
+    // row inserted. Before the fix, apply silently skipped because the
+    // existence check counted the transferred predecessor.
+    const [duplicateInstanceAfter] = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, duplicateInstanceId));
+    expect(duplicateInstanceAfter?.destroyed_at).not.toBeNull();
+
+    const duplicateRows = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, duplicateInstanceId));
+
+    // The transferred predecessor already satisfies the "every instance has
+    // a sub row" invariant. The partial-unique index on instance_id prevents
+    // inserting another row into that slot, so apply-duplicates destroys
+    // the instance but skips the terminal insert — leaving the predecessor
+    // in place.
+    expect(duplicateRows).toHaveLength(1);
+    const predecessorAfter = duplicateRows[0];
+    expect(predecessorAfter?.id).toBe(duplicatePredecessor.id);
+    expect(predecessorAfter?.transferred_to_subscription_id).toBe(successor.id);
+
+    // Canonical instance untouched.
+    const canonicalSubAfter = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, canonicalSub.id));
+    expect(canonicalSubAfter[0]?.instance_id).toBe(canonicalInstanceId);
+  });
 });

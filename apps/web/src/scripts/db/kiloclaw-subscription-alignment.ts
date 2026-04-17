@@ -1338,15 +1338,31 @@ async function applyDuplicateActiveInstanceRow(
   row: DuplicateActiveInstanceCandidate
 ): Promise<DuplicateApplyOutcome> {
   return await db.transaction(async tx => {
+    // Filter transferred-out predecessor rows to match the candidate builder
+    // (subscriptionsByInstanceId at buildDuplicateActiveInstanceCandidates).
+    // Otherwise a canonical instance holding only a historical transferred
+    // predecessor would block reassignment forever: preview classifies the
+    // duplicate as safe, apply sees the transferred row as a current sub and
+    // skips. Same applies to duplicate counts.
     const [canonicalExisting, duplicateExisting] = await Promise.all([
       tx
         .select()
         .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.instance_id, row.canonicalInstanceId)),
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.instance_id, row.canonicalInstanceId),
+            isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+          )
+        ),
       tx
         .select()
         .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.instance_id, row.duplicateInstanceId)),
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.instance_id, row.duplicateInstanceId),
+            isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+          )
+        ),
     ]);
 
     if (
@@ -1414,23 +1430,36 @@ async function applyDuplicateActiveInstanceRow(
       return 'skipped';
     }
 
-    const replacement = await insertDuplicateTerminalSubscription(tx, row);
-    if (!replacement) {
-      throw new Error(
-        `apply-duplicates: failed to insert terminal subscription for duplicate instance ${row.duplicateInstanceId} after marking destroyed; rolling back`
-      );
-    }
+    // If the duplicate's instance_id slot is already occupied (e.g. by a
+    // transferred predecessor), the UQ_kiloclaw_subscriptions_instance partial
+    // unique prevents inserting another row. A transferred predecessor
+    // already satisfies the "every instance has a sub row" invariant, so
+    // skip the terminal insert in that case.
+    const anyRowOnDuplicate = await tx
+      .select({ id: kiloclaw_subscriptions.id })
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, row.duplicateInstanceId))
+      .limit(1);
 
-    await insertAlignmentChangeLog(tx, {
-      subscriptionId: replacement.id,
-      action: 'backfilled',
-      reason:
-        row.contextType === 'personal'
-          ? 'apply_duplicate_active_backfill_personal_terminal'
-          : 'apply_duplicate_active_backfill_org_terminal',
-      before: null,
-      after: replacement,
-    });
+    if (anyRowOnDuplicate.length === 0) {
+      const replacement = await insertDuplicateTerminalSubscription(tx, row);
+      if (!replacement) {
+        throw new Error(
+          `apply-duplicates: failed to insert terminal subscription for duplicate instance ${row.duplicateInstanceId} after marking destroyed; rolling back`
+        );
+      }
+
+      await insertAlignmentChangeLog(tx, {
+        subscriptionId: replacement.id,
+        action: 'backfilled',
+        reason:
+          row.contextType === 'personal'
+            ? 'apply_duplicate_active_backfill_personal_terminal'
+            : 'apply_duplicate_active_backfill_org_terminal',
+        before: null,
+        after: replacement,
+      });
+    }
 
     if (row.action === 'reassign_to_canonical_and_destroy_duplicate') {
       return 'reassigned';
@@ -1612,11 +1641,19 @@ async function applyMissingPersonalBackfillRow(
         return 'skipped';
       }
 
+      // Only current (non-transferred) rows block reassignment. A transferred
+      // predecessor on this instance is runtime-invisible and must not block
+      // the successor insert.
       const [existing, hasLiveCurrent] = await Promise.all([
         tx
           .select({ id: kiloclaw_subscriptions.id })
           .from(kiloclaw_subscriptions)
-          .where(eq(kiloclaw_subscriptions.instance_id, row.instanceId))
+          .where(
+            and(
+              eq(kiloclaw_subscriptions.instance_id, row.instanceId),
+              isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+            )
+          )
           .limit(1),
         liveCurrentPersonalSubscriptionExistsForUser(tx, row.userId),
       ]);
@@ -1759,11 +1796,18 @@ async function applyMissingPersonalBackfillRow(
         return 'skipped';
       }
 
+      // Only current (non-transferred) rows block bootstrap. Transferred
+      // predecessor on this instance is runtime-invisible.
       const [existingForInstance, hasPersonalForUser] = await Promise.all([
         tx
           .select({ id: kiloclaw_subscriptions.id })
           .from(kiloclaw_subscriptions)
-          .where(eq(kiloclaw_subscriptions.instance_id, row.instanceId))
+          .where(
+            and(
+              eq(kiloclaw_subscriptions.instance_id, row.instanceId),
+              isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+            )
+          )
           .limit(1),
         personalContextSubscriptionExistsForUser(tx, row.userId),
       ]);
@@ -1808,11 +1852,18 @@ async function applyMissingPersonalBackfillRow(
         return 'skipped';
       }
 
+      // Only current (non-transferred) rows block earlybird backfill.
+      // Transferred predecessor on this instance is runtime-invisible.
       const [existingForInstance, hasPersonalForUser, earlybirdPurchase] = await Promise.all([
         tx
           .select({ id: kiloclaw_subscriptions.id })
           .from(kiloclaw_subscriptions)
-          .where(eq(kiloclaw_subscriptions.instance_id, row.instanceId))
+          .where(
+            and(
+              eq(kiloclaw_subscriptions.instance_id, row.instanceId),
+              isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+            )
+          )
           .limit(1),
         personalContextSubscriptionExistsForUser(tx, row.userId),
         tx

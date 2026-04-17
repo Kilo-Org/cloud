@@ -6,7 +6,7 @@ import {
   security_advisor_content,
 } from '@kilocode/db/schema';
 import { invalidateSecurityAdvisorContentCache } from '@/lib/security-advisor/content-loader';
-import { and, asc, eq, ne, sql } from 'drizzle-orm';
+import { and, arrayOverlaps, asc, eq, ne } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
@@ -143,7 +143,14 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
             and(
               eq(security_advisor_kiloclaw_coverage.is_active, true),
               ne(security_advisor_kiloclaw_coverage.area, input.area),
-              sql`${security_advisor_kiloclaw_coverage.match_check_ids} && ${input.match_check_ids}::text[]`
+              // Native Drizzle helper — binds the JS array as a single PG
+              // `text[]` parameter. Hand-rolling this as raw SQL with
+              // `${arr}::text[]` serializes as a tuple `($1, $2, $3)` which
+              // `&&` rejects with a syntax error.
+              arrayOverlaps(
+                security_advisor_kiloclaw_coverage.match_check_ids,
+                input.match_check_ids
+              )
             )
           );
         if (conflicting.length > 0) {

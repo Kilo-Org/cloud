@@ -12,6 +12,7 @@ import {
 import { useSSE } from '../hooks/useSSE';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
 import { useConversationDetail, useRenameConversation } from '../hooks/useConversations';
+import { toast } from 'sonner';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
@@ -89,11 +90,14 @@ export function MessageArea({
   }
 
   function handleSend(text: string, inReplyToMessageId?: string) {
-    sendMessage.mutate({
-      conversationId,
-      content: [{ type: 'text', text }],
-      inReplyToMessageId,
-    });
+    sendMessage.mutate(
+      {
+        conversationId,
+        content: [{ type: 'text', text }],
+        inReplyToMessageId,
+      },
+      { onError: () => toast.error('Failed to send message') }
+    );
   }
 
   function handleEdit(messageId: string, content: ContentBlock[], version: number) {
@@ -102,7 +106,9 @@ export function MessageArea({
       {
         onError: err => {
           if (err instanceof KiloChatApiError && err.status === 409) {
-            // Version conflict — could show toast here
+            toast.error('Message was edited by someone else — please try again');
+          } else {
+            toast.error('Failed to edit message');
           }
         },
       }
@@ -114,7 +120,10 @@ export function MessageArea({
   }
 
   function handleConfirmDelete(messageId: string) {
-    deleteMessage.mutate({ messageId, conversationId });
+    deleteMessage.mutate(
+      { messageId, conversationId },
+      { onError: () => toast.error('Failed to delete message') }
+    );
     setPendingDeleteId(null);
   }
 
@@ -135,7 +144,10 @@ export function MessageArea({
     if (e.key === 'Enter') {
       const trimmed = renameText.trim();
       if (trimmed) {
-        renameConversation.mutate({ conversationId, title: trimmed });
+        renameConversation.mutate(
+          { conversationId, title: trimmed },
+          { onError: () => toast.error('Failed to rename conversation') }
+        );
       }
       setIsRenamingTitle(false);
     } else if (e.key === 'Escape') {

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, createContext, useContext, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { toast } from 'sonner';
 import { InstanceSwitcher } from './InstanceSwitcher';
 import { ConversationList } from './ConversationList';
 import {
@@ -65,7 +66,10 @@ export function KiloChatLayout({
 
   const handleRename = useCallback(
     (conversationId: string, title: string) => {
-      renameConversation.mutate({ conversationId, title });
+      renameConversation.mutate(
+        { conversationId, title },
+        { onError: () => toast.error('Failed to rename conversation') }
+      );
     },
     [renameConversation]
   );
@@ -77,7 +81,12 @@ export function KiloChatLayout({
       if (params?.conversationId === conversationId) {
         router.push('/claw/kilo-chat');
       }
-      leaveConversation.mutate(conversationId);
+      leaveConversation.mutate(conversationId, {
+        onError: () => {
+          setLeavingConversationId(null);
+          toast.error('Failed to leave conversation');
+        },
+      });
     },
     [leaveConversation, params?.conversationId, router]
   );
@@ -90,6 +99,7 @@ export function KiloChatLayout({
         onSuccess: res => {
           router.push(`/claw/kilo-chat/${res.conversationId}`);
         },
+        onError: () => toast.error('Failed to create conversation'),
       }
     );
   }, [selectedSandboxId, createConversation, router]);

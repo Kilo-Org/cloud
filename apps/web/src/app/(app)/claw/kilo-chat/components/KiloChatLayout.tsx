@@ -18,6 +18,7 @@ type KiloChatContextValue = {
   currentUserId: string;
   instanceStatus: string | null;
   leavingConversationId: string | null;
+  botName: string;
 };
 
 const KiloChatContext = createContext<KiloChatContextValue | null>(null);
@@ -91,6 +92,8 @@ export function KiloChatLayout({
     [leaveConversation, params?.conversationId, router]
   );
 
+  const botName = instances[0]?.label || 'KiloClaw';
+
   const handleNewConversation = useCallback(() => {
     if (!selectedSandboxId) return;
     createConversation.mutate(
@@ -106,7 +109,7 @@ export function KiloChatLayout({
 
   return (
     <KiloChatContext.Provider
-      value={{ getToken, currentUserId, instanceStatus, leavingConversationId }}
+      value={{ getToken, currentUserId, instanceStatus, leavingConversationId, botName }}
     >
       <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
         {/* Conversation sidebar */}

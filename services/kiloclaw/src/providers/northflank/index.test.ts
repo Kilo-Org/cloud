@@ -170,6 +170,7 @@ describe('northflankProviderAdapter', () => {
 
     const servicePayload = vi.mocked(createDeploymentService).mock.calls[0]?.[2];
     expect(servicePayload?.deployment.instances).toBe(0);
+    expect(servicePayload?.deployment.docker).toEqual({ configType: 'default' });
     expect(servicePayload?.createOptions?.volumesToAttach).toEqual(['kc-ki-123']);
     expect(servicePayload?.runtimeEnvironment).toEqual(runtimeSpec.env);
     expect(createProjectSecret).toHaveBeenCalledWith(

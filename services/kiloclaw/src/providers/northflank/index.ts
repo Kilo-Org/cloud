@@ -203,6 +203,9 @@ function buildServicePayload(
     deployment: {
       instances,
       external: deploymentImage(config, runtimeSpec.imageRef),
+      docker: {
+        configType: 'default',
+      },
       storage: {
         ephemeralStorage: {
           storageSize: config.ephemeralStorageMb,

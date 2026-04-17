@@ -112,6 +112,25 @@ describe('POST /v1/messages', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 when conversationId is not a valid ULID', async () => {
+    const { userApp } = await createConversation('msg-create-bad-convid');
+
+    const res = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: 'not-a-ulid',
+          content: [{ type: 'text', text: 'Hello' }],
+        }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(400);
+  });
+
   it('bot can also send messages to a conversation', async () => {
     const { conversationId, botApp } = await createConversation('msg-create-bot');
 

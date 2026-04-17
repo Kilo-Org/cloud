@@ -93,8 +93,10 @@ export type TurnstileJwtPayload = {
 
 const warnInSentry = sentryLogger('user.server', 'warning');
 
+import { getBlacklistedDomains } from '@/lib/blacklist-domains-config';
+
 const blacklistDomainsEnv = getEnvVariable('BLACKLIST_DOMAINS');
-const BLACKLIST_DOMAINS = blacklistDomainsEnv
+const BLACKLIST_DOMAINS_FROM_ENV = blacklistDomainsEnv
   ? blacklistDomainsEnv.split('|').map((domain: string) => domain.trim())
   : [];
 
@@ -561,7 +563,7 @@ const authOptions: NextAuthOptions = {
           return redirectUrlForCode('USER-NOT-FOUND', accountInfo.google_user_email);
         }
 
-        if (isEmailBlacklistedByDomain(accountInfo.google_user_email)) {
+        if (await isEmailBlacklistedByDomainAsync(accountInfo.google_user_email)) {
           sentryLogger('auth', 'warning')(
             `SECURITY: Blacklisted: ${accountInfo.google_user_email}`,
             accountInfo
@@ -918,7 +920,7 @@ async function validateUserAuthorization(
 ): Promise<GetAuthResponse> {
   if (!user) {
     return authError(401, 'User not found', kiloUserId);
-  } else if (isUserBlacklistedByDomain(user)) {
+  } else if (await isUserBlacklistedByDomain(user)) {
     return authError(403, 'Access denied (R0)', kiloUserId);
   } else if (!opts.DANGEROUS_allowBlockedUsers && user.blocked_reason) {
     return report_blocked_user(kiloUserId);
@@ -948,18 +950,27 @@ async function validateUserAuthorization(
   };
 }
 
-export const isUserBlacklistedByDomain = (existingUser: Pick<User, 'google_user_email'>) =>
-  isEmailBlacklistedByDomain(existingUser.google_user_email);
+export async function isUserBlacklistedByDomain(
+  existingUser: Pick<User, 'google_user_email'>
+): Promise<boolean> {
+  const domains = await getBlacklistedDomains();
+  return isEmailBlacklistedByDomain(existingUser.google_user_email, domains);
+}
 
 export const isEmailBlacklistedByDomain = (
   email: string,
-  blacklisted_domains = BLACKLIST_DOMAINS
+  blacklisted_domains: string[] | undefined = BLACKLIST_DOMAINS_FROM_ENV
 ) =>
   blacklisted_domains?.some(
     domain =>
       email.toLowerCase().endsWith('@' + domain.toLowerCase()) ||
       email.toLowerCase().endsWith('.' + domain.toLowerCase())
   );
+
+export async function isEmailBlacklistedByDomainAsync(email: string): Promise<boolean> {
+  const domains = await getBlacklistedDomains();
+  return !!isEmailBlacklistedByDomain(email, domains);
+}
 
 export const isBlockedTLD = (email: string, blacklisted_tlds = BLACKLIST_TLDS) =>
   blacklisted_tlds.some(tld => email.toLowerCase().endsWith(tld));

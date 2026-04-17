@@ -3,12 +3,7 @@ import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql, count, or } from 'drizzle-orm';
 import { getUserFromAuth } from '@/lib/user.server';
-import { getEnvVariable } from '@/lib/dotenvx';
-
-const blacklistDomainsEnv = getEnvVariable('BLACKLIST_DOMAINS');
-const BLACKLIST_DOMAINS = blacklistDomainsEnv
-  ? blacklistDomainsEnv.split('|').map((domain: string) => domain.trim())
-  : [];
+import { getBlacklistedDomains } from '@/lib/blacklist-domains-config';
 
 export async function GET() {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
@@ -17,6 +12,8 @@ export async function GET() {
   }
 
   try {
+    const BLACKLIST_DOMAINS = await getBlacklistedDomains();
+
     // Get counts for each blacklisted domain
     const domainCounts = await Promise.all(
       BLACKLIST_DOMAINS.map(async domain => {

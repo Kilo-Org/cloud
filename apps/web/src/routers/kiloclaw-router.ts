@@ -1061,9 +1061,9 @@ async function getPersonalBillingStatus(user: {
       now,
     });
 
-  let accessReason: 'trial' | 'subscription' | 'earlybird' | null =
+  const accessReason: 'trial' | 'subscription' | 'earlybird' | null =
     getKiloClawSubscriptionAccessReason(sub, now);
-  let hasAccess = accessReason !== null;
+  const hasAccess = accessReason !== null;
 
   const trialData =
     sub?.status === 'trialing' || (sub?.trial_started_at && sub?.trial_ends_at)

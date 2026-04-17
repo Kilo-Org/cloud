@@ -1,18 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import type {
-  ApiCallResponse,
-  ListProjectsRequest,
-  ListProjectsResult,
-  ListSecretsRequest,
-  ListSecretsResult,
-  ListServicesRequest,
-  ListServicesResult,
-  ListVolumesRequest,
-  ListVolumesResult,
-} from '@northflank/js-client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   NorthflankApiError,
-  createNorthflankSdk,
   createVolume,
   deleteService,
   findProjectByName,
@@ -22,24 +10,7 @@ import {
   listServices,
 } from './client';
 import { getNorthflankConfig } from './config';
-import type { NorthflankClientConfig, NorthflankSdk } from './client';
-
-const sdkCallResponseBase = {
-  rawResponse: new Response('{}', {
-    headers: {
-      'x-request-id': 'req-1',
-      'x-ratelimit-limit': '100',
-      'x-ratelimit-remaining': '99',
-      'x-ratelimit-reset': '123',
-    },
-  }),
-  request: {
-    url: 'https://api.northflank.com/v1/test',
-    method: 'GET',
-    headers: {},
-    body: undefined,
-  },
-};
+import type { NorthflankClientConfig } from './client';
 
 const config: NorthflankClientConfig = {
   ...getNorthflankConfig({
@@ -53,107 +24,52 @@ const config: NorthflankClientConfig = {
   redactValues: ['edge-secret', 'env-key-secret'],
 };
 
-function sdkResponse<T>(data: T): ApiCallResponse<T> {
-  return {
-    ...sdkCallResponseBase,
-    data,
-  };
+function mockFetchSequence(
+  responses: Array<[number, unknown, HeadersInit?]>
+): ReturnType<typeof vi.fn> {
+  const fetchMock = vi.fn();
+  for (const [status, body, headers] of responses) {
+    const responseBody = typeof body === 'string' ? body : JSON.stringify(body);
+    fetchMock.mockResolvedValueOnce(new Response(responseBody, { status, headers }));
+  }
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
 }
 
-async function unexpectedCall<T>(): Promise<ApiCallResponse<T>> {
-  throw new Error('unexpected Northflank SDK call');
+function firstFetchCall(fetchMock: ReturnType<typeof vi.fn>): [unknown, unknown] {
+  const firstCall = fetchMock.mock.calls[0];
+  if (!firstCall) throw new Error('fetch was not called');
+  return [firstCall[0], firstCall[1]];
 }
 
-type NorthflankSdkOverrides = {
-  create?: Partial<Omit<NorthflankSdk['create'], 'service'>> & {
-    service?: Partial<NorthflankSdk['create']['service']>;
-  };
-  list?: Partial<NorthflankSdk['list']>;
-  get?: Partial<NorthflankSdk['get']>;
-  patch?: { service?: Partial<NorthflankSdk['patch']['service']> };
-  put?: Partial<NorthflankSdk['put']>;
-  delete?: Partial<NorthflankSdk['delete']>;
-  scale?: Partial<NorthflankSdk['scale']>;
-};
-
-type ListCall<TRequest, TResult> = {
-  (opts: TRequest): Promise<ApiCallResponse<TResult>>;
-  all: (opts: TRequest) => Promise<ApiCallResponse<TResult>>;
-};
-
-function createListCall<TRequest, TResult>(
-  implementation?: (opts: TRequest) => Promise<ApiCallResponse<TResult>>
-): ListCall<TRequest, TResult> {
-  const call =
-    implementation ??
-    (async () => {
-      throw new Error('unexpected Northflank SDK list call');
-    });
-  return Object.assign(call, { all: call });
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function createFakeSdk(overrides: NorthflankSdkOverrides): NorthflankSdk {
-  return {
-    create: {
-      project: overrides.create?.project ?? unexpectedCall,
-      volume: overrides.create?.volume ?? unexpectedCall,
-      service: { deployment: overrides.create?.service?.deployment ?? unexpectedCall },
-      secret: overrides.create?.secret ?? unexpectedCall,
-    },
-    list: {
-      projects:
-        overrides.list?.projects ?? createListCall<ListProjectsRequest, ListProjectsResult>(),
-      volumes: overrides.list?.volumes ?? createListCall<ListVolumesRequest, ListVolumesResult>(),
-      services:
-        overrides.list?.services ?? createListCall<ListServicesRequest, ListServicesResult>(),
-      secrets: overrides.list?.secrets ?? createListCall<ListSecretsRequest, ListSecretsResult>(),
-    },
-    get: {
-      project: overrides.get?.project ?? unexpectedCall,
-      volume: overrides.get?.volume ?? unexpectedCall,
-      service: overrides.get?.service ?? unexpectedCall,
-      secretDetails: overrides.get?.secretDetails ?? unexpectedCall,
-    },
-    patch: {
-      service: { deployment: overrides.patch?.service?.deployment ?? unexpectedCall },
-    },
-    put: {
-      secret: overrides.put?.secret ?? unexpectedCall,
-    },
-    delete: {
-      project: overrides.delete?.project ?? unexpectedCall,
-      volume: overrides.delete?.volume ?? unexpectedCall,
-      service: overrides.delete?.service ?? unexpectedCall,
-      secret: overrides.delete?.secret ?? unexpectedCall,
-    },
-    scale: {
-      service: overrides.scale?.service ?? unexpectedCall,
-    },
-  };
+function expectRequestInit(value: unknown): RequestInit {
+  if (!isRecord(value)) throw new Error('fetch init was not an object');
+  return value;
 }
 
-describe('createNorthflankSdk', () => {
-  it('creates the official Northflank SDK and strips /v1 from the configured host', () => {
-    const sdk = createNorthflankSdk(config);
+function expectHeaderRecord(value: HeadersInit | undefined): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error('headers were not a plain object');
+  return value;
+}
 
-    expect(sdk).toHaveProperty('create.project');
-    expect(sdk).toHaveProperty('list.projects');
-  });
+function expectStringBody(value: BodyInit | null | undefined): string {
+  if (typeof value !== 'string') throw new Error('request body was not a string');
+  return value;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
-describe('Northflank SDK wrapper', () => {
-  it('creates volumes with the official SDK payload shape', async () => {
-    let capturedOpts: unknown;
-    const sdk = createFakeSdk({
-      create: {
-        volume: async opts => {
-          capturedOpts = opts;
-          return sdkResponse({ id: 'volume-1', name: 'kc-ki-test' });
-        },
-      },
-    });
+describe('Northflank Worker fetch client', () => {
+  it('sends auth headers and creates volumes mounted at /root', async () => {
+    const fetchMock = mockFetchSequence([[201, { data: { id: 'volume-1', name: 'kc-ki-test' } }]]);
 
-    const volume = await createVolume({ ...config, teamId: 'team-1', sdk }, 'project-1', {
+    const volume = await createVolume({ ...config, teamId: 'team-1' }, 'project-1', {
       name: 'kc-ki-test',
       mountPath: '/root',
       storageSizeMb: 10240,
@@ -162,56 +78,63 @@ describe('Northflank SDK wrapper', () => {
     });
 
     expect(volume).toEqual({ id: 'volume-1', name: 'kc-ki-test' });
-    expect(capturedOpts).toEqual({
-      parameters: { teamId: 'team-1', projectId: 'project-1' },
-      data: {
-        name: 'kc-ki-test',
-        mounts: [{ containerMountPath: '/root' }],
-        spec: {
-          accessMode: 'ReadWriteMany',
-          storageClassName: 'nf-multi-rw',
-          storageSize: 10240,
-        },
+    const [url, init] = firstFetchCall(fetchMock);
+    expect(url).toBe('https://api.northflank.com/v1/teams/team-1/projects/project-1/volumes');
+    const requestInit = expectRequestInit(init);
+    const headers = expectHeaderRecord(requestInit.headers);
+    expect(requestInit.method).toBe('POST');
+    expect(headers.Authorization).toBe('Bearer nf-token');
+    expect(headers['Content-Type']).toBe('application/json');
+    expect(JSON.parse(expectStringBody(requestInit.body))).toEqual({
+      name: 'kc-ki-test',
+      mounts: [{ containerMountPath: '/root' }],
+      spec: {
+        accessMode: 'ReadWriteMany',
+        storageClassName: 'nf-multi-rw',
+        storageSize: 10240,
       },
     });
   });
 
-  it('finds projects by deterministic name using SDK pagination helper', async () => {
-    const projects = createListCall<ListProjectsRequest, ListProjectsResult>(async () =>
-      sdkResponse({ projects: [{ id: 'project-1', name: 'kc-ki-test' }] })
-    );
-    const sdk = createFakeSdk({ list: { projects } });
+  it('finds projects by deterministic name', async () => {
+    mockFetchSequence([
+      [
+        200,
+        {
+          data: { projects: [{ id: 'project-1', name: 'kc-ki-test' }] },
+          pagination: { hasNextPage: false },
+        },
+      ],
+    ]);
 
-    await expect(findProjectByName({ ...config, sdk }, 'kc-ki-test')).resolves.toEqual({
+    await expect(findProjectByName(config, 'kc-ki-test')).resolves.toEqual({
       id: 'project-1',
       name: 'kc-ki-test',
     });
   });
 
   it('lists services with deployment status and ingress DNS', async () => {
-    const services = createListCall<ListServicesRequest, ListServicesResult>(async () =>
-      sdkResponse({
-        services: [
-          {
-            id: 'service-1',
-            appId: '/team/project-1/service-1',
-            projectId: 'project-1',
-            name: 'kc-ki-test',
-            tags: [],
-            serviceType: 'deployment',
-            disabledCI: true,
-            disabledCD: false,
-            servicePaused: false,
-            deployment: { instances: 1 },
-            status: { deployment: { status: 'COMPLETED', reason: 'DEPLOYING' } },
-            ports: [{ name: 'p01', dns: 'kc-ki-test.code.run' }],
+    mockFetchSequence([
+      [
+        200,
+        {
+          data: {
+            services: [
+              {
+                id: 'service-1',
+                name: 'kc-ki-test',
+                servicePaused: false,
+                deployment: { instances: 1 },
+                status: { deployment: { status: 'COMPLETED' } },
+                ports: [{ name: 'p01', dns: 'kc-ki-test.code.run' }],
+              },
+            ],
           },
-        ],
-      })
-    );
-    const sdk = createFakeSdk({ list: { services } });
+        },
+      ],
+    ]);
 
-    const result = await listServices({ ...config, sdk }, 'project-1');
+    const result = await listServices(config, 'project-1');
 
     expect(result.hasNextPage).toBe(false);
     const firstService = result.services[0];
@@ -223,59 +146,39 @@ describe('Northflank SDK wrapper', () => {
     expect(firstService?.ports).toEqual([{ name: 'p01', dns: 'kc-ki-test.code.run' }]);
   });
 
-  it('passes delete_child_objects through SDK options', async () => {
-    let capturedOpts: unknown;
-    const sdk = createFakeSdk({
-      delete: {
-        service: async opts => {
-          capturedOpts = opts;
-          return sdkResponse({});
-        },
-      },
-    });
+  it('encodes delete_child_objects as a query parameter', async () => {
+    const fetchMock = mockFetchSequence([[200, '']]);
 
-    await deleteService({ ...config, sdk }, 'project-1', 'service-1', false);
+    await deleteService(config, 'project-1', 'service-1', false);
 
-    expect(capturedOpts).toEqual({
-      parameters: { projectId: 'project-1', serviceId: 'service-1' },
-      options: { delete_child_objects: false },
-    });
+    const [url, init] = firstFetchCall(fetchMock);
+    expect(url).toBe(
+      'https://api.northflank.com/v1/projects/project-1/services/service-1?delete_child_objects=false'
+    );
+    expect(expectRequestInit(init).method).toBe('DELETE');
   });
 
-  it('redacts secret values from SDK response errors', async () => {
-    const sdk = createFakeSdk({
-      get: {
-        secretDetails: async () => ({
-          ...sdkCallResponseBase,
-          data: {
-            id: 'secret-1',
-            name: 'secret',
-            tags: [],
-            type: 'secret',
-            secretType: 'environment',
-            projectId: 'project-1',
-            priority: 10,
-            restrictions: {},
-            createdAt: '2026-04-17T00:00:00.000Z',
-            updatedAt: '2026-04-17T00:00:00.000Z',
-            secrets: {},
-            addonSecrets: [],
-          },
-          error: {
-            status: 500,
-            message: 'failed with nf-token and edge-secret',
-            details: {
-              secrets: { variables: { KILOCLAW_ENV_KEY: 'env-key-secret' } },
-              password: 'registry-password',
-            },
-          },
-        }),
-      },
-    });
+  it('redacts secret values from API errors', async () => {
+    mockFetchSequence([
+      [
+        500,
+        {
+          error: 'failed with nf-token and edge-secret',
+          secrets: { variables: { KILOCLAW_ENV_KEY: 'env-key-secret' } },
+          password: 'registry-password',
+        },
+        {
+          'x-request-id': 'req-1',
+          'x-ratelimit-limit': '100',
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': '123',
+        },
+      ],
+    ]);
 
     let caught: unknown;
     try {
-      await getProjectSecretDetails({ ...config, sdk }, 'project-1', 'secret-1');
+      await getProjectSecretDetails(config, 'project-1', 'secret-1');
     } catch (err) {
       caught = err;
     }
@@ -284,36 +187,32 @@ describe('Northflank SDK wrapper', () => {
     if (!(caught instanceof NorthflankApiError)) throw new Error('expected NorthflankApiError');
     expect(caught.status).toBe(500);
     expect(caught.requestId).toBe('req-1');
-    expect(caught.rateLimit).toEqual({ limit: '100', remaining: '99', reset: '123' });
+    expect(caught.rateLimit).toEqual({ limit: '100', remaining: '0', reset: '123' });
     expect(caught.body).not.toContain('nf-token');
     expect(caught.message).not.toContain('edge-secret');
     expect(caught.body).not.toContain('env-key-secret');
     expect(caught.body).not.toContain('registry-password');
   });
 
-  it('redacts secret values from thrown SDK errors', async () => {
-    const sdkError = Object.assign(new Error('failed with nf-token and edge-secret'), {
-      status: 429,
-    });
-    const sdk = createFakeSdk({
-      get: {
-        secretDetails: async () => {
-          throw sdkError;
-        },
-      },
-    });
+  it('includes thrown fetch error messages without leaking secrets', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('failed with nf-token and edge-secret');
+      })
+    );
 
     let caught: unknown;
     try {
-      await getProjectSecretDetails({ ...config, sdk }, 'project-1', 'secret-1');
+      await getProjectSecretDetails(config, 'project-1', 'secret-1');
     } catch (err) {
       caught = err;
     }
 
     expect(caught).toBeInstanceOf(NorthflankApiError);
     if (!(caught instanceof NorthflankApiError)) throw new Error('expected NorthflankApiError');
-    expect(caught.status).toBe(429);
-    expect(caught.body).not.toContain('nf-token');
+    expect(caught.status).toBe(503);
+    expect(caught.body).toContain('failed with [REDACTED] and [REDACTED]');
   });
 });
 

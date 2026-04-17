@@ -1,107 +1,14 @@
 import { z } from 'zod';
-import { ApiClient, ApiClientInMemoryContextProvider } from '@northflank/js-client';
 import type {
-  ApiCallResponse,
-  CreateProjectRequest,
-  CreateProjectResult,
   CreateSecretRequest,
-  CreateSecretResult,
   CreateServiceDeploymentRequest,
-  CreateServiceDeploymentResult,
-  CreateVolumeRequest,
-  CreateVolumeResult,
-  DeleteProjectRequest,
-  DeleteProjectResult,
-  DeleteSecretRequest,
-  DeleteSecretResult,
-  DeleteServiceRequest,
-  DeleteServiceResult,
-  DeleteVolumeRequest,
-  DeleteVolumeResult,
-  GetSecretdetailsRequest,
-  GetSecretdetailsResult,
-  GetServiceRequest,
-  GetServiceResult,
-  GetVolumeRequest,
-  GetVolumeResult,
-  ListProjectsRequest,
-  ListProjectsResult,
-  ListSecretsRequest,
-  ListSecretsResult,
-  ListServicesRequest,
-  ListServicesResult,
-  ListVolumesRequest,
-  ListVolumesResult,
   PatchServiceDeploymentRequest,
-  PatchServiceDeploymentResult,
   PutSecretRequest,
-  PutSecretResult,
-  ScaleServiceRequest,
-  ScaleServiceResult,
 } from '@northflank/js-client';
 import type { NorthflankConfig } from './config';
 
-export type NorthflankSdk = {
-  create: {
-    project: (opts: CreateProjectRequest) => Promise<ApiCallResponse<CreateProjectResult>>;
-    volume: (opts: CreateVolumeRequest) => Promise<ApiCallResponse<CreateVolumeResult>>;
-    service: {
-      deployment: (
-        opts: CreateServiceDeploymentRequest
-      ) => Promise<ApiCallResponse<CreateServiceDeploymentResult>>;
-    };
-    secret: (opts: CreateSecretRequest) => Promise<ApiCallResponse<CreateSecretResult>>;
-  };
-  list: {
-    projects: {
-      (opts: ListProjectsRequest): Promise<ApiCallResponse<ListProjectsResult>>;
-      all: (opts: ListProjectsRequest) => Promise<ApiCallResponse<ListProjectsResult>>;
-    };
-    volumes: {
-      (opts: ListVolumesRequest): Promise<ApiCallResponse<ListVolumesResult>>;
-      all: (opts: ListVolumesRequest) => Promise<ApiCallResponse<ListVolumesResult>>;
-    };
-    services: {
-      (opts: ListServicesRequest): Promise<ApiCallResponse<ListServicesResult>>;
-      all: (opts: ListServicesRequest) => Promise<ApiCallResponse<ListServicesResult>>;
-    };
-    secrets: {
-      (opts: ListSecretsRequest): Promise<ApiCallResponse<ListSecretsResult>>;
-      all: (opts: ListSecretsRequest) => Promise<ApiCallResponse<ListSecretsResult>>;
-    };
-  };
-  get: {
-    project: (opts: { parameters: { projectId: string } }) => Promise<ApiCallResponse<unknown>>;
-    volume: (opts: GetVolumeRequest) => Promise<ApiCallResponse<GetVolumeResult>>;
-    service: (opts: GetServiceRequest) => Promise<ApiCallResponse<GetServiceResult>>;
-    secretDetails: (
-      opts: GetSecretdetailsRequest
-    ) => Promise<ApiCallResponse<GetSecretdetailsResult>>;
-  };
-  patch: {
-    service: {
-      deployment: (
-        opts: PatchServiceDeploymentRequest
-      ) => Promise<ApiCallResponse<PatchServiceDeploymentResult>>;
-    };
-  };
-  put: {
-    secret: (opts: PutSecretRequest) => Promise<ApiCallResponse<PutSecretResult>>;
-  };
-  delete: {
-    project: (opts: DeleteProjectRequest) => Promise<ApiCallResponse<DeleteProjectResult>>;
-    volume: (opts: DeleteVolumeRequest) => Promise<ApiCallResponse<DeleteVolumeResult>>;
-    service: (opts: DeleteServiceRequest) => Promise<ApiCallResponse<DeleteServiceResult>>;
-    secret: (opts: DeleteSecretRequest) => Promise<ApiCallResponse<DeleteSecretResult>>;
-  };
-  scale: {
-    service: (opts: ScaleServiceRequest) => Promise<ApiCallResponse<ScaleServiceResult>>;
-  };
-};
-
 export type NorthflankClientConfig = NorthflankConfig & {
   redactValues?: string[];
-  sdk?: NorthflankSdk;
 };
 
 export type NorthflankRateLimitInfo = {
@@ -123,133 +30,48 @@ export class NorthflankApiError extends Error {
   }
 }
 
-const NorthflankProjectSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-  })
-  .passthrough();
-
-const NorthflankVolumeSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-  })
-  .passthrough();
-
+const NorthflankProjectSchema = z.object({ id: z.string(), name: z.string() }).passthrough();
+const NorthflankVolumeSchema = z.object({ id: z.string(), name: z.string() }).passthrough();
 const NorthflankPortSchema = z
-  .object({
-    name: z.string().optional(),
-    dns: z.string().nullable().optional(),
-  })
+  .object({ name: z.string().optional(), dns: z.string().nullable().optional() })
   .passthrough();
-
 const NorthflankServiceSchema = z
   .object({
     id: z.string(),
     name: z.string(),
     servicePaused: z.boolean().optional(),
     ports: z.array(NorthflankPortSchema).optional(),
-    deployment: z
-      .object({
-        instances: z.number().int().optional(),
-      })
-      .passthrough()
-      .optional(),
+    deployment: z.object({ instances: z.number().int().optional() }).passthrough().optional(),
     status: z
       .object({
-        deployment: z
-          .object({
-            status: z.string().optional(),
-          })
-          .passthrough()
-          .optional(),
+        deployment: z.object({ status: z.string().optional() }).passthrough().optional(),
       })
       .passthrough()
       .optional(),
   })
   .passthrough();
+const NorthflankSecretDetailsSchema = z.object({ id: z.string(), name: z.string() }).passthrough();
 
-const NorthflankSecretDetailsSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-  })
-  .passthrough();
-
-const ListProjectsDataSchema = z.object({ projects: z.array(NorthflankProjectSchema) });
-const ListServicesDataSchema = z.object({ services: z.array(NorthflankServiceSchema) });
-const ListSecretsDataSchema = z.object({ secrets: z.array(NorthflankSecretDetailsSchema) });
+const ProjectResponseSchema = z.object({ data: NorthflankProjectSchema });
+const ProjectListResponseSchema = z.object({
+  data: z.object({ projects: z.array(NorthflankProjectSchema) }).passthrough(),
+  pagination: z.object({ hasNextPage: z.boolean().optional() }).passthrough().optional(),
+});
+const VolumeResponseSchema = z.object({ data: NorthflankVolumeSchema });
+const VolumeListResponseSchema = z.object({ data: z.array(NorthflankVolumeSchema) });
+const ServiceResponseSchema = z.object({ data: NorthflankServiceSchema });
+const ServiceListResponseSchema = z.object({
+  data: z.object({ services: z.array(NorthflankServiceSchema) }).passthrough(),
+});
+const SecretDetailsResponseSchema = z.object({ data: NorthflankSecretDetailsSchema });
+const SecretListResponseSchema = z.object({
+  data: z.object({ secrets: z.array(NorthflankSecretDetailsSchema) }).passthrough(),
+});
 
 export type NorthflankProject = z.infer<typeof NorthflankProjectSchema>;
 export type NorthflankVolume = z.infer<typeof NorthflankVolumeSchema>;
 export type NorthflankService = z.infer<typeof NorthflankServiceSchema>;
 export type NorthflankSecretDetails = z.infer<typeof NorthflankSecretDetailsSchema>;
-
-function normalizeSdkHost(apiBase: string): string {
-  return apiBase.replace(/\/$/, '').replace(/\/v1$/, '');
-}
-
-export function createNorthflankSdk(config: NorthflankClientConfig): NorthflankSdk {
-  if (config.sdk) return config.sdk;
-
-  const contextProvider = new ApiClientInMemoryContextProvider();
-  contextProvider.addContext({
-    name: 'kiloclaw',
-    token: config.apiToken,
-    host: normalizeSdkHost(config.apiBase),
-  });
-
-  return new ApiClient(contextProvider, { throwErrorOnHttpErrorCode: true });
-}
-
-function teamParameters(
-  config: Pick<NorthflankClientConfig, 'teamId'>
-): { teamId: string } | undefined {
-  return config.teamId ? { teamId: config.teamId } : undefined;
-}
-
-function projectParameters(
-  config: Pick<NorthflankClientConfig, 'teamId'>,
-  projectId: string
-): { projectId: string } | { teamId: string; projectId: string } {
-  return config.teamId ? { teamId: config.teamId, projectId } : { projectId };
-}
-
-function serviceParameters(
-  config: Pick<NorthflankClientConfig, 'teamId'>,
-  projectId: string,
-  serviceId: string
-):
-  | { projectId: string; serviceId: string }
-  | { teamId: string; projectId: string; serviceId: string } {
-  return config.teamId ? { teamId: config.teamId, projectId, serviceId } : { projectId, serviceId };
-}
-
-function volumeParameters(
-  config: Pick<NorthflankClientConfig, 'teamId'>,
-  projectId: string,
-  volumeId: string
-):
-  | { projectId: string; volumeId: string }
-  | { teamId: string; projectId: string; volumeId: string } {
-  return config.teamId ? { teamId: config.teamId, projectId, volumeId } : { projectId, volumeId };
-}
-
-function secretParameters(
-  projectId: string,
-  secretId: string
-): { projectId: string; secretId: string } {
-  return { projectId, secretId };
-}
-
-function headersToRateLimit(headers: Headers | undefined): NorthflankRateLimitInfo {
-  return {
-    limit: headers?.get('x-ratelimit-limit') ?? null,
-    remaining: headers?.get('x-ratelimit-remaining') ?? null,
-    reset: headers?.get('x-ratelimit-reset') ?? null,
-  };
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -282,6 +104,12 @@ function redactText(text: string, config: NorthflankClientConfig): string {
 }
 
 function redactForError(value: unknown, config: NorthflankClientConfig): string {
+  if (value instanceof Error) {
+    return redactText(
+      JSON.stringify({ name: value.name, message: value.message, stack: value.stack }),
+      config
+    );
+  }
   try {
     return redactText(JSON.stringify(redactUnknown(value)), config);
   } catch {
@@ -289,114 +117,151 @@ function redactForError(value: unknown, config: NorthflankClientConfig): string 
   }
 }
 
-function maybeStatus(err: unknown): number {
-  if (!isRecord(err)) return 500;
-  const status = err.status;
-  return typeof status === 'number' ? status : 500;
+function rateLimitFromHeaders(headers: Headers): NorthflankRateLimitInfo {
+  return {
+    limit: headers.get('x-ratelimit-limit'),
+    remaining: headers.get('x-ratelimit-remaining'),
+    reset: headers.get('x-ratelimit-reset'),
+  };
 }
 
-function maybeMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (!isRecord(err)) return String(err);
-  const message = err.message;
-  if (typeof message === 'string') return message;
-  try {
-    return JSON.stringify(redactUnknown(err));
-  } catch {
-    return 'Northflank SDK error';
+function northflankPath(config: NorthflankClientConfig, path: string): string {
+  const base = config.apiBase.replace(/\/$/, '');
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  if (!config.teamId || normalizedPath.startsWith('/teams/')) return `${base}${normalizedPath}`;
+  return `${base}/teams/${encodeURIComponent(config.teamId)}${normalizedPath}`;
+}
+
+function pathWithQuery(path: string, params: Record<string, string | number | boolean | null>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== null) search.set(key, String(value));
   }
+  const query = search.toString();
+  return query ? `${path}?${query}` : path;
 }
 
-async function callSdk<TResponse, TParsed>(
+async function requestJson<T>(
   config: NorthflankClientConfig,
-  context: string,
-  call: () => Promise<ApiCallResponse<TResponse>>,
-  parser: (value: unknown) => TParsed
-): Promise<TParsed> {
+  path: string,
+  init: RequestInit | undefined,
+  schema: z.ZodType<T>,
+  expectedStatuses: number[],
+  context: string
+): Promise<T> {
+  let response: Response;
   try {
-    const response = await call();
-    if (response.error) {
-      const body = redactForError(response.error, config);
-      throw new NorthflankApiError(
-        `Northflank API ${context} failed (${response.error.status}): ${body}`,
-        response.error.status,
-        body,
-        response.rawResponse.headers.get('x-request-id'),
-        headersToRateLimit(response.rawResponse.headers)
-      );
-    }
-    return parser(response.data);
+    response = await fetch(northflankPath(config, path), {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${config.apiToken}`,
+        'Content-Type': 'application/json',
+        ...init?.headers,
+      },
+    });
   } catch (err) {
-    if (err instanceof NorthflankApiError) throw err;
-    const status = maybeStatus(err);
     const body = redactForError(err, config);
     throw new NorthflankApiError(
-      `Northflank API ${context} failed (${status}): ${body}`,
-      status,
+      `Northflank API ${context} failed before response: ${body}`,
+      503,
       body,
       null,
-      headersToRateLimit(undefined)
+      { limit: null, remaining: null, reset: null }
     );
   }
+
+  const text = await response.text();
+  let json: unknown = null;
+  if (text) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = text;
+    }
+  }
+
+  if (!expectedStatuses.includes(response.status)) {
+    const body = redactForError(json, config);
+    throw new NorthflankApiError(
+      `Northflank API ${context} failed (${response.status}): ${body}`,
+      response.status,
+      body,
+      response.headers.get('x-request-id'),
+      rateLimitFromHeaders(response.headers)
+    );
+  }
+
+  try {
+    return schema.parse(json);
+  } catch (err) {
+    const body = redactForError({ response: json, parseError: err }, config);
+    throw new NorthflankApiError(
+      `Northflank API ${context} returned an unexpected response: ${body}`,
+      502,
+      body,
+      response.headers.get('x-request-id'),
+      rateLimitFromHeaders(response.headers)
+    );
+  }
+}
+
+async function requestVoid(
+  config: NorthflankClientConfig,
+  path: string,
+  init: RequestInit | undefined,
+  expectedStatuses: number[],
+  context: string
+): Promise<void> {
+  await requestJson(config, path, init, z.unknown(), expectedStatuses, context);
+}
+
+function jsonInit(method: string, body: unknown): RequestInit {
+  return { method, body: JSON.stringify(body) };
 }
 
 export async function createProject(
   config: NorthflankClientConfig,
   input: { name: string; region: string; description?: string }
 ): Promise<NorthflankProject> {
-  const sdk = createNorthflankSdk(config);
-  const parameters = teamParameters(config);
-  return callSdk(
+  const response = await requestJson(
     config,
-    'createProject',
-    () => sdk.create.project({ parameters, data: input }),
-    value => NorthflankProjectSchema.parse(value)
+    '/projects',
+    jsonInit('POST', input),
+    ProjectResponseSchema,
+    [200, 201],
+    'createProject'
   );
-}
-
-export async function listProjects(
-  config: NorthflankClientConfig,
-  pagination?: { page?: number; perPage?: number }
-): Promise<{ projects: NorthflankProject[]; hasNextPage: boolean }> {
-  const sdk = createNorthflankSdk(config);
-  const response = await callSdk(
-    config,
-    'listProjects',
-    () =>
-      sdk.list.projects({
-        parameters: teamParameters(config),
-        options: { page: pagination?.page, per_page: pagination?.perPage },
-      }),
-    value => ListProjectsDataSchema.parse(value)
-  );
-  return { projects: response.projects, hasNextPage: false };
+  return response.data;
 }
 
 export async function findProjectByName(
   config: NorthflankClientConfig,
   name: string
 ): Promise<NorthflankProject | null> {
-  const sdk = createNorthflankSdk(config);
-  const response = await callSdk(
+  const response = await requestJson(
     config,
-    'findProjectByName',
-    () => sdk.list.projects.all({ parameters: teamParameters(config) }),
-    value => ListProjectsDataSchema.parse(value)
+    '/projects',
+    undefined,
+    ProjectListResponseSchema,
+    [200],
+    'findProjectByName'
   );
-  return response.projects.find(project => project.name === name) ?? null;
+  return response.data.projects.find(project => project.name === name) ?? null;
 }
 
 export async function getProject(
   config: NorthflankClientConfig,
   projectId: string
 ): Promise<NorthflankProject> {
-  const sdk = createNorthflankSdk(config);
-  return callSdk(
+  const response = await requestJson(
     config,
-    'getProject',
-    () => sdk.get.project({ parameters: { projectId } }),
-    value => NorthflankProjectSchema.parse(value)
+    `/projects/${encodeURIComponent(projectId)}`,
+    undefined,
+    ProjectResponseSchema,
+    [200],
+    'getProject'
   );
+  return response.data;
 }
 
 export async function deleteProject(
@@ -404,16 +269,14 @@ export async function deleteProject(
   projectId: string,
   deleteChildObjects = false
 ): Promise<void> {
-  const sdk = createNorthflankSdk(config);
-  await callSdk(
+  await requestVoid(
     config,
-    'deleteProject',
-    () =>
-      sdk.delete.project({
-        parameters: projectParameters(config, projectId),
-        options: { delete_child_objects: deleteChildObjects },
-      }),
-    () => undefined
+    pathWithQuery(`/projects/${encodeURIComponent(projectId)}`, {
+      delete_child_objects: deleteChildObjects,
+    }),
+    { method: 'DELETE' },
+    [200, 202, 204],
+    'deleteProject'
   );
 }
 
@@ -428,38 +291,38 @@ export async function createVolume(
     accessMode: string;
   }
 ): Promise<NorthflankVolume> {
-  const sdk = createNorthflankSdk(config);
-  return callSdk(
+  const response = await requestJson(
     config,
-    'createVolume',
-    () =>
-      sdk.create.volume({
-        parameters: projectParameters(config, projectId),
-        data: {
-          name: input.name,
-          mounts: [{ containerMountPath: input.mountPath }],
-          spec: {
-            accessMode: input.accessMode === 'ReadWriteOnce' ? 'ReadWriteOnce' : 'ReadWriteMany',
-            storageClassName: input.storageClassName,
-            storageSize: input.storageSizeMb,
-          },
-        },
-      }),
-    value => NorthflankVolumeSchema.parse(value)
+    `/projects/${encodeURIComponent(projectId)}/volumes`,
+    jsonInit('POST', {
+      name: input.name,
+      mounts: [{ containerMountPath: input.mountPath }],
+      spec: {
+        accessMode: input.accessMode === 'ReadWriteOnce' ? 'ReadWriteOnce' : 'ReadWriteMany',
+        storageClassName: input.storageClassName,
+        storageSize: input.storageSizeMb,
+      },
+    }),
+    VolumeResponseSchema,
+    [200, 201],
+    'createVolume'
   );
+  return response.data;
 }
 
 export async function listVolumes(
   config: NorthflankClientConfig,
   projectId: string
 ): Promise<NorthflankVolume[]> {
-  const sdk = createNorthflankSdk(config);
-  return callSdk(
+  const response = await requestJson(
     config,
-    'listVolumes',
-    () => sdk.list.volumes.all({ parameters: projectParameters(config, projectId) }),
-    value => z.array(NorthflankVolumeSchema).parse(value)
+    `/projects/${encodeURIComponent(projectId)}/volumes`,
+    undefined,
+    VolumeListResponseSchema,
+    [200],
+    'listVolumes'
   );
+  return response.data;
 }
 
 export async function findVolumeByName(
@@ -476,13 +339,15 @@ export async function getVolume(
   projectId: string,
   volumeIdOrName: string
 ): Promise<NorthflankVolume> {
-  const sdk = createNorthflankSdk(config);
-  return callSdk(
+  const response = await requestJson(
     config,
-    'getVolume',
-    () => sdk.get.volume({ parameters: volumeParameters(config, projectId, volumeIdOrName) }),
-    value => NorthflankVolumeSchema.parse(value)
+    `/projects/${encodeURIComponent(projectId)}/volumes/${encodeURIComponent(volumeIdOrName)}`,
+    undefined,
+    VolumeResponseSchema,
+    [200],
+    'getVolume'
   );
+  return response.data;
 }
 
 export async function deleteVolume(
@@ -490,12 +355,12 @@ export async function deleteVolume(
   projectId: string,
   volumeIdOrName: string
 ): Promise<void> {
-  const sdk = createNorthflankSdk(config);
-  await callSdk(
+  await requestVoid(
     config,
-    'deleteVolume',
-    () => sdk.delete.volume({ parameters: volumeParameters(config, projectId, volumeIdOrName) }),
-    () => undefined
+    `/projects/${encodeURIComponent(projectId)}/volumes/${encodeURIComponent(volumeIdOrName)}`,
+    { method: 'DELETE' },
+    [200, 202, 204],
+    'deleteVolume'
   );
 }
 
@@ -504,17 +369,15 @@ export async function createDeploymentService(
   projectId: string,
   payload: CreateServiceDeploymentRequest['data']
 ): Promise<NorthflankService> {
-  const sdk = createNorthflankSdk(config);
-  return callSdk(
+  const response = await requestJson(
     config,
-    'createDeploymentService',
-    () =>
-      sdk.create.service.deployment({
-        parameters: projectParameters(config, projectId),
-        data: payload,
-      }),
-    value => NorthflankServiceSchema.parse(value)
+    `/projects/${encodeURIComponent(projectId)}/services/deployment`,
+    jsonInit('POST', payload),
+    ServiceResponseSchema,
+    [200, 201],
+    'createDeploymentService'
   );
+  return response.data;
 }
 
 export async function patchDeploymentService(
@@ -523,17 +386,15 @@ export async function patchDeploymentService(
   serviceId: string,
   payload: PatchServiceDeploymentRequest['data']
 ): Promise<NorthflankService> {
-  const sdk = createNorthflankSdk(config);
-  return callSdk(
+  const response = await requestJson(
     config,
-    'patchDeploymentService',
-    () =>
-      sdk.patch.service.deployment({
-        parameters: serviceParameters(config, projectId, serviceId),
-        data: payload,
-      }),
-    value => NorthflankServiceSchema.parse(value)
+    `/projects/${encodeURIComponent(projectId)}/services/deployment/${encodeURIComponent(serviceId)}`,
+    jsonInit('PATCH', payload),
+    ServiceResponseSchema,
+    [200],
+    'patchDeploymentService'
   );
+  return response.data;
 }
 
 export async function scaleService(
@@ -542,16 +403,12 @@ export async function scaleService(
   serviceId: string,
   instances: number
 ): Promise<void> {
-  const sdk = createNorthflankSdk(config);
-  await callSdk(
+  await requestVoid(
     config,
-    'scaleService',
-    () =>
-      sdk.scale.service({
-        parameters: serviceParameters(config, projectId, serviceId),
-        data: { instances },
-      }),
-    () => undefined
+    `/projects/${encodeURIComponent(projectId)}/services/${encodeURIComponent(serviceId)}/scale`,
+    jsonInit('POST', { instances }),
+    [200, 202, 204],
+    'scaleService'
   );
 }
 
@@ -559,14 +416,15 @@ export async function listServices(
   config: NorthflankClientConfig,
   projectId: string
 ): Promise<{ services: NorthflankService[]; hasNextPage: boolean }> {
-  const sdk = createNorthflankSdk(config);
-  const response = await callSdk(
+  const response = await requestJson(
     config,
-    'listServices',
-    () => sdk.list.services.all({ parameters: projectParameters(config, projectId) }),
-    value => ListServicesDataSchema.parse(value)
+    `/projects/${encodeURIComponent(projectId)}/services`,
+    undefined,
+    ServiceListResponseSchema,
+    [200],
+    'listServices'
   );
-  return { services: response.services, hasNextPage: false };
+  return { services: response.data.services, hasNextPage: false };
 }
 
 export async function findServiceByName(
@@ -583,13 +441,15 @@ export async function getService(
   projectId: string,
   serviceId: string
 ): Promise<NorthflankService> {
-  const sdk = createNorthflankSdk(config);
-  return callSdk(
+  const response = await requestJson(
     config,
-    'getService',
-    () => sdk.get.service({ parameters: serviceParameters(config, projectId, serviceId) }),
-    value => NorthflankServiceSchema.parse(value)
+    `/projects/${encodeURIComponent(projectId)}/services/${encodeURIComponent(serviceId)}`,
+    undefined,
+    ServiceResponseSchema,
+    [200],
+    'getService'
   );
+  return response.data;
 }
 
 export async function deleteService(
@@ -598,16 +458,17 @@ export async function deleteService(
   serviceId: string,
   deleteChildObjects = false
 ): Promise<void> {
-  const sdk = createNorthflankSdk(config);
-  await callSdk(
+  await requestVoid(
     config,
-    'deleteService',
-    () =>
-      sdk.delete.service({
-        parameters: serviceParameters(config, projectId, serviceId),
-        options: { delete_child_objects: deleteChildObjects },
-      }),
-    () => undefined
+    pathWithQuery(
+      `/projects/${encodeURIComponent(projectId)}/services/${encodeURIComponent(serviceId)}`,
+      {
+        delete_child_objects: deleteChildObjects,
+      }
+    ),
+    { method: 'DELETE' },
+    [200, 202, 204],
+    'deleteService'
   );
 }
 
@@ -622,9 +483,8 @@ export async function waitForDeploymentCompleted(
   while (Date.now() < deadline) {
     const deploymentStatus = lastService.status?.deployment?.status;
     if (deploymentStatus === 'COMPLETED') return lastService;
-    if (deploymentStatus === 'FAILED') {
+    if (deploymentStatus === 'FAILED')
       throw new Error(`Northflank deployment failed for service ${serviceId}`);
-    }
     await new Promise(resolve => setTimeout(resolve, 2_000));
     lastService = await getService(config, projectId, serviceId);
   }
@@ -636,13 +496,15 @@ export async function createProjectSecret(
   projectId: string,
   payload: CreateSecretRequest['data']
 ): Promise<NorthflankSecretDetails> {
-  const sdk = createNorthflankSdk(config);
-  return callSdk(
+  const response = await requestJson(
     config,
-    'createProjectSecret',
-    () => sdk.create.secret({ parameters: { projectId }, data: payload }),
-    value => NorthflankSecretDetailsSchema.parse(value)
+    `/projects/${encodeURIComponent(projectId)}/secrets`,
+    jsonInit('POST', payload),
+    SecretDetailsResponseSchema,
+    [200, 201],
+    'createProjectSecret'
   );
+  return response.data;
 }
 
 export async function findProjectSecretByName(
@@ -650,14 +512,15 @@ export async function findProjectSecretByName(
   projectId: string,
   name: string
 ): Promise<NorthflankSecretDetails | null> {
-  const sdk = createNorthflankSdk(config);
-  const response = await callSdk(
+  const response = await requestJson(
     config,
-    'findProjectSecretByName',
-    () => sdk.list.secrets.all({ parameters: { projectId } }),
-    value => ListSecretsDataSchema.parse(value)
+    `/projects/${encodeURIComponent(projectId)}/secrets`,
+    undefined,
+    SecretListResponseSchema,
+    [200],
+    'findProjectSecretByName'
   );
-  return response.secrets.find(secret => secret.name === name) ?? null;
+  return response.data.secrets.find(secret => secret.name === name) ?? null;
 }
 
 export async function getProjectSecretDetails(
@@ -665,13 +528,15 @@ export async function getProjectSecretDetails(
   projectId: string,
   secretId: string
 ): Promise<NorthflankSecretDetails> {
-  const sdk = createNorthflankSdk(config);
-  return callSdk(
+  const response = await requestJson(
     config,
-    'getProjectSecretDetails',
-    () => sdk.get.secretDetails({ parameters: secretParameters(projectId, secretId) }),
-    value => NorthflankSecretDetailsSchema.parse(value)
+    `/projects/${encodeURIComponent(projectId)}/secrets/${encodeURIComponent(secretId)}/details`,
+    undefined,
+    SecretDetailsResponseSchema,
+    [200],
+    'getProjectSecretDetails'
   );
+  return response.data;
 }
 
 export async function putProjectSecret(
@@ -680,13 +545,15 @@ export async function putProjectSecret(
   secretId: string,
   payload: PutSecretRequest['data']
 ): Promise<NorthflankSecretDetails> {
-  const sdk = createNorthflankSdk(config);
-  return callSdk(
+  const response = await requestJson(
     config,
-    'putProjectSecret',
-    () => sdk.put.secret({ parameters: secretParameters(projectId, secretId), data: payload }),
-    value => NorthflankSecretDetailsSchema.parse(value)
+    `/projects/${encodeURIComponent(projectId)}/secrets/${encodeURIComponent(secretId)}`,
+    jsonInit('PUT', payload),
+    SecretDetailsResponseSchema,
+    [200],
+    'putProjectSecret'
   );
+  return response.data;
 }
 
 export async function deleteProjectSecret(
@@ -694,12 +561,12 @@ export async function deleteProjectSecret(
   projectId: string,
   secretId: string
 ): Promise<void> {
-  const sdk = createNorthflankSdk(config);
-  await callSdk(
+  await requestVoid(
     config,
-    'deleteProjectSecret',
-    () => sdk.delete.secret({ parameters: secretParameters(projectId, secretId) }),
-    () => undefined
+    `/projects/${encodeURIComponent(projectId)}/secrets/${encodeURIComponent(secretId)}`,
+    { method: 'DELETE' },
+    [200, 202, 204],
+    'deleteProjectSecret'
   );
 }
 
@@ -709,8 +576,4 @@ export function isNorthflankNotFound(err: unknown): boolean {
 
 export function isNorthflankConflict(err: unknown): boolean {
   return err instanceof NorthflankApiError && err.status === 409;
-}
-
-export function northflankErrorMessage(err: unknown): string {
-  return maybeMessage(err);
 }

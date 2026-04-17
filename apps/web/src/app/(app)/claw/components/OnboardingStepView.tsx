@@ -20,7 +20,10 @@ export function OnboardingStepIndicator({
         {Array.from({ length: totalSteps }, (_, i) => (
           <span
             key={i}
-            className={cn('h-1.5 w-6 rounded-full', i < currentStep ? 'bg-blue-500' : 'bg-muted')}
+            className={cn(
+              'h-1.5 w-6 rounded-full',
+              i < currentStep ? 'bg-brand-primary' : 'bg-muted'
+            )}
           />
         ))}
       </div>

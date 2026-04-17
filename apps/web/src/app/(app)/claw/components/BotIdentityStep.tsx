@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { OnboardingStepView } from './OnboardingStepView';
@@ -10,24 +10,11 @@ import { cn } from '@/lib/utils';
 
 const NAME_SUGGESTIONS = ['Aria', 'Echo', 'Nova', 'Rex', 'Sage', 'Iris', 'Orion', 'Pixel'];
 
-const EMOJI_OPTIONS = [
-  '🤖',
-  '🐱',
-  '🐙',
-  '🦁',
-  '⚡',
-  '🌙',
-  '🍥',
-  '🔥',
-  '🦄',
-  '🧠',
-  '🐉',
-  '✨',
-  '🌊',
-  '🎪',
-  '🦋',
-  '💎',
-];
+const EMOJI_OPTIONS = ['🤖', '👾', '🧠', '⚡', '🔮', '🔥', '🐉', '✨', '🌙'];
+
+function pickRandom<T>(items: readonly T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
+}
 
 type NaturePreset = {
   id: string;
@@ -78,6 +65,12 @@ export function BotIdentityStep({
   const activeEmoji = customEmoji || selectedEmoji;
   const nature = NATURE_PRESETS.find(n => n.id === selectedNatureId) ?? NATURE_PRESETS[0];
 
+  function handleShuffle() {
+    setBotName(pickRandom(NAME_SUGGESTIONS));
+    setSelectedEmoji(pickRandom(EMOJI_OPTIONS));
+    setCustomEmoji('');
+  }
+
   function handleContinue() {
     onContinue({
       botName: botName.trim() || 'KiloClaw',
@@ -96,16 +89,28 @@ export function BotIdentityStep({
       showProvisioningBanner={!instanceRunning}
       contentClassName="gap-6"
     >
-      {/* Name */}
+      <div className="border-border bg-muted/30 flex items-center gap-3 rounded-lg border p-4">
+        <span className="text-2xl">{activeEmoji}</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground font-medium">{botName || 'Your bot'}</p>
+          <p className="text-muted-foreground text-sm">{nature.label}</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleShuffle}
+          aria-label="Shuffle name and emoji"
+          className="border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors"
+        >
+          <Shuffle className="h-4 w-4" />
+        </button>
+      </div>
+
       <div className="space-y-3">
-        <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-          What should we call it?
-        </h3>
         <Input
           value={botName}
           onChange={e => setBotName(e.target.value)}
           maxLength={80}
-          placeholder="e.g. Aria, Sage, Nova..."
+          placeholder="Name your bot"
         />
         <div className="flex flex-wrap gap-2">
           {NAME_SUGGESTIONS.map(name => (
@@ -115,7 +120,7 @@ export function BotIdentityStep({
               className={cn(
                 'rounded-full border px-3 py-1 text-sm transition-colors',
                 botName === name
-                  ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+                  ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
                   : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
               )}
               onClick={() => setBotName(name)}
@@ -126,20 +131,16 @@ export function BotIdentityStep({
         </div>
       </div>
 
-      {/* Emoji picker */}
       <div className="space-y-3">
-        <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-          Pick a signature emoji
-        </h3>
-        <div className="grid grid-cols-8 gap-2">
+        <div className="flex flex-wrap gap-3">
           {EMOJI_OPTIONS.map(emoji => (
             <button
               key={emoji}
               type="button"
               className={cn(
-                'flex h-12 items-center justify-center rounded-lg border text-xl transition-colors',
+                'flex h-14 w-14 items-center justify-center rounded-lg border text-2xl transition-colors',
                 selectedEmoji === emoji && !customEmoji
-                  ? 'border-blue-500 bg-blue-500/10'
+                  ? 'border-brand-primary bg-brand-primary/10'
                   : 'border-border hover:border-foreground/30 hover:bg-muted/50'
               )}
               onClick={() => {
@@ -161,45 +162,27 @@ export function BotIdentityStep({
         />
       </div>
 
-      {/* Nature */}
-      <div className="space-y-3">
-        <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-          What kind of creature is it?
-        </h3>
-        <div className="grid gap-3 md:grid-cols-2">
-          {NATURE_PRESETS.map(preset => (
-            <button
-              key={preset.id}
-              type="button"
-              className={cn(
-                'flex items-center gap-3 rounded-lg border p-4 text-left transition-colors',
-                selectedNatureId === preset.id
-                  ? 'border-blue-500 bg-blue-500/10'
-                  : 'border-border hover:border-foreground/30 hover:bg-muted/50'
-              )}
-              onClick={() => setSelectedNatureId(preset.id)}
-            >
-              <span className="text-2xl">{preset.emoji}</span>
-              <div>
-                <p className="text-foreground font-medium">{preset.label}</p>
-                <p className="text-muted-foreground text-sm">{preset.vibe}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Preview */}
-      <div className="border-border bg-muted/30 flex items-center gap-3 rounded-lg border p-4">
-        <span className="text-2xl">{activeEmoji}</span>
-        <div>
-          <p className="text-foreground font-medium">{botName || 'Your bot'}</p>
-          <p className="text-muted-foreground text-sm">{nature.label}</p>
-        </div>
+      <div className="flex flex-wrap gap-2">
+        {NATURE_PRESETS.map(preset => (
+          <button
+            key={preset.id}
+            type="button"
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors',
+              selectedNatureId === preset.id
+                ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
+                : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
+            )}
+            onClick={() => setSelectedNatureId(preset.id)}
+          >
+            <span>{preset.emoji}</span>
+            {preset.label}
+          </button>
+        ))}
       </div>
 
       <Button
-        className="w-full bg-emerald-600 py-6 text-base text-white hover:bg-emerald-700"
+        className="bg-brand-primary hover:bg-brand-primary/90 w-full py-6 text-base text-black"
         onClick={handleContinue}
       >
         Continue

@@ -92,7 +92,7 @@ export function KiloChatLayout({
     [leaveConversation, params?.conversationId, router]
   );
 
-  const botName = instances[0]?.label || 'KiloClaw';
+  const botName = instances.find(i => i.sandboxId === selectedSandboxId)?.label || 'KiloClaw';
 
   const handleNewConversation = useCallback(() => {
     if (!selectedSandboxId) return;

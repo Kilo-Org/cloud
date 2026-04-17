@@ -1084,9 +1084,9 @@ async function getPersonalBillingStatus(user: {
     .limit(1);
 
   const earlybirdExpiresAt = KILOCLAW_EARLYBIRD_EXPIRY_DATE;
-  const earlybirdDaysRemaining = earlybird
-    ? Math.ceil((new Date(earlybirdExpiresAt).getTime() - Date.now()) / 86_400_000)
-    : 0;
+  const earlybirdDaysRemaining = Math.ceil(
+    (new Date(earlybirdExpiresAt).getTime() - Date.now()) / 86_400_000
+  );
 
   let accessReason: 'trial' | 'subscription' | 'earlybird' | null =
     getKiloClawSubscriptionAccessReason(sub, now);
@@ -1145,9 +1145,10 @@ async function getPersonalBillingStatus(user: {
       }
     : null;
 
-  const earlybirdData = earlybird
+  const isEarlybird = earlybird || accessReason === 'earlybird';
+  const earlybirdData = isEarlybird
     ? {
-        purchased: true,
+        purchased: !!earlybird,
         expiresAt: earlybirdExpiresAt,
         daysRemaining: earlybirdDaysRemaining,
       }

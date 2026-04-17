@@ -301,9 +301,9 @@ describe('kiloclaw-subscription-alignment script', () => {
     );
   });
 
-  it('does not bootstrap trial or earlybird rows for destroyed personal instances', async () => {
+  it('backfills canceled terminal row for destroyed personal instance missing a sub row', async () => {
     const user = await insertTestUser({
-      google_user_email: 'destroyed-bootstrap@example.com',
+      google_user_email: 'destroyed-terminal@example.com',
     });
     const destroyedInstanceId = crypto.randomUUID();
 
@@ -322,7 +322,44 @@ describe('kiloclaw-subscription-alignment script', () => {
       .from(kiloclaw_subscriptions)
       .where(eq(kiloclaw_subscriptions.user_id, user.id));
 
-    expect(subscriptions).toHaveLength(0);
+    // Destroyed missing-row instances get a terminal canceled trial row so
+    // apply-missing-personal can clean up after admin-panel destroys.
+    expect(subscriptions).toHaveLength(1);
+    const terminal = subscriptions[0];
+    expect(terminal).toEqual(
+      expect.objectContaining({
+        user_id: user.id,
+        instance_id: destroyedInstanceId,
+        plan: 'trial',
+        status: 'canceled',
+        payment_source: null,
+      })
+    );
+    if (!terminal) {
+      throw new Error('Expected terminal subscription row');
+    }
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, terminal.id));
+
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'backfilled',
+          reason: 'apply_missing_personal_backfill_destroyed_terminal',
+        }),
+      ])
+    );
+
+    // Second run is a no-op.
+    await run('apply-missing-personal');
+    const subscriptionsAfterRerun = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id));
+    expect(subscriptionsAfterRerun).toHaveLength(1);
   });
 
   it('bootstraps personal trial even when user has org-context subscription', async () => {
@@ -634,5 +671,90 @@ describe('kiloclaw-subscription-alignment script', () => {
 
     // No terminal replacement inserted either.
     expect(subscriptions).toHaveLength(1);
+  });
+
+  it('ignores transferred-out rows when picking duplicate reassign targets', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'duplicate-transferred@example.com',
+    });
+
+    // Canonical instance C has zero current subscriptions.
+    // Duplicate instance D holds only a transferred-out predecessor (history).
+    // The script MUST NOT treat D's historical row as a live sub; moving it
+    // onto C would occupy the unique instance_id slot with a dead row and
+    // wedge future repair.
+    const canonicalInstanceId = crypto.randomUUID();
+    const duplicateInstanceId = crypto.randomUUID();
+    const transferredSuccessorId = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: canonicalInstanceId,
+        user_id: user.id,
+        sandbox_id: `ki_${canonicalInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        id: duplicateInstanceId,
+        user_id: user.id,
+        sandbox_id: `ki_${duplicateInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-04-02T00:00:00.000Z',
+      },
+    ]);
+
+    // A live successor elsewhere (detached for this test — point is only that
+    // it's referenced by transferred_to_subscription_id). Insert it detached
+    // then reference it from the predecessor on the duplicate instance.
+    const [successor] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        id: transferredSuccessorId,
+        user_id: user.id,
+        instance_id: null,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'stripe',
+        cancel_at_period_end: false,
+        created_at: '2026-03-20T00:00:00.000Z',
+        updated_at: '2026-03-20T00:00:00.000Z',
+      })
+      .returning();
+
+    const [predecessor] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: duplicateInstanceId,
+        plan: 'standard',
+        status: 'canceled',
+        payment_source: 'credits',
+        cancel_at_period_end: false,
+        transferred_to_subscription_id: successor?.id,
+        created_at: '2026-03-01T00:00:00.000Z',
+        updated_at: '2026-03-20T00:00:00.000Z',
+      })
+      .returning();
+
+    if (!predecessor || !successor) {
+      throw new Error('Expected seed subscription rows');
+    }
+
+    await run('apply-duplicates', '--confirm-sandboxes-destroyed');
+
+    const predecessorAfter = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, predecessor.id));
+
+    // Predecessor MUST stay pinned to duplicateInstanceId (not moved to canonical).
+    expect(predecessorAfter[0]?.instance_id).toBe(duplicateInstanceId);
+    expect(predecessorAfter[0]?.transferred_to_subscription_id).toBe(successor.id);
+
+    // Canonical still has no attached sub.
+    const canonicalAttached = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, canonicalInstanceId));
+    expect(canonicalAttached).toHaveLength(0);
   });
 });

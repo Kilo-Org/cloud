@@ -17,8 +17,17 @@
  * Flags:
  *   --confirm-sandboxes-destroyed   Required for apply-duplicates to write
  *     destroyed_at. Operators MUST first tear down the underlying sandbox
- *     resources via the admin panel. Without this flag, apply-duplicates
- *     prints a manifest of duplicate sandbox IDs and exits without writes.
+ *     resource out-of-band (provider-level teardown that does NOT mutate
+ *     kiloclaw_instances — the admin panel destroy flow writes destroyed_at
+ *     itself and would hide the row from apply-duplicates). Without this
+ *     flag, apply-duplicates prints a manifest of duplicate sandbox IDs and
+ *     exits without writes.
+ *
+ * Admin-panel workflow (recommended): operators destroy duplicate sandboxes
+ * via the admin panel, which sets destroyed_at and tears down the resource.
+ * Then apply-missing-personal picks up the now-destroyed instances via the
+ * backfill_destroyed_terminal_personal path and inserts canceled terminal
+ * subscription rows — no --confirm-sandboxes-destroyed flag required.
  */
 
 import { and, asc, desc, eq, inArray, isNull, notExists, or, sql } from 'drizzle-orm';
@@ -95,6 +104,7 @@ type MissingPersonalBackfillAction =
   | 'reassign_destroyed_access_row'
   | 'bootstrap_trial_row'
   | 'backfill_earlybird_row'
+  | 'backfill_destroyed_terminal_personal'
   | 'manual_review';
 
 type MissingPersonalCandidate = {
@@ -557,6 +567,13 @@ async function buildMissingPersonalCandidates(): Promise<MissingPersonalCandidat
       !earlybirdPurchaseCreatedAt
     ) {
       action = 'bootstrap_trial_row';
+    } else if (row.destroyedAt) {
+      // Destroyed personal instance without a sub row. Insert a canceled
+      // terminal trial row to satisfy the "every instance has a sub row"
+      // invariant. Mirrors the org-side backfill_destroyed_trial path and
+      // closes the admin-panel-destroy wedge where destroyed_at is written
+      // before apply-duplicates sees the row.
+      action = 'backfill_destroyed_terminal_personal';
     }
 
     return {
@@ -662,10 +679,16 @@ async function buildDuplicateActiveInstanceCandidates(): Promise<
     getLatestSeatPurchases(orgIds),
   ]);
 
+  // Transferred-out rows are history (predecessor in a successor chain).
+  // Runtime resolvers in lib/kiloclaw/current-personal-subscription.ts ignore
+  // them, so they MUST NOT count toward duplicate-instance sub counts nor be
+  // eligible as a targetSubscriptionId for reassignment: moving a transferred
+  // row onto the canonical instance would occupy the instance_id unique slot
+  // without providing a live sub, wedging future repair.
   const subscriptionsByInstanceId = new Map<string, KiloClawSubscription[]>();
   for (const subscription of subscriptions) {
     const instanceId = subscription.instance_id;
-    if (!instanceId) {
+    if (!instanceId || subscription.transferred_to_subscription_id !== null) {
       continue;
     }
     const existing = subscriptionsByInstanceId.get(instanceId);
@@ -826,6 +849,7 @@ function summarizeMissingPersonalCandidates(rows: MissingPersonalCandidate[]) {
         reassign_destroyed_access_row: 0,
         bootstrap_trial_row: 0,
         backfill_earlybird_row: 0,
+        backfill_destroyed_terminal_personal: 0,
         manual_review: 0,
       }
     )
@@ -1059,6 +1083,18 @@ async function previewMissingPersonalBackfill() {
         earlybirdPurchaseCreatedAt: row.earlybirdPurchaseCreatedAt,
         trialEndsAt: getEarlybirdEndsAt(),
         instanceCreatedAt: row.instanceCreatedAt,
+      }))
+  );
+  printSection(
+    'Missing personal rows safe to backfill terminal canceled row (destroyed instance)',
+    rows
+      .filter(row => row.action === 'backfill_destroyed_terminal_personal')
+      .map(row => ({
+        instanceId: row.instanceId,
+        userId: row.userId,
+        sandboxId: row.sandboxId,
+        instanceCreatedAt: row.instanceCreatedAt,
+        instanceDestroyedAt: row.instanceDestroyedAt,
       }))
   );
   printSection(
@@ -1328,6 +1364,8 @@ async function applyDuplicateActiveInstanceRow(
       return 'skipped';
     }
 
+    let didReassign = false;
+
     if (row.action === 'reassign_to_canonical_and_destroy_duplicate') {
       const before = duplicateExisting[0] ?? null;
       if (!before || before.id !== row.targetSubscriptionId) {
@@ -1346,8 +1384,16 @@ async function applyDuplicateActiveInstanceRow(
         .returning();
 
       if (!updated) {
+        // UPDATE matched zero rows — no mutation, safe to skip.
         return 'skipped';
       }
+
+      // ---- MUTATION BARRIER ----
+      // Past this point the sub has been moved off the duplicate. Any later
+      // failure MUST throw so drizzle rolls the tx back; returning 'skipped'
+      // would leave the canonical instance with the sub but the duplicate
+      // without its terminal replacement, violating one-row-per-instance.
+      didReassign = true;
 
       await insertAlignmentChangeLog(tx, {
         subscriptionId: updated.id,
@@ -1360,12 +1406,19 @@ async function applyDuplicateActiveInstanceRow(
 
     const destroyed = await markDuplicateInstanceDestroyed(tx, row.duplicateInstanceId);
     if (!destroyed) {
+      if (didReassign) {
+        throw new Error(
+          `apply-duplicates: duplicate instance ${row.duplicateInstanceId} destroy marker lost race after reassigning sub to ${row.canonicalInstanceId}; rolling back`
+        );
+      }
       return 'skipped';
     }
 
     const replacement = await insertDuplicateTerminalSubscription(tx, row);
     if (!replacement) {
-      return 'skipped';
+      throw new Error(
+        `apply-duplicates: failed to insert terminal subscription for duplicate instance ${row.duplicateInstanceId} after marking destroyed; rolling back`
+      );
     }
 
     await insertAlignmentChangeLog(tx, {
@@ -1506,6 +1559,7 @@ type MissingPersonalOutcome =
   | 'reassigned'
   | 'bootstrapped'
   | 'earlybird_backfilled'
+  | 'destroyed_terminal_backfilled'
   | 'skipped'
   | 'no_op';
 
@@ -1620,8 +1674,15 @@ async function applyMissingPersonalBackfillRow(
         .returning();
 
       if (!insertedSuccessor) {
+        // INSERT returned nothing — no mutation, safe to skip.
         return 'skipped';
       }
+
+      // ---- MUTATION BARRIER ----
+      // Past this point the successor row exists in the tx. Any downstream
+      // failure MUST throw so drizzle rolls the tx back; returning 'skipped'
+      // would commit the orphan successor and violate the single-current-row
+      // invariant.
 
       const [predecessor] = await tx
         .update(kiloclaw_subscriptions)
@@ -1651,7 +1712,9 @@ async function applyMissingPersonalBackfillRow(
         .returning();
 
       if (!predecessor) {
-        return 'skipped';
+        throw new Error(
+          `reassign_destroyed_access_row: predecessor ${before.id} was transferred concurrently after successor ${insertedSuccessor.id} was inserted; rolling back successor`
+        );
       }
 
       const successor =
@@ -1669,7 +1732,9 @@ async function applyMissingPersonalBackfillRow(
           : insertedSuccessor;
 
       if (!successor) {
-        return 'skipped';
+        throw new Error(
+          `reassign_destroyed_access_row: successor ${insertedSuccessor.id} disappeared during stripe re-attach`
+        );
       }
 
       await insertAlignmentChangeLog(tx, {
@@ -1797,6 +1862,55 @@ async function applyMissingPersonalBackfillRow(
       return 'earlybird_backfilled';
     }
 
+    if (row.action === 'backfill_destroyed_terminal_personal') {
+      if (!row.instanceDestroyedAt) {
+        // Candidate classification guarantees destroyedAt. If the instance
+        // was un-destroyed between preview and apply, fall out; the next
+        // audit run will reclassify.
+        return 'skipped';
+      }
+
+      const existingForInstance = await tx
+        .select({ id: kiloclaw_subscriptions.id })
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.instance_id, row.instanceId))
+        .limit(1);
+
+      if (existingForInstance.length > 0) {
+        return 'skipped';
+      }
+
+      const trialEndsAt = getPersonalTrialEndsAt(row.instanceCreatedAt);
+      const [inserted] = await tx
+        .insert(kiloclaw_subscriptions)
+        .values({
+          user_id: row.userId,
+          instance_id: row.instanceId,
+          plan: 'trial',
+          status: 'canceled',
+          payment_source: null,
+          cancel_at_period_end: false,
+          trial_started_at: row.instanceCreatedAt,
+          trial_ends_at: trialEndsAt,
+          created_at: row.instanceCreatedAt,
+          updated_at: row.instanceCreatedAt,
+        })
+        .returning();
+
+      if (!inserted) {
+        return 'skipped';
+      }
+
+      await insertAlignmentChangeLog(tx, {
+        subscriptionId: inserted.id,
+        action: 'backfilled',
+        reason: 'apply_missing_personal_backfill_destroyed_terminal',
+        before: null,
+        after: inserted,
+      });
+      return 'destroyed_terminal_backfilled';
+    }
+
     return 'no_op';
   });
 }
@@ -1807,6 +1921,7 @@ async function applyMissingPersonalBackfill() {
   let reassigned = 0;
   let bootstrapped = 0;
   let earlybirdBackfilled = 0;
+  let destroyedTerminalBackfilled = 0;
   const skipped: Array<{
     instanceId: string;
     userId: string;
@@ -1847,6 +1962,9 @@ async function applyMissingPersonalBackfill() {
       case 'earlybird_backfilled':
         earlybirdBackfilled += 1;
         break;
+      case 'destroyed_terminal_backfilled':
+        destroyedTerminalBackfilled += 1;
+        break;
       case 'skipped':
         skipped.push({ instanceId: row.instanceId, userId: row.userId, action: row.action });
         break;
@@ -1861,6 +1979,7 @@ async function applyMissingPersonalBackfill() {
     { action: 'reassign_destroyed_access_row', count: reassigned },
     { action: 'bootstrap_trial_row', count: bootstrapped },
     { action: 'backfill_earlybird_row', count: earlybirdBackfilled },
+    { action: 'backfill_destroyed_terminal_personal', count: destroyedTerminalBackfilled },
     { action: 'skipped', count: skipped.length },
   ]);
   printSection('Missing personal rows skipped during apply', skipped);

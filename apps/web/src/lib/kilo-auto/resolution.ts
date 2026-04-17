@@ -91,11 +91,9 @@ export async function applyResolvedAutoModel(
   }
   if (resolved.verbosity) {
     if (request.kind === 'messages') {
-      // Anthropic's output_config.effort doesn't support 'xhigh'; map it to 'max'
-      const effort = resolved.verbosity === 'xhigh' ? 'max' : resolved.verbosity;
       request.body.output_config = {
         ...request.body.output_config,
-        effort,
+        effort: resolved.verbosity,
       };
     } else if (request.kind === 'responses') {
       request.body.text = {

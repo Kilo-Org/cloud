@@ -615,6 +615,18 @@ describe('generateBaseConfig', () => {
     expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
   });
 
+  it('adds KiloClaw customizer to an existing plugin allowlist', () => {
+    const existing = JSON.stringify({
+      plugins: {
+        allow: ['openclaw-channel-streamchat', 'telegram', 'kilocode', 'browser'],
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.plugins.allow).toContain('kiloclaw-customizer');
+  });
+
   it('configures Telegram channel', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv(), TELEGRAM_BOT_TOKEN: 'tg-token-123' };

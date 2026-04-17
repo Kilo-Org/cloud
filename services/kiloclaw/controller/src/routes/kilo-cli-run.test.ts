@@ -54,6 +54,13 @@ describe('buildRunPrompt', () => {
     expect(result).toContain('/root/clawd/');
     expect(result).toContain('/_kilo/health');
   });
+
+  it('instructs recovery agents to preserve the KiloClaw customizer plugin', () => {
+    const result = buildRunPrompt('fix plugin warnings');
+    expect(result).toContain('kiloclaw-customizer');
+    expect(result).toContain('Do NOT remove');
+    expect(result).toContain('adding `"kiloclaw-customizer"` to `plugins.allow`');
+  });
 });
 
 describe('/_kilo/cli-run routes', () => {

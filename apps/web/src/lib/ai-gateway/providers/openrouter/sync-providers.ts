@@ -441,14 +441,16 @@ async function mirrorToRedis(values: {
   providers: NormalizedOpenRouterResponse;
   openrouter: Record<string, StoredModel>;
   vercel: Record<string, StoredModel>;
-  openrouterProviders: OpenRouterApiProvidersResponse;
+  openrouterProviders: OpenRouterApiProvidersResponse | null;
 }): Promise<void> {
   const entries: [string, unknown][] = [
     [SYNC_PROVIDERS_REDIS_KEYS.providers, values.providers],
     [SYNC_PROVIDERS_REDIS_KEYS.openrouter, values.openrouter],
     [SYNC_PROVIDERS_REDIS_KEYS.vercel, values.vercel],
-    [SYNC_PROVIDERS_REDIS_KEYS.openrouterProviders, values.openrouterProviders],
   ];
+  if (values.openrouterProviders) {
+    entries.push([SYNC_PROVIDERS_REDIS_KEYS.openrouterProviders, values.openrouterProviders]);
+  }
   await Promise.all(
     entries.map(async ([key, value]) => {
       try {
@@ -465,7 +467,21 @@ export async function syncAndStoreProviders() {
 
   const openrouter_data = await fetchGatewayModels(PROVIDERS.OPENROUTER);
   const vercel_data = await fetchGatewayModels(PROVIDERS.VERCEL_AI_GATEWAY);
-  const openrouter_providers = await fetchOpenRouterApiProviders();
+
+  // Best-effort: no readers yet, and a temporary failure here must not
+  // prevent the primary (openrouter/vercel/providers) snapshot from refreshing.
+  let openrouter_providers: OpenRouterApiProvidersResponse | null = null;
+  try {
+    const fetched = await fetchOpenRouterApiProviders();
+    if (fetched.data.length < 10) {
+      throw new Error(
+        `Suspicious: total number of OpenRouter API providers is ${fetched.data.length} < 10`
+      );
+    }
+    openrouter_providers = fetched;
+  } catch (err) {
+    console.error('[syncAndStoreProviders] Failed to fetch /api/v1/providers:', err);
+  }
 
   const providers = await syncProviders();
 
@@ -475,12 +491,6 @@ export async function syncAndStoreProviders() {
 
   if (providers.total_models < 100) {
     throw new Error(`Suspicious: total number of models is ${providers.total_models} < 100`);
-  }
-
-  if (openrouter_providers.data.length < 10) {
-    throw new Error(
-      `Suspicious: total number of OpenRouter API providers is ${openrouter_providers.data.length} < 10`
-    );
   }
 
   const result = await db.transaction(async tx => {

@@ -162,22 +162,30 @@ export function MessageBubble({
         )}
       </div>
 
-      {showActions && isOwn && !isEditing && pendingDeleteId !== message.id && (
-        <div className="bg-background border-border absolute top-1 right-4 flex items-center gap-0.5 rounded border p-0.5 shadow-sm">
-          <button
-            onClick={handleStartEdit}
-            className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
-            title="Edit"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => onDelete(message.id)}
-            className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
-            title="Delete"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+      {showActions && !isEditing && pendingDeleteId !== message.id && (
+        <div
+          className={`bg-background border-border absolute top-1 flex items-center gap-0.5 rounded border p-0.5 shadow-sm ${
+            isOwn ? 'right-[calc(75%+1rem)]' : 'left-[calc(75%+1rem)]'
+          }`}
+        >
+          {isOwn && (
+            <>
+              <button
+                onClick={handleStartEdit}
+                className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+                title="Edit"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => onDelete(message.id)}
+                className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+                title="Delete"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
           <button
             onClick={() => onReply(message)}
             className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"

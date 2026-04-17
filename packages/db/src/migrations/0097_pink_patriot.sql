@@ -1,0 +1,1 @@
+ALTER TABLE "kilocode_users" ADD COLUMN "is_openai_deactivated" boolean DEFAULT false NOT NULL;

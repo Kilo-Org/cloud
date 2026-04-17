@@ -53,6 +53,7 @@ import {
   organizations,
   kilocode_users,
   auto_top_up_configs,
+  pending_impact_sale_reversals,
   user_affiliate_attributions,
   user_affiliate_events,
 } from '@kilocode/db/schema';
@@ -812,6 +813,48 @@ describe('processStripePaymentEventHook', () => {
       .where(eq(user_affiliate_events.event_type, 'sale_reversal'));
 
     expect(reversalEvents).toHaveLength(0);
+  });
+
+  test('charge.dispute.created skips non-KiloClaw charges (e.g., Kilo Pass, top-ups)', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+
+    const { client } = await import('@/lib/stripe-client');
+    const nonKiloClawInvoice = {
+      lines: {
+        data: [{ pricing: { price_details: { price: 'price_kilo_pass_not_kiloclaw' } } }],
+      },
+    } as unknown as Stripe.Invoice;
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue({
+      invoice: nonKiloClawInvoice,
+      lastResponse: { headers: {}, requestId: 'req_test', statusCode: 200 },
+    } as unknown as Stripe.Response<Stripe.Charge>);
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_non_kiloclaw',
+      type: 'charge.dispute.created',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_non_kiloclaw',
+          charge: 'ch_non_kiloclaw',
+        }),
+        previous_attributes: {},
+      },
+    };
+
+    await processStripePaymentEventHook(event);
+
+    const reversalEvents = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.event_type, 'sale_reversal'));
+    const pendingRows = await db.select().from(pending_impact_sale_reversals);
+
+    expect(reversalEvents).toHaveLength(0);
+    expect(pendingRows).toHaveLength(0);
+
+    retrieveSpy.mockRestore();
   });
 
   describe('subscription_schedule.* (Kilo Pass scheduled changes)', () => {

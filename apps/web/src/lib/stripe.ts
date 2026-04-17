@@ -65,6 +65,22 @@ import {
 import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organization-types';
 import { successResult } from '@/lib/maybe-result';
 
+async function isKiloClawCharge(chargeId: string): Promise<boolean> {
+  try {
+    // The `invoice` field is present at runtime on charges but removed from newer
+    // Stripe TypeScript definitions. Read the response as a structural type.
+    const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
+      await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+    const invoice = charge.invoice;
+    if (!invoice || typeof invoice === 'string') return false;
+    return invoiceLooksLikeKiloClawByPriceId(invoice);
+  } catch {
+    // If charge lookup fails, err on side of processing — avoid silently
+    // dropping legitimate affiliate reversals.
+    return true;
+  }
+}
+
 if (!APP_URL) throw new Error('APP_URL constant is not set');
 
 export async function isCardFingerprintEligibleForFreeCredits(
@@ -770,6 +786,14 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       const chargeId =
         typeof dispute.charge === 'string' ? dispute.charge : (dispute.charge?.id ?? null);
       if (!chargeId) {
+        break;
+      }
+
+      // Only enqueue reversals for KiloClaw charges — those are the only ones
+      // that produce affiliate sale events. Non-KiloClaw disputes (Kilo Pass,
+      // top-ups, etc.) would otherwise accumulate in pending_impact_sale_reversals
+      // forever because they will never have a matching sale row.
+      if (!(await isKiloClawCharge(chargeId))) {
         break;
       }
 

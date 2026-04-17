@@ -136,6 +136,8 @@ export async function POST(request: NextRequest) {
     status: 'success',
     report: {
       markdown: report.markdown,
+      grade: report.grade,
+      score: report.score,
       summary: report.summary,
       findings: report.findings,
       recommendations: report.recommendations,

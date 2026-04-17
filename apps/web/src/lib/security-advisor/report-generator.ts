@@ -5,8 +5,31 @@ import type {
   Recommendation,
   RecommendationPriority,
   FindingSeverity,
+  ReportGrade,
 } from './schemas';
 import { findCoverageForCheckId, type LoadedSecurityAdvisorContent } from './content-loader';
+
+// --- Grading ---
+
+/**
+ * Per-finding score deductions. Critical findings dominate the grade; warnings
+ * stack up linearly; info is visibility-only and does not affect the score.
+ * Tuned against the real-world "7 warnings, 0 critical" baseline to land at C,
+ * with 1 critical dropping to D and 2+ criticals to F.
+ */
+const SCORE_PENALTY_CRITICAL = 35;
+const SCORE_PENALTY_WARN = 4;
+
+function computeGrade(
+  criticalCount: number,
+  warnCount: number
+): { score: number; grade: ReportGrade } {
+  const raw = 100 - SCORE_PENALTY_CRITICAL * criticalCount - SCORE_PENALTY_WARN * warnCount;
+  const score = Math.max(0, Math.round(raw));
+  const grade: ReportGrade =
+    score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+  return { score, grade };
+}
 
 // --- Report generation ---
 
@@ -21,6 +44,8 @@ interface GenerateReportOptions {
 
 interface GeneratedReport {
   markdown: string;
+  grade: ReportGrade;
+  score: number;
   summary: { critical: number; warn: number; info: number; passed: number };
   findings: ReportFinding[];
   recommendations: Recommendation[];
@@ -50,16 +75,20 @@ export function generateSecurityReport(options: GenerateReportOptions): Generate
     passed,
   };
 
+  const { score, grade } = computeGrade(summary.critical, summary.warn);
+
   const markdown = renderMarkdown({
     findings,
     recommendations,
     summary,
+    score,
+    grade,
     publicIp,
     isKiloClaw,
     content,
   });
 
-  return { markdown, summary, findings, recommendations };
+  return { markdown, score, grade, summary, findings, recommendations };
 }
 
 function mapFinding(
@@ -161,24 +190,53 @@ function severityToPriority(severity: FindingSeverity): RecommendationPriority {
   }
 }
 
+/**
+ * Map the stored RecommendationPriority to the user-facing badge text. We show
+ * the same severity vocabulary used in the "## Critical Findings" / "## Warnings"
+ * section headings so the reader sees one consistent label set across the
+ * report. Info findings are filtered out of recommendations, so `low`/`medium`
+ * are included for completeness but never render in practice today.
+ */
+function priorityBadge(priority: RecommendationPriority): string {
+  switch (priority) {
+    case 'immediate':
+      return 'CRITICAL';
+    case 'high':
+      return 'WARNING';
+    case 'medium':
+      return 'WARNING';
+    case 'low':
+      return 'INFO';
+  }
+}
+
 // --- Markdown rendering ---
 
 interface RenderOptions {
   findings: ReportFinding[];
   recommendations: Recommendation[];
   summary: { critical: number; warn: number; info: number; passed: number };
+  score: number;
+  grade: ReportGrade;
   publicIp?: string;
   isKiloClaw: boolean;
   content: LoadedSecurityAdvisorContent;
 }
 
 function renderMarkdown(opts: RenderOptions): string {
-  const { findings, recommendations, summary, publicIp, isKiloClaw, content } = opts;
+  const { findings, recommendations, summary, score, grade, publicIp, isKiloClaw, content } = opts;
   const get = (key: string, fallback: string) => getContent(content, key, fallback);
   const lines: string[] = [];
 
   // Header
   lines.push('# Security Audit Report');
+  lines.push('');
+
+  // Overall grade — shown at the top so the user sees a single at-a-glance
+  // answer before diving into the finding list.
+  lines.push(`## Security Grade: ${grade}`);
+  lines.push('');
+  lines.push(`**Score:** ${score} / 100`);
   lines.push('');
 
   // Summary
@@ -235,12 +293,17 @@ function renderMarkdown(opts: RenderOptions): string {
     }
   }
 
-  // Recommendations
+  // Recommendations — render badges using the same vocabulary as the
+  // finding sections ("Critical Findings" / "Warnings") so the user sees
+  // one set of words throughout the report instead of two. We map the
+  // priority enum (immediate/high/...) to the matching severity label
+  // at render time; the structured `priority` field in the response
+  // stays as-is for API stability.
   if (recommendations.length > 0) {
     lines.push('## Recommendations');
     lines.push('');
     for (const rec of recommendations) {
-      lines.push(`- [${rec.priority.toUpperCase()}] ${rec.action}`);
+      lines.push(`- [${priorityBadge(rec.priority)}] ${rec.action}`);
     }
     lines.push('');
   }

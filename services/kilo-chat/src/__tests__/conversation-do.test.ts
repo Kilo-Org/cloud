@@ -146,7 +146,7 @@ describe('ConversationDO', () => {
     const { messages } = await stub.listMessages({ limit: 10 });
     const msg = messages.find(m => m.id === created.messageId);
     expect(msg).toBeDefined();
-    expect(JSON.parse(msg!.content)).toEqual([{ type: 'text', text: 'Edited' }]);
+    expect(msg!.content).toEqual([{ type: 'text', text: 'Edited' }]);
     expect(msg!.updatedAt).not.toBeNull();
   });
 

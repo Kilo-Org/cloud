@@ -163,7 +163,11 @@ export class ConversationDO extends DurableObject<Env> {
     const convRow = this.db.select().from(conversation).get();
     if (!convRow) return null;
 
-    const memberRows = this.db.select().from(members).all();
+    const memberRows = this.db
+      .select()
+      .from(members)
+      .where(sql`${members.left_at} IS NULL`)
+      .all();
 
     return {
       id: convRow.id,
@@ -175,7 +179,11 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   isMember(memberId: string): boolean {
-    const row = this.db.select().from(members).where(eq(members.id, memberId)).get();
+    const row = this.db
+      .select()
+      .from(members)
+      .where(and(eq(members.id, memberId), sql`${members.left_at} IS NULL`))
+      .get();
     return row !== undefined;
   }
 
@@ -183,7 +191,9 @@ export class ConversationDO extends DurableObject<Env> {
     return this.db
       .select()
       .from(members)
-      .where(and(eq(members.kind, 'bot'), ne(members.id, senderId)))
+      .where(
+        and(eq(members.kind, 'bot'), ne(members.id, senderId), sql`${members.left_at} IS NULL`)
+      )
       .all()
       .map(m => ({ id: m.id, kind: m.kind }));
   }
@@ -268,7 +278,7 @@ export class ConversationDO extends DurableObject<Env> {
       messages: rows.map(row => ({
         id: row.id,
         senderId: row.sender_id,
-        content: row.deleted === 1 ? '[]' : row.content,
+        content: row.deleted === 1 ? [] : JSON.parse(row.content),
         inReplyToMessageId: row.in_reply_to_message_id,
         version: row.version,
         updatedAt: row.updated_at,
@@ -481,13 +491,20 @@ export class ConversationDO extends DurableObject<Env> {
     return { ok: true };
   }
 
-  getUserMembersExcluding(excludeId: string): Array<{ id: string; kind: string }> {
-    return this.db
-      .select()
+  leaveMember(memberId: string): {
+    remainingUsers: Array<{ id: string }>;
+    botMembers: Array<{ id: string }>;
+  } {
+    this.db.update(members).set({ left_at: Date.now() }).where(eq(members.id, memberId)).run();
+    const active = this.db
+      .select({ id: members.id, kind: members.kind })
       .from(members)
-      .where(and(eq(members.kind, 'user'), sql`${members.id} != ${excludeId}`))
-      .all()
-      .map(m => ({ id: m.id, kind: m.kind }));
+      .where(sql`${members.left_at} IS NULL`)
+      .all();
+    return {
+      remainingUsers: active.filter(m => m.kind === 'user'),
+      botMembers: active.filter(m => m.kind === 'bot'),
+    };
   }
 
   async fetch(request: Request): Promise<Response> {

@@ -15,6 +15,7 @@ export const members = sqliteTable(
     id: text('id').primaryKey(),
     kind: text('kind').notNull(),
     joined_at: integer('joined_at').notNull(),
+    left_at: integer('left_at'),
   },
   table => ({
     kindCheck: check('members_kind_check', sql`${table.kind} IN ('user', 'bot')`),

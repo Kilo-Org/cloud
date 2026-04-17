@@ -9,12 +9,16 @@ type ConversationListProps = {
   conversations: ConversationListItem[];
   isLoading: boolean;
   onNewConversation: () => void;
+  onRename: (id: string, title: string) => void;
+  onLeave: (id: string) => void;
 };
 
 export function ConversationList({
   conversations,
   isLoading,
   onNewConversation,
+  onRename,
+  onLeave,
 }: ConversationListProps) {
   const params = useParams<{ conversationId?: string }>();
   const activeId = params?.conversationId;
@@ -45,6 +49,8 @@ export function ConversationList({
               key={conv.conversationId}
               conversation={conv}
               isActive={conv.conversationId === activeId}
+              onRename={onRename}
+              onLeave={onLeave}
             />
           ))
         )}

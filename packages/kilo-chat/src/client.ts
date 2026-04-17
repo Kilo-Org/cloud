@@ -10,6 +10,7 @@ import type {
   EditMessageRequest,
   EditMessageResponse,
   DeleteMessageRequest,
+  RenameConversationRequest,
   MessageListResponse,
   Message,
   MessageRow,
@@ -102,6 +103,17 @@ export class KiloChatClient {
 
   async deleteMessage(messageId: string, req: DeleteMessageRequest): Promise<void> {
     return this.request(`/v1/messages/${messageId}`, { method: 'DELETE', body: req });
+  }
+
+  async renameConversation(
+    conversationId: string,
+    req: RenameConversationRequest
+  ): Promise<{ ok: true }> {
+    return this.request(`/v1/conversations/${conversationId}`, { method: 'PATCH', body: req });
+  }
+
+  async leaveConversation(conversationId: string): Promise<void> {
+    return this.request(`/v1/conversations/${conversationId}/leave`, { method: 'POST' });
   }
 
   async sendTyping(conversationId: string): Promise<void> {

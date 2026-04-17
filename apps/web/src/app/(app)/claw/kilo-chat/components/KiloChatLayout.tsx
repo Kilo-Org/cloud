@@ -1,10 +1,15 @@
 'use client';
 
 import { useState, useCallback, createContext, useContext, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { InstanceSwitcher } from './InstanceSwitcher';
 import { ConversationList } from './ConversationList';
-import { useConversations, useCreateConversation } from '../hooks/useConversations';
+import {
+  useConversations,
+  useCreateConversation,
+  useRenameConversation,
+  useLeaveConversation,
+} from '../hooks/useConversations';
 
 // ── Context for child pages ─────────────────────────────────────────
 type KiloChatContextValue = {
@@ -50,8 +55,31 @@ export function KiloChatLayout({
     }
   }, [instances, selectedSandboxId]);
 
+  const params = useParams<{ conversationId?: string }>();
   const { data, isLoading } = useConversations(getToken);
   const createConversation = useCreateConversation(getToken);
+  const renameConversation = useRenameConversation(getToken);
+  const leaveConversation = useLeaveConversation(getToken);
+
+  const handleRename = useCallback(
+    (conversationId: string, title: string) => {
+      renameConversation.mutate({ conversationId, title });
+    },
+    [renameConversation]
+  );
+
+  const handleLeave = useCallback(
+    (conversationId: string) => {
+      leaveConversation.mutate(conversationId, {
+        onSuccess: () => {
+          if (params?.conversationId === conversationId) {
+            router.push('/claw/kilo-chat');
+          }
+        },
+      });
+    },
+    [leaveConversation, params?.conversationId, router]
+  );
 
   const handleNewConversation = useCallback(() => {
     if (!selectedSandboxId) return;
@@ -79,6 +107,8 @@ export function KiloChatLayout({
             conversations={data?.conversations ?? []}
             isLoading={isLoading}
             onNewConversation={handleNewConversation}
+            onRename={handleRename}
+            onLeave={handleLeave}
           />
         </div>
 

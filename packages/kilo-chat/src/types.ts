@@ -114,6 +114,10 @@ export type DeleteMessageRequest = {
   conversationId: string;
 };
 
+export type RenameConversationRequest = {
+  title: string;
+};
+
 export type ConversationListResponse = {
   conversations: ConversationListItem[];
 };

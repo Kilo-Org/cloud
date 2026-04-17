@@ -63,6 +63,14 @@ export class MembershipDO extends DurableObject<Env> {
       .run();
   }
 
+  updateConversationTitle(conversationId: string, title: string | null): void {
+    this.db
+      .update(conversations)
+      .set({ conversation_title: title })
+      .where(eq(conversations.conversation_id, conversationId))
+      .run();
+  }
+
   removeConversation(conversationId: string): void {
     this.db.delete(conversations).where(eq(conversations.conversation_id, conversationId)).run();
   }

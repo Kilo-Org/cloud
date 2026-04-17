@@ -476,6 +476,21 @@ export class ConversationDO extends DurableObject<Env> {
     }
   }
 
+  updateTitle(title: string): { ok: true } {
+    this.db.update(conversation).set({ title }).run();
+    return { ok: true };
+  }
+
+  removeMember(memberId: string): { remainingMembers: Array<{ id: string; kind: string }> } {
+    this.db.delete(members).where(eq(members.id, memberId)).run();
+    const remaining = this.db
+      .select()
+      .from(members)
+      .all()
+      .map(m => ({ id: m.id, kind: m.kind }));
+    return { remainingMembers: remaining };
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 

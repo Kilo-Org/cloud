@@ -12,6 +12,10 @@ const createConversationSchema = z.object({
   title: z.string().max(200).optional(),
 });
 
+const renameConversationSchema = z.object({
+  title: z.string().min(1).max(200),
+});
+
 export function registerConversationRoutes(
   app: Hono<{ Bindings: Env; Variables: AuthContext }>
 ): void {
@@ -105,5 +109,91 @@ export function registerConversationRoutes(
       return c.json({ error: 'Not found' }, 404);
     }
     return c.json(info);
+  });
+
+  // PATCH /v1/conversations/:id — rename
+  app.patch('/v1/conversations/:id', async c => {
+    const callerKind = c.get('callerKind');
+    if (callerKind !== 'user') {
+      return c.json({ error: 'Only users can rename conversations' }, 403);
+    }
+
+    const idParam = ulidSchema.safeParse(c.req.param('id'));
+    if (!idParam.success) {
+      return c.json({ error: 'Invalid conversation ID' }, 400);
+    }
+    const conversationId = idParam.data;
+
+    let rawBody: unknown;
+    try {
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON' }, 400);
+    }
+
+    const body = renameConversationSchema.safeParse(rawBody);
+    if (!body.success) {
+      return c.json({ error: 'Invalid request', issues: body.error.issues }, 400);
+    }
+
+    const callerId = c.get('callerId');
+    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
+
+    if (!(await convStub.isMember(callerId))) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    await convStub.updateTitle(body.data.title);
+
+    const info = await convStub.getInfo();
+    if (info) {
+      await Promise.all(
+        info.members.map(member => {
+          const memberStub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(member.id));
+          return memberStub.updateConversationTitle(conversationId, body.data.title);
+        })
+      );
+    }
+
+    return c.json({ ok: true });
+  });
+
+  // POST /v1/conversations/:id/leave — leave conversation
+  app.post('/v1/conversations/:id/leave', async c => {
+    const callerKind = c.get('callerKind');
+    if (callerKind !== 'user') {
+      return c.json({ error: 'Only users can leave conversations' }, 403);
+    }
+
+    const idParam = ulidSchema.safeParse(c.req.param('id'));
+    if (!idParam.success) {
+      return c.json({ error: 'Invalid conversation ID' }, 400);
+    }
+    const conversationId = idParam.data;
+
+    const callerId = c.get('callerId');
+    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
+
+    if (!(await convStub.isMember(callerId))) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const { remainingMembers } = await convStub.removeMember(callerId);
+
+    const callerMembership = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
+    await callerMembership.removeConversation(conversationId);
+
+    // If no users remain, clean up bot memberships
+    const hasUsers = remainingMembers.some(m => m.kind === 'user');
+    if (!hasUsers) {
+      await Promise.all(
+        remainingMembers.map(member => {
+          const memberStub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(member.id));
+          return memberStub.removeConversation(conversationId);
+        })
+      );
+    }
+
+    return c.body(null, 204);
   });
 }

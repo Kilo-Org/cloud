@@ -41,3 +41,26 @@ export function useCreateConversation(getToken: () => Promise<string>) {
     },
   });
 }
+
+export function useRenameConversation(getToken: () => Promise<string>) {
+  const client = useClient(getToken);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conversationId, title }: { conversationId: string; title: string }) =>
+      client.renameConversation(conversationId, { title }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['kilo-chat'] });
+    },
+  });
+}
+
+export function useLeaveConversation(getToken: () => Promise<string>) {
+  const client = useClient(getToken);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) => client.leaveConversation(conversationId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['kilo-chat'] });
+    },
+  });
+}

@@ -500,7 +500,6 @@ export async function syncAndStoreProviders() {
         data: providers,
         openrouter: openrouter_data,
         vercel: vercel_data,
-        openrouter_providers,
       })
       .returning();
     await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));

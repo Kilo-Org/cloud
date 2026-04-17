@@ -1,1 +1,0 @@
-ALTER TABLE "models_by_provider" ADD COLUMN "openrouter_providers" jsonb;

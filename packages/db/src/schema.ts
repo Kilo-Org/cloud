@@ -67,7 +67,6 @@ import type {
   DependabotAlertRaw,
   SecurityFindingAnalysis,
   NormalizedOpenRouterResponse,
-  OpenRouterApiProvidersResponse,
   OpenRouterModel,
   StripeSubscriptionStatus,
   StoredModel,
@@ -2345,7 +2344,6 @@ export const modelsByProvider = pgTable('models_by_provider', {
   data: jsonb('data').$type<NormalizedOpenRouterResponse>().notNull(),
   openrouter: jsonb('openrouter').$type<Record<string, StoredModel>>(),
   vercel: jsonb('vercel').$type<Record<string, StoredModel>>(),
-  openrouter_providers: jsonb('openrouter_providers').$type<OpenRouterApiProvidersResponse>(),
 });
 
 export const cloud_agent_code_reviews = pgTable(

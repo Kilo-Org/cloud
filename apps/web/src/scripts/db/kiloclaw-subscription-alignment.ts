@@ -226,16 +226,16 @@ function getEarlybirdEndsAt(): string {
   return new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE).toISOString();
 }
 
-function getOrganizationManagedActiveAccess(params: {
+// Org billing has not rolled out yet. Every org instance gets managed-active
+// access as a free trial until paid org billing ships. When billing rolls out,
+// restore the spec-defined classifier (active seat purchase || !require_seats
+// || oss_sponsorship_tier || suppress_trial_messaging) and keep this aligned
+// with services/kiloclaw-billing/src/bootstrap.ts.
+function getOrganizationManagedActiveAccess(_params: {
   organization: Pick<Organization, 'require_seats' | 'settings'>;
   latestPurchase: Pick<OrganizationSeatsPurchase, 'subscription_status'> | null;
 }): boolean {
-  return (
-    params.latestPurchase?.subscription_status === 'active' ||
-    !params.organization.require_seats ||
-    params.organization.settings.oss_sponsorship_tier != null ||
-    !!params.organization.settings.suppress_trial_messaging
-  );
+  return true;
 }
 
 function printSection<T>(label: string, rows: T[]) {

@@ -162,11 +162,12 @@ async function bootstrapOrganizationSubscription(
     throw new Error('Organization not found during subscription bootstrap');
   }
 
-  const hasManagedActiveAccess =
-    latestSeatPurchase?.subscriptionStatus === 'active' ||
-    !organization.requireSeats ||
-    organization.settings.oss_sponsorship_tier != null ||
-    !!organization.settings.suppress_trial_messaging;
+  // Org billing has not rolled out yet. Every org instance gets managed-active
+  // access as a free trial until paid org billing ships. When billing rolls
+  // out, restore the spec-defined classifier (active seat purchase ||
+  // !requireSeats || oss_sponsorship_tier || suppress_trial_messaging) and
+  // keep it aligned with apps/web/src/scripts/db/kiloclaw-subscription-alignment.ts.
+  const hasManagedActiveAccess = true;
 
   logger
     .withFields({

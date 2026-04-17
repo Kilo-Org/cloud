@@ -757,4 +757,62 @@ describe('kiloclaw-subscription-alignment script', () => {
       .where(eq(kiloclaw_subscriptions.instance_id, canonicalInstanceId));
     expect(canonicalAttached).toHaveLength(0);
   });
+
+  it('backfills every active org orphan as managed-active regardless of seats/purchase', async () => {
+    // Org billing has not rolled out. Every org instance gets managed-active
+    // access as a free trial until paid org billing ships. Verifies that the
+    // classifier ignores require_seats, oss_sponsorship_tier,
+    // suppress_trial_messaging, and latest seat purchase status.
+    const user = await insertTestUser({
+      google_user_email: 'org-free-trial@example.com',
+    });
+    // require_seats=true + no active purchase would historically have
+    // produced a trial row. Must now produce managed-active.
+    const org = await createTestOrganization('test-org-free-trial', user.id, 0, {}, true);
+
+    const orgInstanceId = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values({
+      id: orgInstanceId,
+      user_id: user.id,
+      organization_id: org.id,
+      sandbox_id: `ki_${orgInstanceId.replaceAll('-', '')}`,
+      created_at: '2026-04-01T00:00:00.000Z',
+    });
+
+    await run('apply-org');
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, orgInstanceId));
+
+    if (!subscription) {
+      throw new Error('Expected subscription row for org instance');
+    }
+
+    expect(subscription).toEqual(
+      expect.objectContaining({
+        user_id: user.id,
+        instance_id: orgInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+      })
+    );
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'backfilled',
+          reason: 'apply_org_backfill_active_standard_credits',
+        }),
+      ])
+    );
+  });
 });

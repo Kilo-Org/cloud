@@ -39,8 +39,8 @@ export function InstanceSwitcher({ instances, selectedId, onSelect }: InstanceSw
         className="border-border bg-background flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm cursor-pointer hover:bg-muted transition-colors"
       >
         <div className="min-w-0 flex-1">
-          <div className="text-muted-foreground text-center text-[10px] uppercase">Instance</div>
-          <div className="truncate text-center font-medium">{selected?.label ?? 'Select...'}</div>
+          <div className="text-muted-foreground text-[10px] uppercase">Instance</div>
+          <div className="truncate font-medium">{selected?.label ?? 'Select...'}</div>
         </div>
         <ChevronDown className="text-muted-foreground h-4 w-4 shrink-0" />
       </button>

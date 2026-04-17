@@ -22,7 +22,12 @@ export default function KiloChatRootLayout({ children }: { children: React.React
   const currentUserId = user?.id ?? '';
 
   return (
-    <KiloChatLayout getToken={getToken} currentUserId={currentUserId} instances={instances}>
+    <KiloChatLayout
+      getToken={getToken}
+      currentUserId={currentUserId}
+      instances={instances}
+      instanceStatus={status?.status ?? null}
+    >
       {children}
     </KiloChatLayout>
   );

@@ -22,9 +22,15 @@ type MessageAreaProps = {
   conversationId: string;
   currentUserId: string;
   getToken: () => Promise<string>;
+  instanceStatus: string | null;
 };
 
-export function MessageArea({ conversationId, currentUserId, getToken }: MessageAreaProps) {
+export function MessageArea({
+  conversationId,
+  currentUserId,
+  getToken,
+  instanceStatus,
+}: MessageAreaProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -124,7 +130,7 @@ export function MessageArea({ conversationId, currentUserId, getToken }: Message
       {/* Header */}
       <div className="border-border flex items-center justify-between border-b px-4 py-3">
         <h2 className="text-sm font-medium">{title}</h2>
-        <BotStatus isTyping={botIsTyping} />
+        <BotStatus isTyping={botIsTyping} instanceStatus={instanceStatus} />
       </div>
 
       {/* Messages */}

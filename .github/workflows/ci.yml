@@ -369,3 +369,61 @@ jobs:
 
       - name: Run tests
         run: pnpm --filter ${{ matrix.workspace.name }} test
+
+  notify-main-failure:
+    if: ${{ always() && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure') }}
+    needs:
+      [
+        typecheck,
+        lint,
+        format-check,
+        drizzle-check,
+        test,
+        build,
+        cloud-agent,
+        cloud-agent-next,
+        workspace-tests,
+      ]
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Notify Slack
+        continue-on-error: true
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": ":red_circle: CI failed on main"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ github.sha }}`>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
+                    }
+                  ]
+                }
+              ]
+            }

@@ -171,11 +171,10 @@ describe('sanitizeError: Instance-not-* status correction', () => {
       JSON.stringify(call[0]).includes('instance.provisioning_failed')
     );
     expect(provisioningFailureCall).toBeDefined();
-    const dataPoint = provisioningFailureCall?.[0];
-    expect(dataPoint).toMatchObject({
+    expect(provisioningFailureCall?.[0]).toMatchObject({
       indexes: ['instance.provisioning_failed'],
     });
-    const serializedDataPoint = JSON.stringify(dataPoint);
+    const serializedDataPoint = JSON.stringify(provisioningFailureCall?.[0]);
     expect(serializedDataPoint).toContain('fly_api_allocateIP_500');
     expect(serializedDataPoint).toContain('provision failed');
     expect(serializedDataPoint).not.toContain('<!DOCTYPE html>');

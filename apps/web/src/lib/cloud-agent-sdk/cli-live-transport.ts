@@ -5,8 +5,9 @@
  */
 import * as z from 'zod';
 import { createBaseConnection } from './base-connection';
-import type { Connection } from './base-connection';
+import type { Connection, ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { normalizeCliEvent, isChatEvent } from './normalizer';
+import { cloudAgentSdkRuntime } from './runtime';
 import { webInboundMessageSchema, heartbeatDataSchema, type WebInboundMessage } from './schemas';
 import type { TransportFactory, TransportSink } from './transport';
 import type { KiloSessionId, SessionSnapshot } from './types';
@@ -17,6 +18,8 @@ type CliLiveTransportConfig = {
   getAuthToken: () => string | Promise<string>;
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   onError?: (message: string) => void;
+  lifecycleHooks?: ConnectionLifecycleHooks;
+  websocketHeaders?: WebSocketHeaders;
 };
 
 const COMMAND_TIMEOUT_MS = 30_000;
@@ -39,15 +42,9 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     >();
 
     function replaySnapshot(snapshot: SessionSnapshot): void {
-      console.log('[cli-debug] replaySnapshot: %d messages to replay', snapshot.messages.length);
       sink.onServiceEvent({ type: 'session.created', info: snapshot.info });
 
       for (const msg of snapshot.messages) {
-        console.log(
-          '[cli-debug] replaySnapshot: message id=%s, parts=%d',
-          msg.info.id,
-          msg.parts.length
-        );
         sink.onChatEvent({ type: 'message.updated', info: msg.info });
 
         for (const part of msg.parts) {
@@ -62,13 +59,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       event: string,
       data: unknown
     ): void {
-      console.log(
-        '[cli-debug] handleEventMessage: sessionId=%s, parentSessionId=%s, event=%s, isOurs=%s',
-        sessionId,
-        parentSessionId,
-        event,
-        sessionId === config.kiloSessionId || parentSessionId === config.kiloSessionId
-      );
       if (sessionId !== config.kiloSessionId && parentSessionId !== config.kiloSessionId) return;
 
       const normalized = normalizeCliEvent(event, data);
@@ -82,8 +72,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     }
 
     function handleSystemMessage(event: string, data: unknown): void {
-      console.log('[cli-debug] handleSystemMessage: event=%s', event);
-
       if (event === 'cli.disconnected') {
         const parsed = z.object({ connectionId: z.string() }).safeParse(data);
         const disconnectedId = parsed.success ? parsed.data.connectionId : undefined;
@@ -142,9 +130,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
     function openBaseConnection(expectedGeneration: number): void {
       if (expectedGeneration !== generation) return;
-      console.log('[cli-debug] openBaseConnection: wsUrl=%s', config.websocketUrl);
 
       baseConnection = createBaseConnection({
+        lifecycleHooks: config.lifecycleHooks,
+        websocketHeaders: config.websocketHeaders,
         buildUrl: () => `${config.websocketUrl}?token=${authToken}`,
         parseMessage: (data: unknown) => {
           if (typeof data !== 'string') return null;
@@ -158,14 +147,9 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           }
         },
         onEvent: payload => {
-          console.log('[cli-debug] WebSocket event received: %o', payload);
           handleInboundMessage(payload);
         },
         onOpen: (ws: WebSocket) => {
-          console.log(
-            '[cli-debug] WebSocket opened, sending subscribe for sessionId=%s',
-            config.kiloSessionId
-          );
           currentWs = ws;
           sessionStopped = false;
           ownerConnectionId = null;
@@ -198,19 +182,15 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
     function startConnection(expectedGeneration: number): void {
       if (expectedGeneration !== generation) return;
-      console.log('[cli-debug] startConnection: hasFetchSnapshot=%s', !!config.fetchSnapshot);
 
       if (!config.fetchSnapshot) {
-        console.log('[cli-debug] startConnection: no fetchSnapshot, opening WebSocket directly');
         openBaseConnection(expectedGeneration);
         return;
       }
 
-      console.log('[cli-debug] startConnection: fetching snapshot...');
       void config.fetchSnapshot(config.kiloSessionId).then(
         snapshot => {
           if (expectedGeneration !== generation) return;
-          console.log('[cli-debug] startConnection: snapshot fetched, opening WebSocket');
           replaySnapshot(snapshot);
           openBaseConnection(expectedGeneration);
         },
@@ -228,7 +208,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
         return Promise.reject(new Error('WebSocket is not connected'));
       }
-      const id = crypto.randomUUID();
+      const id = cloudAgentSdkRuntime.randomUUID();
       const ws = currentWs;
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -250,10 +230,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
     return {
       connect() {
-        console.log(
-          '[cli-debug] CliLiveTransport.connect() called, kiloSessionId=%s',
-          config.kiloSessionId
-        );
         generation += 1;
         const expectedGeneration = generation;
 
@@ -274,7 +250,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
         if (typeof tokenResult === 'string') {
           authToken = tokenResult;
-          console.log('[cli-debug] CliLiveTransport: auth token obtained');
           startConnection(expectedGeneration);
           return;
         }
@@ -283,7 +258,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           token => {
             if (expectedGeneration !== generation) return;
             authToken = token;
-            console.log('[cli-debug] CliLiveTransport: auth token obtained');
             startConnection(expectedGeneration);
           },
           () => {

@@ -1,4 +1,5 @@
 import '../global.css';
+import '@/lib/cloud-agent-runtime';
 
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PortalHost } from '@rn-primitives/portal';
@@ -15,6 +16,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
+import { OrganizationProvider } from '@/lib/organization-context';
 import { initAppsFlyer } from '@/lib/appsflyer';
 import {
   checkInitialNotification,
@@ -165,13 +167,15 @@ function RootLayout() {
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <ActionSheetProvider>
-              <>
-                <RootLayoutNav />
-                <Toaster />
-                <PortalHost />
-              </>
-            </ActionSheetProvider>
+            <OrganizationProvider>
+              <ActionSheetProvider>
+                <>
+                  <RootLayoutNav />
+                  <Toaster />
+                  <PortalHost />
+                </>
+              </ActionSheetProvider>
+            </OrganizationProvider>
           </AuthProvider>
         </QueryClientProvider>
       </TRPCProvider>

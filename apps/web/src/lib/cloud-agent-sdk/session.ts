@@ -14,6 +14,7 @@ import type { ServiceState } from './service-state';
 import { createCloudAgentTransport } from './cloud-agent-transport';
 import { createCliLiveTransport } from './cli-live-transport';
 import { createCliHistoricalTransport } from './cli-historical-transport';
+import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import type {
   CloudAgentApi,
   CloudAgentStreamTicketResult,
@@ -89,6 +90,8 @@ type CloudAgentSessionTransport = {
 
   // Shared
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  lifecycleHooks?: ConnectionLifecycleHooks;
+  websocketHeaders?: WebSocketHeaders;
 
   // CLI live transport construction
   getAuthToken?: () => string | Promise<string>;
@@ -140,19 +143,16 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
   const sink: TransportSink = {
     onChatEvent(event) {
-      console.log('[cli-debug] sink.onChatEvent: type=%s', event.type);
       chatProcessor.process(event);
       config.onEvent?.(event);
     },
     onServiceEvent(event) {
-      console.log('[cli-debug] sink.onServiceEvent: type=%s', event.type);
       serviceState.process(event);
       config.onEvent?.(event);
     },
   };
 
   function pickTransportFactory(resolved: ResolvedSession): TransportFactory {
-    console.log('[cli-debug] pickTransportFactory: resolved=%o', resolved);
     switch (resolved.type) {
       case 'remote': {
         if (!config.transport.cliWebsocketUrl || !config.transport.getAuthToken) {
@@ -160,17 +160,14 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
             'CloudAgentSession transport.cliWebsocketUrl and getAuthToken are required for remote CLI sessions'
           );
         }
-        console.log(
-          '[cli-debug] pickTransportFactory: → CLI Live transport (kiloSessionId=%s, wsUrl=%s)',
-          resolved.kiloSessionId,
-          config.transport.cliWebsocketUrl
-        );
         return createCliLiveTransport({
           kiloSessionId: resolved.kiloSessionId,
           websocketUrl: config.transport.cliWebsocketUrl,
           getAuthToken: config.transport.getAuthToken,
           fetchSnapshot: config.transport.fetchSnapshot,
           onError: config.onError,
+          lifecycleHooks: config.transport.lifecycleHooks,
+          websocketHeaders: config.transport.websocketHeaders,
         });
       }
       case 'cloud-agent': {
@@ -187,10 +184,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         if (!config.transport.api) {
           throw new Error('CloudAgentSession transport.api is required for Cloud Agent sessions');
         }
-        console.log(
-          '[cli-debug] pickTransportFactory: → Cloud Agent transport (cloudAgentSessionId=%s)',
-          resolved.cloudAgentSessionId
-        );
+        if (!config.websocketBaseUrl) {
+          throw new Error(
+            'CloudAgentSession websocketBaseUrl is required for Cloud Agent sessions'
+          );
+        }
         return createCloudAgentTransport({
           sessionId: resolved.cloudAgentSessionId,
           kiloSessionId: config.kiloSessionId,
@@ -199,6 +197,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           fetchSnapshot: config.transport.fetchSnapshot,
           websocketBaseUrl: config.websocketBaseUrl,
           onError: config.onError,
+          lifecycleHooks: config.transport.lifecycleHooks,
+          websocketHeaders: config.transport.websocketHeaders,
         });
       }
       case 'read-only': {
@@ -207,10 +207,6 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
             'CloudAgentSession transport.fetchSnapshot is required for read-only sessions'
           );
         }
-        console.log(
-          '[cli-debug] pickTransportFactory: → Historical transport (kiloSessionId=%s)',
-          resolved.kiloSessionId
-        );
         return createCliHistoricalTransport({
           kiloSessionId: resolved.kiloSessionId,
           fetchSnapshot: config.transport.fetchSnapshot,
@@ -225,7 +221,6 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   }
 
   async function resolveAndConnect(expectedGeneration: number): Promise<void> {
-    console.log('[cli-debug] resolveAndConnect: kiloSessionId=%s', config.kiloSessionId);
     let resolved: ResolvedSession;
 
     try {
@@ -233,7 +228,6 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     } catch (error) {
       if (expectedGeneration !== connectGeneration) return;
       const message = error instanceof Error ? error.message : 'Failed to resolve session';
-      console.log('[cli-debug] resolveAndConnect: error=%s', message);
       config.onError?.(message);
       serviceState.setActivity({ type: 'idle' });
       serviceState.setStatus({ type: 'error', message });
@@ -242,7 +236,6 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
     if (expectedGeneration !== connectGeneration) return;
 
-    console.log('[cli-debug] resolveAndConnect: resolved=%o', resolved);
     config.onResolved?.(resolved);
 
     let factory: TransportFactory;
@@ -250,7 +243,6 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       factory = pickTransportFactory(resolved);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create transport';
-      console.log('[cli-debug] resolveAndConnect: error=%s', message);
       config.onError?.(message);
       serviceState.setActivity({ type: 'idle' });
       serviceState.setStatus({ type: 'error', message });
@@ -258,7 +250,6 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     }
 
     transport = factory(sink);
-    console.log('[cli-debug] resolveAndConnect: transport created, calling connect()');
     transport.connect();
   }
 
@@ -302,10 +293,6 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       return transport?.interrupt !== undefined;
     },
     connect() {
-      console.log(
-        '[cli-debug] CloudAgentSession.connect() called, kiloSessionId=%s',
-        config.kiloSessionId
-      );
       if (transport) {
         transport.destroy();
         transport = null;

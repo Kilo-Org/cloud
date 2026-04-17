@@ -1,4 +1,4 @@
-import { stripPartContentIfFile } from '@/components/cloud-agent-next/types';
+import { stripPartContentIfFile } from './part-utils';
 import type { ChatEvent } from './normalizer';
 import type { SessionStorage } from './storage/types';
 

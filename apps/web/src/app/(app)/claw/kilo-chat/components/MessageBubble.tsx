@@ -41,6 +41,7 @@ export function MessageBubble({
   }
 
   const textContent = contentBlocksToText(message.content);
+  const isBot = message.senderId.startsWith('bot:');
 
   function handleStartEdit() {
     setEditText(textContent);
@@ -66,37 +67,38 @@ export function MessageBubble({
 
   return (
     <div
-      className="group relative px-4 py-1 hover:bg-muted/50"
+      className={`group relative flex px-4 py-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      {replyToMessage && (
-        <div className="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
-          <Reply className="h-3 w-3" />
-          <span>
-            Replying to{' '}
-            {(() => {
-              const preview = contentBlocksToText(replyToMessage.content);
-              return preview.length > 60 ? `${preview.slice(0, 60)}...` : preview;
-            })()}
-          </span>
-        </div>
-      )}
+      <div className={`flex max-w-[75%] flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+        {isBot && !isOwn && (
+          <span className="text-muted-foreground mb-0.5 px-1 text-xs font-medium">KiloClaw</span>
+        )}
 
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-sm font-medium">
-              {isOwn ? 'You' : message.senderId.startsWith('bot:') ? 'KiloClaw' : message.senderId}
+        {replyToMessage && (
+          <div className="text-muted-foreground mb-1 flex items-center gap-1 px-1 text-xs">
+            <Reply className="h-3 w-3" />
+            <span>
+              {(() => {
+                const preview = contentBlocksToText(replyToMessage.content);
+                return preview.length > 60 ? `${preview.slice(0, 60)}...` : preview;
+              })()}
             </span>
-            <span className="text-muted-foreground text-xs">{timeStr}</span>
-            {message.updatedAt && <span className="text-muted-foreground text-xs">(edited)</span>}
           </div>
+        )}
 
+        <div
+          className={`relative rounded-2xl px-3 py-2 ${
+            isOwn
+              ? 'bg-primary text-primary-foreground ml-auto'
+              : 'bg-muted text-foreground mr-auto'
+          }`}
+        >
           {isEditing ? (
-            <div className="mt-1">
+            <div>
               <textarea
-                className="border-input bg-background w-full rounded border p-2 text-sm"
+                className="border-input bg-background text-foreground w-full rounded border p-2 text-sm"
                 value={editText}
                 onChange={e => setEditText(e.target.value)}
                 onKeyDown={e => {
@@ -124,14 +126,23 @@ export function MessageBubble({
           ) : (
             <p className="text-sm whitespace-pre-wrap">{textContent}</p>
           )}
+
+          <div
+            className={`mt-1 flex items-center gap-1 text-[10px] ${
+              isOwn ? 'text-primary-foreground/70 justify-end' : 'text-muted-foreground justify-end'
+            }`}
+          >
+            {message.updatedAt && <span>(edited)</span>}
+            <span>{timeStr}</span>
+          </div>
         </div>
 
         {pendingDeleteId === message.id && (
-          <div className="bg-background border-border flex items-center gap-1.5 rounded border px-2 py-1 text-xs shadow-sm">
+          <div className="bg-background border-border mt-1 flex items-center gap-1.5 rounded border px-2 py-1 text-xs shadow-sm">
             <span>Delete?</span>
             <button
               onClick={() => onConfirmDelete(message.id)}
-              className="text-destructive hover:underline font-medium"
+              className="text-destructive font-medium hover:underline"
             >
               Yes
             </button>
@@ -140,29 +151,29 @@ export function MessageBubble({
             </button>
           </div>
         )}
-
-        {showActions && isOwn && !isEditing && pendingDeleteId !== message.id && (
-          <div className="bg-background border-border flex items-center gap-0.5 rounded border p-0.5 shadow-sm">
-            <button onClick={handleStartEdit} className="hover:bg-muted rounded p-1" title="Edit">
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => onDelete(message.id)}
-              className="hover:bg-muted rounded p-1"
-              title="Delete"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => onReply(message)}
-              className="hover:bg-muted rounded p-1"
-              title="Reply"
-            >
-              <Reply className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
       </div>
+
+      {showActions && isOwn && !isEditing && pendingDeleteId !== message.id && (
+        <div className="bg-background border-border absolute top-1 right-4 flex items-center gap-0.5 rounded border p-0.5 shadow-sm">
+          <button onClick={handleStartEdit} className="hover:bg-muted rounded p-1" title="Edit">
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => onDelete(message.id)}
+            className="hover:bg-muted rounded p-1"
+            title="Delete"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => onReply(message)}
+            className="hover:bg-muted rounded p-1"
+            title="Reply"
+          >
+            <Reply className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

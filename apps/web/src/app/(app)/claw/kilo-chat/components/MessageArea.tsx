@@ -125,9 +125,11 @@ export function MessageArea({
   function handleConfirmDelete(messageId: string) {
     deleteMessage.mutate(
       { messageId, conversationId },
-      { onError: () => toast.error('Failed to delete message') }
+      {
+        onSettled: () => setPendingDeleteId(null),
+        onError: () => toast.error('Failed to delete message'),
+      }
     );
-    setPendingDeleteId(null);
   }
 
   function handleCancelDelete() {

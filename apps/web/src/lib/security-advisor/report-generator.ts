@@ -8,6 +8,7 @@ import type {
   ReportGrade,
 } from './schemas';
 import { findCoverageForCheckId, type LoadedSecurityAdvisorContent } from './content-loader';
+import { isKiloClawMitigated } from './kiloclaw-mitigations';
 
 // --- Grading ---
 
@@ -59,7 +60,15 @@ interface GeneratedReport {
 export function generateSecurityReport(options: GenerateReportOptions): GeneratedReport {
   const { audit, publicIp, isKiloClaw, content } = options;
 
-  const findings = audit.findings.map(f => mapFinding(f, isKiloClaw, content));
+  // On KiloClaw, drop findings that are architecturally mitigated by the
+  // managed infrastructure before grading + rendering. See
+  // kiloclaw-mitigations.ts for the list and rationale per checkId.
+  const activeRawFindings = isKiloClaw
+    ? audit.findings.filter(f => !isKiloClawMitigated(f.checkId))
+    : audit.findings;
+  const suppressedCount = audit.findings.length - activeRawFindings.length;
+
+  const findings = activeRawFindings.map(f => mapFinding(f, isKiloClaw, content));
   const recommendations = generateRecommendations(findings, content);
 
   // Count passed deep-scan checks. Only deep scan results have a clear pass/fail
@@ -72,7 +81,8 @@ export function generateSecurityReport(options: GenerateReportOptions): Generate
 
   // Recompute severity counts from server-mapped findings, not client-reported
   // summary. Server may have overridden severity for known checkIds, so the
-  // client's counts can't be trusted.
+  // client's counts can't be trusted. These counts reflect findings the user
+  // actually sees (post-suppression) so they align with the rendered report.
   const summary = {
     critical: findings.filter(f => f.severity === 'critical').length,
     warn: findings.filter(f => f.severity === 'warn').length,
@@ -90,6 +100,7 @@ export function generateSecurityReport(options: GenerateReportOptions): Generate
     grade,
     publicIp,
     isKiloClaw,
+    suppressedCount,
     content,
   });
 
@@ -230,11 +241,23 @@ interface RenderOptions {
   grade: ReportGrade;
   publicIp?: string;
   isKiloClaw: boolean;
+  /** How many findings were dropped by KiloClaw-mitigation filtering. 0 on OpenClaw. */
+  suppressedCount: number;
   content: LoadedSecurityAdvisorContent;
 }
 
 function renderMarkdown(opts: RenderOptions): string {
-  const { findings, recommendations, summary, score, grade, publicIp, isKiloClaw, content } = opts;
+  const {
+    findings,
+    recommendations,
+    summary,
+    score,
+    grade,
+    publicIp,
+    isKiloClaw,
+    suppressedCount,
+    content,
+  } = opts;
   const get = (key: string, fallback: string) => getContent(content, key, fallback);
   const lines: string[] = [];
 
@@ -267,6 +290,18 @@ function renderMarkdown(opts: RenderOptions): string {
   }
   lines.push(parts.join(' | '));
   lines.push('');
+
+  // KiloClaw-mitigation disclosure: when findings have been suppressed because
+  // KiloClaw's managed infrastructure already mitigates them externally, tell
+  // the user instead of silently hiding them. See kiloclaw-mitigations.ts for
+  // the full list + per-finding rationale.
+  if (suppressedCount > 0) {
+    const noun = suppressedCount === 1 ? 'finding' : 'findings';
+    lines.push(
+      `_${suppressedCount} additional ${noun} hidden: KiloClaw's managed infrastructure mitigates ${suppressedCount === 1 ? 'it' : 'them'} externally via controls the in-gateway audit cannot detect (edge TLS, private networking, product-scoped tool policies). Not counted toward the grade._`
+    );
+    lines.push('');
+  }
 
   if (publicIp) {
     lines.push(`**Public IP:** \`${publicIp}\``);

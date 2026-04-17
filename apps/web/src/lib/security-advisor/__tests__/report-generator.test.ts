@@ -2,6 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import { generateSecurityReport } from '../report-generator';
 import type { AuditFinding, SecurityAdvisorRequest } from '../schemas';
 import type { LoadedSecurityAdvisorContent } from '../content-loader';
+import { KILOCLAW_MITIGATED_CHECKS } from '../kiloclaw-mitigations';
 
 /**
  * Build a test fixture that mirrors the seeded DB content.
@@ -439,6 +440,107 @@ describe('generateSecurityReport', () => {
       });
 
       expect(report.findings[0]!.risk).toBe('Review this finding: Something was reported');
+    });
+  });
+
+  describe('KiloClaw-mitigated finding suppression', () => {
+    // The list lives in kiloclaw-mitigations.ts. These tests guard filtering
+    // BEHAVIOR (dropped from rendered findings, not counted in grade,
+    // disclosure note rendered) — test inputs are derived from the live
+    // KILOCLAW_MITIGATED_CHECKS map so adding or removing entries doesn't
+    // silently break assertions here.
+    const MITIGATED_IDS = Array.from(KILOCLAW_MITIGATED_CHECKS.keys());
+    const MITIGATED_EXAMPLE = MITIGATED_IDS[0]!;
+    const NOT_MITIGATED_EXAMPLE = 'tools.exec.security_full_configured';
+
+    function auditWith(checkIds: string[]): SecurityAdvisorRequest['audit'] {
+      return {
+        ts: 1,
+        summary: { critical: 0, warn: checkIds.length, info: 0 },
+        findings: checkIds.map((id, i) => ({
+          checkId: id,
+          severity: 'warn' as const,
+          title: `t${i}`,
+          detail: `d${i}`,
+          remediation: null,
+        })),
+      };
+    }
+
+    it('drops mitigated findings on KiloClaw and excludes them from the grade', () => {
+      const content = buildTestContent();
+      const report = generateSecurityReport({
+        audit: auditWith([MITIGATED_EXAMPLE, NOT_MITIGATED_EXAMPLE]),
+        isKiloClaw: true,
+        content,
+      });
+
+      // Only the non-mitigated finding survives into the rendered findings.
+      expect(report.findings).toHaveLength(1);
+      expect(report.findings[0]!.checkId).toBe(NOT_MITIGATED_EXAMPLE);
+
+      // Grade is computed on the filtered count (1 warn, not 2).
+      expect(report.score).toBe(96);
+      expect(report.grade).toBe('A');
+    });
+
+    it('keeps the same finding visible on self-hosted OpenClaw', () => {
+      const content = buildTestContent();
+      const report = generateSecurityReport({
+        audit: auditWith([MITIGATED_EXAMPLE, NOT_MITIGATED_EXAMPLE]),
+        isKiloClaw: false,
+        content,
+      });
+
+      // Nothing is suppressed for OpenClaw — both findings are real issues there.
+      expect(report.findings).toHaveLength(2);
+      expect(report.markdown).not.toContain('hidden');
+      expect(report.score).toBe(92);
+    });
+
+    it('renders a disclosure note when any findings are suppressed', () => {
+      const content = buildTestContent();
+      const report = generateSecurityReport({
+        audit: auditWith([MITIGATED_EXAMPLE, NOT_MITIGATED_EXAMPLE]),
+        isKiloClaw: true,
+        content,
+      });
+
+      // Plural-aware message, references external mitigation, not silent.
+      expect(report.markdown).toContain('1 additional finding hidden');
+      expect(report.markdown).toContain("KiloClaw's managed infrastructure");
+      expect(report.markdown).toContain('Not counted toward the grade');
+    });
+
+    it('pluralizes the disclosure note correctly for multiple suppressions', () => {
+      // Guard: this test specifically exercises the plural branch, so it
+      // requires >=2 entries in the live list. If the list ever shrinks to
+      // 1, fail loudly here with a clear pointer rather than silently
+      // asserting against the wrong message.
+      expect(MITIGATED_IDS.length).toBeGreaterThanOrEqual(2);
+
+      const content = buildTestContent();
+      const report = generateSecurityReport({
+        audit: auditWith(MITIGATED_IDS),
+        isKiloClaw: true,
+        content,
+      });
+
+      expect(report.markdown).toContain(`${MITIGATED_IDS.length} additional findings hidden`);
+      expect(report.findings).toHaveLength(0);
+      expect(report.grade).toBe('A'); // All findings suppressed → clean 100.
+    });
+
+    it('omits the disclosure note entirely when nothing was suppressed', () => {
+      const content = buildTestContent();
+      const report = generateSecurityReport({
+        audit: auditWith([NOT_MITIGATED_EXAMPLE]),
+        isKiloClaw: true,
+        content,
+      });
+
+      expect(report.markdown).not.toContain('hidden');
+      expect(report.markdown).not.toContain('additional finding');
     });
   });
 

@@ -1,6 +1,13 @@
 'use client';
 
-import { AlertCircle, AlertTriangle, ArrowRightLeft, Clock, CreditCard } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowRightLeft,
+  Clock,
+  CreditCard,
+  Loader2,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { ClawBannerState, ClawBillingStatus } from './billing-types';
@@ -15,6 +22,7 @@ type BillingBannerProps = {
   onSubscribeClick: () => void;
   onReactivateClick: () => void;
   onUpdatePaymentClick: () => void;
+  isReactivating?: boolean;
 };
 
 function getBannerStyles(state: ClawBannerState) {
@@ -157,6 +165,7 @@ export function BillingBanner({
   onSubscribeClick,
   onReactivateClick,
   onUpdatePaymentClick,
+  isReactivating = false,
 }: BillingBannerProps) {
   const state = deriveBannerState(billing);
 
@@ -203,8 +212,20 @@ export function BillingBanner({
       </div>
 
       {content.cta && (
-        <Button onClick={handleCta} variant="primary" className="shrink-0">
-          {content.cta}
+        <Button
+          onClick={handleCta}
+          variant="primary"
+          className="shrink-0"
+          disabled={content.action === 'reactivate' && isReactivating}
+        >
+          {content.action === 'reactivate' && isReactivating ? (
+            <>
+              <Loader2 className="animate-spin" />
+              Reactivating...
+            </>
+          ) : (
+            content.cta
+          )}
         </Button>
       )}
     </div>

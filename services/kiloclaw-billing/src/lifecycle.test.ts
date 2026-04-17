@@ -4,8 +4,8 @@ const { mockGetWorkerDb } = vi.hoisted(() => ({
   mockGetWorkerDb: vi.fn(),
 }));
 
-vi.mock('@kilocode/db', async () => {
-  const actual = await vi.importActual<typeof import('@kilocode/db')>('@kilocode/db');
+vi.mock('@kilocode/db', async importOriginal => {
+  const actual: Record<string, unknown> = await importOriginal();
   return {
     ...actual,
     getWorkerDb: mockGetWorkerDb,

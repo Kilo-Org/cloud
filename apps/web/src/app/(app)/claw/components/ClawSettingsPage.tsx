@@ -99,7 +99,7 @@ function ClawSettingsWithStatus({
 }) {
   const router = useRouter();
   const personalStatus = useKiloClawStatus();
-  const orgStatus = useOrgKiloClawStatus(organizationId ?? '');
+  const orgStatus = useOrgKiloClawStatus(organizationId);
   const { data: status, isLoading, error } = organizationId ? orgStatus : personalStatus;
 
   const clawUrl = organizationId ? `/organizations/${organizationId}/claw/new` : '/claw/new';

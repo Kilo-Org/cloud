@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, CreditCard, Coins } from 'lucide-react';
+import { ExternalLink, CreditCard, Coins, Loader2 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
@@ -228,7 +228,14 @@ function ActiveSubscriptionCard({
             onClick={handleCancelSwitch}
             disabled={cancelSwitchMutation.isPending || !instanceId}
           >
-            Cancel Switch
+            {cancelSwitchMutation.isPending ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Canceling...
+              </>
+            ) : (
+              'Cancel Switch'
+            )}
           </Button>
         ) : (
           <Button
@@ -237,7 +244,14 @@ function ActiveSubscriptionCard({
             onClick={handleSwitchPlan}
             disabled={switchPlanMutation.isPending || !instanceId}
           >
-            Switch to {otherPlanLabel}
+            {switchPlanMutation.isPending ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Switching...
+              </>
+            ) : (
+              `Switch to ${otherPlanLabel}`
+            )}
           </Button>
         )}
         <Button variant="outline" size="sm" onClick={onCancelClick}>
@@ -256,9 +270,11 @@ function ActiveSubscriptionCard({
 function ConvertingSubscriptionCard({
   billing,
   onReactivateClick,
+  isReactivating,
 }: {
   billing: ClawBillingStatus;
   onReactivateClick: () => void;
+  isReactivating: boolean;
 }) {
   const sub = billing.subscription;
   if (!sub) return null;
@@ -293,8 +309,15 @@ function ConvertingSubscriptionCard({
       </div>
 
       <div className="mt-4">
-        <Button variant="outline" size="sm" onClick={onReactivateClick}>
-          Keep Stripe Billing
+        <Button variant="outline" size="sm" onClick={onReactivateClick} disabled={isReactivating}>
+          {isReactivating ? (
+            <>
+              <Loader2 className="animate-spin" />
+              Reactivating...
+            </>
+          ) : (
+            'Keep Stripe Billing'
+          )}
         </Button>
       </div>
     </div>
@@ -304,9 +327,11 @@ function ConvertingSubscriptionCard({
 function CancelingSubscriptionCard({
   billing,
   onReactivateClick,
+  isReactivating,
 }: {
   billing: ClawBillingStatus;
   onReactivateClick: () => void;
+  isReactivating: boolean;
 }) {
   const sub = billing.subscription;
   if (!sub) return null;
@@ -334,8 +359,15 @@ function CancelingSubscriptionCard({
       </div>
 
       <div className="mt-4">
-        <Button variant="outline" onClick={onReactivateClick}>
-          Reactivate
+        <Button variant="outline" onClick={onReactivateClick} disabled={isReactivating}>
+          {isReactivating ? (
+            <>
+              <Loader2 className="animate-spin" />
+              Reactivating...
+            </>
+          ) : (
+            'Reactivate'
+          )}
         </Button>
       </div>
     </div>
@@ -421,7 +453,7 @@ export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardPro
   }
 
   function handleReactivate() {
-    if (!instanceId) return;
+    if (!instanceId || reactivateMutation.isPending) return;
     reactivateMutation.mutate(
       { instanceId },
       {
@@ -448,10 +480,22 @@ export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardPro
       );
     }
     if (billing.subscription.cancelAtPeriodEnd && billing.subscription.pendingConversion) {
-      return <ConvertingSubscriptionCard billing={billing} onReactivateClick={handleReactivate} />;
+      return (
+        <ConvertingSubscriptionCard
+          billing={billing}
+          onReactivateClick={handleReactivate}
+          isReactivating={reactivateMutation.isPending}
+        />
+      );
     }
     if (billing.subscription.cancelAtPeriodEnd) {
-      return <CancelingSubscriptionCard billing={billing} onReactivateClick={handleReactivate} />;
+      return (
+        <CancelingSubscriptionCard
+          billing={billing}
+          onReactivateClick={handleReactivate}
+          isReactivating={reactivateMutation.isPending}
+        />
+      );
     }
     if (billing.subscription.status === 'active') {
       return <ActiveSubscriptionCard billing={billing} onCancelClick={onCancelClick} />;

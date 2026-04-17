@@ -80,7 +80,7 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
   }
 
   function handleReactivate() {
-    if (!instanceId) return;
+    if (!instanceId || reactivate.isPending) return;
     reactivate.mutate(
       { instanceId },
       {
@@ -134,6 +134,7 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
             onSubscribeClick={handleSubscribe}
             onReactivateClick={handleReactivate}
             onUpdatePaymentClick={handleUpdatePayment}
+            isReactivating={reactivate.isPending}
           />
         ))}
 

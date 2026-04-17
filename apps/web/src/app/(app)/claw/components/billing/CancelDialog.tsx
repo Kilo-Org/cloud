@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
@@ -31,7 +31,7 @@ export function CancelDialog({ open, onOpenChange, billing }: CancelDialogProps)
   const periodEnd = billing.subscription?.currentPeriodEnd;
 
   async function handleConfirm() {
-    if (!instanceId) return;
+    if (!instanceId || cancelMutation.isPending) return;
     await cancelMutation.mutateAsync({ instanceId });
     await Promise.all([
       queryClient.invalidateQueries({
@@ -54,7 +54,10 @@ export function CancelDialog({ open, onOpenChange, billing }: CancelDialogProps)
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={nextOpen => !cancelMutation.isPending && onOpenChange(nextOpen)}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -77,7 +80,11 @@ export function CancelDialog({ open, onOpenChange, billing }: CancelDialogProps)
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={cancelMutation.isPending}
+          >
             Keep Subscription
           </Button>
           <Button
@@ -85,7 +92,14 @@ export function CancelDialog({ open, onOpenChange, billing }: CancelDialogProps)
             onClick={handleConfirm}
             disabled={cancelMutation.isPending || !instanceId}
           >
-            Cancel Subscription
+            {cancelMutation.isPending ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Canceling...
+              </>
+            ) : (
+              'Cancel Subscription'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

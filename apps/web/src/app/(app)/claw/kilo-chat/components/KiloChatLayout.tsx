@@ -69,10 +69,11 @@ export function KiloChatLayout({
   );
 
   const handleLeave = useCallback(
-    (conversationId: string) => {
-      // Navigate away first so the conversation page unmounts before query invalidation
+    async (conversationId: string) => {
+      // Navigate away and wait for unmount before firing the mutation,
+      // so conversation-specific queries don't refetch with a 403
       if (params?.conversationId === conversationId) {
-        router.push('/claw/kilo-chat');
+        await router.push('/claw/kilo-chat');
       }
       leaveConversation.mutate(conversationId);
     },

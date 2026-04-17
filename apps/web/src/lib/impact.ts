@@ -1,12 +1,9 @@
 import 'server-only';
 
 import { createHash } from 'crypto';
-import {
-  IMPACT_ACCOUNT_SID,
-  IMPACT_AUTH_TOKEN,
-  IMPACT_CAMPAIGN_ID,
-  IMPACT_REVERSAL_DISPOSITION_CODE,
-} from '@/lib/config.server';
+import { IMPACT_ACCOUNT_SID, IMPACT_AUTH_TOKEN, IMPACT_CAMPAIGN_ID } from '@/lib/config.server';
+
+const IMPACT_REVERSAL_DISPOSITION_CODE = 'REJECTED';
 
 const IMPACT_BASE_URL = 'https://api.impact.com';
 export const IMPACT_ORDER_ID_MACRO = 'IR_AN_64_TS';
@@ -647,11 +644,10 @@ export async function resolveImpactSubmissionUri(
 
 export async function reverseImpactAction(params: {
   actionId: string;
-  dispositionCode?: string;
 }): Promise<ImpactDispatchResult> {
   const formData = new URLSearchParams({
     ActionId: params.actionId,
-    DispositionCode: params.dispositionCode ?? IMPACT_REVERSAL_DISPOSITION_CODE,
+    DispositionCode: IMPACT_REVERSAL_DISPOSITION_CODE,
   });
 
   return await sendImpactRequest({

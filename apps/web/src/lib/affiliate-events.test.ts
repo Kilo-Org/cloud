@@ -15,7 +15,6 @@ describe('affiliate-events', () => {
     process.env.IMPACT_ACCOUNT_SID = 'impact-account-sid';
     process.env.IMPACT_AUTH_TOKEN = 'impact-auth-token';
     process.env.IMPACT_CAMPAIGN_ID = '50754';
-    delete process.env.IMPACT_REVERSAL_DISPOSITION_CODE;
   });
 
   afterEach(async () => {

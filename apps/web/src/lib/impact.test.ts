@@ -9,7 +9,6 @@ describe('impact', () => {
     process.env.IMPACT_ACCOUNT_SID = 'impact-account-sid';
     process.env.IMPACT_AUTH_TOKEN = 'impact-auth-token';
     process.env.IMPACT_CAMPAIGN_ID = '50754';
-    delete process.env.IMPACT_REVERSAL_DISPOSITION_CODE;
   });
 
   afterEach(() => {
@@ -167,7 +166,7 @@ describe('impact', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('builds reversal request with default disposition code', async () => {
+  it('builds reversal request with REJECTED disposition code', async () => {
     const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -197,26 +196,5 @@ describe('impact', () => {
       body: expect.stringContaining('ActionId=1000.2000.3000'),
     });
     expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('DispositionCode=REJECTED');
-  });
-
-  it('honors overridden reversal disposition code', async () => {
-    process.env.IMPACT_REVERSAL_DISPOSITION_CODE = 'CONS_FRAUD';
-    jest.resetModules();
-
-    const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          Status: 'QUEUED',
-          QueuedUri: '/Advertisers/impact-account-sid/APISubmissions/A-reversal',
-        }),
-        { status: 200 }
-      )
-    );
-    global.fetch = fetchMock;
-
-    const { reverseImpactAction } = await import('@/lib/impact');
-    await reverseImpactAction({ actionId: '1000.2000.3000' });
-
-    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('DispositionCode=CONS_FRAUD');
   });
 });

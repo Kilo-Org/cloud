@@ -115,7 +115,6 @@ export default function NewSessionScreen() {
       return;
     }
 
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsCreating(true);
 
     try {

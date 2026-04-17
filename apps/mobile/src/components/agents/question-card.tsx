@@ -42,7 +42,6 @@ export function QuestionCard({
   const [customHasText, setCustomHasText] = useState<Record<number, boolean>>({});
 
   function toggleOption(questionIndex: number, optionIndex: number, multiple: boolean | undefined) {
-    void Haptics.selectionAsync();
     setSelectedOptions(prev => {
       const prevSet = prev[questionIndex];
       const current = prevSet ? new Set(prevSet) : new Set<number>();
@@ -65,7 +64,6 @@ export function QuestionCard({
   }
 
   function toggleCustom(questionIndex: number, multiple: boolean | undefined) {
-    void Haptics.selectionAsync();
     setCustomSelected(prev => {
       const wasSelected = prev[questionIndex] ?? false;
       if (!multiple && !wasSelected) {

@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import { ActionSheetIOS, Platform, Pressable, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
 import { type StoredMessage } from 'cloud-agent-sdk';
 import { toast } from 'sonner-native';
 
@@ -35,8 +34,6 @@ export function MessageBubble({
     if (!textContent) {
       return;
     }
-
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(

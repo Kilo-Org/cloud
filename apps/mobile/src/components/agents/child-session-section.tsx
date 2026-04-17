@@ -1,6 +1,5 @@
 import { type ReactNode, useCallback, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { Bot, ChevronRight, Loader2 } from 'lucide-react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { type Part, type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
@@ -120,7 +119,6 @@ export function ChildSessionSection({
   const borderColor = getStatusBorderColor(status, colors.destructive);
 
   const handlePress = useCallback(() => {
-    void Haptics.selectionAsync();
     setIsExpanded(prev => !prev);
   }, []);
 

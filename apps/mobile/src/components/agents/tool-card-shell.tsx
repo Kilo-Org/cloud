@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { ChevronDown, type LucideIcon, XCircle } from 'lucide-react-native';
 import Animated, {
   FadeIn,
@@ -48,7 +47,6 @@ export function ToolCardShell({
 
   function handlePress() {
     if (hasContent) {
-      void Haptics.selectionAsync();
       setIsExpanded(prev => !prev);
     }
   }

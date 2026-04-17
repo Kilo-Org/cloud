@@ -1511,6 +1511,8 @@ async function runTrialExpirySweep(
       user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
       sandbox_id: kiloclaw_instances.sandbox_id,
+      instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      organization_id: kiloclaw_instances.organization_id,
       email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
@@ -1543,6 +1545,21 @@ async function runTrialExpirySweep(
             reason: 'missing_instance_row',
           }
         );
+        continue;
+      }
+
+      if (row.instance_destroyed_at) {
+        logSkippedSubscriptionRow('Skipping trial expiry for destroyed instance', row, {
+          reason: 'instance_destroyed',
+        });
+        continue;
+      }
+
+      if (row.organization_id) {
+        logSkippedSubscriptionRow('Skipping trial expiry for organization-managed row', row, {
+          reason: 'organization_managed',
+          organizationId: row.organization_id,
+        });
         continue;
       }
 
@@ -1625,6 +1642,8 @@ async function runSubscriptionExpirySweep(
       user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
       sandbox_id: kiloclaw_instances.sandbox_id,
+      instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      organization_id: kiloclaw_instances.organization_id,
       email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
@@ -1659,6 +1678,25 @@ async function runSubscriptionExpirySweep(
           row,
           {
             reason: 'missing_instance_row',
+          }
+        );
+        continue;
+      }
+
+      if (row.instance_destroyed_at) {
+        logSkippedSubscriptionRow('Skipping subscription expiry for destroyed instance', row, {
+          reason: 'instance_destroyed',
+        });
+        continue;
+      }
+
+      if (row.organization_id) {
+        logSkippedSubscriptionRow(
+          'Skipping subscription expiry for organization-managed row',
+          row,
+          {
+            reason: 'organization_managed',
+            organizationId: row.organization_id,
           }
         );
         continue;
@@ -1728,6 +1766,7 @@ async function runInstanceDestructionSweep(
       user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
       sandbox_id: kiloclaw_instances.sandbox_id,
+      organization_id: kiloclaw_instances.organization_id,
       email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
@@ -1761,6 +1800,18 @@ async function runInstanceDestructionSweep(
           row,
           {
             reason: 'missing_instance_row',
+          }
+        );
+        continue;
+      }
+
+      if (row.organization_id) {
+        logSkippedSubscriptionRow(
+          'Skipping instance destruction for organization-managed row',
+          row,
+          {
+            reason: 'organization_managed',
+            organizationId: row.organization_id,
           }
         );
         continue;
@@ -1851,6 +1902,8 @@ async function runPastDueCleanupSweep(
       user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
       sandbox_id: kiloclaw_instances.sandbox_id,
+      instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      organization_id: kiloclaw_instances.organization_id,
       email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
@@ -1883,6 +1936,21 @@ async function runPastDueCleanupSweep(
             reason: 'missing_instance_row',
           }
         );
+        continue;
+      }
+
+      if (row.instance_destroyed_at) {
+        logSkippedSubscriptionRow('Skipping past-due cleanup for destroyed instance', row, {
+          reason: 'instance_destroyed',
+        });
+        continue;
+      }
+
+      if (row.organization_id) {
+        logSkippedSubscriptionRow('Skipping past-due cleanup for organization-managed row', row, {
+          reason: 'organization_managed',
+          organizationId: row.organization_id,
+        });
         continue;
       }
 
@@ -1988,12 +2056,14 @@ async function runDestructionWarningSweep(
 
   const destructionWarningRows = await database
     .select({
+      id: kiloclaw_subscriptions.id,
       user_id: kiloclaw_subscriptions.user_id,
       email: kilocode_users.google_user_email,
       destruction_deadline: kiloclaw_subscriptions.destruction_deadline,
       instance_id: kiloclaw_instances.id,
       instance_name: kiloclaw_instances.name,
       instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      organization_id: kiloclaw_instances.organization_id,
       plan: kiloclaw_subscriptions.plan,
     })
     .from(kiloclaw_subscriptions)
@@ -2013,6 +2083,17 @@ async function runDestructionWarningSweep(
     try {
       if (isSoftDeletedUserEmail(row.email)) continue;
       if (!row.destruction_deadline || row.instance_destroyed_at) continue;
+      if (row.organization_id) {
+        logSkippedSubscriptionRow(
+          'Skipping destruction warning for organization-managed row',
+          row,
+          {
+            reason: 'organization_managed',
+            organizationId: row.organization_id,
+          }
+        );
+        continue;
+      }
       const instanceIdShort = shortInstanceId(row.instance_id);
       const sent = await trySendEmail(
         database,
@@ -2064,6 +2145,7 @@ async function runTrialWarningSweep(
       instance_id: kiloclaw_subscriptions.instance_id,
       instance_destroyed_at: kiloclaw_instances.destroyed_at,
       instance_sandbox_id: kiloclaw_instances.sandbox_id,
+      organization_id: kiloclaw_instances.organization_id,
       email: kilocode_users.google_user_email,
       trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
     })
@@ -2104,6 +2186,14 @@ async function runTrialWarningSweep(
       if (row.instance_destroyed_at) {
         logSkippedSubscriptionRow('Skipping trial warning for destroyed instance', row, {
           reason: 'instance_destroyed',
+        });
+        continue;
+      }
+
+      if (row.organization_id) {
+        logSkippedSubscriptionRow('Skipping trial warning for organization-managed row', row, {
+          reason: 'organization_managed',
+          organizationId: row.organization_id,
         });
         continue;
       }

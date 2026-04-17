@@ -4,6 +4,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   kiloclaw_admin_audit_logs,
   kiloclaw_earlybird_purchases,
+  kiloclaw_subscription_change_log,
   kiloclaw_instances,
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
@@ -152,10 +153,51 @@ describe('admin.users.getKiloClawState', () => {
     expect(result.accessReason).toBeNull();
   });
 
-  it('returns earlybird access when no subscription row exists', async () => {
+  it('returns earlybird access from canonical subscription row', async () => {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: targetUser.id,
+        sandbox_id: 'sandbox-earlybird-admin-test',
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: targetUser.id,
+      instance_id: instance!.id,
+      plan: 'trial',
+      status: 'trialing',
+      access_origin: 'earlybird',
+      cancel_at_period_end: false,
+      trial_started_at: '2026-01-01T00:00:00.000Z',
+      trial_ends_at: '2026-09-26T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
+
+    expect(result.subscription).toEqual(
+      expect.objectContaining({
+        access_origin: 'earlybird',
+      })
+    );
+    expect(result.hasAccess).toBe(true);
+    expect(result.accessReason).toBe('earlybird');
+    expect(result.earlybird).toEqual(
+      expect.objectContaining({
+        purchased: true,
+        expiresAt: expect.any(String),
+        daysRemaining: expect.any(Number),
+      })
+    );
+    expect(result.subscriptions).toHaveLength(1);
+  });
+
+  it('returns earlybird access from legacy purchase row before backfill', async () => {
     await db.insert(kiloclaw_earlybird_purchases).values({
       user_id: targetUser.id,
-      amount_cents: 2500,
+      stripe_charge_id: `ch_${crypto.randomUUID().replace(/-/g, '')}`,
+      amount_cents: 9900,
     });
 
     const caller = await createCallerForUser(adminUser.id);
@@ -171,7 +213,6 @@ describe('admin.users.getKiloClawState', () => {
         daysRemaining: expect.any(Number),
       })
     );
-    expect(result.subscriptions).toHaveLength(0);
   });
 
   it('returns activeInstanceId when the user has an active instance', async () => {
@@ -438,6 +479,18 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
     expect(auditLog.message).toContain('reset from canceled to trialing');
     expect(auditLog.metadata?.isReset).toBe(true);
     expect(auditLog.metadata?.previousStatus).toBe('canceled');
+
+    const [changeLog] = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, sub.id));
+    expect(changeLog).toEqual(
+      expect.objectContaining({
+        actor_id: adminUser.id,
+        action: 'reactivated',
+        reason: 'admin_reset_trial',
+      })
+    );
   });
 });
 
@@ -506,6 +559,18 @@ describe('admin.users.cancelKiloClawSubscription', () => {
     // current_period_end and credit_renewal_at should be set to ~now
     expect(updated?.current_period_end).not.toBeNull();
     expect(updated?.credit_renewal_at).not.toBeNull();
+
+    const [changeLog] = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, sub.id));
+    expect(changeLog).toEqual(
+      expect.objectContaining({
+        actor_id: adminUser.id,
+        action: 'canceled',
+        reason: 'admin_cancel_immediate',
+      })
+    );
   });
 
   it('immediate cancel can cancel a row already pending period-end cancellation', async () => {

@@ -1,6 +1,17 @@
-import type { OpenRouterChatCompletionRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayMessagesRequest,
+  GatewayRequest,
+  GatewayResponsesRequest,
+  OpenRouterChatCompletionRequest,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import crypto from 'crypto';
 import type OpenAI from 'openai';
+
+const BINARY_DATA_REPLACEMENT =
+  'Error: the file appears to be binary — it contains NUL bytes that cannot ' +
+  'be represented as text. Do not retry reading it. Treat this file as binary, ' +
+  'skip it, or use a tool appropriate for its format (for example, image or ' +
+  'PDF tools) instead.';
 
 function normalizeToolCallId(toolCallId: string, maxIdLength: number | undefined) {
   return crypto.hash('sha256', toolCallId).slice(0, maxIdLength);
@@ -133,4 +144,116 @@ export function hasAttemptCompletionTool(request: OpenRouterChatCompletionReques
   return (request.tools ?? []).some(
     tool => tool.type === 'function' && tool.function?.name === 'attempt_completion'
   );
+}
+
+function containsNul(value: string): boolean {
+  return value.includes('\0');
+}
+
+// Only sanitize results for the "read" tool — the name used by KiloClaw and OpenCode.
+const SANITIZED_TOOL_NAME = 'read';
+
+/**
+ * Replace tool result content that contains NUL ('\0') characters with a
+ * message explaining the tool probably accidentally read binary data.
+ * Limited to the "read" tool to avoid false positives on tools that
+ * legitimately return binary-ish content.
+ */
+export function sanitizeBinaryToolResults(request: GatewayRequest): void {
+  if (request.kind === 'chat_completions') {
+    sanitizeChatCompletionsToolResults(request.body);
+  } else if (request.kind === 'responses') {
+    sanitizeResponsesToolResults(request.body);
+  } else {
+    sanitizeMessagesToolResults(request.body);
+  }
+}
+
+function sanitizeTextPart(part: unknown): void {
+  if (typeof part !== 'object' || part === null) return;
+  if (!('type' in part) || (part.type !== 'text' && part.type !== 'input_text')) return;
+  if (!('text' in part) || typeof part.text !== 'string') return;
+  if (!containsNul(part.text)) return;
+  part.text = BINARY_DATA_REPLACEMENT;
+}
+
+function sanitizeChatCompletionsToolResults(body: OpenRouterChatCompletionRequest): void {
+  if (!Array.isArray(body.messages)) return;
+
+  const toolNameById = new Map<string, string>();
+  for (const msg of body.messages) {
+    if (msg.role !== 'assistant') continue;
+    for (const call of msg.tool_calls ?? []) {
+      if (call.type === 'function') {
+        toolNameById.set(call.id, call.function.name);
+      }
+    }
+  }
+
+  for (const msg of body.messages) {
+    if (msg.role !== 'tool') continue;
+    if (toolNameById.get(msg.tool_call_id) !== SANITIZED_TOOL_NAME) continue;
+    if (typeof msg.content === 'string') {
+      if (containsNul(msg.content)) {
+        console.warn('[sanitizeBinaryToolResults] replacing chat_completions tool result');
+        msg.content = BINARY_DATA_REPLACEMENT;
+      }
+    } else {
+      for (const part of msg.content) sanitizeTextPart(part);
+    }
+  }
+}
+
+function sanitizeResponsesToolResults(body: GatewayResponsesRequest): void {
+  if (!Array.isArray(body.input)) return;
+
+  const toolNameById = new Map<string, string>();
+  for (const item of body.input) {
+    if (item.type === 'function_call' && typeof item.name === 'string') {
+      toolNameById.set(item.call_id, item.name);
+    }
+  }
+
+  for (const item of body.input) {
+    if (item.type !== 'function_call_output') continue;
+    if (toolNameById.get(item.call_id) !== SANITIZED_TOOL_NAME) continue;
+    if (typeof item.output === 'string') {
+      if (containsNul(item.output)) {
+        console.warn('[sanitizeBinaryToolResults] replacing responses function_call_output');
+        item.output = BINARY_DATA_REPLACEMENT;
+      }
+    } else if (Array.isArray(item.output)) {
+      for (const part of item.output) sanitizeTextPart(part);
+    }
+  }
+}
+
+function sanitizeMessagesToolResults(body: GatewayMessagesRequest): void {
+  if (!Array.isArray(body.messages)) return;
+
+  const toolNameById = new Map<string, string>();
+  for (const msg of body.messages) {
+    if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue;
+    for (const block of msg.content) {
+      if (typeof block === 'object' && block.type === 'tool_use') {
+        toolNameById.set(block.id, block.name);
+      }
+    }
+  }
+
+  for (const msg of body.messages) {
+    if (msg.role !== 'user' || !Array.isArray(msg.content)) continue;
+    for (const block of msg.content) {
+      if (typeof block !== 'object' || block.type !== 'tool_result') continue;
+      if (toolNameById.get(block.tool_use_id) !== SANITIZED_TOOL_NAME) continue;
+      if (typeof block.content === 'string') {
+        if (containsNul(block.content)) {
+          console.warn('[sanitizeBinaryToolResults] replacing Anthropic tool_result');
+          block.content = BINARY_DATA_REPLACEMENT;
+        }
+      } else if (Array.isArray(block.content)) {
+        for (const part of block.content) sanitizeTextPart(part);
+      }
+    }
+  }
 }

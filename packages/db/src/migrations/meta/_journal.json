@@ -645,6 +645,34 @@
       "when": 1776345680886,
       "tag": "0091_living_vulture",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1776424147392,
+      "tag": "0092_sudden_alice",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1776433446928,
+      "tag": "0093_living_living_lightning",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1776438967235,
+      "tag": "0094_loud_wrecker",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1776444828897,
+      "tag": "0095_left_unicorn",
+      "breakpoints": true
     }
   ]
 }

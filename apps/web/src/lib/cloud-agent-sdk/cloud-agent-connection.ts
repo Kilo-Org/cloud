@@ -4,7 +4,12 @@ import {
   type CloudAgentEvent,
   type StreamError,
 } from '@/lib/cloud-agent-next/event-types';
-import { createBaseConnection, type Connection } from './base-connection';
+import {
+  createBaseConnection,
+  type Connection,
+  type ConnectionLifecycleHooks,
+  type WebSocketHeaders,
+} from './base-connection';
 import type { CloudAgentStreamTicket, CloudAgentStreamTicketResult } from './transport';
 
 export type ConnectionConfig = {
@@ -19,6 +24,8 @@ export type ConnectionConfig = {
   onRefreshTicket?: () => Promise<CloudAgentStreamTicketResult>;
   heartbeatTimeoutMs?: number;
   reconnectDelayMs?: number;
+  lifecycleHooks?: ConnectionLifecycleHooks;
+  websocketHeaders?: WebSocketHeaders;
 };
 
 export type { Connection };
@@ -78,6 +85,8 @@ export function createConnection(config: ConnectionConfig): Connection {
 
   return createBaseConnection({
     stalenessTimeoutMs: config.heartbeatTimeoutMs,
+    lifecycleHooks: config.lifecycleHooks,
+    websocketHeaders: config.websocketHeaders,
     buildUrl: () => {
       const url = new URL(config.websocketUrl);
       url.searchParams.set('ticket', currentTicket.ticket);

@@ -40,6 +40,7 @@ import {
   KiloClawPlan,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
+  KiloClawProvider,
   KiloClawSubscriptionStatus,
   KiloClawPaymentSource,
   KiloClawSubscriptionAccessOrigin,
@@ -135,6 +136,10 @@ export type AffiliateEventPayloadJson = {
   itemName?: string | null;
   itemSku?: string | null;
   promoCode?: string | null;
+  stripeChargeId?: string | null;
+  impactActionId?: string | null;
+  impactSubmissionUri?: string | null;
+  disputeId?: string | null;
 };
 
 export const credit_transactions = pgTable(
@@ -236,6 +241,7 @@ export const kilocode_users = pgTable(
     account_deletion_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
 
     normalized_email: text(),
+    email_domain: text(),
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
@@ -248,6 +254,7 @@ export const kilocode_users = pgTable(
       .on(table.vercel_downstream_safety_identifier)
       .where(sql`${table.vercel_downstream_safety_identifier} IS NOT NULL`),
     index('IDX_kilocode_users_normalized_email').on(table.normalized_email),
+    index('IDX_kilocode_users_email_domain').on(table.email_domain),
   ]
 );
 
@@ -295,6 +302,9 @@ export const user_affiliate_events = pgTable(
       .$type<AffiliateEventDeliveryState>()
       .default(AffiliateEventDeliveryState.Queued),
     payload_json: jsonb().$type<AffiliateEventPayloadJson>().notNull(),
+    stripe_charge_id: text(),
+    impact_action_id: text(),
+    impact_submission_uri: text(),
     attempt_count: integer().notNull().default(0),
     next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
     claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -316,6 +326,11 @@ export const user_affiliate_events = pgTable(
       table.id
     ),
     index('IDX_user_affiliate_events_parent_event_id').on(table.parent_event_id),
+    index('IDX_user_affiliate_events_provider_event_type_charge').on(
+      table.provider,
+      table.event_type,
+      table.stripe_charge_id
+    ),
     enumCheck('user_affiliate_events_provider_check', table.provider, AffiliateProvider),
     enumCheck('user_affiliate_events_event_type_check', table.event_type, AffiliateEventType),
     enumCheck(
@@ -331,6 +346,28 @@ export const user_affiliate_events = pgTable(
 );
 
 export type UserAffiliateEvent = typeof user_affiliate_events.$inferSelect;
+
+export const pending_impact_sale_reversals = pgTable(
+  'pending_impact_sale_reversals',
+  {
+    stripe_charge_id: text().primaryKey().notNull(),
+    dispute_id: text().notNull(),
+    amount: real().notNull(),
+    currency: text().notNull(),
+    event_date: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    attempt_count: integer().notNull().default(0),
+    last_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    check(
+      'pending_impact_sale_reversals_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type PendingImpactSaleReversal = typeof pending_impact_sale_reversals.$inferSelect;
 
 export const kilo_pass_subscriptions = pgTable(
   'kilo_pass_subscriptions',
@@ -3678,6 +3715,7 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id),
     sandbox_id: text().notNull(),
+    provider: text().$type<KiloClawProvider>().notNull().default(KiloClawProvider.Fly),
     // Null = personal instance. Non-null = org-owned instance.
     organization_id: uuid().references(() => organizations.id),
     name: text(),
@@ -4252,6 +4290,93 @@ export const security_advisor_scans = pgTable(
 );
 
 export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
+
+// ============ SECURITY ADVISOR CONTENT ============
+// Customer-visible report content for the security advisor feature.
+// Three tables are read together by a TTL-cached content loader and injected
+// into the report generator so copy changes (check descriptions, KiloClaw
+// coverage blurbs, CTA copy) do not require a code deploy. Edited via the
+// admin UI under /admin/kiloclaw?tab=security-advisor-content. Rows can be
+// soft-disabled via is_active.
+//
+// Note on `updated_at`: `.$onUpdateFn(() => sql\`now()\`)` only fires on
+// `db.update()` calls — NOT on the SET clause of `INSERT ... ON CONFLICT
+// DO UPDATE`. All writes in the admin router go through `onConflictDoUpdate`
+// and explicitly set `updated_at: nowIso()`. The $onUpdateFn here is a
+// safety net for any future direct `.update()` call we might add.
+
+export const security_advisor_check_catalog = pgTable(
+  'security_advisor_check_catalog',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    check_id: text().notNull().unique(),
+    severity: text().notNull(), // 'critical' | 'warn' | 'info' — server-authoritative override
+    explanation: text().notNull(),
+    risk: text().notNull(),
+    is_active: boolean().notNull().default(true),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check(
+      'security_advisor_check_catalog_severity_check',
+      sql`${table.severity} in ('critical', 'warn', 'info')`
+    ),
+  ]
+);
+
+export type SecurityAdvisorCheck = typeof security_advisor_check_catalog.$inferSelect;
+export type NewSecurityAdvisorCheck = typeof security_advisor_check_catalog.$inferInsert;
+
+export const security_advisor_kiloclaw_coverage = pgTable('security_advisor_kiloclaw_coverage', {
+  id: uuid()
+    .notNull()
+    .default(sql`pg_catalog.gen_random_uuid()`)
+    .primaryKey(),
+  area: text().notNull().unique(),
+  summary: text().notNull(),
+  detail: text().notNull(),
+  match_check_ids: text()
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  is_active: boolean().notNull().default(true),
+  created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
+export type SecurityAdvisorKiloClawCoverage =
+  typeof security_advisor_kiloclaw_coverage.$inferSelect;
+export type NewSecurityAdvisorKiloClawCoverage =
+  typeof security_advisor_kiloclaw_coverage.$inferInsert;
+
+export const security_advisor_content = pgTable('security_advisor_content', {
+  id: uuid()
+    .notNull()
+    .default(sql`pg_catalog.gen_random_uuid()`)
+    .primaryKey(),
+  key: text().notNull().unique(),
+  value: text().notNull(),
+  description: text().notNull().default(''),
+  is_active: boolean().notNull().default(true),
+  created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
+export type SecurityAdvisorContent = typeof security_advisor_content.$inferSelect;
+export type NewSecurityAdvisorContent = typeof security_advisor_content.$inferInsert;
 
 // ============ CHANNEL BADGE COUNTS ============
 // Per-user per-channel unread notification counts for mobile app badge display.

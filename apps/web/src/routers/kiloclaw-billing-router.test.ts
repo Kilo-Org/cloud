@@ -452,7 +452,7 @@ describe('getBillingStatus', () => {
   });
 
   it('returns instance data for legacy earlybird access with no subscription row', async () => {
-    await createKiloclawInstance(user.id);
+    const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_earlybird_purchases).values({
       user_id: user.id,
       amount_cents: 2500,
@@ -464,6 +464,7 @@ describe('getBillingStatus', () => {
     expect(result.hasAccess).toBe(true);
     expect(result.accessReason).toBe('earlybird');
     expect(result.instance).toEqual({
+      id: instance.id,
       exists: true,
       status: null,
       suspendedAt: null,

@@ -1,5 +1,6 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
+import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   user_admin_notes,
   kilocode_users,
@@ -12,7 +13,6 @@ import {
   cli_sessions_v2,
   credit_transactions,
   kiloclaw_subscriptions,
-  kiloclaw_earlybird_purchases,
   kiloclaw_email_log,
   kiloclaw_instances,
 } from '@kilocode/db/schema';
@@ -24,6 +24,7 @@ import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
 import { adminKiloclawVersionsRouter } from '@/routers/admin-kiloclaw-versions-router';
 import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-router';
+import { adminKiloclawProvidersRouter } from '@/routers/admin-kiloclaw-providers-router';
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
@@ -36,6 +37,7 @@ import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router'
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
+import { adminSecurityAdvisorContentRouter } from '@/routers/admin/security-advisor-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
@@ -68,6 +70,7 @@ import { kilo_pass_scheduled_changes } from '@kilocode/db/schema';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
   getEffectiveKiloClawSubscription,
+  getKiloClawEarlybirdStateForUser,
   getKiloClawSubscriptionAccessReason,
 } from '@/lib/kiloclaw/access-state';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
@@ -86,6 +89,17 @@ const SyncResponseSchema = z.object({
 });
 
 type SyncResponse = z.infer<typeof SyncResponseSchema>;
+
+function adminSubscriptionActor(ctxUser: {
+  id: string;
+  google_user_email: string;
+  google_user_name: string | null;
+}) {
+  return {
+    actorType: 'user',
+    actorId: ctxUser.id,
+  } as const;
+}
 
 function parseJsonSafe(text: string): unknown {
   return JSON.parse(text) as unknown;
@@ -515,15 +529,12 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
       }
 
-      const [allSubscriptions, earlybird, activeInstance, allInstances] = await Promise.all([
+      const [allSubscriptions, earlybirdState, activeInstance, allInstances] = await Promise.all([
         db
           .select()
           .from(kiloclaw_subscriptions)
           .where(eq(kiloclaw_subscriptions.user_id, input.userId)),
-        db.query.kiloclaw_earlybird_purchases.findFirst({
-          columns: { id: true },
-          where: eq(kiloclaw_earlybird_purchases.user_id, input.userId),
-        }),
+        getKiloClawEarlybirdStateForUser(input.userId, new Date()),
         db.query.kiloclaw_instances.findFirst({
           columns: { id: true },
           where: and(
@@ -544,17 +555,11 @@ export const adminRouter = createTRPCRouter({
 
       const effectiveSub = getEffectiveKiloClawSubscription(allSubscriptions);
       const accessReason = getKiloClawSubscriptionAccessReason(effectiveSub);
-
-      const now = new Date();
-      const earlybirdDaysRemaining = earlybird
-        ? Math.ceil(
-            (new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE).getTime() - now.getTime()) / 86_400_000
-          )
+      const earlybirdDaysRemaining = earlybirdState.expiresAt
+        ? Math.ceil((new Date(earlybirdState.expiresAt).getTime() - Date.now()) / 86_400_000)
         : 0;
-
-      const hasEarlybirdAccess = !!earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now;
-      const hasAccess = hasEarlybirdAccess || accessReason !== null;
-      const effectiveAccessReason = hasEarlybirdAccess ? 'earlybird' : accessReason;
+      const hasAccess = earlybirdState.hasAccess || accessReason !== null;
+      const effectiveAccessReason = earlybirdState.hasAccess ? 'earlybird' : accessReason;
 
       // Build instance lookup for per-subscription context
       const instancesById = new Map(allInstances.map(inst => [inst.id, inst]));
@@ -570,10 +575,10 @@ export const adminRouter = createTRPCRouter({
         subscriptions,
         hasAccess,
         accessReason: effectiveAccessReason,
-        earlybird: earlybird
+        earlybird: earlybirdState.purchased
           ? {
               purchased: true,
-              expiresAt: KILOCLAW_EARLYBIRD_EXPIRY_DATE,
+              expiresAt: earlybirdState.expiresAt ?? KILOCLAW_EARLYBIRD_EXPIRY_DATE,
               daysRemaining: earlybirdDaysRemaining,
             }
           : null,
@@ -621,7 +626,7 @@ export const adminRouter = createTRPCRouter({
         await db.transaction(async tx => {
           if (isReset) {
             // Reset canceled subscription to a new trial
-            await tx
+            const [updatedSubscription] = await tx
               .update(kiloclaw_subscriptions)
               .set({
                 status: 'trialing',
@@ -640,7 +645,24 @@ export const adminRouter = createTRPCRouter({
                 suspended_at: null,
                 destruction_deadline: null,
               })
-              .where(eq(kiloclaw_subscriptions.id, subscription.id));
+              .where(eq(kiloclaw_subscriptions.id, subscription.id))
+              .returning();
+
+            if (!updatedSubscription) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Failed to reset KiloClaw subscription trial',
+              });
+            }
+
+            await insertKiloClawSubscriptionChangeLog(tx, {
+              subscriptionId: subscription.id,
+              actor: adminSubscriptionActor(ctx.user),
+              action: 'reactivated',
+              reason: 'admin_reset_trial',
+              before: subscription,
+              after: updatedSubscription,
+            });
 
             // Clear email logs so notifications can fire again for the new trial.
             // Unlike autoResumeIfSuspended (which preserves trial warnings as one-time events),
@@ -659,15 +681,35 @@ export const adminRouter = createTRPCRouter({
               .where(
                 and(
                   eq(kiloclaw_email_log.user_id, input.userId),
+                  subscription.instance_id
+                    ? eq(kiloclaw_email_log.instance_id, subscription.instance_id)
+                    : isNull(kiloclaw_email_log.instance_id),
                   inArray(kiloclaw_email_log.email_type, emailTypesToClearOnTrialReset)
                 )
               );
           } else {
             // Just update the trial end date for an active trial
-            await tx
+            const [updatedSubscription] = await tx
               .update(kiloclaw_subscriptions)
               .set({ trial_ends_at: input.trial_ends_at })
-              .where(eq(kiloclaw_subscriptions.id, subscription.id));
+              .where(eq(kiloclaw_subscriptions.id, subscription.id))
+              .returning();
+
+            if (!updatedSubscription) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Failed to update KiloClaw trial end date',
+              });
+            }
+
+            await insertKiloClawSubscriptionChangeLog(tx, {
+              subscriptionId: subscription.id,
+              actor: adminSubscriptionActor(ctx.user),
+              action: 'admin_override',
+              reason: 'admin_update_trial_end',
+              before: subscription,
+              after: updatedSubscription,
+            });
           }
 
           await createKiloClawAdminAuditLog({
@@ -794,7 +836,7 @@ export const adminRouter = createTRPCRouter({
               cancel_at_period_end: true,
             });
 
-            await db
+            const [updatedSubscription] = await db
               .update(kiloclaw_subscriptions)
               .set({
                 cancel_at_period_end: true,
@@ -802,10 +844,27 @@ export const adminRouter = createTRPCRouter({
                   ? { stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null }
                   : {}),
               })
-              .where(eq(kiloclaw_subscriptions.id, subscription.id));
+              .where(eq(kiloclaw_subscriptions.id, subscription.id))
+              .returning();
+
+            if (!updatedSubscription) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Failed to update KiloClaw subscription',
+              });
+            }
+
+            await insertKiloClawSubscriptionChangeLog(db, {
+              subscriptionId: subscription.id,
+              actor: adminSubscriptionActor(ctx.user),
+              action: 'canceled',
+              reason: 'admin_cancel_at_period_end',
+              before: subscription,
+              after: updatedSubscription,
+            });
           } else {
             // Pure-credit: set local cancel_at_period_end and clear schedule state
-            await db
+            const [updatedSubscription] = await db
               .update(kiloclaw_subscriptions)
               .set({
                 cancel_at_period_end: true,
@@ -813,7 +872,24 @@ export const adminRouter = createTRPCRouter({
                 scheduled_plan: null,
                 scheduled_by: null,
               })
-              .where(eq(kiloclaw_subscriptions.id, subscription.id));
+              .where(eq(kiloclaw_subscriptions.id, subscription.id))
+              .returning();
+
+            if (!updatedSubscription) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Failed to update KiloClaw subscription',
+              });
+            }
+
+            await insertKiloClawSubscriptionChangeLog(db, {
+              subscriptionId: subscription.id,
+              actor: adminSubscriptionActor(ctx.user),
+              action: 'canceled',
+              reason: 'admin_cancel_at_period_end',
+              before: subscription,
+              after: updatedSubscription,
+            });
           }
         } else {
           // mode === 'immediate'
@@ -863,7 +939,7 @@ export const adminRouter = createTRPCRouter({
 
           // Update local subscription to canceled
           const now = new Date().toISOString();
-          await db
+          const [updatedSubscription] = await db
             .update(kiloclaw_subscriptions)
             .set({
               status: 'canceled',
@@ -877,7 +953,24 @@ export const adminRouter = createTRPCRouter({
               // For trialing subscriptions, also end the trial immediately
               ...(subscription.status === 'trialing' ? { trial_ends_at: now } : {}),
             })
-            .where(eq(kiloclaw_subscriptions.id, subscription.id));
+            .where(eq(kiloclaw_subscriptions.id, subscription.id))
+            .returning();
+
+          if (!updatedSubscription) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to cancel KiloClaw subscription',
+            });
+          }
+
+          await insertKiloClawSubscriptionChangeLog(db, {
+            subscriptionId: subscription.id,
+            actor: adminSubscriptionActor(ctx.user),
+            action: 'canceled',
+            reason: 'admin_cancel_immediate',
+            before: subscription,
+            after: updatedSubscription,
+          });
         }
 
         await createKiloClawAdminAuditLog({
@@ -1554,6 +1647,7 @@ export const adminRouter = createTRPCRouter({
   kiloclawInstances: adminKiloclawInstancesRouter,
   kiloclawVersions: adminKiloclawVersionsRouter,
   kiloclawRegions: adminKiloclawRegionsRouter,
+  kiloclawProviders: adminKiloclawProvidersRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
   contributorChampions: contributorChampionsRouter,
@@ -1565,4 +1659,5 @@ export const adminRouter = createTRPCRouter({
   customLlm: adminCustomLlmRouter,
   gatewayConfig: adminGatewayConfigRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
+  securityAdvisorContent: adminSecurityAdvisorContentRouter,
 });

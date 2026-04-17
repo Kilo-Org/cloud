@@ -12,6 +12,7 @@ import {
   type SecurityAdvisorResponse,
 } from '@/lib/security-advisor/schemas';
 import { generateSecurityReport } from '@/lib/security-advisor/report-generator';
+import { getSecurityAdvisorContent } from '@/lib/security-advisor/content-loader';
 import {
   checkSecurityAdvisorRateLimit,
   recordSecurityAdvisorScan,
@@ -96,10 +97,12 @@ export async function POST(request: NextRequest) {
 
   // 6. Generate report
   const isKiloClaw = payload.source.platform === 'kiloclaw';
+  const content = await getSecurityAdvisorContent();
   const report = generateSecurityReport({
     audit: payload.audit,
     publicIp: payload.publicIp,
     isKiloClaw,
+    content,
   });
 
   // 7. Record scan in DB (synchronous — must complete before response
@@ -120,6 +123,8 @@ export async function POST(request: NextRequest) {
         findingsCritical: report.summary.critical,
         findingsWarn: report.summary.warn,
         findingsInfo: report.summary.info,
+        grade: report.grade,
+        score: report.score,
         publicIp: payload.publicIp,
       });
     } catch (err) {
@@ -133,6 +138,8 @@ export async function POST(request: NextRequest) {
     status: 'success',
     report: {
       markdown: report.markdown,
+      grade: report.grade,
+      score: report.score,
       summary: report.summary,
       findings: report.findings,
       recommendations: report.recommendations,

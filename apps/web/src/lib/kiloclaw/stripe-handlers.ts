@@ -1438,37 +1438,37 @@ export async function handleKiloClawInvoicePaid(params: {
     amount_paid: invoice.amount_paid,
   });
 
-  await runAfterResponse(async () => {
-    try {
-      const eventDate =
-        invoice.status_transitions?.paid_at != null
-          ? new Date(invoice.status_transitions.paid_at * 1000)
-          : new Date();
-      await enqueueAffiliateEventForUser({
-        userId: metadata.kiloUserId,
+  try {
+    const eventDate =
+      invoice.status_transitions?.paid_at != null
+        ? new Date(invoice.status_transitions.paid_at * 1000)
+        : new Date();
+    await enqueueAffiliateEventForUser({
+      userId: metadata.kiloUserId,
+      provider: 'impact',
+      eventType: 'sale',
+      dedupeKey: buildAffiliateEventDedupeKey({
         provider: 'impact',
         eventType: 'sale',
-        dedupeKey: buildAffiliateEventDedupeKey({
-          provider: 'impact',
-          eventType: 'sale',
-          entityId: invoice.id,
-        }),
-        orderId: invoice.id,
-        amount: invoice.amount_paid / 100,
-        currencyCode: invoice.currency ?? 'usd',
-        eventDate,
-        itemCategory: getImpactItemCategory(plan),
-        itemName: getImpactItemName(plan),
-        itemSku: matchingPriceId,
-      });
-    } catch (error) {
-      logWarning('Affiliate sale enqueue failed', {
-        stripe_event_id: eventId,
-        user_id: metadata.kiloUserId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
+        entityId: invoice.id,
+      }),
+      orderId: invoice.id,
+      amount: invoice.amount_paid / 100,
+      currencyCode: invoice.currency ?? 'usd',
+      eventDate,
+      itemCategory: getImpactItemCategory(plan),
+      itemName: getImpactItemName(plan),
+      itemSku: matchingPriceId,
+      stripeChargeId: chargeId,
+    });
+  } catch (error) {
+    logWarning('Affiliate sale enqueue failed', {
+      stripe_event_id: eventId,
+      user_id: metadata.kiloUserId,
+      stripe_charge_id: chargeId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   // Fire PostHog revenue tracking event in the background
   if (!IS_IN_AUTOMATED_TEST) {

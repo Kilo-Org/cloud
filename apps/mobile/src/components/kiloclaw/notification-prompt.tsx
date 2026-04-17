@@ -15,9 +15,8 @@ import {
   getPlatform,
   registerForPushNotifications,
 } from '@/lib/notifications';
+import { NOTIFICATION_PROMPT_SEEN_KEY } from '@/lib/storage-keys';
 import { useTRPC } from '@/lib/trpc';
-
-const PROMPT_SEEN_KEY = 'notification-prompt-seen';
 
 export function NotificationPrompt({ enabled }: { enabled: boolean }) {
   const [visible, setVisible] = useState(false);
@@ -38,7 +37,7 @@ export function NotificationPrompt({ enabled }: { enabled: boolean }) {
     }
 
     async function check() {
-      const seen = await SecureStore.getItemAsync(PROMPT_SEEN_KEY);
+      const seen = await SecureStore.getItemAsync(NOTIFICATION_PROMPT_SEEN_KEY);
       if (seen) {
         return;
       }
@@ -73,7 +72,7 @@ export function NotificationPrompt({ enabled }: { enabled: boolean }) {
       return;
     }
 
-    await SecureStore.setItemAsync(PROMPT_SEEN_KEY, 'true');
+    await SecureStore.setItemAsync(NOTIFICATION_PROMPT_SEEN_KEY, 'true');
     setVisible(false);
 
     const token = await registerForPushNotifications();
@@ -90,7 +89,7 @@ export function NotificationPrompt({ enabled }: { enabled: boolean }) {
   }, [registerToken]);
 
   const handleDismiss = useCallback(async () => {
-    await SecureStore.setItemAsync(PROMPT_SEEN_KEY, 'true');
+    await SecureStore.setItemAsync(NOTIFICATION_PROMPT_SEEN_KEY, 'true');
     setVisible(false);
   }, []);
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -15,6 +15,7 @@ import { ChatHeader, ChatShell } from '@/components/kiloclaw/chat-shell';
 import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
 import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
+import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw-queries';
 import { type NotificationData, setActiveChatInstance } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
@@ -34,6 +35,8 @@ export function KiloClawChat({
 }: Readonly<KiloClawChatProps>) {
   const { data: creds, isLoading, error } = useStreamChatCredentials(organizationId, enabled);
   const trpc = useTRPC();
+  const { isActive } = useAppLifecycle();
+  const isFocusedRef = useRef(false);
 
   const { mutate: markChatRead } = useMutation(
     trpc.user.markChatRead.mutationOptions({
@@ -48,6 +51,7 @@ export function KiloClawChat({
 
   useFocusEffect(
     useCallback(() => {
+      isFocusedRef.current = true;
       setActiveChatInstance(instanceId);
       markChatRead({ channelId: instanceId });
 
@@ -61,23 +65,23 @@ export function KiloClawChat({
         }
       });
 
-      // Also clear when the app returns to the foreground while this chat is focused.
-      // Notifications received in the background do not fire the listener above, and
-      // useFocusEffect does not re-run on app resume (focus is a navigation concept,
-      // not an app-state one), so without this the badge stays stuck after backgrounding.
-      const appStateSubscription = AppState.addEventListener('change', nextAppState => {
-        if (nextAppState === 'active') {
-          markChatRead({ channelId: instanceId });
-        }
-      });
-
       return () => {
+        isFocusedRef.current = false;
         setActiveChatInstance(null);
         subscription.remove();
-        appStateSubscription.remove();
       };
     }, [instanceId, markChatRead])
   );
+
+  // Clear badge when the app returns to the foreground while this chat is focused.
+  // Notifications received in the background do not fire the listener above, and
+  // useFocusEffect does not re-run on app resume (focus is a navigation concept,
+  // not an app-state one), so without this the badge stays stuck after backgrounding.
+  useEffect(() => {
+    if (isActive && isFocusedRef.current) {
+      markChatRead({ channelId: instanceId });
+    }
+  }, [isActive, instanceId, markChatRead]);
 
   if (!enabled) {
     return (
@@ -205,22 +209,18 @@ function StreamChatUI({
 
   // Gracefully close/reopen the websocket on background/foreground.
   // This preserves the client and channel state (no disconnect/reconnect).
-  const appState = useRef(AppState.currentState);
+  const { isActive } = useAppLifecycle();
+  const wasActiveRef = useRef(isActive);
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      if (client) {
-        if (appState.current === 'active' && /inactive|background/.exec(nextAppState)) {
-          void client.closeConnection();
-        } else if (/inactive|background/.exec(appState.current) && nextAppState === 'active') {
-          void client.openConnection();
-        }
+    if (client) {
+      if (wasActiveRef.current && !isActive) {
+        void client.closeConnection();
+      } else if (!wasActiveRef.current && isActive) {
+        void client.openConnection();
       }
-      appState.current = nextAppState;
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, [client]);
+    }
+    wasActiveRef.current = isActive;
+  }, [client, isActive]);
 
   // Bot presence tracking
   const sandboxId = channelId.replace(/^default-/, '');

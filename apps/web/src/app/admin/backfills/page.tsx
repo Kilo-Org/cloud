@@ -1,5 +1,6 @@
 import { SafetyIdentifiersBackfill } from '../components/SafetyIdentifiersBackfill';
 import { NormalizedEmailBackfill } from '../components/NormalizedEmailBackfill';
+import { EmailDomainBackfill } from '../components/EmailDomainBackfill';
 import { BlockBlacklistedDomainsBackfill } from '../components/BlockBlacklistedDomainsBackfill';
 import { SafetyIdentifierHashGenerator } from '../components/SafetyIdentifierHashGenerator';
 import AdminPage from '../components/AdminPage';
@@ -21,6 +22,10 @@ export default function BackfillsPage() {
           <h2 className="text-2xl font-bold">Normalized Email Backfill</h2>
         </div>
         <NormalizedEmailBackfill />
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Email Domain Backfill</h2>
+        </div>
+        <EmailDomainBackfill />
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Block Blacklisted Domains</h2>
         </div>

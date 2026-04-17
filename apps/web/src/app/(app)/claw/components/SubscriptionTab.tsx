@@ -12,7 +12,7 @@ import { PlanSelectionDialog } from './billing/PlanSelectionDialog';
 
 export function SubscriptionTab() {
   const trpc = useTRPC();
-  const { data: billing } = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
+  const { data: billing } = useQuery(trpc.kiloclaw.getActivePersonalBillingStatus.queryOptions());
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showPlanDialog, setShowPlanDialog] = useState(false);
 

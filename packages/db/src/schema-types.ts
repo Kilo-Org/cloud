@@ -137,6 +137,14 @@ export const KiloClawScheduledBy = {
 
 export type KiloClawScheduledBy = (typeof KiloClawScheduledBy)[keyof typeof KiloClawScheduledBy];
 
+export const KiloClawProvider = {
+  Fly: 'fly',
+  DockerLocal: 'docker-local',
+  Northflank: 'northflank',
+} as const;
+
+export type KiloClawProvider = (typeof KiloClawProvider)[keyof typeof KiloClawProvider];
+
 export const KiloClawSubscriptionStatus = {
   Trialing: 'trialing',
   Active: 'active',
@@ -201,6 +209,7 @@ export const AffiliateEventType = {
   TrialStart: 'trial_start',
   TrialEnd: 'trial_end',
   Sale: 'sale',
+  SaleReversal: 'sale_reversal',
 } as const;
 
 export type AffiliateEventType = (typeof AffiliateEventType)[keyof typeof AffiliateEventType];

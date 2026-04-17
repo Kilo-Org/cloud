@@ -40,6 +40,14 @@ import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
 import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
+import {
+  providerRolloutAvailability,
+  ProviderRolloutConfigSchema,
+  readProviderRolloutConfig,
+  selectProviderForProvision,
+  writeProviderRolloutConfig,
+} from '../providers/rollout';
+import type { ProviderId } from '../schemas/instance-config';
 import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
 import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../db';
 import { and, eq, isNull, sql } from 'drizzle-orm';
@@ -352,6 +360,7 @@ async function insertProvisionedInstanceRecord(params: {
   instanceId: string;
   sandboxId: string;
   orgId: string | null;
+  provider: ProviderId;
 }): Promise<ProvisionedInstanceRecord> {
   const connectionString = params.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
@@ -386,6 +395,7 @@ async function insertProvisionedInstanceRecord(params: {
           id: params.instanceId,
           user_id: params.userId,
           sandbox_id: params.sandboxId,
+          provider: params.provider,
           organization_id: params.orgId,
         })
         .onConflictDoNothing({ target: kiloclaw_instances.id })
@@ -857,10 +867,19 @@ platform.post('/provision', async c => {
   const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionRoute = '/api/platform/provision';
 
+  let selectedProvider = provider;
+  if (!selectedProvider && shouldInsertInstanceRecord) {
+    selectedProvider = await selectProviderForProvision({
+      kv: c.env.KV_CLAW_CACHE,
+      userId,
+      orgId,
+    });
+  }
+
   let provision;
   try {
-    if (provider) {
-      assertAvailableProvider(c.env, provider);
+    if (selectedProvider) {
+      assertAvailableProvider(c.env, selectedProvider);
     }
     provision = await withResolvedDORetry(
       c.env,
@@ -881,7 +900,7 @@ platform.post('/provision', async c => {
             region,
             pinnedImageTag,
           },
-          { instanceId: provisionedInstanceId, orgId, provider }
+          { instanceId: provisionedInstanceId, orgId, provider: selectedProvider }
         ),
       'provision'
     );
@@ -904,6 +923,7 @@ platform.post('/provision', async c => {
         instanceId: provisionedInstanceId,
         sandboxId: provision.sandboxId,
         orgId: orgId ?? null,
+        provider: selectedProvider ?? 'fly',
       });
       writeEvent(c.env, {
         event: 'instance.record_inserted',
@@ -3038,6 +3058,33 @@ platform.put('/regions', async c => {
 
   console.log('[platform] Regions updated:', raw);
   return c.json({ ok: true, regions: result.data.regions, raw });
+});
+
+// GET /api/platform/providers/rollout
+// Returns runtime provider rollout configuration from KV.
+platform.get('/providers/rollout', async c => {
+  try {
+    const { config, source } = await readProviderRolloutConfig(c.env.KV_CLAW_CACHE);
+    return c.json({ rollout: config, availability: providerRolloutAvailability(), source });
+  } catch (err) {
+    console.error('[platform] Failed to read provider rollout config:', err);
+    return c.json({ error: 'Failed to read provider rollout config' }, 500);
+  }
+});
+
+// PUT /api/platform/providers/rollout
+// Updates runtime provider rollout configuration in KV.
+platform.put('/providers/rollout', async c => {
+  const result = await parseBody(c, ProviderRolloutConfigSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    await writeProviderRolloutConfig(c.env.KV_CLAW_CACHE, result.data);
+    return c.json({ ok: true, rollout: result.data, availability: providerRolloutAvailability() });
+  } catch (err) {
+    console.error('[platform] Failed to write provider rollout config:', err);
+    return c.json({ error: 'Failed to write provider rollout config' }, 500);
+  }
 });
 
 // POST /api/platform/destroy-fly-machine

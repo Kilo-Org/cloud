@@ -4,8 +4,13 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
+      "@/types/*": ["../../apps/web/src/types/*"],
+      "@/lib/cloud-agent-next/*": ["../../apps/web/src/lib/cloud-agent-next/*"],
+      "@/lib/images-schema": ["../../apps/web/src/lib/images-schema.ts"],
       "@/*": ["./src/*"],
-      "@/assets/*": ["./assets/*"]
+      "@/assets/*": ["./assets/*"],
+      "cloud-agent-sdk": ["../../apps/web/src/lib/cloud-agent-sdk/index.ts"],
+      "cloud-agent-sdk/*": ["../../apps/web/src/lib/cloud-agent-sdk/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"]

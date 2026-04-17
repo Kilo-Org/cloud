@@ -5,6 +5,7 @@ import { toolUseCycle } from './tool-use-cycle';
 import { autocommit } from './autocommit';
 import { interruption } from './interruption';
 import { realSessionExcerpt } from './real-session-excerpt';
+import { optimisticUserTextReconciliation } from './optimistic-user-text-reconciliation';
 
 const allFixtures: Fixture[] = [
   basicStreaming,
@@ -13,6 +14,7 @@ const allFixtures: Fixture[] = [
   autocommit,
   interruption,
   realSessionExcerpt,
+  optimisticUserTextReconciliation,
 ];
 
 export { allFixtures };

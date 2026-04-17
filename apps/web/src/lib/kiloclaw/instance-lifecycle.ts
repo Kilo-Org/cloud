@@ -3,6 +3,7 @@ import 'server-only';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
+import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   kiloclaw_subscriptions,
   kiloclaw_instances,
@@ -16,6 +17,10 @@ const logInfo = sentryLogger('kiloclaw-instance-lifecycle', 'info');
 const logError = sentryLogger('kiloclaw-instance-lifecycle', 'error');
 const AUTO_RESUME_INITIAL_BACKOFF_MS = 2 * 60 * 60 * 1000;
 const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
+const INSTANCE_LIFECYCLE_ACTOR = {
+  actorType: 'system',
+  actorId: 'web-instance-lifecycle',
+} as const;
 
 type ActiveInstance = {
   id: string;
@@ -38,6 +43,20 @@ function getResettableAutoResumeEmailTypes() {
   ] as const;
 }
 
+function emailLogTypeFilter(
+  kiloUserId: string,
+  emailTypes: readonly string[],
+  instanceId?: string
+) {
+  return and(
+    eq(kiloclaw_email_log.user_id, kiloUserId),
+    inArray(kiloclaw_email_log.email_type, [...emailTypes]),
+    instanceId
+      ? eq(kiloclaw_email_log.instance_id, instanceId)
+      : isNull(kiloclaw_email_log.instance_id)
+  );
+}
+
 function subscriptionFilterForUser(kiloUserId: string, instanceId?: string) {
   return instanceId
     ? and(
@@ -57,19 +76,19 @@ async function clearAutoResumeState(
     instanceId?: string;
     sandboxId?: string;
     logMessage: string;
+    changeLogReason: string;
     logFields?: Record<string, unknown>;
   }
 ): Promise<void> {
   const subscriptionFilter = subscriptionFilterForUser(kiloUserId, options.instanceId);
 
   await db.transaction(async tx => {
+    const subscriptions = await tx.select().from(kiloclaw_subscriptions).where(subscriptionFilter);
+
     await tx
       .delete(kiloclaw_email_log)
       .where(
-        and(
-          eq(kiloclaw_email_log.user_id, kiloUserId),
-          inArray(kiloclaw_email_log.email_type, [...getResettableAutoResumeEmailTypes()])
-        )
+        emailLogTypeFilter(kiloUserId, getResettableAutoResumeEmailTypes(), options.instanceId)
       );
 
     await tx
@@ -82,6 +101,30 @@ async function clearAutoResumeState(
         auto_resume_attempt_count: 0,
       })
       .where(subscriptionFilter);
+
+    for (const subscription of subscriptions) {
+      const clearedSuspension =
+        subscription.suspended_at !== null || subscription.destruction_deadline !== null;
+      if (!clearedSuspension) {
+        continue;
+      }
+
+      await insertKiloClawSubscriptionChangeLog(tx, {
+        subscriptionId: subscription.id,
+        actor: INSTANCE_LIFECYCLE_ACTOR,
+        action: 'reactivated',
+        reason: options.changeLogReason,
+        before: subscription,
+        after: {
+          ...subscription,
+          suspended_at: null,
+          destruction_deadline: null,
+          auto_resume_requested_at: null,
+          auto_resume_retry_after: null,
+          auto_resume_attempt_count: 0,
+        },
+      });
+    }
   });
 
   logInfo(options.logMessage, {
@@ -141,6 +184,7 @@ export async function autoResumeIfSuspended(
     await clearAutoResumeState(kiloUserId, {
       instanceId,
       logMessage: 'Cleared auto-resume state because no active instance remains',
+      changeLogReason: 'auto_resume_aborted_no_active_instance',
       logFields: { recovery_reason: 'no_active_instance' },
     });
     return;
@@ -226,6 +270,7 @@ export async function completeAutoResumeIfReady(
       instanceId,
       sandboxId,
       logMessage: 'Cleared auto-resume state because readiness callback found no active instance',
+      changeLogReason: 'auto_resume_ready_without_active_instance',
       logFields: { recovery_reason: 'ready_without_active_instance' },
     });
     return { instanceId: instanceId ?? null, resumeCompleted: true };
@@ -268,6 +313,7 @@ export async function completeAutoResumeIfReady(
     instanceId: targetInstance.id,
     sandboxId,
     logMessage: 'Async auto-resume completed',
+    changeLogReason: 'auto_resume_completed',
   });
   return { instanceId: targetInstance.id, resumeCompleted: true };
 }

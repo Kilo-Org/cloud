@@ -11,11 +11,15 @@ import {
 
 import { trackEvent } from '@/lib/appsflyer';
 import { queryClient } from '@/lib/query-client';
-
-const TOKEN_KEY = 'auth-token';
+import {
+  AUTH_TOKEN_KEY,
+  NOTIFICATION_PROMPT_SEEN_KEY,
+  ORGANIZATION_STORAGE_KEY,
+  SESSION_FILTERS_KEY,
+} from '@/lib/storage-keys';
 
 // Pre-load token at module level so it's available before React mounts
-const preloadedToken = SecureStore.getItemAsync(TOKEN_KEY);
+const preloadedToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
 
 type AuthContextValue = {
   token: string | undefined;
@@ -43,13 +47,17 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (tokenValue: string) => {
-    await SecureStore.setItemAsync(TOKEN_KEY, tokenValue);
+    await SecureStore.setItemAsync(AUTH_TOKEN_KEY, tokenValue);
     trackEvent('login');
     setToken(tokenValue);
   }, []);
 
   const signOut = useCallback(async () => {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+    // Clear per-user preferences so they don't leak to the next signed-in account
+    await SecureStore.deleteItemAsync(ORGANIZATION_STORAGE_KEY);
+    await SecureStore.deleteItemAsync(SESSION_FILTERS_KEY);
+    await SecureStore.deleteItemAsync(NOTIFICATION_PROMPT_SEEN_KEY);
     queryClient.clear();
     setToken(undefined);
   }, []);

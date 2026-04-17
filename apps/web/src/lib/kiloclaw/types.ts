@@ -142,6 +142,18 @@ export type MachineSize = {
 // Keep in sync with services/kiloclaw/src/schemas/instance-config.ts ProviderIdSchema.
 export type KiloClawProviderId = 'fly' | 'docker-local' | 'northflank';
 
+export type ProviderRolloutConfig = {
+  northflank: {
+    personalTrafficPercent: number;
+    organizationTrafficPercent: number;
+    enabledOrganizationIds: string[];
+  };
+};
+
+export type ProviderRolloutAvailability = {
+  northflank: boolean;
+};
+
 /** Response from POST /api/platform/restore-volume-snapshot */
 export type RestoreVolumeSnapshotResponse = {
   acknowledged: boolean;
@@ -412,6 +424,20 @@ export type UpdateRegionsResponse = {
   ok: true;
   regions: string[];
   raw: string;
+};
+
+/** Response from GET /api/platform/providers/rollout */
+export type ProviderRolloutResponse = {
+  rollout: ProviderRolloutConfig;
+  availability: ProviderRolloutAvailability;
+  source: 'kv' | 'default';
+};
+
+/** Response from PUT /api/platform/providers/rollout */
+export type UpdateProviderRolloutResponse = {
+  ok: true;
+  rollout: ProviderRolloutConfig;
+  availability: ProviderRolloutAvailability;
 };
 
 /** Stream Chat credentials for a user's KiloClaw channel */

@@ -754,6 +754,14 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             const refineryConfig = townConfig.refinery;
             if (!refineryConfig) return;
 
+            if (mergeable_state === 'unknown') {
+              // GitHub is still computing mergeability — skip this poll and
+              // check again on the next tick. Do NOT treat 'unknown' as clean
+              // or dirty to avoid prematurely clearing has_conflicts or
+              // emitting pr_conflict_detected before GitHub has a definitive answer.
+              return;
+            }
+
             if (mergeable_state === 'dirty') {
               // PR has merge conflicts — emit event ONCE per conflict episode.
               // The reconciler decides whether to create a conflict bead or an escalation
@@ -837,8 +845,16 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 [action.bead_id]
               );
               return;
-            } else if (mergeable_state === 'clean' || mergeable_state === 'unknown') {
-              // Conflict resolved — clear the has_conflicts flag
+            } else if (
+              mergeable_state === 'clean' ||
+              mergeable_state === 'blocked' ||
+              mergeable_state === 'has_hooks'
+            ) {
+              // Conflict definitively resolved — clear the has_conflicts flag.
+              // 'clean': no conflicts, all checks pass.
+              // 'blocked': no conflicts but checks are failing (e.g. required reviews).
+              // 'has_hooks': no conflicts but pre-receive hooks are pending.
+              // 'unknown' is handled above (GitHub still computing — retry next poll).
               query(
                 sql,
                 /* sql */ `

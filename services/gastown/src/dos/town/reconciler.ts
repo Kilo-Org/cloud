@@ -211,7 +211,11 @@ type ConvoyRow = z.infer<typeof ConvoyRow>;
  *
  * See reconciliation-spec.md §5.2.
  */
-export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
+export function applyEvent(
+  sql: SqlStorage,
+  event: TownEventRecord,
+  opts?: { townConfig?: TownConfig }
+): void {
   const payload = event.payload;
 
   switch (event.event_type) {
@@ -490,17 +494,13 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
         ]);
       const targetBranch = rmRows[0]?.target_branch ?? '';
 
-      // Read auto_resolve_merge_conflicts from rig config (default true if not configured yet).
-      // townConfig is not available in applyEvent, so we read from rig config directly.
-      // The field may not exist yet (added by a parallel bead) — default to true.
+      // Read auto_resolve_merge_conflicts using the same fallback chain as
+      // auto_resolve_pr_feedback: rig override → town config → default (true).
       const rig = mrBead.rig_id ? getRig(sql, mrBead.rig_id) : null;
-      const autoResolveConflictsField = z
-        .object({ auto_resolve_merge_conflicts: z.boolean().optional() })
-        .safeParse(rig?.config);
-      const autoResolveConflicts =
-        autoResolveConflictsField.success
-          ? autoResolveConflictsField.data.auto_resolve_merge_conflicts !== false
-          : true;
+      const effectiveConfig = opts?.townConfig
+        ? resolveRigConfig(opts.townConfig, rig?.config ?? null)
+        : { auto_resolve_merge_conflicts: rig?.config?.auto_resolve_merge_conflicts !== false };
+      const autoResolveConflicts = effectiveConfig.auto_resolve_merge_conflicts !== false;
 
       if (autoResolveConflicts) {
         // Consolidation: if there's already an open gt:pr-feedback bead for this MR,
@@ -2461,7 +2461,9 @@ function buildConflictResolutionPrompt(
   lines.push(`   git push --force-with-lease origin ${branch}`);
   lines.push('   ```');
   lines.push('');
-  lines.push('5. Call `gt_done` with the PR URL once the push succeeds.');
+  lines.push('5. Call `gt_done` once the push succeeds, passing both required arguments:');
+  lines.push(`   - \`pr_url\`: \`${prUrl}\``);
+  lines.push(`   - \`branch\`: \`${branch}\``);
 
   return lines.join('\n');
 }

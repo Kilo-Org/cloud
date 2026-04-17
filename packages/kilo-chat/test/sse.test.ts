@@ -135,6 +135,39 @@ describe('KiloChatSSE', () => {
     expect(sse.isConnected()).toBe(false);
   });
 
+  it('does not spawn a concurrent loop when connect is called during reconnect delay', async () => {
+    // Simulate: stream ends naturally → loop enters delay(1000) →
+    // connect() is called for a different conversation during the delay.
+    // The old loop should exit, not continue fetching the old conversation.
+    const stream1 = createMockStream([]); // ends immediately → triggers delay(1000)
+    const stream2 = createMockStream([]); // for the new conversation
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, body: stream1 }) // old conv
+      .mockResolvedValueOnce({ ok: true, body: stream2 }); // new conv
+
+    const sse = new KiloChatSSE(createMockConfig(fetch));
+    sse.connect('conv-old', {});
+
+    // Wait long enough for the stream to be consumed and enter the delay
+    await new Promise(r => setTimeout(r, 100));
+
+    // Now switch conversation — this should abort the old loop's delay
+    sse.connect('conv-new', {});
+
+    // Wait for the new loop to make its fetch
+    await new Promise(r => setTimeout(r, 100));
+    sse.disconnect();
+
+    // The second call should be for conv-new, never conv-old again
+    const urls = fetch.mock.calls.map(([url]: [string]) => url);
+    expect(urls[0]).toContain('conv-old');
+    expect(urls[1]).toContain('conv-new');
+    // No third call (the old loop should NOT have continued after delay)
+    const oldConvCalls = urls.filter((u: string) => u.includes('conv-old'));
+    expect(oldConvCalls).toHaveLength(1);
+  });
+
   it('does not regress lastEventId when an edit event reuses an older message id', async () => {
     // Simulate: message.created id=M5, then message.updated id=M3 (edit of older msg).
     // On reconnect, Last-Event-ID should be M5, not M3.

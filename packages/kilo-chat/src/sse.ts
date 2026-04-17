@@ -18,7 +18,7 @@ export class KiloChatSSE {
     this.disconnect();
     this.connected = true;
     this.abortController = new AbortController();
-    void this.connectLoop(conversationId, handlers);
+    void this.connectLoop(conversationId, handlers, this.abortController);
   }
 
   disconnect(): void {
@@ -32,22 +32,31 @@ export class KiloChatSSE {
     return this.connected;
   }
 
-  private async connectLoop(conversationId: string, handlers: SSEEventHandler): Promise<void> {
-    while (this.connected) {
+  private async connectLoop(
+    conversationId: string,
+    handlers: SSEEventHandler,
+    controller: AbortController
+  ): Promise<void> {
+    // Check both `connected` and that our controller is still the active one.
+    // A new connect() replaces abortController, so if they diverge this loop
+    // was superseded and must exit.
+    while (this.connected && this.abortController === controller) {
       try {
         const token = await this.getToken();
+        if (this.abortController !== controller) return;
+
         const url = `${this.baseUrl}/v1/conversations/${conversationId}/events`;
         const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
         if (this.lastEventId) headers['Last-Event-ID'] = this.lastEventId;
 
         const res = await this.fetchFn(url, {
           headers,
-          signal: this.abortController?.signal,
+          signal: controller.signal,
         });
 
         if (!res.ok || !res.body) {
-          if (!this.connected) return;
-          await this.delay(3000);
+          if (!this.connected || this.abortController !== controller) return;
+          await this.delay(3000, controller);
           continue;
         }
 
@@ -58,11 +67,12 @@ export class KiloChatSSE {
         let currentData = '';
         let currentId = '';
 
-        while (this.connected) {
+        while (this.connected && this.abortController === controller) {
           const { done, value } = await reader.read();
           if (done) {
-            // Stream ended naturally; reconnect after a brief pause if still connected
-            if (this.connected) await this.delay(1000);
+            if (this.connected && this.abortController === controller) {
+              await this.delay(1000, controller);
+            }
             break;
           }
 
@@ -80,8 +90,8 @@ export class KiloChatSSE {
             } else if (line === '') {
               if (currentEvent && currentData) {
                 if (currentId && (!this.lastEventId || currentId > this.lastEventId)) {
-                this.lastEventId = currentId;
-              }
+                  this.lastEventId = currentId;
+                }
                 try {
                   const data: unknown = JSON.parse(currentData);
                   this.dispatch(currentEvent, data, handlers);
@@ -96,8 +106,8 @@ export class KiloChatSSE {
           }
         }
       } catch {
-        if (!this.connected) return;
-        await this.delay(3000);
+        if (!this.connected || this.abortController !== controller) return;
+        await this.delay(3000, controller);
       }
     }
   }
@@ -125,7 +135,17 @@ export class KiloChatSSE {
     }
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise(r => setTimeout(r, ms));
+  private delay(ms: number, controller: AbortController): Promise<void> {
+    return new Promise(r => {
+      const t = setTimeout(r, ms);
+      controller.signal.addEventListener(
+        'abort',
+        () => {
+          clearTimeout(t);
+          r();
+        },
+        { once: true }
+      );
+    });
   }
 }

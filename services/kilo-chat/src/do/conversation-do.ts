@@ -91,6 +91,7 @@ export type RemoveReactionResult =
   | { ok: false; error: string };
 
 export const MAX_SSE_PER_MEMBER = 7;
+export const MAX_REPLAY_EVENTS = 500;
 
 export class ConversationDO extends DurableObject<Env> {
   private db;
@@ -502,6 +503,7 @@ export class ConversationDO extends DurableObject<Env> {
           .from(messages)
           .where(gt(messages.id, lastEventId))
           .orderBy(asc(messages.id))
+          .limit(MAX_REPLAY_EVENTS)
           .all();
 
         // Messages that existed before the cursor but were edited or deleted
@@ -513,6 +515,7 @@ export class ConversationDO extends DurableObject<Env> {
           .from(messages)
           .where(and(sql`${messages.id} <= ${lastEventId}`, gt(messages.updated_at, cursorTs)))
           .orderBy(asc(messages.id))
+          .limit(MAX_REPLAY_EVENTS)
           .all();
 
         // UNION ALL forces each arm to hit its dedicated index (reactions_by_id /
@@ -531,6 +534,7 @@ export class ConversationDO extends DurableObject<Env> {
           UNION ALL
           SELECT removed_id AS event_id, 'removed' AS kind, message_id, member_id, emoji, NULL AS at
             FROM reactions WHERE removed_id IS NOT NULL AND removed_id > ${lastEventId}
+          LIMIT ${MAX_REPLAY_EVENTS}
         `);
 
         type ReplayItem = { id: string; text: string };
@@ -614,8 +618,17 @@ export class ConversationDO extends DurableObject<Env> {
 
         items.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
-        if (items.length > 0) {
-          replayBytes = this.encoder.encode(items.map(i => i.text).join(''));
+        const truncated = items.length >= MAX_REPLAY_EVENTS;
+        if (truncated) {
+          items.length = MAX_REPLAY_EVENTS;
+        }
+
+        if (items.length > 0 || truncated) {
+          let text = items.map(i => i.text).join('');
+          if (truncated) {
+            text += formatSseEvent('replay.truncated', { limit: MAX_REPLAY_EVENTS });
+          }
+          replayBytes = this.encoder.encode(text);
         }
       }
 

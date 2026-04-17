@@ -540,8 +540,8 @@ describe('organizations.kiloclaw.listKiloCliRuns', () => {
 
 describe('CLI run cross-instance isolation', () => {
   it('org runs are not visible via personal listKiloCliRuns', async () => {
-    await grantKiloClawAccess(user.id);
     const personalInstanceId = await createPersonalInstance(user.id);
+    await grantKiloClawAccess(user.id, personalInstanceId);
     org = await createOrganization('Isolation Org', user.id);
     const orgInstanceId = await createOrgInstance(user.id, org.id);
 
@@ -575,8 +575,8 @@ describe('CLI run cross-instance isolation', () => {
   });
 
   it('org run status is not accessible from the personal getKiloCliRunStatus route', async () => {
-    await grantKiloClawAccess(user.id);
-    await createPersonalInstance(user.id);
+    const personalInstanceId = await createPersonalInstance(user.id);
+    await grantKiloClawAccess(user.id, personalInstanceId);
     org = await createOrganization('Isolation Org 2', user.id);
     const orgInstanceId = await createOrgInstance(user.id, org.id);
 

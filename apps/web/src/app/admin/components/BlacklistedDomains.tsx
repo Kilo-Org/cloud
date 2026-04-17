@@ -41,9 +41,10 @@ export function BlacklistedDomains() {
   );
 
   function handleSave() {
+    // Support both newline and pipe-separated input (e.g. pasting from the env var)
     const domains = inputValue
-      .split('\n')
-      .map(line => line.trim().toLowerCase())
+      .split(/[\n|]/)
+      .map(part => part.trim().toLowerCase())
       .filter(Boolean);
 
     mutation.mutate({ domains });
@@ -65,9 +66,9 @@ export function BlacklistedDomains() {
               Blacklisted Domains
             </CardTitle>
             <CardDescription>
-              Email domains that are blocked from registration and access. Enter one domain per
-              line. Subdomains are automatically blocked (e.g. blocking example.com also blocks
-              sub.example.com).
+              Email domains that are blocked from registration and access. Enter one domain per line
+              (or paste a pipe-separated list). Subdomains are automatically blocked (e.g. blocking
+              example.com also blocks sub.example.com).
             </CardDescription>
           </div>
           <Badge variant="secondary" className="px-3 py-1">

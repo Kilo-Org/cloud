@@ -1,6 +1,5 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import { redisGet, redisSet } from '@/lib/redis';
-import { createHash } from 'node:crypto';
 import * as z from 'zod';
 
 /**
@@ -60,14 +59,12 @@ export async function posthogQuery(name: string, query: string): Promise<PostHog
 }
 const CACHE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
 
-function cacheKey(name: string, query: string): string {
-  const hash = createHash('sha256').update(`${name}\0${query}`).digest('hex');
-  return `posthog-query:${hash}`;
-}
-
+// `name` is used directly as the Redis cache key suffix, so each call site must
+// use a globally unique `name`. Reusing a name for a different query would
+// return stale/incorrect cached data.
 export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
   return async (name: string, query: string): Promise<Output[]> => {
-    const key = cacheKey(name, query);
+    const key = `posthog-query:${name}`;
 
     try {
       const cached = await redisGet(key);

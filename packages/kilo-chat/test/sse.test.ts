@@ -135,6 +135,49 @@ describe('KiloChatSSE', () => {
     expect(sse.isConnected()).toBe(false);
   });
 
+  it('does not regress lastEventId when an edit event reuses an older message id', async () => {
+    // Simulate: message.created id=M5, then message.updated id=M3 (edit of older msg).
+    // On reconnect, Last-Event-ID should be M5, not M3.
+    const created = JSON.stringify({
+      messageId: 'M5',
+      senderId: 'u1',
+      content: [{ type: 'text', text: 'hello' }],
+      version: 1,
+      inReplyToMessageId: null,
+    });
+    const updated = JSON.stringify({
+      messageId: 'M3',
+      content: [{ type: 'text', text: 'edited' }],
+      version: 2,
+    });
+    // First stream: delivers both events, then ends (reader returns done)
+    const stream1 = createMockStream([
+      `event: message.created\nid: M5\ndata: ${created}\n\n` +
+        `event: message.updated\nid: M3\ndata: ${updated}\n\n`,
+    ]);
+    // Second stream: reconnect — we just need to capture the headers
+    const stream2 = createMockStream([]);
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, body: stream1 })
+      .mockResolvedValueOnce({ ok: true, body: stream2 });
+
+    const sse = new KiloChatSSE(createMockConfig(fetch));
+    sse.connect('conv-1', {
+      onMessageCreated: vi.fn(),
+      onMessageUpdated: vi.fn(),
+    });
+
+    // Wait for both streams to be consumed + reconnect attempt
+    await new Promise(r => setTimeout(r, 2500));
+    sse.disconnect();
+
+    // The reconnect (second fetch call) should have Last-Event-ID = M5, not M3
+    expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const reconnectHeaders = fetch.mock.calls[1][1].headers as Record<string, string>;
+    expect(reconnectHeaders['Last-Event-ID']).toBe('M5');
+  });
+
   it('clears lastEventId on disconnect', async () => {
     const sseData = JSON.stringify({ messageId: 'm1' });
     const stream1 = createMockStream([`event: message.deleted\nid: evt-99\ndata: ${sseData}\n\n`]);

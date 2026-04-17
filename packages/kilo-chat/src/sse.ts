@@ -79,7 +79,9 @@ export class KiloChatSSE {
               currentId = line.slice(3).trim();
             } else if (line === '') {
               if (currentEvent && currentData) {
-                if (currentId) this.lastEventId = currentId;
+                if (currentId && (!this.lastEventId || currentId > this.lastEventId)) {
+                this.lastEventId = currentId;
+              }
                 try {
                   const data: unknown = JSON.parse(currentData);
                   this.dispatch(currentEvent, data, handlers);

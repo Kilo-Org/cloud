@@ -120,14 +120,9 @@ describe('kiloclaw.sendChatMessage', () => {
   });
 
   describe('ownership validation', () => {
-    it('rejects when user has no active instance (no instanceId)', async () => {
-      await db.insert(kiloclaw_subscriptions).values({
-        user_id: user.id,
-        instance_id: null,
-        plan: 'standard',
-        status: 'active',
-        stripe_subscription_id: `sub_detached_${crypto.randomUUID()}`,
-      });
+    it('rejects when user has access but no active instance (no instanceId)', async () => {
+      const destroyedInstanceId = await createDestroyedInstance(user.id);
+      await grantKiloClawAccess(user.id, destroyedInstanceId);
       const caller = await createCallerForUser(user.id);
 
       await expect(caller.kiloclaw.sendChatMessage({ message: 'test' })).rejects.toMatchObject({

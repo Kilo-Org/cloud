@@ -800,11 +800,15 @@ rows renew.
 
 ### Earlybird Expiry Warnings
 
-1. When the earlybird expiry date is 14 or fewer days away, the system
-   MUST send a warning notification to earlybird users who do not have
-   an active or trialing subscription.
-2. When the earlybird expiry date is 1 or fewer days away, the system
-   MUST send a more urgent expires-tomorrow notification.
+1. When a canonical earlybird subscription row's `trial_ends_at` is 14
+   or fewer days away and the user does not have another active or
+   trialing subscription, the system MUST send a warning notification.
+2. When the row's `trial_ends_at` is 1 or fewer days away, the system
+   MUST send a more urgent expires-tomorrow notification instead of
+   the 14-day notification.
+3. The notification's expiry date and days-remaining MUST be derived
+   from the row's `trial_ends_at`, not from a globally configured
+   earlybird expiry constant.
 
 ### Trial Expiry Enforcement
 

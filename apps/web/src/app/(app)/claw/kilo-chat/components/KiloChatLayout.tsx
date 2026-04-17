@@ -67,9 +67,9 @@ export function KiloChatLayout({
 
   return (
     <KiloChatContext.Provider value={{ getToken, currentUserId, instanceStatus }}>
-      <div className="flex h-[calc(100vh-3.5rem)]">
+      <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
         {/* Conversation sidebar */}
-        <div className="border-border w-64 shrink-0 border-r">
+        <div className="border-border flex w-64 shrink-0 flex-col overflow-hidden border-r">
           <InstanceSwitcher
             instances={instances}
             selectedId={selectedSandboxId}
@@ -83,7 +83,7 @@ export function KiloChatLayout({
         </div>
 
         {/* Main content */}
-        <div className="flex-1">{children}</div>
+        <div className="min-h-0 flex-1">{children}</div>
       </div>
     </KiloChatContext.Provider>
   );

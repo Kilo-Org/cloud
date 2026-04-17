@@ -8,6 +8,7 @@ import { and, eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { fetchFinalAssistantTextWithRetries } from '@/lib/cloud-agent-next/session-result';
 import { bot } from '@/lib/bot';
+import { MAX_ITERATIONS } from '@/lib/bot/constants';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import {
   createSyntheticThread,
@@ -349,6 +350,46 @@ async function handleCompletedCallback(
         platformIntegrationId: requestRow.platform_integration_id,
       });
     }
+    return;
+  }
+
+  if (completedStepCount >= MAX_ITERATIONS) {
+    logCallback('Posting completed Cloud Agent result without continuation', {
+      botRequestId,
+      completedStepCount,
+      maxIterations: MAX_ITERATIONS,
+    });
+
+    const updated = await completeBotRequest({
+      botRequestId,
+      expectedCloudAgentSessionId: payload.cloudAgentSessionId,
+      responseTimeMs: Date.now() - startedAt,
+    });
+
+    logCallback('Completed callback attempted terminal DB update after step limit', {
+      botRequestId,
+      updated: Boolean(updated),
+      expectedCloudAgentSessionId: payload.cloudAgentSessionId,
+      storedCloudAgentSessionId: requestRow.cloud_agent_session_id,
+    });
+
+    if (!updated) {
+      logCallback('Skipping Slack post because step-limit completed update returned no row', {
+        botRequestId,
+        requestStatus: requestRow.status,
+        storedCloudAgentSessionId: requestRow.cloud_agent_session_id,
+        callbackCloudAgentSessionId: payload.cloudAgentSessionId,
+      });
+      return;
+    }
+
+    await postSlackThreadMessage({
+      threadId: requestRow.platform_thread_id,
+      markdown: finalMessage,
+      platformIntegrationId: requestRow.platform_integration_id,
+    });
+
+    await swapReaction(requestRow, true);
     return;
   }
 

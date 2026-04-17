@@ -82,8 +82,12 @@ export function OnboardingStepView({
         {title || description ? (
           <div className="flex flex-col gap-3">
             {indicator}
-            {title && <h2 className="text-foreground text-2xl font-bold">{title}</h2>}
-            {description && <p className="text-muted-foreground text-sm">{description}</p>}
+            {(title || description) && (
+              <div className="flex flex-col gap-1">
+                {title && <h2 className="text-foreground text-2xl font-bold">{title}</h2>}
+                {description && <p className="text-muted-foreground text-sm">{description}</p>}
+              </div>
+            )}
           </div>
         ) : (
           <div className="self-start">{indicator}</div>

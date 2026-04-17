@@ -136,7 +136,7 @@ export function BotIdentityStep({
               aria-hidden
               className="pointer-events-none absolute inset-0"
               style={{
-                backgroundImage: `linear-gradient(var(--muted-foreground) 1px, transparent 1px), linear-gradient(90deg, var(--muted-foreground) 1px, transparent 1px)`,
+                backgroundImage: `linear-gradient(lab(95 -34.46 117.24 / 0.55) 1px, transparent 1px), linear-gradient(90deg, lab(95 -34.46 117.24 / 0.55) 1px, transparent 1px)`,
                 backgroundSize: '28px 28px',
                 maskImage: 'radial-gradient(circle at 50% 50%, black 25%, transparent 75%)',
                 WebkitMaskImage: 'radial-gradient(circle at 50% 50%, black 25%, transparent 75%)',

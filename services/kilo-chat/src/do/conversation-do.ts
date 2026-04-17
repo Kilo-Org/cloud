@@ -4,7 +4,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, lt, gt, desc, ne, and, asc, sql, inArray } from 'drizzle-orm';
 import { conversation, members, messages, reactions } from '../db/conversation-schema';
 import migrations from '../../drizzle/conversation/migrations';
-import { monotonicFactory } from 'ulid';
+import { monotonicFactory, decodeTime } from 'ulid';
 import { SSE_PING, formatSseEvent } from '../lib/sse';
 
 export type InitializeParams = {
@@ -489,6 +489,22 @@ export class ConversationDO extends DurableObject<Env> {
           .orderBy(asc(messages.id))
           .all();
 
+        // Messages that existed before the cursor but were edited or deleted
+        // while the client was disconnected. The ULID encodes the cursor
+        // timestamp — any updated_at after that point is a missed mutation.
+        const cursorTs = decodeTime(lastEventId);
+        const modifiedPreCursor = this.db
+          .select()
+          .from(messages)
+          .where(
+            and(
+              sql`${messages.id} <= ${lastEventId}`,
+              gt(messages.updated_at, cursorTs)
+            )
+          )
+          .orderBy(asc(messages.id))
+          .all();
+
         // UNION ALL forces each arm to hit its dedicated index (reactions_by_id /
         // reactions_by_removed_id). An OR-shape would be at the mercy of SQLite's
         // OR-to-UNION optimizer.
@@ -530,6 +546,33 @@ export class ConversationDO extends DurableObject<Env> {
                   }>,
                   version: row.version,
                   inReplyToMessageId: row.in_reply_to_message_id,
+                },
+                row.id
+              ),
+            });
+          }
+        }
+
+        // Emit update/delete events for pre-cursor messages that were
+        // modified while the client was disconnected.
+        for (const row of modifiedPreCursor) {
+          if (row.deleted === 1) {
+            items.push({
+              id: row.id,
+              text: formatSseEvent('message.deleted', { messageId: row.id }, row.id),
+            });
+          } else {
+            items.push({
+              id: row.id,
+              text: formatSseEvent(
+                'message.updated',
+                {
+                  messageId: row.id,
+                  content: JSON.parse(row.content) as Array<{
+                    type: string;
+                    [key: string]: unknown;
+                  }>,
+                  version: row.version,
                 },
                 row.id
               ),

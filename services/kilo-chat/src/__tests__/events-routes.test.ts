@@ -179,6 +179,126 @@ describe('ConversationDO SSE subscribe via fetch() - streaming', () => {
     await res.body?.cancel();
   });
 
+  it('replays edits to pre-cursor messages as message.updated', async () => {
+    const stub = getConvStub('do-sse-edit-replay');
+    await stub.initialize({
+      id: 'do-sse-conv-edit-replay',
+      title: null,
+      createdBy: 'user-1',
+      createdAt: 1000,
+      members: [{ id: 'user-1', kind: 'user' }],
+    });
+
+    // Create M1, then M2
+    const r1 = await stub.createMessage({
+      senderId: 'user-1',
+      content: [{ type: 'text', text: 'Original' }],
+    });
+    expect(r1.ok).toBe(true);
+    if (!r1.ok) return;
+
+    const r2 = await stub.createMessage({
+      senderId: 'user-1',
+      content: [{ type: 'text', text: 'Second' }],
+    });
+    expect(r2.ok).toBe(true);
+    if (!r2.ok) return;
+
+    // Edit M1 AFTER M2 was created (simulates: client disconnected after M2,
+    // then M1 was edited while disconnected)
+    const editResult = await stub.editMessage({
+      messageId: r1.messageId,
+      senderId: 'user-1',
+      content: [{ type: 'text', text: 'Edited' }],
+      version: 1,
+    });
+    expect(editResult.ok).toBe(true);
+
+    // Subscribe with last-event-id = r2.messageId
+    // Should replay the edit to M1 as message.updated
+    const req = new Request('https://do/subscribe?memberId=user-1', {
+      headers: { 'last-event-id': r2.messageId },
+    });
+    const res = await stub.fetch(req);
+    expect(res.status).toBe(200);
+
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    let received = '';
+    const decoder = new TextDecoder();
+
+    const readLoop = async () => {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done || value === undefined) break;
+        received += decoder.decode(value);
+        if (received.includes('message.updated')) break;
+      }
+    };
+
+    await Promise.race([readLoop(), new Promise<void>(r => setTimeout(r, 1000))]);
+    reader.cancel().catch(() => {});
+
+    expect(received).toContain('message.updated');
+    expect(received).toContain(r1.messageId);
+    expect(received).toContain('Edited');
+    // Should NOT contain message.created for M1 (it's an edit, not a new message)
+    expect(received).not.toContain('message.created');
+  });
+
+  it('replays deletes to pre-cursor messages', async () => {
+    const stub = getConvStub('do-sse-delete-replay');
+    await stub.initialize({
+      id: 'do-sse-conv-delete-replay',
+      title: null,
+      createdBy: 'user-1',
+      createdAt: 1000,
+      members: [{ id: 'user-1', kind: 'user' }],
+    });
+
+    const r1 = await stub.createMessage({
+      senderId: 'user-1',
+      content: [{ type: 'text', text: 'To be deleted' }],
+    });
+    expect(r1.ok).toBe(true);
+    if (!r1.ok) return;
+
+    const r2 = await stub.createMessage({
+      senderId: 'user-1',
+      content: [{ type: 'text', text: 'Second' }],
+    });
+    expect(r2.ok).toBe(true);
+    if (!r2.ok) return;
+
+    // Delete M1 after M2
+    await stub.deleteMessage({ messageId: r1.messageId, senderId: 'user-1' });
+
+    // Subscribe with last-event-id = r2.messageId
+    const req = new Request('https://do/subscribe?memberId=user-1', {
+      headers: { 'last-event-id': r2.messageId },
+    });
+    const res = await stub.fetch(req);
+    expect(res.status).toBe(200);
+
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    let received = '';
+    const decoder = new TextDecoder();
+
+    const readLoop = async () => {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done || value === undefined) break;
+        received += decoder.decode(value);
+        if (received.includes('message.deleted')) break;
+      }
+    };
+
+    await Promise.race([readLoop(), new Promise<void>(r => setTimeout(r, 1000))]);
+    reader.cancel().catch(() => {});
+
+    expect(received).toContain('message.deleted');
+    expect(received).toContain(r1.messageId);
+  });
+
   it('replays missed messages when last-event-id is provided', async () => {
     const stub = getConvStub('do-sse-replay');
     await stub.initialize({

@@ -3,7 +3,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { and, isNull, count, not, or, sql, like } from 'drizzle-orm';
-import { extractEmailDomain } from '@/lib/utils';
+import { extractEmailDomain } from '@/lib/email-domain';
 
 // Exclude soft-deleted users: softDeleteUser anonymizes them to
 // `deleted+<id>@deleted.invalid` and sets `blocked_reason` to a string starting

@@ -77,7 +77,8 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
-import { extractEmailDomain, normalizeEmail } from '@/lib/utils';
+import { normalizeEmail } from '@/lib/utils';
+import { extractEmailDomain } from '@/lib/email-domain';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
 
 const workos = new WorkOS(WORKOS_API_KEY);

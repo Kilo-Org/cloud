@@ -12,7 +12,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import { KILOCLAW_INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
 import { send as sendEmail } from '@/lib/email';
 import { findUserById } from '@/lib/user';
@@ -28,6 +28,10 @@ const BodySchema = z.object({
 });
 
 const INSTANCE_READY_EMAIL_TYPE = 'claw_instance_ready';
+
+function legacyInstanceReadyEmailType(sandboxId: string): string {
+  return `claw_instance_ready:${sandboxId}`;
+}
 
 function instanceEmailLogFilter(userId: string, instanceId: string, emailType: string) {
   return and(
@@ -54,6 +58,29 @@ function logInstanceReady(
     return;
   }
   console.log(record);
+}
+
+async function hasSentCompatibleInstanceReadyEmail(
+  userId: string,
+  instanceId: string,
+  sandboxId: string
+): Promise<boolean> {
+  const [existing] = await db
+    .select({ id: kiloclaw_email_log.id })
+    .from(kiloclaw_email_log)
+    .where(
+      or(
+        instanceEmailLogFilter(userId, instanceId, INSTANCE_READY_EMAIL_TYPE),
+        and(
+          eq(kiloclaw_email_log.user_id, userId),
+          isNull(kiloclaw_email_log.instance_id),
+          eq(kiloclaw_email_log.email_type, legacyInstanceReadyEmailType(sandboxId))
+        )
+      )
+    )
+    .limit(1);
+
+  return !!existing;
 }
 
 export async function POST(req: NextRequest) {
@@ -109,6 +136,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sent: false, reason: 'instance_unresolved' });
   }
 
+  if (await hasSentCompatibleInstanceReadyEmail(userId, targetInstanceId, sandboxId)) {
+    return NextResponse.json({ sent: false, reason: 'already_sent' });
+  }
+
   // Idempotent: insert-before-send with rollback on failure (matches billing cron pattern).
   const result = await db
     .insert(kiloclaw_email_log)
@@ -120,7 +151,6 @@ export async function POST(req: NextRequest) {
     .onConflictDoNothing();
 
   if (result.rowCount === 0) {
-    // Already sent for this instance — skip.
     return NextResponse.json({ sent: false, reason: 'already_sent' });
   }
 

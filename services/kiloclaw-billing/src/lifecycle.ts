@@ -1,4 +1,4 @@
-import { and, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
 
 import type { WorkerDb } from '@kilocode/db';
@@ -285,8 +285,12 @@ function isSoftDeletedUserEmail(email: string): boolean {
   return email.endsWith(SOFT_DELETED_EMAIL_SUFFIX);
 }
 
-function notSoftDeletedUserFilter() {
-  return sql`${kilocode_users.google_user_email} NOT LIKE ${`%${SOFT_DELETED_EMAIL_SUFFIX}`}`;
+function currentSubscriptionRowFilter() {
+  return isNull(kiloclaw_subscriptions.transferred_to_subscription_id);
+}
+
+function legacyInstanceReadyEmailType(sandboxId: string) {
+  return `claw_instance_ready:${sandboxId}`;
 }
 
 function shortInstanceId(instanceId: string): string {
@@ -728,6 +732,11 @@ async function trySendEmail(
   subjectOverride?: string,
   entityFields: BillingEntityFields = {}
 ): Promise<boolean> {
+  if (isSoftDeletedUserEmail(userEmail)) {
+    summary.emails_skipped++;
+    return false;
+  }
+
   const emailLogScope = {
     userId,
     emailType,
@@ -1364,6 +1373,7 @@ async function runCreditRenewalSweep(
       and(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         isNull(kiloclaw_subscriptions.stripe_subscription_id),
+        currentSubscriptionRowFilter(),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due']),
         lte(kiloclaw_subscriptions.credit_renewal_at, now)
       )
@@ -1371,6 +1381,9 @@ async function runCreditRenewalSweep(
 
   for (const row of creditRenewalRows) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) {
+        continue;
+      }
       await processCreditRenewalRow(database, env, context, row, clawUrl, summary);
     } catch (error) {
       summary.errors++;
@@ -1403,6 +1416,7 @@ async function runInterruptedAutoResumeSweep(
       and(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         eq(kiloclaw_subscriptions.status, 'active'),
+        currentSubscriptionRowFilter(),
         isNotNull(kiloclaw_subscriptions.suspended_at),
         sql`(${kiloclaw_subscriptions.auto_resume_retry_after} IS NULL OR ${kiloclaw_subscriptions.auto_resume_retry_after} <= ${now})`
       )
@@ -1507,6 +1521,7 @@ async function runTrialExpirySweep(
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'trialing'),
+        currentSubscriptionRowFilter(),
         lt(kiloclaw_subscriptions.trial_ends_at, now),
         isNull(kiloclaw_subscriptions.suspended_at)
       )
@@ -1514,6 +1529,9 @@ async function runTrialExpirySweep(
 
   for (const row of expiredTrials) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) {
+        continue;
+      }
       if (!row.instance_id) {
         logSkippedSubscriptionRow('Skipping trial expiry for detached subscription row', row, {
           reason: 'missing_instance_id',
@@ -1619,6 +1637,7 @@ async function runSubscriptionExpirySweep(
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'canceled'),
+        currentSubscriptionRowFilter(),
         lt(kiloclaw_subscriptions.current_period_end, now),
         isNull(kiloclaw_subscriptions.suspended_at)
       )
@@ -1626,6 +1645,9 @@ async function runSubscriptionExpirySweep(
 
   for (const row of expiredSubscriptions) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) {
+        continue;
+      }
       if (!row.instance_id) {
         logSkippedSubscriptionRow(
           'Skipping subscription expiry for detached subscription row',
@@ -1720,12 +1742,16 @@ async function runInstanceDestructionSweep(
     .where(
       and(
         lt(kiloclaw_subscriptions.destruction_deadline, now),
+        currentSubscriptionRowFilter(),
         isNotNull(kiloclaw_subscriptions.suspended_at)
       )
     );
 
   for (const row of destructionCandidates) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) {
+        continue;
+      }
       if (!row.instance_id) {
         logSkippedSubscriptionRow(
           'Skipping instance destruction for detached subscription row',
@@ -1793,8 +1819,16 @@ async function runInstanceDestructionSweep(
         .where(
           and(
             eq(kiloclaw_email_log.user_id, row.user_id),
-            eq(kiloclaw_email_log.instance_id, row.instance_id),
-            eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
+            or(
+              and(
+                eq(kiloclaw_email_log.instance_id, row.instance_id),
+                eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
+              ),
+              and(
+                isNull(kiloclaw_email_log.instance_id),
+                eq(kiloclaw_email_log.email_type, legacyInstanceReadyEmailType(row.sandbox_id))
+              )
+            )
           )
         );
 
@@ -1833,6 +1867,7 @@ async function runPastDueCleanupSweep(
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'past_due'),
+        currentSubscriptionRowFilter(),
         lt(kiloclaw_subscriptions.past_due_since, fourteenDaysAgo),
         isNull(kiloclaw_subscriptions.suspended_at)
       )
@@ -1840,6 +1875,9 @@ async function runPastDueCleanupSweep(
 
   for (const row of pastDueRows) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) {
+        continue;
+      }
       if (!row.instance_id) {
         logSkippedSubscriptionRow('Skipping past-due cleanup for detached subscription row', row, {
           reason: 'missing_instance_id',
@@ -1922,6 +1960,7 @@ async function runIntroScheduleRepairSweep(
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'active'),
+        currentSubscriptionRowFilter(),
         isNull(kiloclaw_subscriptions.stripe_schedule_id),
         isNotNull(kiloclaw_subscriptions.stripe_subscription_id),
         eq(kiloclaw_subscriptions.cancel_at_period_end, false)
@@ -1974,6 +2013,7 @@ async function runDestructionWarningSweep(
       and(
         gte(kiloclaw_subscriptions.destruction_deadline, advisoryNow),
         lte(kiloclaw_subscriptions.destruction_deadline, twoDaysFromNow),
+        currentSubscriptionRowFilter(),
         isNotNull(kiloclaw_subscriptions.suspended_at),
         isNull(kiloclaw_instances.destroyed_at)
       )
@@ -1981,6 +2021,9 @@ async function runDestructionWarningSweep(
 
   for (const row of destructionWarningRows) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) {
+        continue;
+      }
       if (!row.destruction_deadline || row.instance_destroyed_at) continue;
       const instanceIdShort = shortInstanceId(row.instance_id);
       const sent = await trySendEmail(
@@ -2042,6 +2085,7 @@ async function runTrialWarningSweep(
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'trialing'),
+        currentSubscriptionRowFilter(),
         gte(kiloclaw_subscriptions.trial_ends_at, advisoryNow),
         lte(kiloclaw_subscriptions.trial_ends_at, trialWarningCutoff),
         isNull(kiloclaw_subscriptions.suspended_at)
@@ -2050,6 +2094,9 @@ async function runTrialWarningSweep(
 
   for (const row of trialWarningRows) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) {
+        continue;
+      }
       if (!row.trial_ends_at) continue;
 
       if (!row.instance_id) {
@@ -2147,12 +2194,14 @@ async function runEarlybirdWarningSweep(
       and(
         eq(kiloclaw_subscriptions.access_origin, 'earlybird'),
         eq(kiloclaw_subscriptions.status, 'trialing'),
+        currentSubscriptionRowFilter(),
         sql`${kiloclaw_subscriptions.trial_ends_at} > now()`,
         sql`NOT EXISTS (
           SELECT 1
           FROM ${kiloclaw_subscriptions} AS other
           WHERE other.user_id = ${kiloclaw_subscriptions.user_id}
             AND other.id <> ${kiloclaw_subscriptions.id}
+            AND other.transferred_to_subscription_id IS NULL
             AND (
               other.status = 'active'
               OR (other.status = 'past_due' AND other.suspended_at IS NULL)
@@ -2177,12 +2226,14 @@ async function runEarlybirdWarningSweep(
         SELECT 1
         FROM ${kiloclaw_subscriptions}
         WHERE ${kiloclaw_subscriptions.user_id} = ${kiloclaw_earlybird_purchases.user_id}
+          AND ${kiloclaw_subscriptions.transferred_to_subscription_id} IS NULL
           AND ${kiloclaw_subscriptions.access_origin} = 'earlybird'
       )
       AND NOT EXISTS (
         SELECT 1
         FROM ${kiloclaw_subscriptions}
         WHERE ${kiloclaw_subscriptions.user_id} = ${kiloclaw_earlybird_purchases.user_id}
+          AND ${kiloclaw_subscriptions.transferred_to_subscription_id} IS NULL
           AND (
             ${kiloclaw_subscriptions.status} = 'active'
             OR (
@@ -2199,6 +2250,9 @@ async function runEarlybirdWarningSweep(
 
   for (const row of [...canonicalRows, ...legacyRows]) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) {
+        continue;
+      }
       const expiryDate = formatDateForEmail(earlybirdExpiry);
       const sent =
         daysUntilEarlybird <= 1
@@ -2268,11 +2322,24 @@ async function runComplementaryInferenceEndedSweep(
     })
     .from(kiloclaw_email_log)
     .innerJoin(kilocode_users, eq(kiloclaw_email_log.user_id, kilocode_users.id))
-    .innerJoin(kiloclaw_instances, eq(kiloclaw_email_log.instance_id, kiloclaw_instances.id))
+    .innerJoin(
+      kiloclaw_instances,
+      and(
+        eq(kilocode_users.id, kiloclaw_instances.user_id),
+        or(
+          and(
+            eq(kiloclaw_email_log.instance_id, kiloclaw_instances.id),
+            eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
+          ),
+          and(
+            isNull(kiloclaw_email_log.instance_id),
+            sql`${kiloclaw_email_log.email_type} = 'claw_instance_ready:' || ${kiloclaw_instances.sandbox_id}`
+          )
+        )
+      )
+    )
     .where(
       and(
-        eq(kiloclaw_email_log.email_type, 'claw_instance_ready'),
-        isNotNull(kiloclaw_email_log.instance_id),
         gt(kiloclaw_email_log.sent_at, COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO),
         lte(kiloclaw_email_log.sent_at, windowCutoff),
         isNull(kiloclaw_instances.destroyed_at),
@@ -2280,8 +2347,17 @@ async function runComplementaryInferenceEndedSweep(
         sql`NOT EXISTS (
           SELECT 1 FROM ${kiloclaw_email_log} AS sent_check
           WHERE sent_check.user_id = ${kiloclaw_email_log.user_id}
-            AND sent_check.instance_id = ${kiloclaw_email_log.instance_id}
-            AND sent_check.email_type = 'claw_complementary_inference_ended'
+            AND (
+              (
+                sent_check.instance_id = ${kiloclaw_instances.id}
+                AND sent_check.email_type = 'claw_complementary_inference_ended'
+              )
+              OR (
+                sent_check.instance_id IS NULL
+                AND sent_check.email_type =
+                  'claw_complementary_inference_ended:' || ${kiloclaw_instances.sandbox_id}
+              )
+            )
         )`,
         // Never purchased credits (is_free = false, no org_id = personal purchase)
         sql`NOT EXISTS (
@@ -2295,6 +2371,9 @@ async function runComplementaryInferenceEndedSweep(
 
   for (const row of rows) {
     try {
+      if (isSoftDeletedUserEmail(row.email)) {
+        continue;
+      }
       const sent = await trySendEmail(
         database,
         env,

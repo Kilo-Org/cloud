@@ -33,9 +33,10 @@ function subscriptionPriority(subscription: KiloClawSubscription, now: Date): nu
   const accessReason = getKiloClawSubscriptionAccessReason(subscription, now);
   if (accessReason === 'subscription') return 0;
   if (accessReason === 'trial') return 1;
-  if (subscription.plan !== 'trial') return 2;
-  if (subscription.status === 'trialing') return 3;
-  return 4;
+  if (accessReason === 'earlybird') return 2;
+  if (subscription.plan !== 'trial') return 3;
+  if (subscription.status === 'trialing') return 4;
+  return 5;
 }
 
 function subscriptionRecency(subscription: KiloClawSubscription): number {

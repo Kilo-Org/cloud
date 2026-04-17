@@ -1399,8 +1399,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         .where(
           and(
             eq(kiloclaw_email_log.user_id, instance.user_id),
-            eq(kiloclaw_email_log.instance_id, instance.id),
-            eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
+            or(
+              and(
+                eq(kiloclaw_email_log.instance_id, instance.id),
+                eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
+              ),
+              and(
+                isNull(kiloclaw_email_log.instance_id),
+                eq(kiloclaw_email_log.email_type, `claw_instance_ready:${instance.sandbox_id}`)
+              )
+            )
           )
         );
     } catch (cleanupError) {

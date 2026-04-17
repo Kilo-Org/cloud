@@ -114,7 +114,11 @@ export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthCont
 
   // POST /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing
   app.post('/bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing', async c => {
-    const conversationId = c.req.param('conversationId');
+    const idParam = ulidSchema.safeParse(c.req.param('conversationId'));
+    if (!idParam.success) {
+      return c.json({ error: 'Invalid conversation ID' }, 400);
+    }
+    const conversationId = idParam.data;
     const callerId = c.get('callerId');
     const result = await setTypingFor(c.env, callerId, { conversationId });
     if (!result.ok) {

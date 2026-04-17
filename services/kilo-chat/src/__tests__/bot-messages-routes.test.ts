@@ -477,6 +477,23 @@ describe('POST /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing
 
     expect(res.status).toBe(401);
   });
+
+  it('returns 400 when conversationId path param is not a valid ULID', async () => {
+    const { sandboxId, testEnv } = await setupData('bot-typing-bad-convid');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/not-a-ulid/typing`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+  });
 });
 
 // ─── POST /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions ─────────

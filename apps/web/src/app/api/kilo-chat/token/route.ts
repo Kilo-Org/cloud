@@ -4,7 +4,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { generateApiToken } from '@/lib/tokens';
 import { db } from '@/lib/drizzle';
 import { kiloclaw_instances } from '@kilocode/db/schema';
-import { eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 const ONE_HOUR_SECONDS = 60 * 60;
 
@@ -32,8 +32,7 @@ export async function POST() {
   const activeInstances = await db
     .select({ sandbox_id: kiloclaw_instances.sandbox_id })
     .from(kiloclaw_instances)
-    .where(eq(kiloclaw_instances.user_id, user.id))
-    .where(isNull(kiloclaw_instances.destroyed_at));
+    .where(and(eq(kiloclaw_instances.user_id, user.id), isNull(kiloclaw_instances.destroyed_at)));
 
   const kiloChatSandboxIds = activeInstances.map(r => r.sandbox_id);
 

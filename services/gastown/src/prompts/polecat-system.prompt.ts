@@ -101,7 +101,9 @@ When your hooked bead has the \`gt:pr-conflict\` label, **or** when it has the \
    git push --force-with-lease origin <branch>
    ```
 5. If the bead metadata has `has_feedback: true`, also address the PR review feedback (see PR Fixup Workflow below) before calling gt_done.
-6. Call \`gt_done\` with the PR URL once all conflicts are resolved (and feedback addressed if applicable).
+ 6. Call \`gt_done\` with both required arguments once all conflicts are resolved (and feedback addressed if applicable):
+    - \`pr_url\`: the PR URL from \`pr_conflict_context.pr_url\`
+    - \`branch\`: the branch name from \`pr_conflict_context.branch\`
 
 Do NOT create a new PR. Push to the existing branch.
 

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 
-const GOG_SHIM_PATH = '/root/go/bin/gog';
-const REAL_GOG_PATH = '/usr/local/bin/gog';
+const GOG_SHIM_PATH = '/usr/local/bin/gog';
+const REAL_GOG_PATH = '/usr/local/bin/gog.real';
 
 const GOG_SHIM_SCRIPT = `#!/usr/bin/env bash
 set -euo pipefail
@@ -9,10 +9,6 @@ set -euo pipefail
 REAL_GOG="${REAL_GOG_PATH}"
 
 if [[ "\${KILOCLAW_GOG_SHIM_DISABLE:-}" == "1" ]]; then
-  exec "\${REAL_GOG}" "$@"
-fi
-
-if [[ -z "\${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
   exec "\${REAL_GOG}" "$@"
 fi
 
@@ -186,6 +182,10 @@ case "$cmd" in
     ;;
 esac
 
+if [[ -z "\${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
+  exec "\${REAL_GOG}" "$@"
+fi
+
 tmp_file="$(mktemp)"
 http_code="$(curl -sS -o "\${tmp_file}" -w '%{http_code}' \
   -X POST \
@@ -231,7 +231,7 @@ exec "\${REAL_GOG}" "$@"
 `;
 
 export function installGogShim(): void {
-  fs.mkdirSync('/root/go/bin', { recursive: true });
+  fs.mkdirSync('/usr/local/bin', { recursive: true });
   fs.writeFileSync(GOG_SHIM_PATH, GOG_SHIM_SCRIPT, { mode: 0o755 });
   fs.chmodSync(GOG_SHIM_PATH, 0o755);
 }

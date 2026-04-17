@@ -343,7 +343,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     } else {
       googleAccountEmail = email;
       gmailWatchSupervisor = createSupervisor({
-        command: '/usr/local/bin/gog',
+        command: '/usr/local/bin/gog.real',
         args: [
           'gmail',
           'watch',

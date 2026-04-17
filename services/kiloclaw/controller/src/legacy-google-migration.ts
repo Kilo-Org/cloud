@@ -41,7 +41,7 @@ function endpointFor(checkinUrl: string): string {
 }
 
 function runGogJson(args: string[], env: NodeJS.ProcessEnv): Record<string, unknown> {
-  const output = execFileSync('/usr/local/bin/gog', args, {
+  const output = execFileSync('/usr/local/bin/gog.real', args, {
     env,
     encoding: 'utf8',
   }).toString();
@@ -120,7 +120,7 @@ export async function migrateLegacyGoogleCredentialsToBroker(
   const tmpPath = path.join(os.tmpdir(), `gog-legacy-token-${Date.now()}.json`);
 
   try {
-    execFileSync('/usr/local/bin/gog', ['auth', 'tokens', 'export', email, tmpPath, '--overwrite'], {
+    execFileSync('/usr/local/bin/gog.real', ['auth', 'tokens', 'export', email, tmpPath, '--overwrite'], {
       env: gogEnv,
       encoding: 'utf8',
     });

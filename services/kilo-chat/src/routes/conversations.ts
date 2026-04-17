@@ -178,20 +178,25 @@ export function registerConversationRoutes(
       return c.json({ error: 'Forbidden' }, 403);
     }
 
-    const { remainingMembers } = await convStub.removeMember(callerId);
-
+    // Remove conversation from the caller's membership index (the "leave")
     const callerMembership = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
     await callerMembership.removeConversation(conversationId);
 
-    // If no users remain, clean up bot memberships
-    const hasUsers = remainingMembers.some(m => m.kind === 'user');
-    if (!hasUsers) {
-      await Promise.all(
-        remainingMembers.map(member => {
-          const memberStub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(member.id));
-          return memberStub.removeConversation(conversationId);
-        })
-      );
+    // Check if any other users are still members (we intentionally don't delete
+    // from the ConversationDO members table to avoid FK constraint violations)
+    const remainingUsers = await convStub.getUserMembersExcluding(callerId);
+    if (remainingUsers.length === 0) {
+      // No other users remain — clean up bot memberships too
+      const info = await convStub.getInfo();
+      if (info) {
+        const botMembers = info.members.filter(m => m.kind === 'bot');
+        await Promise.all(
+          botMembers.map(member => {
+            const memberStub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(member.id));
+            return memberStub.removeConversation(conversationId);
+          })
+        );
+      }
     }
 
     return c.body(null, 204);

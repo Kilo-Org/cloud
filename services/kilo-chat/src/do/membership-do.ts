@@ -32,7 +32,7 @@ export class MembershipDO extends DurableObject<Env> {
     return this.db
       .select()
       .from(conversations)
-      .orderBy(desc(sql`coalesce(${conversations.last_message_id}, '')`))
+      .orderBy(desc(sql`coalesce(${conversations.last_message_id}, 'ZZZZZZZZZZZZZZZZZZZZZZZZZZ')`))
       .all()
       .map(row => ({
         conversationId: row.conversation_id,

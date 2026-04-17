@@ -39,6 +39,7 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     account_deletion_requested_at: null,
     normalized_email: null,
     email_domain: null,
+    is_openai_deactivated: false,
     ...userData,
   } satisfies User;
 }

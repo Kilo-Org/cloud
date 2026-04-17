@@ -17,6 +17,7 @@ import {
   modeSchema,
   BALANCED_CLAW_SETUP_MODEL,
   BALANCED_CODEX_MODEL,
+  BALANCED_KIMI_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
@@ -68,6 +69,10 @@ export async function resolveAutoModel(
       if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
         return BALANCED_CLAW_SETUP_MODEL;
       }
+    }
+    const user = await userPromise;
+    if (user?.is_openai_deactivated) {
+      return BALANCED_KIMI_MODEL;
     }
     return BALANCED_CODEX_MODEL;
   }

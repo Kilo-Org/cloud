@@ -139,6 +139,11 @@ const UpdateUserBlockStatusSchema = z.object({
   blocked_reason: z.string().nullable(),
 });
 
+const SetOpenAIDeactivatedSchema = z.object({
+  userId: z.string(),
+  is_openai_deactivated: z.boolean(),
+});
+
 const GetStytchFingerprintsSchema = z.object({
   kilo_user_id: z.string(),
   fingerprint_type: z
@@ -351,6 +356,17 @@ export const adminRouter = createTRPCRouter({
         await db
           .update(kilocode_users)
           .set({ blocked_reason: input.blocked_reason })
+          .where(eq(kilocode_users.id, input.userId));
+
+        return successResult();
+      }),
+
+    setOpenAIDeactivated: adminProcedure
+      .input(SetOpenAIDeactivatedSchema)
+      .mutation(async ({ input }) => {
+        await db
+          .update(kilocode_users)
+          .set({ is_openai_deactivated: input.is_openai_deactivated })
           .where(eq(kilocode_users.id, input.userId));
 
         return successResult();

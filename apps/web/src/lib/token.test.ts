@@ -43,6 +43,7 @@ const mockUser: User = {
   account_deletion_requested_at: null,
   normalized_email: null,
   email_domain: null,
+  is_openai_deactivated: false,
 };
 
 describe('Token Functions', () => {

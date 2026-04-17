@@ -12,6 +12,10 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { SquareArrowOutUpRight, Webhook } from 'lucide-react';
 import { createHash } from 'crypto';
+import { useMutation } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
+import { useState } from 'react';
 
 function getGravatarUrl(email: string, size: number = 80): string {
   const hash = createHash('md5').update(email.toLowerCase().trim()).digest('hex');
@@ -24,6 +28,24 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
   const gravatarUrl = getGravatarUrl(user.google_user_email);
   const stripeUrl = `https://dashboard.stripe.com/${process.env.NODE_ENV === 'development' ? 'test/' : ''}customers/${user.stripe_customer_id}`;
   const hibpUrl = `https://haveibeenpwned.com/account/${encodeURIComponent(user.google_user_email)}`;
+
+  const trpc = useTRPC();
+  const [isOpenAIDeactivated, setIsOpenAIDeactivated] = useState(user.is_openai_deactivated);
+  const toggleOpenAIDeactivated = useMutation(
+    trpc.admin.users.setOpenAIDeactivated.mutationOptions({
+      onSuccess: (_, variables) => {
+        setIsOpenAIDeactivated(variables.is_openai_deactivated);
+        toast.success(
+          variables.is_openai_deactivated
+            ? 'OpenAI deactivated: balanced will route to Kimi K2.5'
+            : 'OpenAI re-enabled: balanced will route to Codex'
+        );
+      },
+      onError: error => {
+        toast.error(error.message || 'Failed to update OpenAI deactivation status');
+      },
+    })
+  );
 
   return (
     <Card
@@ -58,6 +80,24 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
             <PaymentMethodStatusBadge paymentMethodStatus={user.paymentMethodStatus} />
             <ResetAPIKeyButton userId={user.id} />
             {!user.is_sso_protected_domain && <ResetToMagicLinkLoginButton userId={user.id} />}
+            <Button
+              size="sm"
+              variant={isOpenAIDeactivated ? 'destructive' : 'outline'}
+              disabled={toggleOpenAIDeactivated.isPending}
+              onClick={() =>
+                toggleOpenAIDeactivated.mutate({
+                  userId: user.id,
+                  is_openai_deactivated: !isOpenAIDeactivated,
+                })
+              }
+              title={
+                isOpenAIDeactivated
+                  ? 'OpenAI deactivated: balanced routes to Kimi K2.5. Click to re-enable.'
+                  : 'Click to deactivate OpenAI for balanced routing (uses Kimi K2.5 instead of Codex)'
+              }
+            >
+              {isOpenAIDeactivated ? 'OpenAI deactivated' : 'Deactivate OpenAI'}
+            </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href={`/admin/users/${encodeURIComponent(user.id)}/heuristic-abuse`}>
                 View usage + abuse

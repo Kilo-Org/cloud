@@ -77,7 +77,7 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
+import { extractEmailDomain, normalizeEmail } from '@/lib/utils';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
 
 const workos = new WorkOS(WORKOS_API_KEY);
@@ -330,7 +330,7 @@ export async function createOrUpdateUser(
     openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
     vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
     normalized_email: normalizeEmail(args.google_user_email),
-    email_domain: getLowerDomainFromEmail(args.google_user_email),
+    email_domain: extractEmailDomain(args.google_user_email),
   } satisfies typeof kilocode_users.$inferInsert;
 
   const savedUser = await db.transaction(async tx => {

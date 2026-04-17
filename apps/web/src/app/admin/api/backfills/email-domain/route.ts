@@ -3,7 +3,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { and, isNull, count, not, or, sql, like } from 'drizzle-orm';
-import { getLowerDomainFromEmail } from '@/lib/utils';
+import { extractEmailDomain } from '@/lib/utils';
 
 // Exclude soft-deleted users: softDeleteUser anonymizes them to
 // `deleted+<id>@deleted.invalid` and sets `blocked_reason` to a string starting
@@ -61,7 +61,7 @@ export async function POST(): Promise<
     const updates = rows
       .map(row => ({
         id: row.id,
-        email_domain: getLowerDomainFromEmail(row.google_user_email),
+        email_domain: extractEmailDomain(row.google_user_email),
       }))
       .filter((u): u is { id: string; email_domain: string } => u.email_domain !== null);
 

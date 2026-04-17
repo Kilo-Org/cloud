@@ -139,6 +139,7 @@
     "stripe": "catalog:",
     "stytch": "^12.43.1",
     "tailwind-merge": "^3.5.0",
+    "tldts": "^7.0.28",
     "uuid": "11.1.0",
     "vaul": "^1.1.2",
     "zod": "catalog:"

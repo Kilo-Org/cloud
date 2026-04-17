@@ -48,9 +48,10 @@ export function EmailDomainBackfill() {
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
-        Backfill email domains for users missing the field. The domain is the lowercased part after
-        the last <code>@</code> in the user&apos;s email. Each click processes up to 50 000 users.
-        Click repeatedly until the counter reaches zero.
+        Backfill email domains for users missing the field. The domain is the registrable (eTLD+1)
+        domain of the user&apos;s email, e.g. <code>foo@mail.example.co.uk</code> →{' '}
+        <code>example.co.uk</code>. Each click processes up to 50 000 users. Click repeatedly until
+        the counter reaches zero.
       </p>
 
       <div className="bg-background space-y-4 rounded-lg border p-6">

@@ -2,6 +2,7 @@ import type { User } from '@kilocode/db/schema';
 import type { PaymentMethodInfo } from './stripePaymentMethodInfo';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { getDomain } from 'tldts';
 import type { ZodType } from 'zod';
 
 export function cn(...inputs: ClassValue[]) {
@@ -172,6 +173,32 @@ export async function parseResultJsonWithZodSchema<T>(
 
 export function getLowerDomainFromEmail(email: string): string | null {
   return email?.split('@').pop()?.toLowerCase() || null;
+}
+
+/**
+ * Extracts the registrable domain (eTLD+1) from an email address, using the
+ * Public Suffix List via `tldts`. This is what we store in
+ * `kilocode_users.email_domain`.
+ *
+ * - `alice@example.com`           → `example.com`
+ * - `alice@mail.example.com`      → `example.com`
+ * - `alice@foo.bar.example.co.uk` → `example.co.uk`
+ *
+ * When the PSL can't resolve a registrable domain (IP hosts, unknown TLDs,
+ * etc.), falls back to `<raw-host>.invalid` so the result is always non-null
+ * for any email containing `@<something>`. The `.invalid` TLD is reserved by
+ * RFC 2606 and makes these fallback rows obvious in admin/SQL inspection.
+ *
+ * Returns null only for inputs without an `@` or with an empty domain part.
+ */
+export function extractEmailDomain(email: string): string | null {
+  const atIndex = email.lastIndexOf('@');
+  if (atIndex === -1) return null;
+  const host = email.slice(atIndex + 1).toLowerCase();
+  if (host.length === 0) return null;
+  const registrable = getDomain(host);
+  if (registrable !== null) return registrable;
+  return `${host}.invalid`;
 }
 
 /**

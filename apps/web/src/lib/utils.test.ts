@@ -1,4 +1,9 @@
-import { assertNotNullish, toNonNullish, parseResultJsonWithZodSchema } from './utils';
+import {
+  assertNotNullish,
+  toNonNullish,
+  parseResultJsonWithZodSchema,
+  extractEmailDomain,
+} from './utils';
 import * as z from 'zod';
 
 describe('assertNotNull', () => {
@@ -191,5 +196,58 @@ describe('requireNotNull', () => {
 
     expect(toNonNullish(nullableString).toUpperCase()).toBe('TEST');
     expect(toNonNullish(nullableNumber).toFixed(2)).toBe('42.00');
+  });
+});
+
+describe('extractEmailDomain', () => {
+  it('returns the registrable domain for a plain .com address', () => {
+    expect(extractEmailDomain('alice@Example.COM')).toBe('example.com');
+  });
+
+  it('collapses subdomains to the registrable domain', () => {
+    expect(extractEmailDomain('foo@mail.example.com')).toBe('example.com');
+    expect(extractEmailDomain('foo@a.b.c.example.com')).toBe('example.com');
+  });
+
+  it('handles multi-label public suffixes like .co.uk', () => {
+    expect(extractEmailDomain('alice@example.co.uk')).toBe('example.co.uk');
+    expect(extractEmailDomain('alice@foo.bar.example.co.uk')).toBe('example.co.uk');
+  });
+
+  it('handles other multi-label suffixes', () => {
+    expect(extractEmailDomain('alice@foo.example.com.au')).toBe('example.com.au');
+    expect(extractEmailDomain('alice@mail.example.ac.uk')).toBe('example.ac.uk');
+  });
+
+  it('uses the last @ for emails with multiple @ signs', () => {
+    expect(extractEmailDomain('weird@foo@example.com')).toBe('example.com');
+  });
+
+  it('returns null for input without @', () => {
+    expect(extractEmailDomain('no-at-sign')).toBeNull();
+  });
+
+  it('returns null for empty domain part', () => {
+    expect(extractEmailDomain('trailing@')).toBeNull();
+  });
+
+  it('returns null for empty input', () => {
+    expect(extractEmailDomain('')).toBeNull();
+  });
+
+  it('still returns a sensible domain for unknown TLDs', () => {
+    // tldts treats the final label as a public suffix when unknown.
+    expect(extractEmailDomain('alice@host.madeuptld')).toBe('host.madeuptld');
+    expect(extractEmailDomain('alice@sub.host.madeuptld')).toBe('host.madeuptld');
+  });
+
+  it('falls back to `<host>.invalid` when tldts cannot resolve a registrable domain (e.g. IP)', () => {
+    expect(extractEmailDomain('alice@192.168.1.1')).toBe('192.168.1.1.invalid');
+  });
+
+  it('falls back to `<host>.invalid` for single-label hosts', () => {
+    // A bare single label like "localhost" has no registrable domain.
+    expect(extractEmailDomain('alice@localhost')).toBe('localhost.invalid');
+    expect(extractEmailDomain('alice@LOCALHOST')).toBe('localhost.invalid');
   });
 });

@@ -15,6 +15,7 @@ import {
 } from '@jest/globals';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
 import {
+  kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_instances,
   kiloclaw_subscription_change_log,
@@ -556,6 +557,21 @@ describe('provision detached personal billing recovery', () => {
         bootstrapSubscription: true,
       }
     );
+  });
+
+  it('rejects reprovision for legacy earlybird purchase without canonical subscription row', async () => {
+    await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_earlybird_purchases).values({
+      user_id: user.id,
+      amount_cents: 2500,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.provision({})).rejects.toThrow(
+      'Legacy earlybird access requires manual remediation before reprovisioning.'
+    );
+
+    expect(kiloclawInternalClientMock.__provisionMock).not.toHaveBeenCalled();
   });
 });
 

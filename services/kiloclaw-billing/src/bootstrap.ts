@@ -2,6 +2,7 @@ import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import {
   getWorkerDb,
   insertKiloClawSubscriptionChangeLog,
+  kiloclaw_earlybird_purchases,
   kiloclaw_instances,
   kiloclaw_subscriptions,
   organizations,
@@ -486,26 +487,33 @@ async function bootstrapPersonalSubscription(
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
   const now = new Date();
 
-  const [existingForInstance, subscriptions, instances] = await Promise.all([
-    db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.instance_id, input.instanceId))
-      .limit(1)
-      .then(rows => rows[0] ?? null),
-    db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, input.userId)),
-    db
-      .select({
-        id: kiloclaw_instances.id,
-        destroyedAt: kiloclaw_instances.destroyed_at,
-        organizationId: kiloclaw_instances.organization_id,
-      })
-      .from(kiloclaw_instances)
-      .where(eq(kiloclaw_instances.user_id, input.userId)),
-  ]);
+  const [existingForInstance, subscriptions, instances, legacyEarlybirdPurchase] =
+    await Promise.all([
+      db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.instance_id, input.instanceId))
+        .limit(1)
+        .then(rows => rows[0] ?? null),
+      db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.user_id, input.userId)),
+      db
+        .select({
+          id: kiloclaw_instances.id,
+          destroyedAt: kiloclaw_instances.destroyed_at,
+          organizationId: kiloclaw_instances.organization_id,
+        })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.user_id, input.userId)),
+      db
+        .select({ id: kiloclaw_earlybird_purchases.id })
+        .from(kiloclaw_earlybird_purchases)
+        .where(eq(kiloclaw_earlybird_purchases.user_id, input.userId))
+        .limit(1)
+        .then(rows => rows[0] ?? null),
+    ]);
 
   if (existingForInstance) {
     logger
@@ -603,6 +611,19 @@ async function bootstrapPersonalSubscription(
       );
     throw new Error(
       'Cannot bootstrap personal subscription with existing non-access-granting rows'
+    );
+  }
+
+  if (legacyEarlybirdPurchase) {
+    logger
+      .withFields({
+        decision: 'rejected_legacy_earlybird_purchase_only',
+      })
+      .error(
+        'Personal bootstrap: refusing to create trial — legacy earlybird purchase requires manual remediation'
+      );
+    throw new Error(
+      'Cannot bootstrap personal subscription for legacy earlybird purchase without canonical row'
     );
   }
 

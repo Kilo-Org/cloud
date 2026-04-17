@@ -96,8 +96,11 @@ multiple instances, each with its own subscription and renewal cycle.
 All subscriptions deduct from the same user credit balance.
 
 New users who provision an instance without subscribing first
-automatically receive a 7-day free trial. Canonical earlybird
-subscription rows continue to grant access until their recorded expiry.
+automatically receive a 7-day free trial. Legacy
+`kiloclaw_earlybird_purchases` rows without canonical subscription rows
+MUST NOT mint fresh trial access and instead require manual
+remediation. Canonical earlybird subscription rows continue to grant
+access until their recorded expiry.
 A periodic background job enforces expiry, credit renewal, suspension,
 and eventual instance destruction when access lapses, with email
 notifications at each stage.

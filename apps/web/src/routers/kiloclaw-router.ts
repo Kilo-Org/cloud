@@ -22,6 +22,7 @@ import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
+  kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_instances,
   kiloclaw_email_log,
@@ -887,11 +888,18 @@ async function ensureProvisionAccess(
       userId,
       executor,
     });
-  const [anySubscription] = await executor
-    .select({ id: kiloclaw_subscriptions.id })
-    .from(kiloclaw_subscriptions)
-    .where(eq(kiloclaw_subscriptions.user_id, userId))
-    .limit(1);
+  const [[anySubscription], [legacyEarlybirdPurchase]] = await Promise.all([
+    executor
+      .select({ id: kiloclaw_subscriptions.id })
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, userId))
+      .limit(1),
+    executor
+      .select({ id: kiloclaw_earlybird_purchases.id })
+      .from(kiloclaw_earlybird_purchases)
+      .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
+      .limit(1),
+  ]);
   let currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
   try {
     currentRow = await resolveCurrentPersonalSubscriptionRow({
@@ -900,6 +908,13 @@ async function ensureProvisionAccess(
     });
   } catch (error) {
     mapCurrentSubscriptionResolutionError(error);
+  }
+
+  if (legacyEarlybirdPurchase && !currentRow && !detachedAccessGrantingSubscription) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'Legacy earlybird access requires manual remediation before reprovisioning.',
+    });
   }
 
   if (activeInstance && !currentRow && !detachedAccessGrantingSubscription && !anySubscription) {

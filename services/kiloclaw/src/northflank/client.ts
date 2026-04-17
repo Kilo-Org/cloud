@@ -2,8 +2,8 @@ import { z } from 'zod';
 import type {
   CreateSecretRequest,
   CreateServiceDeploymentRequest,
+  PatchSecretRequest,
   PatchServiceDeploymentRequest,
-  PutSecretRequest,
 } from '@northflank/js-client';
 import type { NorthflankConfig } from './config';
 
@@ -550,12 +550,13 @@ export async function putProjectSecret(
   config: NorthflankClientConfig,
   projectId: string,
   secretId: string,
-  payload: PutSecretRequest['data']
+  payload: CreateSecretRequest['data']
 ): Promise<NorthflankSecretDetails> {
+  const { name: _name, ...patchPayload } = payload satisfies CreateSecretRequest['data'];
   const response = await requestJson(
     config,
     `/projects/${encodeURIComponent(projectId)}/secrets/${encodeURIComponent(secretId)}`,
-    jsonInit('PUT', payload),
+    jsonInit('PATCH', patchPayload satisfies PatchSecretRequest['data']),
     SecretDetailsResponseSchema,
     [200],
     'putProjectSecret',

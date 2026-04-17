@@ -9,6 +9,7 @@ import {
   isNorthflankConflict,
   isNorthflankNotFound,
   listServices,
+  putProjectSecret,
 } from './client';
 import { getNorthflankConfig } from './config';
 import type { NorthflankClientConfig } from './client';
@@ -178,6 +179,39 @@ describe('Northflank Worker fetch client', () => {
 
     const [url] = firstFetchCall(fetchMock);
     expect(url).toBe('https://api.northflank.com/v1/projects/project-1/secrets');
+  });
+
+  it('updates project secrets with PATCH on the secret-specific route', async () => {
+    const fetchMock = mockFetchSequence([[200, { data: { id: 'secret-1', name: 'kc-ki-test' } }]]);
+
+    await expect(
+      putProjectSecret(config, 'project-1', 'secret-1', {
+        name: 'kc-ki-test',
+        type: 'secret',
+        secretType: 'environment',
+        priority: 100,
+        restrictions: {
+          restricted: true,
+          nfObjects: [{ id: 'service-1', type: 'service' }],
+        },
+        secrets: { variables: { KILOCLAW_ENV_KEY: 'env-key-secret' } },
+      })
+    ).resolves.toEqual({ id: 'secret-1', name: 'kc-ki-test' });
+
+    const [url, init] = firstFetchCall(fetchMock);
+    expect(url).toBe('https://api.northflank.com/v1/projects/project-1/secrets/secret-1');
+    const requestInit = expectRequestInit(init);
+    expect(requestInit.method).toBe('PATCH');
+    expect(JSON.parse(expectStringBody(requestInit.body))).toEqual({
+      type: 'secret',
+      secretType: 'environment',
+      priority: 100,
+      restrictions: {
+        restricted: true,
+        nfObjects: [{ id: 'service-1', type: 'service' }],
+      },
+      secrets: { variables: { KILOCLAW_ENV_KEY: 'env-key-secret' } },
+    });
   });
 
   it('redacts secret values from API errors', async () => {

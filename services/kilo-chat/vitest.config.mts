@@ -6,12 +6,29 @@ export default defineWorkersConfig({
       workers: {
         wrangler: { configPath: './wrangler.jsonc' },
         miniflare: {
+          // Point the KILOCLAW service binding at the stub worker below.
+          // It must be a named worker reference (not a plain Response function)
+          // because the queue handler calls KILOCLAW.deliverChatWebhook() via
+          // RPC, which requires a WorkerEntrypoint — plain HTTP stubs don't
+          // support RPC and cause intermittent workerd "Failed to get handler
+          // to worker" errors.
           serviceBindings: {
-            // Stub the kiloclaw service binding for tests — RPC calls are not
-            // exercised in unit tests; this prevents miniflare from failing to
-            // resolve the external worker.
-            KILOCLAW: () => new Response('{}', { status: 200 }),
+            KILOCLAW: 'kiloclaw-stub',
           },
+          workers: [
+            {
+              name: 'kiloclaw-stub',
+              modules: true,
+              script: `
+                import { WorkerEntrypoint } from 'cloudflare:workers';
+                export default class KiloclawStub extends WorkerEntrypoint {
+                  async deliverChatWebhook(_payload) {
+                    // no-op stub — webhook delivery is not tested here
+                  }
+                }
+              `,
+            },
+          ],
         },
       },
     },

@@ -86,109 +86,108 @@ export function ConversationItem({
     setIsConfirmingLeave(false);
   }, []);
 
-  if (isRenaming) {
-    return (
-      <div
-        className={`block rounded-md px-3 py-2 ${
-          isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/50'
-        }`}
-      >
-        <input
-          ref={inputRef}
-          value={renameValue}
-          onChange={e => setRenameValue(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') handleConfirmRename();
-            if (e.key === 'Escape') handleCancelRename();
-          }}
-          onBlur={handleConfirmRename}
-          className="bg-background border-border w-full rounded border px-1.5 py-0.5 text-sm"
-          maxLength={200}
-        />
-      </div>
-    );
-  }
+  const title = conversation.conversationTitle ?? 'Untitled';
 
-  if (isConfirmingLeave) {
-    return (
-      <div
-        className={`block rounded-md px-3 py-2 ${
-          isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/50'
-        }`}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm">Leave?</span>
-          <span className="flex gap-1.5 text-xs">
-            <button
-              onClick={handleConfirmLeave}
-              className="text-destructive hover:underline font-medium cursor-pointer"
-            >
-              Yes
-            </button>
-            <button
-              onClick={handleCancelLeave}
-              className="text-muted-foreground hover:underline cursor-pointer"
-            >
-              No
-            </button>
-          </span>
-        </div>
-      </div>
-    );
-  }
+  // Wrap content in a Link unless renaming (input needs to capture clicks)
+  const Wrapper = isRenaming ? 'div' : Link;
+  const wrapperProps = isRenaming
+    ? {}
+    : { href: `/claw/kilo-chat/${conversation.conversationId}`, prefetch: false };
 
   return (
-    <Link
-      href={`/claw/kilo-chat/${conversation.conversationId}`}
+    <Wrapper
+      {...(wrapperProps as Record<string, unknown>)}
       className={`group relative block rounded-md px-3 py-2 ${
         isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/50'
       }`}
-      prefetch={false}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="truncate text-sm font-medium">
-          {conversation.conversationTitle ?? 'Untitled'}
-        </p>
-        <div className="flex shrink-0 items-center gap-1">
-          <span className="text-muted-foreground text-xs group-hover:hidden">{displayTime}</span>
-          <div ref={menuRef} className="relative">
-            <button
-              onClick={e => {
-                e.preventDefault();
-                e.stopPropagation();
-                setMenuOpen(prev => !prev);
-              }}
-              className="hover:bg-muted hidden rounded p-0.5 group-hover:block cursor-pointer transition-colors"
-            >
-              <MoreVertical className="h-3.5 w-3.5" />
-            </button>
-            {menuOpen && (
-              <div className="bg-popover border-border absolute right-0 top-full z-10 mt-1 w-32 rounded-md border py-1 shadow-md">
+        {isRenaming ? (
+          <input
+            ref={inputRef}
+            value={renameValue}
+            onChange={e => setRenameValue(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleConfirmRename();
+              if (e.key === 'Escape') handleCancelRename();
+            }}
+            onBlur={handleConfirmRename}
+            className="bg-transparent min-w-0 flex-1 text-sm font-medium outline-none border-b border-current/20"
+            maxLength={200}
+          />
+        ) : isConfirmingLeave ? (
+          <>
+            <span className="text-sm">Leave?</span>
+            <span className="flex shrink-0 gap-1.5 text-xs">
+              <button
+                onClick={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleConfirmLeave();
+                }}
+                className="text-destructive hover:underline font-medium cursor-pointer"
+              >
+                Yes
+              </button>
+              <button
+                onClick={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCancelLeave();
+                }}
+                className="text-muted-foreground hover:underline cursor-pointer"
+              >
+                No
+              </button>
+            </span>
+          </>
+        ) : (
+          <>
+            <p className="truncate text-sm font-medium">{title}</p>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="text-muted-foreground text-xs group-hover:hidden">
+                {displayTime}
+              </span>
+              <div ref={menuRef} className="relative">
                 <button
                   onClick={e => {
                     e.preventDefault();
                     e.stopPropagation();
-                    handleStartRename();
+                    setMenuOpen(prev => !prev);
                   }}
-                  className="hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
+                  className="hover:bg-muted hidden rounded p-0.5 group-hover:block cursor-pointer transition-colors"
                 >
-                  Rename
+                  <MoreVertical className="h-3.5 w-3.5" />
                 </button>
-                <button
-                  onClick={e => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleStartLeave();
-                  }}
-                  className="text-destructive hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
-                >
-                  Leave
-                </button>
+                {menuOpen && (
+                  <div className="bg-popover border-border absolute right-0 top-full z-10 mt-1 w-32 rounded-md border py-1 shadow-md">
+                    <button
+                      onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleStartRename();
+                      }}
+                      className="hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleStartLeave();
+                      }}
+                      className="text-destructive hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
+                    >
+                      Leave
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
-    </Link>
+    </Wrapper>
   );
 }

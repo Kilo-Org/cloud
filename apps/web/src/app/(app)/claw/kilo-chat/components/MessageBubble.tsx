@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, Trash2, Reply } from 'lucide-react';
+import { Pencil, Trash2, Reply, X, Check } from 'lucide-react';
 import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './KiloChatLayout';
@@ -34,16 +34,15 @@ export function MessageBubble({
   const [editText, setEditText] = useState('');
   const [showActions, setShowActions] = useState(false);
 
-  if (message.deleted) {
-    return (
-      <div className="px-4 py-1">
-        <p className="text-muted-foreground text-sm italic">[message deleted]</p>
-      </div>
-    );
-  }
-
-  const textContent = contentBlocksToText(message.content);
   const isBot = message.senderId.startsWith('bot:');
+  const isOptimistic = message.id.startsWith('optimistic-');
+  const timestamp = isOptimistic ? new Date() : new Date(ulidToTimestamp(message.id));
+  const timeStr = timestamp.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+  const textContent = message.deleted ? '' : contentBlocksToText(message.content);
 
   function handleStartEdit() {
     setEditText(textContent);
@@ -61,14 +60,9 @@ export function MessageBubble({
     setEditText('');
   }
 
-  const isOptimistic = message.id.startsWith('optimistic-');
-  const timestamp = isOptimistic ? new Date() : new Date(ulidToTimestamp(message.id));
-  const timeStr = timestamp.toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  const isDeleting = pendingDeleteId === message.id;
 
-  const actionButtons = showActions && !isEditing && pendingDeleteId !== message.id && (
+  const actionButtons = showActions && !isEditing && !isDeleting && !message.deleted && (
     <div
       className={`bg-background border-border absolute top-0 z-10 flex items-center gap-0.5 rounded border p-0.5 shadow-sm ${
         isOwn ? 'right-full mr-1' : 'left-full ml-1'
@@ -132,36 +126,57 @@ export function MessageBubble({
               isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
             }`}
           >
-            {isEditing ? (
+            {message.deleted ? (
+              <p className="text-sm italic opacity-50">[deleted message]</p>
+            ) : isEditing ? (
               <div>
-                <textarea
-                  className="border-input bg-background text-foreground w-full rounded border p-2 text-sm"
+                <input
+                  className="bg-transparent w-full text-sm outline-none border-b border-current/20 pb-0.5"
                   value={editText}
                   onChange={e => setEditText(e.target.value)}
                   onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === 'Enter') {
                       e.preventDefault();
                       handleSaveEdit();
                     }
                     if (e.key === 'Escape') handleCancelEdit();
                   }}
                   autoFocus
-                  rows={2}
                 />
-                <div className="mt-1 flex gap-2 text-xs">
+                <div className="mt-1 flex items-center gap-1">
                   <button
                     onClick={handleSaveEdit}
-                    className="text-primary hover:underline cursor-pointer"
+                    className="rounded p-0.5 hover:opacity-70 cursor-pointer transition-opacity"
+                    title="Save (Enter)"
                   >
-                    Save
+                    <Check className="h-3 w-3" />
                   </button>
                   <button
                     onClick={handleCancelEdit}
-                    className="text-muted-foreground hover:underline cursor-pointer"
+                    className="rounded p-0.5 hover:opacity-70 cursor-pointer transition-opacity opacity-60"
+                    title="Cancel (Esc)"
                   >
-                    Cancel
+                    <X className="h-3 w-3" />
                   </button>
                 </div>
+              </div>
+            ) : isDeleting ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm">Delete this message?</span>
+                <button
+                  onClick={() => onConfirmDelete(message.id)}
+                  className="rounded p-0.5 hover:opacity-70 cursor-pointer transition-opacity"
+                  title="Confirm delete"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={onCancelDelete}
+                  className="rounded p-0.5 hover:opacity-70 cursor-pointer transition-opacity opacity-60"
+                  title="Cancel"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
             ) : (
               <p className="text-sm whitespace-pre-wrap">{textContent}</p>
@@ -174,29 +189,11 @@ export function MessageBubble({
                   : 'text-muted-foreground justify-end'
               }`}
             >
-              {message.updatedAt && <span>(edited)</span>}
+              {message.updatedAt && !message.deleted && <span>(edited)</span>}
               <span>{timeStr}</span>
             </div>
           </div>
         </div>
-
-        {pendingDeleteId === message.id && (
-          <div className="bg-background border-border mt-1 flex items-center gap-1.5 rounded border px-2 py-1 text-xs shadow-sm">
-            <span>Delete?</span>
-            <button
-              onClick={() => onConfirmDelete(message.id)}
-              className="text-destructive font-medium hover:underline cursor-pointer"
-            >
-              Yes
-            </button>
-            <button
-              onClick={onCancelDelete}
-              className="text-muted-foreground hover:underline cursor-pointer"
-            >
-              No
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

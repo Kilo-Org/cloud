@@ -166,24 +166,25 @@ export function MessageArea({
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="border-border flex items-center justify-between border-b px-4 py-3">
-        {isRenamingTitle ? (
-          <input
-            autoFocus
-            className="text-sm font-medium bg-transparent border-b border-border outline-none w-full max-w-xs"
-            value={renameText}
-            onChange={e => setRenameText(e.target.value)}
-            onKeyDown={handleRenameKeyDown}
-            onBlur={handleRenameBlur}
-          />
-        ) : (
-          <h2
-            className="text-sm font-medium cursor-pointer hover:opacity-70 transition-opacity"
-            onClick={handleTitleClick}
-            title="Click to rename"
-          >
-            {title}
-          </h2>
-        )}
+        <input
+          ref={renamingTitleRef => {
+            if (isRenamingTitle && renamingTitleRef) renamingTitleRef.focus();
+          }}
+          readOnly={!isRenamingTitle}
+          className={`text-sm font-medium bg-transparent outline-none min-w-0 flex-1 mr-2 ${
+            isRenamingTitle
+              ? 'border-b border-current/20'
+              : 'cursor-pointer hover:opacity-70 transition-opacity border-b border-transparent'
+          }`}
+          value={isRenamingTitle ? renameText : title}
+          onChange={e => setRenameText(e.target.value)}
+          onKeyDown={handleRenameKeyDown}
+          onBlur={handleRenameBlur}
+          onClick={() => {
+            if (!isRenamingTitle) handleTitleClick();
+          }}
+          title={isRenamingTitle ? undefined : 'Click to rename'}
+        />
         <BotStatus instanceStatus={instanceStatus} />
       </div>
 

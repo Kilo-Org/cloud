@@ -278,7 +278,7 @@ export class ConversationDO extends DurableObject<Env> {
       messages: rows.map(row => ({
         id: row.id,
         senderId: row.sender_id,
-        content: row.deleted === 1 ? [] : JSON.parse(row.content),
+        content: row.deleted === 1 ? [] : (JSON.parse(row.content) as Record<string, unknown>[]),
         inReplyToMessageId: row.in_reply_to_message_id,
         version: row.version,
         updatedAt: row.updated_at,

@@ -726,7 +726,7 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
   const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
 
   // Log the full error for Sentry/debugging — this never reaches the caller
-  console.error(`[platform] ${operation} failed:`, raw);
+  console.error(`[platform] ${operation} failed:`, err);
 
   // Allow known-safe messages through
   if (SAFE_ERROR_PREFIXES.some(prefix => normalized.startsWith(prefix))) {
@@ -734,6 +734,15 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
   }
 
   return { message: `${operation} failed`, status };
+}
+
+function classifyProvisionFailure(err: unknown, status: number): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const flyApiMatch = raw.match(/Fly API ([A-Za-z0-9_-]+) failed \((\d{3})\)/);
+  const flyOperation = flyApiMatch?.[1];
+  const flyStatus = flyApiMatch?.[2];
+  if (flyOperation && flyStatus) return `fly_api_${flyOperation}_${flyStatus}`;
+  return `provision_${status}`;
 }
 
 /**
@@ -856,6 +865,7 @@ platform.post('/provision', async c => {
   const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
   const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionRoute = '/api/platform/provision';
+  const provisionStartedAt = performance.now();
 
   let provision;
   try {
@@ -892,6 +902,18 @@ platform.post('/provision', async c => {
       return c.json({ error: 'User already has an active instance' }, 409);
     }
     const { message, status } = sanitizeError(err, 'provision');
+    writeEvent(c.env, {
+      event: 'instance.provisioning_failed',
+      delivery: 'http',
+      route: provisionRoute,
+      userId,
+      instanceId: provisionedInstanceId,
+      orgId: orgId ?? undefined,
+      error: message,
+      label: classifyProvisionFailure(err, status),
+      durationMs: performance.now() - provisionStartedAt,
+      value: status,
+    });
     return jsonError(message, status);
   }
 

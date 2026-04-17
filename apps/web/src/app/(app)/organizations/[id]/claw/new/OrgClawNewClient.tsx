@@ -34,9 +34,16 @@ export function OrgClawNewClient({
 function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
   const statusQuery = useOrgKiloClawStatus(organizationId);
   const [createFlowStartedAt, setCreateFlowStartedAt] = useState<number | null>(null);
+  const [setupFailed, setSetupFailed] = useState(false);
   const [hasSettledStatus, setHasSettledStatus] = useState(false);
-  const onCreateFlowStarted = useCallback(() => setCreateFlowStartedAt(Date.now()), []);
-  const onCreateFlowFailed = useCallback(() => setCreateFlowStartedAt(null), []);
+  const onCreateFlowStarted = useCallback(() => {
+    setSetupFailed(false);
+    setCreateFlowStartedAt(Date.now());
+  }, []);
+  const onCreateFlowFailed = useCallback(() => {
+    setSetupFailed(true);
+    setCreateFlowStartedAt(null);
+  }, []);
 
   useEffect(() => {
     if (!statusQuery.isFetching && (statusQuery.data !== undefined || statusQuery.error)) {
@@ -54,19 +61,21 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
         mode="create-first"
         organizationId={organizationId}
         createFlowStarted
+        setupFailed={setupFailed}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
       />
     );
   }
 
-  if (statusQuery.error) {
+  if (!setupFailed && statusQuery.error) {
     return (
       <ClawOnboardingWithBoundary
         statusQuery={statusQuery}
         mode="post-provisioning"
         organizationId={organizationId}
         createFlowStarted={createFlowStartedAt !== null}
+        setupFailed={setupFailed}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
       />
@@ -75,13 +84,14 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
 
   const isFetchingEmptyStatus = statusQuery.isFetching && statusQuery.data?.status === null;
 
-  if (statusQuery.isLoading || !hasSettledStatus || isFetchingEmptyStatus) {
+  if (!setupFailed && (statusQuery.isLoading || !hasSettledStatus || isFetchingEmptyStatus)) {
     return (
       <ClawOnboardingWithBoundary
         statusQuery={{ data: undefined, isLoading: true, error: null }}
         mode="post-provisioning"
         organizationId={organizationId}
         createFlowStarted={createFlowStartedAt !== null}
+        setupFailed={setupFailed}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
       />
@@ -94,10 +104,15 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
 
   return (
     <ClawOnboardingWithBoundary
-      statusQuery={{ ...statusQuery, data: settledStatus }}
+      statusQuery={{
+        ...statusQuery,
+        data: settledStatus,
+        error: setupFailed ? null : statusQuery.error,
+      }}
       mode={mode}
       organizationId={organizationId}
       createFlowStarted={createFlowStartedAt !== null}
+      setupFailed={setupFailed}
       onCreateFlowStarted={onCreateFlowStarted}
       onCreateFlowFailed={onCreateFlowFailed}
     />

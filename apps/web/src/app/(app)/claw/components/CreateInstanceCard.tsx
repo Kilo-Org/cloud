@@ -148,6 +148,10 @@ export function CreateInstanceCard({
       },
       {
         onError: err => {
+          posthog?.capture('claw_setup_provision_failed', {
+            selected_model: selectedModel,
+            reason: 'provision_request_failed',
+          });
           onProvisionFailed?.();
           toast.error(`Failed to create: ${err.message}`);
         },

@@ -55,6 +55,7 @@ export function ClawOnboardingFlow({
   mode,
   organizationId,
   createFlowStarted = false,
+  setupFailed = false,
   onCreateFlowStarted,
   onCreateFlowFailed,
 }: {
@@ -62,6 +63,7 @@ export function ClawOnboardingFlow({
   mode: ClawOnboardingMode;
   organizationId?: string;
   createFlowStarted?: boolean;
+  setupFailed?: boolean;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
 }) {
@@ -71,6 +73,7 @@ export function ClawOnboardingFlow({
         status={status}
         mode={mode}
         createFlowStarted={createFlowStarted}
+        setupFailed={setupFailed}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
       />
@@ -82,12 +85,14 @@ function ClawOnboardingFlowInner({
   status,
   mode,
   createFlowStarted,
+  setupFailed,
   onCreateFlowStarted,
   onCreateFlowFailed,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   createFlowStarted: boolean;
+  setupFailed: boolean;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
 }) {
@@ -113,6 +118,7 @@ function ClawOnboardingFlowInner({
     status,
     mode,
     createSetupStarted,
+    setupFailed,
     onboardingStep,
     selectedPreset,
     hasBotIdentity: botIdentity !== null,
@@ -394,8 +400,8 @@ export function ClawSetupErrorStep({ basePath }: { basePath: string }) {
         <div className="flex flex-col items-center gap-2">
           <h2 className="text-2xl font-bold">Something went wrong</h2>
           <p className="text-muted-foreground max-w-md text-center">
-            Your KiloClaw instance stopped during setup. Please reach out to support for help
-            getting it back online.
+            Your KiloClaw instance stopped or failed during setup. Please reach out to support for
+            help getting it back online.
           </p>
         </div>
 

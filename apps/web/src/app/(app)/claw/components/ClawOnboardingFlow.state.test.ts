@@ -193,6 +193,52 @@ describe('ClawOnboardingFlow state machine', () => {
     }
   );
 
+  test('renders an error when the setup request failed', () => {
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          createSetupStarted: true,
+          setupFailed: true,
+          onboardingStep: 'provisioning',
+          hasBotIdentity: true,
+          selectedPreset: 'always-ask',
+          status: undefined,
+        })
+      ).renderStep
+    ).toBe('error');
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          mode: 'post-provisioning',
+          setupFailed: true,
+          status: createStatus(null),
+        })
+      ).renderStep
+    ).toBe('error');
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          mode: 'post-provisioning',
+          setupFailed: true,
+          status: createStatus('starting'),
+        })
+      ).renderStep
+    ).toBe('error');
+  });
+
+  test('does not let an old setup failure override a running instance', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        setupFailed: true,
+        status: createStatus('running'),
+      })
+    );
+
+    expect(state.renderStep).toBe('complete');
+    expect(state.postProvisioningReady).toBe(true);
+  });
+
   test.each(CLAW_ONBOARDING_ERROR_STATUSES)(
     'renders an error when machine status is %s',
     status => {

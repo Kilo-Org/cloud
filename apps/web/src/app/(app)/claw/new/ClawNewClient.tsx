@@ -32,10 +32,12 @@ function ClawNewLoader({
   createFlowStartedAt,
   billingUpdatedAt,
   onCreateFlowStarted,
+  setupFailed,
   onCreateFlowFailed,
 }: {
   mode: ClawOnboardingMode;
   createFlowStartedAt: number | null;
+  setupFailed: boolean;
   billingUpdatedAt: number;
   onCreateFlowStarted: () => void;
   onCreateFlowFailed: () => void;
@@ -53,14 +55,20 @@ function ClawNewLoader({
         status={status}
         mode={mode}
         createFlowStarted={createFlowStartedAt !== null}
+        setupFailed={setupFailed}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
       />
     );
   }
 
-  const statusQueryForBoundary =
-    statusQuery.error || statusQuery.dataUpdatedAt >= billingUpdatedAt
+  const statusQueryForBoundary = setupFailed
+    ? {
+        data: statusQuery.data,
+        isLoading: false,
+        error: null,
+      }
+    : statusQuery.error || statusQuery.dataUpdatedAt >= billingUpdatedAt
       ? statusQuery
       : {
           data: undefined,
@@ -73,6 +81,7 @@ function ClawNewLoader({
       statusQuery={statusQueryForBoundary}
       mode={mode}
       createFlowStarted={createFlowStartedAt !== null}
+      setupFailed={setupFailed}
       onCreateFlowStarted={onCreateFlowStarted}
       onCreateFlowFailed={onCreateFlowFailed}
     />
@@ -95,8 +104,15 @@ function ClawNewLiveClient() {
   const trpc = useTRPC();
   const billingQuery = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
   const [createFlowStartedAt, setCreateFlowStartedAt] = useState<number | null>(null);
-  const onCreateFlowStarted = useCallback(() => setCreateFlowStartedAt(Date.now()), []);
-  const onCreateFlowFailed = useCallback(() => setCreateFlowStartedAt(null), []);
+  const [setupFailed, setSetupFailed] = useState(false);
+  const onCreateFlowStarted = useCallback(() => {
+    setSetupFailed(false);
+    setCreateFlowStartedAt(Date.now());
+  }, []);
+  const onCreateFlowFailed = useCallback(() => {
+    setSetupFailed(true);
+    setCreateFlowStartedAt(null);
+  }, []);
 
   if (billingQuery.isLoading) {
     return <LoadingState />;
@@ -115,7 +131,7 @@ function ClawNewLiveClient() {
     );
   }
 
-  if (createFlowStartedAt === null && billingQuery.isFetching) {
+  if (!setupFailed && createFlowStartedAt === null && billingQuery.isFetching) {
     return <LoadingState />;
   }
 
@@ -144,6 +160,7 @@ function ClawNewLiveClient() {
     <ClawNewLoader
       mode={mode}
       createFlowStartedAt={createFlowStartedAt}
+      setupFailed={setupFailed}
       billingUpdatedAt={billingQuery.dataUpdatedAt}
       onCreateFlowStarted={onCreateFlowStarted}
       onCreateFlowFailed={onCreateFlowFailed}

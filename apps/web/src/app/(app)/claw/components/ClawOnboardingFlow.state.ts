@@ -62,6 +62,7 @@ export type ClawOnboardingFlowStateInput = {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   createSetupStarted: boolean;
+  setupFailed?: boolean;
   onboardingStep: OnboardingStep;
   selectedPreset: ExecPreset | null;
   hasBotIdentity: boolean;
@@ -103,6 +104,7 @@ export function getClawOnboardingFlowState({
   status,
   mode,
   createSetupStarted,
+  setupFailed = false,
   onboardingStep,
   selectedPreset,
   hasBotIdentity,
@@ -122,6 +124,7 @@ export function getClawOnboardingFlowState({
   const renderStepDecision = getRenderStepDecision({
     mode,
     createSetupStarted,
+    setupFailed,
     instanceStatus,
     postProvisioningReady,
     onboardingStep,
@@ -145,6 +148,7 @@ export function getClawOnboardingFlowState({
     status,
     mode,
     createSetupStarted,
+    setupFailed,
     onboardingStep,
     selectedPreset,
     hasBotIdentity,
@@ -167,7 +171,12 @@ export function getClawOnboardingFlowState({
 
 type RenderStepInput = Pick<
   ClawOnboardingFlowStateInput,
-  'mode' | 'createSetupStarted' | 'onboardingStep' | 'selectedPreset' | 'hasBotIdentity'
+  | 'mode'
+  | 'createSetupStarted'
+  | 'setupFailed'
+  | 'onboardingStep'
+  | 'selectedPreset'
+  | 'hasBotIdentity'
 > & {
   instanceStatus: PopulatedClawStatus | null;
   postProvisioningReady: boolean;
@@ -204,6 +213,7 @@ const clawOnboardingFlowDebugSnapshots = new Map<string, ClawOnboardingFlowDebug
 function getRenderStepDecision({
   mode,
   createSetupStarted,
+  setupFailed,
   instanceStatus,
   postProvisioningReady,
   onboardingStep,
@@ -215,6 +225,13 @@ function getRenderStepDecision({
     return {
       renderStep: 'error',
       reason: `instance status is ${instanceStatus.status}, so setup cannot continue automatically`,
+    };
+  }
+
+  if (setupFailed && !postProvisioningReady) {
+    return {
+      renderStep: 'error',
+      reason: 'the setup request failed, so setup cannot continue automatically',
     };
   }
 
@@ -304,6 +321,7 @@ function logClawOnboardingFlowStateDecision({
   status,
   mode,
   createSetupStarted,
+  setupFailed,
   onboardingStep,
   selectedPreset,
   hasBotIdentity,
@@ -326,6 +344,7 @@ function logClawOnboardingFlowStateDecision({
     {
       mode,
       createSetupStarted,
+      setupFailed,
       onboardingStep,
       selectedPreset,
       hasBotIdentity,

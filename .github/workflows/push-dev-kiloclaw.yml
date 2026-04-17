@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   push-dev:
@@ -27,6 +28,13 @@ jobs:
           registry: registry.fly.io
           username: x
           password: ${{ secrets.FLY_DEV_API_TOKEN }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate image tag and cache bust value
         id: tag
@@ -72,6 +80,8 @@ jobs:
           push: true
           tags: |
             registry.fly.io/kiloclaw-registry-dev:${{ steps.tag.outputs.tag }}
+            ghcr.io/kilo-org/kiloclaw:${{ steps.tag.outputs.tag }}
+            ghcr.io/kilo-org/kiloclaw:sha-${{ github.sha }}
           build-args: |
             CONTROLLER_COMMIT=${{ github.sha }}
             CONTROLLER_CACHE_BUST=${{ steps.tag.outputs.cache_bust }}
@@ -115,7 +125,16 @@ jobs:
             echo "FLY_IMAGE_CONTENT_HASH=${CONTENT}"
             echo '```'
             echo ""
-            echo "**Image pushed to:** \`registry.fly.io/kiloclaw-registry-dev:${TAG}\`"
+            echo "**Images pushed to:**"
+            echo "- \`registry.fly.io/kiloclaw-registry-dev:${TAG}\`"
+            echo "- \`ghcr.io/kilo-org/kiloclaw:${TAG}\`"
+            echo "- \`ghcr.io/kilo-org/kiloclaw:sha-${{ github.sha }}\`"
+            echo ""
+            echo "For Northflank, use:"
+            echo ""
+            echo '```'
+            echo "NF_IMAGE_PATH_TEMPLATE=ghcr.io/kilo-org/kiloclaw:{tag}"
+            echo '```'
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -127,4 +146,7 @@ jobs:
           fi
           echo "OPENCLAW_VERSION=${OPENCLAW}"
           echo "FLY_IMAGE_CONTENT_HASH=${CONTENT}"
+          echo "NF_IMAGE_PATH_TEMPLATE=ghcr.io/kilo-org/kiloclaw:{tag}"
+          echo "GHCR_IMAGE=ghcr.io/kilo-org/kiloclaw:${TAG}"
+          echo "GHCR_SHA_IMAGE=ghcr.io/kilo-org/kiloclaw:sha-${{ github.sha }}"
           echo "=========================="

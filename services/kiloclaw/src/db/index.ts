@@ -95,6 +95,7 @@ export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
       sandbox_id: kiloclaw_instances.sandbox_id,
       user_id: kiloclaw_instances.user_id,
       organization_id: kiloclaw_instances.organization_id,
+      provider: kiloclaw_instances.provider,
     })
     .from(kiloclaw_instances)
     .where(
@@ -109,6 +110,7 @@ export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
     sandboxId: row.sandbox_id,
     userId: row.user_id,
     orgId: row.organization_id,
+    provider: row.provider,
   };
 }
 
@@ -136,6 +138,7 @@ export async function getInstanceByIdIncludingDestroyed(
       user_id: kiloclaw_instances.user_id,
       organization_id: kiloclaw_instances.organization_id,
       inbound_email_enabled: kiloclaw_instances.inbound_email_enabled,
+      provider: kiloclaw_instances.provider,
     })
     .from(kiloclaw_instances)
     .where(where)
@@ -149,6 +152,7 @@ export async function getInstanceByIdIncludingDestroyed(
     userId: row.user_id,
     orgId: row.organization_id,
     inboundEmailEnabled: row.inbound_email_enabled,
+    provider: row.provider,
   };
 }
 

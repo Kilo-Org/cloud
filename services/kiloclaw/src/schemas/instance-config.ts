@@ -74,12 +74,28 @@ export const DockerLocalProviderStateSchema = z.object({
   hostPort: z.number().int().nullable().default(null),
 });
 
+export const NorthflankProviderStateSchema = z.object({
+  provider: z.literal('northflank'),
+  projectId: z.string().nullable().default(null),
+  projectName: z.string().nullable().default(null),
+  serviceId: z.string().nullable().default(null),
+  serviceName: z.string().nullable().default(null),
+  volumeId: z.string().nullable().default(null),
+  volumeName: z.string().nullable().default(null),
+  secretId: z.string().nullable().default(null),
+  secretName: z.string().nullable().default(null),
+  ingressHost: z.string().nullable().default(null),
+  region: z.string().nullable().default(null),
+});
+
 export const ProviderStateSchema = z.discriminatedUnion('provider', [
   FlyProviderStateSchema,
   DockerLocalProviderStateSchema,
+  NorthflankProviderStateSchema,
 ]);
 export type FlyProviderState = z.infer<typeof FlyProviderStateSchema>;
 export type DockerLocalProviderState = z.infer<typeof DockerLocalProviderStateSchema>;
+export type NorthflankProviderState = z.infer<typeof NorthflankProviderStateSchema>;
 export type ProviderState = z.infer<typeof ProviderStateSchema>;
 
 export const KiloExaSearchModeSchema = z.enum(['kilo-proxy', 'disabled']);

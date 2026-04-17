@@ -32,4 +32,24 @@ describe('provider registry', () => {
 
     expect(adapter.id).toBe('docker-local');
   });
+
+  it('rejects northflank when required configuration is missing', () => {
+    expect(() => assertAvailableProvider({} as never, 'northflank')).toThrow(
+      'Provider northflank is not configured'
+    );
+  });
+
+  it('returns the northflank adapter when configured', () => {
+    const env = {
+      NF_API_TOKEN: 'nf-token',
+      NF_REGION: 'us-central',
+      NF_DEPLOYMENT_PLAN: 'nf-compute-200',
+      NF_EDGE_HEADER_NAME: 'x-kiloclaw-edge',
+      NF_EDGE_HEADER_VALUE: 'edge-secret',
+      NF_IMAGE_PATH_TEMPLATE: 'ghcr.io/kilo-org/kiloclaw:{tag}',
+    } as never;
+
+    expect(() => assertAvailableProvider(env, 'northflank')).not.toThrow();
+    expect(getProviderAdapter(env, { provider: 'northflank' }).id).toBe('northflank');
+  });
 });

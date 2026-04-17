@@ -84,15 +84,18 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         }),
       }
     );
+    if (response.status === 409) {
+      return { messageId: params.messageId, stale: true };
+    }
     if (!response.ok) {
       throw new Error(
         `kilo-chat: controller PATCH responded ${response.status}: ${await response.text()}`
       );
     }
-    const body = (await response.json()) as { messageId?: string; stale?: boolean };
+    const body = (await response.json()) as { messageId?: string };
     return {
       messageId: body.messageId ?? params.messageId,
-      stale: body.stale === true,
+      stale: false,
     };
   }
   async function deleteMessage(params: DeleteMessageParams): Promise<void> {

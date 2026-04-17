@@ -264,9 +264,7 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
       testEnv
     );
 
-    expect(editRes.status).toBe(200);
-    const body = await editRes.json<{ stale: boolean }>();
-    expect(body.stale).toBe(true);
+    expect(editRes.status).toBe(409);
   });
 
   it('returns 400 for invalid messageId', async () => {

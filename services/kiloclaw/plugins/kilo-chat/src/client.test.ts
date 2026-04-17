@@ -126,11 +126,10 @@ describe('editMessage', () => {
     expect(result).toEqual({ messageId: 'm1', stale: false });
   });
 
-  it('returns stale when server response indicates stale', async () => {
+  it('returns stale when server responds with 409', async () => {
     const fetchImpl = (async () =>
-      new Response(JSON.stringify({ messageId: 'm1', stale: true }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
+      new Response(JSON.stringify({ error: 'Edit conflict', messageId: 'm1' }), {
+        status: 409,
       })) as typeof fetch;
     const client = createKiloChatClient({
       controllerBaseUrl: 'http://127.0.0.1:18789',

@@ -46,7 +46,7 @@ async function createConversation(userSuffix: string) {
 }
 
 describe('POST /v1/conversations/:id/typing', () => {
-  it('returns 200 for a member', async () => {
+  it('returns 204 for a member', async () => {
     const { conversationId, userApp } = await createConversation('typing-member');
 
     const res = await userApp.request(
@@ -55,9 +55,7 @@ describe('POST /v1/conversations/:id/typing', () => {
       env
     );
 
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual({});
+    expect(res.status).toBe(204);
   });
 
   it('returns 403 for a non-member', async () => {

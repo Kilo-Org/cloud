@@ -70,32 +70,22 @@ function makeSchedule(c: HonoCtx) {
 
 // ─── createMessage ──────────────────────────────────────────────────────────
 
-/**
- * Options for create-message handler.
- * @param includeClientId - When true, echoes clientId in the 201 response
- *                          (human route behaviour). Bot route omits it.
- */
-export function handleCreateMessage(includeClientId: boolean) {
-  return async (c: HonoCtx) => {
-    const body = await parseBody(c, createMessageSchema);
-    if (!body.ok) return body.response;
+export async function handleCreateMessage(c: HonoCtx) {
+  const body = await parseBody(c, createMessageSchema);
+  if (!body.ok) return body.response;
 
-    const callerId = c.get('callerId');
-    const result = await createMessageFor(c.env, callerId, body.data, {
-      waitUntil: makeSchedule(c),
-    });
-    if (!result.ok) {
-      if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
-      return c.json({ error: result.error }, 500);
-    }
-    if (includeClientId) {
-      return c.json(
-        { messageId: result.messageId, ...(result.clientId ? { clientId: result.clientId } : {}) },
-        201
-      );
-    }
-    return c.json({ messageId: result.messageId }, 201);
-  };
+  const callerId = c.get('callerId');
+  const result = await createMessageFor(c.env, callerId, body.data, {
+    waitUntil: makeSchedule(c),
+  });
+  if (!result.ok) {
+    if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    return c.json({ error: result.error }, 500);
+  }
+  return c.json(
+    { messageId: result.messageId, ...(result.clientId ? { clientId: result.clientId } : {}) },
+    201
+  );
 }
 
 // ─── editMessage ────────────────────────────────────────────────────────────
@@ -191,20 +181,14 @@ export async function handleRemoveReaction(c: HonoCtx) {
 
 // ─── setTyping ───────────────────────────────────────────────────────────────
 
-/**
- * @param successResponse - factory for the success response (human returns `{}`,
- *                          bot returns 204 No Content)
- */
-export function handleSetTyping(successResponse: (c: HonoCtx) => Response) {
-  return async (c: HonoCtx) => {
-    const convId = parseConversationId(c);
-    if (!convId.ok) return convId.response;
+export async function handleSetTyping(c: HonoCtx) {
+  const convId = parseConversationId(c);
+  if (!convId.ok) return convId.response;
 
-    const callerId = c.get('callerId');
-    const result = await setTypingFor(c.env, callerId, { conversationId: convId.data });
-    if (!result.ok) {
-      return c.json({ error: result.error }, 403);
-    }
-    return successResponse(c);
-  };
+  const callerId = c.get('callerId');
+  const result = await setTypingFor(c.env, callerId, { conversationId: convId.data });
+  if (!result.ok) {
+    return c.json({ error: result.error }, 403);
+  }
+  return new Response(null, { status: 204 });
 }

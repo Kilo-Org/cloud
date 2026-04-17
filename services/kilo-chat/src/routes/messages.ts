@@ -11,7 +11,7 @@ const listMessagesQuerySchema = z.object({
 
 export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
   // POST /v1/messages — create message (returns clientId if present)
-  app.post('/v1/messages', handleCreateMessage(true));
+  app.post('/v1/messages', handleCreateMessage);
 
   // GET /v1/conversations/:id/messages — list messages
   app.get('/v1/conversations/:id/messages', async c => {

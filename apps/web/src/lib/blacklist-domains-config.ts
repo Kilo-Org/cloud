@@ -1,3 +1,4 @@
+import 'server-only';
 import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
 import { getEnvVariable } from '@/lib/dotenvx';

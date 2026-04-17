@@ -191,7 +191,10 @@ export function AgentSessionListScreen() {
           <View className="flex-row items-center gap-4">
             <Pressable
               onPress={() => {
-                router.push('/(app)/agent-chat/new' as Href);
+                const path = organizationId
+                  ? `/(app)/agent-chat/new?organizationId=${organizationId}`
+                  : '/(app)/agent-chat/new';
+                router.push(path as Href);
               }}
               hitSlop={8}
               accessibilityLabel="New session"

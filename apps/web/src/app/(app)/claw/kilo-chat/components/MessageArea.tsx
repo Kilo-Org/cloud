@@ -11,7 +11,7 @@ import {
 } from '../hooks/useMessages';
 import { useSSE } from '../hooks/useSSE';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
-import { useConversationDetail } from '../hooks/useConversations';
+import { useConversationDetail, useRenameConversation } from '../hooks/useConversations';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
@@ -34,6 +34,8 @@ export function MessageArea({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [isRenamingTitle, setIsRenamingTitle] = useState(false);
+  const [renameText, setRenameText] = useState('');
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
     getToken,
@@ -42,6 +44,7 @@ export function MessageArea({
   const messages = data?.messages ?? [];
 
   const conversationDetail = useConversationDetail(getToken, conversationId);
+  const renameConversation = useRenameConversation(getToken);
   const sendMessage = useSendMessage(getToken);
   const editMessage = useEditMessage(getToken);
   const deleteMessage = useDeleteMessage(getToken);
@@ -123,13 +126,51 @@ export function MessageArea({
 
   const botIsTyping = Array.from(typingMembers.keys()).some(id => id.startsWith('bot:'));
 
-  const title = conversationDetail.data?.title ?? 'Conversation';
+  const title = conversationDetail.data?.title ?? 'Untitled';
+
+  function handleTitleClick() {
+    setRenameText(title);
+    setIsRenamingTitle(true);
+  }
+
+  function handleRenameKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      const trimmed = renameText.trim();
+      if (trimmed) {
+        renameConversation.mutate({ conversationId, title: trimmed });
+      }
+      setIsRenamingTitle(false);
+    } else if (e.key === 'Escape') {
+      setIsRenamingTitle(false);
+    }
+  }
+
+  function handleRenameBlur() {
+    setIsRenamingTitle(false);
+  }
 
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="border-border flex items-center justify-between border-b px-4 py-3">
-        <h2 className="text-sm font-medium">{title}</h2>
+        {isRenamingTitle ? (
+          <input
+            autoFocus
+            className="text-sm font-medium bg-transparent border-b border-border outline-none w-full max-w-xs"
+            value={renameText}
+            onChange={e => setRenameText(e.target.value)}
+            onKeyDown={handleRenameKeyDown}
+            onBlur={handleRenameBlur}
+          />
+        ) : (
+          <h2
+            className="text-sm font-medium cursor-pointer hover:opacity-70 transition-opacity"
+            onClick={handleTitleClick}
+            title="Click to rename"
+          >
+            {title}
+          </h2>
+        )}
         <BotStatus isTyping={botIsTyping} instanceStatus={instanceStatus} />
       </div>
 

@@ -67,7 +67,7 @@ describe('kiloclaw-subscription-alignment script', () => {
       throw new Error('Expected canonical subscription row');
     }
 
-    await run('apply-duplicates');
+    await run('apply-duplicates', '--confirm-sandboxes-destroyed');
 
     const [olderInstance, canonicalInstance] = await db
       .select()
@@ -383,7 +383,7 @@ describe('kiloclaw-subscription-alignment script', () => {
     );
   });
 
-  it('backfills baseline snapshot for subscription that has only mutation logs', async () => {
+  it('backfills baseline from earliest mutation before_state to preserve audit replay', async () => {
     const user = await insertTestUser({
       google_user_email: 'mutation-only-logs@example.com',
     });
@@ -395,13 +395,15 @@ describe('kiloclaw-subscription-alignment script', () => {
       sandbox_id: `ki_${instanceId.replaceAll('-', '')}`,
     });
 
+    // Current state is a post-past_due row; the subscription's initial state
+    // (captured in the earliest mutation's before_state) was still trialing.
     const [subscription] = await db
       .insert(kiloclaw_subscriptions)
       .values({
         user_id: user.id,
         instance_id: instanceId,
         plan: 'trial',
-        status: 'trialing',
+        status: 'past_due',
         cancel_at_period_end: false,
         trial_started_at: '2026-04-01T00:00:00.000Z',
         trial_ends_at: '2026-04-08T00:00:00.000Z',
@@ -412,15 +414,15 @@ describe('kiloclaw-subscription-alignment script', () => {
       throw new Error('Expected subscription row');
     }
 
-    // Simulate a legacy subscription created before changelog rollout whose only
-    // log entries are post-creation mutations (before_state is non-null).
+    const initialState = { ...subscription, status: 'trialing' };
     await db.insert(kiloclaw_subscription_change_log).values({
       subscription_id: subscription.id,
       actor_type: 'system',
       actor_id: 'legacy-mutator',
       action: 'status_changed',
       reason: 'legacy_mutation',
-      before_state: { ...subscription, status: 'trialing' },
+      created_at: '2026-04-05T00:00:00.000Z',
+      before_state: initialState,
       after_state: { ...subscription, status: 'past_due' },
     });
 
@@ -437,8 +439,13 @@ describe('kiloclaw-subscription-alignment script', () => {
     expect(baselineLog).toEqual(
       expect.objectContaining({
         action: 'backfilled',
-        reason: 'baseline_subscription_snapshot',
+        reason: 'baseline_subscription_snapshot_from_earliest_mutation',
       })
+    );
+    // Baseline after_state MUST match the earliest mutation's before_state
+    // (the true initial state) NOT the current post-mutation row state.
+    expect(baselineLog?.after_state).toEqual(
+      expect.objectContaining({ id: subscription.id, status: 'trialing' })
     );
 
     // Running again should be a no-op because a baseline now exists.
@@ -448,5 +455,184 @@ describe('kiloclaw-subscription-alignment script', () => {
       .from(kiloclaw_subscription_change_log)
       .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
     expect(changeLogsAfterRerun.filter(log => log.before_state === null)).toHaveLength(1);
+  });
+
+  it('stamps personal bootstrap trial with 7-day duration, not org 14-day', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'personal-trial-7d@example.com',
+    });
+    const instanceId = crypto.randomUUID();
+    const instanceCreatedAt = '2026-04-10T00:00:00.000Z';
+
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replaceAll('-', '')}`,
+      created_at: instanceCreatedAt,
+    });
+
+    await run('apply-missing-personal');
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, instanceId));
+
+    if (!subscription) {
+      throw new Error('Expected bootstrapped trial row');
+    }
+
+    expect(subscription.plan).toBe('trial');
+    if (!subscription.trial_started_at || !subscription.trial_ends_at) {
+      throw new Error('Expected trial_started_at and trial_ends_at');
+    }
+    // 7 days duration. 14 would indicate the bug where org trial constant leaks
+    // into the personal bootstrap path.
+    const trialDurationMs =
+      new Date(subscription.trial_ends_at).getTime() -
+      new Date(subscription.trial_started_at).getTime();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    expect(trialDurationMs).toBe(sevenDaysMs);
+  });
+
+  it('refuses to reassign destroyed sub when user already has live personal subscription', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'two-personal-guard@example.com',
+    });
+
+    const destroyedInstanceId = crypto.randomUUID();
+    const liveInstanceId = crypto.randomUUID();
+    const missingInstanceId = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: destroyedInstanceId,
+        user_id: user.id,
+        sandbox_id: `ki_${destroyedInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-03-01T00:00:00.000Z',
+        destroyed_at: '2026-03-15T00:00:00.000Z',
+      },
+      {
+        id: liveInstanceId,
+        user_id: user.id,
+        sandbox_id: `ki_${liveInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-03-20T00:00:00.000Z',
+      },
+      {
+        id: missingInstanceId,
+        user_id: user.id,
+        sandbox_id: `ki_${missingInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-04-01T00:00:00.000Z',
+      },
+    ]);
+
+    // Destroyed instance has an access-granting legacy sub (would normally
+    // trigger reassign_destroyed for the missing row).
+    const [destroyedSub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: destroyedInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'stripe',
+        cancel_at_period_end: false,
+        created_at: '2026-03-01T00:00:00.000Z',
+        updated_at: '2026-03-01T00:00:00.000Z',
+      })
+      .returning();
+
+    // Live instance already holds the user's current personal sub.
+    const [liveSub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: liveInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'stripe',
+        cancel_at_period_end: false,
+        created_at: '2026-03-20T00:00:00.000Z',
+        updated_at: '2026-03-20T00:00:00.000Z',
+      })
+      .returning();
+
+    if (!destroyedSub || !liveSub) {
+      throw new Error('Expected seed subscription rows');
+    }
+
+    await run('apply-missing-personal');
+
+    const subscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .orderBy(kiloclaw_subscriptions.created_at);
+
+    // MUST remain 2 rows; creating a successor on missingInstanceId would
+    // yield two current personal subs for one user (spec violation).
+    expect(subscriptions).toHaveLength(2);
+    expect(subscriptions.map(s => s.id).sort()).toEqual([destroyedSub.id, liveSub.id].sort());
+
+    const destroyedAfter = subscriptions.find(s => s.id === destroyedSub.id);
+    const liveAfter = subscriptions.find(s => s.id === liveSub.id);
+
+    expect(destroyedAfter?.transferred_to_subscription_id).toBeNull();
+    expect(destroyedAfter?.status).toBe('active');
+    expect(liveAfter?.transferred_to_subscription_id).toBeNull();
+    expect(liveAfter?.status).toBe('active');
+  });
+
+  it('refuses to write destroyed_at for duplicates without --confirm-sandboxes-destroyed flag', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'no-confirm-flag@example.com',
+    });
+    const emptyOlderInstanceId = crypto.randomUUID();
+    const canonicalInstanceId = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: emptyOlderInstanceId,
+        user_id: user.id,
+        sandbox_id: `ki_${emptyOlderInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        id: canonicalInstanceId,
+        user_id: user.id,
+        sandbox_id: `ki_${canonicalInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-04-02T00:00:00.000Z',
+      },
+    ]);
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: canonicalInstanceId,
+      plan: 'standard',
+      status: 'active',
+      payment_source: 'stripe',
+      cancel_at_period_end: false,
+      created_at: '2026-04-02T00:00:00.000Z',
+      updated_at: '2026-04-02T00:00:00.000Z',
+    });
+
+    await run('apply-duplicates');
+
+    const instances = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.user_id, user.id));
+
+    // Neither instance touched without the confirm flag — operator must
+    // externally verify sandbox teardown first.
+    expect(instances.every(instance => instance.destroyed_at === null)).toBe(true);
+
+    const subscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id));
+
+    // No terminal replacement inserted either.
+    expect(subscriptions).toHaveLength(1);
   });
 });

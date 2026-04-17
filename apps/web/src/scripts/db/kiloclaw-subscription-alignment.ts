@@ -8,17 +8,26 @@
  *   pnpm script db kiloclaw-subscription-alignment preview-missing-personal
  *   pnpm script db kiloclaw-subscription-alignment apply-missing-personal
  *   pnpm script db kiloclaw-subscription-alignment preview-duplicates
- *   pnpm script db kiloclaw-subscription-alignment apply-duplicates
+ *   pnpm script db kiloclaw-subscription-alignment apply-duplicates [--confirm-sandboxes-destroyed]
  *   pnpm script db kiloclaw-subscription-alignment preview-org
  *   pnpm script db kiloclaw-subscription-alignment apply-org
  *   pnpm script db kiloclaw-subscription-alignment preview-changelog-baseline
  *   pnpm script db kiloclaw-subscription-alignment apply-changelog-baseline
+ *
+ * Flags:
+ *   --confirm-sandboxes-destroyed   Required for apply-duplicates to write
+ *     destroyed_at. Operators MUST first tear down the underlying sandbox
+ *     resources via the admin panel. Without this flag, apply-duplicates
+ *     prints a manifest of duplicate sandbox IDs and exits without writes.
  */
 
-import { and, desc, eq, inArray, isNull, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, notExists, or, sql } from 'drizzle-orm';
 
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
-import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
+import {
+  KILOCLAW_EARLYBIRD_EXPIRY_DATE,
+  KILOCLAW_TRIAL_DURATION_DAYS,
+} from '@/lib/kiloclaw/constants';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
@@ -188,7 +197,16 @@ function isAccessGrantingRow(row: DetachedSubscriptionAuditRow, now: Date): bool
   return false;
 }
 
-function getTrialEndsAt(startedAt: string): string {
+// Personal KiloClaw trials are 7 days (KILOCLAW_TRIAL_DURATION_DAYS, billing spec
+// Trials rule 2). Organization trials are 14 days (TRIAL_DURATION_DAYS). These
+// MUST NOT be unified — using 14 for personal rows grants extra free access.
+function getPersonalTrialEndsAt(startedAt: string): string {
+  return new Date(
+    new Date(startedAt).getTime() + KILOCLAW_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+}
+
+function getOrganizationTrialEndsAt(startedAt: string): string {
   return new Date(
     new Date(startedAt).getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
@@ -253,7 +271,8 @@ async function personalContextSubscriptionExistsForUser(
 ): Promise<boolean> {
   // Personal-context = detached (no instance) or attached to a personal instance
   // (no organization). Excludes org-context subscriptions so they don't block
-  // personal backfill decisions.
+  // personal backfill decisions. Transferred-out predecessors are history and
+  // MUST be excluded — a canceled/transferred row is not a current subscription.
   const rows = await executor
     .select({ id: kiloclaw_subscriptions.id })
     .from(kiloclaw_subscriptions)
@@ -261,7 +280,32 @@ async function personalContextSubscriptionExistsForUser(
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, userId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         or(isNull(kiloclaw_subscriptions.instance_id), isNull(kiloclaw_instances.organization_id))
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
+async function liveCurrentPersonalSubscriptionExistsForUser(
+  executor: DbOrTx,
+  userId: string
+): Promise<boolean> {
+  // Live-current = non-transferred row attached to a non-destroyed personal
+  // instance. Used to guard reassign-destroyed apply: if the user already has
+  // a live personal subscription we MUST NOT create a successor on the missing
+  // instance (would yield two current personal rows for one user).
+  const rows = await executor
+    .select({ id: kiloclaw_subscriptions.id })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
       )
     )
     .limit(1);
@@ -438,7 +482,12 @@ async function buildMissingPersonalCandidates(): Promise<MissingPersonalCandidat
   const now = new Date();
 
   return missingRows.map(row => {
-    const userSubscriptions = subscriptionsByUser.get(row.userId) ?? [];
+    // Transferred-out rows are history (predecessor of a successor chain). They
+    // do not count against the "at most one current personal row per user" invariant
+    // and MUST NOT be considered candidates for further reassignment.
+    const userSubscriptions = (subscriptionsByUser.get(row.userId) ?? []).filter(
+      subscription => subscription.transferred_to_subscription_id === null
+    );
     const detachedRows = userSubscriptions.filter(
       subscription => subscription.instance_id === null
     );
@@ -460,6 +509,16 @@ async function buildMissingPersonalCandidates(): Promise<MissingPersonalCandidat
     const linkedDestroyedAccessRows = linkedDestroyedRows.filter(subscription =>
       isAccessGrantingSubscription(subscription, now)
     );
+    // Live-current personal rows: on a non-destroyed instance and not transferred.
+    // If any exist, the user already has a current personal subscription and we
+    // MUST NOT insert a successor on the missing instance (would violate the
+    // "at most one current personal row per user" invariant from the billing spec).
+    const liveCurrentPersonalRows = linkedPersonalRows.filter(subscription => {
+      const instanceId = subscription.instance_id;
+      if (!instanceId) return false;
+      const instance = personalInstancesById.get(instanceId);
+      return !!instance && !instance.destroyedAt;
+    });
     // Personal-context subscriptions: rows linked to a personal instance OR detached
     // (ambiguous, but treated as personal-intended by the adopt_detached path).
     // Org-context subs are intentionally excluded so they don't block personal backfill.
@@ -480,6 +539,7 @@ async function buildMissingPersonalCandidates(): Promise<MissingPersonalCandidat
     } else if (
       !row.destroyedAt &&
       detachedRows.length === 0 &&
+      liveCurrentPersonalRows.length === 0 &&
       linkedDestroyedRows.length === 1 &&
       linkedDestroyedAccessRows.length === 1
     ) {
@@ -865,14 +925,46 @@ async function previewChangelogBaselineBackfill() {
 
 async function applyChangelogBaselineBackfill() {
   const rows = await listSubscriptionsMissingBaselineChangeLog();
-  let inserted = 0;
+  let insertedFromCurrent = 0;
+  let insertedFromMutation = 0;
   const failures: Array<{ subscriptionId: string; userId: string; error: string }> = [];
 
   for (const row of rows) {
     try {
-      const wrote = await db.transaction(async tx => {
+      const result = await db.transaction(async tx => {
         if (await hasBaselineChangeLogEntry(tx, row.id)) {
-          return false;
+          return 'skipped' as const;
+        }
+
+        // When prior mutation logs exist, the oldest row's before_state holds
+        // the subscription's true initial state (captured before the first
+        // mutation was applied). Using it as the fabricated baseline's
+        // after_state preserves audit-replay integrity: replaying
+        // baseline -> mutation1 -> mutation2 ... reaches the current row.
+        // Falling back to the current row would inject a no-op delta before
+        // the first mutation and desync replay forever.
+        const [earliestMutation] = await tx
+          .select({
+            beforeState: kiloclaw_subscription_change_log.before_state,
+          })
+          .from(kiloclaw_subscription_change_log)
+          .where(eq(kiloclaw_subscription_change_log.subscription_id, row.id))
+          .orderBy(asc(kiloclaw_subscription_change_log.created_at))
+          .limit(1);
+
+        const inheritedBaseline = earliestMutation?.beforeState ?? null;
+
+        if (inheritedBaseline) {
+          await tx.insert(kiloclaw_subscription_change_log).values({
+            subscription_id: row.id,
+            actor_type: ALIGNMENT_SCRIPT_ACTOR.actorType,
+            actor_id: ALIGNMENT_SCRIPT_ACTOR.actorId,
+            action: 'backfilled',
+            reason: 'baseline_subscription_snapshot_from_earliest_mutation',
+            before_state: null,
+            after_state: inheritedBaseline,
+          });
+          return 'from_mutation' as const;
         }
 
         await insertAlignmentChangeLog(tx, {
@@ -882,11 +974,13 @@ async function applyChangelogBaselineBackfill() {
           before: null,
           after: row,
         });
-        return true;
+        return 'from_current' as const;
       });
 
-      if (wrote) {
-        inserted += 1;
+      if (result === 'from_mutation') {
+        insertedFromMutation += 1;
+      } else if (result === 'from_current') {
+        insertedFromCurrent += 1;
       }
     } catch (error) {
       console.error('Changelog baseline backfill row failed', {
@@ -904,7 +998,8 @@ async function applyChangelogBaselineBackfill() {
 
   console.log('\nChangelog baseline backfill results');
   console.table([
-    { action: 'backfilled', count: inserted },
+    { action: 'backfilled_from_current_state', count: insertedFromCurrent },
+    { action: 'backfilled_from_earliest_mutation', count: insertedFromMutation },
     { action: 'failed', count: failures.length },
   ]);
   printSection('Changelog baseline rows that failed to backfill', failures);
@@ -948,7 +1043,7 @@ async function previewMissingPersonalBackfill() {
         userId: row.userId,
         sandboxId: row.sandboxId,
         instanceDestroyedAt: row.instanceDestroyedAt,
-        trialEndsAt: getTrialEndsAt(row.instanceCreatedAt),
+        trialEndsAt: getPersonalTrialEndsAt(row.instanceCreatedAt),
         instanceCreatedAt: row.instanceCreatedAt,
       }))
   );
@@ -1017,7 +1112,7 @@ async function previewOrgBackfill() {
         requireSeats: row.requireSeats,
         destroyedAt: row.destroyedAt,
         trialStartedAt: row.organizationCreatedAt,
-        trialEndsAt: row.freeTrialEndAt ?? getTrialEndsAt(row.organizationCreatedAt),
+        trialEndsAt: row.freeTrialEndAt ?? getOrganizationTrialEndsAt(row.organizationCreatedAt),
       }))
   );
   printSection(
@@ -1046,7 +1141,7 @@ async function previewOrgBackfill() {
         requireSeats: row.requireSeats,
         destroyedAt: row.destroyedAt,
         trialStartedAt: row.organizationCreatedAt,
-        trialEndsAt: row.freeTrialEndAt ?? getTrialEndsAt(row.organizationCreatedAt),
+        trialEndsAt: row.freeTrialEndAt ?? getOrganizationTrialEndsAt(row.organizationCreatedAt),
       }))
   );
 }
@@ -1130,7 +1225,7 @@ async function insertDuplicateTerminalSubscription(
         payment_source: null,
         cancel_at_period_end: false,
         trial_started_at: row.duplicateCreatedAt,
-        trial_ends_at: getTrialEndsAt(row.duplicateCreatedAt),
+        trial_ends_at: getPersonalTrialEndsAt(row.duplicateCreatedAt),
         created_at: row.duplicateCreatedAt,
         updated_at: row.duplicateCreatedAt,
       })
@@ -1179,7 +1274,8 @@ async function insertDuplicateTerminalSubscription(
             payment_source: null,
             cancel_at_period_end: false,
             trial_started_at: row.organizationCreatedAt,
-            trial_ends_at: row.freeTrialEndAt ?? getTrialEndsAt(row.organizationCreatedAt),
+            trial_ends_at:
+              row.freeTrialEndAt ?? getOrganizationTrialEndsAt(row.organizationCreatedAt),
             created_at: row.duplicateCreatedAt,
             updated_at: row.duplicateCreatedAt,
           }
@@ -1290,7 +1386,7 @@ async function applyDuplicateActiveInstanceRow(
   });
 }
 
-async function applyDuplicateActiveInstances() {
+async function applyDuplicateActiveInstances(options: ApplyOptions) {
   const rows = await buildDuplicateActiveInstanceCandidates();
   let personalDestroyed = 0;
   let orgDestroyed = 0;
@@ -1302,6 +1398,47 @@ async function applyDuplicateActiveInstances() {
     action: string;
     error?: string;
   }> = [];
+  const manualTeardown: Array<{
+    duplicateInstanceId: string;
+    duplicateSandboxId: string;
+    userId: string;
+    action: string;
+  }> = [];
+
+  // Writing destroyed_at without destroying the underlying sandbox would make
+  // an active sandbox invisible to lifecycle/access checks while it keeps
+  // consuming resources. The canonical destroy flow (kiloclaw-router.ts
+  // destroy procedure) always calls KiloClawInternalClient().destroy() and
+  // rolls back on failure; we can't safely mirror that from a batch script.
+  // Operators MUST confirm each duplicate sandbox has already been torn down
+  // out-of-band before we mark its DB row destroyed.
+  if (!options.confirmSandboxesDestroyed) {
+    for (const row of rows) {
+      if (
+        row.action === 'backfill_destroy_duplicate_personal' ||
+        row.action === 'backfill_destroy_duplicate_org' ||
+        row.action === 'reassign_to_canonical_and_destroy_duplicate'
+      ) {
+        manualTeardown.push({
+          duplicateInstanceId: row.duplicateInstanceId,
+          duplicateSandboxId: row.duplicateSandboxId,
+          userId: row.userId,
+          action: row.action,
+        });
+      }
+    }
+    console.log(
+      '\nRefusing to mark duplicate instances destroyed without external sandbox teardown confirmation.'
+    );
+    console.log(
+      'Operators MUST destroy each sandbox below via the admin panel (or confirm it is already gone),'
+    );
+    console.log(
+      'then re-run with --confirm-sandboxes-destroyed to write destroyed_at and insert terminal rows.'
+    );
+    printSection('Duplicate sandboxes requiring manual teardown first', manualTeardown);
+    return;
+  }
 
   for (const row of rows) {
     if (
@@ -1421,12 +1558,16 @@ async function applyMissingPersonalBackfillRow(
         return 'skipped';
       }
 
-      const existing = await tx
-        .select({ id: kiloclaw_subscriptions.id })
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.instance_id, row.instanceId))
-        .limit(1);
-      if (existing.length > 0) {
+      const [existing, hasLiveCurrent] = await Promise.all([
+        tx
+          .select({ id: kiloclaw_subscriptions.id })
+          .from(kiloclaw_subscriptions)
+          .where(eq(kiloclaw_subscriptions.instance_id, row.instanceId))
+          .limit(1),
+        liveCurrentPersonalSubscriptionExistsForUser(tx, row.userId),
+      ]);
+
+      if (existing.length > 0 || hasLiveCurrent) {
         return 'skipped';
       }
 
@@ -1566,7 +1707,7 @@ async function applyMissingPersonalBackfillRow(
         return 'skipped';
       }
 
-      const trialEndsAt = getTrialEndsAt(row.instanceCreatedAt);
+      const trialEndsAt = getPersonalTrialEndsAt(row.instanceCreatedAt);
       const [inserted] = await tx
         .insert(kiloclaw_subscriptions)
         .values({
@@ -1745,7 +1886,7 @@ async function applyOrgBackfillRow(row: OrgBackfillCandidate): Promise<OrgApplyO
       return 'skipped';
     }
 
-    const trialEndsAt = row.freeTrialEndAt ?? getTrialEndsAt(row.organizationCreatedAt);
+    const trialEndsAt = row.freeTrialEndAt ?? getOrganizationTrialEndsAt(row.organizationCreatedAt);
     const trialStatus = new Date(trialEndsAt).getTime() > Date.now() ? 'trialing' : 'canceled';
     const [inserted] = await tx
       .insert(kiloclaw_subscriptions)
@@ -1866,6 +2007,10 @@ async function applyOrgBackfill() {
   printSection('Org rows skipped during apply', skipped);
 }
 
+type ApplyOptions = {
+  confirmSandboxesDestroyed: boolean;
+};
+
 function parseMode(inputMode?: string): Mode {
   const mode = inputMode ?? 'audit';
   switch (mode) {
@@ -1885,7 +2030,15 @@ function parseMode(inputMode?: string): Mode {
   }
 }
 
-const singleModeHandlers: Partial<Record<Mode, () => Promise<void>>> = {
+function parseApplyOptions(args: string[]): ApplyOptions {
+  return {
+    confirmSandboxesDestroyed: args.includes('--confirm-sandboxes-destroyed'),
+  };
+}
+
+type ModeHandler = (options: ApplyOptions) => Promise<void>;
+
+const singleModeHandlers: Partial<Record<Mode, ModeHandler>> = {
   'preview-missing-personal': previewMissingPersonalBackfill,
   'apply-missing-personal': applyMissingPersonalBackfill,
   'preview-duplicates': previewDuplicateActiveInstances,
@@ -1896,13 +2049,15 @@ const singleModeHandlers: Partial<Record<Mode, () => Promise<void>>> = {
   'apply-changelog-baseline': applyChangelogBaselineBackfill,
 };
 
-export async function run(inputMode?: string) {
+export async function run(...args: string[]) {
+  const inputMode = args[0];
   const mode = parseMode(inputMode);
+  const options = parseApplyOptions(args.slice(1));
 
   const handler = singleModeHandlers[mode];
   if (handler) {
     console.log(`Mode: ${mode}`);
-    await handler();
+    await handler(options);
     return;
   }
   // Fall through: 'audit' and 'repair-detached' share the full summary output.

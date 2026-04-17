@@ -268,7 +268,7 @@ export class ConversationDO extends DurableObject<Env> {
       messages: rows.map(row => ({
         id: row.id,
         senderId: row.sender_id,
-        content: row.content,
+        content: row.deleted === 1 ? '[]' : row.content,
         inReplyToMessageId: row.in_reply_to_message_id,
         version: row.version,
         updatedAt: row.updated_at,
@@ -280,7 +280,7 @@ export class ConversationDO extends DurableObject<Env> {
 
   editMessage(params: EditMessageParams): EditMessageResult {
     const row = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
-    if (!row) {
+    if (!row || row.deleted === 1) {
       return {
         ok: false,
         code: 'not_found',
@@ -338,6 +338,11 @@ export class ConversationDO extends DurableObject<Env> {
         code: 'not_found',
         error: `Message ${params.messageId} not found`,
       };
+    }
+
+    // Already deleted — idempotent success
+    if (row.deleted === 1) {
+      return { ok: true };
     }
 
     if (params.senderId !== row.sender_id) {

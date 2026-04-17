@@ -218,6 +218,48 @@ describe('ConversationDO', () => {
     expect(msg!.updatedAt).not.toBeNull();
   });
 
+  it('editMessage - rejects editing a deleted message', async () => {
+    const stub = getStub('conv-edit-deleted');
+    await stub.initialize(BASE_PARAMS);
+    const created = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Secret info' }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    await stub.deleteMessage({ messageId: created.messageId, senderId: 'user-alice' });
+
+    // Editing a deleted message should fail
+    const result = await stub.editMessage({
+      messageId: created.messageId,
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Zombie edit' }],
+      version: 1,
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('listMessages - scrubs content of deleted messages', async () => {
+    const stub = getStub('conv-delete-scrub');
+    await stub.initialize(BASE_PARAMS);
+    const created = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Sensitive content' }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    await stub.deleteMessage({ messageId: created.messageId, senderId: 'user-alice' });
+
+    const { messages } = await stub.listMessages({ limit: 10 });
+    const msg = messages.find(m => m.id === created.messageId);
+    expect(msg).toBeDefined();
+    expect(msg!.deleted).toBe(true);
+    // Content should be scrubbed — not contain original text
+    expect(msg!.content).not.toContain('Sensitive content');
+  });
+
   it('deleteMessage - rejects non-sender', async () => {
     const stub = getStub('conv-delete-2');
     await stub.initialize(BASE_PARAMS);

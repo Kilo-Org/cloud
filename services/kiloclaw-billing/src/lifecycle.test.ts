@@ -1152,6 +1152,155 @@ describe('credit renewal sweep affiliate tracking', () => {
   });
 });
 
+describe('complementary inference ended sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ sent: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+  });
+
+  it('sends complementary-ended email for normalized instance-ready log rows', async () => {
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    const { db, inserts, selectBuilders } = createMockDb([
+      [
+        {
+          user_id: 'user-1',
+          email: 'user-1@example.com',
+          instance_id: instanceId,
+          sandbox_id: 'ki_11111111111141118111111111111111',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '91919191-9191-4191-8191-919191919191',
+        sweep: 'complementary_inference_ended',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.complementary_inference_ended_emails).toBe(1);
+    expect(summary.emails_sent).toBe(1);
+    expect(selectBuilders[0]?.innerJoin).toHaveBeenCalledTimes(2);
+    expect(selectBuilders[0]?.leftJoin).not.toHaveBeenCalled();
+    expect(inserts).toEqual([
+      {
+        user_id: 'user-1',
+        instance_id: instanceId,
+        email_type: 'claw_complementary_inference_ended',
+      },
+    ]);
+
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+      action: string;
+      input: Record<string, unknown>;
+    };
+    expect(body).toEqual({
+      action: 'send_email',
+      input: {
+        to: 'user-1@example.com',
+        templateName: 'clawComplementaryInferenceEnded',
+        templateVars: { claw_url: 'https://app.kilo.ai/claw' },
+        userId: 'user-1',
+        instanceId,
+      },
+    });
+  });
+
+  it('suppresses duplicate complementary-ended email when log insert conflicts', async () => {
+    const instanceId = '22222222-2222-4222-8222-222222222222';
+    const { db, inserts } = createMockDb(
+      [
+        [
+          {
+            user_id: 'user-2',
+            email: 'user-2@example.com',
+            instance_id: instanceId,
+            sandbox_id: 'ki_22222222222242228222222222222222',
+          },
+        ],
+      ],
+      { insertRowCounts: [0] }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '92929292-9292-4292-8292-929292929292',
+        sweep: 'complementary_inference_ended',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.complementary_inference_ended_emails).toBe(0);
+    expect(summary.emails_sent).toBe(0);
+    expect(summary.emails_skipped).toBe(1);
+    expect(inserts).toEqual([
+      {
+        user_id: 'user-2',
+        instance_id: instanceId,
+        email_type: 'claw_complementary_inference_ended',
+      },
+    ]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not send when purchased-credit exclusion returns no candidates', async () => {
+    const { db, inserts } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '93939393-9393-4393-8393-939393939393',
+        sweep: 'complementary_inference_ended',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.complementary_inference_ended_emails).toBe(0);
+    expect(summary.emails_sent).toBe(0);
+    expect(inserts).toEqual([]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not send when destroyed-instance exclusion returns no candidates', async () => {
+    const { db, inserts } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '94949494-9494-4494-8494-949494949494',
+        sweep: 'complementary_inference_ended',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.complementary_inference_ended_emails).toBe(0);
+    expect(summary.emails_sent).toBe(0);
+    expect(inserts).toEqual([]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe('soft-deleted user lifecycle exclusion', () => {
   beforeEach(() => {
     vi.clearAllMocks();

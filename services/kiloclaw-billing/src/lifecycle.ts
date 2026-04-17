@@ -2373,6 +2373,51 @@ async function runEarlybirdWarningSweep(
 
 const COMPLEMENTARY_INFERENCE_WINDOW_MS = 6 * 60 * 60 * 1000;
 const COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO = '2026-04-10T00:00:00.000Z';
+const INSTANCE_READY_EMAIL_TYPE = 'claw_instance_ready';
+const COMPLEMENTARY_INFERENCE_ENDED_EMAIL_TYPE = 'claw_complementary_inference_ended';
+
+export function buildComplementaryInferenceEndedCandidateQuery(
+  database: WorkerDb,
+  windowCutoff: string
+) {
+  return database
+    .select({
+      user_id: kilocode_users.id,
+      email: kilocode_users.google_user_email,
+      instance_id: kiloclaw_instances.id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+    })
+    .from(kiloclaw_email_log)
+    .innerJoin(
+      kiloclaw_instances,
+      and(
+        eq(kiloclaw_email_log.instance_id, kiloclaw_instances.id),
+        eq(kiloclaw_email_log.user_id, kiloclaw_instances.user_id)
+      )
+    )
+    .innerJoin(kilocode_users, eq(kiloclaw_email_log.user_id, kilocode_users.id))
+    .where(
+      and(
+        eq(kiloclaw_email_log.email_type, INSTANCE_READY_EMAIL_TYPE),
+        isNotNull(kiloclaw_email_log.instance_id),
+        gt(kiloclaw_email_log.sent_at, COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO),
+        lte(kiloclaw_email_log.sent_at, windowCutoff),
+        isNull(kiloclaw_instances.destroyed_at),
+        sql`NOT EXISTS (
+          SELECT 1 FROM ${kiloclaw_email_log} AS sent_check
+          WHERE sent_check.user_id = ${kiloclaw_email_log.user_id}
+            AND sent_check.instance_id = ${kiloclaw_instances.id}
+            AND sent_check.email_type = ${COMPLEMENTARY_INFERENCE_ENDED_EMAIL_TYPE}
+        )`,
+        sql`NOT EXISTS (
+          SELECT 1 FROM ${credit_transactions}
+          WHERE ${credit_transactions.kilo_user_id} = ${kilocode_users.id}
+            AND ${credit_transactions.is_free} = false
+            AND ${credit_transactions.organization_id} IS NULL
+        )`
+      )
+    );
+}
 
 async function runComplementaryInferenceEndedSweep(
   database: WorkerDb,
@@ -2382,66 +2427,7 @@ async function runComplementaryInferenceEndedSweep(
 ): Promise<void> {
   const clawUrl = buildClawUrl(env);
   const windowCutoff = new Date(Date.now() - COMPLEMENTARY_INFERENCE_WINDOW_MS).toISOString();
-
-  // Find users whose per-instance "instance ready" email was sent more than
-  // 6 hours ago after rollout cutoff, whose instance is not destroyed, who
-  // have never purchased credits, and who have not already received same
-  // notification for same instance.
-  const rows = await database
-    .select({
-      user_id: kilocode_users.id,
-      email: kilocode_users.google_user_email,
-      instance_id: kiloclaw_instances.id,
-      sandbox_id: kiloclaw_instances.sandbox_id,
-    })
-    .from(kiloclaw_email_log)
-    .innerJoin(kilocode_users, eq(kiloclaw_email_log.user_id, kilocode_users.id))
-    .innerJoin(
-      kiloclaw_instances,
-      and(
-        eq(kilocode_users.id, kiloclaw_instances.user_id),
-        or(
-          and(
-            eq(kiloclaw_email_log.instance_id, kiloclaw_instances.id),
-            eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
-          ),
-          and(
-            isNull(kiloclaw_email_log.instance_id),
-            sql`${kiloclaw_email_log.email_type} = 'claw_instance_ready:' || ${kiloclaw_instances.sandbox_id}`
-          )
-        )
-      )
-    )
-    .where(
-      and(
-        gt(kiloclaw_email_log.sent_at, COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO),
-        lte(kiloclaw_email_log.sent_at, windowCutoff),
-        isNull(kiloclaw_instances.destroyed_at),
-        // Not already sent the complementary inference ended email for this instance
-        sql`NOT EXISTS (
-          SELECT 1 FROM ${kiloclaw_email_log} AS sent_check
-          WHERE sent_check.user_id = ${kiloclaw_email_log.user_id}
-            AND (
-              (
-                sent_check.instance_id = ${kiloclaw_instances.id}
-                AND sent_check.email_type = 'claw_complementary_inference_ended'
-              )
-              OR (
-                sent_check.instance_id IS NULL
-                AND sent_check.email_type =
-                  'claw_complementary_inference_ended:' || ${kiloclaw_instances.sandbox_id}
-              )
-            )
-        )`,
-        // Never purchased credits (is_free = false, no org_id = personal purchase)
-        sql`NOT EXISTS (
-          SELECT 1 FROM ${credit_transactions}
-          WHERE ${credit_transactions.kilo_user_id} = ${kilocode_users.id}
-            AND ${credit_transactions.is_free} = false
-            AND ${credit_transactions.organization_id} IS NULL
-        )`
-      )
-    );
+  const rows = await buildComplementaryInferenceEndedCandidateQuery(database, windowCutoff);
 
   for (const row of rows) {
     try {
@@ -2452,7 +2438,7 @@ async function runComplementaryInferenceEndedSweep(
         context,
         row.user_id,
         row.email,
-        'claw_complementary_inference_ended',
+        COMPLEMENTARY_INFERENCE_ENDED_EMAIL_TYPE,
         'clawComplementaryInferenceEnded',
         { claw_url: clawUrl },
         summary,

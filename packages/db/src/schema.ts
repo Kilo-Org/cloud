@@ -4060,6 +4060,9 @@ export const kiloclaw_email_log = pgTable(
     uniqueIndex('UQ_kiloclaw_email_log_user_instance_type')
       .on(table.user_id, table.instance_id, table.email_type)
       .where(isNotNull(table.instance_id)),
+    index('IDX_kiloclaw_email_log_type_sent_instance')
+      .on(table.email_type, table.sent_at, table.instance_id, table.user_id)
+      .where(isNotNull(table.instance_id)),
   ]
 );
 

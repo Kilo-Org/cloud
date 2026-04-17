@@ -16,17 +16,12 @@ import {
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
-import {
-  KILOCLAW_API_URL,
-  STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID,
-  STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID,
-} from '@/lib/config.server';
+import { KILOCLAW_API_URL } from '@/lib/config.server';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
-  kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_instances,
   kiloclaw_email_log,
@@ -69,6 +64,7 @@ import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
+import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
   getStripePriceIdForClawPlan,
   getStripePriceIdForClawPlanIntro,
@@ -78,8 +74,10 @@ import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
-import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
-import { getKiloClawSubscriptionAccessReason } from '@/lib/kiloclaw/access-state';
+import {
+  getKiloClawEarlybirdStateForUser,
+  getKiloClawSubscriptionAccessReason,
+} from '@/lib/kiloclaw/access-state';
 import {
   enrollWithCredits as enrollWithCreditsImpl,
   getEffectiveCreditBalancePreview,
@@ -151,18 +149,6 @@ function mapCurrentSubscriptionResolutionError(error: unknown): never {
     });
   }
   throw error;
-}
-
-async function getEarlybirdPurchaseRow(
-  userId: string,
-  executor: typeof db | DrizzleTransaction = db
-): Promise<{ id: string } | null> {
-  const [earlybird] = await executor
-    .select({ id: kiloclaw_earlybird_purchases.id })
-    .from(kiloclaw_earlybird_purchases)
-    .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
-    .limit(1);
-  return earlybird ?? null;
 }
 
 async function resolveDetachedAccessGrantingPersonalSubscription(params: {
@@ -261,10 +247,7 @@ async function resolvePersonalBillingAnchor(params: {
   currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
 }> {
   const executor = params.executor ?? db;
-  const now = new Date();
   const activeInstance = await getActiveInstance(params.userId, executor);
-  const earlybird = await getEarlybirdPurchaseRow(params.userId, executor);
-  const hasActiveEarlybirdAccess = !!earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now;
   const [anySubscription] = await executor
     .select({ id: kiloclaw_subscriptions.id })
     .from(kiloclaw_subscriptions)
@@ -289,7 +272,7 @@ async function resolvePersonalBillingAnchor(params: {
       })
     : null;
 
-  if (activeInstance && !currentRow && !hasActiveEarlybirdAccess && anySubscription) {
+  if (activeInstance && !currentRow && anySubscription) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Active KiloClaw instance is missing its current billing row.',
@@ -899,8 +882,6 @@ async function ensureProvisionAccess(
 }> {
   const now = new Date();
   const activeInstance = await getActiveInstance(userId, executor);
-  const earlybird = await getEarlybirdPurchaseRow(userId, executor);
-  const hasActiveEarlybirdAccess = !!earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now;
   const detachedAccessGrantingSubscription =
     await resolveDetachedAccessGrantingPersonalSubscription({
       userId,
@@ -921,19 +902,15 @@ async function ensureProvisionAccess(
     mapCurrentSubscriptionResolutionError(error);
   }
 
-  if (
-    activeInstance &&
-    !currentRow &&
-    !detachedAccessGrantingSubscription &&
-    !hasActiveEarlybirdAccess
-  ) {
-    if (!anySubscription) {
-      return {
-        instanceId: activeInstance.id,
-        bootstrapSubscription: true,
-        shouldEnqueueTrialStartAffiliate: true,
-      };
-    }
+  if (activeInstance && !currentRow && !detachedAccessGrantingSubscription && !anySubscription) {
+    return {
+      instanceId: activeInstance.id,
+      bootstrapSubscription: true,
+      shouldEnqueueTrialStartAffiliate: true,
+    };
+  }
+
+  if (activeInstance && !currentRow && !detachedAccessGrantingSubscription) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Active KiloClaw instance is missing its current billing row.',
@@ -955,14 +932,6 @@ async function ensureProvisionAccess(
     };
   }
 
-  if (hasActiveEarlybirdAccess) {
-    return {
-      instanceId: activeInstance?.id ?? null,
-      bootstrapSubscription: false,
-      shouldEnqueueTrialStartAffiliate: false,
-    };
-  }
-
   if (detachedAccessGrantingSubscription) {
     return {
       instanceId: activeInstance?.id ?? null,
@@ -971,7 +940,7 @@ async function ensureProvisionAccess(
     };
   }
 
-  if (!anySubscription && !earlybird) {
+  if (!anySubscription) {
     return {
       instanceId: activeInstance?.id ?? null,
       bootstrapSubscription: activeInstance !== null,
@@ -1077,25 +1046,9 @@ async function getPersonalBillingStatus(user: {
       now,
     });
 
-  const [earlybird] = await db
-    .select({ id: kiloclaw_earlybird_purchases.id })
-    .from(kiloclaw_earlybird_purchases)
-    .where(eq(kiloclaw_earlybird_purchases.user_id, user.id))
-    .limit(1);
-
-  const earlybirdExpiresAt = KILOCLAW_EARLYBIRD_EXPIRY_DATE;
-  const earlybirdDaysRemaining = Math.ceil(
-    (new Date(earlybirdExpiresAt).getTime() - Date.now()) / 86_400_000
-  );
-
   let accessReason: 'trial' | 'subscription' | 'earlybird' | null =
     getKiloClawSubscriptionAccessReason(sub, now);
   let hasAccess = accessReason !== null;
-
-  if (!hasAccess && earlybird && new Date(earlybirdExpiresAt) > now) {
-    hasAccess = true;
-    accessReason = 'earlybird';
-  }
 
   const trialData =
     sub?.status === 'trialing' || (sub?.trial_started_at && sub?.trial_ends_at)
@@ -1145,12 +1098,14 @@ async function getPersonalBillingStatus(user: {
       }
     : null;
 
-  const isEarlybird = earlybird || accessReason === 'earlybird';
+  const isEarlybird = sub?.access_origin === 'earlybird';
   const earlybirdData = isEarlybird
     ? {
-        purchased: !!earlybird,
-        expiresAt: earlybirdExpiresAt,
-        daysRemaining: earlybirdDaysRemaining,
+        purchased: true,
+        expiresAt: sub.trial_ends_at ?? KILOCLAW_EARLYBIRD_EXPIRY_DATE,
+        daysRemaining: sub.trial_ends_at
+          ? Math.ceil((new Date(sub.trial_ends_at).getTime() - Date.now()) / 86_400_000)
+          : 0,
       }
     : null;
 
@@ -1215,7 +1170,7 @@ async function getPersonalBillingStatus(user: {
   return {
     hasAccess,
     accessReason,
-    trialEligible: !anyPersonalInstance && !anySubscription && !earlybird,
+    trialEligible: !anyPersonalInstance && !anySubscription,
     creditBalanceMicrodollars,
     creditIntroEligible,
     hasActiveKiloPass,
@@ -2743,76 +2698,17 @@ export const kiloclawRouter = createTRPCRouter({
   getEarlybirdStatus: baseProcedure
     .output(z.object({ purchased: z.boolean() }))
     .query(async ({ ctx }) => {
-      const rows = await db
-        .select({ id: kiloclaw_earlybird_purchases.id })
-        .from(kiloclaw_earlybird_purchases)
-        .where(eq(kiloclaw_earlybird_purchases.user_id, ctx.user.id))
-        .limit(1);
-      return { purchased: rows.length > 0 };
+      const state = await getKiloClawEarlybirdStateForUser(ctx.user.id);
+      return { purchased: state.purchased };
     }),
 
   createEarlybirdCheckoutSession: baseProcedure
     .output(z.object({ url: z.url().nullable() }))
-    .mutation(async ({ ctx }) => {
-      const existing = await db
-        .select({ id: kiloclaw_earlybird_purchases.id })
-        .from(kiloclaw_earlybird_purchases)
-        .where(eq(kiloclaw_earlybird_purchases.user_id, ctx.user.id))
-        .limit(1);
-
-      if (existing.length > 0) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'You have already purchased the early bird offer.',
-        });
-      }
-
-      const stripeCustomerId = ctx.user.stripe_customer_id;
-      if (!stripeCustomerId) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Missing Stripe customer for user.',
-        });
-      }
-
-      if (!STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Early bird pricing is not configured.',
-        });
-      }
-
-      const session = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        customer: stripeCustomerId,
-        billing_address_collection: 'required',
-        line_items: [{ price: STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID, quantity: 1 }],
-        ...(STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID
-          ? { discounts: [{ coupon: STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID }] }
-          : { allow_promotion_codes: true }),
-        customer_update: {
-          name: 'auto',
-          address: 'auto',
-        },
-        tax_id_collection: {
-          enabled: true,
-          required: 'never',
-        },
-        payment_intent_data: {
-          metadata: {
-            type: 'kiloclaw-earlybird',
-            kiloUserId: ctx.user.id,
-          },
-        },
-        success_url: `${APP_URL}/claw?earlybird_checkout=success`,
-        cancel_url: `${APP_URL}/claw/earlybird?checkout=cancelled`,
-        metadata: {
-          type: 'kiloclaw-earlybird',
-          kiloUserId: ctx.user.id,
-        },
+    .mutation(async () => {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Earlybird offer is no longer available.',
       });
-
-      return { url: typeof session.url === 'string' ? session.url : null };
     }),
 
   // User version pinning endpoints

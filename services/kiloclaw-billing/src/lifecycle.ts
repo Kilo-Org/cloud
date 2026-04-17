@@ -14,7 +14,6 @@ import {
 } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
   credit_transactions,
-  kiloclaw_earlybird_purchases,
   kiloclaw_email_log,
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -2291,40 +2290,7 @@ async function runEarlybirdWarningSweep(
       )
     );
 
-  const legacyRows = await database
-    .select({
-      user_id: kiloclaw_earlybird_purchases.user_id,
-      email: kilocode_users.google_user_email,
-    })
-    .from(kiloclaw_earlybird_purchases)
-    .innerJoin(kilocode_users, eq(kiloclaw_earlybird_purchases.user_id, kilocode_users.id))
-    .where(sql`NOT EXISTS (
-        SELECT 1
-        FROM ${kiloclaw_subscriptions}
-        WHERE ${kiloclaw_subscriptions.user_id} = ${kiloclaw_earlybird_purchases.user_id}
-          AND ${kiloclaw_subscriptions.transferred_to_subscription_id} IS NULL
-          AND ${kiloclaw_subscriptions.access_origin} = 'earlybird'
-      )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM ${kiloclaw_subscriptions}
-        WHERE ${kiloclaw_subscriptions.user_id} = ${kiloclaw_earlybird_purchases.user_id}
-          AND ${kiloclaw_subscriptions.transferred_to_subscription_id} IS NULL
-          AND (
-            ${kiloclaw_subscriptions.status} = 'active'
-            OR (
-              ${kiloclaw_subscriptions.status} = 'past_due'
-              AND ${kiloclaw_subscriptions.suspended_at} IS NULL
-            )
-            OR (
-              ${kiloclaw_subscriptions.status} = 'trialing'
-              AND ${kiloclaw_subscriptions.access_origin} IS DISTINCT FROM 'earlybird'
-              AND ${kiloclaw_subscriptions.trial_ends_at} > now()
-            )
-          )
-      )`);
-
-  for (const row of [...canonicalRows, ...legacyRows]) {
+  for (const row of canonicalRows) {
     try {
       if (isSoftDeletedUserEmail(row.email)) continue;
       const expiryDate = formatDateForEmail(earlybirdExpiry);

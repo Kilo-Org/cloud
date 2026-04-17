@@ -1100,56 +1100,6 @@ describe('credit renewal sweep affiliate tracking', () => {
     expect(txInserts).toHaveLength(0);
     expect(txUpdates).toHaveLength(0);
   });
-
-  it('sends earlybird warning for legacy purchase rows before canonical backfill', async () => {
-    const nowSpy = vi
-      .spyOn(Date, 'now')
-      .mockReturnValue(new Date('2026-09-12T00:00:00.000Z').getTime());
-    const { db, inserts } = createMockDb([
-      [
-        {
-          user_id: 'user-legacy-earlybird',
-          email: 'legacy-earlybird@example.com',
-        },
-      ],
-    ]);
-    mockGetWorkerDb.mockReturnValue(db);
-
-    const fetch = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ sent: true }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-    );
-    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
-
-    try {
-      const summary = await runSweep(
-        createEnv(fetch),
-        {
-          runId: '34343434-3434-4434-8434-343434343434',
-          sweep: 'earlybird_warning',
-        },
-        1
-      );
-
-      expect(summary.errors).toBe(0);
-      expect(summary.earlybird_warnings).toBe(1);
-      expect(fetch).toHaveBeenCalledTimes(1);
-      expect(inserts).toEqual(
-        expect.arrayContaining([
-          {
-            user_id: 'user-legacy-earlybird',
-            instance_id: null,
-            email_type: 'claw_earlybird_14d',
-          },
-        ])
-      );
-    } finally {
-      nowSpy.mockRestore();
-    }
-  });
 });
 
 describe('complementary inference ended sweep', () => {

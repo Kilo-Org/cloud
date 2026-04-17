@@ -2,7 +2,6 @@ import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import {
   getWorkerDb,
   insertKiloClawSubscriptionChangeLog,
-  kiloclaw_earlybird_purchases,
   kiloclaw_instances,
   kiloclaw_subscriptions,
   organizations,
@@ -13,7 +12,6 @@ import {
 import type { BillingWorkerEnv } from './types.js';
 import { logger } from './logger.js';
 
-const KILOCLAW_EARLYBIRD_EXPIRY_DATE = '2026-09-26';
 const PERSONAL_TRIAL_DURATION_DAYS = 7;
 const ORGANIZATION_TRIAL_DURATION_DAYS = 14;
 const BOOTSTRAP_ACTOR = {
@@ -488,7 +486,7 @@ async function bootstrapPersonalSubscription(
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
   const now = new Date();
 
-  const [existingForInstance, subscriptions, instances, earlybirdPurchase] = await Promise.all([
+  const [existingForInstance, subscriptions, instances] = await Promise.all([
     db
       .select()
       .from(kiloclaw_subscriptions)
@@ -507,15 +505,6 @@ async function bootstrapPersonalSubscription(
       })
       .from(kiloclaw_instances)
       .where(eq(kiloclaw_instances.user_id, input.userId)),
-    db
-      .select({
-        id: kiloclaw_earlybird_purchases.id,
-        createdAt: kiloclaw_earlybird_purchases.created_at,
-      })
-      .from(kiloclaw_earlybird_purchases)
-      .where(eq(kiloclaw_earlybird_purchases.user_id, input.userId))
-      .limit(1)
-      .then(rows => rows[0] ?? null),
   ]);
 
   if (existingForInstance) {
@@ -603,10 +592,7 @@ async function bootstrapPersonalSubscription(
     });
   }
 
-  const hasActiveEarlybirdAccess =
-    !!earlybirdPurchase && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE).getTime() > now.getTime();
-
-  if (personalSubscriptions.length > 0 && !hasActiveEarlybirdAccess) {
+  if (personalSubscriptions.length > 0) {
     logger
       .withFields({
         decision: 'rejected_non_access_granting_rows_present',
@@ -622,43 +608,21 @@ async function bootstrapPersonalSubscription(
 
   logger
     .withFields({
-      decision: earlybirdPurchase ? 'fresh_earlybird_row' : 'fresh_trial_row',
+      decision: 'fresh_trial_row',
     })
-    .info(
-      earlybirdPurchase
-        ? 'Personal bootstrap: creating earlybird row'
-        : 'Personal bootstrap: creating fresh trial row'
-    );
+    .info('Personal bootstrap: creating fresh trial row');
 
-  const { row: created, created: wasInserted } = await insertSubscriptionIdempotent(
-    db,
-    earlybirdPurchase
-      ? {
-          user_id: input.userId,
-          instance_id: input.instanceId,
-          plan: 'trial',
-          status:
-            new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE).getTime() > now.getTime()
-              ? 'trialing'
-              : 'canceled',
-          access_origin: 'earlybird',
-          payment_source: null,
-          cancel_at_period_end: false,
-          trial_started_at: earlybirdPurchase.createdAt,
-          trial_ends_at: KILOCLAW_EARLYBIRD_EXPIRY_DATE,
-        }
-      : {
-          user_id: input.userId,
-          instance_id: input.instanceId,
-          plan: 'trial',
-          status: 'trialing',
-          access_origin: null,
-          payment_source: null,
-          cancel_at_period_end: false,
-          trial_started_at: now.toISOString(),
-          trial_ends_at: getTrialEndsAt(now),
-        }
-  );
+  const { row: created, created: wasInserted } = await insertSubscriptionIdempotent(db, {
+    user_id: input.userId,
+    instance_id: input.instanceId,
+    plan: 'trial',
+    status: 'trialing',
+    access_origin: null,
+    payment_source: null,
+    cancel_at_period_end: false,
+    trial_started_at: now.toISOString(),
+    trial_ends_at: getTrialEndsAt(now),
+  });
 
   if (!wasInserted) {
     logger
@@ -674,7 +638,7 @@ async function bootstrapPersonalSubscription(
     subscriptionId: created.id,
     actor: BOOTSTRAP_ACTOR,
     action: 'created',
-    reason: earlybirdPurchase ? 'personal_provision_earlybird' : 'personal_provision_trial',
+    reason: 'personal_provision_trial',
     before: null,
     after: created,
   });

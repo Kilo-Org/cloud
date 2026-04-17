@@ -8,7 +8,6 @@ const { mockGetWorkerDb, mockInsertKiloClawSubscriptionChangeLog } = vi.hoisted(
 vi.mock('@kilocode/db', () => ({
   getWorkerDb: mockGetWorkerDb,
   insertKiloClawSubscriptionChangeLog: mockInsertKiloClawSubscriptionChangeLog,
-  kiloclaw_earlybird_purchases: {},
   kiloclaw_instances: {},
   kiloclaw_subscriptions: {},
   organizations: {},
@@ -681,7 +680,6 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
         [], // existingForInstance (none seen yet — TOCTOU window)
         [], // subscriptions for user
         [], // instances for user
-        [], // earlybirdPurchase
         [winnerRow], // reselect after conflict
       ],
       insertFirstReturningRows: [], // onConflictDoNothing swallowed our insert

@@ -1,10 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
-import {
-  kiloclaw_earlybird_purchases,
-  kiloclaw_subscriptions,
-  type KiloClawSubscription,
-} from '@kilocode/db/schema';
+import { kiloclaw_subscriptions, type KiloClawSubscription } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 import {
@@ -126,20 +122,6 @@ export async function getKiloClawEarlybirdStateForUser(
       purchased: true,
       hasAccess: getKiloClawSubscriptionAccessReason(subscription, now) === 'earlybird',
       expiresAt: subscription?.trial_ends_at ?? KILOCLAW_EARLYBIRD_EXPIRY_DATE,
-    };
-  }
-
-  const [legacyPurchase] = await db
-    .select({ createdAt: kiloclaw_earlybird_purchases.created_at })
-    .from(kiloclaw_earlybird_purchases)
-    .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
-    .limit(1);
-
-  if (legacyPurchase) {
-    return {
-      purchased: true,
-      hasAccess: new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now,
-      expiresAt: KILOCLAW_EARLYBIRD_EXPIRY_DATE,
     };
   }
 

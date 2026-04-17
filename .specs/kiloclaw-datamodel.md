@@ -123,11 +123,11 @@ on application logs that may be rotated or incomplete.
    (see kiloclaw-billing.md, Plans rule 5).
 6. Early-bird subscribers who have instance records without
    subscription records are a known violation of rule 4. These
-   MUST be resolved by backfilling subscription records for all
-   early-bird instances. Until backfill is complete, code that
-   queries subscriptions for early-bird users MUST treat the user
-   as having earlybird-only access (no active subscription) and
-   MUST NOT throw an unhandled error or return an error response.
+   MUST be resolved by backfilling canonical subscription records
+   for those instances. Runtime code MUST NOT continue granting
+   access from purchase-table fallback once migration cleanup is
+   complete; users without canonical rows are treated as exceptions
+   requiring manual remediation.
 
 ### Multi-Instance Support
 

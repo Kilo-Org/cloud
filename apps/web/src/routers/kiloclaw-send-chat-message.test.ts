@@ -1,10 +1,6 @@
 import { describe, expect, it, beforeAll, beforeEach, jest } from '@jest/globals';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
-import {
-  kiloclaw_earlybird_purchases,
-  kiloclaw_instances,
-  kiloclaw_subscriptions,
-} from '@kilocode/db/schema';
+import { kiloclaw_instances, kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 
@@ -125,9 +121,12 @@ describe('kiloclaw.sendChatMessage', () => {
 
   describe('ownership validation', () => {
     it('rejects when user has no active instance (no instanceId)', async () => {
-      await db.insert(kiloclaw_earlybird_purchases).values({
+      await db.insert(kiloclaw_subscriptions).values({
         user_id: user.id,
-        amount_cents: 2500,
+        instance_id: null,
+        plan: 'standard',
+        status: 'active',
+        stripe_subscription_id: `sub_detached_${crypto.randomUUID()}`,
       });
       const caller = await createCallerForUser(user.id);
 

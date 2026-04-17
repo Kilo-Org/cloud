@@ -124,8 +124,6 @@ export function MessageArea({
 
   const messageMap = new Map(messages.map(m => [m.id, m]));
 
-  const botIsTyping = Array.from(typingMembers.keys()).some(id => id.startsWith('bot:'));
-
   const title = conversationDetail.data?.title ?? 'Untitled';
 
   function handleTitleClick() {
@@ -171,7 +169,7 @@ export function MessageArea({
             {title}
           </h2>
         )}
-        <BotStatus isTyping={botIsTyping} instanceStatus={instanceStatus} />
+        <BotStatus instanceStatus={instanceStatus} />
       </div>
 
       {/* Messages */}

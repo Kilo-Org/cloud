@@ -325,6 +325,12 @@ export function generateBaseConfig(
   if (!(config.plugins.load.paths as string[]).includes(KILOCLAW_CUSTOMIZER_PLUGIN_PATH)) {
     (config.plugins.load.paths as string[]).push(KILOCLAW_CUSTOMIZER_PLUGIN_PATH);
   }
+  if (
+    Array.isArray(config.plugins.allow) &&
+    !config.plugins.allow.includes(KILOCLAW_CUSTOMIZER_PLUGIN_ID)
+  ) {
+    config.plugins.allow.push(KILOCLAW_CUSTOMIZER_PLUGIN_ID);
+  }
   config.plugins.entries = config.plugins.entries ?? {};
   config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID] =
     config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID] ?? {};

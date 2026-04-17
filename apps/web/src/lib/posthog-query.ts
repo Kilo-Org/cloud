@@ -63,19 +63,21 @@ const CACHE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
 // use a globally unique `name`. Reusing a name for a different query would
 // return stale/incorrect cached data.
 export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
+  const parse = (name: string, raw: unknown): Output[] => {
+    const result = schema.safeParse(raw);
+    if (!result.success) {
+      throw new Error(`${name} parse failed: ${z.prettifyError(result.error)}`);
+    }
+    return result.data;
+  };
+
   return async (name: string, query: string): Promise<Output[]> => {
     const key = `posthog-query:${name}`;
 
     try {
       const cached = await redisGet(key);
       if (cached !== null) {
-        const parsed = schema.safeParse(JSON.parse(cached));
-        if (parsed.success) {
-          return parsed.data;
-        }
-        console.warn(
-          `[cachedPosthogQuery] ${name} cached value failed schema validation, refetching`
-        );
+        return parse(name, JSON.parse(cached));
       }
     } catch (err) {
       console.warn(`[cachedPosthogQuery] ${name} redis get failed, falling through`, err);
@@ -86,20 +88,17 @@ export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
     if (response.status !== 'ok') {
       throw new Error(`${name} query failed: ${JSON.stringify(response.error, undefined, 2)}`);
     }
-    const result = schema.safeParse(response.body.results);
-    if (!result.success) {
-      throw new Error(`${name} parse failed: ${z.prettifyError(result.error)}`);
-    }
+    const data = parse(name, response.body.results);
     console.debug(
-      `[cachedPosthogQuery] ${name} returned ${result.data.length} rows in ${performance.now() - startTime}ms`
+      `[cachedPosthogQuery] ${name} returned ${data.length} rows in ${performance.now() - startTime}ms`
     );
 
     try {
-      await redisSet(key, JSON.stringify(result.data), CACHE_TTL_SECONDS);
+      await redisSet(key, JSON.stringify(response.body.results), CACHE_TTL_SECONDS);
     } catch (err) {
       console.warn(`[cachedPosthogQuery] ${name} redis set failed`, err);
     }
 
-    return result.data;
+    return data;
   };
 }

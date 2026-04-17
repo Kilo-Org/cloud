@@ -5,9 +5,13 @@ import {
   BlacklistDomainsConfigSchema,
   BlacklistDomainsInputSchema,
   DEFAULT_BLACKLIST_DOMAINS_CONFIG,
+  getBlacklistedDomains,
 } from '@/lib/blacklist-domains-config';
 import type { BlacklistDomainsConfig } from '@/lib/blacklist-domains-config';
 import { TRPCError } from '@trpc/server';
+import { db } from '@/lib/drizzle';
+import { kilocode_users } from '@kilocode/db/schema';
+import { sql, count, or } from 'drizzle-orm';
 
 async function readConfig(): Promise<BlacklistDomainsConfig> {
   try {
@@ -44,5 +48,33 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
       });
     }
     return config;
+  }),
+
+  stats: adminProcedure.query(async () => {
+    const domains = await getBlacklistedDomains();
+
+    const domainCounts = await Promise.all(
+      domains.map(async domain => {
+        const conditions = or(
+          sql`lower(${kilocode_users.google_user_email}) LIKE ${`%@${domain.toLowerCase()}`}`,
+          sql`lower(${kilocode_users.google_user_email}) LIKE ${`%.${domain.toLowerCase()}`}`
+        );
+
+        const result = await db.select({ count: count() }).from(kilocode_users).where(conditions);
+
+        return {
+          domain,
+          blockedCount: result[0]?.count ?? 0,
+        };
+      })
+    );
+
+    domainCounts.sort((a, b) => b.blockedCount - a.blockedCount);
+
+    return {
+      domains: domainCounts,
+      totalDomains: domains.length,
+      totalBlockedUsers: domainCounts.reduce((sum, d) => sum + d.blockedCount, 0),
+    };
   }),
 });

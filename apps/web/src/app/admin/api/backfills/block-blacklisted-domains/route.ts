@@ -74,6 +74,12 @@ export async function POST(): Promise<
 
   const condition = blacklistedDomainCondition(domains);
   let totalProcessed = 0;
+  // Track whether we ever hit a short select, which is the only reliable
+  // signal that the result set is exhausted. Basing `remaining` on
+  // `totalProcessed` alone would falsely report "done" if concurrent writers
+  // set `blocked_reason` on some of our selected rows (shrinking
+  // `updated.length`) across every batch in this request.
+  let reachedEnd = false;
 
   for (let i = 0; i < BATCHES_PER_REQUEST; i++) {
     const rows = await db
@@ -82,7 +88,10 @@ export async function POST(): Promise<
       .where(and(isNull(kilocode_users.blocked_reason), condition))
       .limit(BATCH_SIZE);
 
-    if (rows.length === 0) break;
+    if (rows.length === 0) {
+      reachedEnd = true;
+      break;
+    }
 
     // Re-check `blocked_reason IS NULL` in the update to cover a race where
     // another writer set it between the select and the update.
@@ -102,11 +111,14 @@ export async function POST(): Promise<
 
     totalProcessed += updated.length;
 
-    if (rows.length < BATCH_SIZE) break;
+    if (rows.length < BATCH_SIZE) {
+      reachedEnd = true;
+      break;
+    }
   }
 
   return NextResponse.json({
     processed: totalProcessed,
-    remaining: totalProcessed === BATCH_SIZE * BATCHES_PER_REQUEST,
+    remaining: !reachedEnd,
   });
 }

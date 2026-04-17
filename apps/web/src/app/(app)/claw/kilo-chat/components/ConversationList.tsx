@@ -3,7 +3,52 @@
 import { Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
+import { ulidToTimestamp } from '@kilocode/kilo-chat';
 import { ConversationItem } from './ConversationItem';
+
+function getConversationTimestamp(conv: ConversationListItem): number {
+  if (conv.lastMessageId) {
+    try {
+      return ulidToTimestamp(conv.lastMessageId);
+    } catch {
+      // fall through to joinedAt
+    }
+  }
+  return conv.joinedAt;
+}
+
+function groupConversations(
+  conversations: ConversationListItem[]
+): Array<{ label: string; items: ConversationListItem[] }> {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const yesterdayStart = todayStart - 86400000;
+  const weekStart = todayStart - 6 * 86400000;
+
+  const groups: Record<string, ConversationListItem[]> = {
+    Today: [],
+    Yesterday: [],
+    'This Week': [],
+    Older: [],
+  };
+
+  for (const conv of conversations) {
+    const ts = getConversationTimestamp(conv);
+    if (ts >= todayStart) {
+      groups['Today'].push(conv);
+    } else if (ts >= yesterdayStart) {
+      groups['Yesterday'].push(conv);
+    } else if (ts >= weekStart) {
+      groups['This Week'].push(conv);
+    } else {
+      groups['Older'].push(conv);
+    }
+  }
+
+  return (['Today', 'Yesterday', 'This Week', 'Older'] as const)
+    .filter(label => groups[label].length > 0)
+    .map(label => ({ label, items: groups[label] }));
+}
 
 type ConversationListProps = {
   conversations: ConversationListItem[];
@@ -44,14 +89,21 @@ export function ConversationList({
             No conversations yet
           </div>
         ) : (
-          conversations.map(conv => (
-            <ConversationItem
-              key={conv.conversationId}
-              conversation={conv}
-              isActive={conv.conversationId === activeId}
-              onRename={onRename}
-              onLeave={onLeave}
-            />
+          groupConversations(conversations).map(group => (
+            <div key={group.label}>
+              <div className="text-muted-foreground px-3 pt-3 pb-1 text-[11px] font-medium uppercase">
+                {group.label}
+              </div>
+              {group.items.map(conv => (
+                <ConversationItem
+                  key={conv.conversationId}
+                  conversation={conv}
+                  isActive={conv.conversationId === activeId}
+                  onRename={onRename}
+                  onLeave={onLeave}
+                />
+              ))}
+            </div>
           ))
         )}
       </div>

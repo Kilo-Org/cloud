@@ -59,15 +59,9 @@ export function useLeaveConversation(getToken: () => Promise<string>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (conversationId: string) => client.leaveConversation(conversationId),
-    onMutate: async (conversationId: string) => {
-      // Cancel and remove conversation-specific queries immediately so they can't
-      // refetch while the page is still mounted during navigation
-      await queryClient.cancelQueries({ queryKey: ['kilo-chat', 'conversation', conversationId] });
-      await queryClient.cancelQueries({ queryKey: ['kilo-chat', 'messages', conversationId] });
+    onSuccess: (_data, conversationId) => {
       queryClient.removeQueries({ queryKey: ['kilo-chat', 'conversation', conversationId] });
       queryClient.removeQueries({ queryKey: ['kilo-chat', 'messages', conversationId] });
-    },
-    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
     },
   });

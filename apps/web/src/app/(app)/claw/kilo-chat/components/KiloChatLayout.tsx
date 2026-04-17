@@ -16,6 +16,7 @@ type KiloChatContextValue = {
   getToken: () => Promise<string>;
   currentUserId: string;
   instanceStatus: string | null;
+  leavingConversationId: string | null;
 };
 
 const KiloChatContext = createContext<KiloChatContextValue | null>(null);
@@ -56,6 +57,7 @@ export function KiloChatLayout({
   }, [instances, selectedSandboxId]);
 
   const params = useParams<{ conversationId?: string }>();
+  const [leavingConversationId, setLeavingConversationId] = useState<string | null>(null);
   const { data, isLoading } = useConversations(getToken);
   const createConversation = useCreateConversation(getToken);
   const renameConversation = useRenameConversation(getToken);
@@ -69,11 +71,11 @@ export function KiloChatLayout({
   );
 
   const handleLeave = useCallback(
-    async (conversationId: string) => {
-      // Navigate away and wait for unmount before firing the mutation,
-      // so conversation-specific queries don't refetch with a 403
+    (conversationId: string) => {
+      // Mark as leaving so child queries disable themselves immediately
+      setLeavingConversationId(conversationId);
       if (params?.conversationId === conversationId) {
-        await router.push('/claw/kilo-chat');
+        router.push('/claw/kilo-chat');
       }
       leaveConversation.mutate(conversationId);
     },
@@ -93,7 +95,9 @@ export function KiloChatLayout({
   }, [selectedSandboxId, createConversation, router]);
 
   return (
-    <KiloChatContext.Provider value={{ getToken, currentUserId, instanceStatus }}>
+    <KiloChatContext.Provider
+      value={{ getToken, currentUserId, instanceStatus, leavingConversationId }}
+    >
       <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
         {/* Conversation sidebar */}
         <div className="border-border flex w-64 shrink-0 flex-col overflow-hidden border-r">

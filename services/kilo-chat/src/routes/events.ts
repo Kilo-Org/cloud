@@ -1,8 +1,6 @@
 import type { Hono } from 'hono';
-import { z } from 'zod';
 import type { AuthContext } from '../auth';
-
-const ulidSchema = z.string().regex(/^[0-9A-Z]{26}$/, 'Invalid ULID');
+import { ulidSchema } from './schemas';
 
 export function registerEventsRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
   app.get('/v1/conversations/:id/events', async c => {

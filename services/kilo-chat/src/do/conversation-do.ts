@@ -90,10 +90,13 @@ export type RemoveReactionResult =
   | { ok: true; removed: false }
   | { ok: false; error: string };
 
+export const MAX_SSE_PER_MEMBER = 7;
+
 export class ConversationDO extends DurableObject<Env> {
   private db;
   private nextUlid = monotonicFactory();
   private sseClients = new Map<string, WritableStreamDefaultWriter>();
+  private sseClientsByMember = new Map<string, Set<string>>();
   private encoder = new TextEncoder();
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -102,12 +105,19 @@ export class ConversationDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(() => migrate(this.db, migrations));
   }
 
+  private removeSseClient(connId: string): void {
+    this.sseClients.delete(connId);
+    for (const [, conns] of this.sseClientsByMember) {
+      if (conns.delete(connId)) break;
+    }
+  }
+
   private broadcast(event: string, data: unknown, id?: string): void {
     const text = formatSseEvent(event, data, id);
     const bytes = this.encoder.encode(text);
     for (const [connId, writer] of this.sseClients) {
       writer.write(bytes).catch(() => {
-        this.sseClients.delete(connId);
+        this.removeSseClient(connId);
         writer.close().catch(() => {});
       });
     }
@@ -469,6 +479,11 @@ export class ConversationDO extends DurableObject<Env> {
         return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
       }
 
+      const memberConns = this.sseClientsByMember.get(memberId);
+      if (memberConns && memberConns.size >= MAX_SSE_PER_MEMBER) {
+        return new Response(JSON.stringify({ error: 'Too many connections' }), { status: 429 });
+      }
+
       const lastEventId = request.headers.get('last-event-id') ?? undefined;
 
       // Schedule keepalive alarm if not already set
@@ -607,11 +622,14 @@ export class ConversationDO extends DurableObject<Env> {
       const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
       const writer = writable.getWriter();
       this.sseClients.set(connId, writer);
+      const conns = this.sseClientsByMember.get(memberId) ?? new Set();
+      conns.add(connId);
+      this.sseClientsByMember.set(memberId, conns);
 
       // Send replay immediately
       if (replayBytes !== null) {
         writer.write(replayBytes).catch(() => {
-          this.sseClients.delete(connId);
+          this.removeSseClient(connId);
           writer.close().catch(() => {});
         });
       }
@@ -635,7 +653,7 @@ export class ConversationDO extends DurableObject<Env> {
             });
         },
         cancel: () => {
-          this.sseClients.delete(connId);
+          this.removeSseClient(connId);
           reader.cancel().catch(() => {});
           writer.close().catch(() => {});
         },
@@ -658,7 +676,7 @@ export class ConversationDO extends DurableObject<Env> {
     const ping = this.encoder.encode(SSE_PING);
     for (const [connId, writer] of this.sseClients) {
       writer.write(ping).catch(() => {
-        this.sseClients.delete(connId);
+        this.removeSseClient(connId);
         writer.close().catch(() => {});
       });
     }

@@ -1,9 +1,7 @@
 import type { Hono } from 'hono';
-import { z } from 'zod';
 import type { AuthContext } from '../auth';
 import { setTypingFor } from '../services/typing';
-
-const ulidSchema = z.string().regex(/^[0-9A-Z]{26}$/, 'Invalid ULID');
+import { ulidSchema } from './schemas';
 
 export function registerTypingRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
   app.post('/v1/conversations/:id/typing', async c => {

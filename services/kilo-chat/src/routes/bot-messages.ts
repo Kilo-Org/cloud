@@ -1,52 +1,15 @@
 import type { Hono } from 'hono';
-import { z } from 'zod';
 import type { AuthContext } from '../auth';
 import { createMessageFor, deleteMessageFor, editMessageFor } from '../services/messages';
 import { addReactionFor, removeReactionFor } from '../services/reactions';
 import { setTypingFor } from '../services/typing';
-
-const ulidSchema = z.string().regex(/^[0-9A-Z]{26}$/, 'Invalid ULID');
-
-const contentBlockSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('text'), text: z.string().min(1).max(8000) }),
-]);
-
-const createMessageSchema = z.object({
-  conversationId: z.string().min(1),
-  content: z.array(contentBlockSchema).min(1).max(20),
-  inReplyToMessageId: ulidSchema.optional(),
-});
-
-const editMessageSchema = z.object({
-  conversationId: z.string().min(1),
-  content: z.array(contentBlockSchema).min(1).max(20),
-  version: z.number().int().nonnegative(),
-});
-
-const deleteMessageSchema = z.object({
-  conversationId: z.string().min(1),
-});
-
-// 1-64 bytes UTF-8, no C0 (0x00-0x1F) or C1 (0x7F-0x9F) control chars.
-const emojiSchema = z
-  .string()
-  .min(1, 'emoji required')
-  .refine(v => new TextEncoder().encode(v).length <= 64, { message: 'emoji too long' })
-  .refine(
-    v => {
-      for (let i = 0; i < v.length; i++) {
-        const c = v.charCodeAt(i);
-        if ((c >= 0x00 && c <= 0x1f) || (c >= 0x7f && c <= 0x9f)) return false;
-      }
-      return true;
-    },
-    { message: 'emoji contains control chars' }
-  );
-
-const reactionBodySchema = z.object({
-  conversationId: z.string().min(1),
-  emoji: emojiSchema,
-});
+import {
+  ulidSchema,
+  createMessageSchema,
+  editMessageSchema,
+  deleteMessageSchema,
+  reactionBodySchema,
+} from './schemas';
 
 export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
   // POST /bot/v1/sandboxes/:sandboxId/messages — create message

@@ -623,7 +623,7 @@ export class ConversationDO extends DurableObject<Env> {
 
         items.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
-        const truncated = items.length >= MAX_REPLAY_EVENTS;
+        const truncated = items.length > MAX_REPLAY_EVENTS;
         if (truncated) {
           items.length = MAX_REPLAY_EVENTS;
         }

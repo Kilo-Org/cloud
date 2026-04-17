@@ -59,7 +59,8 @@ export function MessageBubble({
     setEditText('');
   }
 
-  const timestamp = new Date(ulidToTimestamp(message.id));
+  const isOptimistic = message.id.startsWith('optimistic-');
+  const timestamp = isOptimistic ? new Date() : new Date(ulidToTimestamp(message.id));
   const timeStr = timestamp.toLocaleTimeString([], {
     hour: 'numeric',
     minute: '2-digit',

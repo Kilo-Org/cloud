@@ -186,27 +186,66 @@ describe('admin.blacklistDomains.suspicious', () => {
   });
 
   it('orders rows by blocked_account_count desc then account_count desc', async () => {
-    for (let i = 0; i < 5; i++) {
+    // more-blocked.com: 2 of 4 blocked (50%)
+    for (let i = 0; i < 2; i++) {
       await insertTestUser({
-        google_user_email: `u${i}@more-users.com`,
-        email_domain: 'more-users.com',
+        google_user_email: `u${i}@more-blocked.com`,
+        email_domain: 'more-blocked.com',
       });
     }
     for (let i = 0; i < 2; i++) {
       await insertTestUser({
-        google_user_email: `u${i}@fewer-users-but-blocked.com`,
-        email_domain: 'fewer-users-but-blocked.com',
+        google_user_email: `b${i}@more-blocked.com`,
+        email_domain: 'more-blocked.com',
         blocked_reason: 'abuse',
       });
     }
+    // fewer-blocked.com: 1 of 2 blocked (50%)
+    await insertTestUser({
+      google_user_email: 'u@fewer-blocked.com',
+      email_domain: 'fewer-blocked.com',
+    });
+    await insertTestUser({
+      google_user_email: 'b@fewer-blocked.com',
+      email_domain: 'fewer-blocked.com',
+      blocked_reason: 'abuse',
+    });
 
     const caller = await createCallerForUser(admin.id);
     const { domains } = await caller.admin.blacklistDomains.suspicious();
 
     const ordered = domains.map(d => d.domain);
-    expect(ordered.indexOf('fewer-users-but-blocked.com')).toBeLessThan(
-      ordered.indexOf('more-users.com')
-    );
+    expect(ordered.indexOf('more-blocked.com')).toBeLessThan(ordered.indexOf('fewer-blocked.com'));
+  });
+
+  it('hides domains with fewer than 1% of accounts blocked', async () => {
+    // noisy.com: 99 clean users + 0 blocked → 0% → filtered out
+    for (let i = 0; i < 99; i++) {
+      await insertTestUser({
+        google_user_email: `u${i}@noisy.com`,
+        email_domain: 'noisy.com',
+      });
+    }
+    // just-under.com: 99 clean + 0 blocked → filtered out (0%)
+    // over-threshold.com: 99 clean + 1 blocked → 1% → surfaced
+    for (let i = 0; i < 99; i++) {
+      await insertTestUser({
+        google_user_email: `u${i}@over-threshold.com`,
+        email_domain: 'over-threshold.com',
+      });
+    }
+    await insertTestUser({
+      google_user_email: 'b@over-threshold.com',
+      email_domain: 'over-threshold.com',
+      blocked_reason: 'abuse',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const { domains } = await caller.admin.blacklistDomains.suspicious();
+
+    const names = domains.map(d => d.domain);
+    expect(names).toContain('over-threshold.com');
+    expect(names).not.toContain('noisy.com');
   });
 
   it('excludes users whose email_domain is NULL', async () => {
@@ -225,6 +264,7 @@ describe('admin.blacklistDomains.suspicious', () => {
     await insertTestUser({
       google_user_email: 'a@example.com',
       email_domain: 'example.com',
+      blocked_reason: 'abuse',
     });
 
     const caller = await createCallerForUser(admin.id);

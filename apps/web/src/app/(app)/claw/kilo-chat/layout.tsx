@@ -27,6 +27,7 @@ export default function KiloChatRootLayout({ children }: { children: React.React
       currentUserId={currentUserId}
       instances={instances}
       instanceStatus={status?.status ?? null}
+      assistantName={status?.botName ?? null}
     >
       {children}
     </KiloChatLayout>

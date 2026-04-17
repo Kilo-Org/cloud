@@ -10,7 +10,8 @@ import { MessageArea } from '../components/MessageArea';
 export default function KiloChatConversationPage() {
   const params = useParams<{ conversationId: string }>();
   const router = useRouter();
-  const { getToken, currentUserId, instanceStatus, leavingConversationId } = useKiloChatContext();
+  const { getToken, currentUserId, instanceStatus, leavingConversationId, assistantName } =
+    useKiloChatContext();
   const isLeaving = leavingConversationId === params.conversationId;
   const conversationDetail = useConversationDetail(
     getToken,
@@ -38,6 +39,7 @@ export default function KiloChatConversationPage() {
       currentUserId={currentUserId}
       getToken={getToken}
       instanceStatus={instanceStatus}
+      assistantName={assistantName}
     />
   );
 }

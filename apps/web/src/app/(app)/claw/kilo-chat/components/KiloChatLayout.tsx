@@ -18,7 +18,7 @@ type KiloChatContextValue = {
   currentUserId: string;
   instanceStatus: string | null;
   leavingConversationId: string | null;
-  botName: string;
+  assistantName: string | null;
 };
 
 const KiloChatContext = createContext<KiloChatContextValue | null>(null);
@@ -35,6 +35,7 @@ type KiloChatLayoutProps = {
   currentUserId: string;
   instances: Array<{ sandboxId: string; label: string }>;
   instanceStatus: string | null;
+  assistantName: string | null;
   children: React.ReactNode;
 };
 
@@ -43,6 +44,7 @@ export function KiloChatLayout({
   currentUserId,
   instances,
   instanceStatus,
+  assistantName,
   children,
 }: KiloChatLayoutProps) {
   const router = useRouter();
@@ -92,8 +94,6 @@ export function KiloChatLayout({
     [leaveConversation, params?.conversationId, router]
   );
 
-  const botName = instances.find(i => i.sandboxId === selectedSandboxId)?.label || 'KiloClaw';
-
   const handleNewConversation = useCallback(() => {
     if (!selectedSandboxId) return;
     createConversation.mutate(
@@ -109,7 +109,7 @@ export function KiloChatLayout({
 
   return (
     <KiloChatContext.Provider
-      value={{ getToken, currentUserId, instanceStatus, leavingConversationId, botName }}
+      value={{ getToken, currentUserId, instanceStatus, leavingConversationId, assistantName }}
     >
       <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
         {/* Conversation sidebar */}

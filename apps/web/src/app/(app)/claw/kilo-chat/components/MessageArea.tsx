@@ -19,12 +19,14 @@ import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
 import { BotStatus } from './BotStatus';
 import { KiloChatApiError } from '@kilocode/kilo-chat';
+import { MessageCircle } from 'lucide-react';
 
 type MessageAreaProps = {
   conversationId: string;
   currentUserId: string;
   getToken: () => Promise<string>;
   instanceStatus: string | null;
+  assistantName: string | null;
 };
 
 export function MessageArea({
@@ -32,6 +34,7 @@ export function MessageArea({
   currentUserId,
   getToken,
   instanceStatus,
+  assistantName,
 }: MessageAreaProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -200,6 +203,18 @@ export function MessageArea({
         {isFetchingNextPage && (
           <div className="text-muted-foreground py-2 text-center text-xs">
             Loading older messages...
+          </div>
+        )}
+        {messages.length === 0 && !isFetchingNextPage && (
+          <div className="flex h-full flex-col items-center justify-center px-6">
+            <div className="border-border bg-muted/50 flex flex-col items-center gap-3 rounded-lg border px-8 py-6">
+              <MessageCircle className="text-muted-foreground/60 h-8 w-8" />
+              <p className="text-muted-foreground text-sm">
+                Ask {assistantName ?? 'KiloClaw'} to draft a message, make a checklist,
+                <br />
+                or help you think through a decision.
+              </p>
+            </div>
           </div>
         )}
         {messages.map(msg => (

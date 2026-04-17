@@ -29,7 +29,7 @@ export function MessageBubble({
   onCancelDelete,
   onReply,
 }: MessageBubbleProps) {
-  const { botName } = useKiloChatContext();
+  const { assistantName } = useKiloChatContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const [showActions, setShowActions] = useState(false);
@@ -106,7 +106,9 @@ export function MessageBubble({
     >
       <div className={`flex max-w-[75%] flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
         {isBot && !isOwn && (
-          <span className="text-muted-foreground mb-0.5 px-1 text-xs font-medium">{botName}</span>
+          <span className="text-muted-foreground mb-0.5 px-1 text-xs font-medium">
+            {assistantName ?? 'KiloClaw'}
+          </span>
         )}
 
         {replyToMessage && (

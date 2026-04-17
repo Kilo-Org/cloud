@@ -116,6 +116,57 @@ describe('impact', () => {
     });
   });
 
+  it('rejects sale success without action mapping or submission uri', async () => {
+    const fetchMock = jest
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(JSON.stringify({ Status: 'ACCEPTED' }), { status: 200 }));
+    global.fetch = fetchMock;
+
+    const { buildSalePayload, sendImpactConversionPayload } = await import('@/lib/impact');
+    const result = await sendImpactConversionPayload(
+      buildSalePayload({
+        trackingId: 'impact-click-123',
+        customerId: 'user_123',
+        customerEmailHash: 'hashed-email',
+        orderId: 'in_123',
+        amount: 9,
+        currencyCode: 'usd',
+        eventDate: new Date('2026-04-02T12:00:00.000Z'),
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+      })
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      failureKind: 'submission_failed',
+      responseBody: '{"Status":"ACCEPTED"}',
+      error: 'Impact sale success response missing action mapping',
+    });
+  });
+
+  it('fails queued submission resolution when impact is unconfigured', async () => {
+    delete process.env.IMPACT_ACCOUNT_SID;
+    delete process.env.IMPACT_AUTH_TOKEN;
+    delete process.env.IMPACT_CAMPAIGN_ID;
+    jest.resetModules();
+
+    const fetchMock = jest.fn<typeof fetch>();
+    global.fetch = fetchMock;
+
+    const { resolveImpactSubmissionUri } = await import('@/lib/impact');
+    const result = await resolveImpactSubmissionUri(
+      '/Advertisers/impact-account-sid/APISubmissions/A-queued-sale'
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      failureKind: 'submission_failed',
+      error: 'Impact is unconfigured; cannot resolve queued submission',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('builds reversal request with default disposition code', async () => {
     const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
       new Response(

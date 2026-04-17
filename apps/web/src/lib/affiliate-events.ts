@@ -1119,10 +1119,13 @@ async function dispatchSaleReversalEvent(
     return 'delivered';
   }
 
-  if (reversalResult.failureKind === 'http_4xx') {
-    await handlePermanentFailure(database, event, 'http_4xx', {
+  if (
+    reversalResult.failureKind === 'http_4xx' ||
+    reversalResult.failureKind === 'submission_failed'
+  ) {
+    await handlePermanentFailure(database, event, reversalResult.failureKind, {
       statusCode: reversalResult.statusCode,
-      error: reversalResult.responseBody,
+      error: reversalResult.error ?? reversalResult.responseBody,
     });
     logWarning('Impact sale reversal requires manual follow-up after permanent failure', {
       ...buildAffiliateEventLogFields(updatedEvent),
@@ -1271,10 +1274,10 @@ export async function dispatchQueuedAffiliateEvents(params?: {
         continue;
       }
 
-      if (result.failureKind === 'http_4xx') {
-        await handlePermanentFailure(database, event, 'http_4xx', {
+      if (result.failureKind === 'http_4xx' || result.failureKind === 'submission_failed') {
+        await handlePermanentFailure(database, event, result.failureKind, {
           statusCode: result.statusCode,
-          error: result.responseBody,
+          error: result.error ?? result.responseBody,
         });
         summary.failed += 1;
         continue;

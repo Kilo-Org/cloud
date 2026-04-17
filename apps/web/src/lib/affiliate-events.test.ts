@@ -650,6 +650,37 @@ describe('affiliate-events', () => {
     );
   });
 
+  it('fails queued sale reversal permanently when submission resolution is unconfigured', async () => {
+    const { user } = await createDeliveredSaleEvent({ saleResponse: 'queued' });
+
+    delete process.env.IMPACT_ACCOUNT_SID;
+    delete process.env.IMPACT_AUTH_TOKEN;
+    delete process.env.IMPACT_CAMPAIGN_ID;
+    jest.resetModules();
+
+    const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =
+      await import('@/lib/affiliate-events');
+
+    await enqueueImpactSaleReversalForCharge({
+      stripeChargeId: 'ch_sale_test_123',
+      disputeId: 'dp_unconfigured_resolution',
+      amount: 29,
+      currency: 'usd',
+      eventDate: new Date('2026-04-10T10:00:00.000Z'),
+    });
+
+    const summary = await dispatchQueuedAffiliateEvents();
+    const reversalEvent = (await getUserAffiliateEvents(user.id)).find(
+      row => row.event_type === 'sale_reversal'
+    );
+
+    expect(summary.failed).toBe(1);
+    expect(summary.retried).toBe(0);
+    expect(reversalEvent?.delivery_state).toBe('failed');
+    expect(reversalEvent?.attempt_count).toBe(1);
+    expect(reversalEvent?.next_retry_at).toBeNull();
+  });
+
   it('retries sale reversal on retryable upstream failure', async () => {
     const { user } = await createDeliveredSaleEvent({ saleResponse: 'immediate' });
     const { dispatchQueuedAffiliateEvents, enqueueImpactSaleReversalForCharge } =

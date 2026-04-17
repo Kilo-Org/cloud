@@ -106,7 +106,7 @@ type ImpactRequestSuccess =
 
 type ImpactRequestFailure = {
   ok: false;
-  failureKind: 'http_4xx' | 'http_5xx' | 'network';
+  failureKind: 'http_4xx' | 'http_5xx' | 'network' | 'submission_failed';
   statusCode?: number;
   responseBody?: string;
   error?: string;
@@ -549,12 +549,29 @@ function getNormalizedStatus(value: unknown): string | null {
 export async function sendImpactConversionPayload(
   payload: ImpactConversionPayload
 ): Promise<ImpactDispatchResult> {
-  return await sendImpactRequest({
+  const result = await sendImpactRequest({
     method: 'POST',
     path: `/Advertisers/${IMPACT_ACCOUNT_SID}/Conversions`,
     body: JSON.stringify(payload),
     contentType: 'application/json',
   });
+
+  if (
+    result.ok &&
+    payload.ActionTrackerId === IMPACT_ACTION_TRACKER_IDS.sale &&
+    !result.skipped &&
+    result.delivery !== 'immediate' &&
+    result.delivery !== 'queued'
+  ) {
+    return {
+      ok: false,
+      failureKind: 'submission_failed',
+      responseBody: result.responseBody,
+      error: 'Impact sale success response missing action mapping',
+    };
+  }
+
+  return result;
 }
 
 export async function resolveImpactSubmissionUri(
@@ -582,8 +599,9 @@ export async function resolveImpactSubmissionUri(
 
   if (result.skipped === 'unconfigured') {
     return {
-      ok: true,
-      status: 'pending',
+      ok: false,
+      failureKind: 'submission_failed',
+      error: 'Impact is unconfigured; cannot resolve queued submission',
     };
   }
 

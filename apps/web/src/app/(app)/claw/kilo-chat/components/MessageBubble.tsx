@@ -69,7 +69,11 @@ export function MessageBubble({
   });
 
   const actionButtons = showActions && !isEditing && pendingDeleteId !== message.id && (
-    <div className="bg-background border-border flex shrink-0 items-center gap-0.5 self-start rounded border p-0.5 shadow-sm">
+    <div
+      className={`bg-background border-border absolute top-0 z-10 flex items-center gap-0.5 rounded border p-0.5 shadow-sm ${
+        isOwn ? 'right-full mr-1' : 'left-full ml-1'
+      }`}
+    >
       {isOwn && (
         <>
           <button
@@ -121,9 +125,10 @@ export function MessageBubble({
           </div>
         )}
 
-        <div className={`flex items-start gap-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+        <div className="relative">
+          {actionButtons}
           <div
-            className={`relative rounded-2xl px-3 py-2 ${
+            className={`rounded-2xl px-3 py-2 ${
               isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
             }`}
           >
@@ -173,8 +178,6 @@ export function MessageBubble({
               <span>{timeStr}</span>
             </div>
           </div>
-
-          {actionButtons}
         </div>
 
         {pendingDeleteId === message.id && (

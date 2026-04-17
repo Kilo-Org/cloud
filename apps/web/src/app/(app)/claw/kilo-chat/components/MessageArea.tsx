@@ -51,7 +51,7 @@ export function MessageArea({
   const deleteMessage = useDeleteMessage(getToken);
 
   const updateCache = useMessageCacheUpdater(conversationId);
-  const { typingMembers, handleTypingEvent } = useTypingState(currentUserId);
+  const { typingMembers, handleTypingEvent, clearTypingForMember } = useTypingState(currentUserId);
   const sendTyping = useTypingSender(getToken, conversationId);
 
   // SSE connection
@@ -63,10 +63,13 @@ export function MessageArea({
         if (event.type === 'typing') {
           handleTypingEvent(event.data);
         } else {
+          if (event.type === 'message.created') {
+            clearTypingForMember((event.data as { senderId: string }).senderId);
+          }
           updateCache(event);
         }
       },
-      [handleTypingEvent, updateCache]
+      [handleTypingEvent, clearTypingForMember, updateCache]
     ),
   });
 

@@ -54,5 +54,19 @@ export function useTypingState(currentUserId: string | null) {
     },
     [currentUserId]
   );
-  return { typingMembers, handleTypingEvent };
+  const clearTypingForMember = useCallback((memberId: string) => {
+    const existing = timersRef.current.get(memberId);
+    if (existing) {
+      clearTimeout(existing);
+      timersRef.current.delete(memberId);
+    }
+    setTypingMembers(prev => {
+      if (!prev.has(memberId)) return prev;
+      const next = new Map(prev);
+      next.delete(memberId);
+      return next;
+    });
+  }, []);
+
+  return { typingMembers, handleTypingEvent, clearTypingForMember };
 }

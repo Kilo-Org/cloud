@@ -68,31 +68,33 @@ export function MessageBubble({
         isOwn ? 'right-full mr-1' : 'left-full ml-1'
       }`}
     >
-      {isOwn && (
-        <>
-          <button
-            onClick={handleStartEdit}
-            className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
-            title="Edit"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => onDelete(message.id)}
-            className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
-            title="Delete"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </>
+      {isOwn && !message.deliveryFailed && (
+        <button
+          onClick={handleStartEdit}
+          className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+          title="Edit"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
       )}
-      <button
-        onClick={() => onReply(message)}
-        className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
-        title="Reply"
-      >
-        <Reply className="h-3.5 w-3.5" />
-      </button>
+      {isOwn && (
+        <button
+          onClick={() => onDelete(message.id)}
+          className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+          title="Delete"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {!message.deliveryFailed && (
+        <button
+          onClick={() => onReply(message)}
+          className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+          title="Reply"
+        >
+          <Reply className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 

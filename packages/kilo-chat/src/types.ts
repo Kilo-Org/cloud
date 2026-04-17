@@ -13,8 +13,8 @@ export type ContentBlock = TextBlock; // union — extend when new types land
 export type ConversationListItem = {
   conversationId: string;
   conversationTitle: string | null;
-  lastMessageId: string | null;
-  lastReadMessageId: string | null;
+  lastActivityAt: number | null;
+  lastReadAt: number | null;
   joinedAt: number;
 };
 

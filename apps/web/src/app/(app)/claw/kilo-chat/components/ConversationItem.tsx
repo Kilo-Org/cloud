@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { MoreVertical } from 'lucide-react';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
-import { ulidToTimestamp } from '@kilocode/kilo-chat';
 
 type ConversationItemProps = {
   conversation: ConversationListItem;
@@ -26,9 +25,7 @@ export function ConversationItem({
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const timestamp = conversation.lastMessageId
-    ? ulidToTimestamp(conversation.lastMessageId)
-    : conversation.joinedAt;
+  const timestamp = conversation.lastActivityAt ?? conversation.joinedAt;
   const displayTime = new Date(timestamp).toLocaleTimeString([], {
     hour: 'numeric',
     minute: '2-digit',

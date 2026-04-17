@@ -27,14 +27,14 @@ describe('MembershipDO', () => {
       {
         conversationId: 'conv-1',
         conversationTitle: 'Test Chat',
-        lastMessageId: null,
-        lastReadMessageId: null,
+        lastActivityAt: null,
+        lastReadAt: null,
         joinedAt: 1000,
       },
     ]);
   });
 
-  it('updates lastMessageId', async () => {
+  it('updates lastActivityAt', async () => {
     const stub = getStub('user-3');
     await stub.addConversation({
       conversationId: 'conv-1',
@@ -42,12 +42,12 @@ describe('MembershipDO', () => {
       sandboxId: 'sandbox-1',
       joinedAt: 1000,
     });
-    await stub.updateLastMessageId('conv-1', '01ABC');
+    await stub.updateLastActivity('conv-1', 5000);
     const result = await stub.listConversations();
-    expect(result[0].lastMessageId).toBe('01ABC');
+    expect(result[0].lastActivityAt).toBe(5000);
   });
 
-  it('lists conversations sorted by lastMessageId descending', async () => {
+  it('lists conversations sorted by lastActivityAt descending', async () => {
     const stub = getStub('user-4');
     await stub.addConversation({
       conversationId: 'conv-a',
@@ -61,8 +61,8 @@ describe('MembershipDO', () => {
       sandboxId: 'sandbox-1',
       joinedAt: 2000,
     });
-    await stub.updateLastMessageId('conv-a', '01ZZZZZ');
-    await stub.updateLastMessageId('conv-b', '01AAAAA');
+    await stub.updateLastActivity('conv-a', 3000);
+    await stub.updateLastActivity('conv-b', 2500);
     const result = await stub.listConversations();
     expect(result[0].conversationId).toBe('conv-a');
     expect(result[1].conversationId).toBe('conv-b');

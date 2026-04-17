@@ -3,18 +3,10 @@
 import { Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
-import { ulidToTimestamp } from '@kilocode/kilo-chat';
 import { ConversationItem } from './ConversationItem';
 
 function getConversationTimestamp(conv: ConversationListItem): number {
-  if (conv.lastMessageId) {
-    try {
-      return ulidToTimestamp(conv.lastMessageId);
-    } catch {
-      // fall through to joinedAt
-    }
-  }
-  return conv.joinedAt;
+  return conv.lastActivityAt ?? conv.joinedAt;
 }
 
 function groupConversations(

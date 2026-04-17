@@ -4,7 +4,7 @@ export const conversations = sqliteTable('conversations', {
   conversation_id: text('conversation_id').primaryKey(),
   conversation_title: text('conversation_title'),
   sandbox_id: text('sandbox_id').notNull(),
-  last_message_id: text('last_message_id'),
-  last_read_message_id: text('last_read_message_id'),
+  last_activity_at: integer('last_activity_at'),
+  last_read_at: integer('last_read_at'),
   joined_at: integer('joined_at').notNull(),
 });

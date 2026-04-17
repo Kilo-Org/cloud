@@ -8,8 +8,8 @@ import migrations from '../../drizzle/membership/migrations';
 export type ConversationEntry = {
   conversationId: string;
   conversationTitle: string | null;
-  lastMessageId: string | null;
-  lastReadMessageId: string | null;
+  lastActivityAt: number | null;
+  lastReadAt: number | null;
   joinedAt: number;
 };
 
@@ -35,16 +35,13 @@ export class MembershipDO extends DurableObject<Env> {
       .select()
       .from(conversations)
       .where(where)
-      .orderBy(
-        desc(sql`coalesce(${conversations.last_message_id}, 'ZZZZZZZZZZZZZZZZZZZZZZZZZZ')`),
-        desc(conversations.joined_at)
-      )
+      .orderBy(desc(sql`coalesce(${conversations.last_activity_at}, ${conversations.joined_at})`))
       .all()
       .map(row => ({
         conversationId: row.conversation_id,
         conversationTitle: row.conversation_title,
-        lastMessageId: row.last_message_id,
-        lastReadMessageId: row.last_read_message_id,
+        lastActivityAt: row.last_activity_at,
+        lastReadAt: row.last_read_at,
         joinedAt: row.joined_at,
       }));
   }
@@ -62,10 +59,10 @@ export class MembershipDO extends DurableObject<Env> {
       .run();
   }
 
-  updateLastMessageId(conversationId: string, messageId: string): void {
+  updateLastActivity(conversationId: string, activityAt: number): void {
     this.db
       .update(conversations)
-      .set({ last_message_id: messageId })
+      .set({ last_activity_at: activityAt })
       .where(eq(conversations.conversation_id, conversationId))
       .run();
   }

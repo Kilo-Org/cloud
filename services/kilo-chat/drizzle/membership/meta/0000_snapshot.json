@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "634e621f-31e6-4ad3-b897-1aadef274e84",
+  "id": "18fb012c-7f01-4bad-8d86-e57ec4cb9046",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "conversations": {
@@ -21,16 +21,23 @@
           "notNull": false,
           "autoincrement": false
         },
-        "last_message_id": {
-          "name": "last_message_id",
+        "sandbox_id": {
+          "name": "sandbox_id",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_activity_at": {
+          "name": "last_activity_at",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "last_read_message_id": {
-          "name": "last_read_message_id",
-          "type": "text",
+        "last_read_at": {
+          "name": "last_read_at",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

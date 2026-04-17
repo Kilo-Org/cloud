@@ -40,6 +40,7 @@ import {
   KiloClawPlan,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
+  KiloClawProvider,
   KiloClawSubscriptionStatus,
   KiloClawPaymentSource,
   KiloClawSubscriptionAccessOrigin,
@@ -3680,6 +3681,7 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id),
     sandbox_id: text().notNull(),
+    provider: text().$type<KiloClawProvider>().notNull().default(KiloClawProvider.Fly),
     // Null = personal instance. Non-null = org-owned instance.
     organization_id: uuid().references(() => organizations.id),
     name: text(),

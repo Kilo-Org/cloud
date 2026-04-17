@@ -11,6 +11,7 @@ import {
 } from '@/lib/bot/conversation-context';
 import { buildPrSignature, getRequesterInfo } from '@/lib/bot/pr-signature';
 import { updateBotRequest, linkBotRequestToSession } from '@/lib/bot/request-logging';
+import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/step-budget';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
@@ -54,6 +55,8 @@ type RunBotAgentParams = {
   user: User;
   botRequestId: string | undefined;
   prompt: string;
+  completedStepCount?: number;
+  initialSteps?: BotRequestStep[];
   onSessionReady?: (params: {
     kiloSessionId: string;
     cloudAgentSessionId: string;
@@ -72,9 +75,9 @@ function ownerFromIntegration(pi: PlatformIntegration): Owner {
   else return { type: 'user', id: pi.owned_by_user_id as string };
 }
 
-function serializeStep(step: StepResult<ToolSet>): BotRequestStep {
+function serializeStep(step: StepResult<ToolSet>, stepNumberOffset: number): BotRequestStep {
   return {
-    stepNumber: step.stepNumber,
+    stepNumber: step.stepNumber + stepNumberOffset,
     finishReason: step.finishReason,
     toolCalls: step.staticToolCalls.map(tc => ({ name: tc.toolName, args: tc.input })),
     toolResults: step.staticToolResults.map(tr => ({ name: tr.toolName, result: tr.output })),
@@ -227,11 +230,23 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
   }
 
   const startedAt = Date.now();
+  const initialSteps = params.initialSteps ?? [];
+  const completedStepCount = Math.max(params.completedStepCount ?? 0, initialSteps.length);
+  const remainingIterations = getRemainingBotIterations(completedStepCount);
   const collectedSteps: BotRequestStep[] = [];
   let startedCloudAgentSession = false;
 
   if (params.botRequestId) {
     updateBotRequest(params.botRequestId, { modelUsed: modelSlug });
+  }
+
+  if (remainingIterations <= 0) {
+    return {
+      finalText: `Cloud Agent session completed, but I stopped here because Kilo Bot reached its ${MAX_ITERATIONS}-step limit for this request. Send a new message if more work is needed.`,
+      startedCloudAgentSession: false,
+      collectedSteps,
+      responseTimeMs: Date.now() - startedAt,
+    };
   }
 
   const agent = new ToolLoopAgent({
@@ -241,7 +256,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
       params.thread,
       params.message
     ),
-    stopWhen: stepCountIs(MAX_ITERATIONS),
+    stopWhen: stepCountIs(remainingIterations),
     tools: {
       spawnCloudAgentSession: tool({
         description: `Spawn a Cloud Agent session to perform coding tasks on a GitHub repository or GitLab project. The agent can make code changes, fix bugs, implement features, review/analyze code, run tests, or open PRs/MRs. Do NOT use it for questions you can answer directly.
@@ -272,7 +287,14 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
                 modelSlug,
               });
             },
-            { prSignature, chatPlatform }
+            {
+              prSignature,
+              chatPlatform,
+              currentStep: getNextBotCallbackStep({
+                completedStepCount,
+                completedStepsInCurrentRun: collectedSteps.length,
+              }),
+            }
           );
 
           // Persist the session link synchronously so callbacks can
@@ -286,9 +308,9 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
       }),
     },
     onStepFinish: step => {
-      collectedSteps.push(serializeStep(step));
+      collectedSteps.push(serializeStep(step, completedStepCount));
       if (params.botRequestId) {
-        updateBotRequest(params.botRequestId, { steps: [...collectedSteps] });
+        updateBotRequest(params.botRequestId, { steps: [...initialSteps, ...collectedSteps] });
       }
     },
   });

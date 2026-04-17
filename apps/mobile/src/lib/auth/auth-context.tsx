@@ -11,7 +11,12 @@ import {
 
 import { trackEvent } from '@/lib/appsflyer';
 import { queryClient } from '@/lib/query-client';
-import { AUTH_TOKEN_KEY, ORGANIZATION_STORAGE_KEY, SESSION_FILTERS_KEY } from '@/lib/storage-keys';
+import {
+  AUTH_TOKEN_KEY,
+  NOTIFICATION_PROMPT_SEEN_KEY,
+  ORGANIZATION_STORAGE_KEY,
+  SESSION_FILTERS_KEY,
+} from '@/lib/storage-keys';
 
 // Pre-load token at module level so it's available before React mounts
 const preloadedToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
@@ -52,6 +57,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     // Clear per-user preferences so they don't leak to the next signed-in account
     await SecureStore.deleteItemAsync(ORGANIZATION_STORAGE_KEY);
     await SecureStore.deleteItemAsync(SESSION_FILTERS_KEY);
+    await SecureStore.deleteItemAsync(NOTIFICATION_PROMPT_SEEN_KEY);
     queryClient.clear();
     setToken(undefined);
   }, []);

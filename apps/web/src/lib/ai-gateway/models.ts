@@ -22,7 +22,7 @@ import {
 } from '@/lib/ai-gateway/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
-import { gpt_oss_20b_free_model } from '@/lib/ai-gateway/providers/openai';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/ai-gateway/providers/xai';
@@ -67,7 +67,7 @@ export const kiloExclusiveModels = [
   // Please do not remove models from this list immediately.
   // Instead, set status to 'disabled' first
   // and only remove when very few users are requesting it.
-  gpt_oss_20b_free_model,
+  gemma_4_26b_a4b_it_free_model,
   minimax_m25_free_model,
   morph_warp_grep_free_model,
   grok_code_fast_1_optimized_free_model,

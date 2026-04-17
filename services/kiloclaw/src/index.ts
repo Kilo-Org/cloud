@@ -146,7 +146,7 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
   // Platform routes need infra bindings but not AI provider keys
   if (isPlatformRoute(c)) {
     const missing: string[] = [];
-    if (!c.env.INTERNAL_API_SECRET) missing.push('INTERNAL_API_SECRET');
+    if (!c.env.KILOCLAW_INTERNAL_API_SECRET) missing.push('KILOCLAW_INTERNAL_API_SECRET');
     if (!c.env.HYPERDRIVE?.connectionString) missing.push('HYPERDRIVE');
     if (!c.env.NEXTAUTH_SECRET) missing.push('NEXTAUTH_SECRET');
     if (!c.env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');

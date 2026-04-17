@@ -24,7 +24,6 @@ import { FirstTopupBonusPromo } from './FirstTopupBonusPromo';
 import { AlertTriangle, Coins } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { FirstTopup24for24CountdownTimer } from '@/components/payment/FirstTopup24for24CountdownTimer';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.
@@ -64,7 +63,7 @@ export default function CreditPurchaseOptions({
   showOrganizationWarning = false,
 }: CreditPurchaseOptionsProps) {
   // Use hasNoTopups if provided, otherwise fall back to isFirstPurchase for backward compatibility
-  const showFirstPurchasePromo = isFirstPurchase;
+  const showFirstPurchasePromo = isFirstPurchase && FIRST_TOPUP_BONUS_AMOUNT > 0;
   const purchaseAmounts = showFirstPurchasePromo ? FIRST_TOPUP_AMOUNTS : amounts;
   const [submitting, setSubmitting] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
@@ -190,8 +189,9 @@ export default function CreditPurchaseOptions({
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {purchaseAmounts.map(amount => {
                 const totalAmount = showFirstPurchasePromo
-                  ? amount + FIRST_TOPUP_BONUS_AMOUNT()
+                  ? amount + FIRST_TOPUP_BONUS_AMOUNT
                   : amount;
+
                 const buttonText = showFirstPurchasePromo
                   ? `Buy $${amount}, get $${totalAmount}`
                   : `$${amount}`;
@@ -260,12 +260,9 @@ export default function CreditPurchaseOptions({
                       {showFirstPurchasePromo && (
                         <>
                           <span className="mt-2 block font-semibold text-blue-400">
-                            🎉 You'll receive an extra ${FIRST_TOPUP_BONUS_AMOUNT()} on your first
+                            🎉 You'll receive an extra ${FIRST_TOPUP_BONUS_AMOUNT} on your first
                             purchase!
                           </span>
-                          <div>
-                            <FirstTopup24for24CountdownTimer />
-                          </div>
                           <p className="mt-1 text-xs text-green-300">
                             Free promotional credits expire in{' '}
                             {Math.ceil(PROMO_CREDIT_EXPIRY_HRS / 24)} days.
@@ -307,7 +304,7 @@ export default function CreditPurchaseOptions({
                           parseFloat(customAmount) >= MINIMUM_TOP_UP_AMOUNT ? (
                             <span className="font-medium text-green-400">
                               You'll receive $
-                              {Math.floor(parseFloat(customAmount)) + FIRST_TOPUP_BONUS_AMOUNT()} in
+                              {Math.floor(parseFloat(customAmount)) + FIRST_TOPUP_BONUS_AMOUNT} in
                               total credits
                             </span>
                           ) : (

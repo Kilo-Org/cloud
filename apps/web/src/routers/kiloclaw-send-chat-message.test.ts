@@ -1,6 +1,10 @@
 import { describe, expect, it, beforeAll, beforeEach, jest } from '@jest/globals';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
-import { kiloclaw_instances, kiloclaw_subscriptions } from '@kilocode/db/schema';
+import {
+  kiloclaw_earlybird_purchases,
+  kiloclaw_instances,
+  kiloclaw_subscriptions,
+} from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 
@@ -85,12 +89,13 @@ async function createDestroyedInstance(userId: string): Promise<string> {
   return row.id;
 }
 
-async function grantKiloClawAccess(userId: string): Promise<void> {
+async function grantKiloClawAccess(userId: string, instanceId: string): Promise<void> {
   await db.insert(kiloclaw_subscriptions).values({
     user_id: userId,
+    instance_id: instanceId,
     plan: 'standard',
     status: 'active',
-    stripe_subscription_id: `sub_test_${userId.slice(0, 8)}`,
+    stripe_subscription_id: `sub_test_${crypto.randomUUID()}`,
   });
 }
 
@@ -108,8 +113,8 @@ describe('kiloclaw.sendChatMessage', () => {
     });
 
     it('allows users with active subscription', async () => {
-      await grantKiloClawAccess(user.id);
-      await createActiveInstance(user.id);
+      const instanceId = await createActiveInstance(user.id);
+      await grantKiloClawAccess(user.id, instanceId);
       mockSendChatMessage.mockResolvedValue({ success: true, channelId: 'chan-1' });
 
       const caller = await createCallerForUser(user.id);
@@ -120,7 +125,10 @@ describe('kiloclaw.sendChatMessage', () => {
 
   describe('ownership validation', () => {
     it('rejects when user has no active instance (no instanceId)', async () => {
-      await grantKiloClawAccess(user.id);
+      await db.insert(kiloclaw_earlybird_purchases).values({
+        user_id: user.id,
+        amount_cents: 2500,
+      });
       const caller = await createCallerForUser(user.id);
 
       await expect(caller.kiloclaw.sendChatMessage({ message: 'test' })).rejects.toMatchObject({
@@ -130,7 +138,8 @@ describe('kiloclaw.sendChatMessage', () => {
     });
 
     it('rejects when instanceId belongs to another user', async () => {
-      await grantKiloClawAccess(user.id);
+      const accessInstanceId = await createActiveInstance(user.id);
+      await grantKiloClawAccess(user.id, accessInstanceId);
       const otherInstanceId = await createActiveInstance(otherUser.id);
 
       const caller = await createCallerForUser(user.id);
@@ -143,7 +152,8 @@ describe('kiloclaw.sendChatMessage', () => {
     });
 
     it('rejects when instanceId points to a destroyed instance', async () => {
-      await grantKiloClawAccess(user.id);
+      const accessInstanceId = await createActiveInstance(user.id);
+      await grantKiloClawAccess(user.id, accessInstanceId);
       const destroyedId = await createDestroyedInstance(user.id);
 
       const caller = await createCallerForUser(user.id);
@@ -156,8 +166,8 @@ describe('kiloclaw.sendChatMessage', () => {
     });
 
     it('allows sending to own active instance by instanceId', async () => {
-      await grantKiloClawAccess(user.id);
       const instanceId = await createActiveInstance(user.id);
+      await grantKiloClawAccess(user.id, instanceId);
       mockSendChatMessage.mockResolvedValue({ success: true, channelId: 'chan-1' });
 
       const caller = await createCallerForUser(user.id);
@@ -172,8 +182,8 @@ describe('kiloclaw.sendChatMessage', () => {
 
   describe('error translation (KiloClawApiError → TRPCError)', () => {
     beforeEach(async () => {
-      await grantKiloClawAccess(user.id);
-      await createActiveInstance(user.id);
+      const instanceId = await createActiveInstance(user.id);
+      await grantKiloClawAccess(user.id, instanceId);
     });
 
     it('maps worker 400 to tRPC BAD_REQUEST', async () => {

@@ -239,7 +239,7 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
   },
   {
     credit_category: '20-usd-after-first-top-up',
-    amount_usd: 20,
+    amount_usd: 0,
     description: 'Bonus for users who top up for the first time',
     expiry_hours: PROMO_CREDIT_EXPIRY_HRS,
     is_idempotent: true,
@@ -259,8 +259,8 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
   },
   {
     credit_category: 'first-topup-bonus',
-    description: `First top-up bonus - $${FIRST_TOPUP_BONUS_AMOUNT()} credit`,
-    amount_usd: FIRST_TOPUP_BONUS_AMOUNT(),
+    description: `First top-up bonus - $${FIRST_TOPUP_BONUS_AMOUNT} credit`,
+    amount_usd: FIRST_TOPUP_BONUS_AMOUNT,
     expiry_hours: PROMO_CREDIT_EXPIRY_HRS,
     is_idempotent: true,
   },

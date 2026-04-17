@@ -53,7 +53,6 @@ import { createTestPaymentMethod } from './helpers/payment-method.helper';
 import { eq, and, count } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { createOrganization } from '@/lib/organizations/organizations';
-import { FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import {
   KiloPassCadence,
@@ -1168,9 +1167,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
-    expect(updatedUser?.total_microdollars_acquired).toBe(
-      amountInCents * 10_000 + FIRST_TOPUP_BONUS_AMOUNT() * 1_000_000
-    );
+    expect(updatedUser?.total_microdollars_acquired).toBe(amountInCents * 10_000);
   });
 
   test('neither organizationId nor kiloUserId (no user found): ignored (no DB side-effects)', async () => {

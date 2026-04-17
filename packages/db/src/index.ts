@@ -7,5 +7,11 @@ export {
   type GetWorkerDbOptions,
   type WorkerDb,
 } from './client';
+export {
+  insertKiloClawSubscriptionChangeLog,
+  serializeKiloClawSubscriptionSnapshot,
+  type KiloClawSubscriptionChangeActor,
+  type KiloClawSubscriptionChangeLogInput,
+} from './kiloclaw-subscription-change-log';
 export { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';
 export { sql, ne } from 'drizzle-orm';

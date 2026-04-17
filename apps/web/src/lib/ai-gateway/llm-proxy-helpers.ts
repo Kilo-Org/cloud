@@ -94,9 +94,10 @@ export async function usageLimitExceededResponse(user: User, balance?: number) {
 
   const title = !payments.payments_count ? 'Paid Model - Credits Required' : 'Low Credit Warning!';
 
-  const message = !payments.payments_count
-    ? `This is a paid model. To use paid models, you need to add credits. Get $${FIRST_TOPUP_BONUS_AMOUNT(new Date(Date.now() + 10 * 60 * 1000))} free on your first topup!`
-    : 'Add credits to continue, or switch to a free model';
+  const message =
+    !payments.payments_count && FIRST_TOPUP_BONUS_AMOUNT > 0
+      ? `This is a paid model. To use paid models, you need to add credits. Get $${FIRST_TOPUP_BONUS_AMOUNT} free on your first topup!`
+      : 'Add credits to continue, or switch to a free model';
 
   return NextResponse.json(
     {

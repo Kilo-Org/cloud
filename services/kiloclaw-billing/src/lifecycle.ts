@@ -315,9 +315,13 @@ async function markAutoResumeRequested(
   const subscriptionFilter = params.instanceId
     ? and(
         eq(kiloclaw_subscriptions.user_id, params.userId),
-        eq(kiloclaw_subscriptions.instance_id, params.instanceId)
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
-    : eq(kiloclaw_subscriptions.user_id, params.userId);
+    : and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+      );
 
   await database
     .update(kiloclaw_subscriptions)
@@ -339,9 +343,13 @@ async function clearAutoResumeState(
   const subscriptionFilter = params.instanceId
     ? and(
         eq(kiloclaw_subscriptions.user_id, params.userId),
-        eq(kiloclaw_subscriptions.instance_id, params.instanceId)
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
-    : eq(kiloclaw_subscriptions.user_id, params.userId);
+    : and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+      );
 
   const resettableEmailTypes = [
     'claw_suspended_trial',
@@ -880,9 +888,13 @@ async function processCreditRenewalRow(
   const subscriptionWhere = row.instance_id
     ? and(
         eq(kiloclaw_subscriptions.user_id, userId),
-        eq(kiloclaw_subscriptions.instance_id, row.instance_id)
+        eq(kiloclaw_subscriptions.instance_id, row.instance_id),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
-    : eq(kiloclaw_subscriptions.user_id, userId);
+    : and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+      );
 
   if (row.cancel_at_period_end) {
     await database
@@ -1155,6 +1167,7 @@ async function runCreditRenewalSweep(
       and(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         isNull(kiloclaw_subscriptions.stripe_subscription_id),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         inArray(kiloclaw_subscriptions.status, ['active', 'past_due']),
         lte(kiloclaw_subscriptions.credit_renewal_at, now),
         notSoftDeletedUserFilter()
@@ -1193,6 +1206,7 @@ async function runInterruptedAutoResumeSweep(
       and(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         eq(kiloclaw_subscriptions.status, 'active'),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         isNotNull(kiloclaw_subscriptions.suspended_at),
         sql`(${kiloclaw_subscriptions.auto_resume_retry_after} IS NULL OR ${kiloclaw_subscriptions.auto_resume_retry_after} <= ${now})`
       )
@@ -1297,6 +1311,7 @@ async function runTrialExpirySweep(
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'trialing'),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         lt(kiloclaw_subscriptions.trial_ends_at, now),
         isNull(kiloclaw_subscriptions.suspended_at),
         notSoftDeletedUserFilter()
@@ -1381,6 +1396,7 @@ async function runSubscriptionExpirySweep(
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'canceled'),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         lt(kiloclaw_subscriptions.current_period_end, now),
         isNull(kiloclaw_subscriptions.suspended_at),
         notSoftDeletedUserFilter()
@@ -1450,6 +1466,7 @@ async function runInstanceDestructionSweep(
     .where(
       and(
         lt(kiloclaw_subscriptions.destruction_deadline, now),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         isNotNull(kiloclaw_subscriptions.suspended_at),
         notSoftDeletedUserFilter()
       )
@@ -1530,6 +1547,7 @@ async function runPastDueCleanupSweep(
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'past_due'),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         lt(kiloclaw_subscriptions.past_due_since, fourteenDaysAgo),
         isNull(kiloclaw_subscriptions.suspended_at),
         notSoftDeletedUserFilter()
@@ -1591,6 +1609,7 @@ async function runIntroScheduleRepairSweep(
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'active'),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         isNull(kiloclaw_subscriptions.stripe_schedule_id),
         isNotNull(kiloclaw_subscriptions.stripe_subscription_id),
         eq(kiloclaw_subscriptions.cancel_at_period_end, false)
@@ -1643,6 +1662,7 @@ async function runDestructionWarningSweep(
       and(
         gte(kiloclaw_subscriptions.destruction_deadline, advisoryNow),
         lte(kiloclaw_subscriptions.destruction_deadline, twoDaysFromNow),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         isNotNull(kiloclaw_subscriptions.suspended_at),
         isNull(kiloclaw_instances.destroyed_at),
         notSoftDeletedUserFilter()
@@ -1708,6 +1728,7 @@ async function runTrialWarningSweep(
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'trialing'),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
         gte(kiloclaw_subscriptions.trial_ends_at, advisoryNow),
         lte(kiloclaw_subscriptions.trial_ends_at, trialWarningCutoff),
         isNull(kiloclaw_subscriptions.suspended_at),
@@ -1787,7 +1808,10 @@ async function runEarlybirdWarningSweep(
     .innerJoin(kilocode_users, eq(kiloclaw_earlybird_purchases.user_id, kilocode_users.id))
     .leftJoin(
       kiloclaw_subscriptions,
-      eq(kiloclaw_earlybird_purchases.user_id, kiloclaw_subscriptions.user_id)
+      and(
+        eq(kiloclaw_earlybird_purchases.user_id, kiloclaw_subscriptions.user_id),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+      )
     )
     .where(
       and(

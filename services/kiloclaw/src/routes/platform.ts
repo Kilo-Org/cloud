@@ -28,6 +28,11 @@ import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { flattenError, z } from 'zod';
 import { withDORetry } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
+import {
+  kiloclaw_inbound_email_aliases,
+  kiloclaw_inbound_email_reserved_aliases,
+  kiloclaw_instances,
+} from '@kilocode/db/schema';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
@@ -35,14 +40,9 @@ import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
 import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
-import {
-  doKeyFromActiveInstance,
-  resolveDoKeyForInstance,
-  resolveDoKeyForUser,
-} from '../lib/instance-routing';
-import { getInstanceById, getWorkerDb } from '../db';
-import { kiloclaw_inbound_email_aliases } from '@kilocode/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
+import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../db';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 
 const GmailHistoryIdSchema = z.object({
   userId: z.string().min(1),
@@ -108,6 +108,38 @@ function logBillingPlatform(
   const record = JSON.stringify({
     level,
     message,
+    ...fields,
+  });
+
+  if (level === 'error') {
+    console.error(record);
+    return;
+  }
+  console.log(record);
+}
+
+type ProvisionWriteLogFields = {
+  event: 'instance_record_insert' | 'instance_record_destroy' | 'subscription_bootstrap';
+  outcome: 'started' | 'completed' | 'failed';
+  userId?: string;
+  instanceId?: string;
+  orgId?: string | null;
+  sandboxId?: string;
+  durationMs?: number;
+  statusCode?: number;
+  inserted?: boolean;
+  error?: string;
+};
+
+function logProvisionWrite(
+  level: 'info' | 'error',
+  message: string,
+  fields: ProvisionWriteLogFields
+) {
+  const record = JSON.stringify({
+    level,
+    message,
+    billingComponent: 'kiloclaw_platform',
     ...fields,
   });
 
@@ -220,11 +252,15 @@ function setValidatedQueryUserId(c: Context<AppEnv>): string | null {
 /**
  * Resolve the DO key for a platform request.
  *
- * When instanceId is provided, the Postgres row is still consulted so legacy
- * sandboxes (sandbox_id not starting with `ki_`) route to the original
- * userId-keyed DO instead of a brand-new DO keyed by the row's UUID. If the
- * lookup fails or the row is missing, we fall back to the raw UUID — correct
- * for instance-keyed rows and a no-regression path for legacy rows.
+ * When instanceId is provided, it is authoritative. Postgres is only a
+ * best-effort bridge so legacy rows still route to their original userId-keyed
+ * DO and destroyed rows keep resolving after soft-delete. Missing rows fall
+ * back to the explicit instanceId so fresh provisioning can reach its DO
+ * before the instance record is inserted.
+ *
+ * Otherwise the active Postgres row is the source of truth so legacy sandboxes
+ * continue to route to the original userId-keyed DO after kilocode_users.id
+ * migrations.
  */
 export async function resolveInstanceDoKey(
   env: AppEnv['Bindings'],
@@ -232,19 +268,39 @@ export async function resolveInstanceDoKey(
   instanceId?: string
 ): Promise<string> {
   if (instanceId) {
-    try {
-      const resolved = await resolveDoKeyForInstance(env.HYPERDRIVE?.connectionString, instanceId);
-      if (resolved) return resolved;
-    } catch (err) {
+    const connectionString = env.HYPERDRIVE?.connectionString;
+    if (!connectionString) {
       console.warn(
-        '[platform] Failed to resolve DO key from instanceId, falling back to raw UUID',
+        '[platform] Missing database connection for explicit instance DO-key resolution, using instanceId',
+        { userId, instanceId }
+      );
+      return instanceId;
+    }
+
+    try {
+      const instance = await getInstanceByIdIncludingDestroyed(
+        getWorkerDb(connectionString),
+        instanceId,
         {
-          instanceId,
-          error: err instanceof Error ? err.message : String(err),
+          includeDestroyed: true,
         }
       );
+      if (!instance) {
+        console.warn(
+          '[platform] Instance not found during explicit DO-key resolution, using instanceId',
+          { userId, instanceId }
+        );
+        return instanceId;
+      }
+      return doKeyFromActiveInstance(instance);
+    } catch (err) {
+      console.warn('[platform] Failed to resolve DO key for explicit instance, using instanceId', {
+        userId,
+        instanceId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return instanceId;
     }
-    return instanceId;
   }
 
   try {
@@ -279,6 +335,261 @@ async function withResolvedDORetry<TResult>(
   operationName: string
 ): Promise<TResult> {
   return withDORetry(await instanceStubFactory(env, userId, instanceId), operation, operationName);
+}
+
+type ProvisionedInstanceRecord = {
+  id: string;
+  sandboxId: string;
+};
+
+function buildDefaultInboundEmailAlias(instanceId: string): string {
+  return `claw-${instanceId.replaceAll('-', '')}`;
+}
+
+async function insertProvisionedInstanceRecord(params: {
+  env: AppEnv['Bindings'];
+  userId: string;
+  instanceId: string;
+  sandboxId: string;
+  orgId: string | null;
+}): Promise<ProvisionedInstanceRecord> {
+  const connectionString = params.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    logProvisionWrite('error', 'Instance record insert aborted: HYPERDRIVE not configured', {
+      event: 'instance_record_insert',
+      outcome: 'failed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      error: 'HYPERDRIVE is not configured',
+    });
+    throw new Error('HYPERDRIVE is not configured');
+  }
+
+  const start = performance.now();
+  logProvisionWrite('info', 'Inserting provisioned instance record', {
+    event: 'instance_record_insert',
+    outcome: 'started',
+    userId: params.userId,
+    instanceId: params.instanceId,
+    orgId: params.orgId,
+    sandboxId: params.sandboxId,
+  });
+
+  const db = getWorkerDb(connectionString);
+  const alias = buildDefaultInboundEmailAlias(params.instanceId);
+  try {
+    const created = await db.transaction(async tx => {
+      const [createdInstance] = await tx
+        .insert(kiloclaw_instances)
+        .values({
+          id: params.instanceId,
+          user_id: params.userId,
+          sandbox_id: params.sandboxId,
+          organization_id: params.orgId,
+        })
+        .onConflictDoNothing({ target: kiloclaw_instances.id })
+        .returning({
+          id: kiloclaw_instances.id,
+          sandboxId: kiloclaw_instances.sandbox_id,
+        });
+
+      const [existingAlias] = await tx
+        .select({ alias: kiloclaw_inbound_email_aliases.alias })
+        .from(kiloclaw_inbound_email_aliases)
+        .where(
+          and(
+            eq(kiloclaw_inbound_email_aliases.instance_id, params.instanceId),
+            isNull(kiloclaw_inbound_email_aliases.retired_at)
+          )
+        )
+        .limit(1);
+
+      if (!existingAlias) {
+        await tx
+          .insert(kiloclaw_inbound_email_reserved_aliases)
+          .values({ alias })
+          .onConflictDoNothing();
+
+        await tx
+          .insert(kiloclaw_inbound_email_aliases)
+          .values({
+            alias,
+            instance_id: params.instanceId,
+          })
+          .onConflictDoNothing({
+            target: kiloclaw_inbound_email_aliases.alias,
+          });
+      }
+
+      return createdInstance ?? null;
+    });
+
+    if (created) {
+      logProvisionWrite('info', 'Instance record inserted', {
+        event: 'instance_record_insert',
+        outcome: 'completed',
+        userId: params.userId,
+        instanceId: params.instanceId,
+        orgId: params.orgId,
+        sandboxId: params.sandboxId,
+        durationMs: performance.now() - start,
+        inserted: true,
+      });
+      return created;
+    }
+
+    const [existing] = await db
+      .select({
+        id: kiloclaw_instances.id,
+        sandboxId: kiloclaw_instances.sandbox_id,
+      })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, params.instanceId))
+      .limit(1);
+
+    if (!existing) {
+      logProvisionWrite('error', 'Instance record insert reported conflict but row not found', {
+        event: 'instance_record_insert',
+        outcome: 'failed',
+        userId: params.userId,
+        instanceId: params.instanceId,
+        orgId: params.orgId,
+        durationMs: performance.now() - start,
+        error: 'row_missing_after_conflict',
+      });
+      throw new Error('Failed to insert provisioned instance record');
+    }
+
+    logProvisionWrite('info', 'Instance record already existed (onConflictDoNothing hit)', {
+      event: 'instance_record_insert',
+      outcome: 'completed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      sandboxId: existing.sandboxId,
+      durationMs: performance.now() - start,
+      inserted: false,
+    });
+    return existing;
+  } catch (err) {
+    logProvisionWrite('error', 'Instance record insert failed', {
+      event: 'instance_record_insert',
+      outcome: 'failed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      durationMs: performance.now() - start,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
+async function markProvisionedInstanceDestroyed(params: {
+  env: AppEnv['Bindings'];
+  instanceId: string;
+}): Promise<void> {
+  const connectionString = params.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    logProvisionWrite('error', 'Instance destroy compensation aborted: HYPERDRIVE not configured', {
+      event: 'instance_record_destroy',
+      outcome: 'failed',
+      instanceId: params.instanceId,
+      error: 'HYPERDRIVE is not configured',
+    });
+    throw new Error('HYPERDRIVE is not configured during instance destroy compensation');
+  }
+
+  const start = performance.now();
+  logProvisionWrite('info', 'Marking provisioned instance destroyed', {
+    event: 'instance_record_destroy',
+    outcome: 'started',
+    instanceId: params.instanceId,
+  });
+
+  const db = getWorkerDb(connectionString);
+  try {
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: sql`NOW()` })
+      .where(
+        and(eq(kiloclaw_instances.id, params.instanceId), isNull(kiloclaw_instances.destroyed_at))
+      );
+
+    logProvisionWrite('info', 'Instance record marked destroyed', {
+      event: 'instance_record_destroy',
+      outcome: 'completed',
+      instanceId: params.instanceId,
+      durationMs: performance.now() - start,
+    });
+  } catch (err) {
+    logProvisionWrite('error', 'Instance destroy compensation failed', {
+      event: 'instance_record_destroy',
+      outcome: 'failed',
+      instanceId: params.instanceId,
+      durationMs: performance.now() - start,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
+async function bootstrapProvisionedSubscription(params: {
+  env: AppEnv['Bindings'];
+  userId: string;
+  instanceId: string;
+  orgId: string | null;
+}): Promise<void> {
+  if (!params.env.KILOCLAW_BILLING) {
+    logProvisionWrite('error', 'Subscription bootstrap aborted: KILOCLAW_BILLING not configured', {
+      event: 'subscription_bootstrap',
+      outcome: 'failed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      error: 'KILOCLAW_BILLING service binding is not configured',
+    });
+    throw new Error('KILOCLAW_BILLING service binding is not configured');
+  }
+
+  const start = performance.now();
+  logProvisionWrite('info', 'Calling billing worker to bootstrap subscription', {
+    event: 'subscription_bootstrap',
+    outcome: 'started',
+    userId: params.userId,
+    instanceId: params.instanceId,
+    orgId: params.orgId,
+  });
+
+  try {
+    await params.env.KILOCLAW_BILLING.bootstrapProvisionSubscription({
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logProvisionWrite('error', 'Subscription bootstrap RPC failed', {
+      event: 'subscription_bootstrap',
+      outcome: 'failed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      durationMs: performance.now() - start,
+      error: message.slice(0, 500),
+    });
+    throw err;
+  }
+
+  logProvisionWrite('info', 'Subscription bootstrap completed', {
+    event: 'subscription_bootstrap',
+    outcome: 'completed',
+    userId: params.userId,
+    instanceId: params.instanceId,
+    orgId: params.orgId,
+    durationMs: performance.now() - start,
+  });
 }
 
 /** Parse and validate optional ?instanceId= query param. Returns 400 on invalid format. */
@@ -527,6 +838,7 @@ platform.post('/provision', async c => {
     userId,
     instanceId,
     orgId,
+    bootstrapSubscription,
     provider,
     envVars,
     encryptedSecrets,
@@ -539,6 +851,11 @@ platform.post('/provision', async c => {
     region,
     pinnedImageTag,
   } = result.data;
+  const provisionedInstanceId = instanceId ?? crypto.randomUUID();
+  const shouldInsertInstanceRecord = !instanceId;
+  const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
+  const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
+  const provisionRoute = '/api/platform/provision';
 
   let provision;
   try {
@@ -548,7 +865,7 @@ platform.post('/provision', async c => {
     provision = await withResolvedDORetry(
       c.env,
       userId,
-      instanceId,
+      provisionedInstanceId,
       stub =>
         stub.provision(
           userId,
@@ -564,7 +881,7 @@ platform.post('/provision', async c => {
             region,
             pinnedImageTag,
           },
-          instanceId || orgId || provider ? { instanceId, orgId, provider } : undefined
+          { instanceId: provisionedInstanceId, orgId, provider }
         ),
       'provision'
     );
@@ -578,28 +895,156 @@ platform.post('/provision', async c => {
     return jsonError(message, status);
   }
 
-  // Record the instance in the appropriate registry (best-effort).
-  // instanceId is always provided by Next.js (the Postgres row UUID).
-  if (instanceId) {
+  if (shouldInsertInstanceRecord) {
+    const insertStartedAt = performance.now();
     try {
-      const registryKey = orgId ? `org:${orgId}` : `user:${userId}`;
-      const registryStub = c.env.KILOCLAW_REGISTRY.get(
-        c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
-      );
-      // doKey = instanceId: all new provisions create DOs keyed by instanceId.
-      // For lazy-migrated legacy instances, doKey = userId (set in lazyMigrate).
-      await registryStub.createInstance(registryKey, userId, instanceId, instanceId);
-      console.log('[platform] Registry entry created:', {
-        registryKey,
-        instanceId,
-        doKey: instanceId,
+      await insertProvisionedInstanceRecord({
+        env: c.env,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? null,
       });
-    } catch (registryErr) {
-      console.error('[platform] Registry create failed (non-fatal):', registryErr);
+      writeEvent(c.env, {
+        event: 'instance.record_inserted',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        durationMs: performance.now() - insertStartedAt,
+      });
+    } catch (persistErr) {
+      console.error('[platform] Provision post-processing failed:', persistErr);
+      const { message, status } = sanitizeError(persistErr, 'post-provision bootstrap');
+      writeEvent(c.env, {
+        event: 'instance.record_insert_failed',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        error: message,
+        durationMs: performance.now() - insertStartedAt,
+      });
+      await withResolvedDORetry(
+        c.env,
+        userId,
+        provisionedInstanceId,
+        stub => stub.destroy(),
+        'destroy'
+      ).catch(destroyErr => {
+        console.error(
+          '[platform] Failed to destroy provisioned instance after bootstrap error:',
+          destroyErr
+        );
+      });
+      await markProvisionedInstanceDestroyed({
+        env: c.env,
+        instanceId: provisionedInstanceId,
+      }).catch(markErr => {
+        console.error(
+          '[platform] Failed to mark instance destroyed after bootstrap error:',
+          markErr
+        );
+      });
+      return jsonError(message, status);
     }
   }
 
-  return c.json(provision, 201);
+  if (shouldBootstrapSubscription) {
+    const bootstrapStartedAt = performance.now();
+    try {
+      await bootstrapProvisionedSubscription({
+        env: c.env,
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? null,
+      });
+      writeEvent(c.env, {
+        event: 'instance.subscription_bootstrapped',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        durationMs: performance.now() - bootstrapStartedAt,
+      });
+    } catch (persistErr) {
+      console.error('[platform] Provision post-processing failed:', persistErr);
+      const { message, status } = sanitizeError(persistErr, 'post-provision bootstrap');
+      writeEvent(c.env, {
+        event: 'instance.subscription_bootstrap_failed',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        error: message,
+        durationMs: performance.now() - bootstrapStartedAt,
+      });
+      if (shouldInsertInstanceRecord) {
+        await withResolvedDORetry(
+          c.env,
+          userId,
+          provisionedInstanceId,
+          stub => stub.destroy(),
+          'destroy'
+        ).catch(destroyErr => {
+          console.error(
+            '[platform] Failed to destroy provisioned instance after bootstrap error:',
+            destroyErr
+          );
+        });
+        await markProvisionedInstanceDestroyed({
+          env: c.env,
+          instanceId: provisionedInstanceId,
+        }).catch(markErr => {
+          console.error(
+            '[platform] Failed to mark instance destroyed after bootstrap error:',
+            markErr
+          );
+        });
+      } else {
+        console.error(
+          '[platform] Subscription bootstrap failed after reprovisioning existing instance; leaving Durable Object provisioned for retry/manual recovery',
+          {
+            userId,
+            instanceId: provisionedInstanceId,
+            doKey: provisionDoKey,
+          }
+        );
+      }
+      return jsonError(message, status);
+    }
+  }
+
+  try {
+    const registryKey = orgId ? `org:${orgId}` : `user:${userId}`;
+    const registryStub = c.env.KILOCLAW_REGISTRY.get(
+      c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+    );
+    await registryStub.createInstance(registryKey, userId, provisionedInstanceId, provisionDoKey);
+    console.log('[platform] Registry entry created:', {
+      registryKey,
+      instanceId: provisionedInstanceId,
+      doKey: provisionDoKey,
+    });
+  } catch (registryErr) {
+    console.error('[platform] Registry create failed (non-fatal):', registryErr);
+  }
+
+  return c.json(
+    {
+      ...provision,
+      instanceId: provisionedInstanceId,
+    },
+    201
+  );
 });
 
 // PATCH /api/platform/kilocode-config

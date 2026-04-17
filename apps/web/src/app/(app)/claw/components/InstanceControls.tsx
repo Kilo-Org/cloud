@@ -467,6 +467,7 @@ export function InstanceControls({
         open={kiloRunOpen}
         onOpenChange={setKiloRunOpen}
         machineStatus={status.status}
+        mutations={mutations}
       />
     </div>
   );

@@ -266,8 +266,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       const response = await POST(
         makeRequest({
           status: 'interrupted',
-          errorMessage:
-            'This is a paid model. To use paid models, you need to add credits. Get $20 free on your first topup!',
+          errorMessage: 'This is a paid model. To use paid models, you need to add credits.',
         }),
         makeParams(REVIEW_ID)
       );
@@ -277,8 +276,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         REVIEW_ID,
         'failed',
         expect.objectContaining({
-          errorMessage:
-            'This is a paid model. To use paid models, you need to add credits. Get $20 free on your first topup!',
+          errorMessage: 'This is a paid model. To use paid models, you need to add credits.',
           terminalReason: 'billing',
         })
       );

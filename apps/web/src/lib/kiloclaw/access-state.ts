@@ -2,6 +2,11 @@ import { db } from '@/lib/drizzle';
 import { kiloclaw_subscriptions, type KiloClawSubscription } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
+import {
+  CurrentPersonalSubscriptionResolutionError,
+  resolveCurrentPersonalSubscriptionRow,
+} from '@/lib/kiloclaw/current-personal-subscription';
+
 export type KiloClawAccessReason = 'trial' | 'subscription';
 
 function parseTimestamp(value: string | null | undefined): number {
@@ -85,3 +90,20 @@ export async function getEffectiveKiloClawSubscriptionForUser(
     subscriptionCount: subscriptions.length,
   };
 }
+
+export async function getCurrentPersonalKiloClawSubscriptionForUser(
+  userId: string,
+  now = new Date()
+): Promise<{
+  subscription: KiloClawSubscription | null;
+  accessReason: KiloClawAccessReason | null;
+}> {
+  const row = await resolveCurrentPersonalSubscriptionRow({ userId, dbOrTx: db });
+  const subscription = row?.subscription ?? null;
+  return {
+    subscription,
+    accessReason: getKiloClawSubscriptionAccessReason(subscription, now),
+  };
+}
+
+export { CurrentPersonalSubscriptionResolutionError };

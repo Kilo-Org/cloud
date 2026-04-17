@@ -42,9 +42,13 @@ function subscriptionFilterForUser(kiloUserId: string, instanceId?: string) {
   return instanceId
     ? and(
         eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.instance_id, instanceId)
+        eq(kiloclaw_subscriptions.instance_id, instanceId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
-    : eq(kiloclaw_subscriptions.user_id, kiloUserId);
+    : and(
+        eq(kiloclaw_subscriptions.user_id, kiloUserId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+      );
 }
 
 async function clearAutoResumeState(
@@ -96,15 +100,21 @@ async function resolveActiveInstance(
     ? and(
         eq(kiloclaw_instances.id, options.instanceId),
         eq(kiloclaw_instances.user_id, kiloUserId),
+        isNull(kiloclaw_instances.organization_id),
         isNull(kiloclaw_instances.destroyed_at)
       )
     : options.sandboxId
       ? and(
           eq(kiloclaw_instances.user_id, kiloUserId),
           eq(kiloclaw_instances.sandbox_id, options.sandboxId),
+          isNull(kiloclaw_instances.organization_id),
           isNull(kiloclaw_instances.destroyed_at)
         )
-      : and(eq(kiloclaw_instances.user_id, kiloUserId), isNull(kiloclaw_instances.destroyed_at));
+      : and(
+          eq(kiloclaw_instances.user_id, kiloUserId),
+          isNull(kiloclaw_instances.organization_id),
+          isNull(kiloclaw_instances.destroyed_at)
+        );
 
   const [targetInstance] = await db
     .select({ id: kiloclaw_instances.id, sandbox_id: kiloclaw_instances.sandbox_id })
@@ -142,7 +152,8 @@ export async function autoResumeIfSuspended(
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.instance_id, targetInstance.id)
+        eq(kiloclaw_subscriptions.instance_id, targetInstance.id),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
     )
     .limit(1);
@@ -167,7 +178,8 @@ export async function autoResumeIfSuspended(
       .where(
         and(
           eq(kiloclaw_subscriptions.user_id, kiloUserId),
-          eq(kiloclaw_subscriptions.instance_id, targetInstance.id)
+          eq(kiloclaw_subscriptions.instance_id, targetInstance.id),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
         )
       );
     logError('Failed to request async auto-resume', {
@@ -190,7 +202,8 @@ export async function autoResumeIfSuspended(
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.instance_id, targetInstance.id)
+        eq(kiloclaw_subscriptions.instance_id, targetInstance.id),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
     );
 
@@ -229,7 +242,8 @@ export async function completeAutoResumeIfReady(
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.instance_id, targetInstance.id)
+        eq(kiloclaw_subscriptions.instance_id, targetInstance.id),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
     )
     .limit(1);

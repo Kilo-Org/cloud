@@ -6,7 +6,10 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { kiloclaw_earlybird_purchases } from '@kilocode/db/schema';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
-import { getEffectiveKiloClawSubscriptionForUser } from '@/lib/kiloclaw/access-state';
+import {
+  getCurrentPersonalKiloClawSubscriptionForUser,
+  CurrentPersonalSubscriptionResolutionError,
+} from '@/lib/kiloclaw/access-state';
 import { baseProcedure } from '@/lib/trpc/init';
 
 /**
@@ -17,10 +20,31 @@ export async function requireKiloClawAccess(userId: string): Promise<void> {
   const now = new Date();
 
   // 1. Active subscription
-  const { subscription, accessReason, subscriptionCount } =
-    await getEffectiveKiloClawSubscriptionForUser(userId, now);
-  if (accessReason) {
-    return;
+  let subscription = null;
+  let accessReason = null;
+  try {
+    const resolved = await getCurrentPersonalKiloClawSubscriptionForUser(userId, now);
+    subscription = resolved.subscription;
+    accessReason = resolved.accessReason;
+    if (accessReason) {
+      return;
+    }
+  } catch (error) {
+    if (error instanceof CurrentPersonalSubscriptionResolutionError) {
+      console.warn(
+        JSON.stringify({
+          event: 'kiloclaw_access_quarantined_multiple_current_rows',
+          userId,
+          instanceId: error.instanceId,
+          message: error.message,
+        })
+      );
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'KiloClaw billing state needs support review before access can be restored.',
+      });
+    }
+    throw error;
   }
 
   // 2. Earlybird not expired
@@ -38,7 +62,6 @@ export async function requireKiloClawAccess(userId: string): Promise<void> {
     JSON.stringify({
       event: 'kiloclaw_access_denied',
       userId,
-      subscriptionCount,
       effectiveSubscription: subscription
         ? {
             id: subscription.id,

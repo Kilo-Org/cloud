@@ -195,16 +195,23 @@ function extractWranglerVars(repoRoot: string, workerDir: string): Map<string, s
   return vars;
 }
 
+/**
+ * A passthrough entry is "already provided" by wrangler.jsonc vars only when
+ * the example has no dev-specific default. If the example supplies a default
+ * that differs from the wrangler var, the example is asserting a dev override
+ * and the key must land in .dev.vars to take effect.
+ */
 function isProvidedByWranglerVars(
   entry: ExampleEntry,
   envLocal: Map<string, string>,
   wranglerVars: Map<string, string>
 ): boolean {
-  return (
-    entry.annotation.type === 'passthrough' &&
-    !envLocal.has(entry.key) &&
-    wranglerVars.has(entry.key)
-  );
+  if (entry.annotation.type !== 'passthrough') return false;
+  if (envLocal.has(entry.key)) return false;
+  const wranglerValue = wranglerVars.get(entry.key);
+  if (wranglerValue === undefined) return false;
+  if (!entry.defaultValue) return true;
+  return entry.defaultValue === wranglerValue;
 }
 
 function extractSecretsStoreBindings(repoRoot: string, workerDir: string): SecretStoreBinding[] {

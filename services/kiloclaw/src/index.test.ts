@@ -68,6 +68,35 @@ describe('platform route env validation', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
+  it('rejects platform routes when KILOCLAW_INTERNAL_API_SECRET is missing', async () => {
+    const response = await worker.fetch(
+      new Request('https://example.com/api/platform/provision', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'secret-123',
+        },
+        body: JSON.stringify({ userId: 'user-1' }),
+      }),
+      {
+        INTERNAL_API_SECRET: 'next-internal-api-secret',
+        HYPERDRIVE: { connectionString: 'postgresql://fake' },
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        FLY_API_TOKEN: 'fly-token',
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('5');
+    await expect(response.json()).resolves.toEqual({ error: 'Configuration error' });
+    expect(console.error).toHaveBeenCalledWith(
+      '[CONFIG] Platform route missing bindings:',
+      'KILOCLAW_INTERNAL_API_SECRET'
+    );
+  });
+
   it('rejects platform routes when NEXTAUTH_SECRET is missing', async () => {
     const response = await worker.fetch(
       new Request('https://example.com/api/platform/provision', {
@@ -79,7 +108,8 @@ describe('platform route env validation', () => {
         body: JSON.stringify({ userId: 'user-1' }),
       }),
       {
-        INTERNAL_API_SECRET: 'secret-123',
+        INTERNAL_API_SECRET: 'next-internal-api-secret',
+        KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
         HYPERDRIVE: { connectionString: 'postgresql://fake' },
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
         FLY_API_TOKEN: 'fly-token',

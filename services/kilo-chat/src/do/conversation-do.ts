@@ -42,14 +42,17 @@ export type MessageReactionSummary = {
   memberIds: string[];
 };
 
+export type MessageContentBlock = { type: string; [key: string]: string };
+
 export type MessageRow = {
   id: string;
   senderId: string;
-  content: string;
+  content: MessageContentBlock[];
   inReplyToMessageId: string | null;
-  version: number;
   updatedAt: number | null;
+  clientUpdatedAt: number | null;
   deleted: boolean;
+  deliveryFailed: boolean;
   reactions: MessageReactionSummary[];
 };
 
@@ -314,7 +317,7 @@ export class ConversationDO extends DurableObject<Env> {
       messages: rows.map(row => ({
         id: row.id,
         senderId: row.sender_id,
-        content: row.deleted === 1 ? [] : (JSON.parse(row.content) as Record<string, unknown>[]),
+        content: row.deleted === 1 ? [] : (JSON.parse(row.content) as MessageContentBlock[]),
         inReplyToMessageId: row.in_reply_to_message_id,
         updatedAt: row.updated_at,
         clientUpdatedAt: row.client_updated_at,

@@ -211,7 +211,7 @@ describe('ConversationDO SSE subscribe via fetch() - streaming', () => {
       messageId: r1.messageId,
       senderId: 'user-1',
       content: [{ type: 'text', text: 'Edited' }],
-      version: 1,
+      clientTimestamp: Date.now(),
     });
     expect(editResult.ok).toBe(true);
 

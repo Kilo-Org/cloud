@@ -16,6 +16,7 @@ export type ConversationEntry = {
 export type AddConversationParams = {
   conversationId: string;
   conversationTitle: string | null;
+  sandboxId: string | null;
   joinedAt: number;
 };
 
@@ -28,10 +29,12 @@ export class MembershipDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(() => migrate(this.db, migrations));
   }
 
-  listConversations(): ConversationEntry[] {
+  listConversations(sandboxId?: string): ConversationEntry[] {
+    const where = sandboxId ? eq(conversations.sandbox_id, sandboxId) : undefined;
     return this.db
       .select()
       .from(conversations)
+      .where(where)
       .orderBy(
         desc(sql`coalesce(${conversations.last_message_id}, 'ZZZZZZZZZZZZZZZZZZZZZZZZZZ')`),
         desc(conversations.joined_at)
@@ -52,6 +55,7 @@ export class MembershipDO extends DurableObject<Env> {
       .values({
         conversation_id: params.conversationId,
         conversation_title: params.conversationTitle,
+        sandbox_id: params.sandboxId,
         joined_at: params.joinedAt,
       })
       .onConflictDoNothing()

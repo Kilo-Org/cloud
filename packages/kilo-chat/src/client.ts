@@ -70,8 +70,9 @@ export class KiloChatClient {
     return res.json() as Promise<T>;
   }
 
-  async listConversations(): Promise<ConversationListResponse> {
-    return this.request('/v1/conversations');
+  async listConversations(sandboxId?: string): Promise<ConversationListResponse> {
+    const query = sandboxId ? `?sandboxId=${encodeURIComponent(sandboxId)}` : '';
+    return this.request(`/v1/conversations${query}`);
   }
 
   async getConversation(conversationId: string): Promise<ConversationDetailResponse> {

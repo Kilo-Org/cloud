@@ -1,0 +1,1 @@
+ALTER TABLE `conversations` ADD `sandbox_id` text;

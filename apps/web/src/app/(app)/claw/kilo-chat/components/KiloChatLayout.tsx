@@ -60,7 +60,7 @@ export function KiloChatLayout({
 
   const params = useParams<{ conversationId?: string }>();
   const [leavingConversationId, setLeavingConversationId] = useState<string | null>(null);
-  const { data, isLoading } = useConversations(getToken);
+  const { data, isLoading } = useConversations(getToken, selectedSandboxId);
   const createConversation = useCreateConversation(getToken);
   const renameConversation = useRenameConversation(getToken);
   const leaveConversation = useLeaveConversation(getToken);

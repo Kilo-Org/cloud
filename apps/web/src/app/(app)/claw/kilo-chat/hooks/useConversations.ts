@@ -10,11 +10,12 @@ function useClient(getToken: () => Promise<string>) {
   return useMemo(() => new KiloChatClient({ baseUrl: KILO_CHAT_URL, getToken }), [getToken]);
 }
 
-export function useConversations(getToken: () => Promise<string>) {
+export function useConversations(getToken: () => Promise<string>, sandboxId: string | null) {
   const client = useClient(getToken);
   return useQuery({
-    queryKey: ['kilo-chat', 'conversations'],
-    queryFn: () => client.listConversations(),
+    queryKey: ['kilo-chat', 'conversations', sandboxId],
+    queryFn: () => client.listConversations(sandboxId ?? undefined),
+    enabled: !!sandboxId,
     refetchInterval: POLL_INTERVAL,
   });
 }

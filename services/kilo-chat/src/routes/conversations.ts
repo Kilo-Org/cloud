@@ -69,6 +69,7 @@ export function registerConversationRoutes(
     const memberParams = {
       conversationId,
       conversationTitle: body.data.title ?? null,
+      sandboxId: body.data.sandboxId,
       joinedAt: now,
     };
 
@@ -82,11 +83,12 @@ export function registerConversationRoutes(
     return c.json({ conversationId }, 201);
   });
 
-  // GET /v1/conversations — list my conversations
+  // GET /v1/conversations — list my conversations, optionally filtered by sandboxId
   app.get('/v1/conversations', async c => {
     const callerId = c.get('callerId');
+    const sandboxId = c.req.query('sandboxId') ?? undefined;
     const stub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
-    const list = await stub.listConversations();
+    const list = await stub.listConversations(sandboxId);
     return c.json({ conversations: list });
   });
 

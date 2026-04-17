@@ -80,7 +80,11 @@ export function CancelDialog({ open, onOpenChange, billing }: CancelDialogProps)
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Keep Subscription
           </Button>
-          <Button variant="destructive" onClick={handleConfirm} disabled={cancelMutation.isPending || !instanceId}>
+          <Button
+            variant="destructive"
+            onClick={handleConfirm}
+            disabled={cancelMutation.isPending || !instanceId}
+          >
             Cancel Subscription
           </Button>
         </DialogFooter>

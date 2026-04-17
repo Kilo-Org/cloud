@@ -92,8 +92,9 @@ async function writeBestEffortSubscriptionChangeLog(
       before: params.before,
       after: params.after,
     });
-  } catch {
+  } catch (error) {
     // Trial change already committed. Log failure must not trigger retry.
+    console.error('[admin-extend-claw-trial] Failed to write subscription change log:', error);
   }
 }
 

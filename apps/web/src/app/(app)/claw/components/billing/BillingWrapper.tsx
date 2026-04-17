@@ -81,36 +81,42 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
 
   function handleReactivate() {
     if (!instanceId) return;
-    reactivate.mutate({ instanceId }, {
-      onSuccess: () => {
-        void Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
-          }),
-          queryClient.invalidateQueries({
-            queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
-          }),
-          queryClient.invalidateQueries({
-            queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
-          }),
-          queryClient.invalidateQueries({
-            queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({ instanceId }),
-          }),
-          queryClient.invalidateQueries({
-            queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
-          }),
-        ]);
-      },
-    });
+    reactivate.mutate(
+      { instanceId },
+      {
+        onSuccess: () => {
+          void Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
+            }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
+            }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
+            }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({ instanceId }),
+            }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
+            }),
+          ]);
+        },
+      }
+    );
   }
 
   function handleUpdatePayment() {
     if (!instanceId) return;
-    billingPortal.mutate({ instanceId, returnUrl: `${window.location.origin}/claw` }, {
-      onSuccess: result => {
-        window.location.href = result.url;
-      },
-    });
+    billingPortal.mutate(
+      { instanceId, returnUrl: `${window.location.origin}/claw` },
+      {
+        onSuccess: result => {
+          window.location.href = result.url;
+        },
+      }
+    );
   }
 
   return (

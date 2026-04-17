@@ -56,8 +56,12 @@ function ActiveSubscriptionCard({
   const instanceId = billing.instance?.id ?? null;
   const switchPlanMutation = useMutation(trpc.kiloclaw.switchPlanAtInstance.mutationOptions());
   const portalMutation = useMutation(trpc.kiloclaw.getCustomerPortalUrl.mutationOptions());
-  const cancelSwitchMutation = useMutation(trpc.kiloclaw.cancelPlanSwitchAtInstance.mutationOptions());
-  const acceptConversionMutation = useMutation(trpc.kiloclaw.acceptConversionAtInstance.mutationOptions());
+  const cancelSwitchMutation = useMutation(
+    trpc.kiloclaw.cancelPlanSwitchAtInstance.mutationOptions()
+  );
+  const acceptConversionMutation = useMutation(
+    trpc.kiloclaw.acceptConversionAtInstance.mutationOptions()
+  );
   const CONVERSION_DISMISSED_KEY = 'kiloclaw-conversion-dismissed';
   const [conversionDismissed, setConversionDismissed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -105,7 +109,10 @@ function ActiveSubscriptionCard({
 
   async function handleManageBilling() {
     if (!instanceId) return;
-    const result = await portalMutation.mutateAsync({ instanceId, returnUrl: `${window.location.origin}/claw` });
+    const result = await portalMutation.mutateAsync({
+      instanceId,
+      returnUrl: `${window.location.origin}/claw`,
+    });
     window.location.href = result.url;
   }
 
@@ -387,7 +394,9 @@ export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardPro
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const instanceId = billing.instance?.id ?? null;
-  const reactivateMutation = useMutation(trpc.kiloclaw.reactivateSubscriptionAtInstance.mutationOptions());
+  const reactivateMutation = useMutation(
+    trpc.kiloclaw.reactivateSubscriptionAtInstance.mutationOptions()
+  );
   const portalMutation = useMutation(trpc.kiloclaw.getCustomerPortalUrl.mutationOptions());
 
   async function invalidateBillingQueries() {
@@ -413,16 +422,22 @@ export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardPro
 
   function handleReactivate() {
     if (!instanceId) return;
-    reactivateMutation.mutate({ instanceId }, {
-      onSuccess: () => {
-        void invalidateBillingQueries();
-      },
-    });
+    reactivateMutation.mutate(
+      { instanceId },
+      {
+        onSuccess: () => {
+          void invalidateBillingQueries();
+        },
+      }
+    );
   }
 
   async function handleUpdatePayment() {
     if (!instanceId) return;
-    const result = await portalMutation.mutateAsync({ instanceId, returnUrl: `${window.location.origin}/claw` });
+    const result = await portalMutation.mutateAsync({
+      instanceId,
+      returnUrl: `${window.location.origin}/claw`,
+    });
     window.location.href = result.url;
   }
 

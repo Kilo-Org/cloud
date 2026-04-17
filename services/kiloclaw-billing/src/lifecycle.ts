@@ -2028,27 +2028,52 @@ async function runTrialWarningSweep(
 
   const trialWarningRows = await database
     .select({
+      id: kiloclaw_subscriptions.id,
       user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
+      instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      instance_sandbox_id: kiloclaw_instances.sandbox_id,
       email: kilocode_users.google_user_email,
       trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
-    .innerJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'trialing'),
         gte(kiloclaw_subscriptions.trial_ends_at, advisoryNow),
         lte(kiloclaw_subscriptions.trial_ends_at, trialWarningCutoff),
-        isNull(kiloclaw_subscriptions.suspended_at),
-        isNull(kiloclaw_instances.destroyed_at)
+        isNull(kiloclaw_subscriptions.suspended_at)
       )
     );
 
   for (const row of trialWarningRows) {
     try {
       if (!row.trial_ends_at) continue;
+
+      if (!row.instance_id) {
+        logSkippedSubscriptionRow('Skipping trial warning for detached subscription row', row, {
+          reason: 'missing_instance_id',
+        });
+        continue;
+      }
+
+      if (!row.instance_sandbox_id) {
+        logSkippedSubscriptionRow(
+          'Skipping trial warning for subscription without instance row',
+          row,
+          { reason: 'missing_instance_row' }
+        );
+        continue;
+      }
+
+      if (row.instance_destroyed_at) {
+        logSkippedSubscriptionRow('Skipping trial warning for destroyed instance', row, {
+          reason: 'instance_destroyed',
+        });
+        continue;
+      }
 
       const daysRemaining = Math.ceil(
         (new Date(row.trial_ends_at).getTime() - Date.now()) / MS_PER_DAY

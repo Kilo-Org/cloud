@@ -96,12 +96,16 @@ export async function POST(req: NextRequest) {
 
   const targetInstanceId = resumeState.instanceId ?? instanceId ?? null;
   if (!targetInstanceId) {
-    logInstanceReady('error', 'Instance-ready email skipped because instance could not be resolved', {
-      event: 'instance_ready_email_skipped',
-      outcome: 'skipped',
-      userId,
-      sandboxId,
-    });
+    logInstanceReady(
+      'error',
+      'Instance-ready email skipped because instance could not be resolved',
+      {
+        event: 'instance_ready_email_skipped',
+        outcome: 'skipped',
+        userId,
+        sandboxId,
+      }
+    );
     return NextResponse.json({ sent: false, reason: 'instance_unresolved' });
   }
 

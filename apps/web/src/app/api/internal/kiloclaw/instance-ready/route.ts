@@ -27,9 +27,14 @@ const BodySchema = z.object({
   shouldNotify: z.boolean().optional(),
 });
 
-/** Per-instance email type key. Includes sandboxId to support future multi-instance. */
-function emailTypeKey(sandboxId: string): string {
-  return `claw_instance_ready:${sandboxId}`;
+const INSTANCE_READY_EMAIL_TYPE = 'claw_instance_ready';
+
+function instanceEmailLogFilter(userId: string, instanceId: string, emailType: string) {
+  return and(
+    eq(kiloclaw_email_log.user_id, userId),
+    eq(kiloclaw_email_log.instance_id, instanceId),
+    eq(kiloclaw_email_log.email_type, emailType)
+  );
 }
 
 function logInstanceReady(
@@ -64,7 +69,6 @@ export async function POST(req: NextRequest) {
   }
 
   const { userId, sandboxId, instanceId, shouldNotify } = parsed.data;
-  const emailType = emailTypeKey(sandboxId);
 
   const user = await findUserById(userId);
   if (!user) {
@@ -90,10 +94,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sent: false, reason: 'not_first_ready' });
   }
 
+  const targetInstanceId = resumeState.instanceId ?? instanceId ?? null;
+  if (!targetInstanceId) {
+    logInstanceReady('error', 'Instance-ready email skipped because instance could not be resolved', {
+      event: 'instance_ready_email_skipped',
+      outcome: 'skipped',
+      userId,
+      sandboxId,
+    });
+    return NextResponse.json({ sent: false, reason: 'instance_unresolved' });
+  }
+
   // Idempotent: insert-before-send with rollback on failure (matches billing cron pattern).
   const result = await db
     .insert(kiloclaw_email_log)
-    .values({ user_id: userId, email_type: emailType })
+    .values({
+      user_id: userId,
+      instance_id: targetInstanceId,
+      email_type: INSTANCE_READY_EMAIL_TYPE,
+    })
     .onConflictDoNothing();
 
   if (result.rowCount === 0) {
@@ -112,9 +131,7 @@ export async function POST(req: NextRequest) {
     try {
       await db
         .delete(kiloclaw_email_log)
-        .where(
-          and(eq(kiloclaw_email_log.user_id, userId), eq(kiloclaw_email_log.email_type, emailType))
-        );
+        .where(instanceEmailLogFilter(userId, targetInstanceId, INSTANCE_READY_EMAIL_TYPE));
     } catch (deleteError) {
       logInstanceReady('error', 'Failed to roll back instance-ready email log after send failure', {
         event: 'email_rollback_failed',

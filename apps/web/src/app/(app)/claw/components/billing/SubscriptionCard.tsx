@@ -53,10 +53,11 @@ function ActiveSubscriptionCard({
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const switchPlanMutation = useMutation(trpc.kiloclaw.switchPlan.mutationOptions());
-  const portalMutation = useMutation(trpc.kiloclaw.createBillingPortalSession.mutationOptions());
-  const cancelSwitchMutation = useMutation(trpc.kiloclaw.cancelPlanSwitch.mutationOptions());
-  const acceptConversionMutation = useMutation(trpc.kiloclaw.acceptConversion.mutationOptions());
+  const instanceId = billing.instance?.id ?? null;
+  const switchPlanMutation = useMutation(trpc.kiloclaw.switchPlanAtInstance.mutationOptions());
+  const portalMutation = useMutation(trpc.kiloclaw.getCustomerPortalUrl.mutationOptions());
+  const cancelSwitchMutation = useMutation(trpc.kiloclaw.cancelPlanSwitchAtInstance.mutationOptions());
+  const acceptConversionMutation = useMutation(trpc.kiloclaw.acceptConversionAtInstance.mutationOptions());
   const CONVERSION_DISMISSED_KEY = 'kiloclaw-conversion-dismissed';
   const [conversionDismissed, setConversionDismissed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -74,31 +75,50 @@ function ActiveSubscriptionCard({
 
   const hasUserRequestedSwitch = sub.scheduledBy === 'user';
 
+  async function invalidateBillingQueries() {
+    if (!instanceId) return;
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({ instanceId }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
+      }),
+    ]);
+  }
+
   async function handleSwitchPlan() {
+    if (!instanceId) return;
     const toPlan = isCommit ? 'standard' : 'commit';
-    await switchPlanMutation.mutateAsync({ toPlan });
-    void queryClient.invalidateQueries({
-      queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
-    });
+    await switchPlanMutation.mutateAsync({ instanceId, toPlan });
+    await invalidateBillingQueries();
   }
 
   async function handleManageBilling() {
-    const result = await portalMutation.mutateAsync();
+    if (!instanceId) return;
+    const result = await portalMutation.mutateAsync({ instanceId, returnUrl: `${window.location.origin}/claw` });
     window.location.href = result.url;
   }
 
   async function handleCancelSwitch() {
-    await cancelSwitchMutation.mutateAsync();
-    void queryClient.invalidateQueries({
-      queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
-    });
+    if (!instanceId) return;
+    await cancelSwitchMutation.mutateAsync({ instanceId });
+    await invalidateBillingQueries();
   }
 
   async function handleAcceptConversion() {
-    await acceptConversionMutation.mutateAsync();
-    void queryClient.invalidateQueries({
-      queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
-    });
+    if (!instanceId) return;
+    await acceptConversionMutation.mutateAsync({ instanceId });
+    await invalidateBillingQueries();
   }
 
   // Clear the persisted dismiss when the prompt is no longer relevant
@@ -175,7 +195,7 @@ function ActiveSubscriptionCard({
               variant="outline"
               size="sm"
               onClick={handleAcceptConversion}
-              disabled={acceptConversionMutation.isPending}
+              disabled={acceptConversionMutation.isPending || !instanceId}
             >
               Switch to Credits
             </Button>
@@ -199,7 +219,7 @@ function ActiveSubscriptionCard({
             variant="outline"
             size="sm"
             onClick={handleCancelSwitch}
-            disabled={cancelSwitchMutation.isPending}
+            disabled={cancelSwitchMutation.isPending || !instanceId}
           >
             Cancel Switch
           </Button>
@@ -208,7 +228,7 @@ function ActiveSubscriptionCard({
             variant="outline"
             size="sm"
             onClick={handleSwitchPlan}
-            disabled={switchPlanMutation.isPending}
+            disabled={switchPlanMutation.isPending || !instanceId}
           >
             Switch to {otherPlanLabel}
           </Button>
@@ -366,21 +386,43 @@ function PastDueSubscriptionCard({
 export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const reactivateMutation = useMutation(trpc.kiloclaw.reactivateSubscription.mutationOptions());
-  const portalMutation = useMutation(trpc.kiloclaw.createBillingPortalSession.mutationOptions());
+  const instanceId = billing.instance?.id ?? null;
+  const reactivateMutation = useMutation(trpc.kiloclaw.reactivateSubscriptionAtInstance.mutationOptions());
+  const portalMutation = useMutation(trpc.kiloclaw.getCustomerPortalUrl.mutationOptions());
+
+  async function invalidateBillingQueries() {
+    if (!instanceId) return;
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({ instanceId }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
+      }),
+    ]);
+  }
 
   function handleReactivate() {
-    reactivateMutation.mutate(undefined, {
+    if (!instanceId) return;
+    reactivateMutation.mutate({ instanceId }, {
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
-        });
+        void invalidateBillingQueries();
       },
     });
   }
 
   async function handleUpdatePayment() {
-    const result = await portalMutation.mutateAsync();
+    if (!instanceId) return;
+    const result = await portalMutation.mutateAsync({ instanceId, returnUrl: `${window.location.origin}/claw` });
     window.location.href = result.url;
   }
 

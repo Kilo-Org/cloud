@@ -24,16 +24,32 @@ type CancelDialogProps = {
 export function CancelDialog({ open, onOpenChange, billing }: CancelDialogProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const cancelMutation = useMutation(trpc.kiloclaw.cancelSubscription.mutationOptions());
+  const cancelMutation = useMutation(trpc.kiloclaw.cancelSubscriptionAtInstance.mutationOptions());
+  const instanceId = billing.instance?.id ?? null;
 
   const isCommit = billing.subscription?.plan === 'commit';
   const periodEnd = billing.subscription?.currentPeriodEnd;
 
   async function handleConfirm() {
-    await cancelMutation.mutateAsync();
-    void queryClient.invalidateQueries({
-      queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
-    });
+    if (!instanceId) return;
+    await cancelMutation.mutateAsync({ instanceId });
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({ instanceId }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
+      }),
+    ]);
     onOpenChange(false);
   }
 
@@ -64,7 +80,7 @@ export function CancelDialog({ open, onOpenChange, billing }: CancelDialogProps)
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Keep Subscription
           </Button>
-          <Button variant="destructive" onClick={handleConfirm}>
+          <Button variant="destructive" onClick={handleConfirm} disabled={cancelMutation.isPending || !instanceId}>
             Cancel Subscription
           </Button>
         </DialogFooter>

@@ -17,6 +17,7 @@ import { autoResumeIfSuspended, completeAutoResumeIfReady } from './instance-lif
 const selectResultsQueue: unknown[][] = [];
 const updateSetCalls: Array<Record<string, unknown>> = [];
 const txUpdateSetCalls: Array<Record<string, unknown>> = [];
+const txInsertValues: Array<Record<string, unknown>> = [];
 const deleteWhereCalls: unknown[] = [];
 const startAsyncMock = jest.fn();
 
@@ -24,6 +25,14 @@ function createSelectResult<T>(rows: T[]) {
   const promise = Promise.resolve(rows);
   return {
     limit: jest.fn().mockResolvedValue(rows),
+    then: promise.then.bind(promise),
+  };
+}
+
+function createWhereResult<T>(rows: T[]) {
+  const promise = Promise.resolve(undefined);
+  return {
+    returning: jest.fn().mockResolvedValue(rows),
     then: promise.then.bind(promise),
   };
 }
@@ -41,6 +50,7 @@ describe('instance lifecycle async resume', () => {
     selectResultsQueue.length = 0;
     updateSetCalls.length = 0;
     txUpdateSetCalls.length = 0;
+    txInsertValues.length = 0;
     deleteWhereCalls.length = 0;
     startAsyncMock.mockReset();
     jest.mocked(KiloClawInternalClient).mockImplementation(
@@ -61,8 +71,9 @@ describe('instance lifecycle async resume', () => {
     mockDb.update.mockImplementation(() => ({
       set: jest.fn((values: Record<string, unknown>) => {
         updateSetCalls.push(values);
+        const whereResult = createWhereResult([{}]);
         return {
-          where: jest.fn(async () => undefined),
+          where: jest.fn(() => whereResult),
         };
       }),
     }));
@@ -70,6 +81,11 @@ describe('instance lifecycle async resume', () => {
     mockDb.transaction.mockReset();
     mockDb.transaction.mockImplementation(async callback => {
       const tx = {
+        select: jest.fn(() => ({
+          from: jest.fn(() => ({
+            where: jest.fn(() => createSelectResult(selectResultsQueue.shift() ?? [])),
+          })),
+        })),
         delete: jest.fn(() => ({
           where: jest.fn(async (whereArg: unknown) => {
             deleteWhereCalls.push(whereArg);
@@ -79,9 +95,16 @@ describe('instance lifecycle async resume', () => {
         update: jest.fn(() => ({
           set: jest.fn((values: Record<string, unknown>) => {
             txUpdateSetCalls.push(values);
+            const whereResult = createWhereResult([{}]);
             return {
-              where: jest.fn(async () => undefined),
+              where: jest.fn(() => whereResult),
             };
+          }),
+        })),
+        insert: jest.fn(() => ({
+          values: jest.fn(async (values: Record<string, unknown>) => {
+            txInsertValues.push(values);
+            return undefined;
           }),
         })),
       };
@@ -124,7 +147,20 @@ describe('instance lifecycle async resume', () => {
 
   it('clears stale suspension state when no active instance remains', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
-    selectResultsQueue.push([]);
+    selectResultsQueue.push(
+      [],
+      [
+        {
+          id: 'sub-1',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          plan: 'trial',
+          status: 'canceled',
+          suspended_at: '2026-04-07T20:00:00.000Z',
+          destruction_deadline: '2026-04-14T20:00:00.000Z',
+        },
+      ]
+    );
 
     await autoResumeIfSuspended('user-1', instanceId);
 
@@ -141,6 +177,14 @@ describe('instance lifecycle async resume', () => {
         auto_resume_attempt_count: 0,
       },
     ]);
+    expect(txInsertValues).toHaveLength(1);
+    expect(txInsertValues[0]).toEqual(
+      expect.objectContaining({
+        actor_id: 'web-instance-lifecycle',
+        action: 'reactivated',
+        reason: 'auto_resume_aborted_no_active_instance',
+      })
+    );
   });
 
   it('completes async auto-resume for the correct instance and clears retry state', async () => {
@@ -151,6 +195,20 @@ describe('instance lifecycle async resume', () => {
       [
         {
           suspended_at: '2026-04-07T20:00:00.000Z',
+          auto_resume_requested_at: '2026-04-07T20:05:00.000Z',
+          auto_resume_retry_after: '2026-04-07T22:05:00.000Z',
+          auto_resume_attempt_count: 2,
+        },
+      ],
+      [
+        {
+          id: 'sub-1',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          plan: 'trial',
+          status: 'canceled',
+          suspended_at: '2026-04-07T20:00:00.000Z',
+          destruction_deadline: '2026-04-14T20:00:00.000Z',
           auto_resume_requested_at: '2026-04-07T20:05:00.000Z',
           auto_resume_retry_after: '2026-04-07T22:05:00.000Z',
           auto_resume_attempt_count: 2,
@@ -171,12 +229,20 @@ describe('instance lifecycle async resume', () => {
       auto_resume_retry_after: null,
       auto_resume_attempt_count: 0,
     });
+    expect(txInsertValues).toHaveLength(1);
+    expect(txInsertValues[0]).toEqual(
+      expect.objectContaining({
+        actor_id: 'web-instance-lifecycle',
+        action: 'reactivated',
+        reason: 'auto_resume_completed',
+      })
+    );
   });
 
   it('clears auto-resume state when readiness arrives after the instance is already gone', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
-    selectResultsQueue.push([]);
+    selectResultsQueue.push([], []);
 
     const result = await completeAutoResumeIfReady('user-1', sandboxId, instanceId);
 
@@ -192,6 +258,7 @@ describe('instance lifecycle async resume', () => {
         auto_resume_attempt_count: 0,
       },
     ]);
+    expect(txInsertValues).toHaveLength(0);
   });
 
   it('treats repeated readiness notifications as idempotent once resume state is already clear', async () => {

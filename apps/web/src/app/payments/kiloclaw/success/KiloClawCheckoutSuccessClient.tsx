@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Loader2, CheckCircle2 } from 'lucide-react';
@@ -17,15 +17,28 @@ import { Loader2, CheckCircle2 } from 'lucide-react';
  */
 export function KiloClawCheckoutSuccessClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const trpc = useTRPC();
   const [timedOut, setTimedOut] = useState(false);
+  const instanceId = searchParams.get('clawInstanceId');
 
-  const { data: billingStatus } = useQuery({
-    ...trpc.kiloclaw.getBillingStatus.queryOptions(),
+  const detailQuery = useQuery({
+    ...trpc.kiloclaw.getSubscriptionDetail.queryOptions(
+      { instanceId: instanceId ?? '00000000-0000-4000-8000-000000000000' },
+      {
+        enabled: !!instanceId,
+      }
+    ),
+    refetchInterval: timedOut ? false : 1_000,
+  });
+  const billingStatusQuery = useQuery({
+    ...trpc.kiloclaw.getActivePersonalBillingStatus.queryOptions(undefined, {
+      enabled: !instanceId,
+    }),
     refetchInterval: timedOut ? false : 1_000,
   });
 
-  const sub = billingStatus?.subscription;
+  const sub = instanceId ? detailQuery.data : billingStatusQuery.data?.subscription;
   // Subscription row exists (Stripe webhook created it)
   const subscriptionCreated = sub?.status === 'active';
   // Invoice settlement completed — payment_source is 'credits' (hybrid state)

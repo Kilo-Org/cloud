@@ -464,7 +464,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { data: billing } = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
+  const { data: billing } = useQuery(trpc.kiloclaw.getPersonalBillingSummary.queryOptions());
   const checkout = useMutation(trpc.kiloclaw.createSubscriptionCheckout.mutationOptions());
   const kiloPassUpsell = useMutation(
     trpc.kiloclaw.createKiloPassUpsellCheckout.mutationOptions({
@@ -477,7 +477,10 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
     trpc.kiloclaw.enrollWithCredits.mutationOptions({
       onSuccess: () => {
         void queryClient.invalidateQueries({
-          queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
+          queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
         });
         void queryClient.invalidateQueries({
           queryKey: trpc.kiloclaw.getStatus.queryKey(),
@@ -493,6 +496,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   const creditIntroEligible = billing?.creditIntroEligible ?? false;
   const hasActiveKiloPass = billing?.hasActiveKiloPass ?? false;
   const creditEnrollmentPreview = billing?.creditEnrollmentPreview ?? null;
+  const activeInstanceId = billing?.activeInstanceId ?? null;
   const showKiloPassUpsell = !hasActiveKiloPass;
   const selectedCreditEnrollmentPreview =
     hostingOnlyPlan !== null ? (creditEnrollmentPreview?.[hostingOnlyPlan] ?? null) : null;
@@ -536,6 +540,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
         tier: selectedTier,
         cadence,
         hostingPlan,
+        ...(activeInstanceId ? { instanceId: activeInstanceId } : {}),
       });
     } catch (err) {
       const message =
@@ -547,7 +552,10 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   async function handleHostingOnlyCheckout() {
     if (!hostingOnlyPlan) return;
     try {
-      const result = await checkout.mutateAsync({ plan: hostingOnlyPlan });
+      const result = await checkout.mutateAsync({
+        plan: hostingOnlyPlan,
+        ...(activeInstanceId ? { instanceId: activeInstanceId } : {}),
+      });
       if (result.url) {
         window.location.href = result.url;
       }
@@ -561,7 +569,10 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   async function handleEnrollWithCredits() {
     if (!hostingOnlyPlan) return;
     try {
-      await enrollWithCredits.mutateAsync({ plan: hostingOnlyPlan });
+      await enrollWithCredits.mutateAsync({
+        plan: hostingOnlyPlan,
+        ...(activeInstanceId ? { instanceId: activeInstanceId } : {}),
+      });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to activate with credits. Please try again.';

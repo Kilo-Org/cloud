@@ -8,9 +8,9 @@ import { Banner } from '@/components/shared/Banner';
 
 export function ProfileKiloClawBanner() {
   const trpc = useTRPC();
-  const billingQuery = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
+  const summaryQuery = useQuery(trpc.kiloclaw.getPersonalBillingSummary.queryOptions());
 
-  if (billingQuery.isLoading) {
+  if (summaryQuery.isLoading) {
     return (
       <div className="flex w-full items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
         <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
@@ -18,14 +18,14 @@ export function ProfileKiloClawBanner() {
     );
   }
 
-  const billing = billingQuery.data;
-  if (billingQuery.isError || !billing) {
+  const billing = summaryQuery.data;
+  if (summaryQuery.isError || !billing) {
     return null;
   }
 
-  const hasInstance = billing.instance !== null && billing.instance.exists;
+  const hasInstance = billing.hasActiveInstance;
 
-  if (hasInstance && billing.hasAccess) {
+  if (hasInstance && billing.activeInstanceHasAccess) {
     return (
       <Banner color="emerald">
         <Banner.Icon>
@@ -45,7 +45,7 @@ export function ProfileKiloClawBanner() {
     );
   }
 
-  if (hasInstance && !billing.hasAccess) {
+  if (hasInstance && !billing.activeInstanceHasAccess) {
     return (
       <Banner color="amber">
         <Banner.Icon>

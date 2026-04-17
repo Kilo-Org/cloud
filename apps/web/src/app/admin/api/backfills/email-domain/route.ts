@@ -2,8 +2,20 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { isNull, count, sql } from 'drizzle-orm';
+import { and, isNull, count, not, or, sql, like } from 'drizzle-orm';
 import { getLowerDomainFromEmail } from '@/lib/utils';
+
+// Exclude soft-deleted users: softDeleteUser anonymizes them to
+// `deleted+<id>@deleted.invalid` and sets `blocked_reason` to a string starting
+// with `soft-deleted at`. Filling email_domain for those rows would undo the
+// GDPR nulling invariant.
+export const emailDomainBackfillCandidates = and(
+  isNull(kilocode_users.email_domain),
+  or(
+    isNull(kilocode_users.blocked_reason),
+    not(like(kilocode_users.blocked_reason, 'soft-deleted at %'))
+  )
+);
 
 export type EmailDomainCountsResponse = {
   missing: number;
@@ -21,7 +33,7 @@ export async function GET(): Promise<NextResponse<EmailDomainCountsResponse | { 
   const [result] = await db
     .select({ count: count() })
     .from(kilocode_users)
-    .where(isNull(kilocode_users.email_domain));
+    .where(emailDomainBackfillCandidates);
 
   return NextResponse.json({ missing: result?.count ?? 0 });
 }
@@ -41,7 +53,7 @@ export async function POST(): Promise<
     const rows = await db
       .select({ id: kilocode_users.id, google_user_email: kilocode_users.google_user_email })
       .from(kilocode_users)
-      .where(isNull(kilocode_users.email_domain))
+      .where(emailDomainBackfillCandidates)
       .limit(BATCH_SIZE);
 
     if (rows.length === 0) break;

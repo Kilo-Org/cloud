@@ -1,6 +1,6 @@
 {
-  "id": "a2bff895-8be3-4626-b101-e658eed21469",
-  "prevId": "64ca6916-6fe0-4f9f-96ce-a52d4072f486",
+  "id": "08a80e4a-839b-4728-a945-e0669beb68a8",
+  "prevId": "a2bff895-8be3-4626-b101-e658eed21469",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -12374,6 +12374,74 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.pending_impact_sale_reversals": {
+      "name": "pending_impact_sale_reversals",
+      "schema": "",
+      "columns": {
+        "stripe_charge_id": {
+          "name": "stripe_charge_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "dispute_id": {
+          "name": "dispute_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_date": {
+          "name": "event_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "last_attempt_at": {
+          "name": "last_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "pending_impact_sale_reversals_attempt_count_non_negative_check": {
+          "name": "pending_impact_sale_reversals_attempt_count_non_negative_check",
+          "value": "\"pending_impact_sale_reversals\".\"attempt_count\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.platform_integrations": {
       "name": "platform_integrations",
       "schema": "",
@@ -15860,6 +15928,24 @@
           "primaryKey": false,
           "notNull": true
         },
+        "stripe_charge_id": {
+          "name": "stripe_charge_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "impact_action_id": {
+          "name": "impact_action_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "impact_submission_uri": {
+          "name": "impact_submission_uri",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "attempt_count": {
           "name": "attempt_count",
           "type": "integer",
@@ -15935,6 +16021,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "IDX_user_affiliate_events_provider_event_type_charge": {
+          "name": "IDX_user_affiliate_events_provider_event_type_charge",
+          "columns": [
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stripe_charge_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -15983,7 +16096,7 @@
         },
         "user_affiliate_events_event_type_check": {
           "name": "user_affiliate_events_event_type_check",
-          "value": "\"user_affiliate_events\".\"event_type\" IN ('signup', 'trial_start', 'trial_end', 'sale')"
+          "value": "\"user_affiliate_events\".\"event_type\" IN ('signup', 'trial_start', 'trial_end', 'sale', 'sale_reversal')"
         },
         "user_affiliate_events_delivery_state_check": {
           "name": "user_affiliate_events_delivery_state_check",

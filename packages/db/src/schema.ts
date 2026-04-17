@@ -346,6 +346,28 @@ export const user_affiliate_events = pgTable(
 
 export type UserAffiliateEvent = typeof user_affiliate_events.$inferSelect;
 
+export const pending_impact_sale_reversals = pgTable(
+  'pending_impact_sale_reversals',
+  {
+    stripe_charge_id: text().primaryKey().notNull(),
+    dispute_id: text().notNull(),
+    amount: real().notNull(),
+    currency: text().notNull(),
+    event_date: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    attempt_count: integer().notNull().default(0),
+    last_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    check(
+      'pending_impact_sale_reversals_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type PendingImpactSaleReversal = typeof pending_impact_sale_reversals.$inferSelect;
+
 export const kilo_pass_subscriptions = pgTable(
   'kilo_pass_subscriptions',
   {

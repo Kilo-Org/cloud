@@ -21,6 +21,7 @@ import {
   kilocode_users,
   type AffiliateEventPayloadJson,
   type UserAffiliateEvent,
+  pending_impact_sale_reversals,
   user_affiliate_attributions,
   user_affiliate_events,
 } from '@kilocode/db/schema';
@@ -274,27 +275,83 @@ async function getEventByDedupeKey(
 
 async function markAffiliateEventDelivered(
   database: DatabaseClient,
-  eventId: string,
-  params?: { clearClaimedAt?: boolean }
-): Promise<void> {
-  if (params?.clearClaimedAt) {
-    await database.execute(sql`
-      UPDATE ${user_affiliate_events}
-      SET
-        ${sql.identifier(user_affiliate_events.delivery_state.name)} = 'delivered',
-        ${sql.identifier(user_affiliate_events.next_retry_at.name)} = NULL,
-        ${sql.identifier(user_affiliate_events.claimed_at.name)} = NULL
-      WHERE ${user_affiliate_events.id} = ${eventId}::uuid
-    `);
-  } else {
-    await database
-      .update(user_affiliate_events)
-      .set({
-        delivery_state: 'delivered',
-        next_retry_at: null,
-      })
-      .where(eq(user_affiliate_events.id, eventId));
+  event: AffiliateEventRow,
+  params?: {
+    clearClaimedAt?: boolean;
+    impactMapping?: {
+      impactActionId?: string | null;
+      impactSubmissionUri?: string | null;
+    };
   }
+): Promise<AffiliateEventRow> {
+  const mapping = params?.impactMapping;
+  const nextPayload = mapping
+    ? ({
+        ...event.payload_json,
+        impactActionId: mapping.impactActionId ?? event.payload_json.impactActionId ?? null,
+        impactSubmissionUri:
+          mapping.impactSubmissionUri ?? event.payload_json.impactSubmissionUri ?? null,
+      } satisfies AffiliateEventPayloadJson)
+    : event.payload_json;
+
+  const updateValues: {
+    delivery_state: 'delivered';
+    next_retry_at: null;
+    claimed_at?: null;
+    impact_action_id?: string | null;
+    impact_submission_uri?: string | null;
+    payload_json?: AffiliateEventPayloadJson;
+  } = {
+    delivery_state: 'delivered',
+    next_retry_at: null,
+  };
+  if (params?.clearClaimedAt) {
+    updateValues.claimed_at = null;
+  }
+  if (mapping) {
+    updateValues.impact_action_id = mapping.impactActionId ?? event.impact_action_id ?? null;
+    updateValues.impact_submission_uri =
+      mapping.impactSubmissionUri ?? event.impact_submission_uri ?? null;
+    updateValues.payload_json = nextPayload;
+  }
+
+  const [updated] = await database
+    .update(user_affiliate_events)
+    .set(updateValues)
+    .where(eq(user_affiliate_events.id, event.id))
+    .returning({
+      id: user_affiliate_events.id,
+      user_id: user_affiliate_events.user_id,
+      provider: user_affiliate_events.provider,
+      event_type: user_affiliate_events.event_type,
+      dedupe_key: user_affiliate_events.dedupe_key,
+      parent_event_id: user_affiliate_events.parent_event_id,
+      delivery_state: user_affiliate_events.delivery_state,
+      payload_json: user_affiliate_events.payload_json,
+      stripe_charge_id: user_affiliate_events.stripe_charge_id,
+      impact_action_id: user_affiliate_events.impact_action_id,
+      impact_submission_uri: user_affiliate_events.impact_submission_uri,
+      attempt_count: user_affiliate_events.attempt_count,
+      next_retry_at: user_affiliate_events.next_retry_at,
+      claimed_at: user_affiliate_events.claimed_at,
+      created_at: user_affiliate_events.created_at,
+    });
+
+  return (
+    updated ?? {
+      ...event,
+      delivery_state: 'delivered',
+      next_retry_at: null,
+      claimed_at: params?.clearClaimedAt ? null : event.claimed_at,
+      impact_action_id: mapping
+        ? (mapping.impactActionId ?? event.impact_action_id ?? null)
+        : event.impact_action_id,
+      impact_submission_uri: mapping
+        ? (mapping.impactSubmissionUri ?? event.impact_submission_uri ?? null)
+        : event.impact_submission_uri,
+      payload_json: nextPayload,
+    }
+  );
 }
 
 async function updateAffiliateEventImpactMapping(
@@ -875,12 +932,16 @@ export async function enqueueImpactSaleReversalForCharge(
   const parentSaleEvent = await getImpactSaleEventByChargeId(database, params.stripeChargeId);
 
   if (!parentSaleEvent) {
-    logWarning('Impact sale reversal requires manual follow-up because sale row is missing', {
-      affiliate_provider: 'impact',
-      affiliate_event_type: 'sale_reversal',
-      stripe_charge_id: params.stripeChargeId,
-      dispute_id: params.disputeId,
-    });
+    await persistPendingSaleReversal(database, params);
+    logInfo(
+      'Impact sale reversal deferred because sale row is not yet recorded; will reconcile on dispatch',
+      {
+        affiliate_provider: 'impact',
+        affiliate_event_type: 'sale_reversal',
+        stripe_charge_id: params.stripeChargeId,
+        dispute_id: params.disputeId,
+      }
+    );
     return null;
   }
 
@@ -938,6 +999,71 @@ export async function enqueueImpactSaleReversalForCharge(
     }
   );
   return event;
+}
+
+async function persistPendingSaleReversal(
+  database: DatabaseClient,
+  params: EnqueueImpactSaleReversalForChargeParams
+): Promise<void> {
+  await database
+    .insert(pending_impact_sale_reversals)
+    .values({
+      stripe_charge_id: params.stripeChargeId,
+      dispute_id: params.disputeId,
+      amount: params.amount,
+      currency: params.currency,
+      event_date: params.eventDate.toISOString(),
+    })
+    .onConflictDoNothing({
+      target: [pending_impact_sale_reversals.stripe_charge_id],
+    });
+}
+
+async function reconcilePendingSaleReversals(
+  database: DatabaseClient
+): Promise<{ materialized: number }> {
+  const pendingRows = await database.query.pending_impact_sale_reversals.findMany();
+  let materialized = 0;
+
+  for (const pending of pendingRows) {
+    const parentSaleEvent = await getImpactSaleEventByChargeId(database, pending.stripe_charge_id);
+
+    await database
+      .update(pending_impact_sale_reversals)
+      .set({
+        attempt_count: sql`${pending_impact_sale_reversals.attempt_count} + 1`,
+        last_attempt_at: new Date().toISOString(),
+      })
+      .where(eq(pending_impact_sale_reversals.stripe_charge_id, pending.stripe_charge_id));
+
+    if (!parentSaleEvent) {
+      logWarning('Pending Impact sale reversal still waiting for sale row', {
+        affiliate_provider: 'impact',
+        affiliate_event_type: 'sale_reversal',
+        stripe_charge_id: pending.stripe_charge_id,
+        dispute_id: pending.dispute_id,
+      });
+      continue;
+    }
+
+    const reversal = await enqueueImpactSaleReversalForCharge({
+      database,
+      stripeChargeId: pending.stripe_charge_id,
+      disputeId: pending.dispute_id,
+      amount: pending.amount,
+      currency: pending.currency,
+      eventDate: new Date(pending.event_date),
+    });
+
+    if (reversal) {
+      await database
+        .delete(pending_impact_sale_reversals)
+        .where(eq(pending_impact_sale_reversals.stripe_charge_id, pending.stripe_charge_id));
+      materialized += 1;
+    }
+  }
+
+  return { materialized };
 }
 
 async function handleRetryableFailure(
@@ -1084,24 +1210,18 @@ async function dispatchSaleReversalEvent(
     return 'failed';
   }
 
-  const updatedEvent = await updateAffiliateEventImpactMapping(database, event, {
-    impactActionId,
-  });
   const reversalResult = await reverseImpactAction({
     actionId: impactActionId,
   });
 
   if (reversalResult.ok) {
-    const eventWithReversalMetadata =
-      reversalResult.delivery === 'queued'
-        ? await updateAffiliateEventImpactMapping(database, updatedEvent, {
-            impactActionId,
-            impactSubmissionUri: reversalResult.submissionUri,
-          })
-        : updatedEvent;
-
-    await markAffiliateEventDelivered(database, event.id, {
+    const deliveredEvent = await markAffiliateEventDelivered(database, event, {
       clearClaimedAt: reversalResult.skipped === 'unconfigured',
+      impactMapping: {
+        impactActionId,
+        impactSubmissionUri:
+          reversalResult.delivery === 'queued' ? reversalResult.submissionUri : null,
+      },
     });
 
     logInfo(
@@ -1109,10 +1229,7 @@ async function dispatchSaleReversalEvent(
         ? 'Skipped Impact sale reversal because Impact is unconfigured'
         : 'Delivered Impact sale reversal',
       {
-        ...buildAffiliateEventLogFields({
-          ...eventWithReversalMetadata,
-          delivery_state: 'delivered',
-        }),
+        ...buildAffiliateEventLogFields(deliveredEvent),
         dispatch_source: 'cron',
       }
     );
@@ -1128,7 +1245,7 @@ async function dispatchSaleReversalEvent(
       error: reversalResult.error ?? reversalResult.responseBody,
     });
     logWarning('Impact sale reversal requires manual follow-up after permanent failure', {
-      ...buildAffiliateEventLogFields(updatedEvent),
+      ...buildAffiliateEventLogFields(event),
       dispatch_source: 'cron',
     });
     return 'failed';
@@ -1136,7 +1253,7 @@ async function dispatchSaleReversalEvent(
 
   await handleRetryableFailure(
     database,
-    updatedEvent,
+    event,
     reversalResult.failureKind,
     reversalResult.statusCode
   );
@@ -1195,6 +1312,14 @@ export async function dispatchQueuedAffiliateEvents(params?: {
     });
   }
 
+  const { materialized: materializedReversals } = await reconcilePendingSaleReversals(database);
+  if (materializedReversals > 0) {
+    logInfo('Materialized deferred Impact sale reversals once sale rows appeared', {
+      dispatch_source: 'cron',
+      materialized_count: materializedReversals,
+    });
+  }
+
   let remaining = limit;
   while (remaining > 0) {
     const claimedEvents = await claimQueuedEvents(database, remaining);
@@ -1226,27 +1351,19 @@ export async function dispatchQueuedAffiliateEvents(params?: {
       const impactPayload = buildImpactConversionPayloadForEvent(event);
       const result: ImpactDispatchResult = await sendImpactConversionPayload(impactPayload);
       if (result.ok) {
-        const mappedEvent =
+        const impactMapping =
           event.event_type === 'sale' && result.delivery === 'immediate'
-            ? await updateAffiliateEventImpactMapping(database, event, {
-                impactActionId: result.actionId,
-                impactSubmissionUri: null,
-              })
+            ? { impactActionId: result.actionId, impactSubmissionUri: null }
             : event.event_type === 'sale' && result.delivery === 'queued'
-              ? await updateAffiliateEventImpactMapping(database, event, {
-                  impactSubmissionUri: result.submissionUri,
-                })
-              : event;
+              ? { impactSubmissionUri: result.submissionUri }
+              : undefined;
 
-        await markAffiliateEventDelivered(database, event.id, {
+        const deliveredEvent = await markAffiliateEventDelivered(database, event, {
           clearClaimedAt: result.skipped === 'unconfigured',
+          impactMapping,
         });
         summary.delivered += 1;
 
-        const deliveredEvent = {
-          ...mappedEvent,
-          delivery_state: 'delivered',
-        } satisfies AffiliateEventRow;
         logInfo(
           result.skipped === 'unconfigured'
             ? 'Skipped affiliate event delivery because Impact is unconfigured'

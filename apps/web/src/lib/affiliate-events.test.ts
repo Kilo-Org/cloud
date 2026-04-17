@@ -2,6 +2,7 @@ import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   kilocode_users,
+  pending_impact_sale_reversals,
   user_affiliate_attributions,
   user_affiliate_events,
 } from '@kilocode/db/schema';
@@ -20,6 +21,7 @@ describe('affiliate-events', () => {
   afterEach(async () => {
     jest.restoreAllMocks();
     global.fetch = originalFetch;
+    await db.delete(pending_impact_sale_reversals).where(sql`true`);
     await db.delete(user_affiliate_events).where(sql`true`);
     await db.delete(user_affiliate_attributions).where(sql`true`);
     await db.delete(kilocode_users).where(sql`true`);
@@ -794,5 +796,46 @@ describe('affiliate-events', () => {
 
     expect(reversalEvents).toHaveLength(1);
     expect(reversalEvents[0]?.dedupe_key).toBe('affiliate:impact:sale_reversal:ch_sale_test_123');
+  });
+
+  it('persists dispute when sale row is missing and materializes reversal once sale appears', async () => {
+    const { enqueueImpactSaleReversalForCharge, dispatchQueuedAffiliateEvents } =
+      await import('@/lib/affiliate-events');
+
+    // Dispute arrives before invoice.paid has recorded the sale row.
+    const deferredResult = await enqueueImpactSaleReversalForCharge({
+      stripeChargeId: 'ch_sale_test_123',
+      disputeId: 'dp_before_sale',
+      amount: 29,
+      currency: 'usd',
+      eventDate: new Date('2026-04-10T10:00:00.000Z'),
+    });
+    expect(deferredResult).toBeNull();
+
+    const pendingBefore = await db.select().from(pending_impact_sale_reversals);
+    expect(pendingBefore).toHaveLength(1);
+    expect(pendingBefore[0]).toMatchObject({
+      stripe_charge_id: 'ch_sale_test_123',
+      dispute_id: 'dp_before_sale',
+    });
+
+    // Sale row arrives after the dispute was persisted.
+    const { user } = await createDeliveredSaleEvent({ saleResponse: 'immediate' });
+
+    // Reconciler on next dispatch materializes the pending dispute into a sale_reversal event
+    // attached to the now-existing sale row, and removes the pending placeholder.
+    await dispatchQueuedAffiliateEvents();
+
+    const pendingAfter = await db.select().from(pending_impact_sale_reversals);
+    expect(pendingAfter).toHaveLength(0);
+
+    const reversalEvents = (await getUserAffiliateEvents(user.id)).filter(
+      row => row.event_type === 'sale_reversal'
+    );
+    expect(reversalEvents).toHaveLength(1);
+    expect(reversalEvents[0]).toMatchObject({
+      stripe_charge_id: 'ch_sale_test_123',
+      payload_json: expect.objectContaining({ disputeId: 'dp_before_sale' }),
+    });
   });
 });

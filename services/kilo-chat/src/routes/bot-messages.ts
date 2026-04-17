@@ -8,18 +8,18 @@ import { setTypingFor } from '../services/typing';
 const ulidSchema = z.string().regex(/^[0-9A-Z]{26}$/, 'Invalid ULID');
 
 const contentBlockSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('text'), text: z.string().min(1) }),
+  z.object({ type: z.literal('text'), text: z.string().min(1).max(8000) }),
 ]);
 
 const createMessageSchema = z.object({
   conversationId: z.string().min(1),
-  content: z.array(contentBlockSchema).min(1),
+  content: z.array(contentBlockSchema).min(1).max(20),
   inReplyToMessageId: ulidSchema.optional(),
 });
 
 const editMessageSchema = z.object({
   conversationId: z.string().min(1),
-  content: z.array(contentBlockSchema).min(1),
+  content: z.array(contentBlockSchema).min(1).max(20),
   version: z.number().int().nonnegative(),
 });
 

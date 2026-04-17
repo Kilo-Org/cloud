@@ -429,6 +429,44 @@ describe('DELETE /v1/messages/:id', () => {
   });
 });
 
+describe('input size limits', () => {
+  it('rejects message text exceeding max length', async () => {
+    const { conversationId, userApp } = await createConversation('msg-size-text');
+
+    const res = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'x'.repeat(20_000) }],
+        }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects message with too many content blocks', async () => {
+    const { conversationId, userApp } = await createConversation('msg-size-blocks');
+
+    const blocks = Array.from({ length: 50 }, (_, i) => ({ type: 'text', text: `block ${i}` }));
+    const res = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: blocks }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('Webhook queue enqueue', () => {
   it('does not error when a human sends a message to a conversation with a bot member', async () => {
     const { conversationId, userApp } = await createConversation('msg-webhook-1');

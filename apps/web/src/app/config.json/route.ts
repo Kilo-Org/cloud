@@ -1,78 +1,17 @@
 import { NextResponse } from 'next/server';
+import { kiloExtras } from './extras';
 
 /**
  * Serves the Kilo CLI config JSON Schema at `app.kilo.ai/config.json`.
  *
- * Fetches the upstream opencode schema at request time and merges Kilo-specific
- * additions/overrides on top. Keep the extras below in sync with the zod schema
- * in packages/opencode/src/config/config.ts in the kilocode repo (grep for
- * `kilocode_change` markers).
- *
- * If this list drifts from the zod schema, users of `$schema: https://app.kilo.ai/config.json`
- * will see spurious "unknown property" warnings for Kilo-only keys.
+ * Fetches the upstream opencode schema at request time and overlays Kilo's
+ * additions/overrides (see `./extras.ts`). Cached at the CDN edge for 1 hour
+ * with stale-while-revalidate, so the actual upstream fetch happens at most
+ * once per hour per region.
  */
 
 const UPSTREAM = 'https://opencode.ai/config.json';
-const MODEL_REF = 'https://models.dev/model-schema.json#/$defs/Model';
 const CACHE_SECONDS = 60 * 60; // 1 hour
-
-const nullableModel = {
-  anyOf: [{ $ref: MODEL_REF, type: 'string' }, { type: 'null' }],
-};
-
-const agentConfigExtras = {
-  ref: 'AgentConfig',
-  type: 'object',
-  properties: { model: nullableModel },
-  additionalProperties: {},
-} as const;
-
-const kiloExtras = {
-  top: {
-    model: {
-      description: 'Model to use in the format of provider/model, eg anthropic/claude-2',
-      ...nullableModel,
-    },
-    small_model: {
-      description:
-        'Small model to use for tasks like title generation in the format of provider/model',
-      ...nullableModel,
-    },
-    remote_control: {
-      description:
-        'Enable remote control of sessions via Kilo Cloud. Equivalent to running /remote on startup.',
-      type: 'boolean',
-    },
-    commit_message: {
-      description: 'Configuration for AI-generated commit messages',
-      type: 'object',
-      properties: {
-        prompt: {
-          description:
-            'Custom system prompt for AI commit message generation. When set, replaces the default conventional commits prompt entirely.',
-          type: 'string',
-        },
-      },
-      additionalProperties: false,
-    },
-  },
-  agents: {
-    ask: agentConfigExtras,
-    debug: agentConfigExtras,
-    orchestrator: agentConfigExtras,
-  },
-  experimental: {
-    codebase_search: {
-      description: 'Enable AI-powered codebase search',
-      type: 'boolean',
-    },
-    openTelemetry: {
-      description: 'Enable telemetry. Set to false to opt-out.',
-      default: true,
-      type: 'boolean',
-    },
-  },
-} as const;
 
 export type Schema = Record<string, unknown>;
 

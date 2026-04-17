@@ -1381,9 +1381,7 @@ async function runCreditRenewalSweep(
 
   for (const row of creditRenewalRows) {
     try {
-      if (isSoftDeletedUserEmail(row.email)) {
-        continue;
-      }
+      if (isSoftDeletedUserEmail(row.email)) continue;
       await processCreditRenewalRow(database, env, context, row, clawUrl, summary);
     } catch (error) {
       summary.errors++;
@@ -1529,9 +1527,7 @@ async function runTrialExpirySweep(
 
   for (const row of expiredTrials) {
     try {
-      if (isSoftDeletedUserEmail(row.email)) {
-        continue;
-      }
+      if (isSoftDeletedUserEmail(row.email)) continue;
       if (!row.instance_id) {
         logSkippedSubscriptionRow('Skipping trial expiry for detached subscription row', row, {
           reason: 'missing_instance_id',
@@ -1645,9 +1641,7 @@ async function runSubscriptionExpirySweep(
 
   for (const row of expiredSubscriptions) {
     try {
-      if (isSoftDeletedUserEmail(row.email)) {
-        continue;
-      }
+      if (isSoftDeletedUserEmail(row.email)) continue;
       if (!row.instance_id) {
         logSkippedSubscriptionRow(
           'Skipping subscription expiry for detached subscription row',
@@ -1749,9 +1743,7 @@ async function runInstanceDestructionSweep(
 
   for (const row of destructionCandidates) {
     try {
-      if (isSoftDeletedUserEmail(row.email)) {
-        continue;
-      }
+      if (isSoftDeletedUserEmail(row.email)) continue;
       if (!row.instance_id) {
         logSkippedSubscriptionRow(
           'Skipping instance destruction for detached subscription row',
@@ -1875,9 +1867,7 @@ async function runPastDueCleanupSweep(
 
   for (const row of pastDueRows) {
     try {
-      if (isSoftDeletedUserEmail(row.email)) {
-        continue;
-      }
+      if (isSoftDeletedUserEmail(row.email)) continue;
       if (!row.instance_id) {
         logSkippedSubscriptionRow('Skipping past-due cleanup for detached subscription row', row, {
           reason: 'missing_instance_id',
@@ -2021,9 +2011,7 @@ async function runDestructionWarningSweep(
 
   for (const row of destructionWarningRows) {
     try {
-      if (isSoftDeletedUserEmail(row.email)) {
-        continue;
-      }
+      if (isSoftDeletedUserEmail(row.email)) continue;
       if (!row.destruction_deadline || row.instance_destroyed_at) continue;
       const instanceIdShort = shortInstanceId(row.instance_id);
       const sent = await trySendEmail(
@@ -2094,9 +2082,7 @@ async function runTrialWarningSweep(
 
   for (const row of trialWarningRows) {
     try {
-      if (isSoftDeletedUserEmail(row.email)) {
-        continue;
-      }
+      if (isSoftDeletedUserEmail(row.email)) continue;
       if (!row.trial_ends_at) continue;
 
       if (!row.instance_id) {
@@ -2250,9 +2236,7 @@ async function runEarlybirdWarningSweep(
 
   for (const row of [...canonicalRows, ...legacyRows]) {
     try {
-      if (isSoftDeletedUserEmail(row.email)) {
-        continue;
-      }
+      if (isSoftDeletedUserEmail(row.email)) continue;
       const expiryDate = formatDateForEmail(earlybirdExpiry);
       const sent =
         daysUntilEarlybird <= 1
@@ -2371,9 +2355,7 @@ async function runComplementaryInferenceEndedSweep(
 
   for (const row of rows) {
     try {
-      if (isSoftDeletedUserEmail(row.email)) {
-        continue;
-      }
+      if (isSoftDeletedUserEmail(row.email)) continue;
       const sent = await trySendEmail(
         database,
         env,

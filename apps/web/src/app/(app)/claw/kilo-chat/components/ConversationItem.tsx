@@ -85,19 +85,27 @@ export function ConversationItem({
 
   const title = conversation.conversationTitle ?? 'Untitled';
 
+  const sharedClassName = `group relative block rounded-md px-3 py-2 ${
+    isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/50'
+  }`;
+
   // Wrap content in a Link unless renaming (input needs to capture clicks)
-  const Wrapper = isRenaming ? 'div' : Link;
-  const wrapperProps = isRenaming
-    ? {}
-    : { href: `/claw/kilo-chat/${conversation.conversationId}`, prefetch: false };
+  const Wrapper = isRenaming
+    ? ({ children }: { children: React.ReactNode }) => (
+        <div className={sharedClassName}>{children}</div>
+      )
+    : ({ children }: { children: React.ReactNode }) => (
+        <Link
+          href={`/claw/kilo-chat/${conversation.conversationId}`}
+          prefetch={false}
+          className={sharedClassName}
+        >
+          {children}
+        </Link>
+      );
 
   return (
-    <Wrapper
-      {...(wrapperProps as Record<string, unknown>)}
-      className={`group relative block rounded-md px-3 py-2 ${
-        isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/50'
-      }`}
-    >
+    <Wrapper>
       <div className="flex items-center justify-between gap-2">
         {isRenaming ? (
           <input

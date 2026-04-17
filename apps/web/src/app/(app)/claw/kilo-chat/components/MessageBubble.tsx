@@ -1,10 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, memo } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Pencil, Trash2, Reply, X, Check, AlertCircle } from 'lucide-react';
 import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './KiloChatLayout';
+
+const MemoizedMarkdown = memo(function MemoizedMarkdown({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        a: ({ href, children }) => (
+          <a href={href} target="_blank" rel="noopener noreferrer">
+            {children}
+          </a>
+        ),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+});
 
 type MessageBubbleProps = {
   message: Message;
@@ -184,7 +203,15 @@ export function MessageBubble({
                 </button>
               </div>
             ) : (
-              <p className="text-sm whitespace-pre-wrap">{textContent}</p>
+              <div
+                className={`prose prose-sm max-w-none break-words [&_pre]:overflow-x-auto [&_code]:break-all [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 ${
+                  isOwn
+                    ? 'prose-invert text-primary-foreground [&_a]:text-primary-foreground/80 [&_a]:underline [&_code]:text-primary-foreground/90'
+                    : 'text-foreground [&_a]:text-blue-500 [&_a]:hover:underline [&_code]:text-foreground/90'
+                }`}
+              >
+                <MemoizedMarkdown content={textContent} />
+              </div>
             )}
 
             <div

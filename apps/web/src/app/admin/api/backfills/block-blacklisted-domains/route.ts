@@ -11,13 +11,10 @@ const BLACKLIST_DOMAINS = blacklistDomainsEnv
   : [];
 
 function blacklistedDomainConditions() {
-  const conditions = BLACKLIST_DOMAINS.map(
-    domain =>
-      or(
-        sql`lower(${kilocode_users.google_user_email}) LIKE ${`%@${domain.toLowerCase()}`}`,
-        sql`lower(${kilocode_users.google_user_email}) LIKE ${`%.${domain.toLowerCase()}`}`
-      )!
-  );
+  const conditions = BLACKLIST_DOMAINS.flatMap(domain => [
+    sql`lower(${kilocode_users.google_user_email}) LIKE ${`%@${domain.toLowerCase()}`}`,
+    sql`lower(${kilocode_users.google_user_email}) LIKE ${`%.${domain.toLowerCase()}`}`,
+  ]);
   return or(...conditions);
 }
 

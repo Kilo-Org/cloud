@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from '@jest/globals';
 import { cleanupDbForTest } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
-import { isDomainOnBlacklist } from './blacklist-domains-router';
+import { computeBlacklistStats, isDomainOnBlacklist } from './blacklist-domains-router';
 import type { User } from '@kilocode/db/schema';
 
 let admin: User;
@@ -41,6 +41,105 @@ describe('isDomainOnBlacklist', () => {
 
   it('returns false on empty blacklist', () => {
     expect(isDomainOnBlacklist('anything.com', [])).toBe(false);
+  });
+});
+
+describe('computeBlacklistStats', () => {
+  it('sums per-email_domain counts for each blacklist entry by exact match', () => {
+    const stats = computeBlacklistStats(
+      ['mailinator.com', 'spam.org'],
+      [
+        { email_domain: 'mailinator.com', count: 12 },
+        { email_domain: 'spam.org', count: 5 },
+        { email_domain: 'legit.com', count: 99 },
+      ]
+    );
+
+    expect(stats.domains).toEqual([
+      { domain: 'mailinator.com', blockedCount: 12 },
+      { domain: 'spam.org', blockedCount: 5 },
+    ]);
+    expect(stats.totalDomains).toBe(2);
+    expect(stats.totalBlockedUsers).toBe(17);
+  });
+
+  it('includes subdomain groups in the count for a blacklist entry', () => {
+    const stats = computeBlacklistStats(
+      ['mailinator.com'],
+      [
+        { email_domain: 'mailinator.com', count: 4 },
+        { email_domain: 'evil.mailinator.com', count: 3 },
+        { email_domain: 'a.b.mailinator.com', count: 2 },
+        { email_domain: 'notmailinator.com', count: 100 },
+      ]
+    );
+
+    expect(stats.domains).toEqual([{ domain: 'mailinator.com', blockedCount: 9 }]);
+    expect(stats.totalBlockedUsers).toBe(9);
+  });
+
+  it('orders result by blockedCount descending', () => {
+    const stats = computeBlacklistStats(
+      ['first.com', 'second.com', 'third.com'],
+      [
+        { email_domain: 'first.com', count: 1 },
+        { email_domain: 'second.com', count: 10 },
+        { email_domain: 'third.com', count: 5 },
+      ]
+    );
+
+    expect(stats.domains.map(d => d.domain)).toEqual(['second.com', 'third.com', 'first.com']);
+  });
+
+  it('ignores rows with null email_domain', () => {
+    const stats = computeBlacklistStats(
+      ['mailinator.com'],
+      [
+        { email_domain: null, count: 999 },
+        { email_domain: 'mailinator.com', count: 3 },
+      ]
+    );
+
+    expect(stats.domains).toEqual([{ domain: 'mailinator.com', blockedCount: 3 }]);
+  });
+
+  it('returns zero-count entries for blacklist entries with no matching users', () => {
+    const stats = computeBlacklistStats(['unused.com'], [{ email_domain: 'other.com', count: 10 }]);
+
+    expect(stats.domains).toEqual([{ domain: 'unused.com', blockedCount: 0 }]);
+    expect(stats.totalBlockedUsers).toBe(0);
+  });
+
+  it('returns empty stats for an empty blacklist', () => {
+    const stats = computeBlacklistStats([], [{ email_domain: 'anything.com', count: 5 }]);
+
+    expect(stats.domains).toEqual([]);
+    expect(stats.totalDomains).toBe(0);
+    expect(stats.totalBlockedUsers).toBe(0);
+  });
+});
+
+describe('admin.blacklistDomains.stats', () => {
+  it('returns structurally valid shape (empty blacklist → empty domain list)', async () => {
+    await insertTestUser({
+      google_user_email: 'a@example.com',
+      email_domain: 'example.com',
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const stats = await caller.admin.blacklistDomains.stats();
+
+    expect(stats).toMatchObject({
+      domains: expect.any(Array),
+      totalDomains: expect.any(Number),
+      totalBlockedUsers: expect.any(Number),
+    });
+    // With BLACKLIST_DOMAINS unset in the test env and redis unavailable,
+    // the procedure sees an empty blacklist and returns an empty per-domain
+    // breakdown regardless of how many users exist.
+    expect(stats.domains).toEqual([]);
+    expect(stats.totalDomains).toBe(0);
+    expect(stats.totalBlockedUsers).toBe(0);
   });
 });
 

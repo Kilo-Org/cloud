@@ -70,13 +70,11 @@ export function KiloChatLayout({
 
   const handleLeave = useCallback(
     (conversationId: string) => {
-      leaveConversation.mutate(conversationId, {
-        onSuccess: () => {
-          if (params?.conversationId === conversationId) {
-            router.push('/claw/kilo-chat');
-          }
-        },
-      });
+      // Navigate away first so the conversation page unmounts before query invalidation
+      if (params?.conversationId === conversationId) {
+        router.push('/claw/kilo-chat');
+      }
+      leaveConversation.mutate(conversationId);
     },
     [leaveConversation, params?.conversationId, router]
   );

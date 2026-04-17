@@ -123,6 +123,8 @@ export async function POST(request: NextRequest) {
         findingsCritical: report.summary.critical,
         findingsWarn: report.summary.warn,
         findingsInfo: report.summary.info,
+        grade: report.grade,
+        score: report.score,
         publicIp: payload.publicIp,
       });
     } catch (err) {

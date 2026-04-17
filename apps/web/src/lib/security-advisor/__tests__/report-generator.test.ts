@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { generateSecurityReport } from '../report-generator';
-import type { SecurityAdvisorRequest } from '../schemas';
+import type { AuditFinding, SecurityAdvisorRequest } from '../schemas';
 import type { LoadedSecurityAdvisorContent } from '../content-loader';
 
 /**
@@ -451,13 +451,7 @@ describe('generateSecurityReport', () => {
     } {
       // Build synthetic findings that pass through client severity (no catalog
       // match) so the count lands as specified.
-      const findings: {
-        checkId: string;
-        severity: 'critical' | 'warn' | 'info';
-        title: string;
-        detail: string;
-        remediation: null;
-      }[] = [];
+      const findings: AuditFinding[] = [];
       for (let i = 0; i < audit.critical; i++)
         findings.push({
           checkId: `synthetic.crit.${i}`,

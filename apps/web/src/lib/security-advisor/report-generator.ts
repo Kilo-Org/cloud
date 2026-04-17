@@ -14,8 +14,13 @@ import { findCoverageForCheckId, type LoadedSecurityAdvisorContent } from './con
 /**
  * Per-finding score deductions. Critical findings dominate the grade; warnings
  * stack up linearly; info is visibility-only and does not affect the score.
- * Tuned against the real-world "7 warnings, 0 critical" baseline to land at C,
- * with 1 critical dropping to D and 2+ criticals to F.
+ *
+ * This is the first calibration pass — tuned against a real captured audit
+ * (7 warnings, 0 critical, 1 info) to land at C. Letter cutoffs follow the
+ * US academic 90/80/70/60 convention. Both the weights and the thresholds
+ * are tunable; if product wants to adjust the curve, this is the one place
+ * to edit. The test suite's hardcoded expected scores will need to move in
+ * lockstep — see the "grade computation" describe block.
  */
 const SCORE_PENALTY_CRITICAL = 35;
 const SCORE_PENALTY_WARN = 4;
@@ -191,11 +196,14 @@ function severityToPriority(severity: FindingSeverity): RecommendationPriority {
 }
 
 /**
- * Map the stored RecommendationPriority to the user-facing badge text. We show
- * the same severity vocabulary used in the "## Critical Findings" / "## Warnings"
- * section headings so the reader sees one consistent label set across the
- * report. Info findings are filtered out of recommendations, so `low`/`medium`
- * are included for completeness but never render in practice today.
+ * Map the stored RecommendationPriority to the user-facing badge text. The
+ * report uses the same severity vocabulary as the "## Critical Findings" /
+ * "## Warnings" section headings so the reader sees one consistent label
+ * set. Only `immediate` and `high` are produced today — `low` is included
+ * because info findings could plausibly earn a recommendation in the future,
+ * and `medium` deliberately throws so that any new caller that starts
+ * producing medium-priority recommendations has to make a conscious labeling
+ * choice rather than silently inheriting `WARNING`.
  */
 function priorityBadge(priority: RecommendationPriority): string {
   switch (priority) {
@@ -203,10 +211,12 @@ function priorityBadge(priority: RecommendationPriority): string {
       return 'CRITICAL';
     case 'high':
       return 'WARNING';
-    case 'medium':
-      return 'WARNING';
     case 'low':
       return 'INFO';
+    case 'medium':
+      throw new Error(
+        '[SecurityAdvisor] priorityBadge: "medium" priority has no defined label yet. Pick one in report-generator.ts before emitting medium-priority recommendations.'
+      );
   }
 }
 

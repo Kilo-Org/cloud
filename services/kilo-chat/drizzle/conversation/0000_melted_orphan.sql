@@ -10,6 +10,7 @@ CREATE TABLE `members` (
 	`id` text PRIMARY KEY NOT NULL,
 	`kind` text NOT NULL,
 	`joined_at` integer NOT NULL,
+	`left_at` integer,
 	CONSTRAINT "members_kind_check" CHECK("members"."kind" IN ('user', 'bot'))
 );
 --> statement-breakpoint
@@ -20,6 +21,7 @@ CREATE TABLE `messages` (
 	`in_reply_to_message_id` text,
 	`version` integer DEFAULT 1 NOT NULL,
 	`updated_at` integer,
+	`client_updated_at` integer,
 	`deleted` integer DEFAULT 0 NOT NULL,
 	FOREIGN KEY (`sender_id`) REFERENCES `members`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`in_reply_to_message_id`) REFERENCES `messages`(`id`) ON UPDATE no action ON DELETE no action,

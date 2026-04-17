@@ -19,6 +19,7 @@ describe('MembershipDO', () => {
     await stub.addConversation({
       conversationId: 'conv-1',
       conversationTitle: 'Test Chat',
+      sandboxId: 'sandbox-1',
       joinedAt: 1000,
     });
     const result = await stub.listConversations();
@@ -38,6 +39,7 @@ describe('MembershipDO', () => {
     await stub.addConversation({
       conversationId: 'conv-1',
       conversationTitle: null,
+      sandboxId: 'sandbox-1',
       joinedAt: 1000,
     });
     await stub.updateLastMessageId('conv-1', '01ABC');
@@ -50,11 +52,13 @@ describe('MembershipDO', () => {
     await stub.addConversation({
       conversationId: 'conv-a',
       conversationTitle: null,
+      sandboxId: 'sandbox-1',
       joinedAt: 1000,
     });
     await stub.addConversation({
       conversationId: 'conv-b',
       conversationTitle: null,
+      sandboxId: 'sandbox-1',
       joinedAt: 2000,
     });
     await stub.updateLastMessageId('conv-a', '01ZZZZZ');
@@ -69,6 +73,7 @@ describe('MembershipDO', () => {
     await stub.addConversation({
       conversationId: 'conv-1',
       conversationTitle: null,
+      sandboxId: 'sandbox-1',
       joinedAt: 1000,
     });
     await stub.removeConversation('conv-1');

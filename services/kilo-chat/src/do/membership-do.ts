@@ -16,7 +16,7 @@ export type ConversationEntry = {
 export type AddConversationParams = {
   conversationId: string;
   conversationTitle: string | null;
-  sandboxId: string | null;
+  sandboxId: string;
   joinedAt: number;
 };
 

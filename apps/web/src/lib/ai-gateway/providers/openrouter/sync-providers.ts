@@ -9,6 +9,7 @@ import type {
   OpenRouterProvider,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import {
+  OpenRouterApiProvidersResponse,
   OpenRouterProvidersResponse,
   OpenRouterSearchResponse,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
@@ -19,6 +20,17 @@ import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@/lib/ai-gateway/providers/vercel/types';
 import { EndpointsSchema, ModelsSchema } from '@/lib/ai-gateway/providers/vercel/types';
+import { redisSet } from '@/lib/redis';
+
+// Redis keys for the latest synced data. Consumers are not wired up yet —
+// these mirror what is persisted in the `models_by_provider` table so the
+// hot path can eventually avoid a database round-trip.
+export const SYNC_PROVIDERS_REDIS_KEYS = {
+  providers: 'ai-gateway.sync-providers.providers',
+  openrouter: 'ai-gateway.sync-providers.openrouter',
+  vercel: 'ai-gateway.sync-providers.vercel',
+  openrouterProviders: 'ai-gateway.sync-providers.openrouter-providers',
+} as const;
 
 async function fetchGatewayModels(gateway: Provider) {
   const headers = {
@@ -401,11 +413,59 @@ async function syncProviders() {
   return result;
 }
 
+async function fetchOpenRouterApiProviders(): Promise<OpenRouterApiProvidersResponse> {
+  console.log('Fetching OpenRouter providers from public API endpoint...');
+
+  const response = await fetch('https://openrouter.ai/api/v1/providers', {
+    method: 'GET',
+    headers: {
+      'HTTP-Referer': 'https://kilocode.ai',
+      'X-Title': 'Kilo Code',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch OpenRouter API providers: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const parsed = OpenRouterApiProvidersResponse.parse(await response.json());
+  console.log(`Found ${parsed.data.length} providers from /api/v1/providers`);
+  return parsed;
+}
+
+// Best-effort mirror of the synced data into Redis. Consumers are not wired
+// up yet; failures are logged but never block the DB write.
+async function mirrorToRedis(values: {
+  providers: NormalizedOpenRouterResponse;
+  openrouter: Record<string, StoredModel>;
+  vercel: Record<string, StoredModel>;
+  openrouterProviders: OpenRouterApiProvidersResponse;
+}): Promise<void> {
+  const entries: [string, unknown][] = [
+    [SYNC_PROVIDERS_REDIS_KEYS.providers, values.providers],
+    [SYNC_PROVIDERS_REDIS_KEYS.openrouter, values.openrouter],
+    [SYNC_PROVIDERS_REDIS_KEYS.vercel, values.vercel],
+    [SYNC_PROVIDERS_REDIS_KEYS.openrouterProviders, values.openrouterProviders],
+  ];
+  await Promise.all(
+    entries.map(async ([key, value]) => {
+      try {
+        await redisSet(key, JSON.stringify(value));
+      } catch (err) {
+        console.error(`[syncAndStoreProviders] Failed to write ${key} to Redis:`, err);
+      }
+    })
+  );
+}
+
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
   const openrouter_data = await fetchGatewayModels(PROVIDERS.OPENROUTER);
   const vercel_data = await fetchGatewayModels(PROVIDERS.VERCEL_AI_GATEWAY);
+  const openrouter_providers = await fetchOpenRouterApiProviders();
 
   const providers = await syncProviders();
 
@@ -417,13 +477,31 @@ export async function syncAndStoreProviders() {
     throw new Error(`Suspicious: total number of models is ${providers.total_models} < 100`);
   }
 
+  if (openrouter_providers.data.length < 10) {
+    throw new Error(
+      `Suspicious: total number of OpenRouter API providers is ${openrouter_providers.data.length} < 10`
+    );
+  }
+
   const result = await db.transaction(async tx => {
     const results = await tx
       .insert(modelsByProvider)
-      .values({ data: providers, openrouter: openrouter_data, vercel: vercel_data })
+      .values({
+        data: providers,
+        openrouter: openrouter_data,
+        vercel: vercel_data,
+        openrouter_providers,
+      })
       .returning();
     await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
     return results[0];
+  });
+
+  await mirrorToRedis({
+    providers,
+    openrouter: openrouter_data,
+    vercel: vercel_data,
+    openrouterProviders: openrouter_providers,
   });
 
   return {

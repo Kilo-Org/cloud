@@ -5,6 +5,16 @@ import { Pencil, Trash2, Reply } from 'lucide-react';
 import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 
+function botDisplayName(senderId: string): string {
+  // senderId format: bot:<name>:<sandboxId>
+  const parts = senderId.split(':');
+  if (parts.length >= 2) {
+    const name = parts[1];
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+  return 'KiloClaw';
+}
+
 type MessageBubbleProps = {
   message: Message;
   isOwn: boolean;
@@ -74,7 +84,9 @@ export function MessageBubble({
     >
       <div className={`flex max-w-[75%] flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
         {isBot && !isOwn && (
-          <span className="text-muted-foreground mb-0.5 px-1 text-xs font-medium">KiloClaw</span>
+          <span className="text-muted-foreground mb-0.5 px-1 text-xs font-medium">
+            {botDisplayName(message.senderId)}
+          </span>
         )}
 
         {replyToMessage && (

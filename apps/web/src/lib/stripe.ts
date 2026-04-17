@@ -66,19 +66,15 @@ import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organiz
 import { successResult } from '@/lib/maybe-result';
 
 async function isKiloClawCharge(chargeId: string): Promise<boolean> {
-  try {
-    // The `invoice` field is present at runtime on charges but removed from newer
-    // Stripe TypeScript definitions. Read the response as a structural type.
-    const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
-      await client.charges.retrieve(chargeId, { expand: ['invoice'] });
-    const invoice = charge.invoice;
-    if (!invoice || typeof invoice === 'string') return false;
-    return invoiceLooksLikeKiloClawByPriceId(invoice);
-  } catch {
-    // If charge lookup fails, err on side of processing — avoid silently
-    // dropping legitimate affiliate reversals.
-    return true;
-  }
+  // The `invoice` field is present at runtime on charges but removed from newer
+  // Stripe TypeScript definitions. Read the response as a structural type.
+  // Errors (Stripe outage, network) propagate so the webhook returns non-2xx and
+  // Stripe retries delivery — avoids both silent drops and false backlog.
+  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
+    await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+  const invoice = charge.invoice;
+  if (!invoice || typeof invoice === 'string') return false;
+  return invoiceLooksLikeKiloClawByPriceId(invoice);
 }
 
 if (!APP_URL) throw new Error('APP_URL constant is not set');

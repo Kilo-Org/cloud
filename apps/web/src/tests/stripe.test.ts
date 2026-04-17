@@ -1,3 +1,5 @@
+process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
+
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import type * as creditsModule from '@/lib/credits';
 import type * as organizationBillingModule from '@/lib/organizations/organization-billing';
@@ -169,6 +171,20 @@ const baseStripeEvent = () => ({
   pending_webhooks: 0,
   request: null,
 });
+
+async function mockChargeRetrieveForKiloClaw(priceId: string) {
+  const { client } = await import('@/lib/stripe-client');
+  const invoice = {
+    object: 'invoice',
+    lines: {
+      data: [{ pricing: { price_details: { price: priceId } } }],
+    },
+  } as unknown as Stripe.Invoice;
+  return jest.spyOn(client.charges, 'retrieve').mockResolvedValue({
+    invoice,
+    lastResponse: { headers: {}, requestId: 'req_test', statusCode: 200 },
+  } as unknown as Stripe.Response<Stripe.Charge>);
+}
 
 const sampleStripeDispute = (
   overrides: Partial<Stripe.Dispute> & Pick<Stripe.Dispute, 'id'>
@@ -678,6 +694,8 @@ describe('processStripePaymentEventHook', () => {
       impact_action_id: '1000.2000.3000',
     });
 
+    const retrieveSpy = await mockChargeRetrieveForKiloClaw('price_test_kiloclaw_standard');
+
     const event: Stripe.Event = {
       ...baseStripeEvent(),
       id: 'evt_dispute_created',
@@ -692,6 +710,7 @@ describe('processStripePaymentEventHook', () => {
     };
 
     await processStripePaymentEventHook(event);
+    retrieveSpy.mockRestore();
 
     const reversalEvents = await db
       .select()
@@ -709,9 +728,11 @@ describe('processStripePaymentEventHook', () => {
     expect(reversalEvents[0]?.payload_json.disputeId).toBe('dp_123');
   });
 
-  test('charge.dispute.created does nothing for unmatched charge', async () => {
+  test('charge.dispute.created persists pending row for unmatched KiloClaw charge', async () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
+
+    const retrieveSpy = await mockChargeRetrieveForKiloClaw('price_test_kiloclaw_standard');
 
     const event: Stripe.Event = {
       ...baseStripeEvent(),
@@ -727,13 +748,20 @@ describe('processStripePaymentEventHook', () => {
     };
 
     await processStripePaymentEventHook(event);
+    retrieveSpy.mockRestore();
 
     const reversalEvents = await db
       .select()
       .from(user_affiliate_events)
       .where(eq(user_affiliate_events.event_type, 'sale_reversal'));
+    const pendingRows = await db.select().from(pending_impact_sale_reversals);
 
     expect(reversalEvents).toHaveLength(0);
+    expect(pendingRows).toHaveLength(1);
+    expect(pendingRows[0]).toMatchObject({
+      stripe_charge_id: 'ch_missing',
+      dispute_id: 'dp_unmatched',
+    });
   });
 
   test('charge.dispute.created does nothing when charge id is missing', async () => {
@@ -792,6 +820,8 @@ describe('processStripePaymentEventHook', () => {
       stripe_charge_id: 'ch_legacy_missing_mapping',
     });
 
+    const retrieveSpy = await mockChargeRetrieveForKiloClaw('price_test_kiloclaw_standard');
+
     const event: Stripe.Event = {
       ...baseStripeEvent(),
       id: 'evt_dispute_legacy',
@@ -806,6 +836,7 @@ describe('processStripePaymentEventHook', () => {
     };
 
     await processStripePaymentEventHook(event);
+    retrieveSpy.mockRestore();
 
     const reversalEvents = await db
       .select()
@@ -821,6 +852,7 @@ describe('processStripePaymentEventHook', () => {
 
     const { client } = await import('@/lib/stripe-client');
     const nonKiloClawInvoice = {
+      object: 'invoice',
       lines: {
         data: [{ pricing: { price_details: { price: 'price_kilo_pass_not_kiloclaw' } } }],
       },
@@ -852,6 +884,36 @@ describe('processStripePaymentEventHook', () => {
     const pendingRows = await db.select().from(pending_impact_sale_reversals);
 
     expect(reversalEvents).toHaveLength(0);
+    expect(pendingRows).toHaveLength(0);
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('charge.dispute.created propagates errors from Stripe so the webhook retries', async () => {
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest
+      .spyOn(client.charges, 'retrieve')
+      .mockRejectedValue(new Error('Stripe API unavailable'));
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_stripe_err',
+      type: 'charge.dispute.created',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_stripe_err',
+          charge: 'ch_stripe_err',
+        }),
+        previous_attributes: {},
+      },
+    };
+
+    await expect(processStripePaymentEventHook(event)).rejects.toThrow('Stripe API unavailable');
+
+    const pendingRows = await db.select().from(pending_impact_sale_reversals);
     expect(pendingRows).toHaveLength(0);
 
     retrieveSpy.mockRestore();

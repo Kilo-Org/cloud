@@ -76,15 +76,21 @@ export async function createMessageFor(
   }
 
   // Update lastMessageId on every member's MembershipDO so their recency
-  // sort reflects this new message.
+  // sort reflects this new message. Best-effort: the message and webhook are
+  // already committed, so a MembershipDO failure must not fail the request.
   const info = await convStub.getInfo();
   if (info) {
-    await Promise.all(
+    const results = await Promise.allSettled(
       info.members.map(member => {
         const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
         return stub.updateLastMessageId(conversationId, messageId);
       })
     );
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        console.error('Failed to update MembershipDO lastMessageId:', r.reason);
+      }
+    }
   }
 
   return { ok: true, messageId, version };

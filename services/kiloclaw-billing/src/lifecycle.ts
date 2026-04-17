@@ -2376,10 +2376,7 @@ const COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO = '2026-04-10T00:00:00.0
 const INSTANCE_READY_EMAIL_TYPE = 'claw_instance_ready';
 const COMPLEMENTARY_INFERENCE_ENDED_EMAIL_TYPE = 'claw_complementary_inference_ended';
 
-export function buildComplementaryInferenceEndedCandidateQuery(
-  database: WorkerDb,
-  windowCutoff: string
-) {
+function buildComplementaryInferenceEndedCandidateQuery(database: WorkerDb, windowCutoff: string) {
   return database
     .select({
       user_id: kilocode_users.id,

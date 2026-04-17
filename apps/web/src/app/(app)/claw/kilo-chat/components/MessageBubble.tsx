@@ -203,7 +203,9 @@ export function MessageBubble({
                 </button>
               </div>
             ) : (
-              <div className="prose prose-sm prose-invert max-w-none break-words [&_pre]:overflow-x-auto [&_code]:break-all [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0">
+              <div
+                className={`prose prose-sm max-w-none break-words [&_pre]:overflow-x-auto [&_code]:break-all [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 ${isOwn ? '' : 'prose-invert'}`}
+              >
                 <MemoizedMarkdown content={textContent} />
               </div>
             )}

@@ -2,7 +2,11 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { z } from 'zod';
 import { sql } from 'drizzle-orm';
-import { decryptWithSymmetricKey, encryptWithSymmetricKey, timingSafeEqual } from '@kilocode/encryption';
+import {
+  decryptWithSymmetricKey,
+  encryptWithSymmetricKey,
+  timingSafeEqual,
+} from '@kilocode/encryption';
 import type { AppEnv } from '../types';
 import { userIdFromSandboxId } from '../auth/sandbox-id';
 import {
@@ -86,7 +90,6 @@ const GoogleMigrateLegacyRequestSchema = z.object({
 const GOOGLE_CAPABILITY_SCOPES: Record<string, readonly string[]> = {
   calendar_read: ['https://www.googleapis.com/auth/calendar.readonly'],
 };
-
 
 /**
  * Return the backend app origin for internal API calls.
@@ -441,9 +444,14 @@ controller.post('/google/token', async (c: Context<AppEnv>) => {
     return c.json({ error: 'Google OAuth requires reconnect', status: connection.status }, 409);
   }
 
-  const unsupportedCapabilities = capabilities.filter(capability => !(capability in GOOGLE_CAPABILITY_SCOPES));
+  const unsupportedCapabilities = capabilities.filter(
+    capability => !(capability in GOOGLE_CAPABILITY_SCOPES)
+  );
   if (unsupportedCapabilities.length > 0) {
-    return c.json({ error: `Unsupported capabilities: ${unsupportedCapabilities.join(', ')}` }, 400);
+    return c.json(
+      { error: `Unsupported capabilities: ${unsupportedCapabilities.join(', ')}` },
+      400
+    );
   }
 
   if (!hasRequiredCapabilities(capabilities, connection.capabilities)) {
@@ -527,7 +535,8 @@ controller.post('/google/token', async (c: Context<AppEnv>) => {
     });
   } catch (error) {
     const mapped = mapGoogleRefreshError(error);
-    const shouldRequireReconnect = mapped.code === 'invalid_grant' || mapped.code === 'deleted_client';
+    const shouldRequireReconnect =
+      mapped.code === 'invalid_grant' || mapped.code === 'deleted_client';
 
     if (shouldRequireReconnect) {
       await updateGoogleOAuthConnectionTokenData(db, instance.id, {
@@ -616,7 +625,10 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
   if (existing) {
     await updateGoogleOAuthConnectionTokenData(db, instance.id, {
       oauthClientId: parsed.data.oauthClientId,
-      oauthClientSecretEncrypted: encryptWithSymmetricKey(parsed.data.oauthClientSecret, encryptionKey),
+      oauthClientSecretEncrypted: encryptWithSymmetricKey(
+        parsed.data.oauthClientSecret,
+        encryptionKey
+      ),
       credentialProfile: 'legacy',
       refreshTokenEncrypted: encryptWithSymmetricKey(parsed.data.refreshToken, encryptionKey),
       scopes,

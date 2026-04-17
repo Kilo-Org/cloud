@@ -3764,8 +3764,14 @@ export const kiloclaw_google_oauth_connections = pgTable(
       .notNull()
       .default('kilo_owned'),
     refresh_token_encrypted: text().notNull(),
-    scopes: text().array().notNull().default(sql`'{}'::text[]`),
-    capabilities: text().array().notNull().default(sql`'{}'::text[]`),
+    scopes: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    capabilities: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     status: text().$type<KiloClawGoogleOAuthStatus>().notNull().default('active'),
     last_error: text(),
     last_error_at: timestamp({ withTimezone: true, mode: 'string' }),

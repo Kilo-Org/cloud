@@ -79,7 +79,9 @@ describe('GET /api/integrations/google/connect', () => {
     const response = await GET(makeRequest('/api/integrations/google/connect') as never);
 
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('https://accounts.google.com/o/oauth2/v2/auth?x=1');
+    expect(response.headers.get('location')).toBe(
+      'https://accounts.google.com/o/oauth2/v2/auth?x=1'
+    );
     expect(mockedGetActiveInstance).toHaveBeenCalledWith(USER_ID);
     expect(mockedGetActiveOrgInstance).not.toHaveBeenCalled();
     expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
@@ -99,7 +101,9 @@ describe('GET /api/integrations/google/connect', () => {
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('https://accounts.google.com/o/oauth2/v2/auth?x=1');
+    expect(response.headers.get('location')).toBe(
+      'https://accounts.google.com/o/oauth2/v2/auth?x=1'
+    );
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
     expect(mockedGetActiveOrgInstance).toHaveBeenCalledWith(USER_ID, ORG_ID);
     expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
@@ -137,7 +141,10 @@ describe('GET /api/integrations/google/connect', () => {
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/organizations/${ORG_ID}/claw/settings?error=oauth_init_failed`);
+    expectRedirectLocation(
+      response,
+      `/organizations/${ORG_ID}/claw/settings?error=oauth_init_failed`
+    );
     expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
   });
 

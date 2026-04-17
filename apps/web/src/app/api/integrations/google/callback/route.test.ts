@@ -162,7 +162,10 @@ describe('GET /api/integrations/google/callback', () => {
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/organizations/${ORG_ID}/claw/settings?success=google_connected`);
+    expectRedirectLocation(
+      response,
+      `/organizations/${ORG_ID}/claw/settings?success=google_connected`
+    );
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
   });
 
@@ -193,7 +196,10 @@ describe('GET /api/integrations/google/callback', () => {
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/organizations/${ORG_ID}/claw/settings?error=user%20cancelled`);
+    expectRedirectLocation(
+      response,
+      `/organizations/${ORG_ID}/claw/settings?error=user%20cancelled`
+    );
   });
 
   test('redirects invalid state to personal claw settings invalid_state', async () => {
@@ -228,7 +234,10 @@ describe('GET /api/integrations/google/callback', () => {
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/organizations/${ORG_ID}/claw/settings?error=connection_failed`);
+    expectRedirectLocation(
+      response,
+      `/organizations/${ORG_ID}/claw/settings?error=connection_failed`
+    );
     expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
   });
 });

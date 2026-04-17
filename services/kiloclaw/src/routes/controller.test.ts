@@ -103,8 +103,7 @@ function makeEnv(options?: {
     GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET:
       options?.googleWorkspaceOauthClientSecret ?? 'test-google-client-secret',
     GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY:
-      options?.googleWorkspaceRefreshTokenEncryptionKey ??
-      Buffer.alloc(32, 7).toString('base64'),
+      options?.googleWorkspaceRefreshTokenEncryptionKey ?? Buffer.alloc(32, 7).toString('base64'),
   } as never;
 }
 

@@ -412,7 +412,14 @@ console.log('━━━━━━━━━━━━━━━━━━━━━━�
 try {
   await runCommand(
     'gog',
-    ['auth', 'add', userEmail, `--services=${LEGACY_GOOGLE_SETUP_SERVICES}`, '--force-consent', '--manual'],
+    [
+      'auth',
+      'add',
+      userEmail,
+      `--services=${LEGACY_GOOGLE_SETUP_SERVICES}`,
+      '--force-consent',
+      '--manual',
+    ],
     {
       env: gogEnv,
     }

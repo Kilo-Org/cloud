@@ -61,7 +61,9 @@ function mapServicesToCapabilities(services: readonly string[]): string[] {
   return [...capabilities].sort();
 }
 
-function parseClientCredentials(credsPath: string): { clientId: string; clientSecret: string } | null {
+function parseClientCredentials(
+  credsPath: string
+): { clientId: string; clientSecret: string } | null {
   const raw = fs.readFileSync(credsPath, 'utf8');
   const parsed = JSON.parse(raw) as Record<string, unknown>;
 
@@ -120,17 +122,24 @@ export async function migrateLegacyGoogleCredentialsToBroker(
   const tmpPath = path.join(os.tmpdir(), `gog-legacy-token-${Date.now()}.json`);
 
   try {
-    execFileSync('/usr/local/bin/gog.real', ['auth', 'tokens', 'export', email, tmpPath, '--overwrite'], {
-      env: gogEnv,
-      encoding: 'utf8',
-    });
+    execFileSync(
+      '/usr/local/bin/gog.real',
+      ['auth', 'tokens', 'export', email, tmpPath, '--overwrite'],
+      {
+        env: gogEnv,
+        encoding: 'utf8',
+      }
+    );
 
     const exportPayload = JSON.parse(fs.readFileSync(tmpPath, 'utf8')) as GogTokenExportJson;
     if (!exportPayload.refresh_token) {
       return false;
     }
 
-    const credentialsList = runGogJson(['auth', 'credentials', 'list', '--json'], gogEnv) as GogCredentialsListJson;
+    const credentialsList = runGogJson(
+      ['auth', 'credentials', 'list', '--json'],
+      gogEnv
+    ) as GogCredentialsListJson;
     const tokenClient = exportPayload.client || 'default';
     const credsPath =
       credentialsList.clients?.find(client => client.client === tokenClient)?.path ||

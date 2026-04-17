@@ -37,9 +37,9 @@ describe('google capabilities', () => {
       GOOGLE_CAPABILITY.GMAIL_READ,
     ]);
 
-    expect(
-      hasRequiredScopesForCapabilities(grantedScopes, [GOOGLE_CAPABILITY.CALENDAR_READ])
-    ).toBe(true);
+    expect(hasRequiredScopesForCapabilities(grantedScopes, [GOOGLE_CAPABILITY.CALENDAR_READ])).toBe(
+      true
+    );
     expect(hasRequiredScopesForCapabilities(grantedScopes, [GOOGLE_CAPABILITY.GMAIL_READ])).toBe(
       true
     );

@@ -95,7 +95,10 @@ describe('GET /api/integrations/google/disconnect', () => {
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, `/organizations/${ORG_ID}/claw/settings?success=google_disconnected`);
+    expectRedirectLocation(
+      response,
+      `/organizations/${ORG_ID}/claw/settings?success=google_disconnected`
+    );
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
     expect(mockedGetActiveOrgInstance).toHaveBeenCalledWith(USER_ID, ORG_ID);
   });

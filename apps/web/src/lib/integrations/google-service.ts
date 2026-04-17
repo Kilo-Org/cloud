@@ -60,7 +60,10 @@ function createGoogleOAuthClient(): OAuth2Client {
   });
 }
 
-export function buildGoogleOAuthUrl(state: string, capabilities: readonly GoogleCapability[]): string {
+export function buildGoogleOAuthUrl(
+  state: string,
+  capabilities: readonly GoogleCapability[]
+): string {
   const oauthClient = createGoogleOAuthClient();
   const scopes = resolveGoogleScopesForCapabilities(capabilities);
 

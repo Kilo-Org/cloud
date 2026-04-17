@@ -832,9 +832,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   private shouldEnableGoogleWorkspaceTools(): boolean {
-    return (
-      this.s.googleCredentials !== null || this.s.googleOAuthConnection?.status === 'active'
-    );
+    return this.s.googleCredentials !== null || this.s.googleOAuthConnection?.status === 'active';
   }
 
   private async syncGoogleWorkspaceConfig(reason: string): Promise<void> {
@@ -856,7 +854,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     try {
-      const result = await gateway.syncGoogleWorkspaceToolsSectionOnMachine(this.s, this.env, enabled);
+      const result = await gateway.syncGoogleWorkspaceToolsSectionOnMachine(
+        this.s,
+        this.env,
+        enabled
+      );
       if (result === null) {
         this.s.googleWorkspaceConfigSyncPending = true;
         this.s.googleWorkspaceConfigSyncError = 'controller_route_unavailable';
@@ -867,7 +869,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     } catch (error) {
       this.s.googleWorkspaceConfigSyncPending = true;
-      this.s.googleWorkspaceConfigSyncError = error instanceof Error ? error.message : String(error);
+      this.s.googleWorkspaceConfigSyncError =
+        error instanceof Error ? error.message : String(error);
       doWarn(this.s, 'google workspace config sync failed', {
         reason,
         enabled,
@@ -1216,7 +1219,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     scopes: string[];
     capabilities: string[];
     lastError?: string | null;
-  }): Promise<{ googleOAuthConnected: boolean; googleOAuthStatus: GoogleOAuthConnection['status'] }> {
+  }): Promise<{
+    googleOAuthConnected: boolean;
+    googleOAuthStatus: GoogleOAuthConnection['status'];
+  }> {
     await this.loadState();
 
     const now = Date.now();
@@ -1230,9 +1236,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       capabilities: [...new Set(connection.capabilities)].sort(),
       status: connection.status,
       lastError: connection.lastError ?? null,
-      connectedAt: isActive
-        ? previous?.connectedAt ?? now
-        : previous?.connectedAt ?? null,
+      connectedAt: isActive ? (previous?.connectedAt ?? now) : (previous?.connectedAt ?? null),
       updatedAt: now,
     };
 

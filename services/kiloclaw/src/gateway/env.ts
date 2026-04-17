@@ -183,10 +183,10 @@ export async function buildEnvVars(
       Object.assign(sensitive, channelEnv);
     }
 
-  // Layer 4b: Decrypt Google credentials (gog config tarball) and pass as env var.
-  // Wrapped in try/catch so corrupted credentials don't block container startup —
-  // the machine starts without Google access instead of failing entirely.
-  if (userConfig.googleCredentials && env.AGENT_ENV_VARS_PRIVATE_KEY) {
+    // Layer 4b: Decrypt Google credentials (gog config tarball) and pass as env var.
+    // Wrapped in try/catch so corrupted credentials don't block container startup —
+    // the machine starts without Google access instead of failing entirely.
+    if (userConfig.googleCredentials && env.AGENT_ENV_VARS_PRIVATE_KEY) {
       try {
         const tarballBase64 = decryptWithPrivateKey(
           userConfig.googleCredentials.gogConfigTarball,

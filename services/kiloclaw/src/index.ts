@@ -190,7 +190,10 @@ async function requireControllerGoogleEnvVars(c: Context<AppEnv>, next: Next) {
   const missing = missingGoogleBrokerEnv(c.env);
   if (missing.length > 0) {
     console.error('[CONFIG] Controller Google route missing bindings:', missing.join(', '));
-    return c.json({ error: 'Configuration error' }, { status: 503, headers: { 'Retry-After': '5' } });
+    return c.json(
+      { error: 'Configuration error' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
   }
   return next();
 }

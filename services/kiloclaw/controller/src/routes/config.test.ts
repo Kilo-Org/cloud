@@ -334,7 +334,9 @@ describe('/_kilo/config/tools-md/google-workspace route', () => {
     const app = new Hono();
     registerConfigRoutes(app, createMockSupervisor(), 'test-token');
 
-    readMock.mockReturnValue(`# TOOLS\n\n<!-- BEGIN:google-workspace -->\nfoo\n<!-- END:google-workspace -->\n`);
+    readMock.mockReturnValue(
+      `# TOOLS\n\n<!-- BEGIN:google-workspace -->\nfoo\n<!-- END:google-workspace -->\n`
+    );
 
     const resp = await app.request('/_kilo/config/tools-md/google-workspace', {
       method: 'POST',

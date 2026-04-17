@@ -608,7 +608,7 @@ describe('repairTools', () => {
   });
 });
 
-const EXPECTED_REPLACEMENT = expect.stringContaining('binary data');
+const EXPECTED_REPLACEMENT = expect.stringContaining('NUL bytes');
 
 describe('sanitizeBinaryToolResults', () => {
   describe('chat_completions format', () => {

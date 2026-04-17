@@ -8,9 +8,10 @@ import crypto from 'crypto';
 import type OpenAI from 'openai';
 
 const BINARY_DATA_REPLACEMENT =
-  'The tool result contained binary data (NUL characters detected). ' +
-  'This usually means a binary file was read by mistake. ' +
-  'Try a different approach that avoids reading binary files.';
+  'Error: the file appears to be binary — it contains NUL bytes that cannot ' +
+  'be represented as text. Do not retry reading it. Treat this file as binary, ' +
+  'skip it, or use a tool appropriate for its format (for example, image or ' +
+  'PDF tools) instead.';
 
 function normalizeToolCallId(toolCallId: string, maxIdLength: number | undefined) {
   return crypto.hash('sha256', toolCallId).slice(0, maxIdLength);
@@ -168,25 +169,23 @@ export function sanitizeBinaryToolResults(request: GatewayRequest): void {
   }
 }
 
-function sanitizeTextParts(parts: Array<{ type: string; text: string }>): void {
-  for (const part of parts) {
-    if ((part.type === 'text' || part.type === 'input_text') && containsNul(part.text)) {
-      part.text = BINARY_DATA_REPLACEMENT;
-    }
-  }
+function sanitizeTextPart(part: unknown): void {
+  if (typeof part !== 'object' || part === null) return;
+  if (!('type' in part) || (part.type !== 'text' && part.type !== 'input_text')) return;
+  if (!('text' in part) || typeof part.text !== 'string') return;
+  if (!containsNul(part.text)) return;
+  part.text = BINARY_DATA_REPLACEMENT;
 }
 
 function sanitizeChatCompletionsToolResults(body: OpenRouterChatCompletionRequest): void {
   if (!Array.isArray(body.messages)) return;
 
-  // Build a map from tool_call_id → tool name
   const toolNameById = new Map<string, string>();
   for (const msg of body.messages) {
-    if (msg.role === 'assistant') {
-      for (const call of msg.tool_calls ?? []) {
-        if (call.type === 'function') {
-          toolNameById.set(call.id, call.function.name);
-        }
+    if (msg.role !== 'assistant') continue;
+    for (const call of msg.tool_calls ?? []) {
+      if (call.type === 'function') {
+        toolNameById.set(call.id, call.function.name);
       }
     }
   }
@@ -199,8 +198,8 @@ function sanitizeChatCompletionsToolResults(body: OpenRouterChatCompletionReques
         console.warn('[sanitizeBinaryToolResults] replacing chat_completions tool result');
         msg.content = BINARY_DATA_REPLACEMENT;
       }
-    } else if (Array.isArray(msg.content)) {
-      sanitizeTextParts(msg.content);
+    } else {
+      for (const part of msg.content) sanitizeTextPart(part);
     }
   }
 }
@@ -208,16 +207,10 @@ function sanitizeChatCompletionsToolResults(body: OpenRouterChatCompletionReques
 function sanitizeResponsesToolResults(body: GatewayResponsesRequest): void {
   if (!Array.isArray(body.input)) return;
 
-  // Build a map from call_id → tool name
   const toolNameById = new Map<string, string>();
   for (const item of body.input) {
-    if (
-      typeof item === 'object' &&
-      'type' in item &&
-      item.type === 'function_call' &&
-      'name' in item
-    ) {
-      toolNameById.set((item as { call_id: string }).call_id, (item as { name: string }).name);
+    if (item.type === 'function_call' && typeof item.name === 'string') {
+      toolNameById.set(item.call_id, item.name);
     }
   }
 
@@ -230,7 +223,7 @@ function sanitizeResponsesToolResults(body: GatewayResponsesRequest): void {
         item.output = BINARY_DATA_REPLACEMENT;
       }
     } else if (Array.isArray(item.output)) {
-      sanitizeTextParts(item.output as Array<{ type: string; text: string }>);
+      for (const part of item.output) sanitizeTextPart(part);
     }
   }
 }
@@ -238,7 +231,6 @@ function sanitizeResponsesToolResults(body: GatewayResponsesRequest): void {
 function sanitizeMessagesToolResults(body: GatewayMessagesRequest): void {
   if (!Array.isArray(body.messages)) return;
 
-  // Build a map from tool_use_id → tool name
   const toolNameById = new Map<string, string>();
   for (const msg of body.messages) {
     if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue;
@@ -260,7 +252,7 @@ function sanitizeMessagesToolResults(body: GatewayMessagesRequest): void {
           block.content = BINARY_DATA_REPLACEMENT;
         }
       } else if (Array.isArray(block.content)) {
-        sanitizeTextParts(block.content as Array<{ type: string; text: string }>);
+        for (const part of block.content) sanitizeTextPart(part);
       }
     }
   }

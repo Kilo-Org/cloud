@@ -47,8 +47,8 @@ export function MessageArea({
   const conversationDetail = useConversationDetail(getToken, conversationId);
   const renameConversation = useRenameConversation(getToken);
   const sendMessage = useSendMessage(getToken);
-  const editMessage = useEditMessage(getToken);
-  const deleteMessage = useDeleteMessage(getToken);
+  const editMessage = useEditMessage(getToken, conversationId);
+  const deleteMessage = useDeleteMessage(getToken, conversationId);
 
   const updateCache = useMessageCacheUpdater(conversationId);
   const { typingMembers, handleTypingEvent, clearTypingForMember } = useTypingState(currentUserId);

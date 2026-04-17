@@ -45,19 +45,69 @@ export function useSendMessage(getToken: () => Promise<string>) {
   });
 }
 
-export function useEditMessage(getToken: () => Promise<string>) {
+export function useEditMessage(getToken: () => Promise<string>, conversationId: string | null) {
   const client = useClient(getToken);
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId, ...req }: EditMessageRequest & { messageId: string }) =>
       client.editMessage(messageId, req),
+    onMutate: async variables => {
+      if (!conversationId) return;
+      const queryKey = ['kilo-chat', 'messages', conversationId];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData(queryKey);
+      queryClient.setQueryData(queryKey, (old: unknown) => {
+        if (!old || typeof old !== 'object') return old;
+        const data = old as { pages: Message[][]; pageParams: unknown[] };
+        return {
+          ...data,
+          pages: data.pages.map(page =>
+            page.map(msg =>
+              msg.id === variables.messageId
+                ? { ...msg, content: variables.content, clientUpdatedAt: variables.timestamp }
+                : msg
+            )
+          ),
+        };
+      });
+      return { previous, queryKey };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
+    },
   });
 }
 
-export function useDeleteMessage(getToken: () => Promise<string>) {
+export function useDeleteMessage(getToken: () => Promise<string>, conversationId: string | null) {
   const client = useClient(getToken);
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId, ...req }: DeleteMessageRequest & { messageId: string }) =>
       client.deleteMessage(messageId, req),
+    onMutate: async variables => {
+      if (!conversationId) return;
+      const queryKey = ['kilo-chat', 'messages', conversationId];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData(queryKey);
+      queryClient.setQueryData(queryKey, (old: unknown) => {
+        if (!old || typeof old !== 'object') return old;
+        const data = old as { pages: Message[][]; pageParams: unknown[] };
+        return {
+          ...data,
+          pages: data.pages.map(page =>
+            page.map(msg => (msg.id === variables.messageId ? { ...msg, deleted: true } : msg))
+          ),
+        };
+      });
+      return { previous, queryKey };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
+    },
   });
 }
 

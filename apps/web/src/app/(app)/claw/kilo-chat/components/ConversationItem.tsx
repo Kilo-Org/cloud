@@ -25,7 +25,7 @@ export function ConversationItem({ conversation, isActive }: ConversationItemPro
       }`}
       prefetch={false}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <p className="truncate text-sm font-medium">
           {conversation.conversationTitle ?? 'Untitled'}
         </p>

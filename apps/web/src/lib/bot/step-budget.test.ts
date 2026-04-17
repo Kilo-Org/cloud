@@ -23,12 +23,12 @@ describe('bot step budget', () => {
   });
 
   it('counts the in-flight spawn step for the next callback URL', () => {
-    expect(
-      getNextBotCallbackStep({ completedStepCount: 1, completedStepsInCurrentRun: 0 })
-    ).toBe(2);
-    expect(
-      getNextBotCallbackStep({ completedStepCount: 1, completedStepsInCurrentRun: 2 })
-    ).toBe(4);
+    expect(getNextBotCallbackStep({ completedStepCount: 1, completedStepsInCurrentRun: 0 })).toBe(
+      2
+    );
+    expect(getNextBotCallbackStep({ completedStepCount: 1, completedStepsInCurrentRun: 2 })).toBe(
+      4
+    );
     expect(
       getNextBotCallbackStep({
         completedStepCount: MAX_ITERATIONS,

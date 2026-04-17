@@ -496,12 +496,7 @@ export class ConversationDO extends DurableObject<Env> {
         const modifiedPreCursor = this.db
           .select()
           .from(messages)
-          .where(
-            and(
-              sql`${messages.id} <= ${lastEventId}`,
-              gt(messages.updated_at, cursorTs)
-            )
-          )
+          .where(and(sql`${messages.id} <= ${lastEventId}`, gt(messages.updated_at, cursorTs)))
           .orderBy(asc(messages.id))
           .all();
 

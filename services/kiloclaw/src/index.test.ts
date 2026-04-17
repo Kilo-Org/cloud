@@ -71,7 +71,7 @@ describe('platform route env validation', () => {
   });
 
   it('rejects platform routes when KILOCLAW_INTERNAL_API_SECRET is missing', async () => {
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/api/platform/provision', {
         method: 'POST',
         headers: {

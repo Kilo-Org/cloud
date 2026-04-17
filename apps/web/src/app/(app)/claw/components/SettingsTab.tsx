@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
@@ -801,6 +802,7 @@ export function SettingsTab({
   organizationName?: string;
 }) {
   const posthog = usePostHog();
+  const { data: user } = useUser();
   const { data: config } = useClawConfig();
   const { organizationId } = useClawContext();
   const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
@@ -901,6 +903,7 @@ export function SettingsTab({
       ? `/api/integrations/google/disconnect?${qs}`
       : '/api/integrations/google/disconnect';
   }, [organizationId]);
+  const canSeeGoogleCalendar = !!user?.is_admin;
 
   function handleCycleInboundEmailAddress() {
     mutations.cycleInboundEmailAddress.mutate(undefined, {
@@ -1109,30 +1112,32 @@ export function SettingsTab({
       {/* ── Webhook Integration ── */}
       <WebhookIntegrationSection />
 
-      <div className="rounded-lg border px-4 py-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <GoogleGIcon className="h-5 w-5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium">Google Calendar</p>
-              <div className="text-muted-foreground text-xs">
-                {status.googleOAuthConnected
-                  ? `Connected${status.googleOAuthAccountEmail ? ` as ${status.googleOAuthAccountEmail}` : ''}`
-                  : 'Not connected'}
+      {canSeeGoogleCalendar && (
+        <div className="rounded-lg border px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <GoogleGIcon className="h-5 w-5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium">Google Calendar</p>
+                <div className="text-muted-foreground text-xs">
+                  {status.googleOAuthConnected
+                    ? `Connected${status.googleOAuthAccountEmail ? ` as ${status.googleOAuthAccountEmail}` : ''}`
+                    : 'Not connected'}
+                </div>
               </div>
             </div>
+            {status.googleOAuthConnected ? (
+              <Button asChild variant="outline" size="sm">
+                <a href={googleCalendarDisconnectHref}>Disconnect</a>
+              </Button>
+            ) : (
+              <Button asChild variant="outline" size="sm">
+                <a href={googleCalendarConnectHref}>Connect</a>
+              </Button>
+            )}
           </div>
-          {status.googleOAuthConnected ? (
-            <Button asChild variant="outline" size="sm">
-              <a href={googleCalendarDisconnectHref}>Disconnect</a>
-            </Button>
-          ) : (
-            <Button asChild variant="outline" size="sm">
-              <a href={googleCalendarConnectHref}>Connect</a>
-            </Button>
-          )}
         </div>
-      </div>
+      )}
 
       {/* ── Messaging Channels ── */}
       <div>

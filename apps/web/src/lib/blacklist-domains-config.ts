@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
 import { getEnvVariable } from '@/lib/dotenvx';
+import { createCachedFetch } from '@/lib/cached-fetch';
 
 export const BLACKLIST_DOMAINS_REDIS_KEY = 'admin:blacklisted-domains';
 
@@ -24,24 +25,7 @@ export const BlacklistDomainsInputSchema = z.object({
   domains: z.array(z.string().min(1).trim()),
 });
 
-/**
- * Reads blacklisted domains from Redis, falling back to the BLACKLIST_DOMAINS env var.
- * Returns a plain string array of domains.
- */
-export async function getBlacklistedDomains(): Promise<string[]> {
-  try {
-    const raw = await redisGet(BLACKLIST_DOMAINS_REDIS_KEY);
-    if (raw) {
-      const parsed = BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
-      if (parsed.domains.length > 0) {
-        return parsed.domains;
-      }
-    }
-  } catch {
-    // Fall through to env var
-  }
-
-  // Fallback to env var
+function getEnvFallbackDomains(): string[] {
   const envVal = getEnvVariable('BLACKLIST_DOMAINS');
   return envVal
     ? envVal
@@ -50,3 +34,23 @@ export async function getBlacklistedDomains(): Promise<string[]> {
         .filter(Boolean)
     : [];
 }
+
+/**
+ * Reads blacklisted domains from Redis, falling back to the BLACKLIST_DOMAINS env var.
+ * Cached in-process for 10 seconds (stale-while-revalidate) to avoid hitting Redis on
+ * every auth check.
+ */
+export const getBlacklistedDomains = createCachedFetch(
+  async (): Promise<string[]> => {
+    const raw = await redisGet(BLACKLIST_DOMAINS_REDIS_KEY);
+    if (raw) {
+      const parsed = BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+      if (parsed.domains.length > 0) {
+        return parsed.domains;
+      }
+    }
+    return getEnvFallbackDomains();
+  },
+  10_000,
+  getEnvFallbackDomains()
+);

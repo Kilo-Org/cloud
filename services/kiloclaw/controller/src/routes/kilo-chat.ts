@@ -139,11 +139,16 @@ async function relayBodyRoute(
   if (!read.ok) return read.response;
 
   const fetchImpl = options.fetchImpl ?? fetch;
-  const upstream = await fetchImpl(upstreamUrl(options, config.upstreamSuffix(c)), {
-    method: config.method,
-    headers: outboundHeaders(options, c.req.header('content-type')),
-    body: read.body || undefined,
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetchImpl(upstreamUrl(options, config.upstreamSuffix(c)), {
+      method: config.method,
+      headers: outboundHeaders(options, c.req.header('content-type')),
+      body: read.body || undefined,
+    });
+  } catch {
+    return c.json({ error: 'Bad Gateway' }, 502);
+  }
   return relay(upstream);
 }
 
@@ -230,10 +235,15 @@ export function registerKiloChatTypingRoute(app: Hono, options: KiloChatRouteOpt
       return c.json({ error: 'conversationId required' }, 400);
     }
 
-    const upstream = await fetchImpl(
-      upstreamUrl(options, `/conversations/${encodeURIComponent(conversationId)}/typing`),
-      { method: 'POST', headers: outboundHeaders(options) }
-    );
+    let upstream: Response;
+    try {
+      upstream = await fetchImpl(
+        upstreamUrl(options, `/conversations/${encodeURIComponent(conversationId)}/typing`),
+        { method: 'POST', headers: outboundHeaders(options) }
+      );
+    } catch {
+      return c.json({ error: 'Bad Gateway' }, 502);
+    }
     return relay(upstream);
   });
 }

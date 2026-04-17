@@ -481,6 +481,44 @@ describe('DELETE /_kilo/kilo-chat/messages/:id/reactions', () => {
   });
 });
 
+describe('upstream network errors return 502', () => {
+  it('send route returns 502 when upstream fetch throws', async () => {
+    const fetchImpl = (async () => {
+      throw new Error('ECONNREFUSED');
+    }) as typeof fetch;
+    const app = makeApp(fetchImpl);
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/send', {
+        method: 'POST',
+        body: JSON.stringify({ conversationId: 'c1', text: 'hi' }),
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${TOKEN}`,
+        },
+      })
+    );
+    expect(res.status).toBe(502);
+  });
+
+  it('typing route returns 502 when upstream fetch throws', async () => {
+    const fetchImpl = (async () => {
+      throw new Error('ECONNREFUSED');
+    }) as typeof fetch;
+    const app = makeTypingApp(fetchImpl);
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/typing', {
+        method: 'POST',
+        body: JSON.stringify({ conversationId: 'c1' }),
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${TOKEN}`,
+        },
+      })
+    );
+    expect(res.status).toBe(502);
+  });
+});
+
 describe('body size limits', () => {
   function makeApp(register: typeof registerKiloChatSendRoute, fetchImpl: typeof fetch) {
     const app = new Hono();

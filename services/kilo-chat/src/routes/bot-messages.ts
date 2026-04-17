@@ -39,7 +39,7 @@ export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthCont
       if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
       return c.json({ error: result.error }, 500);
     }
-    return c.json({ messageId: result.messageId, version: result.version }, 201);
+    return c.json({ messageId: result.messageId }, 201);
   });
 
   // PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId — edit message
@@ -71,13 +71,10 @@ export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthCont
       if (result.code === 'not_found') return c.json({ error: result.error }, 404);
       return c.json({ error: result.error }, 500);
     }
-    if (result.conflict) {
-      return c.json(
-        { error: 'Conflict', messageId: result.messageId, version: result.version },
-        409
-      );
+    if (result.stale) {
+      return c.json({ messageId: result.messageId, stale: true }, 200);
     }
-    return c.json({ messageId: result.messageId, version: result.version });
+    return c.json({ messageId: result.messageId });
   });
 
   // DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId — soft delete

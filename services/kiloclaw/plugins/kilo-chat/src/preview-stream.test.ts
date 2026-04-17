@@ -3,26 +3,11 @@ import { createPreviewStream } from './preview-stream';
 import type { KiloChatClient } from './client';
 
 function makeClientSpies() {
-  const createMessage = vi.fn(
-    async (p: {
-      conversationId: string;
-      content: Array<{ type: string; [key: string]: unknown }>;
-    }) => ({
-      messageId: 'm1',
-      version: 1,
-    })
-  );
-  const editMessage = vi.fn(
-    async (p: {
-      conversationId: string;
-      messageId: string;
-      content: Array<{ type: string; [key: string]: unknown }>;
-      version: number;
-    }) => ({
-      messageId: p.messageId,
-      version: p.version,
-    })
-  );
+  const createMessage = vi.fn(async () => ({ messageId: 'm1' }));
+  const editMessage = vi.fn(async (p: { messageId: string }) => ({
+    messageId: p.messageId,
+    stale: false,
+  }));
   const deleteMessage = vi.fn(async () => undefined);
   const client: KiloChatClient = {
     createMessage,
@@ -46,24 +31,26 @@ describe('createPreviewStream', () => {
     expect(editMessage).not.toHaveBeenCalled();
   });
 
-  it('first update POSTs, subsequent update after throttle PATCHes with v++', async () => {
+  it('first update POSTs, subsequent update after throttle PATCHes with timestamp', async () => {
     vi.useFakeTimers();
     try {
       const { client, createMessage, editMessage } = makeClientSpies();
       const stream = createPreviewStream({ client, conversationId: 'c1', throttleMs: 100 });
       stream.update('H');
-      await vi.advanceTimersByTimeAsync(0); // flush microtasks
+      await vi.advanceTimersByTimeAsync(0);
       expect(createMessage).toHaveBeenCalledTimes(1);
 
       stream.update('Hel');
       await vi.advanceTimersByTimeAsync(100);
       expect(editMessage).toHaveBeenCalledTimes(1);
-      expect(editMessage).toHaveBeenCalledWith({
-        conversationId: 'c1',
-        messageId: 'm1',
-        content: [{ type: 'text', text: 'Hel' }],
-        version: 2,
-      });
+      expect(editMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: 'c1',
+          messageId: 'm1',
+          content: [{ type: 'text', text: 'Hel' }],
+          timestamp: expect.any(Number),
+        })
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -74,17 +61,15 @@ describe('createPreviewStream', () => {
     try {
       const { client, editMessage } = makeClientSpies();
       const stream = createPreviewStream({ client, conversationId: 'c1', throttleMs: 100 });
-      // Seed the preview with an initial POST.
       stream.update('H');
       await vi.advanceTimersByTimeAsync(0);
-      // Three rapid updates while throttled.
       stream.update('He');
       stream.update('Hel');
       stream.update('Hell');
       await vi.advanceTimersByTimeAsync(100);
       expect(editMessage).toHaveBeenCalledTimes(1);
       expect(editMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ content: [{ type: 'text', text: 'Hell' }], version: 2 })
+        expect.objectContaining({ content: [{ type: 'text', text: 'Hell' }] })
       );
     } finally {
       vi.useRealTimers();
@@ -114,20 +99,21 @@ describe('createPreviewStream', () => {
       const stream = createPreviewStream({ client, conversationId: 'c1', throttleMs: 100 });
       stream.update('H');
       await vi.advanceTimersByTimeAsync(0);
-      stream.update('Hel'); // pending, not yet flushed
+      stream.update('Hel');
       const resultPromise = stream.finalize('Hello!');
       await vi.advanceTimersByTimeAsync(200);
       const result = await resultPromise;
       expect(result).toEqual({ messageId: 'm1' });
       expect(createMessage).toHaveBeenCalledTimes(1);
-      // Exactly one PATCH with the final text and v=2.
       expect(editMessage).toHaveBeenCalledTimes(1);
-      expect(editMessage).toHaveBeenCalledWith({
-        conversationId: 'c1',
-        messageId: 'm1',
-        content: [{ type: 'text', text: 'Hello!' }],
-        version: 2,
-      });
+      expect(editMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: 'c1',
+          messageId: 'm1',
+          content: [{ type: 'text', text: 'Hello!' }],
+          timestamp: expect.any(Number),
+        })
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -150,9 +136,7 @@ describe('createPreviewStream', () => {
       throttleMs: 100,
       onWarn: () => {},
     });
-    // Create a preview via update (first update fires POST immediately), then abort.
     stream2.update('partial');
-    // Give the microtask queue a chance to complete the POST.
     await new Promise(resolve => setImmediate(resolve));
     expect(createMessage).toHaveBeenCalledTimes(1);
     await stream2.abort();
@@ -174,58 +158,13 @@ describe('createPreviewStream', () => {
     await expect(stream.abort()).resolves.toBeUndefined();
   });
 
-  it('uses server-returned version to compute the next PATCH version', async () => {
+  it('does not claim text was applied when a streaming PATCH is stale', async () => {
     vi.useFakeTimers();
     try {
       const { client, editMessage } = makeClientSpies();
-      // Simulate server reconciling to version 100 on the first edit.
-      editMessage.mockImplementationOnce(async p => ({ messageId: p.messageId, version: 100 }));
-      const stream = createPreviewStream({ client, conversationId: 'c1', throttleMs: 50 });
-      stream.update('a');
-      await vi.advanceTimersByTimeAsync(0);
-      stream.update('ab');
-      await vi.advanceTimersByTimeAsync(50);
-      // First PATCH sent version: 2 (client's nextVersion); server echoed 100.
-      expect(editMessage.mock.calls[0]![0].version).toBe(2);
-      // Second update triggers another PATCH.
-      stream.update('abc');
-      await vi.advanceTimersByTimeAsync(50);
-      // Second PATCH must start from server-returned 100 → 101.
-      expect(editMessage.mock.calls[1]![0].version).toBe(101);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('versions increase monotonically across many updates', async () => {
-    vi.useFakeTimers();
-    try {
-      const { client, editMessage } = makeClientSpies();
-      const stream = createPreviewStream({ client, conversationId: 'c1', throttleMs: 50 });
-      stream.update('a');
-      await vi.advanceTimersByTimeAsync(0);
-      for (const t of ['ab', 'abc', 'abcd', 'abcde']) {
-        stream.update(t);
-        await vi.advanceTimersByTimeAsync(50);
-      }
-      const versions = editMessage.mock.calls.map(([p]) => p.version);
-      for (let i = 1; i < versions.length; i += 1) {
-        expect(versions[i]).toBeGreaterThan(versions[i - 1]!);
-      }
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('does not claim text was applied when a streaming PATCH is dropped (409)', async () => {
-    vi.useFakeTimers();
-    try {
-      const { client, editMessage } = makeClientSpies();
-      // First edit (v=2) reports dropped; finalize with the same text must still re-send.
       editMessage.mockImplementationOnce(async p => ({
         messageId: p.messageId,
-        version: p.version,
-        dropped: true,
+        stale: true,
       }));
       const stream = createPreviewStream({
         client,
@@ -239,41 +178,15 @@ describe('createPreviewStream', () => {
       await vi.advanceTimersByTimeAsync(100);
       expect(editMessage).toHaveBeenCalledTimes(1);
 
-      // Finalize with the same text that the dropped PATCH carried: must PATCH again,
+      // Finalize with the same text that the stale PATCH carried: must PATCH again,
       // because the remote preview never actually shows that text.
       await stream.finalize('Hello');
       expect(editMessage).toHaveBeenCalledTimes(2);
       expect(editMessage.mock.calls[1]![0]).toEqual(
-        expect.objectContaining({ content: [{ type: 'text', text: 'Hello' }], version: 3 })
+        expect.objectContaining({ content: [{ type: 'text', text: 'Hello' }] })
       );
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it('retries once when the final PATCH is dropped (409)', async () => {
-    const { client, editMessage } = makeClientSpies();
-    editMessage.mockImplementationOnce(async p => ({
-      messageId: p.messageId,
-      version: p.version,
-      dropped: true,
-    }));
-    const stream = createPreviewStream({
-      client,
-      conversationId: 'c1',
-      throttleMs: 100,
-      onWarn: () => {},
-    });
-    // Prime with a POST so finalize takes the PATCH path.
-    stream.update('H');
-    await Promise.resolve();
-    await stream.finalize('Final');
-    expect(editMessage).toHaveBeenCalledTimes(2);
-    expect(editMessage.mock.calls[0]![0]).toEqual(
-      expect.objectContaining({ content: [{ type: 'text', text: 'Final' }], version: 2 })
-    );
-    expect(editMessage.mock.calls[1]![0]).toEqual(
-      expect.objectContaining({ content: [{ type: 'text', text: 'Final' }], version: 3 })
-    );
   });
 });

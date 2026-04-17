@@ -40,7 +40,7 @@ describe('ConversationDO', () => {
     expect(await stub.isMember('user-stranger')).toBe(false);
   });
 
-  it('createMessage - creates message, returns ULID + version 1', async () => {
+  it('createMessage - creates message, returns ULID', async () => {
     const stub = getStub('conv-create-1');
     await stub.initialize(BASE_PARAMS);
     const result = await stub.createMessage({
@@ -50,7 +50,6 @@ describe('ConversationDO', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.messageId).toMatch(/^[0-9A-Z]{26}$/);
-      expect(result.version).toBe(1);
     }
   });
 
@@ -121,7 +120,7 @@ describe('ConversationDO', () => {
     expect(page2).toHaveLength(0);
   });
 
-  it('editMessage - edits and increments version', async () => {
+  it('editMessage - edits message with newer timestamp', async () => {
     const stub = getStub('conv-edit-1');
     await stub.initialize(BASE_PARAMS);
     const created = await stub.createMessage({
@@ -131,26 +130,24 @@ describe('ConversationDO', () => {
     expect(created.ok).toBe(true);
     if (!created.ok) return;
 
-    // Send current version (1) — server auto-increments to 2
     const result = await stub.editMessage({
       messageId: created.messageId,
       senderId: 'user-alice',
       content: [{ type: 'text', text: 'Edited' }],
-      version: 1,
+      clientTimestamp: Date.now(),
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.conflict).toBe(false);
-    expect(result.version).toBe(2);
+    expect(result.stale).toBe(false);
 
     const { messages } = await stub.listMessages({ limit: 10 });
     const msg = messages.find(m => m.id === created.messageId);
     expect(msg).toBeDefined();
     expect(msg!.content).toEqual([{ type: 'text', text: 'Edited' }]);
-    expect(msg!.updatedAt).not.toBeNull();
+    expect(msg!.clientUpdatedAt).not.toBeNull();
   });
 
-  it('editMessage - returns conflict on stale version', async () => {
+  it('editMessage - discards stale timestamp', async () => {
     const stub = getStub('conv-edit-2');
     await stub.initialize(BASE_PARAMS);
     const created = await stub.createMessage({
@@ -160,17 +157,28 @@ describe('ConversationDO', () => {
     expect(created.ok).toBe(true);
     if (!created.ok) return;
 
-    // Current version is 1, sending stale version 0 should conflict
+    // First edit with timestamp 1000
+    await stub.editMessage({
+      messageId: created.messageId,
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Edit 1' }],
+      clientTimestamp: 1000,
+    });
+
+    // Second edit with older timestamp should be discarded
     const result = await stub.editMessage({
       messageId: created.messageId,
       senderId: 'user-alice',
       content: [{ type: 'text', text: 'Stale edit' }],
-      version: 0,
+      clientTimestamp: 500,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.conflict).toBe(true);
-    expect(result.version).toBe(1);
+    expect(result.stale).toBe(true);
+
+    const { messages } = await stub.listMessages({ limit: 10 });
+    const msg = messages.find(m => m.id === created.messageId);
+    expect(msg!.content).toEqual([{ type: 'text', text: 'Edit 1' }]);
   });
 
   it('editMessage - rejects non-sender', async () => {
@@ -187,7 +195,7 @@ describe('ConversationDO', () => {
       messageId: created.messageId,
       senderId: 'user-stranger',
       content: [{ type: 'text', text: 'Hacked' }],
-      version: 2,
+      clientTimestamp: Date.now(),
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -235,7 +243,7 @@ describe('ConversationDO', () => {
       messageId: created.messageId,
       senderId: 'user-alice',
       content: [{ type: 'text', text: 'Zombie edit' }],
-      version: 1,
+      clientTimestamp: Date.now(),
     });
     expect(result.ok).toBe(false);
   });

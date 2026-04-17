@@ -29,9 +29,7 @@ export type CreateMessageParams = {
   inReplyToMessageId?: string;
 };
 
-export type CreateMessageResult =
-  | { ok: true; messageId: string; version: number }
-  | { ok: false; error: string };
+export type CreateMessageResult = { ok: true; messageId: string } | { ok: false; error: string };
 
 export type ListMessagesParams = {
   limit: number;
@@ -63,12 +61,12 @@ export type EditMessageParams = {
   messageId: string;
   senderId: string;
   content: Array<{ type: string; [key: string]: unknown }>;
-  version: number;
+  clientTimestamp: number;
 };
 
 export type EditMessageResult =
-  | { ok: true; conflict: false; messageId: string; version: number }
-  | { ok: true; conflict: true; messageId: string; version: number }
+  | { ok: true; stale: false; messageId: string }
+  | { ok: true; stale: true; messageId: string }
   | { ok: false; code: 'not_found' | 'forbidden'; error: string };
 
 export type DeleteMessageParams = {
@@ -230,13 +228,12 @@ export class ConversationDO extends DurableObject<Env> {
         messageId,
         senderId: params.senderId,
         content: params.content,
-        version: 1,
         inReplyToMessageId: params.inReplyToMessageId ?? null,
       },
       messageId
     );
 
-    return { ok: true, messageId, version: 1 };
+    return { ok: true, messageId };
   }
 
   listMessages(params: ListMessagesParams): ListMessagesResult {
@@ -280,8 +277,8 @@ export class ConversationDO extends DurableObject<Env> {
         senderId: row.sender_id,
         content: row.deleted === 1 ? [] : (JSON.parse(row.content) as Record<string, unknown>[]),
         inReplyToMessageId: row.in_reply_to_message_id,
-        version: row.version,
         updatedAt: row.updated_at,
+        clientUpdatedAt: row.client_updated_at,
         deleted: row.deleted === 1,
         reactions: reactionsByMessage.get(row.id) ?? [],
       })),
@@ -306,10 +303,10 @@ export class ConversationDO extends DurableObject<Env> {
       };
     }
 
-    // Optimistic concurrency: client sends the version it believes is current.
-    // If it doesn't match, the edit is stale (conflict).
-    if (params.version !== row.version) {
-      return { ok: true, conflict: true, messageId: params.messageId, version: row.version };
+    // Discard out-of-order edits: if the client's timestamp is older than the
+    // last accepted edit, silently drop it.
+    if (row.client_updated_at != null && params.clientTimestamp <= row.client_updated_at) {
+      return { ok: true, stale: true, messageId: params.messageId };
     }
 
     const newVersion = row.version + 1;
@@ -319,17 +316,22 @@ export class ConversationDO extends DurableObject<Env> {
         content: JSON.stringify(params.content),
         version: newVersion,
         updated_at: Date.now(),
+        client_updated_at: params.clientTimestamp,
       })
       .where(eq(messages.id, params.messageId))
       .run();
 
     this.broadcast(
       'message.updated',
-      { messageId: params.messageId, content: params.content, version: newVersion },
+      {
+        messageId: params.messageId,
+        content: params.content,
+        clientUpdatedAt: params.clientTimestamp,
+      },
       params.messageId
     );
 
-    return { ok: true, conflict: false, messageId: params.messageId, version: newVersion };
+    return { ok: true, stale: false, messageId: params.messageId };
   }
 
   setTyping(memberId: string): { ok: true } | { ok: false; error: string } {

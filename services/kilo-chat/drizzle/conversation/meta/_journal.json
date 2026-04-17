@@ -15,6 +15,13 @@
       "when": 1776432447611,
       "tag": "0001_chemical_deadpool",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1776440937367,
+      "tag": "0002_puzzling_wolverine",
+      "breakpoints": true
     }
   ]
 }

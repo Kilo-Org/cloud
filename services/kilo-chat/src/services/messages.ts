@@ -21,7 +21,7 @@ export type CreateMessageParams = {
   inReplyToMessageId?: string;
 };
 
-export type CreateMessageOk = { ok: true; messageId: string; version: number };
+export type CreateMessageOk = { ok: true; messageId: string };
 export type CreateMessageErr = {
   ok: false;
   code: 'forbidden' | 'internal';
@@ -51,7 +51,7 @@ export async function createMessageFor(
     return { ok: false, code: 'internal', error: result.error };
   }
 
-  const { messageId, version } = result;
+  const { messageId } = result;
 
   // Enqueue webhook per bot member (other than the sender). Best-effort:
   // executionCtx.waitUntil may not be available in every caller (e.g. tests).
@@ -93,7 +93,7 @@ export async function createMessageFor(
     }
   }
 
-  return { ok: true, messageId, version };
+  return { ok: true, messageId };
 }
 
 // ─── editMessage ────────────────────────────────────────────────────────────
@@ -102,34 +102,32 @@ export type EditMessageParams = {
   conversationId: string;
   messageId: string;
   content: ContentBlock[];
-  version: number;
+  timestamp: number;
 };
 
 export type EditMessageOk = {
   ok: true;
-  conflict: false;
+  stale: false;
   messageId: string;
-  version: number;
 };
-export type EditMessageConflict = {
+export type EditMessageStale = {
   ok: true;
-  conflict: true;
+  stale: true;
   messageId: string;
-  version: number;
 };
 export type EditMessageErr = {
   ok: false;
   code: 'forbidden' | 'not_found' | 'internal';
   error: string;
 };
-export type EditMessageResult = EditMessageOk | EditMessageConflict | EditMessageErr;
+export type EditMessageResult = EditMessageOk | EditMessageStale | EditMessageErr;
 
 export async function editMessageFor(
   env: Env,
   callerId: string,
   params: EditMessageParams
 ): Promise<EditMessageResult> {
-  const { conversationId, messageId, content, version } = params;
+  const { conversationId, messageId, content, timestamp } = params;
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
 
   if (!(await convStub.isMember(callerId))) {
@@ -140,26 +138,20 @@ export async function editMessageFor(
     messageId,
     senderId: callerId,
     content,
-    version,
+    clientTimestamp: timestamp,
   });
   if (!result.ok) {
     if (result.code === 'forbidden') return { ok: false, code: 'forbidden', error: 'Forbidden' };
     if (result.code === 'not_found') return { ok: false, code: 'not_found', error: 'Not found' };
     return { ok: false, code: 'internal', error: result.error };
   }
-  if (result.conflict) {
-    return {
-      ok: true,
-      conflict: true,
-      messageId: result.messageId,
-      version: result.version,
-    };
+  if (result.stale) {
+    return { ok: true, stale: true, messageId: result.messageId };
   }
   return {
     ok: true,
-    conflict: false,
+    stale: false,
     messageId: result.messageId,
-    version: result.version,
   };
 }
 

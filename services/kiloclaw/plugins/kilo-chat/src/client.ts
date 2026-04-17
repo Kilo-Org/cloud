@@ -10,14 +10,14 @@ export type CreateMessageParams = {
   conversationId: string;
   content: ContentBlock[];
 };
-export type CreateMessageResult = { messageId: string; version: number };
-export type EditMessageResult = CreateMessageResult & { dropped?: boolean };
+export type CreateMessageResult = { messageId: string };
+export type EditMessageResult = { messageId: string; stale?: boolean };
 
 export type EditMessageParams = {
   conversationId: string;
   messageId: string;
   content: ContentBlock[];
-  version: number;
+  timestamp: number;
 };
 
 export type DeleteMessageParams = { conversationId: string; messageId: string };
@@ -45,13 +45,11 @@ function authHeaders(token: string): HeadersInit {
 }
 
 function parseCreateResult(data: unknown): CreateMessageResult {
-  const o = (data ?? {}) as { messageId?: unknown; version?: unknown };
+  const o = (data ?? {}) as { messageId?: unknown };
   if (typeof o.messageId !== 'string' || o.messageId.length === 0) {
     throw new Error('kilo-chat: response missing messageId');
   }
-  const version =
-    typeof o.version === 'number' && Number.isFinite(o.version) && o.version > 0 ? o.version : 1;
-  return { messageId: o.messageId, version };
+  return { messageId: o.messageId };
 }
 
 export function createKiloChatClient(options: KiloChatClientOptions): KiloChatClient {
@@ -82,31 +80,20 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         body: JSON.stringify({
           conversationId: params.conversationId,
           content: params.content,
-          version: params.version,
+          timestamp: params.timestamp,
         }),
       }
     );
-    if (response.status === 409) {
-      // Stale version — benign drop. Read the server's authoritative current
-      // version from the 409 body so the caller can re-base subsequent edits
-      // on the real server state instead of echoing the stale client version.
-      let serverVersion = params.version;
-      try {
-        const body = (await response.json()) as { version?: unknown };
-        if (typeof body.version === 'number' && Number.isFinite(body.version) && body.version > 0) {
-          serverVersion = body.version;
-        }
-      } catch {
-        // Body missing or not JSON — fall back to the client-sent version.
-      }
-      return { messageId: params.messageId, version: serverVersion, dropped: true };
-    }
     if (!response.ok) {
       throw new Error(
         `kilo-chat: controller PATCH responded ${response.status}: ${await response.text()}`
       );
     }
-    return parseCreateResult(await response.json());
+    const body = (await response.json()) as { messageId?: string; stale?: boolean };
+    return {
+      messageId: body.messageId ?? params.messageId,
+      stale: body.stale === true,
+    };
   }
   async function deleteMessage(params: DeleteMessageParams): Promise<void> {
     const response = await fetchImpl(

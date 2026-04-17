@@ -85,7 +85,7 @@ const sampleContent = [{ type: 'text', text: 'Hello from bot' }];
 // ─── POST /bot/v1/sandboxes/:sandboxId/messages ───────────────────────────────
 
 describe('POST /bot/v1/sandboxes/:sandboxId/messages', () => {
-  it('creates a message and returns 201 with { messageId, version }', async () => {
+  it('creates a message and returns 201 with { messageId }', async () => {
     const { sandboxId, conversationId, testEnv } = await setupData('bot-create-1');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
@@ -101,9 +101,8 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages', () => {
     );
 
     expect(res.status).toBe(201);
-    const body = await res.json<{ messageId: string; version: number }>();
+    const body = await res.json<{ messageId: string }>();
     expect(body.messageId).toMatch(/^[0-9A-Z]{26}$/);
-    expect(body.version).toBe(1);
   });
 
   it('returns 400 for invalid JSON', async () => {
@@ -183,12 +182,11 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages', () => {
 // ─── PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId ──────────────────
 
 describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
-  it('edits a bot-owned message and returns 200 with { messageId, version }', async () => {
+  it('edits a bot-owned message and returns 200 with { messageId }', async () => {
     const { sandboxId, conversationId, testEnv } = await setupData('bot-edit-1');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
-    // Bot creates a message first
     const createRes = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/messages`,
       {
@@ -201,7 +199,6 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     expect(createRes.status).toBe(201);
     const { messageId } = await createRes.json<{ messageId: string }>();
 
-    // Edit it
     const editRes = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}`,
       {
@@ -210,20 +207,19 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
         body: JSON.stringify({
           conversationId,
           content: [{ type: 'text', text: 'Edited by bot' }],
-          version: 1,
+          timestamp: Date.now(),
         }),
       },
       testEnv
     );
 
     expect(editRes.status).toBe(200);
-    const body = await editRes.json<{ messageId: string; version: number }>();
+    const body = await editRes.json<{ messageId: string }>();
     expect(body.messageId).toBe(messageId);
-    expect(body.version).toBe(2);
   });
 
-  it('returns 409 on stale version', async () => {
-    const { sandboxId, conversationId, testEnv } = await setupData('bot-edit-conflict');
+  it('discards stale edit (older timestamp)', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-edit-stale');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
@@ -238,6 +234,22 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
+    // First edit with timestamp 1000
+    await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Edit 1' }],
+          timestamp: 1000,
+        }),
+      },
+      testEnv
+    );
+
+    // Second edit with older timestamp
     const editRes = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}`,
       {
@@ -246,16 +258,15 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
         body: JSON.stringify({
           conversationId,
           content: [{ type: 'text', text: 'Stale edit' }],
-          version: 0, // stale: current is 1
+          timestamp: 500,
         }),
       },
       testEnv
     );
 
-    expect(editRes.status).toBe(409);
-    const body = await editRes.json<{ error: string; messageId: string; version: number }>();
-    expect(body.error).toBe('Conflict');
-    expect(body.messageId).toBe(messageId);
+    expect(editRes.status).toBe(200);
+    const body = await editRes.json<{ stale: boolean }>();
+    expect(body.stale).toBe(true);
   });
 
   it('returns 400 for invalid messageId', async () => {
@@ -271,7 +282,7 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
         body: JSON.stringify({
           conversationId,
           content: sampleContent,
-          version: 1,
+          timestamp: Date.now(),
         }),
       },
       testEnv
@@ -290,7 +301,7 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
       {
         method: 'PATCH',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId }), // missing content and version
+        body: JSON.stringify({ conversationId }), // missing content and timestamp
       },
       testEnv
     );
@@ -312,7 +323,7 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
         body: JSON.stringify({
           conversationId,
           content: [{ type: 'text', text: 'Bot editing user msg' }],
-          version: 1,
+          timestamp: Date.now(),
         }),
       },
       testEnv

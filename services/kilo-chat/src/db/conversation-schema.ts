@@ -47,6 +47,7 @@ export const messages = sqliteTable(
     in_reply_to_message_id: text('in_reply_to_message_id'),
     version: integer('version').notNull().default(1),
     updated_at: integer('updated_at'),
+    client_updated_at: integer('client_updated_at'),
     deleted: integer('deleted').notNull().default(0),
   },
   table => ({

@@ -19,16 +19,13 @@ export type CreatePreviewStreamOptions = {
  * Per-conversation throttled POST/PATCH/DELETE controller.
  *
  * Semantics:
- *   - First `update` POSTs and records the server-issued `messageId` (version=1).
+ *   - First `update` POSTs and records the server-issued `messageId`.
  *   - Subsequent `update` calls within `throttleMs` coalesce; one PATCH fires per window,
- *     always with the latest text, with version incremented each outbound PATCH.
+ *     always with the latest text and a monotonic client timestamp.
  *   - Identical consecutive text is deduped (no HTTP).
  *   - `finalize` awaits any in-flight request, then performs exactly one final POST
- *     (if never updated) or PATCH (with final text, version+=1).
+ *     (if never updated) or PATCH (with final text).
  *   - `abort` best-effort DELETEs any created message; swallows errors.
- *
- * Not reentrant across many finalize/abort calls; each instance lives for exactly
- * one inbound dispatch turn.
  */
 export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewStream {
   const warn =
@@ -42,7 +39,6 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
   let messageId: string | undefined;
   let lastSentText: string | undefined;
   let pendingText: string | undefined;
-  let version = 0; // becomes 1 on first POST; increments per outbound PATCH
   let inFlight: Promise<unknown> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -57,10 +53,6 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
     if (isDone()) return;
     if (inFlight) {
       await inFlight;
-      // Do NOT re-enter: the caller (update-path post-flush check or timer-path
-      // post-flush check) is responsible for rescheduling if pendingText remains.
-      // Re-entering here would either duplicate in-flight slots or starve the
-      // caller's reschedule opportunity.
       return;
     }
     const text = pendingText;
@@ -74,7 +66,6 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
         .createMessage({ conversationId: opts.conversationId, content: [{ type: 'text', text }] })
         .then(res => {
           messageId = res.messageId;
-          version = 1;
           lastSentText = text;
           phase = 'editing';
         })
@@ -89,22 +80,19 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       return;
     }
 
-    // Subsequent send: PATCH.
-    const nextVersion = version + 1;
+    // Subsequent send: PATCH with monotonic client timestamp.
     const p = opts.client
       .editMessage({
         conversationId: opts.conversationId,
         messageId,
         content: [{ type: 'text', text }],
-        version: nextVersion,
+        timestamp: Date.now(),
       })
       .then(res => {
-        version = res.version;
-        if (res.dropped) {
-          // Server rejected our version (409). Do NOT record `lastSentText`:
-          // the remote preview still shows older text, and a subsequent flush
-          // or finalize must re-send to catch the user up.
-          warn('editMessage dropped (stale version) during stream');
+        if (res.stale) {
+          // Server had a newer timestamp — don't update lastSentText so the
+          // next flush or finalize re-sends.
+          warn('editMessage stale during stream');
         } else {
           lastSentText = text;
         }
@@ -134,8 +122,6 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       if (isDone()) return;
       pendingText = text;
       if (phase === 'idle' && !inFlight) {
-        // Fire the first POST without waiting for the throttle window —
-        // preview latency matters most on the first token.
         void flushOnce().then(() => {
           if (pendingText !== undefined && phase === 'editing') scheduleFlush();
         });
@@ -148,7 +134,6 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
         if (!messageId) throw new Error('kilo-chat preview: finalize on aborted stream');
         return { messageId };
       }
-      // Flush any in-flight + pending edits, then drive final text.
       if (timer) {
         clearTimeout(timer);
         timer = undefined;
@@ -166,39 +151,19 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
           content: [{ type: 'text', text: finalText }],
         });
         messageId = res.messageId;
-        version = res.version;
         lastSentText = finalText;
         phase = 'finalized';
         return { messageId };
       }
       if (finalText !== lastSentText) {
-        let nextVersion = version + 1;
         try {
-          let res = await opts.client.editMessage({
+          await opts.client.editMessage({
             conversationId: opts.conversationId,
             messageId,
             content: [{ type: 'text', text: finalText }],
-            version: nextVersion,
+            timestamp: Date.now(),
           });
-          // On final edit, a 409 drop would leave the user-visible message
-          // stuck on older text. Retry once with a freshly-bumped version.
-          if (res.dropped) {
-            warn('editMessage dropped (stale version) during finalize; retrying');
-            version = res.version;
-            nextVersion = version + 1;
-            res = await opts.client.editMessage({
-              conversationId: opts.conversationId,
-              messageId,
-              content: [{ type: 'text', text: finalText }],
-              version: nextVersion,
-            });
-          }
-          version = res.version;
-          if (!res.dropped) {
-            lastSentText = finalText;
-          } else {
-            warn('editMessage dropped twice during finalize; remote preview may be stale');
-          }
+          lastSentText = finalText;
         } catch (err) {
           warn('editMessage failed during finalize', err);
           throw err;

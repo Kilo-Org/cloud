@@ -11,7 +11,7 @@ type MessageBubbleProps = {
   isOwn: boolean;
   replyToMessage?: Message | null;
   pendingDeleteId: string | null;
-  onEdit: (messageId: string, content: ContentBlock[], version: number) => void;
+  onEdit: (messageId: string, content: ContentBlock[]) => void;
   onDelete: (messageId: string) => void;
   onConfirmDelete: (messageId: string) => void;
   onCancelDelete: () => void;
@@ -51,7 +51,7 @@ export function MessageBubble({
 
   function handleSaveEdit() {
     if (!editText.trim()) return;
-    onEdit(message.id, [{ type: 'text', text: editText.trim() }], message.version);
+    onEdit(message.id, [{ type: 'text', text: editText.trim() }]);
     setIsEditing(false);
   }
 
@@ -189,7 +189,7 @@ export function MessageBubble({
                   : 'text-muted-foreground justify-end'
               }`}
             >
-              {message.updatedAt && !message.deleted && <span>(edited)</span>}
+              {message.clientUpdatedAt && !message.deleted && <span>(edited)</span>}
               <span>{timeStr}</span>
             </div>
           </div>

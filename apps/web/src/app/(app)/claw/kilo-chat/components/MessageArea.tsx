@@ -103,9 +103,9 @@ export function MessageArea({
     );
   }
 
-  function handleEdit(messageId: string, content: ContentBlock[], version: number) {
+  function handleEdit(messageId: string, content: ContentBlock[]) {
     editMessage.mutate(
-      { messageId, conversationId, content, version },
+      { messageId, conversationId, content, timestamp: Date.now() },
       {
         onError: err => {
           if (err instanceof KiloChatApiError && err.status === 409) {

@@ -71,10 +71,9 @@ describe('POST /v1/messages', () => {
     );
 
     expect(res.status).toBe(201);
-    const body = await res.json<{ messageId: string; version: number }>();
+    const body = await res.json<{ messageId: string }>();
     expect(body.messageId).toBeTruthy();
     expect(typeof body.messageId).toBe('string');
-    expect(body.version).toBe(1);
   });
 
   it('returns 403 for non-member', async () => {
@@ -145,9 +144,8 @@ describe('POST /v1/messages', () => {
     );
 
     expect(res.status).toBe(201);
-    const body = await res.json<{ messageId: string; version: number }>();
+    const body = await res.json<{ messageId: string }>();
     expect(body.messageId).toBeTruthy();
-    expect(body.version).toBe(1);
   });
 });
 
@@ -266,7 +264,6 @@ describe('PATCH /v1/messages/:id', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
-    // Edit the message — send current version (1), server increments to 2
     const editRes = await userApp.request(
       `/v1/messages/${messageId}`,
       {
@@ -275,20 +272,19 @@ describe('PATCH /v1/messages/:id', () => {
         body: JSON.stringify({
           conversationId,
           content: [{ type: 'text', text: 'Edited content' }],
-          version: 1,
+          timestamp: Date.now(),
         }),
       },
       env
     );
 
     expect(editRes.status).toBe(200);
-    const body = await editRes.json<{ messageId: string; version: number }>();
+    const body = await editRes.json<{ messageId: string }>();
     expect(body.messageId).toBe(messageId);
-    expect(body.version).toBe(2);
   });
 
-  it('returns 409 on stale version (version <= current)', async () => {
-    const { conversationId, userApp } = await createConversation('msg-edit-conflict');
+  it('discards stale edit (older timestamp)', async () => {
+    const { conversationId, userApp } = await createConversation('msg-edit-stale');
 
     const createRes = await userApp.request(
       '/v1/messages',
@@ -301,7 +297,22 @@ describe('PATCH /v1/messages/:id', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
-    // Try to edit with stale version (version=0 doesn't match current=1)
+    // First edit with timestamp 1000
+    await userApp.request(
+      `/v1/messages/${messageId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Edit 1' }],
+          timestamp: 1000,
+        }),
+      },
+      env
+    );
+
+    // Second edit with older timestamp — should be accepted but stale
     const editRes = await userApp.request(
       `/v1/messages/${messageId}`,
       {
@@ -310,13 +321,15 @@ describe('PATCH /v1/messages/:id', () => {
         body: JSON.stringify({
           conversationId,
           content: [{ type: 'text', text: 'Stale edit' }],
-          version: 0,
+          timestamp: 500,
         }),
       },
       env
     );
 
-    expect(editRes.status).toBe(409);
+    expect(editRes.status).toBe(200);
+    const body = await editRes.json<{ stale: boolean }>();
+    expect(body.stale).toBe(true);
   });
 
   it('returns 403 when non-sender tries to edit', async () => {
@@ -349,7 +362,7 @@ describe('PATCH /v1/messages/:id', () => {
         body: JSON.stringify({
           conversationId,
           content: [{ type: 'text', text: 'Bot edit attempt' }],
-          version: 1,
+          timestamp: Date.now(),
         }),
       },
       env
@@ -502,7 +515,7 @@ describe('Webhook queue enqueue', () => {
     );
 
     expect(res.status).toBe(201);
-    const body = await res.json<{ messageId: string; version: number }>();
+    const body = await res.json<{ messageId: string }>();
     expect(body.messageId).toBeTruthy();
   });
 });

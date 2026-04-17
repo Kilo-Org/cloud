@@ -78,8 +78,8 @@ export function useMessageCacheUpdater(conversationId: string | null) {
             senderId: e.senderId,
             content: e.content,
             inReplyToMessageId: e.inReplyToMessageId,
-            version: e.version,
             updatedAt: null,
+            clientUpdatedAt: null,
             deleted: false,
           };
           queryClient.setQueryData(queryKey, (old: unknown) => {
@@ -100,7 +100,12 @@ export function useMessageCacheUpdater(conversationId: string | null) {
               pages: data.pages.map(page =>
                 page.map(msg =>
                   msg.id === e.messageId
-                    ? { ...msg, content: e.content, version: e.version, updatedAt: Date.now() }
+                    ? {
+                        ...msg,
+                        content: e.content,
+                        updatedAt: Date.now(),
+                        clientUpdatedAt: e.clientUpdatedAt,
+                      }
                     : msg
                 )
               ),

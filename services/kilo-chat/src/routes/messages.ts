@@ -39,7 +39,7 @@ export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: Auth
       if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
       return c.json({ error: result.error }, 500);
     }
-    return c.json({ messageId: result.messageId, version: result.version }, 201);
+    return c.json({ messageId: result.messageId }, 201);
   });
 
   // GET /v1/conversations/:id/messages — list messages
@@ -102,13 +102,10 @@ export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: Auth
       if (result.code === 'not_found') return c.json({ error: result.error }, 404);
       return c.json({ error: result.error }, 500);
     }
-    if (result.conflict) {
-      return c.json(
-        { error: 'Conflict', messageId: result.messageId, version: result.version },
-        409
-      );
+    if (result.stale) {
+      return c.json({ messageId: result.messageId, stale: true }, 200);
     }
-    return c.json({ messageId: result.messageId, version: result.version });
+    return c.json({ messageId: result.messageId });
   });
 
   // DELETE /v1/messages/:id — soft delete

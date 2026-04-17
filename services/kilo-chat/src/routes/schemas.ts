@@ -15,7 +15,7 @@ export const createMessageSchema = z.object({
 export const editMessageSchema = z.object({
   conversationId: ulidSchema,
   content: z.array(contentBlockSchema).min(1).max(20),
-  version: z.number().int().nonnegative(),
+  timestamp: z.number().int().positive(),
 });
 
 export const deleteMessageSchema = z.object({

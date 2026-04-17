@@ -32,8 +32,8 @@ export type Message = {
   senderId: string;
   content: ContentBlock[];
   inReplyToMessageId: string | null;
-  version: number;
   updatedAt: number | null;
+  clientUpdatedAt: number | null;
   deleted: boolean;
 };
 
@@ -42,8 +42,8 @@ export type MessageRow = {
   senderId: string;
   content: string;
   inReplyToMessageId: string | null;
-  version: number;
   updatedAt: number | null;
+  clientUpdatedAt: number | null;
   deleted: boolean;
 };
 
@@ -52,14 +52,13 @@ export type MessageCreatedEvent = {
   messageId: string;
   senderId: string;
   content: ContentBlock[];
-  version: number;
   inReplyToMessageId: string | null;
 };
 
 export type MessageUpdatedEvent = {
   messageId: string;
   content: ContentBlock[];
-  version: number;
+  clientUpdatedAt: number | null;
 };
 
 export type MessageDeletedEvent = {
@@ -96,18 +95,16 @@ export type CreateMessageRequest = {
 
 export type CreateMessageResponse = {
   messageId: string;
-  version: number;
 };
 
 export type EditMessageRequest = {
   conversationId: string;
   content: ContentBlock[];
-  version: number;
+  timestamp: number;
 };
 
 export type EditMessageResponse = {
   messageId: string;
-  version: number;
 };
 
 export type DeleteMessageRequest = {

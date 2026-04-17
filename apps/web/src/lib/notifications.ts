@@ -137,9 +137,10 @@ async function generateLowCreditNotification(
   if (balance >= 2) return [];
   const payments = await summarizeUserPayments(user.id);
 
-  const message = !payments.payments_count
-    ? `Your credit balance is low. Top up now and get $${FIRST_TOPUP_BONUS_AMOUNT()} extra on your first purchase! Add any amount of credits and we'll add $${FIRST_TOPUP_BONUS_AMOUNT()} on top instantly.`
-    : 'Your credit balance is low. Add credits to continue using the service without interruption.';
+  const message =
+    !payments.payments_count && FIRST_TOPUP_BONUS_AMOUNT > 0
+      ? `Your credit balance is low. Top up now and get $${FIRST_TOPUP_BONUS_AMOUNT} extra on your first purchase! Add any amount of credits and we'll add $${FIRST_TOPUP_BONUS_AMOUNT} on top instantly.`
+      : 'Your credit balance is low. Add credits to continue using the service without interruption.';
 
   return [
     {
@@ -147,9 +148,10 @@ async function generateLowCreditNotification(
       title: 'Low Credit Balance',
       message,
       action: {
-        actionText: !payments.payments_count
-          ? `Add Credits & Get $${FIRST_TOPUP_BONUS_AMOUNT()} Free`
-          : 'Add Credits',
+        actionText:
+          !payments.payments_count && FIRST_TOPUP_BONUS_AMOUNT > 0
+            ? `Add Credits & Get $${FIRST_TOPUP_BONUS_AMOUNT} Free`
+            : 'Add Credits',
         actionURL: `${APP_URL}/profile`,
       },
     },

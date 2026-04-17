@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { YouTubeEmbed } from '@/components/YouTubeEmbed';
 import { FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
-import { FirstTopup24for24CountdownTimer } from '@/components/payment/FirstTopup24for24CountdownTimer';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Check, Copy, Terminal } from 'lucide-react';
@@ -330,11 +329,12 @@ export default function WelcomeContent({
             <Link href="/profile" className="font-semibold text-blue-400 hover:underline">
               profile
             </Link>
-            , where you can top up your AI model credits,
-            <br /> and get ${FIRST_TOPUP_BONUS_AMOUNT()} in bonus credits on your first top up.
-            <div>
-              <FirstTopup24for24CountdownTimer />
-            </div>
+            , where you can top up your AI model credits.
+            {FIRST_TOPUP_BONUS_AMOUNT > 0 && (
+              <>
+                <br /> and get ${FIRST_TOPUP_BONUS_AMOUNT} in bonus credits on your first top up.
+              </>
+            )}
           </>
         ) : (
           <>
@@ -345,11 +345,12 @@ export default function WelcomeContent({
             >
               sign in or sign up
             </Link>{' '}
-            to buy credits, where you can top up your AI model credits,
-            <br /> and get ${FIRST_TOPUP_BONUS_AMOUNT()} in bonus credits on your first top up.
-            <div>
-              <FirstTopup24for24CountdownTimer />
-            </div>
+            to buy credits, where you can top up your AI model credits.
+            {FIRST_TOPUP_BONUS_AMOUNT > 0 && (
+              <>
+                <br /> and get ${FIRST_TOPUP_BONUS_AMOUNT} in bonus credits on your first top up.
+              </>
+            )}
           </>
         )}
       </div>

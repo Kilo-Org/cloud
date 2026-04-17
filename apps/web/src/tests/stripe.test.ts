@@ -1169,7 +1169,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       where: eq(kilocode_users.id, user.id),
     });
     expect(updatedUser?.total_microdollars_acquired).toBe(
-      amountInCents * 10_000 + FIRST_TOPUP_BONUS_AMOUNT() * 1_000_000
+      amountInCents * 10_000 + FIRST_TOPUP_BONUS_AMOUNT * 1_000_000
     );
   });
 

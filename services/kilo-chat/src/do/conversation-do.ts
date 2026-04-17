@@ -156,6 +156,7 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   notifyDeliveryFailed(messageId: string, senderId: string): void {
+    this.db.update(messages).set({ delivery_failed: 1 }).where(eq(messages.id, messageId)).run();
     this.sendToMember(senderId, 'message.delivery_failed', { messageId });
   }
 
@@ -318,6 +319,7 @@ export class ConversationDO extends DurableObject<Env> {
         updatedAt: row.updated_at,
         clientUpdatedAt: row.client_updated_at,
         deleted: row.deleted === 1,
+        deliveryFailed: row.delivery_failed === 1,
         reactions: reactionsByMessage.get(row.id) ?? [],
       })),
     };

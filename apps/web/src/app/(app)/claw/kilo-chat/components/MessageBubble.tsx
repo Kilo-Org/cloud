@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, Trash2, Reply, X, Check } from 'lucide-react';
+import { Pencil, Trash2, Reply, X, Check, AlertCircle } from 'lucide-react';
 import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './KiloChatLayout';
@@ -190,6 +190,15 @@ export function MessageBubble({
                   : 'text-muted-foreground justify-end'
               }`}
             >
+              {message.deliveryFailed && (
+                <span
+                  className="text-destructive flex items-center gap-0.5"
+                  title="Delivery failed"
+                >
+                  <AlertCircle className="h-3 w-3" />
+                  Not delivered
+                </span>
+              )}
               {message.clientUpdatedAt && !message.deleted && <span>(edited)</span>}
               <span>{timeStr}</span>
             </div>

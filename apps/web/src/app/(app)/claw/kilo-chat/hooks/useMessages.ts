@@ -8,6 +8,7 @@ import type {
   MessageCreatedEvent,
   MessageUpdatedEvent,
   MessageDeletedEvent,
+  MessageDeliveryFailedEvent,
 } from '@kilocode/kilo-chat';
 import { useCallback, useMemo } from 'react';
 import { KILO_CHAT_URL } from '@/lib/constants';
@@ -62,6 +63,7 @@ export function useSendMessage(
         updatedAt: null,
         clientUpdatedAt: null,
         deleted: false,
+        deliveryFailed: false,
       };
       queryClient.setQueryData(queryKey, (old: unknown) => {
         if (!old || typeof old !== 'object') return old;
@@ -179,6 +181,7 @@ export function useMessageCacheUpdater(conversationId: string | null) {
             updatedAt: null,
             clientUpdatedAt: null,
             deleted: false,
+            deliveryFailed: false,
           };
           queryClient.setQueryData(queryKey, (old: unknown) => {
             if (!old || typeof old !== 'object') return old;
@@ -224,6 +227,20 @@ export function useMessageCacheUpdater(conversationId: string | null) {
               ...data,
               pages: data.pages.map(page =>
                 page.map(msg => (msg.id === e.messageId ? { ...msg, deleted: true } : msg))
+              ),
+            };
+          });
+          break;
+        }
+        case 'message.delivery_failed': {
+          const e = event.data as MessageDeliveryFailedEvent;
+          queryClient.setQueryData(queryKey, (old: unknown) => {
+            if (!old || typeof old !== 'object') return old;
+            const data = old as { pages: Message[][]; pageParams: unknown[] };
+            return {
+              ...data,
+              pages: data.pages.map(page =>
+                page.map(msg => (msg.id === e.messageId ? { ...msg, deliveryFailed: true } : msg))
               ),
             };
           });

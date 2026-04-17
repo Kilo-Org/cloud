@@ -64,6 +64,7 @@ export function MessageArea({
         if (event.type === 'typing') {
           handleTypingEvent(event.data);
         } else if (event.type === 'message.delivery_failed') {
+          updateCache(event);
           toast.error('Message could not be delivered to the bot');
         } else {
           if (event.type === 'message.created') {

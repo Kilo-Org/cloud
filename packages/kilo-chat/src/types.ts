@@ -35,6 +35,7 @@ export type Message = {
   updatedAt: number | null;
   clientUpdatedAt: number | null;
   deleted: boolean;
+  deliveryFailed: boolean;
 };
 
 export type MessageRow = {
@@ -45,6 +46,7 @@ export type MessageRow = {
   updatedAt: number | null;
   clientUpdatedAt: number | null;
   deleted: boolean;
+  deliveryFailed: boolean;
 };
 
 // ── SSE events ──────────────────────────────────────────────────────

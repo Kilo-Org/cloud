@@ -49,6 +49,7 @@ export const messages = sqliteTable(
     updated_at: integer('updated_at'),
     client_updated_at: integer('client_updated_at'),
     deleted: integer('deleted').notNull().default(0),
+    delivery_failed: integer('delivery_failed').notNull().default(0),
   },
   table => ({
     senderFk: foreignKey({

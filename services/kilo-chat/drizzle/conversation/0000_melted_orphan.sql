@@ -23,6 +23,7 @@ CREATE TABLE `messages` (
 	`updated_at` integer,
 	`client_updated_at` integer,
 	`deleted` integer DEFAULT 0 NOT NULL,
+	`delivery_failed` integer DEFAULT 0 NOT NULL,
 	FOREIGN KEY (`sender_id`) REFERENCES `members`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`in_reply_to_message_id`) REFERENCES `messages`(`id`) ON UPDATE no action ON DELETE no action,
 	CONSTRAINT "messages_deleted_check" CHECK("messages"."deleted" IN (0, 1)),

@@ -85,7 +85,7 @@ export default class extends WorkerEntrypoint<Env> {
         const stub = this.env.CONVERSATION_DO.get(
           this.env.CONVERSATION_DO.idFromName(conversationId)
         );
-        stub.notifyDeliveryFailed(messageId, senderId);
+        await stub.notifyDeliveryFailed(messageId, senderId);
       } catch (err) {
         console.error('DLQ handler error:', err);
       }

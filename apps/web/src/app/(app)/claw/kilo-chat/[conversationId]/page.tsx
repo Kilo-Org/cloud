@@ -11,17 +11,20 @@ export default function KiloChatConversationPage() {
   const params = useParams<{ conversationId: string }>();
   const router = useRouter();
   const { getToken, currentUserId, instanceStatus, leavingConversationId } = useKiloChatContext();
-  const conversationDetail = useConversationDetail(getToken, params.conversationId);
+  const isLeaving = leavingConversationId === params.conversationId;
+  const conversationDetail = useConversationDetail(
+    getToken,
+    isLeaving ? null : params.conversationId
+  );
 
   useEffect(() => {
-    if (conversationDetail.isError) {
+    if (conversationDetail.isError && !isLeaving) {
       toast.error('Conversation not found');
       router.replace('/claw/kilo-chat');
     }
-  }, [conversationDetail.isError, router]);
+  }, [conversationDetail.isError, isLeaving, router]);
 
-  // Don't render (or fire queries) for a conversation we're leaving
-  if (leavingConversationId === params.conversationId) {
+  if (isLeaving) {
     return null;
   }
 

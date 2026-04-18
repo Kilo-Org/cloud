@@ -733,7 +733,7 @@ export const OpenRouterEndpoint = z.object({
   moderation_required: z.boolean(),
   data_policy: OpenRouterDataPolicy,
   pricing: OpenRouterPricing,
-  variable_pricings: z.array(z.unknown()),
+  variable_pricings: z.array(z.unknown()).default([]),
   is_hidden: z.boolean(),
   is_deranked: z.boolean(),
   is_disabled: z.boolean(),

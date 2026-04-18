@@ -156,7 +156,10 @@ export function applyVercelSettings(
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
 ) {
-  requestToMutate.body.model = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(requestToMutate));
+  requestToMutate.body.model = mapModelIdToVercel(
+    requestedModel,
+    isReasoningExplicitlyDisabled(requestToMutate),
+  );
 
   if (userByok) {
     if (userByok.length === 0) {

@@ -44,6 +44,7 @@ import {
   bot_requests,
   cloud_agent_code_reviews,
   kiloclaw_instances,
+  kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
   user_period_cache,
@@ -745,11 +746,30 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
+    // kiloclaw_subscriptions, kiloclaw_cli_runs, kiloclaw_google_oauth_connections,
+    // and kiloclaw_inbound_email_aliases all reference kiloclaw_instances.
+    // Delete them before instances to satisfy FK constraints.
+    await tx.delete(kiloclaw_subscriptions).where(eq(kiloclaw_subscriptions.user_id, userId));
+    await tx
+      .delete(kiloclaw_earlybird_purchases)
+      .where(eq(kiloclaw_earlybird_purchases.user_id, userId));
+    await tx.delete(kiloclaw_email_log).where(eq(kiloclaw_email_log.user_id, userId));
     await tx
       .update(kiloclaw_cli_runs)
       .set({ initiated_by_admin_id: null })
       .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
+    await tx
+      .delete(kiloclaw_google_oauth_connections)
+      .where(
+        inArray(
+          kiloclaw_google_oauth_connections.instance_id,
+          tx
+            .select({ id: kiloclaw_instances.id })
+            .from(kiloclaw_instances)
+            .where(eq(kiloclaw_instances.user_id, userId))
+        )
+      );
     await tx
       .delete(kiloclaw_inbound_email_aliases)
       .where(

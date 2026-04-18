@@ -635,6 +635,69 @@ export async function handleMayorBeadDelete(
   return c.json(resSuccess({ deleted: true }));
 }
 
+const MayorBulkDeleteBeadsBody = z.object({
+  bead_ids: z.array(z.string().uuid()).min(1).max(5000),
+});
+
+export async function handleMayorBulkDeleteBeads(
+  c: Context<GastownEnv>,
+  params: { townId: string; rigId: string }
+) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  const parsed = await parseJsonBody(c, MayorBulkDeleteBeadsBody);
+  if (!parsed.success) {
+    return c.json(resError('Invalid request body', parsed.error), 400);
+  }
+
+  const { bead_ids } = parsed.data;
+
+  console.log(
+    `${HANDLER_LOG} handleMayorBulkDeleteBeads: townId=${params.townId} rigId=${params.rigId} count=${bead_ids.length}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const count = await town.deleteBeads(bead_ids);
+
+  return c.json(resSuccess({ deleted: count }));
+}
+
+const MayorDeleteBeadsByStatusBody = z.object({
+  status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']),
+  type: z
+    .enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent'])
+    .optional(),
+});
+
+export async function handleMayorDeleteBeadsByStatus(
+  c: Context<GastownEnv>,
+  params: { townId: string; rigId: string }
+) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  const parsed = await parseJsonBody(c, MayorDeleteBeadsByStatusBody);
+  if (!parsed.success) {
+    return c.json(resError('Invalid request body', parsed.error), 400);
+  }
+
+  const { status, type } = parsed.data;
+
+  console.log(
+    `${HANDLER_LOG} handleMayorDeleteBeadsByStatus: townId=${params.townId} rigId=${params.rigId} status=${status}${type ? ` type=${type}` : ''}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const count = await town.deleteBeadsByStatus(status, type, params.rigId);
+
+  return c.json(resSuccess({ deleted: count }));
+}
+
 /**
  * POST /api/mayor/:townId/tools/escalations/:escalationId/acknowledge
  * Acknowledge an escalation, marking it as reviewed.

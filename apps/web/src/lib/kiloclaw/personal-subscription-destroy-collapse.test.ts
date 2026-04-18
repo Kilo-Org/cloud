@@ -326,9 +326,7 @@ describe('personal subscription destroy collapse', () => {
           userId: string;
         }) => void
       >();
-    const executor = {
-      select: (...args: Parameters<typeof db.select>) => db.select(...args),
-      update: (...args: Parameters<typeof db.update>) => db.update(...args),
+    const executor = Object.assign(Object.create(db), {
       insert: ((table: typeof kiloclaw_subscription_change_log) => {
         if (table === kiloclaw_subscription_change_log) {
           return {
@@ -339,7 +337,7 @@ describe('personal subscription destroy collapse', () => {
         }
         return db.insert(table);
       }) as typeof db.insert,
-    };
+    });
 
     const destroyed = await markInstanceDestroyedWithPersonalSubscriptionCollapse({
       actor: TEST_ACTOR,

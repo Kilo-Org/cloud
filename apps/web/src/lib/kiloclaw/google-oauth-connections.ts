@@ -199,3 +199,18 @@ export async function clearKiloClawGoogleOAuthConnection(instanceId: string): Pr
       )
     );
 }
+
+export async function getKiloClawGoogleOAuthConnection(instanceId: string) {
+  const [row] = await db
+    .select()
+    .from(kiloclaw_google_oauth_connections)
+    .where(
+      and(
+        eq(kiloclaw_google_oauth_connections.instance_id, instanceId),
+        eq(kiloclaw_google_oauth_connections.provider, 'google')
+      )
+    )
+    .limit(1);
+
+  return row ?? null;
+}

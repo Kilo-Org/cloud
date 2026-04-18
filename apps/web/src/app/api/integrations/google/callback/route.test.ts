@@ -169,6 +169,35 @@ describe('GET /api/integrations/google/callback', () => {
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
   });
 
+  test('allows different org admin than instance creator to complete callback', async () => {
+    const CREATOR_ID = 'f19f4f22-b25e-4f8b-9f52-5b4ab2b4d9ec';
+
+    mockedVerifyGoogleOAuthState.mockReturnValue({
+      owner: { type: 'org', id: ORG_ID },
+      userId: USER_ID,
+      instanceId: INSTANCE_ID,
+      capabilities: ['calendar_read'],
+    });
+
+    mockedGetInstanceById.mockResolvedValue({
+      id: INSTANCE_ID,
+      userId: CREATOR_ID,
+      organizationId: ORG_ID,
+    } as never);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/callback?code=abc&state=signed-org') as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(
+      response,
+      `/organizations/${ORG_ID}/claw/settings?success=google_connected`
+    );
+    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+  });
+
   test('redirects personal OAuth provider errors to personal claw settings', async () => {
     const { GET } = await import('./route');
     const response = await GET(

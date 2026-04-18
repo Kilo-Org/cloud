@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
-import { clearKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
+import {
+  clearKiloClawGoogleOAuthConnection,
+  getKiloClawGoogleOAuthConnection,
+} from '@/lib/kiloclaw/google-oauth-connections';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { failureResult } from '@/lib/maybe-result';
 
@@ -28,6 +31,7 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetActiveInstance = jest.mocked(getActiveInstance);
 const mockedGetActiveOrgInstance = jest.mocked(getActiveOrgInstance);
 const mockedClearKiloClawGoogleOAuthConnection = jest.mocked(clearKiloClawGoogleOAuthConnection);
+const mockedGetKiloClawGoogleOAuthConnection = jest.mocked(getKiloClawGoogleOAuthConnection);
 const mockedCaptureMessage = jest.mocked(captureMessage);
 const mockedCaptureException = jest.mocked(captureException);
 
@@ -62,6 +66,10 @@ describe('POST /api/integrations/google/disconnect', () => {
 
     mockedGetActiveInstance.mockResolvedValue({ id: INSTANCE_ID } as never);
     mockedGetActiveOrgInstance.mockResolvedValue({ id: INSTANCE_ID } as never);
+    mockedGetKiloClawGoogleOAuthConnection.mockResolvedValue({
+      account_email: 'user@example.com',
+      account_subject: 'sub-1',
+    } as never);
     mockedClearKiloClawGoogleOAuthConnection.mockResolvedValue();
     mockedClearGoogleOAuthConnection.mockResolvedValue({
       googleOAuthConnected: false,
@@ -90,8 +98,14 @@ describe('POST /api/integrations/google/disconnect', () => {
     expectRedirectLocation(response, '/claw/settings?success=google_disconnected');
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: true });
     expect(mockedGetActiveInstance).toHaveBeenCalledWith(USER_ID);
+    expect(mockedGetKiloClawGoogleOAuthConnection).toHaveBeenCalledWith(INSTANCE_ID);
     expect(mockedClearKiloClawGoogleOAuthConnection).toHaveBeenCalledWith(INSTANCE_ID);
     expect(mockedClearGoogleOAuthConnection).toHaveBeenCalledWith(USER_ID, INSTANCE_ID);
+
+    const doClearOrder = mockedClearGoogleOAuthConnection.mock.invocationCallOrder[0] ?? -1;
+    const dbClearOrder = mockedClearKiloClawGoogleOAuthConnection.mock.invocationCallOrder[0] ?? -1;
+    expect(doClearOrder).toBeGreaterThan(0);
+    expect(dbClearOrder).toBeGreaterThan(doClearOrder);
   });
 
   test('disconnects org flow and redirects to org claw settings', async () => {
@@ -131,7 +145,19 @@ describe('POST /api/integrations/google/disconnect', () => {
 
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/claw/settings?error=disconnect_failed');
+    expect(mockedClearGoogleOAuthConnection).toHaveBeenCalledWith(USER_ID, INSTANCE_ID);
     expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
+  });
+
+  test('does not delete DB row if DO clear fails', async () => {
+    mockedClearGoogleOAuthConnection.mockRejectedValue(new Error('do down'));
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest('/api/integrations/google/disconnect') as never);
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/claw/settings?error=disconnect_failed');
+    expect(mockedClearKiloClawGoogleOAuthConnection).not.toHaveBeenCalled();
   });
 
   test('rejects invalid origin', async () => {

@@ -139,9 +139,7 @@ export async function GET(request: NextRequest) {
       instance.organizationId === null;
 
     const isOrgOwnerMatch =
-      verifiedState.owner.type === 'org' &&
-      instance.userId === user.id &&
-      instance.organizationId === verifiedState.owner.id;
+      verifiedState.owner.type === 'org' && instance.organizationId === verifiedState.owner.id;
 
     if (!isUserOwnerMatch && !isOrgOwnerMatch) {
       captureMessage('Google callback owner/instance mismatch', {

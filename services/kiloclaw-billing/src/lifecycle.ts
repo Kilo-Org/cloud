@@ -1841,26 +1841,29 @@ async function runInstanceDestructionSweep(
       await destroyInstanceForEnforcement(env, context, row);
 
       if (row.instance_id) {
-        await markInstanceDestroyedWithPersonalSubscriptionCollapse({
-          actor: LIFECYCLE_ACTOR,
-          changeLogFailurePolicy: 'log',
-          destroyedAt: now,
-          executor: database,
-          instanceId: row.instance_id,
-          onChangeLogFailure: ({ error, subscriptionId, userId, reason }) => {
-            log('error', 'Failed to write personal subscription collapse change log', {
-              event: 'subscription_change_log_failed',
-              outcome: 'failed',
-              subscriptionId,
-              userId,
-              instanceId: row.instance_id,
-              action: 'reassigned',
-              reason,
-              error: errorMessage(error),
-            });
-          },
-          reason: 'destroy_path_inline_collapse',
-          userId: row.user_id,
+        const instanceId = row.instance_id;
+        await database.transaction(async tx => {
+          await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+            actor: LIFECYCLE_ACTOR,
+            changeLogFailurePolicy: 'log',
+            destroyedAt: now,
+            executor: tx,
+            instanceId,
+            onChangeLogFailure: ({ error, subscriptionId, userId, reason }) => {
+              log('error', 'Failed to write personal subscription collapse change log', {
+                event: 'subscription_change_log_failed',
+                outcome: 'failed',
+                subscriptionId,
+                userId,
+                instanceId,
+                action: 'reassigned',
+                reason,
+                error: errorMessage(error),
+              });
+            },
+            reason: 'destroy_path_inline_collapse',
+            userId: row.user_id,
+          });
         });
       }
 

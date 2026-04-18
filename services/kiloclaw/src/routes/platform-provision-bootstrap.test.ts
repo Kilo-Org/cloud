@@ -174,11 +174,7 @@ describe('platform provision bootstrap quarantine', () => {
     });
     expect(destroy).not.toHaveBeenCalled();
     expect(workerDb.updateSets).toHaveLength(1);
-    expect(workerDb.updateSets[0]).toEqual(
-      expect.objectContaining({
-        destroyed_at: expect.anything(),
-      })
-    );
+    expect(workerDb.updateSets[0]?.destroyed_at).toBeDefined();
     const eventCall = mockWriteEvent.mock.calls.find(
       call => call[1]?.event === 'instance.subscription_bootstrap_quarantined'
     );

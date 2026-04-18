@@ -83,6 +83,7 @@ export type ClawBillingStatus = {
   subscription: {
     plan: 'commit' | 'standard';
     status: 'active' | 'past_due' | 'canceled' | 'unpaid';
+    activationState: 'pending_settlement' | 'activated';
     cancelAtPeriodEnd: boolean;
     currentPeriodEnd: string;
     commitEndsAt: string | null;

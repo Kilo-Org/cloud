@@ -492,6 +492,38 @@ describe('getBillingStatus', () => {
       .where(eq(kiloclaw_subscriptions.instance_id, trialInstance.id));
     expect(adoptedTrialRows).toHaveLength(1);
   });
+
+  it('reports Stripe-created paid rows as pending settlement without granting access', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      stripe_subscription_id: 'sub_status_pending_settlement',
+      payment_source: 'stripe',
+      plan: 'standard',
+      status: 'active',
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result.hasAccess).toBe(false);
+    expect(result.accessReason).toBeNull();
+    expect(result.subscription).toMatchObject({
+      plan: 'standard',
+      status: 'active',
+      activationState: 'pending_settlement',
+      paymentSource: 'stripe',
+      hasStripeFunding: true,
+    });
+    expect(result.instance).toMatchObject({
+      id: instance.id,
+      exists: true,
+      destroyed: false,
+    });
+  });
 });
 
 describe('provision detached personal billing recovery', () => {
@@ -631,6 +663,25 @@ describe('requireKiloClawAccess', () => {
       warnSpy.mockRestore();
     }
   });
+
+  it('rejects pending-settlement rows until settlement activates access', async () => {
+    const { requireKiloClawAccess } = await import('@/lib/kiloclaw/access-gate');
+
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      stripe_subscription_id: 'sub_pending_access_gate',
+      payment_source: 'stripe',
+      plan: 'standard',
+      status: 'active',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+    });
+
+    await expect(requireKiloClawAccess(user.id)).rejects.toThrow(
+      'KiloClaw access requires an active subscription or trial.'
+    );
+  });
 });
 
 describe('subscription center procedures', () => {
@@ -663,7 +714,7 @@ describe('subscription center procedures', () => {
     userId: string;
     instanceId: string;
     stripeSubscriptionId?: string;
-    paymentSource?: 'credits';
+    paymentSource?: 'credits' | 'stripe';
     plan: 'standard' | 'commit' | 'trial';
     status: 'active' | 'past_due' | 'canceled' | 'unpaid' | 'trialing';
     createdAt?: string;
@@ -746,6 +797,7 @@ describe('subscription center procedures', () => {
     expect(result.subscriptions[0]).toMatchObject({
       instanceId: newerPersonalInstance.id,
       plan: 'commit',
+      activationState: 'activated',
       paymentSource: 'credits',
       hasStripeFunding: false,
     });
@@ -776,9 +828,71 @@ describe('subscription center procedures', () => {
       instanceName: 'Target Personal Instance',
       plan: 'standard',
       status: 'active',
+      activationState: 'activated',
       paymentSource: 'credits',
       hasStripeFunding: false,
       creditRenewalAt: '2026-05-01T00:00:00.000Z',
+    });
+  });
+
+  it('lists pending-settlement personal subscriptions with activationState', async () => {
+    const instance = await createInstanceRow({
+      userId: user.id,
+      name: 'Pending Settlement Instance',
+    });
+
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: instance.id,
+      stripeSubscriptionId: 'sub_pending_list',
+      paymentSource: 'stripe',
+      plan: 'standard',
+      status: 'active',
+      currentPeriodStart: '2026-04-01T00:00:00.000Z',
+      currentPeriodEnd: '2026-05-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.listPersonalSubscriptions();
+
+    expect(result.subscriptions).toHaveLength(1);
+    expect(result.subscriptions[0]).toMatchObject({
+      instanceId: instance.id,
+      plan: 'standard',
+      status: 'active',
+      activationState: 'pending_settlement',
+      paymentSource: 'stripe',
+      hasStripeFunding: true,
+    });
+  });
+
+  it('returns pending-settlement detail with activationState', async () => {
+    const instance = await createInstanceRow({
+      userId: user.id,
+      name: 'Pending Settlement Detail',
+    });
+
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: instance.id,
+      stripeSubscriptionId: 'sub_pending_detail',
+      paymentSource: 'stripe',
+      plan: 'standard',
+      status: 'active',
+      currentPeriodStart: '2026-04-01T00:00:00.000Z',
+      currentPeriodEnd: '2026-05-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getSubscriptionDetail({ instanceId: instance.id });
+
+    expect(result).toMatchObject({
+      instanceId: instance.id,
+      plan: 'standard',
+      status: 'active',
+      activationState: 'pending_settlement',
+      paymentSource: 'stripe',
+      hasStripeFunding: true,
     });
   });
 

@@ -77,6 +77,7 @@ import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
 import {
   getKiloClawEarlybirdStateForUser,
+  getKiloClawSubscriptionActivationState,
   getKiloClawSubscriptionAccessReason,
 } from '@/lib/kiloclaw/access-state';
 import {
@@ -169,9 +170,14 @@ async function resolveDetachedAccessGrantingPersonalSubscription(params: {
       )
     );
 
-  const accessGrantingRows = rows.filter(
-    row => getKiloClawSubscriptionAccessReason(row, now) !== null
-  );
+  const accessGrantingRows = rows.filter(row => {
+    if (row.status === 'active') return true;
+    if (row.status === 'past_due' && !row.suspended_at) return true;
+    if (row.status === 'trialing' && row.trial_ends_at && new Date(row.trial_ends_at) > now) {
+      return true;
+    }
+    return false;
+  });
   if (accessGrantingRows.length > 1) {
     throw new TRPCError({
       code: 'CONFLICT',
@@ -977,6 +983,7 @@ const KiloclawInstanceSwitchPlanInputSchema = z.object({
   instanceId: z.string().uuid(),
   toPlan: z.enum(['commit', 'standard']),
 });
+const KiloclawActivationStateSchema = z.enum(['pending_settlement', 'activated']);
 
 const KiloclawPersonalSubscriptionSchema = z.object({
   instanceId: z.string().uuid(),
@@ -985,6 +992,7 @@ const KiloclawPersonalSubscriptionSchema = z.object({
   destroyedAt: z.string().nullable(),
   plan: z.string(),
   status: z.string(),
+  activationState: KiloclawActivationStateSchema,
   cancelAtPeriodEnd: z.boolean(),
   pendingConversion: z.boolean(),
   scheduledPlan: z.string().nullable(),
@@ -1099,6 +1107,7 @@ async function getPersonalBillingStatus(user: {
     ? {
         plan: sub.plan as 'commit' | 'standard',
         status: sub.status as 'active' | 'past_due' | 'canceled' | 'unpaid',
+        activationState: getKiloClawSubscriptionActivationState(sub),
         cancelAtPeriodEnd: sub.cancel_at_period_end,
         currentPeriodEnd: normalizeTimestamp(sub.current_period_end) ?? '',
         commitEndsAt: normalizeTimestamp(sub.commit_ends_at),
@@ -1230,6 +1239,7 @@ function serializeKiloclawPersonalSubscription(
   hasActiveKiloPass: boolean
 ) {
   const hasStripeFunding = Boolean(row.subscription.stripe_subscription_id);
+  const activationState = getKiloClawSubscriptionActivationState(row.subscription);
 
   return {
     instanceId: row.instance.id,
@@ -1238,6 +1248,7 @@ function serializeKiloclawPersonalSubscription(
     destroyedAt: normalizeTimestamp(row.instance.destroyedAt),
     plan: row.subscription.plan,
     status: row.subscription.status,
+    activationState,
     cancelAtPeriodEnd: row.subscription.cancel_at_period_end,
     pendingConversion: row.subscription.pending_conversion,
     scheduledPlan: row.subscription.scheduled_plan ?? null,

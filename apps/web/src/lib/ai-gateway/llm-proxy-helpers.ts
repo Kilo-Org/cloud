@@ -228,15 +228,9 @@ export function modelNotAllowedResponse() {
   );
 }
 
-export function forbiddenFreeModelResponse(
-  header: FraudDetectionHeaders,
-  feature: FeatureValue | null
-) {
+export function forbiddenFreeModelResponse(header: FraudDetectionHeaders) {
   const errorType = ProxyErrorType.discontinued_free_model;
-  if (feature === 'kiloclaw' || feature === 'openclaw') {
-    const error = `The free period of this model ended. Please use ${KILO_AUTO_FREE_MODEL.name} to continue, switch using: /model kilocode/${KILO_AUTO_FREE_MODEL.id}`;
-    return NextResponse.json({ error, error_type: errorType, message: error }, { status: 404 });
-  } else if (isRooCodeBasedClient(header)) {
+  if (isRooCodeBasedClient(header)) {
     // https://github.com/Kilo-Org/kilocode/blob/50d6bd482bec6fae7d1c80b14ffb064de3761507/src/shared/kilocode/errorUtils.ts#L13
     const error = `The alpha period for this model has ended.`;
     return NextResponse.json(

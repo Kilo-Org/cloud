@@ -410,7 +410,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     (!autoModel && isForbiddenFreeModel(originalModelIdLowerCased))
   ) {
     console.warn(`User requested forbidden free model ${originalModelIdLowerCased}; rejecting.`);
-    return forbiddenFreeModelResponse(fraudHeaders, feature);
+    return forbiddenFreeModelResponse(fraudHeaders);
   }
 
   // Extract properties for usage context

@@ -158,7 +158,7 @@ export function applyVercelSettings(
 ) {
   requestToMutate.body.model = mapModelIdToVercel(
     requestedModel,
-    isReasoningExplicitlyDisabled(requestToMutate),
+    isReasoningExplicitlyDisabled(requestToMutate)
   );
 
   if (userByok) {

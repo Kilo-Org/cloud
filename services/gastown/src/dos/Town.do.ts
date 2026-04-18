@@ -3673,6 +3673,11 @@ export class TownDO extends DurableObject<Env> {
       pendingEventCount: 0,
     };
 
+    // Fetch town config once and share across Phase 0 and Phase 1 so that
+    // applyEvent can use the full fallback chain (rig → town → default) for
+    // settings like auto_resolve_merge_conflicts.
+    const townConfig = await this.getTownConfig();
+
     // Phase 0: Drain events and apply state transitions
     try {
       const pending = events.drainEvents(this.sql);
@@ -3682,7 +3687,7 @@ export class TownDO extends DurableObject<Env> {
       }
       for (const event of pending) {
         try {
-          reconciler.applyEvent(this.sql, event);
+          reconciler.applyEvent(this.sql, event, { townConfig });
           events.markProcessed(this.sql, event.event_id);
         } catch (err) {
           logger.error('reconciler: applyEvent failed', {
@@ -3723,7 +3728,6 @@ export class TownDO extends DurableObject<Env> {
     // Phase 1: Reconcile — compute desired state vs actual state
     const sideEffects: Array<() => Promise<void>> = [];
     try {
-      const townConfig = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
         draining: this._draining,
         townConfig,

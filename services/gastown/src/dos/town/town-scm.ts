@@ -45,14 +45,20 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<string | null
   return token ?? null;
 }
 
+export type PRStatusResult = {
+  status: 'open' | 'merged' | 'closed';
+  mergeable_state?: string;
+};
+
 /**
  * Check the status of a PR/MR via its URL.
- * Returns 'open', 'merged', or 'closed' (null if cannot determine).
+ * Returns a PRStatusResult with status and optional mergeable_state (GitHub only),
+ * or null if the status cannot be determined.
  */
 export async function checkPRStatus(
   ctx: SCMContext,
   prUrl: string
-): Promise<'open' | 'merged' | 'closed' | null> {
+): Promise<PRStatusResult | null> {
   const townConfig = await ctx.getTownConfig();
 
   // GitHub PR URL format: https://github.com/{owner}/{repo}/pull/{number}
@@ -87,9 +93,9 @@ export async function checkPRStatus(
     const data = GitHubPRStatusSchema.safeParse(json);
     if (!data.success) return null;
 
-    if (data.data.merged) return 'merged';
-    if (data.data.state === 'closed') return 'closed';
-    return 'open';
+    if (data.data.merged) return { status: 'merged' };
+    if (data.data.state === 'closed') return { status: 'closed' };
+    return { status: 'open', mergeable_state: data.data.mergeable_state };
   }
 
   // GitLab MR URL format: https://{host}/{path}/-/merge_requests/{iid}
@@ -133,9 +139,9 @@ export async function checkPRStatus(
     const data = GitLabMRStatusSchema.safeParse(glJson);
     if (!data.success) return null;
 
-    if (data.data.state === 'merged') return 'merged';
-    if (data.data.state === 'closed') return 'closed';
-    return 'open';
+    if (data.data.state === 'merged') return { status: 'merged' };
+    if (data.data.state === 'closed') return { status: 'closed' };
+    return { status: 'open' };
   }
 
   console.warn(`${TOWN_LOG} checkPRStatus: unrecognized PR URL format: ${prUrl}`);

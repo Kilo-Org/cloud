@@ -669,6 +669,19 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
   const capabilities = effectiveGoogleCapabilities(grantsBySource);
 
   if (existing && existing.credential_profile === 'kilo_owned') {
+    const currentGrants = parseGoogleGrantsBySource(existing.grants_by_source);
+    const currentCapabilities = normalizeCapabilities(existing.capabilities ?? []);
+    const sameLegacyGrants =
+      JSON.stringify(currentGrants.legacy ?? []) === JSON.stringify(nextLegacyGrants);
+    const sameOauthGrants = JSON.stringify(currentGrants.oauth ?? []) === JSON.stringify(nextOauthGrants);
+    const sameCapabilities = JSON.stringify(currentCapabilities) === JSON.stringify(capabilities);
+
+    if (existing.status === 'active' && sameLegacyGrants && sameOauthGrants && sameCapabilities) {
+      return c.json({ migrated: false, reason: 'kilo_owned_already_active' }, 200);
+    }
+  }
+
+  if (existing && existing.credential_profile === 'kilo_owned') {
     await db.execute(sql`
       UPDATE kiloclaw_google_oauth_connections
       SET

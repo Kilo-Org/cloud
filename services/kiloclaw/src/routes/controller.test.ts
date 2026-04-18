@@ -150,6 +150,25 @@ async function makeAuthHeaders(targetSandboxId = sandboxId) {
   };
 }
 
+function makeGoogleConnection(encryptionKey: string, overrides?: Record<string, unknown>) {
+  return {
+    instance_id: 'instance-1',
+    provider: 'google',
+    account_email: 'user@example.com',
+    account_subject: 'google-subject-1',
+    credential_profile: 'kilo_owned',
+    oauth_client_id: null,
+    oauth_client_secret_encrypted: null,
+    refresh_token_encrypted: encryptWithSymmetricKey('refresh-token-1', encryptionKey),
+    capabilities: ['calendar_read'],
+    grants_by_source: { oauth: ['calendar_read'] },
+    scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+    status: 'active',
+    connected_at: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 function analyticsEvents(writeDataPoint: Mock): AnalyticsEngineDataPoint[] {
   const calls = writeDataPoint.mock.calls as [AnalyticsEngineDataPoint][];
   return calls.map(([call]) => call);
@@ -200,6 +219,42 @@ describe('POST /checkin', () => {
         body: JSON.stringify(makeBody()),
       },
       makeEnv()
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('returns 401 when authorization header is malformed', async () => {
+    const headers = await makeAuthHeaders();
+    const response = await controller.request(
+      '/google/status',
+      {
+        method: 'POST',
+        headers: {
+          ...headers,
+          authorization: 'Token kilo-key-1',
+        },
+        body: JSON.stringify({ sandboxId }),
+      },
+      makeEnv({ hyperdriveConnectionString: 'postgres://example' })
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 403 when api key does not match durable object config', async () => {
+    const headers = await makeAuthHeaders();
+    const response = await controller.request(
+      '/google/status',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId }),
+      },
+      makeEnv({
+        hyperdriveConnectionString: 'postgres://example',
+        kilocodeApiKey: 'different-key',
+      })
     );
 
     expect(response.status).toBe(403);
@@ -584,6 +639,277 @@ describe('POST /google/token', () => {
     vi.restoreAllMocks();
   });
 
+  it('returns 401 when auth headers are missing', async () => {
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId, capabilities: ['calendar_read'] }),
+      },
+      makeEnv({ hyperdriveConnectionString: 'postgres://example' })
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 401 when authorization header is malformed', async () => {
+    const headers = await makeAuthHeaders();
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers: {
+          ...headers,
+          authorization: 'Token kilo-key-1',
+        },
+        body: JSON.stringify({ sandboxId, capabilities: ['calendar_read'] }),
+      },
+      makeEnv({ hyperdriveConnectionString: 'postgres://example' })
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 403 when gateway token is invalid', async () => {
+    const headers = await makeAuthHeaders();
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'x-kiloclaw-gateway-token': 'wrong-token',
+        },
+        body: JSON.stringify({ sandboxId, capabilities: ['calendar_read'] }),
+      },
+      makeEnv({ hyperdriveConnectionString: 'postgres://example' })
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('returns 401 when authorization header is malformed', async () => {
+    const response = await controller.request(
+      '/google/migrate-legacy',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: 'Token kilo-key-1',
+          'x-kiloclaw-gateway-token': 'gateway-token',
+        },
+        body: JSON.stringify({
+          sandboxId,
+          accountEmail: 'legacy@example.com',
+          accountSubject: 'legacy-subject',
+          oauthClientId: 'legacy-client-id',
+          oauthClientSecret: 'legacy-client-secret',
+          refreshToken: 'legacy-refresh-token',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          capabilities: ['calendar_read'],
+        }),
+      },
+      makeEnv({ hyperdriveConnectionString: 'postgres://example' })
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 403 when api key does not match durable object config', async () => {
+    const headers = await makeAuthHeaders();
+    const response = await controller.request(
+      '/google/migrate-legacy',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sandboxId,
+          accountEmail: 'legacy@example.com',
+          accountSubject: 'legacy-subject',
+          oauthClientId: 'legacy-client-id',
+          oauthClientSecret: 'legacy-client-secret',
+          refreshToken: 'legacy-refresh-token',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          capabilities: ['calendar_read'],
+        }),
+      },
+      makeEnv({
+        hyperdriveConnectionString: 'postgres://example',
+        kilocodeApiKey: 'different-key',
+      })
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('returns migrated false when kilo_owned connection is already active with same grants', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const execute = vi.fn().mockResolvedValue(undefined);
+    mockGetWorkerDb.mockReturnValue({ execute });
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(
+      makeGoogleConnection(encryptionKey, {
+        id: 'conn-kilo',
+        credential_profile: 'kilo_owned',
+        status: 'active',
+        capabilities: ['calendar_read'],
+        grants_by_source: { oauth: ['calendar_read'] },
+      })
+    );
+
+    const response = await controller.request(
+      '/google/migrate-legacy',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sandboxId,
+          accountEmail: 'legacy@example.com',
+          accountSubject: 'legacy-subject',
+          oauthClientId: 'legacy-client-id',
+          oauthClientSecret: 'legacy-client-secret',
+          refreshToken: 'legacy-refresh-token',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          capabilities: [],
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      migrated: false,
+      reason: 'kilo_owned_already_active',
+    });
+    expect(mockUpdateGoogleOAuthConnectionTokenData).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    expect(instanceStub.updateGoogleOAuthConnection).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when api key does not match durable object config', async () => {
+    const headers = await makeAuthHeaders();
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId, capabilities: ['calendar_read'] }),
+      },
+      makeEnv({
+        hyperdriveConnectionString: 'postgres://example',
+        kilocodeApiKey: 'different-key',
+      })
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('returns 404 when no google oauth connection exists for the instance', async () => {
+    const env = makeEnv({ hyperdriveConnectionString: 'postgres://example' });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(null);
+
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId, capabilities: ['calendar_read'] }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it('returns 409 when connection is not active', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(
+      makeGoogleConnection(encryptionKey, { status: 'action_required' })
+    );
+
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId, capabilities: ['calendar_read'] }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(409);
+  });
+
+  it('returns 412 when requested capability is not granted', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(
+      makeGoogleConnection(encryptionKey, { capabilities: ['calendar_read'] })
+    );
+
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId, capabilities: ['drive_read'] }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(412);
+  });
+
+  it('returns 400 when unsupported capabilities are requested', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(
+      makeGoogleConnection(encryptionKey)
+    );
+
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId, capabilities: ['unsupported_capability'] }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(400);
+  });
+
   it('returns an access token for active calendar oauth connections', async () => {
     const encryptionKey = Buffer.alloc(32, 7).toString('base64');
     const env = makeEnv({
@@ -593,16 +919,7 @@ describe('POST /google/token', () => {
     const headers = await makeAuthHeaders();
 
     mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
-    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue({
-      instance_id: 'instance-1',
-      provider: 'google',
-      account_email: 'user@example.com',
-      account_subject: 'google-subject-1',
-      refresh_token_encrypted: encryptWithSymmetricKey('refresh-token-1', encryptionKey),
-      capabilities: ['calendar_read'],
-      scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
-      status: 'active',
-    });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(makeGoogleConnection(encryptionKey));
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(
@@ -636,8 +953,12 @@ describe('POST /google/token', () => {
     const scopes = (payload as { scopes?: unknown }).scopes;
     expect(Array.isArray(scopes)).toBe(true);
     expect(mockUpdateGoogleOAuthConnectionTokenData).toHaveBeenCalledWith(
-      {},
+      expect.any(Object),
       'instance-1',
+      expect.objectContaining({ status: 'active' })
+    );
+    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'active' })
     );
   });
@@ -651,16 +972,7 @@ describe('POST /google/token', () => {
     const headers = await makeAuthHeaders();
 
     mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
-    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue({
-      instance_id: 'instance-1',
-      provider: 'google',
-      account_email: 'user@example.com',
-      account_subject: 'google-subject-1',
-      refresh_token_encrypted: encryptWithSymmetricKey('refresh-token-1', encryptionKey),
-      capabilities: ['calendar_read'],
-      scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
-      status: 'active',
-    });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(makeGoogleConnection(encryptionKey));
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(
@@ -683,9 +995,248 @@ describe('POST /google/token', () => {
     const payload = await response.json();
     expect(payload).toEqual(expect.objectContaining({ reason: 'invalid_grant' }));
     expect(mockUpdateGoogleOAuthConnectionTokenData).toHaveBeenCalledWith(
+      expect.any(Object),
+      'instance-1',
+      expect.objectContaining({ status: 'action_required' })
+    );
+    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'action_required' })
+    );
+  });
+
+  it('marks oauth connection action_required on deleted_client', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(makeGoogleConnection(encryptionKey));
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: 'deleted_client', error_description: 'client is deleted' }),
+        { status: 400, headers: { 'content-type': 'application/json' } }
+      )
+    );
+
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId, capabilities: ['calendar_read'] }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(409);
+    expect(mockUpdateGoogleOAuthConnectionTokenData).toHaveBeenCalledWith(
+      expect.any(Object),
+      'instance-1',
+      expect.objectContaining({ status: 'action_required' })
+    );
+    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'action_required' })
+    );
+  });
+
+  it('returns 502 on unmapped google refresh errors without flipping status', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(makeGoogleConnection(encryptionKey));
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'temporarily_unavailable' }), {
+        status: 500,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId, capabilities: ['calendar_read'] }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(502);
+    expect(mockUpdateGoogleOAuthConnectionTokenData).not.toHaveBeenCalledWith(
       {},
       'instance-1',
       expect.objectContaining({ status: 'action_required' })
+    );
+  });
+
+  it('marks oauth connection action_required when refresh token decryption fails', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(
+      makeGoogleConnection(encryptionKey, { refresh_token_encrypted: 'not-encrypted-token' })
+    );
+
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId, capabilities: ['calendar_read'] }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(409);
+    expect(mockUpdateGoogleOAuthConnectionTokenData).toHaveBeenCalledWith(
+      expect.any(Object),
+      'instance-1',
+      expect.objectContaining({
+        status: 'action_required',
+        lastError: 'refresh_token_decryption_failed',
+      })
+    );
+    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'action_required',
+        lastError: 'refresh_token_decryption_failed',
+      })
+    );
+  });
+});
+
+describe('POST /google/status', () => {
+  beforeEach(() => {
+    mockGetInstanceBySandboxId.mockReset();
+    mockGetGoogleOAuthConnectionByInstanceId.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns 401 when auth headers are missing', async () => {
+    const response = await controller.request(
+      '/google/status',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId }),
+      },
+      makeEnv({ hyperdriveConnectionString: 'postgres://example' })
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 403 when gateway token is invalid', async () => {
+    const headers = await makeAuthHeaders();
+    const response = await controller.request(
+      '/google/status',
+      {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'x-kiloclaw-gateway-token': 'wrong-token',
+        },
+        body: JSON.stringify({ sandboxId }),
+      },
+      makeEnv({ hyperdriveConnectionString: 'postgres://example' })
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('returns disconnected payload when no row exists', async () => {
+    const env = makeEnv({ hyperdriveConnectionString: 'postgres://example' });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(null);
+
+    const response = await controller.request(
+      '/google/status',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ connected: false, accounts: [] });
+  });
+
+  it('returns connected false for non-active status while listing account', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const env = makeEnv({ hyperdriveConnectionString: 'postgres://example' });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(
+      makeGoogleConnection(encryptionKey, { status: 'action_required' })
+    );
+
+    const response = await controller.request(
+      '/google/status',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload).toEqual(
+      expect.objectContaining({
+        connected: false,
+        accounts: [expect.objectContaining({ email: 'user@example.com', status: 'action_required' })],
+      })
+    );
+  });
+
+  it('returns connected true when status is active', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const env = makeEnv({ hyperdriveConnectionString: 'postgres://example' });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(makeGoogleConnection(encryptionKey));
+
+    const response = await controller.request(
+      '/google/status',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({ connected: true, accounts: [expect.any(Object)] })
     );
   });
 });
@@ -700,6 +1251,155 @@ describe('POST /google/migrate-legacy', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('returns 401 when auth headers are missing', async () => {
+    const response = await controller.request(
+      '/google/migrate-legacy',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sandboxId,
+          accountEmail: 'legacy@example.com',
+          accountSubject: 'legacy-subject',
+          oauthClientId: 'legacy-client-id',
+          oauthClientSecret: 'legacy-client-secret',
+          refreshToken: 'legacy-refresh-token',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          capabilities: ['calendar_read'],
+        }),
+      },
+      makeEnv({ hyperdriveConnectionString: 'postgres://example' })
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 403 when gateway token is invalid', async () => {
+    const headers = await makeAuthHeaders();
+    const response = await controller.request(
+      '/google/migrate-legacy',
+      {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'x-kiloclaw-gateway-token': 'wrong-token',
+        },
+        body: JSON.stringify({
+          sandboxId,
+          accountEmail: 'legacy@example.com',
+          accountSubject: 'legacy-subject',
+          oauthClientId: 'legacy-client-id',
+          oauthClientSecret: 'legacy-client-secret',
+          refreshToken: 'legacy-refresh-token',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          capabilities: ['calendar_read'],
+        }),
+      },
+      makeEnv({ hyperdriveConnectionString: 'postgres://example' })
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('inserts a legacy oauth row when none exists and mirrors active status to DO', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const execute = vi.fn().mockResolvedValue(undefined);
+    mockGetWorkerDb.mockReturnValue({ execute });
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(null);
+
+    const response = await controller.request(
+      '/google/migrate-legacy',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sandboxId,
+          accountEmail: 'legacy@example.com',
+          accountSubject: 'legacy-subject',
+          oauthClientId: 'legacy-client-id',
+          oauthClientSecret: 'legacy-client-secret',
+          refreshToken: 'legacy-refresh-token',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          capabilities: ['calendar_read'],
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ migrated: true, profile: 'legacy' });
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(mockUpdateGoogleOAuthConnectionTokenData).not.toHaveBeenCalled();
+    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'active' })
+    );
+  });
+
+  it('updates an existing legacy row in place and mirrors active status to DO', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const execute = vi.fn().mockResolvedValue(undefined);
+    mockGetWorkerDb.mockReturnValue({ execute });
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(
+      makeGoogleConnection(encryptionKey, {
+        id: 'conn-legacy',
+        credential_profile: 'legacy',
+        oauth_client_id: 'legacy-client-id',
+        oauth_client_secret_encrypted: encryptWithSymmetricKey('legacy-client-secret', encryptionKey),
+        grants_by_source: { legacy: ['calendar_read'] },
+      })
+    );
+
+    const response = await controller.request(
+      '/google/migrate-legacy',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sandboxId,
+          accountEmail: 'legacy@example.com',
+          accountSubject: 'legacy-subject',
+          oauthClientId: 'legacy-client-id',
+          oauthClientSecret: 'legacy-client-secret',
+          refreshToken: 'legacy-refresh-token',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          capabilities: ['calendar_read', 'gmail_read'],
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ migrated: true, profile: 'legacy' });
+    expect(mockUpdateGoogleOAuthConnectionTokenData).toHaveBeenCalledWith(
+      expect.any(Object),
+      'instance-1',
+      expect.objectContaining({
+        credentialProfile: 'legacy',
+        status: 'active',
+      })
+    );
+    expect(execute).toHaveBeenCalledTimes(1);
+    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'active' })
+    );
   });
 
   it('merges legacy grants into an existing kilo_owned connection without overwriting token profile', async () => {

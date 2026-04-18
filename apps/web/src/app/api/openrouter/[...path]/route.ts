@@ -89,6 +89,7 @@ import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/proce
 import { extractResponsesPromptInfo } from '@/lib/ai-gateway/processUsage.responses';
 import { extractMessagesPromptInfo } from '@/lib/ai-gateway/processUsage.messages';
 import {
+  enableReasoningSummaries,
   fixResponsesRequest,
   getMaxTokens,
   hasMiddleOutTransform,
@@ -502,6 +503,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (requestBodyParsed.kind === 'responses') {
     fixResponsesRequest(requestBodyParsed.body);
   }
+
+  enableReasoningSummaries(requestBodyParsed);
 
   const toolsAvailable = getToolsAvailable(requestBodyParsed);
   const toolsUsed = getToolsUsed(requestBodyParsed);

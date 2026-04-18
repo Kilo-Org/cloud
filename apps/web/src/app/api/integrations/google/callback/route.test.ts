@@ -178,6 +178,24 @@ describe('GET /api/integrations/google/callback', () => {
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/claw/settings?error=access_denied');
     expect(mockedCaptureMessage).toHaveBeenCalledWith('Google OAuth error', expect.any(Object));
+    expect(mockedCaptureMessage).toHaveBeenCalledWith(
+      'Google OAuth error',
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          hasCode: false,
+          hasState: true,
+          stateHash: expect.any(String),
+          error: 'access_denied',
+        }),
+      })
+    );
+
+    const call = mockedCaptureMessage.mock.calls.find(
+      ([message]) => message === 'Google OAuth error'
+    );
+    const payload = call?.[1] as { extra?: Record<string, unknown> } | undefined;
+    expect(payload?.extra).not.toHaveProperty('state');
+    expect(payload?.extra).not.toHaveProperty('allParams');
   });
 
   test('redirects org OAuth provider errors to org claw settings', async () => {
@@ -216,6 +234,24 @@ describe('GET /api/integrations/google/callback', () => {
       'Google callback invalid or tampered state',
       expect.any(Object)
     );
+    expect(mockedCaptureMessage).toHaveBeenCalledWith(
+      'Google callback invalid or tampered state',
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          hasCode: true,
+          hasState: true,
+          stateHash: expect.any(String),
+          error: null,
+        }),
+      })
+    );
+
+    const call = mockedCaptureMessage.mock.calls.find(
+      ([message]) => message === 'Google callback invalid or tampered state'
+    );
+    const payload = call?.[1] as { extra?: Record<string, unknown> } | undefined;
+    expect(payload?.extra).not.toHaveProperty('state');
+    expect(payload?.extra).not.toHaveProperty('allParams');
   });
 
   test('redirects unexpected failures to org claw settings when state indicates org owner', async () => {

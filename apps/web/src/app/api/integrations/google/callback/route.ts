@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@/lib/constants';
 import { getUserFromAuth } from '@/lib/user.server';
@@ -25,6 +26,23 @@ function buildGoogleRedirectPath(state: string | null, queryParam: string): stri
   return `/claw/settings?${queryParam}`;
 }
 
+function oauthSentryContext(searchParams: URLSearchParams): {
+  hasCode: boolean;
+  hasState: boolean;
+  stateHash: string | null;
+  error: string | null;
+  errorDescription: string | null;
+} {
+  const state = searchParams.get('state');
+  return {
+    hasCode: !!searchParams.get('code'),
+    hasState: !!state,
+    stateHash: state ? createHash('sha256').update(state).digest('hex').slice(0, 8) : null,
+    error: searchParams.get('error'),
+    errorDescription: searchParams.get('error_description'),
+  };
+}
+
 /**
  * Google OAuth callback.
  *
@@ -48,7 +66,7 @@ export async function GET(request: NextRequest) {
       captureMessage('Google OAuth error', {
         level: 'warning',
         tags: { endpoint: 'google/callback', source: 'google_oauth' },
-        extra: { error, errorDescription, state },
+        extra: oauthSentryContext(searchParams),
       });
 
       const errorCode = encodeURIComponent(errorDescription || error);
@@ -61,7 +79,7 @@ export async function GET(request: NextRequest) {
       captureMessage('Google callback missing code', {
         level: 'warning',
         tags: { endpoint: 'google/callback', source: 'google_oauth' },
-        extra: { state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: oauthSentryContext(searchParams),
       });
 
       return NextResponse.redirect(
@@ -74,7 +92,7 @@ export async function GET(request: NextRequest) {
       captureMessage('Google callback invalid or tampered state', {
         level: 'warning',
         tags: { endpoint: 'google/callback', source: 'google_oauth' },
-        extra: { state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: oauthSentryContext(searchParams),
       });
       return NextResponse.redirect(new URL('/claw/settings?error=invalid_state', APP_URL));
     }
@@ -183,10 +201,7 @@ export async function GET(request: NextRequest) {
         endpoint: 'google/callback',
         source: 'google_oauth',
       },
-      extra: {
-        state,
-        hasCode: !!request.nextUrl.searchParams.get('code'),
-      },
+      extra: oauthSentryContext(request.nextUrl.searchParams),
     });
 
     return NextResponse.redirect(

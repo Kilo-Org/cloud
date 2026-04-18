@@ -296,9 +296,12 @@ rules resolve conflicts.
    customer before creating a new checkout session, to guard against
    concurrent checkouts. This check does not cover provider-side
    subscriptions in past-due status.
-4. The system MUST NOT allow promotional codes for either plan.
-5. The system MUST apply a provider-configured first-month discount
-   coupon when creating a standard plan checkout session.
+4. The system MUST allow promotional codes for either plan.
+5. The system MUST apply the configured first-month discount when
+   creating a standard plan checkout session without consuming the
+   promotional-code input. The implementation MAY use a dedicated
+   intro price or another provider-supported mechanism that keeps
+   user-entered promotional codes available.
 6. When a configurable billing start date is set and is in the future,
    the system MUST create the subscription with a delayed billing period
    that begins on that date.
@@ -1084,7 +1087,8 @@ Previous values:
 New values:
 
 - Trial duration: 7 days (existing trials keep their original end date)
-- Standard plan: $9/month with $4 first month via coupon, no promotional codes
+- Standard plan: $9/month with $4 first month while still allowing
+  promotional codes
 - Commit plan: $48/6 months
 - Trial expiry warning: 2 days before expiry
 - 14 existing subscribers migrated to new pricing at next billing cycle

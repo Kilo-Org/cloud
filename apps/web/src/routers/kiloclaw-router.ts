@@ -3334,7 +3334,7 @@ export const kiloclawRouter = createTRPCRouter({
         customer: stripeCustomerId,
         billing_address_collection: 'required',
         line_items: [{ price: priceId, quantity: 1 }],
-        allow_promotion_codes: false,
+        allow_promotion_codes: true,
         customer_update: { name: 'auto', address: 'auto' },
         tax_id_collection: { enabled: true, required: 'never' },
         success_url: successUrl,

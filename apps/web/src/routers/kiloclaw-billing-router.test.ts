@@ -1032,7 +1032,7 @@ describe('createSubscriptionCheckout', () => {
     );
   });
 
-  it('uses the intro price and disables promotion codes for new standard subscribers', async () => {
+  it('uses the intro price and allows promotion codes for new standard subscribers', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -1056,7 +1056,7 @@ describe('createSubscriptionCheckout', () => {
     >;
     // Should use intro price
     expect(callArgs.line_items).toEqual([{ price: 'price_standard_intro', quantity: 1 }]);
-    expect(callArgs.allow_promotion_codes).toBe(false);
+    expect(callArgs.allow_promotion_codes).toBe(true);
     // Should NOT have discounts (coupon removed)
     expect(callArgs.discounts).toBeUndefined();
     expect(callArgs.metadata).toEqual(
@@ -1089,7 +1089,7 @@ describe('createSubscriptionCheckout', () => {
     >;
     // Should use regular price (via getStripePriceIdForClawPlan mock which returns 'price_test_kiloclaw')
     expect(callArgs.line_items).toEqual([{ price: 'price_test_kiloclaw', quantity: 1 }]);
-    expect(callArgs.allow_promotion_codes).toBe(false);
+    expect(callArgs.allow_promotion_codes).toBe(true);
     expect(callArgs.discounts).toBeUndefined();
   });
 
@@ -1117,7 +1117,7 @@ describe('createSubscriptionCheckout', () => {
     expect(callArgs.line_items).toEqual([{ price: 'price_standard_intro', quantity: 1 }]);
   });
 
-  it('disables promotion codes for commit plan', async () => {
+  it('allows promotion codes for commit plan', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -1139,7 +1139,7 @@ describe('createSubscriptionCheckout', () => {
       string,
       unknown
     >;
-    expect(callArgs.allow_promotion_codes).toBe(false);
+    expect(callArgs.allow_promotion_codes).toBe(true);
     expect(callArgs.discounts).toBeUndefined();
   });
 

@@ -3757,7 +3757,7 @@ export const kiloclaw_google_oauth_connections = pgTable(
       .notNull(),
     instance_id: uuid()
       .notNull()
-      .references(() => kiloclaw_instances.id, { onDelete: 'cascade' }),
+      .references(() => kiloclaw_instances.id),
     provider: text().notNull().default('google'),
     account_email: text().notNull(),
     account_subject: text().notNull(),

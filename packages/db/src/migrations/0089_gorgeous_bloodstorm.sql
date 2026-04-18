@@ -21,7 +21,7 @@ CREATE TABLE "kiloclaw_google_oauth_connections" (
 	CONSTRAINT "kiloclaw_google_oauth_connections_credential_profile_check" CHECK ("kiloclaw_google_oauth_connections"."credential_profile" IN ('legacy', 'kilo_owned'))
 );
 --> statement-breakpoint
-ALTER TABLE "kiloclaw_google_oauth_connections" ADD CONSTRAINT "kiloclaw_google_oauth_connections_instance_id_kiloclaw_instances_id_fk" FOREIGN KEY ("instance_id") REFERENCES "public"."kiloclaw_instances"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "kiloclaw_google_oauth_connections" ADD CONSTRAINT "kiloclaw_google_oauth_connections_instance_id_kiloclaw_instances_id_fk" FOREIGN KEY ("instance_id") REFERENCES "public"."kiloclaw_instances"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "UQ_kiloclaw_google_oauth_connections_instance" ON "kiloclaw_google_oauth_connections" USING btree ("instance_id");--> statement-breakpoint
 CREATE INDEX "IDX_kiloclaw_google_oauth_connections_status" ON "kiloclaw_google_oauth_connections" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "IDX_kiloclaw_google_oauth_connections_provider" ON "kiloclaw_google_oauth_connections" USING btree ("provider");

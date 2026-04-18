@@ -896,9 +896,7 @@ describe('TOOLS.md section configs', () => {
 
   it('Google Workspace section uses current gog calendar guidance', () => {
     expect(GOG_SECTION_CONFIG.section).toContain('gog auth list --json');
-    expect(GOG_SECTION_CONFIG.section).toContain(
-      'gog calendar calendars --account <email> --json'
-    );
+    expect(GOG_SECTION_CONFIG.section).toContain('gog calendar calendars --account <email> --json');
     expect(GOG_SECTION_CONFIG.section).toContain(
       'gog calendar events --all --all-pages --account <email> --from <iso> --to <iso> --json'
     );

@@ -39,6 +39,7 @@ function generateModel(): OpenRouterModel {
     input_modalities: inputModalities,
     output_modalities: outputModalities,
     group: base?.group ?? 'default',
+    updated_at: base?.updated_at ?? new Date().toISOString(),
     endpoint: base?.endpoint ?? null,
   };
 }

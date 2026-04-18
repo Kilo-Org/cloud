@@ -181,6 +181,7 @@ async function syncProviders() {
           input_modalities: model.architecture.input_modalities,
           output_modalities: model.architecture.output_modalities,
           group: 'other',
+          updated_at: new Date().toISOString(),
           endpoint: {
             provider_display_name: 'Other',
             is_free: !kfm.pricing,

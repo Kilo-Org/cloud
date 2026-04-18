@@ -169,6 +169,15 @@ function makeGoogleConnection(encryptionKey: string, overrides?: Record<string, 
   };
 }
 
+function getInstanceStub(env: unknown): { updateGoogleOAuthConnection: Mock } {
+  const kiloInstance = env as {
+    KILOCLAW_INSTANCE: {
+      get: () => { updateGoogleOAuthConnection: Mock };
+    };
+  };
+  return kiloInstance.KILOCLAW_INSTANCE.get();
+}
+
 function analyticsEvents(writeDataPoint: Mock): AnalyticsEngineDataPoint[] {
   const calls = writeDataPoint.mock.calls as [AnalyticsEngineDataPoint][];
   return calls.map(([call]) => call);
@@ -790,7 +799,7 @@ describe('POST /google/token', () => {
     });
     expect(mockUpdateGoogleOAuthConnectionTokenData).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
-    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    const instanceStub = getInstanceStub(env);
     expect(instanceStub.updateGoogleOAuthConnection).not.toHaveBeenCalled();
   });
 
@@ -957,7 +966,7 @@ describe('POST /google/token', () => {
       'instance-1',
       expect.objectContaining({ status: 'active' })
     );
-    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    const instanceStub = getInstanceStub(env);
     expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'active' })
     );
@@ -999,7 +1008,7 @@ describe('POST /google/token', () => {
       'instance-1',
       expect.objectContaining({ status: 'action_required' })
     );
-    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    const instanceStub = getInstanceStub(env);
     expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'action_required' })
     );
@@ -1039,7 +1048,7 @@ describe('POST /google/token', () => {
       'instance-1',
       expect.objectContaining({ status: 'action_required' })
     );
-    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    const instanceStub = getInstanceStub(env);
     expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'action_required' })
     );
@@ -1113,7 +1122,7 @@ describe('POST /google/token', () => {
         lastError: 'refresh_token_decryption_failed',
       })
     );
-    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    const instanceStub = getInstanceStub(env);
     expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'action_required',
@@ -1339,7 +1348,7 @@ describe('POST /google/migrate-legacy', () => {
     await expect(response.json()).resolves.toEqual({ migrated: true, profile: 'legacy' });
     expect(execute).toHaveBeenCalledTimes(1);
     expect(mockUpdateGoogleOAuthConnectionTokenData).not.toHaveBeenCalled();
-    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    const instanceStub = getInstanceStub(env);
     expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'active' })
     );
@@ -1396,7 +1405,7 @@ describe('POST /google/migrate-legacy', () => {
       })
     );
     expect(execute).toHaveBeenCalledTimes(1);
-    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    const instanceStub = getInstanceStub(env);
     expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'active' })
     );
@@ -1453,7 +1462,7 @@ describe('POST /google/migrate-legacy', () => {
     await expect(response.json()).resolves.toEqual({ migrated: true, profile: 'kilo_owned' });
     expect(mockUpdateGoogleOAuthConnectionTokenData).not.toHaveBeenCalled();
 
-    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
+    const instanceStub = getInstanceStub(env);
     expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({
         accountEmail: 'existing@example.com',

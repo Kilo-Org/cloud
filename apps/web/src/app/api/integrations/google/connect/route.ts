@@ -7,7 +7,7 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
 import { createGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
-import { parseGoogleCapabilities } from '@/lib/integrations/google/capabilities';
+import { DEFAULT_GOOGLE_CAPABILITIES } from '@/lib/integrations/google/capabilities';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { Owner } from '@/lib/integrations/core/types';
 
@@ -29,18 +29,17 @@ function buildConnectErrorPath(organizationId: string | undefined, errorCode: st
  *
  * Query params:
  * - organizationId: optional organization UUID
- * - capabilities: optional comma-separated capability set
  */
 export async function GET(request: NextRequest) {
   let organizationId: string | undefined;
 
   try {
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
     if (authFailedResponse) {
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
     }
 
-    const capabilities = parseGoogleCapabilities(request.nextUrl.searchParams.get('capabilities'));
+    const capabilities = [...DEFAULT_GOOGLE_CAPABILITIES];
 
     const organizationIdParam = request.nextUrl.searchParams.get('organizationId');
     if (organizationIdParam) {

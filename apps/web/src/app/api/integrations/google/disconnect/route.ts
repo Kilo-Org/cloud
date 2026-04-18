@@ -19,11 +19,26 @@ function buildDisconnectPath(organizationId: string | undefined, queryParam: str
   return `/claw/settings?${queryParam}`;
 }
 
-export async function GET(request: NextRequest) {
+function isSameOriginMutation(request: NextRequest): boolean {
+  const origin = request.headers.get('origin');
+  if (!origin) return false;
+
+  try {
+    return new URL(origin).origin === new URL(APP_URL).origin;
+  } catch {
+    return false;
+  }
+}
+
+export async function POST(request: NextRequest) {
   let organizationId: string | undefined;
 
   try {
-    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    if (!isSameOriginMutation(request)) {
+      return NextResponse.redirect(new URL('/claw/settings?error=invalid_origin', APP_URL));
+    }
+
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
     if (authFailedResponse) {
       return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
     }
@@ -82,4 +97,8 @@ export async function GET(request: NextRequest) {
       new URL(buildDisconnectPath(organizationId, 'error=disconnect_failed'), APP_URL)
     );
   }
+}
+
+export async function GET() {
+  return NextResponse.redirect(new URL('/claw/settings?error=method_not_allowed', APP_URL));
 }

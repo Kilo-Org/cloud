@@ -4,7 +4,6 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
 import { createGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
-import { parseGoogleCapabilities } from '@/lib/integrations/google/capabilities';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { failureResult } from '@/lib/maybe-result';
 
@@ -16,7 +15,6 @@ jest.mock('@/routers/organizations/utils', () => ({
 jest.mock('@/lib/kiloclaw/instance-registry');
 jest.mock('@/lib/integrations/google-service');
 jest.mock('@/lib/integrations/google/oauth-state');
-jest.mock('@/lib/integrations/google/capabilities');
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
@@ -27,7 +25,6 @@ const mockedGetActiveInstance = jest.mocked(getActiveInstance);
 const mockedGetActiveOrgInstance = jest.mocked(getActiveOrgInstance);
 const mockedBuildGoogleOAuthUrl = jest.mocked(buildGoogleOAuthUrl);
 const mockedCreateGoogleOAuthState = jest.mocked(createGoogleOAuthState);
-const mockedParseGoogleCapabilities = jest.mocked(parseGoogleCapabilities);
 const mockedCaptureException = jest.mocked(captureException);
 const mockedCaptureMessage = jest.mocked(captureMessage);
 
@@ -54,7 +51,6 @@ describe('GET /api/integrations/google/connect', () => {
       user: { id: USER_ID },
       authFailedResponse: null,
     } as never);
-    mockedParseGoogleCapabilities.mockReturnValue(['calendar_read']);
     mockedGetActiveInstance.mockResolvedValue({ id: INSTANCE_ID } as never);
     mockedGetActiveOrgInstance.mockResolvedValue({ id: INSTANCE_ID } as never);
     mockedCreateGoogleOAuthState.mockReturnValue('state-123');
@@ -84,6 +80,7 @@ describe('GET /api/integrations/google/connect', () => {
     );
     expect(mockedGetActiveInstance).toHaveBeenCalledWith(USER_ID);
     expect(mockedGetActiveOrgInstance).not.toHaveBeenCalled();
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: true });
     expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
       {
         owner: { type: 'user', id: USER_ID },

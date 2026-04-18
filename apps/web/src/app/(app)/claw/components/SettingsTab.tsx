@@ -1127,9 +1127,11 @@ export function SettingsTab({
               </div>
             </div>
             {status.googleOAuthConnected ? (
-              <Button asChild variant="outline" size="sm">
-                <a href={googleCalendarDisconnectHref}>Disconnect</a>
-              </Button>
+              <form action={googleCalendarDisconnectHref} method="POST">
+                <Button type="submit" variant="outline" size="sm">
+                  Disconnect
+                </Button>
+              </form>
             ) : (
               <Button asChild variant="outline" size="sm">
                 <a href={googleCalendarConnectHref}>Connect</a>

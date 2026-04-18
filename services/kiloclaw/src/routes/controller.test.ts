@@ -14,11 +14,13 @@ vi.mock('cloudflare:workers', () => ({
 }));
 
 const {
+  mockGetWorkerDb,
   mockFindEmailByUserId,
   mockGetInstanceBySandboxId,
   mockGetGoogleOAuthConnectionByInstanceId,
   mockUpdateGoogleOAuthConnectionTokenData,
 } = vi.hoisted(() => ({
+  mockGetWorkerDb: vi.fn().mockReturnValue({}),
   mockFindEmailByUserId: vi.fn().mockResolvedValue('user@example.com'),
   mockGetInstanceBySandboxId: vi.fn(),
   mockGetGoogleOAuthConnectionByInstanceId: vi.fn(),
@@ -26,7 +28,7 @@ const {
 }));
 
 vi.mock('../db', () => ({
-  getWorkerDb: () => ({}),
+  getWorkerDb: mockGetWorkerDb,
   findEmailByUserId: mockFindEmailByUserId,
   getInstanceBySandboxId: mockGetInstanceBySandboxId,
   getGoogleOAuthConnectionByInstanceId: mockGetGoogleOAuthConnectionByInstanceId,
@@ -684,6 +686,80 @@ describe('POST /google/token', () => {
       {},
       'instance-1',
       expect.objectContaining({ status: 'action_required' })
+    );
+  });
+});
+
+describe('POST /google/migrate-legacy', () => {
+  beforeEach(() => {
+    mockGetWorkerDb.mockReset().mockReturnValue({ execute: vi.fn().mockResolvedValue(undefined) });
+    mockGetInstanceBySandboxId.mockReset();
+    mockGetGoogleOAuthConnectionByInstanceId.mockReset();
+    mockUpdateGoogleOAuthConnectionTokenData.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('merges legacy grants into an existing kilo_owned connection without overwriting token profile', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue({
+      id: 'conn-1',
+      instance_id: 'instance-1',
+      provider: 'google',
+      account_email: 'existing@example.com',
+      account_subject: 'existing-subject',
+      credential_profile: 'kilo_owned',
+      refresh_token_encrypted: encryptWithSymmetricKey('refresh-token-1', encryptionKey),
+      oauth_client_secret_encrypted: null,
+      oauth_client_id: 'oauth-client-id',
+      capabilities: ['calendar_read'],
+      grants_by_source: { oauth: ['calendar_read'] },
+      scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+      status: 'active',
+    });
+
+    const response = await controller.request(
+      '/google/migrate-legacy',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sandboxId,
+          accountEmail: 'legacy@example.com',
+          accountSubject: 'legacy-subject',
+          oauthClientId: 'legacy-client-id',
+          oauthClientSecret: 'legacy-client-secret',
+          refreshToken: 'legacy-refresh-token',
+          scopes: [
+            'https://www.googleapis.com/auth/calendar.readonly',
+            'https://www.googleapis.com/auth/gmail.readonly',
+          ],
+          capabilities: ['calendar_read', 'gmail_read'],
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ migrated: true, profile: 'kilo_owned' });
+    expect(mockUpdateGoogleOAuthConnectionTokenData).not.toHaveBeenCalled();
+
+    const instanceStub = env.KILOCLAW_INSTANCE.get();
+    expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountEmail: 'existing@example.com',
+        accountSubject: 'existing-subject',
+        capabilities: ['calendar_read', 'gmail_read'],
+      })
     );
   });
 });

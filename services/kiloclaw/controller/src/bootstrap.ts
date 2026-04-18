@@ -589,13 +589,18 @@ export const GOG_SECTION_CONFIG: ToolsMdSectionConfig = {
 
 The \`gog\` CLI is configured and ready for Google Workspace operations (Gmail, Calendar, Drive, Docs, Sheets, Slides, Tasks, Forms, Chat, Classroom).
 
-- List accounts: \`gog auth list\`
+- List accounts: \`gog auth list --json\`
 - Gmail — search: \`gog gmail search --account <email> --query "from:X"\`
 - Gmail — read: \`gog gmail get --account <email> <message-id>\`
 - Gmail — send: \`gog gmail send --account <email> --to <addr> --subject "..." --body "..."\`
-- Calendar — list events: \`gog calendar events list --account <email>\`
-- Drive — list files: \`gog drive files list --account <email>\`
+- Calendar — list calendars first: \`gog calendar calendars --account <email> --json\`
+- Calendar — fetch events (all calendars): \`gog calendar events --account <email> --from <iso> --to <iso> --json\`
+- Calendar — use \`primary\` only when explicitly requested; otherwise query all calendars first
+- Calendar — if results look sparse, retry with explicit calendar IDs from \`gog calendar calendars\`:
+  \`gog calendar events <calendarId> --account <email> --from <iso> --to <iso> --json\`
+- Drive — list files: \`gog drive ls --account <email> --json\`
 - Docs — read: \`gog docs get --account <email> <doc-id>\`
+- If a command is blocked by capabilities, first run \`gog auth list --json\` to confirm what is granted.
 - Run \`gog --help\` and \`gog <service> --help\` for all available commands.
 <!-- END:google-workspace -->`,
 };

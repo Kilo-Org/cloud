@@ -715,6 +715,144 @@ export function deleteBead(sql: SqlStorage, beadId: string): void {
   query(sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.bead_id} = ?`, [beadId]);
 }
 
+export function deleteBeads(sql: SqlStorage, beadIds: string[]): number {
+  if (beadIds.length === 0) return 0;
+
+  const allIds = new Set(beadIds);
+
+  // Expand with child beads (molecule steps, etc.)
+  const childRows = [
+    ...query(
+      sql,
+      /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.parent_bead_id} IN (${beadIds.map(() => '?').join(',')})`,
+      [...beadIds]
+    ),
+  ];
+  const childIds = BeadRecord.pick({ bead_id: true })
+    .array()
+    .parse(childRows)
+    .map(r => r.bead_id);
+
+  // Recursively collect children of children
+  if (childIds.length > 0) {
+    for (const childId of childIds) {
+      allIds.add(childId);
+    }
+    // Recurse for deeper nesting
+    const deeperIds = collectChildBeadIds(sql, childIds);
+    for (const id of deeperIds) {
+      allIds.add(id);
+    }
+  }
+
+  const allIdsArr = [...allIds];
+  const placeholders = allIdsArr.map(() => '?').join(',');
+
+  // Unhook agents assigned to any of these beads
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${agent_metadata}
+      SET ${agent_metadata.columns.current_hook_bead_id} = NULL,
+          ${agent_metadata.columns.status} = 'idle'
+      WHERE ${agent_metadata.current_hook_bead_id} IN (${placeholders})
+    `,
+    [...allIdsArr]
+  );
+
+  // Delete dependencies referencing any of these beads
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${bead_dependencies} WHERE ${bead_dependencies.bead_id} IN (${placeholders}) OR ${bead_dependencies.depends_on_bead_id} IN (${placeholders})`,
+    [...allIdsArr, ...allIdsArr]
+  );
+
+  // Delete events
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${bead_events} WHERE ${bead_events.bead_id} IN (${placeholders})`,
+    [...allIdsArr]
+  );
+
+  // Delete satellite metadata
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${agent_metadata} WHERE ${agent_metadata.bead_id} IN (${placeholders})`,
+    [...allIdsArr]
+  );
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${review_metadata} WHERE ${review_metadata.bead_id} IN (${placeholders})`,
+    [...allIdsArr]
+  );
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${escalation_metadata} WHERE ${escalation_metadata.bead_id} IN (${placeholders})`,
+    [...allIdsArr]
+  );
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${convoy_metadata} WHERE ${convoy_metadata.bead_id} IN (${placeholders})`,
+    [...allIdsArr]
+  );
+
+  // Delete the beads themselves
+  query(
+    sql,
+    /* sql */ `DELETE FROM ${beads} WHERE ${beads.bead_id} IN (${placeholders})`,
+    [...allIdsArr]
+  );
+
+  return allIdsArr.length;
+}
+
+function collectChildBeadIds(sql: SqlStorage, parentIds: string[]): string[] {
+  if (parentIds.length === 0) return [];
+  const childRows = [
+    ...query(
+      sql,
+      /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.parent_bead_id} IN (${parentIds.map(() => '?').join(',')})`,
+      [...parentIds]
+    ),
+  ];
+  const childIds = BeadRecord.pick({ bead_id: true })
+    .array()
+    .parse(childRows)
+    .map(r => r.bead_id);
+  if (childIds.length === 0) return [];
+  const deeperIds = collectChildBeadIds(sql, childIds);
+  return [...childIds, ...deeperIds];
+}
+
+export function deleteBeadsByStatus(
+  sql: SqlStorage,
+  status: BeadStatus,
+  type?: BeadType
+): number {
+  const conditions: string[] = [`${beads.status} = ?`];
+  const values: unknown[] = [status];
+
+  if (type) {
+    conditions.push(`${beads.type} = ?`);
+    values.push(type);
+  }
+
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${conditions.join(' AND ')}`,
+      values
+    ),
+  ];
+  const beadIds = BeadRecord.pick({ bead_id: true })
+    .array()
+    .parse(rows)
+    .map(r => r.bead_id);
+
+  if (beadIds.length === 0) return 0;
+  return deleteBeads(sql, beadIds);
+}
+
 // ── Bead Events ─────────────────────────────────────────────────────
 
 export function logBeadEvent(

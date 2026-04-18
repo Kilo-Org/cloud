@@ -77,8 +77,10 @@ function createSelectBuilder<T>(rows: T[]): SelectBuilder<T> {
 function createWorkerDb() {
   const txSelectQueue = [[]];
   const txInsertReturningQueue = [[{ id: 'instance-new', sandboxId: 'sandbox-new' }], [], []];
+  const updateSets: Array<Record<string, unknown>> = [];
 
   return {
+    updateSets,
     transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
       const tx = {
         select: vi.fn(() => createSelectBuilder(txSelectQueue.shift() ?? [])),
@@ -94,6 +96,14 @@ function createWorkerDb() {
       return await callback(tx);
     }),
     select: vi.fn(() => createSelectBuilder([])),
+    update: vi.fn(() => ({
+      set: vi.fn((values: Record<string, unknown>) => {
+        updateSets.push(values);
+        return {
+          where: vi.fn(async () => undefined),
+        };
+      }),
+    })),
   };
 }
 
@@ -132,11 +142,12 @@ function makeEnv() {
 describe('platform provision bootstrap quarantine', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetWorkerDb.mockReturnValue(createWorkerDb());
   });
 
-  it('returns an error and leaves fresh instance provisioned when RPC and fallback both fail', async () => {
+  it('returns an error and marks fresh instance destroyed when RPC and fallback both fail', async () => {
     const { env, destroy } = makeEnv();
+    const workerDb = createWorkerDb();
+    mockGetWorkerDb.mockReturnValue(workerDb);
     mockBootstrapProvisionedSubscriptionWithFallback.mockRejectedValue(
       new BootstrapProvisionFallbackError({
         rpcError: new Error('rpc down'),
@@ -162,6 +173,12 @@ describe('platform provision bootstrap quarantine', () => {
       error: 'post-provision bootstrap failed',
     });
     expect(destroy).not.toHaveBeenCalled();
+    expect(workerDb.updateSets).toHaveLength(1);
+    expect(workerDb.updateSets[0]).toEqual(
+      expect.objectContaining({
+        destroyed_at: expect.anything(),
+      })
+    );
     const eventCall = mockWriteEvent.mock.calls.find(
       call => call[1]?.event === 'instance.subscription_bootstrap_quarantined'
     );

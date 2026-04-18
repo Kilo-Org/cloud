@@ -1019,8 +1019,19 @@ platform.post('/provision', async c => {
         label: 'rpc_and_local_fallback_failed',
         durationMs: performance.now() - bootstrapStartedAt,
       });
+      if (shouldInsertInstanceRecord) {
+        await markProvisionedInstanceDestroyed({
+          env: c.env,
+          instanceId: provisionedInstanceId,
+        }).catch(markErr => {
+          console.error(
+            '[platform] Failed to mark bootstrap-quarantined instance destroyed for retry:',
+            markErr
+          );
+        });
+      }
       console.error(
-        '[platform] Subscription bootstrap failed after local fallback; instance left quarantined for remediation',
+        '[platform] Subscription bootstrap failed after local fallback; instance quarantined for remediation',
         {
           userId,
           instanceId: provisionedInstanceId,

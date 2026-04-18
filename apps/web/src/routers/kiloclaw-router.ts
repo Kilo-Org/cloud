@@ -1141,7 +1141,7 @@ async function getPersonalBillingStatus(user: {
     };
   }
 
-  const [anySubscription, anyPersonalInstance] = await Promise.all([
+  const [anySubscription, anyPersonalInstanceHistory] = await Promise.all([
     db
       .select({ id: kiloclaw_subscriptions.id })
       .from(kiloclaw_subscriptions)
@@ -1152,11 +1152,7 @@ async function getPersonalBillingStatus(user: {
       .select({ id: kiloclaw_instances.id })
       .from(kiloclaw_instances)
       .where(
-        and(
-          eq(kiloclaw_instances.user_id, user.id),
-          isNull(kiloclaw_instances.organization_id),
-          isNull(kiloclaw_instances.destroyed_at)
-        )
+        and(eq(kiloclaw_instances.user_id, user.id), isNull(kiloclaw_instances.organization_id))
       )
       .limit(1)
       .then(rows => rows[0] ?? null),
@@ -1189,7 +1185,7 @@ async function getPersonalBillingStatus(user: {
   return {
     hasAccess,
     accessReason,
-    trialEligible: !anyPersonalInstance && !anySubscription,
+    trialEligible: !anyPersonalInstanceHistory && !anySubscription,
     creditBalanceMicrodollars,
     creditIntroEligible,
     hasActiveKiloPass,

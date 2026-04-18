@@ -368,7 +368,7 @@ describe('getBillingStatus', () => {
     expect(result.trialEligible).toBe(true);
   });
 
-  it('returns trialEligible true when user only has a destroyed personal instance row', async () => {
+  it('returns trialEligible false when user only has a destroyed personal instance row', async () => {
     await db.insert(kiloclaw_instances).values({
       user_id: user.id,
       sandbox_id: 'sandbox-destroyed',
@@ -379,7 +379,7 @@ describe('getBillingStatus', () => {
     const result = await caller.kiloclaw.getBillingStatus();
 
     expect(result).not.toBeNull();
-    expect(result.trialEligible).toBe(true);
+    expect(result.trialEligible).toBe(false);
   });
 
   it('returns trialEligible false when user has an active personal instance row', async () => {

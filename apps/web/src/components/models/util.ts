@@ -267,7 +267,7 @@ export function formatContextLength(length: number | null | undefined): string {
 }
 
 export function getModelSeries(model: OpenRouterModel): string {
-  const group = model.group.toLowerCase();
+  const group = model.group?.toLowerCase() || '';
   const name = model.name.toLowerCase();
 
   if (group.includes('gpt') || name.includes('gpt')) return 'GPT';

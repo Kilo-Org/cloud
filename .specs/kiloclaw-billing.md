@@ -998,10 +998,14 @@ rows renew.
    `kiloclaw_instance` and `kiloclaw_subscription` rows for that
    user. Ownership references and directly identifying user fields
    MUST be anonymized rather than deleted.
-2. When a user is soft-deleted, the system MUST delete auxiliary
+2. When a user is soft-deleted, the system MUST retain subscription
+   change-log rows as canonical audit history. Any directly
+   identifying actor or ownership fields in those rows MUST be
+   anonymized while preserving the audit trail's meaning.
+3. When a user is soft-deleted, the system MUST delete auxiliary
    KiloClaw billing records whose purpose is operational rather than
    canonical state, such as email notification log entries.
-3. Credit transaction records created by subscription deductions are
+4. Credit transaction records created by subscription deductions are
    managed by the credit system's own data deletion rules, not by
    KiloClaw billing. This spec does not impose additional deletion
    requirements on credit transaction records.

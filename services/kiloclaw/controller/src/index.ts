@@ -450,7 +450,13 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     legacyGoogleMigration.migrated = migrationResult.migrated;
     legacyGoogleMigration.reason = migrationResult.reason;
 
-    if (migrationResult.attempted && !migrationResult.migrated) {
+    const enableLegacyFallback =
+      migrationResult.attempted &&
+      !migrationResult.migrated &&
+      migrationResult.reason !== 'no_legacy_account' &&
+      migrationResult.reason !== 'skipped';
+
+    if (enableLegacyFallback) {
       process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED = '1';
       process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_REASON = migrationResult.reason;
       console.warn(

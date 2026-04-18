@@ -17,12 +17,6 @@ import type { BillingWorkerEnv } from './types.js';
 
 let loggedValues: unknown[] = [];
 
-type SelectResult<T> = Promise<T[]> & {
-  limit: ReturnType<typeof vi.fn>;
-  orderBy: ReturnType<typeof vi.fn>;
-  then: Promise<T[]>['then'];
-};
-
 type SelectBuilder = {
   from: ReturnType<typeof vi.fn>;
   innerJoin: ReturnType<typeof vi.fn>;
@@ -32,13 +26,6 @@ type SelectBuilder = {
   limit: ReturnType<typeof vi.fn>;
   then: Promise<unknown[]>['then'];
 };
-
-function createSelectResult<T>(rows: T[]): SelectResult<T> {
-  const result = Promise.resolve(rows) as SelectResult<T>;
-  result.limit = vi.fn(async () => rows);
-  result.orderBy = vi.fn(() => result);
-  return result;
-}
 
 function createMockDb(
   selectResults: unknown[][],

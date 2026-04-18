@@ -3334,7 +3334,7 @@ export const kiloclawRouter = createTRPCRouter({
         customer: stripeCustomerId,
         billing_address_collection: 'required',
         line_items: [{ price: priceId, quantity: 1 }],
-        allow_promotion_codes: true,
+        allow_promotion_codes: false,
         customer_update: { name: 'auto', address: 'auto' },
         tax_id_collection: { enabled: true, required: 'never' },
         success_url: successUrl,
@@ -3410,6 +3410,12 @@ export const kiloclawRouter = createTRPCRouter({
       const stripeCustomerId = ctx.user.stripe_customer_id;
       if (!stripeCustomerId) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
+      }
+      if (input.hostingPlan === 'commit' && input.cadence === 'monthly' && input.tier === '19') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Kilo Pass tier 19 monthly does not include enough credits for commit hosting.',
+        });
       }
 
       const { anchorInstance } = await resolvePersonalBillingAnchor({

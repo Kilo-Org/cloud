@@ -29,6 +29,10 @@ import { flattenError, z } from 'zod';
 import { withDORetry } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
+  markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  type KiloClawSubscriptionChangeActor,
+} from '@kilocode/db';
+import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
@@ -79,6 +83,11 @@ const WebSearchConfigPatchSchema = z.object({
   userId: z.string().min(1),
   exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
 });
+
+const KILOCLAW_WORKER_DESTROY_ACTOR = {
+  actorType: 'system',
+  actorId: 'kiloclaw-worker',
+} satisfies KiloClawSubscriptionChangeActor;
 
 const KiloCliRunConflictSchema = z.object({
   conflict: z.object({
@@ -528,12 +537,30 @@ async function markProvisionedInstanceDestroyed(params: {
 
   const db = getWorkerDb(connectionString);
   try {
-    await db
-      .update(kiloclaw_instances)
-      .set({ destroyed_at: sql`NOW()` })
-      .where(
-        and(eq(kiloclaw_instances.id, params.instanceId), isNull(kiloclaw_instances.destroyed_at))
-      );
+    await db.transaction(async tx => {
+      const [instance] = await tx
+        .select({
+          id: kiloclaw_instances.id,
+          userId: kiloclaw_instances.user_id,
+        })
+        .from(kiloclaw_instances)
+        .where(
+          and(eq(kiloclaw_instances.id, params.instanceId), isNull(kiloclaw_instances.destroyed_at))
+        )
+        .limit(1);
+
+      if (!instance) {
+        return;
+      }
+
+      await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+        actor: KILOCLAW_WORKER_DESTROY_ACTOR,
+        executor: tx,
+        instanceId: instance.id,
+        reason: 'destroy_path_inline_collapse',
+        userId: instance.userId,
+      });
+    });
 
     logProvisionWrite('info', 'Instance record marked destroyed', {
       event: 'instance_record_destroy',

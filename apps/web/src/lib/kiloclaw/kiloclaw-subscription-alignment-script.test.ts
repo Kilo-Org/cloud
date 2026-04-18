@@ -362,6 +362,114 @@ describe('kiloclaw-subscription-alignment script', () => {
     expect(subscriptionsAfterRerun).toHaveLength(1);
   });
 
+  it('collapses multi-row all-destroyed personal users into one current row', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'multi-row-all-destroyed@example.com',
+    });
+
+    const instanceA = crypto.randomUUID();
+    const instanceB = crypto.randomUUID();
+    const instanceC = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: instanceA,
+        user_id: user.id,
+        sandbox_id: `ki_${instanceA.replaceAll('-', '')}`,
+        created_at: '2026-03-01T00:00:00.000Z',
+        destroyed_at: '2026-03-02T00:00:00.000Z',
+      },
+      {
+        id: instanceB,
+        user_id: user.id,
+        sandbox_id: `ki_${instanceB.replaceAll('-', '')}`,
+        created_at: '2026-03-05T00:00:00.000Z',
+        destroyed_at: '2026-03-06T00:00:00.000Z',
+      },
+      {
+        id: instanceC,
+        user_id: user.id,
+        sandbox_id: `ki_${instanceC.replaceAll('-', '')}`,
+        created_at: '2026-03-10T00:00:00.000Z',
+        destroyed_at: '2026-03-11T00:00:00.000Z',
+      },
+    ]);
+
+    const [subscriptionA, subscriptionB, subscriptionC] = await db
+      .insert(kiloclaw_subscriptions)
+      .values([
+        {
+          user_id: user.id,
+          instance_id: instanceA,
+          plan: 'trial',
+          status: 'canceled',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-03-01T00:00:00.000Z',
+          updated_at: '2026-03-01T00:00:00.000Z',
+        },
+        {
+          user_id: user.id,
+          instance_id: instanceB,
+          plan: 'standard',
+          status: 'canceled',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-03-05T00:00:00.000Z',
+          updated_at: '2026-03-05T00:00:00.000Z',
+        },
+        {
+          user_id: user.id,
+          instance_id: instanceC,
+          plan: 'standard',
+          status: 'canceled',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-03-10T00:00:00.000Z',
+          updated_at: '2026-03-10T00:00:00.000Z',
+        },
+      ])
+      .returning();
+
+    if (!subscriptionA || !subscriptionB || !subscriptionC) {
+      throw new Error('Expected destroyed subscription rows');
+    }
+
+    await run('apply-multi-row-all-destroyed');
+
+    const subscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .orderBy(kiloclaw_subscriptions.created_at);
+
+    expect(subscriptions.map(subscription => subscription.transferred_to_subscription_id)).toEqual([
+      subscriptionB.id,
+      subscriptionC.id,
+      null,
+    ]);
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.actor_id, 'kiloclaw-subscription-alignment'));
+
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'reassigned',
+          reason: 'apply_multi_row_all_destroyed_collapse',
+          subscription_id: subscriptionA.id,
+        }),
+        expect.objectContaining({
+          action: 'reassigned',
+          reason: 'apply_multi_row_all_destroyed_collapse',
+          subscription_id: subscriptionB.id,
+        }),
+      ])
+    );
+  });
+
   it('bootstraps personal trial even when user has org-context subscription', async () => {
     const user = await insertTestUser({
       google_user_email: 'org-sub-holder@example.com',

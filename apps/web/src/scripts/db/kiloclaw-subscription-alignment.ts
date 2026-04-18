@@ -11,6 +11,8 @@
  *   pnpm script db kiloclaw-subscription-alignment apply-duplicates [--confirm-sandboxes-destroyed]
  *   pnpm script db kiloclaw-subscription-alignment preview-org
  *   pnpm script db kiloclaw-subscription-alignment apply-org
+ *   pnpm script db kiloclaw-subscription-alignment preview-multi-row-all-destroyed
+ *   pnpm script db kiloclaw-subscription-alignment apply-multi-row-all-destroyed
  *   pnpm script db kiloclaw-subscription-alignment preview-changelog-baseline
  *   pnpm script db kiloclaw-subscription-alignment apply-changelog-baseline
  *
@@ -30,7 +32,7 @@
  * subscription rows — no --confirm-sandboxes-destroyed flag required.
  */
 
-import { and, asc, desc, eq, inArray, isNull, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, notExists, or, sql } from 'drizzle-orm';
 
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import {
@@ -38,7 +40,10 @@ import {
   KILOCLAW_TRIAL_DURATION_DAYS,
 } from '@/lib/kiloclaw/constants';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import {
+  collapseOrphanPersonalSubscriptionsOnDestroy,
+  insertKiloClawSubscriptionChangeLog,
+} from '@kilocode/db';
 import {
   kiloclaw_earlybird_purchases,
   kiloclaw_instances,
@@ -62,6 +67,8 @@ type Mode =
   | 'apply-duplicates'
   | 'preview-org'
   | 'apply-org'
+  | 'preview-multi-row-all-destroyed'
+  | 'apply-multi-row-all-destroyed'
   | 'preview-changelog-baseline'
   | 'apply-changelog-baseline';
 
@@ -180,6 +187,14 @@ type DuplicateActiveInstanceCandidate = {
 };
 
 type MissingChangelogBaselineRow = KiloClawSubscription;
+
+type MultiRowAllDestroyedCandidate = {
+  currentRowCount: number;
+  destroyedInstanceId: string;
+  latestSubscriptionCreatedAt: string;
+  subscriptionIds: string[];
+  userId: string;
+};
 
 const ALIGNMENT_SCRIPT_ACTOR = {
   actorType: 'system',
@@ -2177,6 +2192,126 @@ async function applyOrgBackfill() {
   printSection('Org rows skipped during apply', skipped);
 }
 
+async function buildMultiRowAllDestroyedCandidates(): Promise<MultiRowAllDestroyedCandidate[]> {
+  const rows = await db
+    .select({
+      subscriptionId: kiloclaw_subscriptions.id,
+      userId: kiloclaw_subscriptions.user_id,
+      instanceId: kiloclaw_subscriptions.instance_id,
+      subscriptionCreatedAt: kiloclaw_subscriptions.created_at,
+      instanceDestroyedAt: kiloclaw_instances.destroyed_at,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        isNotNull(kiloclaw_subscriptions.instance_id),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
+        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id),
+        isNull(kiloclaw_instances.organization_id)
+      )
+    )
+    .orderBy(
+      kiloclaw_subscriptions.user_id,
+      kiloclaw_subscriptions.created_at,
+      kiloclaw_subscriptions.id
+    );
+
+  const grouped = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const existing = grouped.get(row.userId);
+    if (existing) {
+      existing.push(row);
+    } else {
+      grouped.set(row.userId, [row]);
+    }
+  }
+
+  const candidates: MultiRowAllDestroyedCandidate[] = [];
+  for (const [userId, userRows] of grouped.entries()) {
+    const aliveRows = userRows.filter(row => row.instanceDestroyedAt === null);
+    if (aliveRows.length > 0 || userRows.length <= 1) {
+      continue;
+    }
+
+    const latestRow = userRows[userRows.length - 1];
+    if (!latestRow?.instanceId) {
+      continue;
+    }
+
+    candidates.push({
+      currentRowCount: userRows.length,
+      destroyedInstanceId: latestRow.instanceId,
+      latestSubscriptionCreatedAt: latestRow.subscriptionCreatedAt,
+      subscriptionIds: userRows.map(row => row.subscriptionId),
+      userId,
+    });
+  }
+
+  return candidates;
+}
+
+async function previewMultiRowAllDestroyed() {
+  const rows = await buildMultiRowAllDestroyedCandidates();
+
+  printSection('Multi-row all-destroyed users', rows);
+  printSection('Multi-row all-destroyed action counts', [
+    { action: 'apply_multi_row_all_destroyed_collapse', count: rows.length },
+  ]);
+}
+
+async function applyMultiRowAllDestroyed() {
+  const rows = await buildMultiRowAllDestroyedCandidates();
+  let collapsedUsers = 0;
+  let updatedSubscriptions = 0;
+  const skipped: Array<{ userId: string; destroyedInstanceId: string; reason: string }> = [];
+
+  for (const row of rows) {
+    try {
+      const result = await db.transaction(async tx => {
+        return await collapseOrphanPersonalSubscriptionsOnDestroy({
+          actor: ALIGNMENT_SCRIPT_ACTOR,
+          destroyedInstanceId: row.destroyedInstanceId,
+          executor: tx,
+          reason: 'apply_multi_row_all_destroyed_collapse',
+          userId: row.userId,
+        });
+      });
+
+      if (result.updatedSubscriptionIds.length === 0) {
+        skipped.push({
+          userId: row.userId,
+          destroyedInstanceId: row.destroyedInstanceId,
+          reason: 'no_updates_needed',
+        });
+        continue;
+      }
+
+      collapsedUsers += 1;
+      updatedSubscriptions += result.updatedSubscriptionIds.length;
+    } catch (error) {
+      console.error('Multi-row all-destroyed apply row failed', {
+        userId: row.userId,
+        destroyedInstanceId: row.destroyedInstanceId,
+        error: describeError(error),
+      });
+      skipped.push({
+        userId: row.userId,
+        destroyedInstanceId: row.destroyedInstanceId,
+        reason: describeError(error),
+      });
+    }
+  }
+
+  console.log('\nMulti-row all-destroyed apply results');
+  console.table([
+    { action: 'apply_multi_row_all_destroyed_collapse', count: collapsedUsers },
+    { action: 'updated_subscriptions', count: updatedSubscriptions },
+    { action: 'skipped', count: skipped.length },
+  ]);
+  printSection('Multi-row all-destroyed users skipped during apply', skipped);
+}
+
 type ApplyOptions = {
   confirmSandboxesDestroyed: boolean;
 };
@@ -2192,6 +2327,8 @@ function parseMode(inputMode?: string): Mode {
     case 'apply-duplicates':
     case 'preview-org':
     case 'apply-org':
+    case 'preview-multi-row-all-destroyed':
+    case 'apply-multi-row-all-destroyed':
     case 'preview-changelog-baseline':
     case 'apply-changelog-baseline':
       return mode;
@@ -2215,6 +2352,8 @@ const singleModeHandlers: Partial<Record<Mode, ModeHandler>> = {
   'apply-duplicates': applyDuplicateActiveInstances,
   'preview-org': previewOrgBackfill,
   'apply-org': applyOrgBackfill,
+  'preview-multi-row-all-destroyed': previewMultiRowAllDestroyed,
+  'apply-multi-row-all-destroyed': applyMultiRowAllDestroyed,
   'preview-changelog-baseline': previewChangelogBaselineBackfill,
   'apply-changelog-baseline': applyChangelogBaselineBackfill,
 };

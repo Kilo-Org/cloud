@@ -773,11 +773,8 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
           {
             createdAt: '2026-04-01T00:00:00.000Z',
             freeTrialEndAt: null,
-            requireSeats: false,
-            settings: {},
           },
         ], // organization row
-        [], // latestSeatPurchase
         [winnerRow], // reselect after conflict
       ],
       insertFirstReturningRows: [], // onConflictDoNothing swallowed our insert

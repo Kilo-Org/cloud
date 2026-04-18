@@ -1,0 +1,165 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as DbModule from '../db';
+import type * as ProvisionBootstrapModule from './provision-bootstrap';
+import type * as AnalyticsModule from '../utils/analytics';
+
+const { mockGetWorkerDb, mockBootstrapProvisionedSubscriptionWithFallback, mockWriteEvent } =
+  vi.hoisted(() => ({
+    mockGetWorkerDb: vi.fn(),
+    mockBootstrapProvisionedSubscriptionWithFallback: vi.fn(),
+    mockWriteEvent: vi.fn(),
+  }));
+
+vi.mock('cloudflare:workers', () => ({
+  DurableObject: class {},
+  waitUntil: (promise: Promise<unknown>) => promise,
+}));
+
+vi.mock('../db', async importOriginal => {
+  const actual = await importOriginal<typeof DbModule>();
+  return {
+    ...actual,
+    getWorkerDb: mockGetWorkerDb,
+    getInstanceById: vi.fn(),
+    getInstanceByIdIncludingDestroyed: vi.fn(),
+  };
+});
+
+vi.mock('./provision-bootstrap', async importOriginal => {
+  const actual = await importOriginal<typeof ProvisionBootstrapModule>();
+  return {
+    ...actual,
+    bootstrapProvisionedSubscriptionWithFallback: mockBootstrapProvisionedSubscriptionWithFallback,
+  };
+});
+
+vi.mock('../utils/analytics', async importOriginal => {
+  const actual = await importOriginal<typeof AnalyticsModule>();
+  return {
+    ...actual,
+    writeEvent: mockWriteEvent,
+  };
+});
+
+import { platform } from './platform';
+import { BootstrapProvisionFallbackError } from './provision-bootstrap';
+
+type SelectBuilder<T> = PromiseLike<T[]> & {
+  from: ReturnType<typeof vi.fn>;
+  where: ReturnType<typeof vi.fn>;
+  limit: ReturnType<typeof vi.fn>;
+  then: Promise<T[]>['then'];
+};
+
+function createSelectBuilder<T>(rows: T[]): SelectBuilder<T> {
+  const promise = Promise.resolve(rows);
+  const builder = {
+    from: vi.fn(),
+    where: vi.fn(),
+    limit: vi.fn(),
+    then: promise.then.bind(promise),
+  } as SelectBuilder<T>;
+  builder.from.mockReturnValue(builder);
+  builder.where.mockReturnValue(builder);
+  builder.limit.mockReturnValue(builder);
+  return builder;
+}
+
+function createWorkerDb() {
+  const txSelectQueue = [[]];
+  const txInsertReturningQueue = [[{ id: 'instance-new', sandboxId: 'sandbox-new' }], [], []];
+
+  return {
+    transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        select: vi.fn(() => createSelectBuilder(txSelectQueue.shift() ?? [])),
+        insert: vi.fn(() => ({
+          values: vi.fn(() => ({
+            onConflictDoNothing: vi.fn(() => ({
+              returning: vi.fn(async () => txInsertReturningQueue.shift() ?? []),
+            })),
+          })),
+        })),
+      };
+
+      return await callback(tx);
+    }),
+    select: vi.fn(() => createSelectBuilder([])),
+  };
+}
+
+function makeEnv() {
+  const destroy = vi.fn().mockResolvedValue(undefined);
+  const provision = vi.fn().mockResolvedValue({ sandboxId: 'sandbox-new' });
+
+  return {
+    env: {
+      HYPERDRIVE: { connectionString: 'postgresql://fake' },
+      KILOCLAW_INSTANCE: {
+        idFromName: vi.fn((id: string) => id),
+        get: vi.fn(() => ({ provision, destroy })),
+      },
+      KILOCLAW_REGISTRY: {
+        idFromName: vi.fn((id: string) => id),
+        get: vi.fn(() => ({
+          createInstance: vi.fn().mockResolvedValue(undefined),
+          listInstances: vi.fn().mockResolvedValue([]),
+          destroyInstance: vi.fn().mockResolvedValue(undefined),
+        })),
+      },
+      KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      KV_CLAW_CACHE: {
+        get: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue({ keys: [], list_complete: true }),
+        getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+      },
+    } as never,
+    destroy,
+  };
+}
+
+describe('platform provision bootstrap quarantine', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReturnValue(createWorkerDb());
+  });
+
+  it('returns an error and leaves fresh instance provisioned when RPC and fallback both fail', async () => {
+    const { env, destroy } = makeEnv();
+    mockBootstrapProvisionedSubscriptionWithFallback.mockRejectedValue(
+      new BootstrapProvisionFallbackError({
+        rpcError: new Error('rpc down'),
+        fallbackError: new Error('fallback down'),
+      })
+    );
+
+    const response = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          provider: 'fly',
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: 'post-provision bootstrap failed',
+    });
+    expect(destroy).not.toHaveBeenCalled();
+    expect(mockWriteEvent).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({
+        event: 'instance.subscription_bootstrap_quarantined',
+        userId: 'user-1',
+        instanceId: expect.any(String),
+      })
+    );
+  });
+});

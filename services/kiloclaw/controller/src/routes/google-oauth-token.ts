@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Hono } from 'hono';
+import { timingSafeTokenEqual } from '../auth';
 
 const GoogleOAuthTokenRequestSchema = z.object({
   capabilities: z.array(z.string().min(1)).default(['calendar_read']),
@@ -31,9 +32,21 @@ type TokenProvider = {
 
 export function registerGoogleOAuthTokenRoutes(
   app: Hono,
-  _expectedToken: string,
+  expectedToken: string,
   tokenProvider: TokenProvider
 ): void {
+  app.use('/_kilo/google-oauth/*', async (c, next) => {
+    const authHeader = c.req.header('authorization');
+    const [scheme, token] = (authHeader ?? '').split(/\s+/, 2);
+    const bearer = scheme?.toLowerCase() === 'bearer' ? token : null;
+
+    if (!timingSafeTokenEqual(bearer, expectedToken)) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    await next();
+  });
+
   app.post('/_kilo/google-oauth/token', async c => {
     let payload: unknown;
     try {

@@ -137,6 +137,7 @@ if [[ "$cmd" == "auth" ]]; then
     status_tmp="$(mktemp)"
     status_http="$(curl -sS -o "\${status_tmp}" -w '%{http_code}' \
       -X POST \
+      -H "Authorization: Bearer \${OPENCLAW_GATEWAY_TOKEN}" \
       -H 'Content-Type: application/json' \
       --data '{}' \
       "http://127.0.0.1:\${PORT:-18789}/_kilo/google-oauth/status" || true)"

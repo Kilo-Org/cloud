@@ -279,6 +279,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   const [refineryCodeReview, setRefineryCodeReview] = useState(true);
   const [reviewMode, setReviewMode] = useState<'rework' | 'comments'>('rework');
   const [autoResolvePrFeedback, setAutoResolvePrFeedback] = useState(false);
+  const [autoResolveMergeConflicts, setAutoResolveMergeConflicts] = useState(true);
   const [autoMergeDelayMinutes, setAutoMergeDelayMinutes] = useState<number | null>(null);
   const [mergeStrategy, setMergeStrategy] = useState<'direct' | 'pr'>('direct');
   const [stagedConvoysDefault, setStagedConvoysDefault] = useState(false);
@@ -315,6 +316,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     setRefineryCodeReview(cfg.refinery?.code_review ?? true);
     setReviewMode(cfg.refinery?.review_mode === 'comments' ? 'comments' : 'rework');
     setAutoResolvePrFeedback(cfg.refinery?.auto_resolve_pr_feedback ?? false);
+    setAutoResolveMergeConflicts(cfg.refinery?.auto_resolve_merge_conflicts ?? true);
     setAutoMergeDelayMinutes(cfg.refinery?.auto_merge_delay_minutes ?? null);
     setMergeStrategy(cfg.merge_strategy === 'pr' ? 'pr' : 'direct');
     setStagedConvoysDefault(cfg.staged_convoys_default ?? false);
@@ -380,6 +382,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           review_mode: reviewMode,
           require_clean_merge: true,
           auto_resolve_pr_feedback: autoResolvePrFeedback,
+          auto_resolve_merge_conflicts: autoResolveMergeConflicts,
           auto_merge_delay_minutes: autoMergeDelayMinutes,
         },
         convoy_merge_mode: convoyMergeMode,
@@ -1071,6 +1074,20 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                   <Switch
                     checked={autoResolvePrFeedback}
                     onCheckedChange={setAutoResolvePrFeedback}
+                  />
+                </div>
+
+                <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <div className="flex-1">
+                    <Label className="text-sm text-white/70">Auto-resolve merge conflicts</Label>
+                    <p className="text-[11px] text-white/30">
+                      When a PR has merge conflicts, automatically dispatch an agent to rebase and
+                      resolve them.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={autoResolveMergeConflicts}
+                    onCheckedChange={setAutoResolveMergeConflicts}
                   />
                 </div>
 

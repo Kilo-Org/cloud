@@ -137,7 +137,7 @@ export function BeadsTab({ townId }: { townId: string }) {
     } else if (confirmAction.type === 'bulk-delete') {
       bulkDeleteMutation.mutate({ townId, beadIds: confirmAction.beadIds });
     } else {
-      deleteByStatusMutation.mutate({ townId, status: 'failed' });
+      deleteByStatusMutation.mutate({ townId, status: 'failed', type: typeFilter === 'all' ? undefined : typeFilter });
     }
   };
 

@@ -267,24 +267,23 @@ export function formatContextLength(length: number | null | undefined): string {
 }
 
 export function getModelSeries(model: OpenRouterModel): string {
-  const group = model.group?.toLowerCase() || '';
   const name = model.name.toLowerCase();
 
-  if (group.includes('gpt') || name.includes('gpt')) return 'GPT';
-  if (group.includes('claude') || name.includes('claude')) return 'Claude';
-  if (group.includes('gemini') || name.includes('gemini')) return 'Gemini';
-  if (group.includes('grok') || name.includes('grok')) return 'Grok';
-  if (group.includes('cohere') || name.includes('cohere')) return 'Cohere';
-  if (group.includes('nova') || name.includes('nova')) return 'Nova';
-  if (group.includes('qwen') || name.includes('qwen')) return 'Qwen';
-  if (group.includes('yi') || name.includes('yi')) return 'Yi';
-  if (group.includes('deepseek') || name.includes('deepseek')) return 'DeepSeek';
-  if (group.includes('mistral') || name.includes('mistral')) return 'Mistral';
-  if (group.includes('llama2') || name.includes('llama-2')) return 'Llama2';
-  if (group.includes('llama3') || name.includes('llama-3')) return 'Llama3';
-  if (group.includes('llama4') || name.includes('llama-4')) return 'Llama4';
-  if (group.includes('rwkv') || name.includes('rwkv')) return 'RWKV';
-  if (group.includes('palm') || name.includes('palm')) return 'PaLM';
+  if (name.includes('gpt')) return 'GPT';
+  if (name.includes('claude')) return 'Claude';
+  if (name.includes('gemini')) return 'Gemini';
+  if (name.includes('grok')) return 'Grok';
+  if (name.includes('cohere')) return 'Cohere';
+  if (name.includes('nova')) return 'Nova';
+  if (name.includes('qwen')) return 'Qwen';
+  if (name.includes('yi')) return 'Yi';
+  if (name.includes('deepseek')) return 'DeepSeek';
+  if (name.includes('mistral')) return 'Mistral';
+  if (name.includes('llama-2')) return 'Llama2';
+  if (name.includes('llama-3')) return 'Llama3';
+  if (name.includes('llama-4')) return 'Llama4';
+  if (name.includes('rwkv')) return 'RWKV';
+  if (name.includes('palm')) return 'PaLM';
   if (name.includes('router')) return 'Router';
   if (name.includes('media')) return 'Media';
 

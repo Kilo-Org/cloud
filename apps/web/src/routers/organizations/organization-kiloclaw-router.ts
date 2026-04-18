@@ -40,6 +40,7 @@ import {
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
+import { clearDestroyedSubscriptionLifecycle } from '@/lib/kiloclaw/instance-lifecycle';
 import {
   getOrganizationProvisionLockKey,
   withKiloclawProvisionContextLock,
@@ -511,15 +512,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
     }
 
     try {
-      await db
-        .update(kiloclaw_subscriptions)
-        .set({ destruction_deadline: null })
-        .where(
-          and(
-            eq(kiloclaw_subscriptions.user_id, ctx.user.id),
-            eq(kiloclaw_subscriptions.instance_id, instance.id)
-          )
-        );
+      await clearDestroyedSubscriptionLifecycle({
+        actorUserId: ctx.user.id,
+        kiloUserId: ctx.user.id,
+        instanceId: instance.id,
+      });
     } catch (cleanupError) {
       console.error('[organization-kiloclaw] Post-destroy cleanup failed:', cleanupError);
     }

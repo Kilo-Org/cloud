@@ -53,6 +53,7 @@ import {
   getPersonalProvisionLockKey,
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
+import { clearDestroyedSubscriptionLifecycle } from '@/lib/kiloclaw/instance-lifecycle';
 
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import {
@@ -2042,34 +2043,12 @@ export const kiloclawRouter = createTRPCRouter({
       // send warning emails or attempt a redundant destroy.
       // Current billing row stays anchored to destroyed instance until
       // reprovision bootstrap creates successor row on next provision.
-      // Only clear suspended_at for non-past_due subscriptions — nulling it
-      // on a past_due row would re-enable access without fixing payment.
       if (destroyedRow) {
-        const [sub] = await db
-          .select({ status: kiloclaw_subscriptions.status })
-          .from(kiloclaw_subscriptions)
-          .where(
-            and(
-              eq(kiloclaw_subscriptions.user_id, ctx.user.id),
-              eq(kiloclaw_subscriptions.instance_id, destroyedRow.id)
-            )
-          )
-          .limit(1);
-        const clearFields: { destruction_deadline: null; suspended_at?: null } = {
-          destruction_deadline: null,
-        };
-        if (sub && sub.status !== 'past_due') {
-          clearFields.suspended_at = null;
-        }
-        await db
-          .update(kiloclaw_subscriptions)
-          .set(clearFields)
-          .where(
-            and(
-              eq(kiloclaw_subscriptions.user_id, ctx.user.id),
-              eq(kiloclaw_subscriptions.instance_id, destroyedRow.id)
-            )
-          );
+        await clearDestroyedSubscriptionLifecycle({
+          actorUserId: ctx.user.id,
+          kiloUserId: ctx.user.id,
+          instanceId: destroyedRow.id,
+        });
       }
 
       // Clear lifecycle emails so they can fire again if the user re-provisions.

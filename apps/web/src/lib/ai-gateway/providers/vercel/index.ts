@@ -12,8 +12,8 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { unstable_cache } from 'next/cache';
 import { readDb } from '@/lib/drizzle';
 import { modelsByProvider } from '@kilocode/db/schema';

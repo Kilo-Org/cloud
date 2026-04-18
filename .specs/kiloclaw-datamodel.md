@@ -242,9 +242,14 @@ complete).
     instance record is persisted. This call MUST occur as part of
     the same provisioning request — the window between instance
     commit and subscription creation (see rule 4) MUST be bounded
-    to the duration of that request. If subscription creation
-    fails, the provisioning service MUST retry or mark the instance
-    as requiring remediation so the orphan is not silently ignored.
+    to the duration of that request. If the primary subscription
+    bootstrap path fails after the instance row is persisted, the
+    provisioning service MUST retry or run a fallback path that
+    still creates canonical subscription state before the request
+    exits. The request MUST NOT complete successfully while leaving
+    a silently unpaired instance row. If both primary and fallback
+    bootstrap fail, the instance MUST be marked for explicit
+    remediation rather than left as an unnoticed orphan.
 23. The onboarding flow MUST NOT be considered complete (and MUST NOT
     play the completion "ding" sound) until both the instance record
     and the subscription record have been persisted to the database.

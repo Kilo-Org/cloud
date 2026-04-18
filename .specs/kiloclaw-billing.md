@@ -135,10 +135,19 @@ notifications at each stage.
 
 ### Payment Sources
 
+The rules in this section govern paid self-service KiloClaw
+subscription rows. Trial rows are temporary bootstrap rows and are
+exempt from the paid funding invariants in rules 2 and 3. Current
+organizational bootstrap rows that grant temporary `managed-active`
+access before org billing launches are also outside these funding
+invariants; they remain a temporary carveout until org billing
+integration ships.
+
 1. The system MUST record a payment source for each subscription. The
    value MUST be either `stripe` or `credits`.
-2. The system MUST enforce exactly three valid combinations of payment
-   source and payment provider subscription ID:
+2. For paid self-service rows, the system MUST enforce exactly three
+   valid combinations of payment source and payment provider
+   subscription ID:
 
    | State         | payment_source | provider subscription ID |
    | ------------- | -------------- | ------------------------ |
@@ -152,8 +161,9 @@ notifications at each stage.
    (hybrid) or a null one (pure credit). No other combination is
    valid.
 
-3. A subscription with payment source `credits` MUST record a credit
-   renewal timestamp indicating when the next credit deduction is due.
+3. A paid self-service subscription with payment source `credits`
+   MUST record a credit renewal timestamp indicating when the next
+   credit deduction is due.
 4. At most one subscription record per instance is allowed regardless
    of payment source (see Plans rule 5).
 5. User-initiated switching between payment sources is not supported
@@ -981,10 +991,13 @@ rows renew.
 
 ### User Data Deletion
 
-1. When a user is soft-deleted, the system MUST delete all subscription
-   records for that user.
-2. When a user is soft-deleted, the system MUST delete all email
-   notification log entries for that user.
+1. When a user is soft-deleted, the system MUST retain
+   `kiloclaw_instance` and `kiloclaw_subscription` rows for that
+   user. Ownership references and directly identifying user fields
+   MUST be anonymized rather than deleted.
+2. When a user is soft-deleted, the system MUST delete auxiliary
+   KiloClaw billing records whose purpose is operational rather than
+   canonical state, such as email notification log entries.
 3. Credit transaction records created by subscription deductions are
    managed by the credit system's own data deletion rules, not by
    KiloClaw billing. This spec does not impose additional deletion

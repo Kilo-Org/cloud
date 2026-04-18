@@ -173,4 +173,14 @@ describe('POST /api/integrations/google/disconnect', () => {
     expectRedirectLocation(response, '/claw/settings?error=invalid_origin');
     expect(mockedClearKiloClawGoogleOAuthConnection).not.toHaveBeenCalled();
   });
+
+  test('GET redirects with method_not_allowed and does not mutate state', async () => {
+    const { GET } = await import('./route');
+    const response = await GET();
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/claw/settings?error=method_not_allowed');
+    expect(mockedClearGoogleOAuthConnection).not.toHaveBeenCalled();
+    expect(mockedClearKiloClawGoogleOAuthConnection).not.toHaveBeenCalled();
+  });
 });

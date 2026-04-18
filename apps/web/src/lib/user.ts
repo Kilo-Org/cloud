@@ -47,6 +47,8 @@ import {
   kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
+  kiloclaw_earlybird_purchases,
+  kiloclaw_email_log,
   user_period_cache,
   user_feedback,
   app_builder_feedback,

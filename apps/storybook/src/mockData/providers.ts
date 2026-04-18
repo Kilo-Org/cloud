@@ -38,6 +38,7 @@ function generateModel(): OpenRouterModel {
     context_length: base?.context_length ?? 100000,
     input_modalities: inputModalities,
     output_modalities: outputModalities,
+    group: base?.group ?? 'default',
     endpoint: base?.endpoint ?? null,
   };
 }

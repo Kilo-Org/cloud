@@ -601,6 +601,7 @@ export const OpenRouterBaseModel = z.object({
   context_length: z.number(),
   input_modalities: z.array(z.string()),
   output_modalities: z.array(z.string()),
+  group: z.string(),
 });
 
 export type OpenRouterEndpoint = z.infer<typeof OpenRouterEndpoint>;

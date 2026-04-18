@@ -57,4 +57,28 @@ describe('getKiloClawCheckoutSuccessPhase', () => {
       })
     ).toBe('activated');
   });
+
+  it('does not treat non-active activated rows as successful checkout', () => {
+    expect(
+      getKiloClawCheckoutSuccessPhase({
+        subscription: {
+          status: 'canceled',
+          activationState: 'activated',
+        },
+        timedOut: false,
+      })
+    ).toBe('waiting_for_subscription');
+  });
+
+  it('times out instead of showing success for non-active activated rows', () => {
+    expect(
+      getKiloClawCheckoutSuccessPhase({
+        subscription: {
+          status: 'past_due',
+          activationState: 'activated',
+        },
+        timedOut: true,
+      })
+    ).toBe('timed_out');
+  });
 });

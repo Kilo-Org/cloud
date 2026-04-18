@@ -13,7 +13,9 @@ export function getKiloClawCheckoutSuccessPhase(params: {
   subscription: CheckoutSuccessSubscription | undefined;
   timedOut: boolean;
 }): KiloClawCheckoutSuccessPhase {
-  if (params.subscription?.activationState === 'activated') {
+  const isActiveSubscription = params.subscription?.status === 'active';
+
+  if (isActiveSubscription && params.subscription?.activationState === 'activated') {
     return 'activated';
   }
 
@@ -21,10 +23,7 @@ export function getKiloClawCheckoutSuccessPhase(params: {
     return 'timed_out';
   }
 
-  if (
-    params.subscription?.activationState === 'pending_settlement' ||
-    params.subscription?.status === 'active'
-  ) {
+  if (isActiveSubscription) {
     return 'waiting_for_settlement';
   }
 

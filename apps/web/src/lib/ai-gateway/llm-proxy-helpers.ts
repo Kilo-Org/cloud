@@ -633,10 +633,17 @@ export function countAndStoreFimUsage(
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
     : usageContext.isStreaming
-      ? parseMistralFimUsageFromStream(clonedResponse.body, requestSpan, usageContext.provider, statusCode)
+      ? parseMistralFimUsageFromStream(
+          clonedResponse.body,
+          requestSpan,
+          usageContext.provider,
+          statusCode
+        )
       : clonedResponse
           .text()
-          .then(content => parseMistralFimUsageFromString(content, usageContext.provider, statusCode));
+          .then(content =>
+            parseMistralFimUsageFromString(content, usageContext.provider, statusCode)
+          );
 
   after(
     usageStatsPromise.then(usageStats => {

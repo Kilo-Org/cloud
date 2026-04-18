@@ -7,7 +7,16 @@ const { mockGetWorkerDb, mockBootstrapProvisionedSubscriptionWithFallback, mockW
   vi.hoisted(() => ({
     mockGetWorkerDb: vi.fn(),
     mockBootstrapProvisionedSubscriptionWithFallback: vi.fn(),
-    mockWriteEvent: vi.fn(),
+    mockWriteEvent: vi.fn<
+      (
+        env: unknown,
+        data: {
+          event: string;
+          userId?: string;
+          instanceId?: string;
+        }
+      ) => void
+    >(),
   }));
 
 vi.mock('cloudflare:workers', () => ({
@@ -153,13 +162,13 @@ describe('platform provision bootstrap quarantine', () => {
       error: 'post-provision bootstrap failed',
     });
     expect(destroy).not.toHaveBeenCalled();
-    expect(mockWriteEvent).toHaveBeenCalledWith(
-      env,
-      expect.objectContaining({
-        event: 'instance.subscription_bootstrap_quarantined',
-        userId: 'user-1',
-        instanceId: expect.any(String),
-      })
+    const eventCall = mockWriteEvent.mock.calls.find(
+      call => call[1]?.event === 'instance.subscription_bootstrap_quarantined'
     );
+    expect(eventCall?.[0]).toBe(env);
+    expect(eventCall?.[1]?.event).toBe('instance.subscription_bootstrap_quarantined');
+    expect(eventCall?.[1]?.userId).toBe('user-1');
+    expect(typeof eventCall?.[1]?.instanceId).toBe('string');
+    expect(eventCall?.[1]?.instanceId?.length).toBeGreaterThan(0);
   });
 });

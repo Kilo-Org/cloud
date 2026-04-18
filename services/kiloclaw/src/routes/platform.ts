@@ -635,6 +635,17 @@ function statusCodeFromError(err: unknown): number {
   return 500;
 }
 
+function describeUnknownError(error: unknown): string | null {
+  if (!error) return null;
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return null;
+  }
+}
+
 function jsonError(message: string, status: number, code?: string): Response {
   return new Response(JSON.stringify({ error: message, ...(code ? { code } : {}) }), {
     status,
@@ -1002,15 +1013,7 @@ platform.post('/provision', async c => {
         instanceId: provisionedInstanceId,
         sandboxId: provision.sandboxId,
         orgId: orgId ?? undefined,
-        error: [
-          message,
-          rpcError instanceof Error ? rpcError.message : rpcError ? String(rpcError) : null,
-          fallbackError instanceof Error
-            ? fallbackError.message
-            : fallbackError
-              ? String(fallbackError)
-              : null,
-        ]
+        error: [message, describeUnknownError(rpcError), describeUnknownError(fallbackError)]
           .filter(part => !!part)
           .join(' | '),
         label: 'rpc_and_local_fallback_failed',
@@ -1023,13 +1026,8 @@ platform.post('/provision', async c => {
           instanceId: provisionedInstanceId,
           doKey: provisionDoKey,
           shouldInsertInstanceRecord,
-          rpcError: rpcError instanceof Error ? rpcError.message : String(rpcError),
-          fallbackError:
-            fallbackError instanceof Error
-              ? fallbackError.message
-              : fallbackError
-                ? String(fallbackError)
-                : undefined,
+          rpcError: describeUnknownError(rpcError) ?? undefined,
+          fallbackError: describeUnknownError(fallbackError) ?? undefined,
         }
       );
       return jsonError(message, status);

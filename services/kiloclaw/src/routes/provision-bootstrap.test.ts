@@ -1,9 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from '@kilocode/db';
+import type { BootstrapProvisionFallbackError } from './provision-bootstrap';
 
 const { mockGetWorkerDb, mockBootstrapProvisionSubscriptionWithDb } = vi.hoisted(() => ({
   mockGetWorkerDb: vi.fn(),
-  mockBootstrapProvisionSubscriptionWithDb: vi.fn(),
+  mockBootstrapProvisionSubscriptionWithDb: vi.fn<
+    (params: {
+      db: unknown;
+      input: {
+        userId: string;
+        instanceId: string;
+        orgId: string | null;
+      };
+      actor: {
+        actorType: 'system';
+        actorId: string;
+      };
+    }) => Promise<{ id: string }>
+  >(),
 }));
 
 vi.mock('@kilocode/db', async importOriginal => {
@@ -19,7 +33,6 @@ vi.mock('../../../kiloclaw-billing/src/provision-bootstrap-shared.js', () => ({
 }));
 
 import {
-  BootstrapProvisionFallbackError,
   bootstrapProvisionedSubscriptionLocally,
   bootstrapProvisionedSubscriptionWithFallback,
 } from './provision-bootstrap';
@@ -56,20 +69,18 @@ describe('bootstrapProvisionedSubscriptionWithFallback', () => {
     });
 
     expect(mockGetWorkerDb).toHaveBeenCalledWith('postgresql://fake');
-    expect(mockBootstrapProvisionSubscriptionWithDb).toHaveBeenCalledWith(
-      expect.objectContaining({
-        db,
-        input: expect.objectContaining({
-          userId: 'user-1',
-          instanceId: '11111111-1111-4111-8111-111111111111',
-          orgId: null,
-        }),
-        actor: {
-          actorType: 'system',
-          actorId: 'kiloclaw-platform-bootstrap',
-        },
-      })
-    );
+    const call = mockBootstrapProvisionSubscriptionWithDb.mock.calls[0]?.[0];
+    expect(call).toBeDefined();
+    expect(call?.db).toBe(db);
+    expect(call?.input).toEqual({
+      userId: 'user-1',
+      instanceId: '11111111-1111-4111-8111-111111111111',
+      orgId: null,
+    });
+    expect(call?.actor).toEqual({
+      actorType: 'system',
+      actorId: 'kiloclaw-platform-bootstrap',
+    });
   });
 
   it('surfaces both errors when RPC and local fallback fail', async () => {

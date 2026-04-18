@@ -753,7 +753,7 @@ describe('POST /google/migrate-legacy', () => {
     await expect(response.json()).resolves.toEqual({ migrated: true, profile: 'kilo_owned' });
     expect(mockUpdateGoogleOAuthConnectionTokenData).not.toHaveBeenCalled();
 
-    const instanceStub = env.KILOCLAW_INSTANCE.get();
+    const instanceStub = (env as any).KILOCLAW_INSTANCE.get();
     expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({
         accountEmail: 'existing@example.com',

@@ -43,6 +43,7 @@ describe('gog shim script', () => {
     expect(script).toContain('broker_capabilities=\'["gmail_read"]\'');
     expect(script).toContain('drive|docs|sheets)');
     expect(script).toContain('broker_capabilities=\'["drive_read"]\'');
+    expect(script).toContain('capabilities\\":\${broker_capabilities}');
   });
 
   it('rejects mixed google and non-google auth --services commands', async () => {

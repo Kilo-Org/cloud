@@ -237,7 +237,7 @@ http_code="$(curl -sS -o "\${tmp_file}" -w '%{http_code}' \
   -X POST \
   -H "Authorization: Bearer \${OPENCLAW_GATEWAY_TOKEN}" \
   -H 'Content-Type: application/json' \
-  --data "{\"capabilities\":\${broker_capabilities}}" \
+  --data "{\\\"capabilities\\\":\${broker_capabilities}}" \
   "http://127.0.0.1:\${PORT:-18789}/_kilo/google-oauth/token" || true)"
 
 response_body="$(cat "\${tmp_file}")"

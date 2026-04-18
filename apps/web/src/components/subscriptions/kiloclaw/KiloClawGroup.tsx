@@ -10,6 +10,8 @@ import {
   formatDateLabel,
   formatKiloclawPrice,
   formatPaymentSummary,
+  getKiloclawDisplayStatus,
+  getKiloclawStatusNote,
   isInfoStatus,
   isKiloclawTerminal,
   isWarningStatus,
@@ -53,7 +55,7 @@ export function KiloClawGroup({
               icon={<KiloCrabIcon className="h-5 w-5" />}
               title={subscription.instanceName ?? 'KiloClaw instance'}
               subtitle={subscription.instanceName || subscription.instanceId}
-              status={subscription.status}
+              status={getKiloclawDisplayStatus(subscription)}
               price={formatKiloclawPrice(subscription.plan)}
               billingDate={formatDateLabel(
                 subscription.creditRenewalAt ??
@@ -67,12 +69,15 @@ export function KiloClawGroup({
               })}
               href={`/subscriptions/kiloclaw/${subscription.instanceId}`}
               isTerminal={isKiloclawTerminal(subscription.status)}
+              statusNote={getKiloclawStatusNote(subscription)}
               warningTone={
-                isWarningStatus(subscription.status)
-                  ? 'warning'
-                  : isInfoStatus(subscription.status)
-                    ? 'info'
-                    : undefined
+                subscription.activationState === 'pending_settlement'
+                  ? 'info'
+                  : isWarningStatus(subscription.status)
+                    ? 'warning'
+                    : isInfoStatus(subscription.status)
+                      ? 'info'
+                      : undefined
               }
             />
           ))}

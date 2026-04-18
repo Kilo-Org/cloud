@@ -40,7 +40,7 @@ import {
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
-import { clearDestroyedSubscriptionLifecycle } from '@/lib/kiloclaw/instance-lifecycle';
+import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
 import {
   getOrganizationProvisionLockKey,
   withKiloclawProvisionContextLock,
@@ -512,7 +512,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
     }
 
     try {
-      await clearDestroyedSubscriptionLifecycle({
+      await clearSubscriptionLifecycleAfterInstanceDestroy({
         actorUserId: ctx.user.id,
         kiloUserId: ctx.user.id,
         instanceId: instance.id,

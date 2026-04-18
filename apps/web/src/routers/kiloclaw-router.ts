@@ -53,7 +53,7 @@ import {
   getPersonalProvisionLockKey,
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
-import { clearDestroyedSubscriptionLifecycle } from '@/lib/kiloclaw/instance-lifecycle';
+import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
 
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import {
@@ -2044,7 +2044,7 @@ export const kiloclawRouter = createTRPCRouter({
       // Current billing row stays anchored to destroyed instance until
       // reprovision bootstrap creates successor row on next provision.
       if (destroyedRow) {
-        await clearDestroyedSubscriptionLifecycle({
+        await clearSubscriptionLifecycleAfterInstanceDestroy({
           actorUserId: ctx.user.id,
           kiloUserId: ctx.user.id,
           instanceId: destroyedRow.id,

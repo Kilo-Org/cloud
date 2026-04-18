@@ -71,7 +71,7 @@ function subscriptionFilterForUser(kiloUserId: string, instanceId?: string) {
       );
 }
 
-export async function clearDestroyedSubscriptionLifecycle(params: {
+export async function clearSubscriptionLifecycleAfterInstanceDestroy(params: {
   actorUserId: string;
   kiloUserId: string;
   instanceId: string;

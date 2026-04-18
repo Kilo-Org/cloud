@@ -118,8 +118,11 @@ notifications at each stage.
 5. The system MUST enforce at most one subscription record per
    instance. Each subscription MUST reference the instance it funds.
    A user MAY have multiple instances, each with its own subscription.
-6. The user-visible price for each plan MUST be identical regardless
-   of payment source.
+6. The base user-visible price for each plan MUST be identical
+   regardless of payment source. Payment-provider-native promotions,
+   coupons, or other checkout-side adjustments are excluded from this
+   parity rule and are governed by the payment-source-specific rules
+   below.
 7. Stripe-funded billing MUST use configured payment-provider price
    identifiers. Credit-funded billing MUST use internal microdollar
    amounts that correspond to the same plan prices.
@@ -127,11 +130,14 @@ notifications at each stage.
    configuration for the selected plan is missing. For Stripe-funded
    billing this includes the payment-provider price identifier.
 9. Each plan MUST support two payment sources: payment-provider
-   (Stripe) and credits. Plan pricing, access rules, failure handling,
-   and suspension/destruction timelines MUST be identical regardless
-   of payment source. The payment mechanism and the internal
-   implementation of plan switching and cancellation differ by payment
-   source (see Plan Switching and Cancellation and Reactivation).
+   (Stripe) and credits. Base plan pricing, built-in first-period
+   pricing defined by this spec, access rules, failure handling, and
+   suspension/destruction timelines MUST be identical regardless of
+   payment source. Payment-provider-native promotions, coupons, and
+   checkout-side adjustments MAY differ by payment source. The payment
+   mechanism and the internal implementation of plan switching and
+   cancellation differ by payment source (see Plan Switching and
+   Cancellation and Reactivation).
 
 ### Payment Sources
 
@@ -296,7 +302,10 @@ rules resolve conflicts.
    customer before creating a new checkout session, to guard against
    concurrent checkouts. This check does not cover provider-side
    subscriptions in past-due status.
-4. The system MUST allow promotional codes for either plan.
+4. The system MUST allow payment-provider promotional codes for either
+   plan. These promotions are payment-provider-native checkout
+   adjustments and do not require an equivalent user-entered mechanism
+   in the credit-enrollment flow.
 5. The system MUST apply the configured first-month discount when
    creating a standard plan checkout session without consuming the
    promotional-code input. The implementation MAY use a dedicated
@@ -332,10 +341,11 @@ rules resolve conflicts.
 2. The system MUST allow credit enrollment when the existing
    subscription status is trialing or canceled.
 3. The system MUST apply a first-month discounted price when enrolling
-   in the standard plan via credits, identical to the Stripe-configured
-   first-month discount (see Subscription Checkout rule 5). The
-   discounted cost is 4,000,000 microdollars. A user qualifies for the
-   discount when no prior paid subscription exists; a canceled trial
+   in the standard plan via credits, identical to the built-in Stripe
+   first-month discount defined in Subscription Checkout rule 5. This
+   rule does not attempt to mirror user-entered payment-provider promo
+   codes. The discounted cost is 4,000,000 microdollars. A user
+   qualifies for the discount when no prior paid subscription exists; a canceled trial
    subscription (plan = 'trial') MUST NOT count as a prior paid
    subscription. When the user has a canceled non-trial subscription,
    the system MUST charge the regular standard price of 9,000,000
@@ -512,7 +522,7 @@ rows renew.
 4. The deduction amount MUST equal the settled invoice amount. The
    system MUST NOT substitute locally defined plan cost constants.
    Payment-provider-side adjustments (first-month discounts,
-   prorations) flow through as-is.
+   promotional codes, coupons, prorations) flow through as-is.
 5. Settlement MUST be idempotent. Processing the same invoice twice
    MUST NOT produce duplicate credits or duplicate deductions.
 6. On successful settlement the system MUST:

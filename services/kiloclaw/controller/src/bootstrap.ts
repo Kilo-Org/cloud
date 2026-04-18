@@ -594,10 +594,11 @@ The \`gog\` CLI is configured and ready for Google Workspace operations (Gmail, 
 - Gmail — read: \`gog gmail get --account <email> <message-id>\`
 - Gmail — send: \`gog gmail send --account <email> --to <addr> --subject "..." --body "..."\`
 - Calendar — list calendars first: \`gog calendar calendars --account <email> --json\`
-- Calendar — fetch events (all calendars): \`gog calendar events --account <email> --from <iso> --to <iso> --json\`
-- Calendar — use \`primary\` only when explicitly requested; otherwise query all calendars first
+- Calendar — default retrieval path: \`gog calendar events --all --all-pages --max 250 --account <email> --from <iso> --to <iso> --json\`
+- Calendar — align \`--from\` / \`--to\` to the user-requested local date window before summarizing
+- Calendar — use \`primary\` only when explicitly requested by the user
 - Calendar — if results look sparse, retry with explicit calendar IDs from \`gog calendar calendars\`:
-  \`gog calendar events <calendarId> --account <email> --from <iso> --to <iso> --json\`
+  \`gog calendar events <calendarId> --all-pages --max 250 --account <email> --from <iso> --to <iso> --json\`
 - Drive — list files: \`gog drive ls --account <email> --json\`
 - Docs — read: \`gog docs get --account <email> <doc-id>\`
 - If a command is blocked by capabilities, first run \`gog auth list --json\` to confirm what is granted.

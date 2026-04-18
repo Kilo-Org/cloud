@@ -137,7 +137,8 @@ export async function migrateLegacyGoogleCredentialsToBroker(
     return { attempted: true, migrated: false, reason: 'no_legacy_account' };
   }
 
-  const tmpPath = path.join(os.tmpdir(), `gog-legacy-token-${Date.now()}.json`);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gog-legacy-'));
+  const tmpPath = path.join(tmpDir, 'token.json');
 
   try {
     try {
@@ -149,6 +150,12 @@ export async function migrateLegacyGoogleCredentialsToBroker(
           encoding: 'utf8',
         }
       );
+
+      try {
+        fs.chmodSync(tmpPath, 0o600);
+      } catch {
+        // best effort: continue migration even if chmod is unsupported
+      }
     } catch {
       return { attempted: true, migrated: false, reason: 'token_export_failed' };
     }
@@ -212,9 +219,9 @@ export async function migrateLegacyGoogleCredentialsToBroker(
     return { attempted: true, migrated: false, reason: 'token_export_failed' };
   } finally {
     try {
-      fs.unlinkSync(tmpPath);
-    } catch {
-      // ignore
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch (error) {
+      console.error('[legacy-google-migration] failed to remove tmp dir', tmpDir, error);
     }
   }
 }

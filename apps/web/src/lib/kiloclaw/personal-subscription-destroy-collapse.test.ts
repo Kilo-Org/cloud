@@ -327,8 +327,8 @@ describe('personal subscription destroy collapse', () => {
         }) => void
       >();
     const executor = {
-      select: db.select.bind(db),
-      update: db.update.bind(db),
+      select: (...args: Parameters<typeof db.select>) => db.select(...args),
+      update: (...args: Parameters<typeof db.update>) => db.update(...args),
       insert: ((table: typeof kiloclaw_subscription_change_log) => {
         if (table === kiloclaw_subscription_change_log) {
           return {

@@ -865,7 +865,7 @@ platform.post('/provision', async c => {
     });
   }
 
-  let provision;
+  let provision: Awaited<ReturnType<KiloClawInstanceStub['provision']>>;
   try {
     if (selectedProvider) {
       assertAvailableProvider(c.env, selectedProvider);

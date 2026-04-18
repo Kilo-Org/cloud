@@ -32,6 +32,22 @@ type LegacyGoogleMigrationOptions = {
   skipMigration?: boolean;
 };
 
+export type LegacyGoogleMigrationResult = {
+  attempted: boolean;
+  migrated: boolean;
+  reason:
+    | 'skipped'
+    | 'auth_list_failed'
+    | 'no_legacy_account'
+    | 'token_export_failed'
+    | 'missing_refresh_token'
+    | 'credentials_list_failed'
+    | 'missing_credentials_path'
+    | 'invalid_credentials_file'
+    | 'migration_endpoint_failed'
+    | 'migrated';
+};
+
 function endpointFor(checkinUrl: string): string {
   const url = new URL(checkinUrl);
   url.pathname = '/api/controller/google/migrate-legacy';
@@ -96,8 +112,10 @@ function parseClientCredentials(
 
 export async function migrateLegacyGoogleCredentialsToBroker(
   options: LegacyGoogleMigrationOptions
-): Promise<boolean> {
-  if (options.skipMigration) return false;
+): Promise<LegacyGoogleMigrationResult> {
+  if (options.skipMigration) {
+    return { attempted: false, migrated: false, reason: 'skipped' };
+  }
 
   const gogEnv: NodeJS.ProcessEnv = {
     ...process.env,
@@ -111,47 +129,56 @@ export async function migrateLegacyGoogleCredentialsToBroker(
   try {
     authList = runGogJson(['auth', 'list', '--json'], gogEnv) as GogAuthListJson;
   } catch {
-    return false;
+    return { attempted: true, migrated: false, reason: 'auth_list_failed' };
   }
 
   const email = authList.accounts?.find(a => typeof a.email === 'string')?.email;
   if (!email) {
-    return false;
+    return { attempted: true, migrated: false, reason: 'no_legacy_account' };
   }
 
   const tmpPath = path.join(os.tmpdir(), `gog-legacy-token-${Date.now()}.json`);
 
   try {
-    execFileSync(
-      '/usr/local/bin/gog.real',
-      ['auth', 'tokens', 'export', email, tmpPath, '--overwrite'],
-      {
-        env: gogEnv,
-        encoding: 'utf8',
-      }
-    );
+    try {
+      execFileSync(
+        '/usr/local/bin/gog.real',
+        ['auth', 'tokens', 'export', email, tmpPath, '--overwrite'],
+        {
+          env: gogEnv,
+          encoding: 'utf8',
+        }
+      );
+    } catch {
+      return { attempted: true, migrated: false, reason: 'token_export_failed' };
+    }
 
     const exportPayload = JSON.parse(fs.readFileSync(tmpPath, 'utf8')) as GogTokenExportJson;
     if (!exportPayload.refresh_token) {
-      return false;
+      return { attempted: true, migrated: false, reason: 'missing_refresh_token' };
     }
 
-    const credentialsList = runGogJson(
-      ['auth', 'credentials', 'list', '--json'],
-      gogEnv
-    ) as GogCredentialsListJson;
+    let credentialsList: GogCredentialsListJson;
+    try {
+      credentialsList = runGogJson(
+        ['auth', 'credentials', 'list', '--json'],
+        gogEnv
+      ) as GogCredentialsListJson;
+    } catch {
+      return { attempted: true, migrated: false, reason: 'credentials_list_failed' };
+    }
     const tokenClient = exportPayload.client || 'default';
     const credsPath =
       credentialsList.clients?.find(client => client.client === tokenClient)?.path ||
       credentialsList.clients?.find(client => client.client === 'default')?.path;
 
     if (!credsPath) {
-      return false;
+      return { attempted: true, migrated: false, reason: 'missing_credentials_path' };
     }
 
     const credentials = parseClientCredentials(credsPath);
     if (!credentials) {
-      return false;
+      return { attempted: true, migrated: false, reason: 'invalid_credentials_file' };
     }
 
     const body = {
@@ -177,12 +204,12 @@ export async function migrateLegacyGoogleCredentialsToBroker(
     });
 
     if (!response.ok) {
-      return false;
+      return { attempted: true, migrated: false, reason: 'migration_endpoint_failed' };
     }
 
-    return true;
+    return { attempted: true, migrated: true, reason: 'migrated' };
   } catch {
-    return false;
+    return { attempted: true, migrated: false, reason: 'token_export_failed' };
   } finally {
     try {
       fs.unlinkSync(tmpPath);

@@ -36,6 +36,9 @@ const ProductTelemetrySchema = z.object({
   botVibe: z.string().nullable().optional(),
   botEmoji: z.string().nullable().optional(),
   browserEnabled: z.boolean(),
+  googleLegacyMigrationAttempted: z.boolean().optional(),
+  googleLegacyMigrationSucceeded: z.boolean().optional(),
+  googleLegacyMigrationFailureReason: z.string().nullable().optional(),
 });
 
 const INSTANCE_READY_LOAD_THRESHOLD = 0.1;
@@ -89,7 +92,43 @@ const GoogleMigrateLegacyRequestSchema = z.object({
 
 const GOOGLE_CAPABILITY_SCOPES: Record<string, readonly string[]> = {
   calendar_read: ['https://www.googleapis.com/auth/calendar.readonly'],
+  gmail_read: ['https://www.googleapis.com/auth/gmail.readonly'],
+  drive_read: [
+    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/documents.readonly',
+    'https://www.googleapis.com/auth/spreadsheets.readonly',
+  ],
 };
+
+type GoogleGrantsBySource = {
+  legacy?: string[];
+  oauth?: string[];
+};
+
+function normalizeCapabilities(capabilities: readonly string[]): string[] {
+  return [...new Set(capabilities.map(capability => capability.trim()).filter(Boolean))].sort();
+}
+
+function parseGoogleGrantsBySource(raw: unknown): GoogleGrantsBySource {
+  if (!raw || typeof raw !== 'object') {
+    return {};
+  }
+
+  const obj = raw as Record<string, unknown>;
+  const parseList = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+
+  const legacy = normalizeCapabilities(parseList(obj.legacy));
+  const oauth = normalizeCapabilities(parseList(obj.oauth));
+  const grants: GoogleGrantsBySource = {};
+  if (legacy.length > 0) grants.legacy = legacy;
+  if (oauth.length > 0) grants.oauth = oauth;
+  return grants;
+}
+
+function effectiveGoogleCapabilities(grants: GoogleGrantsBySource): string[] {
+  return normalizeCapabilities([...(grants.legacy ?? []), ...(grants.oauth ?? [])]);
+}
 
 /**
  * Return the backend app origin for internal API calls.
@@ -609,10 +648,6 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
   const { db, instance, stub } = authorized;
   const existing = await getGoogleOAuthConnectionByInstanceId(db, instance.id);
 
-  if (existing && existing.credential_profile === 'kilo_owned') {
-    return c.json({ migrated: false, reason: 'kilo_owned_already_active' }, 200);
-  }
-
   const encryptionKey = c.env.GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY;
   if (!encryptionKey) {
     return c.json({ error: 'Google OAuth broker is not configured' }, 503);
@@ -620,9 +655,29 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
 
   const now = new Date().toISOString();
   const scopes = [...new Set(parsed.data.scopes)].sort();
-  const capabilities = [...new Set(parsed.data.capabilities)].sort();
+  const migratedLegacyCapabilities = normalizeCapabilities(parsed.data.capabilities);
+  const existingGrants = parseGoogleGrantsBySource(existing?.grants_by_source);
+  const nextLegacyGrants = normalizeCapabilities([
+    ...(existingGrants.legacy ?? []),
+    ...migratedLegacyCapabilities,
+    ...(existing?.credential_profile === 'legacy' ? (existing.capabilities ?? []) : []),
+  ]);
+  const nextOauthGrants = normalizeCapabilities(existingGrants.oauth ?? []);
+  const grantsBySource: GoogleGrantsBySource = {};
+  if (nextLegacyGrants.length > 0) grantsBySource.legacy = nextLegacyGrants;
+  if (nextOauthGrants.length > 0) grantsBySource.oauth = nextOauthGrants;
+  const capabilities = effectiveGoogleCapabilities(grantsBySource);
 
-  if (existing) {
+  if (existing && existing.credential_profile === 'kilo_owned') {
+    await db.execute(sql`
+      UPDATE kiloclaw_google_oauth_connections
+      SET
+        grants_by_source = ${JSON.stringify(grantsBySource)}::jsonb,
+        capabilities = ${capabilities},
+        updated_at = ${now}
+      WHERE instance_id = ${instance.id}
+    `);
+  } else if (existing) {
     await updateGoogleOAuthConnectionTokenData(db, instance.id, {
       oauthClientId: parsed.data.oauthClientId,
       oauthClientSecretEncrypted: encryptWithSymmetricKey(
@@ -642,6 +697,7 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
       SET
         account_email = ${parsed.data.accountEmail},
         account_subject = ${parsed.data.accountSubject},
+        grants_by_source = ${JSON.stringify(grantsBySource)}::jsonb,
         capabilities = ${capabilities},
         connected_at = ${now},
         updated_at = ${now}
@@ -662,6 +718,7 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
         credential_profile,
         refresh_token_encrypted,
         scopes,
+        grants_by_source,
         capabilities,
         status,
         connected_at,
@@ -677,6 +734,7 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
         'legacy',
         ${encryptWithSymmetricKey(parsed.data.refreshToken, encryptionKey)},
         ${scopes},
+        ${JSON.stringify(grantsBySource)}::jsonb,
         ${capabilities},
         'active',
         ${now},
@@ -692,6 +750,7 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
         credential_profile = EXCLUDED.credential_profile,
         refresh_token_encrypted = EXCLUDED.refresh_token_encrypted,
         scopes = EXCLUDED.scopes,
+        grants_by_source = EXCLUDED.grants_by_source,
         capabilities = EXCLUDED.capabilities,
         status = EXCLUDED.status,
         last_error = NULL,
@@ -703,14 +762,20 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
 
   await stub.updateGoogleOAuthConnection({
     status: 'active',
-    accountEmail: parsed.data.accountEmail,
-    accountSubject: parsed.data.accountSubject,
+    accountEmail:
+      existing && existing.credential_profile === 'kilo_owned'
+        ? existing.account_email
+        : parsed.data.accountEmail,
+    accountSubject:
+      existing && existing.credential_profile === 'kilo_owned'
+        ? existing.account_subject
+        : parsed.data.accountSubject,
     scopes,
     capabilities,
     lastError: null,
   });
 
-  return c.json({ migrated: true, profile: 'legacy' }, 200);
+  return c.json({ migrated: true, profile: existing?.credential_profile ?? 'legacy' }, 200);
 });
 
 export { controller };

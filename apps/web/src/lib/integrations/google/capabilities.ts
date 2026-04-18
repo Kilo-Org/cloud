@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const GOOGLE_CAPABILITY = {
   CALENDAR_READ: 'calendar_read',
   GMAIL_READ: 'gmail_read',
+  DRIVE_READ: 'drive_read',
 } as const;
 
 export type GoogleCapability = (typeof GOOGLE_CAPABILITY)[keyof typeof GOOGLE_CAPABILITY];
@@ -10,11 +11,17 @@ export type GoogleCapability = (typeof GOOGLE_CAPABILITY)[keyof typeof GOOGLE_CA
 export const GoogleCapabilitySchema = z.enum([
   GOOGLE_CAPABILITY.CALENDAR_READ,
   GOOGLE_CAPABILITY.GMAIL_READ,
+  GOOGLE_CAPABILITY.DRIVE_READ,
 ]);
 
 const GOOGLE_CAPABILITY_SCOPES: Record<GoogleCapability, readonly string[]> = {
   [GOOGLE_CAPABILITY.CALENDAR_READ]: ['https://www.googleapis.com/auth/calendar.readonly'],
   [GOOGLE_CAPABILITY.GMAIL_READ]: ['https://www.googleapis.com/auth/gmail.readonly'],
+  [GOOGLE_CAPABILITY.DRIVE_READ]: [
+    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/documents.readonly',
+    'https://www.googleapis.com/auth/spreadsheets.readonly',
+  ],
 };
 
 export const GOOGLE_IDENTITY_SCOPES = [

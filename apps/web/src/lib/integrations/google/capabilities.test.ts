@@ -14,9 +14,10 @@ describe('google capabilities', () => {
   });
 
   test('parseGoogleCapabilities parses and deduplicates comma-separated values', () => {
-    expect(parseGoogleCapabilities('calendar_read,gmail_read,calendar_read')).toEqual([
+    expect(parseGoogleCapabilities('calendar_read,gmail_read,drive_read,calendar_read')).toEqual([
       GOOGLE_CAPABILITY.CALENDAR_READ,
       GOOGLE_CAPABILITY.GMAIL_READ,
+      GOOGLE_CAPABILITY.DRIVE_READ,
     ]);
   });
 
@@ -29,18 +30,23 @@ describe('google capabilities', () => {
 
     expect(scopes).toContain('https://www.googleapis.com/auth/calendar.readonly');
     expect(scopes).not.toContain('https://www.googleapis.com/auth/gmail.readonly');
+    expect(scopes).not.toContain('https://www.googleapis.com/auth/drive.readonly');
   });
 
   test('hasRequiredScopesForCapabilities validates required scopes', () => {
     const grantedScopes = resolveGoogleScopesForCapabilities([
       GOOGLE_CAPABILITY.CALENDAR_READ,
       GOOGLE_CAPABILITY.GMAIL_READ,
+      GOOGLE_CAPABILITY.DRIVE_READ,
     ]);
 
     expect(hasRequiredScopesForCapabilities(grantedScopes, [GOOGLE_CAPABILITY.CALENDAR_READ])).toBe(
       true
     );
     expect(hasRequiredScopesForCapabilities(grantedScopes, [GOOGLE_CAPABILITY.GMAIL_READ])).toBe(
+      true
+    );
+    expect(hasRequiredScopesForCapabilities(grantedScopes, [GOOGLE_CAPABILITY.DRIVE_READ])).toBe(
       true
     );
     expect(

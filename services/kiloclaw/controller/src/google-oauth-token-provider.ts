@@ -27,7 +27,7 @@ type GoogleOAuthTokenProviderOptions = {
   getSandboxId: () => string;
   getCheckinUrl: () => string;
   refreshSkewSeconds?: number;
-  migrateLegacy?: () => Promise<boolean>;
+  migrateLegacy?: () => Promise<{ migrated: boolean }>;
 };
 
 type CachedToken = GoogleOAuthTokenResponse & {
@@ -201,8 +201,8 @@ export class GoogleOAuthTokenProvider {
             throw error;
           }
 
-          const migrated = await migrateLegacy();
-          if (migrated) {
+          const migrationResult = await migrateLegacy();
+          if (migrationResult.migrated) {
             return await fetchFreshToken(endpoint, {
               apiKey: this.options.getApiKey(),
               gatewayToken: this.options.getGatewayToken(),

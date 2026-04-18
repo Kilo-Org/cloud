@@ -22,6 +22,40 @@ type UpsertKiloClawGoogleOAuthConnectionInput = {
   capabilities: GoogleCapability[];
 };
 
+type GrantsBySource = {
+  legacy?: string[];
+  oauth?: string[];
+};
+
+function normalizeCapabilities(values: readonly string[]): string[] {
+  return [...new Set(values.map(value => value.trim()).filter(Boolean))].sort();
+}
+
+function deriveGrantsBySource(
+  existing: {
+    credential_profile: 'legacy' | 'kilo_owned';
+    capabilities: string[];
+    grants_by_source?: GrantsBySource | null;
+  } | null,
+  oauthCapabilities: readonly string[]
+): GrantsBySource {
+  const nextOauth = normalizeCapabilities(oauthCapabilities);
+  const existingGrants = existing?.grants_by_source ?? {};
+  const nextLegacy = normalizeCapabilities([
+    ...(existingGrants.legacy ?? []),
+    ...(existing?.credential_profile === 'legacy' ? (existing.capabilities ?? []) : []),
+  ]);
+
+  const grants: GrantsBySource = {};
+  if (nextLegacy.length > 0) grants.legacy = nextLegacy;
+  if (nextOauth.length > 0) grants.oauth = nextOauth;
+  return grants;
+}
+
+function effectiveCapabilitiesFromGrants(grants: GrantsBySource): string[] {
+  return normalizeCapabilities([...(grants.legacy ?? []), ...(grants.oauth ?? [])]);
+}
+
 function encryptRefreshToken(refreshToken: string): string {
   if (!GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY) {
     throw new Error('GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY is not configured');
@@ -45,7 +79,7 @@ export async function upsertKiloClawGoogleOAuthConnection(
 }> {
   const now = new Date().toISOString();
   const nextScopes = [...new Set(input.scopes)].sort();
-  const nextCapabilities = [...new Set(input.capabilities)].sort();
+  const oauthCapabilities = normalizeCapabilities(input.capabilities);
 
   const [existing] = await db
     .select()
@@ -67,9 +101,11 @@ export async function upsertKiloClawGoogleOAuthConnection(
 
   if (existing) {
     const nextStatus: KiloClawGoogleOAuthStatus = 'active';
+    const grantsBySource = deriveGrantsBySource(existing, oauthCapabilities);
+    const effectiveCapabilities = effectiveCapabilitiesFromGrants(grantsBySource);
     const shouldUpdateConnectedAt =
       existing.status !== 'active' ||
-      !equalSortedLists(existing.capabilities ?? [], nextCapabilities) ||
+      !equalSortedLists(existing.capabilities ?? [], effectiveCapabilities) ||
       !equalSortedLists(existing.scopes ?? [], nextScopes);
 
     await db
@@ -82,7 +118,8 @@ export async function upsertKiloClawGoogleOAuthConnection(
         credential_profile: 'kilo_owned',
         refresh_token_encrypted: encryptedRefreshToken,
         scopes: nextScopes,
-        capabilities: nextCapabilities,
+        grants_by_source: grantsBySource,
+        capabilities: effectiveCapabilities,
         status: nextStatus,
         last_error: null,
         last_error_at: null,
@@ -95,11 +132,15 @@ export async function upsertKiloClawGoogleOAuthConnection(
       status: nextStatus,
       accountEmail: input.accountEmail,
       scopes: nextScopes,
-      capabilities: nextCapabilities,
+      capabilities: effectiveCapabilities,
     };
   }
 
   const status: KiloClawGoogleOAuthStatus = 'active';
+  const grantsBySource: GrantsBySource = {
+    oauth: oauthCapabilities,
+  };
+  const effectiveCapabilities = effectiveCapabilitiesFromGrants(grantsBySource);
   await db.insert(kiloclaw_google_oauth_connections).values({
     instance_id: input.instanceId,
     provider: 'google',
@@ -110,7 +151,8 @@ export async function upsertKiloClawGoogleOAuthConnection(
     credential_profile: 'kilo_owned',
     refresh_token_encrypted: encryptedRefreshToken,
     scopes: nextScopes,
-    capabilities: nextCapabilities,
+    grants_by_source: grantsBySource,
+    capabilities: effectiveCapabilities,
     status,
     connected_at: now,
     created_at: now,
@@ -121,7 +163,7 @@ export async function upsertKiloClawGoogleOAuthConnection(
     status,
     accountEmail: input.accountEmail,
     scopes: nextScopes,
-    capabilities: nextCapabilities,
+    capabilities: effectiveCapabilities,
   };
 }
 

@@ -130,6 +130,10 @@ if [[ "$cmd" == "auth" ]]; then
   subcmd="$(auth_subcommand "$@" || true)"
 
   if [[ "$subcmd" == "list" ]]; then
+    if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
+      exec "\${REAL_GOG}" "$@"
+    fi
+
     status_tmp="$(mktemp)"
     status_http="$(curl -sS -o "\${status_tmp}" -w '%{http_code}' \
       -X POST \
@@ -140,42 +144,88 @@ if [[ "$cmd" == "auth" ]]; then
     status_body="$(cat "\${status_tmp}")"
     rm -f "\${status_tmp}"
 
-    if [[ -n "$status_http" ]] && [[ "$status_http" -ge 200 ]] && [[ "$status_http" -lt 300 ]]; then
-      if ! command -v jq >/dev/null 2>&1; then
-        exec "\${REAL_GOG}" "$@"
+    if [[ -z "$status_http" ]] || [[ "$status_http" -lt 200 ]] || [[ "$status_http" -ge 300 ]]; then
+      error_message="google_oauth_status_failed"
+      if command -v jq >/dev/null 2>&1; then
+        parsed_error="$(echo "\${status_body}" | jq -r '.error // empty' 2>/dev/null || true)"
+        if [[ -n "\${parsed_error}" ]]; then
+          error_message="\${parsed_error}"
+        fi
       fi
+      echo "[gog-wrapper] \${error_message}" >&2
+      exit 78
+    fi
 
-      if has_json_flag "$@"; then
-        echo "$status_body" | jq -c '{accounts: (.accounts // [])}'
-        exit 0
-      fi
+    if ! command -v jq >/dev/null 2>&1; then
+      echo '[gog-wrapper] jq is required for OAuth status parsing' >&2
+      exit 78
+    fi
 
-      account_count="$(echo "$status_body" | jq -r '(.accounts // []) | length')"
-      if [[ "$account_count" == "0" ]]; then
-        echo "No tokens stored" >&2
-        exit 0
-      fi
-
-      echo "$status_body" | jq -r '.accounts[] | [
-        .email,
-        .client,
-        ((.services // []) | join(",")),
-        (.created_at // ""),
-        (.auth // "oauth")
-      ] | @tsv'
+    if has_json_flag "$@"; then
+      echo "$status_body" | jq -c '{accounts: (.accounts // [])}'
       exit 0
     fi
+
+    account_count="$(echo "$status_body" | jq -r '(.accounts // []) | length')"
+    if [[ "$account_count" == "0" ]]; then
+      echo "No tokens stored" >&2
+      exit 0
+    fi
+
+    echo "$status_body" | jq -r '.accounts[] | [
+      .email,
+      .client,
+      ((.services // []) | join(",")),
+      (.created_at // ""),
+      (.auth // "oauth")
+    ] | @tsv'
+    exit 0
   fi
 
   auth_services="$(read_auth_services "$@" || true)"
-  if [[ "\${auth_services}" == *calendar* ]] && [[ "\${auth_services}" == *gmail* || "\${auth_services}" == *drive* ]]; then
-    echo '[gog-wrapper] mixed legacy+oauth service auth is not supported in one command' >&2
-    exit 64
+
+  if [[ -n "\${auth_services}" ]]; then
+    has_google_service=0
+    has_non_google_service=0
+    IFS=',' read -r -a service_list <<< "\${auth_services}"
+    for raw_service in "\${service_list[@]}"; do
+      service="\${raw_service//[[:space:]]/}"
+      case "\${service}" in
+        calendar|gmail|drive|docs|sheets)
+          has_google_service=1
+          ;;
+        *)
+          has_non_google_service=1
+          ;;
+      esac
+    done
+
+    if [[ "\${has_google_service}" == "1" ]] && [[ "\${has_non_google_service}" == "1" ]]; then
+      echo '[gog-wrapper] mixed google and non-google auth --services is not supported in one command' >&2
+      exit 64
+    fi
   fi
 fi
 
+broker_capabilities=''
 case "$cmd" in
   calendar|cal)
+    broker_capabilities='["calendar_read"]'
+    if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
+      exec "\${REAL_GOG}" "$@"
+    fi
+    ;;
+  gmail)
+    broker_capabilities='["gmail_read"]'
+    if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
+      exec "\${REAL_GOG}" "$@"
+    fi
+    ;;
+  drive|docs|sheets)
+    broker_capabilities='["drive_read"]'
+    if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
+      exec "\${REAL_GOG}" "$@"
+    fi
     ;;
   *)
     exec "\${REAL_GOG}" "$@"
@@ -183,7 +233,35 @@ case "$cmd" in
 esac
 
 if [[ -z "\${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
-  exec "\${REAL_GOG}" "$@"
+  if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
+    exec "\${REAL_GOG}" "$@"
+  fi
+  echo '[gog-wrapper] OPENCLAW_GATEWAY_TOKEN is required for broker-routed Google commands' >&2
+  exit 78
+fi
+
+if [[ -z "\${KILOCODE_API_KEY:-}" ]]; then
+  if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
+    exec "\${REAL_GOG}" "$@"
+  fi
+  echo '[gog-wrapper] KILOCODE_API_KEY is required for broker-routed Google commands' >&2
+  exit 78
+fi
+
+if [[ -z "\${KILOCLAW_SANDBOX_ID:-}" ]]; then
+  if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
+    exec "\${REAL_GOG}" "$@"
+  fi
+  echo '[gog-wrapper] KILOCLAW_SANDBOX_ID is required for broker-routed Google commands' >&2
+  exit 78
+fi
+
+if [[ -z "\${KILOCLAW_CHECKIN_URL:-}" ]]; then
+  if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
+    exec "\${REAL_GOG}" "$@"
+  fi
+  echo '[gog-wrapper] KILOCLAW_CHECKIN_URL is required for broker-routed Google commands' >&2
+  exit 78
 fi
 
 tmp_file="$(mktemp)"
@@ -191,7 +269,7 @@ http_code="$(curl -sS -o "\${tmp_file}" -w '%{http_code}' \
   -X POST \
   -H "Authorization: Bearer \${OPENCLAW_GATEWAY_TOKEN}" \
   -H 'Content-Type: application/json' \
-  --data '{"capabilities":["calendar_read"]}' \
+  --data "{\"capabilities\":\${broker_capabilities}}" \
   "http://127.0.0.1:\${PORT:-18789}/_kilo/google-oauth/token" || true)"
 
 response_body="$(cat "\${tmp_file}")"

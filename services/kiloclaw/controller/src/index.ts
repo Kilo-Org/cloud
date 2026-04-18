@@ -246,6 +246,11 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   // eslint-disable-next-line prefer-const -- assigned after pairing cache is created
   let pairingCache: ReturnType<typeof createPairingCache> | undefined;
   let stopCheckin: (() => void) | undefined;
+  const legacyGoogleMigration = {
+    attempted: false,
+    migrated: false,
+    reason: null as string | null,
+  };
 
   const onSignal = async (signal: NodeJS.Signals): Promise<void> => {
     if (shuttingDown) return;
@@ -434,13 +439,33 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   }
 
   try {
-    await migrateLegacyGoogleCredentialsToBroker({
+    const migrationResult = await migrateLegacyGoogleCredentialsToBroker({
       apiKey: env.KILOCODE_API_KEY ?? '',
       gatewayToken: config.expectedToken,
       sandboxId: env.KILOCLAW_SANDBOX_ID ?? '',
       checkinUrl: env.KILOCLAW_CHECKIN_URL ?? '',
     });
+
+    legacyGoogleMigration.attempted = migrationResult.attempted;
+    legacyGoogleMigration.migrated = migrationResult.migrated;
+    legacyGoogleMigration.reason = migrationResult.reason;
+
+    if (migrationResult.attempted && !migrationResult.migrated) {
+      process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED = '1';
+      process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_REASON = migrationResult.reason;
+      console.warn(
+        `[gog] Legacy Google migration did not complete; enabling gog.real fallback (reason=${migrationResult.reason})`
+      );
+    } else {
+      delete process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED;
+      delete process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_REASON;
+    }
   } catch (err) {
+    legacyGoogleMigration.attempted = true;
+    legacyGoogleMigration.migrated = false;
+    legacyGoogleMigration.reason = 'migration_exception';
+    process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED = '1';
+    process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_REASON = 'migration_exception';
     console.error('[gog] Legacy Google migration failed:', err);
   }
 
@@ -472,7 +497,16 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
       getCheckinUrl: () => env.KILOCLAW_CHECKIN_URL ?? '',
       getSupervisorStats: () => supervisor.getStats(),
       getOpenclawVersion,
-      getProductTelemetry: openclawVersion => collectProductTelemetry(openclawVersion),
+      getProductTelemetry: openclawVersion =>
+        collectProductTelemetry(openclawVersion, undefined, {
+          googleLegacyMigrationAttempted: legacyGoogleMigration.attempted,
+          googleLegacyMigrationSucceeded:
+            legacyGoogleMigration.attempted && legacyGoogleMigration.migrated,
+          googleLegacyMigrationFailureReason:
+            legacyGoogleMigration.attempted && !legacyGoogleMigration.migrated
+              ? legacyGoogleMigration.reason
+              : null,
+        }),
     });
 
     console.log(

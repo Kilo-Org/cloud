@@ -3743,6 +3743,10 @@ export type KiloClawInstance = typeof kiloclaw_instances.$inferSelect;
 
 export type KiloClawGoogleOAuthStatus = 'active' | 'action_required' | 'disconnected';
 export type KiloClawGoogleOAuthCredentialProfile = 'legacy' | 'kilo_owned';
+export type KiloClawGoogleOAuthGrantsBySource = {
+  legacy?: string[];
+  oauth?: string[];
+};
 
 export const kiloclaw_google_oauth_connections = pgTable(
   'kiloclaw_google_oauth_connections',
@@ -3768,6 +3772,10 @@ export const kiloclaw_google_oauth_connections = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    grants_by_source: jsonb()
+      .$type<KiloClawGoogleOAuthGrantsBySource>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     capabilities: text()
       .array()
       .notNull()

@@ -9,6 +9,7 @@ CREATE TABLE "kiloclaw_google_oauth_connections" (
 	"credential_profile" text DEFAULT 'kilo_owned' NOT NULL,
 	"refresh_token_encrypted" text NOT NULL,
 	"scopes" text[] DEFAULT '{}'::text[] NOT NULL,
+	"grants_by_source" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"capabilities" text[] DEFAULT '{}'::text[] NOT NULL,
 	"status" text DEFAULT 'active' NOT NULL,
 	"last_error" text,

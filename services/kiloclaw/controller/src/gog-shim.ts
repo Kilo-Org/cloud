@@ -232,38 +232,6 @@ case "$cmd" in
     ;;
 esac
 
-if [[ -z "\${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
-  if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
-    exec "\${REAL_GOG}" "$@"
-  fi
-  echo '[gog-wrapper] OPENCLAW_GATEWAY_TOKEN is required for broker-routed Google commands' >&2
-  exit 78
-fi
-
-if [[ -z "\${KILOCODE_API_KEY:-}" ]]; then
-  if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
-    exec "\${REAL_GOG}" "$@"
-  fi
-  echo '[gog-wrapper] KILOCODE_API_KEY is required for broker-routed Google commands' >&2
-  exit 78
-fi
-
-if [[ -z "\${KILOCLAW_SANDBOX_ID:-}" ]]; then
-  if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
-    exec "\${REAL_GOG}" "$@"
-  fi
-  echo '[gog-wrapper] KILOCLAW_SANDBOX_ID is required for broker-routed Google commands' >&2
-  exit 78
-fi
-
-if [[ -z "\${KILOCLAW_CHECKIN_URL:-}" ]]; then
-  if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
-    exec "\${REAL_GOG}" "$@"
-  fi
-  echo '[gog-wrapper] KILOCLAW_CHECKIN_URL is required for broker-routed Google commands' >&2
-  exit 78
-fi
-
 tmp_file="$(mktemp)"
 http_code="$(curl -sS -o "\${tmp_file}" -w '%{http_code}' \
   -X POST \

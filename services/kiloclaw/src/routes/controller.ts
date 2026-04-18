@@ -673,7 +673,8 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
     const currentCapabilities = normalizeCapabilities(existing.capabilities ?? []);
     const sameLegacyGrants =
       JSON.stringify(currentGrants.legacy ?? []) === JSON.stringify(nextLegacyGrants);
-    const sameOauthGrants = JSON.stringify(currentGrants.oauth ?? []) === JSON.stringify(nextOauthGrants);
+    const sameOauthGrants =
+      JSON.stringify(currentGrants.oauth ?? []) === JSON.stringify(nextOauthGrants);
     const sameCapabilities = JSON.stringify(currentCapabilities) === JSON.stringify(capabilities);
 
     if (existing.status === 'active' && sameLegacyGrants && sameOauthGrants && sameCapabilities) {

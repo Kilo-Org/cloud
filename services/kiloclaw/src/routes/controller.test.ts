@@ -902,9 +902,7 @@ describe('POST /google/token', () => {
     const headers = await makeAuthHeaders();
 
     mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
-    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(
-      makeGoogleConnection(encryptionKey)
-    );
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(makeGoogleConnection(encryptionKey));
 
     const response = await controller.request(
       '/google/token',
@@ -1220,7 +1218,9 @@ describe('POST /google/status', () => {
     expect(payload).toEqual(
       expect.objectContaining({
         connected: false,
-        accounts: [expect.objectContaining({ email: 'user@example.com', status: 'action_required' })],
+        accounts: [
+          expect.objectContaining({ email: 'user@example.com', status: 'action_required' }),
+        ],
       })
     );
   });
@@ -1370,7 +1370,10 @@ describe('POST /google/migrate-legacy', () => {
         id: 'conn-legacy',
         credential_profile: 'legacy',
         oauth_client_id: 'legacy-client-id',
-        oauth_client_secret_encrypted: encryptWithSymmetricKey('legacy-client-secret', encryptionKey),
+        oauth_client_secret_encrypted: encryptWithSymmetricKey(
+          'legacy-client-secret',
+          encryptionKey
+        ),
         grants_by_source: { legacy: ['calendar_read'] },
       })
     );

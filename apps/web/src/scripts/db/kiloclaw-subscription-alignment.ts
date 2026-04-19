@@ -998,7 +998,12 @@ async function applyChangelogBaselineBackfill() {
 
   for (const chunk of chunkArray(rows, chunkSize)) {
     try {
-      await db.transaction(async tx => {
+      // Counts are returned from the transaction callback and accumulated
+      // AFTER commit. Mutating the outer counters inside the callback would
+      // over-report on rollback: e.g. if the `currentStateRows` INSERT ran
+      // but the later `mutationStateRows` INSERT threw, the whole tx would
+      // roll back while the outer counters stayed incremented.
+      const chunkResult = await db.transaction(async tx => {
         const chunkIds = chunk.map(row => row.id);
         const existingBaselines = await tx
           .select({ subscriptionId: kiloclaw_subscription_change_log.subscription_id })
@@ -1014,8 +1019,7 @@ async function applyChangelogBaselineBackfill() {
         const candidateRows = chunk.filter(row => !existingBaselineIds.has(row.id));
 
         if (candidateRows.length === 0) {
-          processedCount += chunk.length;
-          return;
+          return { insertedFromCurrent: 0, insertedFromMutation: 0 };
         }
 
         const candidateIds = candidateRows.map(row => row.id);
@@ -1052,7 +1056,6 @@ async function applyChangelogBaselineBackfill() {
               after_state: serializeKiloClawSubscriptionSnapshot(row),
             }))
           );
-          insertedFromCurrent += currentStateRows.length;
         }
 
         if (mutationStateRows.length > 0) {
@@ -1067,9 +1070,16 @@ async function applyChangelogBaselineBackfill() {
               after_state: earliestMutationMap.get(row.id) ?? null,
             }))
           );
-          insertedFromMutation += mutationStateRows.length;
         }
+
+        return {
+          insertedFromCurrent: currentStateRows.length,
+          insertedFromMutation: mutationStateRows.length,
+        };
       });
+
+      insertedFromCurrent += chunkResult.insertedFromCurrent;
+      insertedFromMutation += chunkResult.insertedFromMutation;
     } catch (error) {
       const errorMessage = describeError(error);
       console.error('Changelog baseline backfill chunk failed', {
@@ -2314,13 +2324,22 @@ type MultiRowAllDestroyedCandidate = {
   tailCreatedAt: string;
   currentAmbiguousRowCount: number;
   pairs: MultiRowAllDestroyedPair[];
+  // A candidate is `fullyCollapsible` when the planned pair set reduces the
+  // user's current ambiguous row count to exactly one. When a pre-existing
+  // partial chain (e.g. D→B in a history of [D, A, B, C]) claims an
+  // intermediate row's predecessor slot, the UQ_kiloclaw_subscriptions_transferred_to
+  // guard forces us to drop a pair, leaving more than one row ambiguous.
+  // Apply paths must skip these users — partial collapse would replace one
+  // `CurrentPersonalSubscriptionResolutionError`-firing shape with another
+  // and mask the problem in the change log.
+  fullyCollapsible: boolean;
 };
 
 type MultiRowAllDestroyedOutcome =
   | 'collapsed'
   | 'skipped_no_longer_ambiguous'
   | 'skipped_race'
-  | 'skipped_no_pairs';
+  | 'skipped_not_collapsible';
 
 // ---------------------------------------------------------------------------
 // Multi-row-all-destroyed collapse
@@ -2408,33 +2427,13 @@ async function buildMultiRowAllDestroyedCandidates(): Promise<MultiRowAllDestroy
     if (currentAmbiguous.length < 2) continue;
     if (currentAmbiguous.some(row => row.instanceDestroyedAt === null)) continue;
 
-    // Which rows are already someone's immediate successor? We must not emit
-    // a pair whose target already has a predecessor — UQ_kiloclaw_subscriptions_transferred_to
-    // would reject the UPDATE and roll back the user's whole tx.
-    const existingPredecessorTargets = new Set(
-      userRows.map(row => row.transferredToSubscriptionId).filter((id): id is string => id !== null)
-    );
-
-    const pairs: MultiRowAllDestroyedPair[] = [];
-    for (let index = 0; index < userRows.length - 1; index += 1) {
-      const source = userRows[index];
-      const next = userRows[index + 1];
-      if (!source || !next) continue;
-      if (source.transferredToSubscriptionId !== null) continue;
-      if (existingPredecessorTargets.has(next.subscriptionId)) continue;
-      pairs.push({
-        sourceId: source.subscriptionId,
-        targetId: next.subscriptionId,
-        sourceCreatedAt: source.subscriptionCreatedAt,
-        targetCreatedAt: next.subscriptionCreatedAt,
-      });
-      // Once we plan to point `source` at `next`, `next` is now claimed as a
-      // predecessor target within this candidate; future pairs in this user
-      // must respect that.
-      existingPredecessorTargets.add(next.subscriptionId);
-    }
-
-    if (pairs.length === 0) continue;
+    const pairs = planMultiRowAllDestroyedPairsFromSourceRows(userRows);
+    // `fullyCollapsible` === true means applying the plan reduces the
+    // ambiguous set to exactly one tail row. If every candidate target is
+    // already someone else's predecessor, the plan is empty and
+    // `fullyCollapsible` will be false — we still surface the user so
+    // operators and apply can count them as requiring manual review.
+    const fullyCollapsible = currentAmbiguous.length - pairs.length === 1;
 
     const tail = userRows[userRows.length - 1];
     if (!tail) continue;
@@ -2445,22 +2444,89 @@ async function buildMultiRowAllDestroyedCandidates(): Promise<MultiRowAllDestroy
       tailCreatedAt: tail.subscriptionCreatedAt,
       currentAmbiguousRowCount: currentAmbiguous.length,
       pairs,
+      fullyCollapsible,
     });
   }
 
   return candidates;
 }
 
+// Sequential-chain pair planner shared by preview and both apply paths.
+// Walks rows oldest-to-newest, pairing each non-transferred row with its
+// immediately-next row as successor, skipping pairs whose target is already
+// someone else's predecessor (UQ_kiloclaw_subscriptions_transferred_to).
+// The plan collapses the user's ambiguous set when
+// `currentAmbiguousCount - pairs.length === 1`. Callers must check that
+// condition before applying — partial plans leave the user still ambiguous.
+function planMultiRowAllDestroyedPairsFromSourceRows(
+  userRows: MultiRowAllDestroyedSourceRow[]
+): MultiRowAllDestroyedPair[] {
+  const existingPredecessorTargets = new Set(
+    userRows.map(row => row.transferredToSubscriptionId).filter((id): id is string => id !== null)
+  );
+
+  const pairs: MultiRowAllDestroyedPair[] = [];
+  for (let index = 0; index < userRows.length - 1; index += 1) {
+    const source = userRows[index];
+    const next = userRows[index + 1];
+    if (!source || !next) continue;
+    if (source.transferredToSubscriptionId !== null) continue;
+    if (existingPredecessorTargets.has(next.subscriptionId)) continue;
+    pairs.push({
+      sourceId: source.subscriptionId,
+      targetId: next.subscriptionId,
+      sourceCreatedAt: source.subscriptionCreatedAt,
+      targetCreatedAt: next.subscriptionCreatedAt,
+    });
+    existingPredecessorTargets.add(next.subscriptionId);
+  }
+  return pairs;
+}
+
+type MultiRowJoinedRow = {
+  subscription: KiloClawSubscription;
+  instanceDestroyedAt: string | null;
+};
+
+// Variant of the planner that works on full joined rows (subscription +
+// instance destroyed_at) so apply paths can reuse each `before` row object
+// directly for change-log snapshots without a per-pair SELECT. The
+// collapsibility rule is the same: `ambiguous - pairs === 1` to fully
+// collapse.
+function planMultiRowAllDestroyedPairsFromJoinedRows(
+  joinedRows: MultiRowJoinedRow[]
+): Array<{ before: KiloClawSubscription; targetId: string }> {
+  const existingPredecessorTargets = new Set(
+    joinedRows
+      .map(row => row.subscription.transferred_to_subscription_id)
+      .filter((id): id is string => id !== null)
+  );
+
+  const pairs: Array<{ before: KiloClawSubscription; targetId: string }> = [];
+  for (let index = 0; index < joinedRows.length - 1; index += 1) {
+    const source = joinedRows[index]?.subscription;
+    const next = joinedRows[index + 1]?.subscription;
+    if (!source || !next) continue;
+    if (source.transferred_to_subscription_id !== null) continue;
+    if (existingPredecessorTargets.has(next.id)) continue;
+    pairs.push({ before: source, targetId: next.id });
+    existingPredecessorTargets.add(next.id);
+  }
+  return pairs;
+}
+
 function summarizeMultiRowAllDestroyedCandidates(candidates: MultiRowAllDestroyedCandidate[]) {
-  const totalUsers = candidates.length;
-  const totalPairsToWrite = candidates.reduce((acc, row) => acc + row.pairs.length, 0);
+  const collapsible = candidates.filter(candidate => candidate.fullyCollapsible);
+  const nonCollapsible = candidates.filter(candidate => !candidate.fullyCollapsible);
+  const totalPairsToWrite = collapsible.reduce((acc, row) => acc + row.pairs.length, 0);
   const buckets = new Map<number, number>();
-  for (const candidate of candidates) {
+  for (const candidate of collapsible) {
     const userRowCount = candidate.currentAmbiguousRowCount;
     buckets.set(userRowCount, (buckets.get(userRowCount) ?? 0) + 1);
   }
   return {
-    totalUsers,
+    collapsibleUsers: collapsible.length,
+    nonCollapsibleUsers: nonCollapsible.length,
     totalPairsToWrite,
     distribution: [...buckets.entries()]
       .sort(([a], [b]) => a - b)
@@ -2474,19 +2540,22 @@ function summarizeMultiRowAllDestroyedCandidates(candidates: MultiRowAllDestroye
 async function previewMultiRowAllDestroyedCollapse() {
   const candidates = await buildMultiRowAllDestroyedCandidates();
   const summary = summarizeMultiRowAllDestroyedCandidates(candidates);
+  const nonCollapsible = candidates.filter(candidate => !candidate.fullyCollapsible);
 
   console.log('\nmulti-row-all-destroyed preview');
   console.table([
-    { metric: 'users_affected', count: summary.totalUsers },
+    { metric: 'users_collapsible', count: summary.collapsibleUsers },
+    { metric: 'users_non_collapsible', count: summary.nonCollapsibleUsers },
     { metric: 'pairs_to_write', count: summary.totalPairsToWrite },
   ]);
   printSection(
-    'User ambiguous-row-count distribution (rows matching the guard before collapse)',
+    'Collapsible user ambiguous-row-count distribution (rows matching the guard before collapse)',
     summary.distribution
   );
   printSection(
-    'Sample candidates (top 25 by pair count desc)',
-    [...candidates]
+    'Sample collapsible candidates (top 25 by pair count desc)',
+    candidates
+      .filter(candidate => candidate.fullyCollapsible)
       .sort((a, b) => b.pairs.length - a.pairs.length)
       .slice(0, 25)
       .map(candidate => ({
@@ -2498,6 +2567,18 @@ async function previewMultiRowAllDestroyedCollapse() {
         oldestSourceCreatedAt: candidate.pairs[0]?.sourceCreatedAt ?? null,
       }))
   );
+  if (nonCollapsible.length > 0) {
+    printSection(
+      'Non-collapsible users (pre-existing partial chain blocks full collapse; require manual review)',
+      nonCollapsible.slice(0, 25).map(candidate => ({
+        userId: candidate.userId,
+        currentAmbiguousRows: candidate.currentAmbiguousRowCount,
+        pairsPlanned: candidate.pairs.length,
+        ambiguousRowsRemainingAfterPlan:
+          candidate.currentAmbiguousRowCount - candidate.pairs.length,
+      }))
+    );
+  }
 }
 
 async function applyMultiRowAllDestroyedCollapseRow(
@@ -2541,26 +2622,16 @@ async function applyMultiRowAllDestroyedCollapseRow(
       return { outcome: 'skipped_no_longer_ambiguous' as const, pairsWritten: 0 };
     }
 
-    const existingPredecessorTargets = new Set(
-      joinedRows
-        .map(row => row.subscription.transferred_to_subscription_id)
-        .filter((id): id is string => id !== null)
-    );
+    const plannedPairs = planMultiRowAllDestroyedPairsFromJoinedRows(joinedRows);
 
-    type PlannedPair = { before: KiloClawSubscription; targetId: string };
-    const plannedPairs: PlannedPair[] = [];
-    for (let index = 0; index < joinedRows.length - 1; index += 1) {
-      const source = joinedRows[index]?.subscription;
-      const next = joinedRows[index + 1]?.subscription;
-      if (!source || !next) continue;
-      if (source.transferred_to_subscription_id !== null) continue;
-      if (existingPredecessorTargets.has(next.id)) continue;
-      plannedPairs.push({ before: source, targetId: next.id });
-      existingPredecessorTargets.add(next.id);
-    }
-
-    if (plannedPairs.length === 0) {
-      return { outcome: 'skipped_no_pairs' as const, pairsWritten: 0 };
+    // A partial plan would replace the guard-firing shape with a different
+    // guard-firing shape and obscure the broken state in the change log.
+    // Require that applying the plan reduces the ambiguous set to exactly one
+    // tail row before writing anything. This also covers the degenerate
+    // `plannedPairs.length === 0` case: `currentAmbiguous.length >= 2` by
+    // guard above, so zero pairs cannot satisfy `- plannedPairs.length === 1`.
+    if (currentAmbiguous.length - plannedPairs.length !== 1) {
+      return { outcome: 'skipped_not_collapsible' as const, pairsWritten: 0 };
     }
 
     // Apply each UPDATE individually but capture the after-row for batched
@@ -2624,6 +2695,7 @@ async function applyMultiRowAllDestroyedCollapseChunkBulk(params: {
   usersCollapsed: number;
   pairsWritten: number;
   usersWithNoWork: number;
+  usersNotCollapsible: number;
 }> {
   return await db.transaction(async tx => {
     const userIds = params.chunk.map(candidate => candidate.userId);
@@ -2673,6 +2745,7 @@ async function applyMultiRowAllDestroyedCollapseChunkBulk(params: {
     };
     const allPlannedPairs: PlannedPair[] = [];
     let usersWithNoWork = 0;
+    let usersNotCollapsible = 0;
 
     for (const candidate of params.chunk) {
       const userRows = byUser.get(candidate.userId);
@@ -2692,34 +2765,28 @@ async function applyMultiRowAllDestroyedCollapseChunkBulk(params: {
         continue;
       }
 
-      const existingPredecessorTargets = new Set(
-        userRows
-          .map(row => row.subscription.transferred_to_subscription_id)
-          .filter((id): id is string => id !== null)
-      );
+      const plannedPairs = planMultiRowAllDestroyedPairsFromJoinedRows(userRows);
 
-      let plannedForUser = 0;
-      for (let index = 0; index < userRows.length - 1; index += 1) {
-        const source = userRows[index]?.subscription;
-        const next = userRows[index + 1]?.subscription;
-        if (!source || !next) continue;
-        if (source.transferred_to_subscription_id !== null) continue;
-        if (existingPredecessorTargets.has(next.id)) continue;
+      // Skip non-collapsible users: writing their partial chain would replace
+      // one guard-firing shape with another and still leave the user broken.
+      // `plannedPairs.length === 0` is also caught here because
+      // `currentAmbiguous.length >= 2` above (zero pairs would leave `!== 1`).
+      if (currentAmbiguous.length - plannedPairs.length !== 1) {
+        usersNotCollapsible += 1;
+        continue;
+      }
+
+      for (const pair of plannedPairs) {
         allPlannedPairs.push({
           userId: candidate.userId,
-          before: source,
-          targetId: next.id,
+          before: pair.before,
+          targetId: pair.targetId,
         });
-        existingPredecessorTargets.add(next.id);
-        plannedForUser += 1;
-      }
-      if (plannedForUser === 0) {
-        usersWithNoWork += 1;
       }
     }
 
     if (allPlannedPairs.length === 0) {
-      return { usersCollapsed: 0, pairsWritten: 0, usersWithNoWork };
+      return { usersCollapsed: 0, pairsWritten: 0, usersWithNoWork, usersNotCollapsible };
     }
 
     // 3. One raw-SQL bulk UPDATE for every pair in the chunk. FROM VALUES is
@@ -2746,7 +2813,7 @@ async function applyMultiRowAllDestroyedCollapseChunkBulk(params: {
     `);
 
     if (updatedRows.length === 0) {
-      return { usersCollapsed: 0, pairsWritten: 0, usersWithNoWork };
+      return { usersCollapsed: 0, pairsWritten: 0, usersWithNoWork, usersNotCollapsible };
     }
 
     // 4. Reconstruct the `after` snapshot for each updated row from the
@@ -2796,17 +2863,25 @@ async function applyMultiRowAllDestroyedCollapseChunkBulk(params: {
       usersCollapsed: collapsedUserIds.size,
       pairsWritten: updatedRows.length,
       usersWithNoWork,
+      usersNotCollapsible,
     };
   });
 }
 
 async function applyMultiRowAllDestroyedCollapse(options: ApplyOptions) {
-  const candidates = await buildMultiRowAllDestroyedCandidates();
+  const allCandidates = await buildMultiRowAllDestroyedCandidates();
+  const candidates = allCandidates.filter(candidate => candidate.fullyCollapsible);
+  const nonCollapsibleCandidates = allCandidates.filter(candidate => !candidate.fullyCollapsible);
   const totalPairs = candidates.reduce((acc, row) => acc + row.pairs.length, 0);
 
   console.log(
-    `\nmulti-row-all-destroyed apply: ${candidates.length} users, ${totalPairs} pairs to write`
+    `\nmulti-row-all-destroyed apply: ${candidates.length} collapsible users, ${totalPairs} pairs to write`
   );
+  if (nonCollapsibleCandidates.length > 0) {
+    console.log(
+      `[skip] ${nonCollapsibleCandidates.length} user(s) non-collapsible (pre-existing partial chain); require manual review`
+    );
+  }
   if (options.bulk) {
     console.log(
       '[bulk] enabled; processing ~250 users per transaction, per-user fallback on chunk failure'
@@ -2816,7 +2891,12 @@ async function applyMultiRowAllDestroyedCollapse(options: ApplyOptions) {
   let usersCollapsed = 0;
   let pairsWritten = 0;
   let usersWithNoWork = 0;
-  const skipped: Array<{ userId: string; reason: string; error?: string }> = [];
+  const skipped: Array<{ userId: string; reason: string; error?: string }> = [
+    ...nonCollapsibleCandidates.map(candidate => ({
+      userId: candidate.userId,
+      reason: 'skipped_not_collapsible',
+    })),
+  ];
   const perUserFallback: MultiRowAllDestroyedCandidate[] = [];
   const startedAt = Date.now();
 
@@ -2830,6 +2910,14 @@ async function applyMultiRowAllDestroyedCollapse(options: ApplyOptions) {
         usersCollapsed += result.usersCollapsed;
         pairsWritten += result.pairsWritten;
         usersWithNoWork += result.usersWithNoWork;
+        // `usersNotCollapsible` from the bulk result counts users whose
+        // apply-time re-plan came back non-collapsible after the preview
+        // showed them as collapsible (race with a concurrent chain write).
+        // Surface them as skipped without an individual user id, since the
+        // bulk path doesn't carry per-user identity out of the tx.
+        for (let i = 0; i < result.usersNotCollapsible; i += 1) {
+          skipped.push({ userId: '(bulk chunk)', reason: 'skipped_not_collapsible' });
+        }
       } catch (error) {
         // One bad row (e.g. a UQ_kiloclaw_subscriptions_transferred_to race
         // from a concurrent webhook / reprovision) poisons the entire chunk
@@ -2901,7 +2989,8 @@ async function applyMultiRowAllDestroyedCollapse(options: ApplyOptions) {
     { metric: 'users_collapsed', count: usersCollapsed },
     { metric: 'pairs_written', count: pairsWritten },
     { metric: 'users_skipped_no_work', count: usersWithNoWork },
-    { metric: 'users_skipped', count: skipped.length },
+    { metric: 'users_skipped_not_collapsible', count: nonCollapsibleCandidates.length },
+    { metric: 'users_skipped_total', count: skipped.length },
   ]);
   printSection('Users skipped during multi-row-all-destroyed apply', skipped.slice(0, 50));
 }

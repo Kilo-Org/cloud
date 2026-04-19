@@ -2984,12 +2984,21 @@ async function applyMultiRowAllDestroyedCollapse(options: ApplyOptions) {
     });
   }
 
+  // Derive the non-collapsible metric from the skipped set so it includes
+  // preview-time detection, bulk in-tx re-plan races, and per-user in-tx
+  // re-plan races. Counting only `nonCollapsibleCandidates.length` would
+  // hide users whose plan was valid at preview but raced with a concurrent
+  // chain write during apply.
+  const usersSkippedNotCollapsible = skipped.filter(
+    row => row.reason === 'skipped_not_collapsible'
+  ).length;
+
   console.log('\nmulti-row-all-destroyed apply results');
   console.table([
     { metric: 'users_collapsed', count: usersCollapsed },
     { metric: 'pairs_written', count: pairsWritten },
     { metric: 'users_skipped_no_work', count: usersWithNoWork },
-    { metric: 'users_skipped_not_collapsible', count: nonCollapsibleCandidates.length },
+    { metric: 'users_skipped_not_collapsible', count: usersSkippedNotCollapsible },
     { metric: 'users_skipped_total', count: skipped.length },
   ]);
   printSection('Users skipped during multi-row-all-destroyed apply', skipped.slice(0, 50));

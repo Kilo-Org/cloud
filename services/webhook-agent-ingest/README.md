@@ -22,7 +22,7 @@ A webhook trigger service for Kilo Code that allows users to create named endpoi
 
 ### Local Secrets Setup
 
-Before running the dev server, you need to set up your local secret store. The `INTERNAL_API_SECRET_DEV` create it with:
+Before running the dev server, you need to set up your local secret store. The `INTERNAL_API_SECRET_DEV` — create it with:
 
 ```bash
 npx wrangler secrets-store secret create 342a86d9e3a94da698e82d0c6e2a36f0 --name INTERNAL_API_SECRET_DEV --scopes workers --value 'YOUR_SECRET_HERE'

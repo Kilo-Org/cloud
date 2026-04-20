@@ -1,10 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
-import { OpenRouterModelsResponseSchema } from '@/lib/organizations/organization-types';
+import type {
+  OpenRouterModelsResponse,
+  OpenRouterProvidersResponse,
+} from '@/lib/organizations/organization-types';
+import {
+  OpenRouterProvidersResponseSchema,
+  OpenRouterModelsResponseSchema,
+} from '@/lib/organizations/organization-types';
 import {
   NormalizedOpenRouterResponse,
-  OpenRouterApiProvidersResponse,
   type OpenRouterModel,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import * as z from 'zod';
@@ -82,15 +87,15 @@ export function useOpenRouterModels() {
 }
 
 export function useOpenRouterProviders() {
-  return useQuery<OpenRouterApiProvidersResponse>({
+  return useQuery<OpenRouterProvidersResponse>({
     queryKey: ['openrouter-providers'],
-    queryFn: async (): Promise<OpenRouterApiProvidersResponse> => {
+    queryFn: async (): Promise<OpenRouterProvidersResponse> => {
       const response = await fetch('/api/openrouter/providers');
       if (!response.ok) {
         throw new Error(`Failed to fetch providers: ${response.status} ${response.statusText}`);
       }
       const data = await response.json();
-      return OpenRouterApiProvidersResponse.parse(data);
+      return OpenRouterProvidersResponseSchema.parse(data);
     },
   });
 }

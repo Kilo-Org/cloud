@@ -9,6 +9,12 @@
   "logpush": true,
   "placement": { "mode": "smart" },
   "dev": { "port": 8803 },
+  "routes": [
+    {
+      "pattern": "events.kiloapps.io",
+      "custom_domain": true
+    }
+  ],
 
   "durable_objects": {
     "bindings": [

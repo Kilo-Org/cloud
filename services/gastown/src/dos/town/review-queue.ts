@@ -208,53 +208,6 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
   });
 }
 
-export function popReviewQueue(sql: SqlStorage): ReviewQueueEntry | null {
-  // Pop the oldest open MR bead, but skip any whose source bead already
-  // has another MR in_progress (i.e. a refinery is already reviewing it).
-  // This prevents popping stale MR beads and triggering failReviewWithRework
-  // while an active review is in flight for the same source.
-  //
-  // The source bead is linked via bead_dependencies (dependency_type='tracks'):
-  //   bead_dependencies.bead_id = MR bead
-  //   bead_dependencies.depends_on_bead_id = source bead
-  const rows = [
-    ...query(
-      sql,
-      /* sql */ `
-        ${REVIEW_JOIN}
-        WHERE ${beads.status} = 'open'
-          AND NOT EXISTS (
-            SELECT 1 FROM ${beads} AS active_mr
-            WHERE active_mr.${beads.columns.type} = 'merge_request'
-              AND active_mr.${beads.columns.status} = 'in_progress'
-              AND active_mr.${beads.columns.rig_id} = ${beads.rig_id}
-          )
-        ORDER BY ${beads.created_at} ASC
-        LIMIT 1
-      `,
-      []
-    ),
-  ];
-
-  if (rows.length === 0) return null;
-  const parsed = MergeRequestBeadRecord.parse(rows[0]);
-  const entry = toReviewQueueEntry(parsed);
-
-  // Mark as running (in_progress)
-  query(
-    sql,
-    /* sql */ `
-      UPDATE ${beads}
-      SET ${beads.columns.status} = 'in_progress',
-          ${beads.columns.updated_at} = ?
-      WHERE ${beads.bead_id} = ?
-    `,
-    [now(), entry.id]
-  );
-
-  return { ...entry, status: 'running', processed_at: now() };
-}
-
 export function completeReview(
   sql: SqlStorage,
   entryId: string,
@@ -369,8 +322,8 @@ export function completeReviewWithResult(
         conflict: true,
       },
     });
-    // Return source bead to open so the normal scheduling path handles
-    // rework. Clear assignee so feedStrandedConvoys can match.
+    // Return source bead to open so the reconciler's scheduling path handles
+    // rework. Clear assignee so the reconciler can match it for dispatch.
     const conflictSourceBead = getBead(sql, entry.bead_id);
     if (
       conflictSourceBead &&
@@ -390,11 +343,10 @@ export function completeReviewWithResult(
     }
   } else if (input.status === 'failed') {
     // Review failed (rework requested): return source bead to open so
-    // the normal scheduling path (feedStrandedConvoys → hookBead →
-    // schedulePendingWork → dispatch) handles rework. Clear the stale
-    // assignee so feedStrandedConvoys can match (requires assignee IS NULL).
-    // This avoids the fire-and-forget rework dispatch race in TownDO
-    // where the dispatch fails and rehookOrphanedBeads churn.
+    // the reconciler's scheduling path handles rework. Clear the stale
+    // assignee so the reconciler can match it for dispatch (requires
+    // assignee IS NULL). This avoids a fire-and-forget rework dispatch
+    // race where the dispatch fails and the bead churns.
     const sourceBead = getBead(sql, entry.bead_id);
     if (sourceBead && sourceBead.status !== 'closed' && sourceBead.status !== 'failed') {
       updateBeadStatus(sql, entry.bead_id, 'open', entry.agent_id);
@@ -498,9 +450,8 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
   const agent = getAgent(sql, agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
   if (!agent.current_hook_bead_id) {
-    // The agent was unhooked by a recovery path (witnessPatrol,
-    // rehookOrphanedBeads) between when the agent finished work and
-    // when it called gt_done.
+    // The agent was unhooked by a recovery path between when the agent
+    // finished work and when it called gt_done.
     //
     // For refineries, this is critical: the refinery successfully merged
     // but the hook was cleared by zombie detection. We MUST still complete
@@ -581,9 +532,12 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
 
   // PR-fixup beads skip the review queue. The polecat pushed fixup commits
   // to an existing PR branch — no separate review is needed.
-  if (hookedBead?.labels.includes('gt:pr-fixup')) {
+  // PR-conflict beads also skip the review queue: the polecat rebased and
+  // force-pushed the branch to resolve conflicts — closing the bead unblocks
+  // the parent MR bead so poll_pr can re-check mergeable_state.
+  if (hookedBead?.labels.includes('gt:pr-fixup') || hookedBead?.labels.includes('gt:pr-conflict')) {
     console.log(
-      `[review-queue] agentDone: pr-fixup bead ${agent.current_hook_bead_id} — closing directly (skip review)`
+      `[review-queue] agentDone: ${hookedBead.labels.includes('gt:pr-conflict') ? 'pr-conflict' : 'pr-fixup'} bead ${agent.current_hook_bead_id} — closing directly (skip review)`
     );
     closeBead(sql, agent.current_hook_bead_id, agentId);
     unhookBead(sql, agentId);
@@ -648,9 +602,9 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
 
     unhookBead(sql, agentId);
     // Set refinery to idle immediately — the review is done and the
-    // refinery is available for new work. Without this, processReviewQueue
-    // sees the refinery as 'working' and won't pop the next MR bead until
-    // agentCompleted fires (when the container process eventually exits).
+    // refinery is available for new work. Without this, the reconciler
+    // sees the refinery as 'working' and won't dispatch the next MR bead
+    // until agentCompleted fires (when the container process eventually exits).
     updateAgentStatus(sql, agentId, 'idle');
     return;
   }
@@ -659,7 +613,7 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
 
   if (!agent.rig_id) {
     console.warn(
-      `[review-queue] agentDone: agent ${agentId} has null rig_id — review entry may fail in processReviewQueue`
+      `[review-queue] agentDone: agent ${agentId} has null rig_id — review entry may fail in submitToReviewQueue`
     );
   }
 
@@ -718,13 +672,13 @@ export function agentCompleted(
       // NEVER fail or unhook a refinery from agentCompleted.
       // agentCompleted races with gt_done: the process exits, the
       // container sends /completed, but gt_done's HTTP request may
-      // still be in flight. If we unhook here, recoverStuckReviews
-      // can fire between agentCompleted and gt_done, resetting the
-      // MR bead that's about to be closed by gt_done.
+      // still be in flight. If we unhook here, a recovery path can
+      // fire between agentCompleted and gt_done, resetting the MR bead
+      // that's about to be closed by gt_done.
       //
       // Leave the hook intact. gt_done will close + unhook if the
-      // merge succeeded. recoverStuckReviews (which checks for
-      // status='working') handles the case where gt_done never arrives.
+      // merge succeeded. The reconciler (which checks for status='working')
+      // handles the case where gt_done never arrives.
       //
       // No-op for the bead — just fall through to mark agent idle.
     } else {

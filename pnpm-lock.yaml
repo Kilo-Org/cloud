@@ -1545,11 +1545,11 @@ importers:
   services/gastown/container:
     dependencies:
       '@kilocode/plugin':
-        specifier: 7.1.23
-        version: 7.1.23
+        specifier: 7.2.14
+        version: 7.2.14
       '@kilocode/sdk':
-        specifier: 7.1.23
-        version: 7.1.23
+        specifier: 7.2.14
+        version: 7.2.14
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -4193,11 +4193,22 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
-  '@kilocode/plugin@7.1.23':
-    resolution: {integrity: sha512-sFI0rlgQg3mzYP05/gg09IE1mN4QyAXyOlJjM36CFoVKi1bPYz/dqEqr6ddmMNmB577A4gDu0D07hr0pGIFrBA==}
+  '@kilocode/plugin@7.2.14':
+    resolution: {integrity: sha512-mS+WA9HZIBH2qQ9ARA+v0q4MdQTSdfOvKbe4AOSkjP+P5hVA70OM/UVM9DVcvmjSOxU+wuUxmOy+j/EQIrgFmw==}
+    peerDependencies:
+      '@opentui/core': '>=0.1.97'
+      '@opentui/solid': '>=0.1.97'
+    peerDependenciesMeta:
+      '@opentui/core':
+        optional: true
+      '@opentui/solid':
+        optional: true
 
   '@kilocode/sdk@7.1.23':
     resolution: {integrity: sha512-moSKXqpwE+ozVbNE1aYIUb5Kd7fesOicRUn90WiMlp+8lRhqQc6ZTTIaIB9ZzD7Dak//4bSuo++bb+Jtw3U4Fg==}
+
+  '@kilocode/sdk@7.2.14':
+    resolution: {integrity: sha512-Naz83lFrsbavuDp6UwxRuglOaSNvRBsZfcRNvb7RpWYAwbuJP0dBdhpXj6uO3ta5qxeQ2JzxKNC9Ffz+LCLLDg==}
 
   '@lottiefiles/dotlottie-react@0.17.15':
     resolution: {integrity: sha512-4wYAjsJhM28eUvJ/gT3KRM6fcyT7EM9n7PDrP71LaBTacc6bSN43qFTSJc1Li3QxUiraz23p0Q8EJBzXo8DsRw==}
@@ -17723,12 +17734,16 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@kilocode/plugin@7.1.23':
+  '@kilocode/plugin@7.2.14':
     dependencies:
-      '@kilocode/sdk': 7.1.23
+      '@kilocode/sdk': 7.2.14
       zod: 4.1.8
 
   '@kilocode/sdk@7.1.23': {}
+
+  '@kilocode/sdk@7.2.14':
+    dependencies:
+      cross-spawn: 7.0.6
 
   '@lottiefiles/dotlottie-react@0.17.15(react@19.2.4)':
     dependencies:

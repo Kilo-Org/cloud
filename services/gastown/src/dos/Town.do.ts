@@ -72,6 +72,7 @@ import type {
   BeadFilter,
   Bead,
   BeadStatus,
+  BeadType as BeadTypeType,
   BeadPriority as BeadPriorityType,
   RegisterAgentInput,
   AgentFilter,
@@ -80,7 +81,6 @@ import type {
   SendMailInput,
   Mail,
   ReviewQueueInput,
-  ReviewQueueEntry,
   AgentDoneInput,
   PrimeContext,
   Molecule,
@@ -341,6 +341,17 @@ export class TownDO extends DurableObject<Env> {
             mergeStrategy: 'pr',
             targetBranch,
           });
+        }
+
+        // Option B (defense-in-depth): If the reconciler re-dispatches an
+        // open triage batch bead (gt:triage, created_by='patrol') — e.g.
+        // because Option A's in_progress transition was somehow bypassed —
+        // inject the triage system prompt so the polecat gets the correct
+        // tools and instructions instead of the generic polecat prompt.
+        if (bead.labels.includes(patrol.TRIAGE_BATCH_LABEL) && bead.created_by === 'patrol') {
+          const pendingRequests = patrol.listPendingTriageRequests(this.sql);
+          const { buildTriageSystemPrompt } = await import('../prompts/triage-system.prompt');
+          systemPromptOverride = buildTriageSystemPrompt(pendingRequests);
         }
 
         return scheduling.dispatchAgent(schedulingCtx, agent, bead, {
@@ -786,6 +797,53 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
+    // Persist custom env_vars to DO storage so they survive container restarts.
+    // Compare against the previously-persisted set of keys to clear removed ones.
+    // Reserved infra keys are never overwritten or deleted — infra values always win.
+    const RESERVED_ENV_KEYS = new Set([
+      'KILOCODE_TOKEN',
+      'GIT_TOKEN',
+      'GITHUB_TOKEN',
+      'GITLAB_TOKEN',
+      'GITLAB_INSTANCE_URL',
+      'GITHUB_CLI_PAT',
+      'GH_TOKEN',
+      'GASTOWN_GIT_AUTHOR_NAME',
+      'GASTOWN_GIT_AUTHOR_EMAIL',
+      'GASTOWN_DISABLE_AI_COAUTHOR',
+      'GASTOWN_ORGANIZATION_ID',
+      'GASTOWN_CONTAINER_TOKEN',
+      'GASTOWN_SESSION_TOKEN',
+      'GASTOWN_API_URL',
+    ]);
+    const CUSTOM_ENV_KEYS_STORAGE_KEY = 'container:custom_env_var_keys';
+    const prevCustomKeys: string[] =
+      (await this.ctx.storage.get<string[]>(CUSTOM_ENV_KEYS_STORAGE_KEY)) ?? [];
+    const newCustomKeys = Object.keys(townConfig.env_vars).filter(
+      key => !RESERVED_ENV_KEYS.has(key)
+    );
+    const newCustomKeySet = new Set(newCustomKeys);
+
+    for (const key of prevCustomKeys) {
+      if (RESERVED_ENV_KEYS.has(key)) continue;
+      if (!newCustomKeySet.has(key)) {
+        try {
+          await container.deleteEnvVar(key);
+        } catch (err) {
+          console.warn(`[Town.do] syncConfigToContainer: delete custom ${key} failed:`, err);
+        }
+      }
+    }
+    for (const [key, value] of Object.entries(townConfig.env_vars)) {
+      if (RESERVED_ENV_KEYS.has(key)) continue;
+      try {
+        await container.setEnvVar(key, value);
+      } catch (err) {
+        console.warn(`[Town.do] syncConfigToContainer: set custom ${key} failed:`, err);
+      }
+    }
+    await this.ctx.storage.put(CUSTOM_ENV_KEYS_STORAGE_KEY, newCustomKeys);
+
     // Phase 2: Push to the running container's process.env via the
     // /sync-config endpoint. The X-Town-Config header delivers the
     // full config; the endpoint applies CONFIG_ENV_MAP to process.env.
@@ -1074,6 +1132,33 @@ export class TownDO extends DurableObject<Env> {
 
   async deleteBead(beadId: string): Promise<void> {
     beadOps.deleteBead(this.sql, beadId);
+  }
+
+  async deleteBeads(beadIds: string[]): Promise<number> {
+    return beadOps.deleteBeads(this.sql, beadIds);
+  }
+
+  async deleteBeadsByStatus(
+    status: BeadStatus,
+    type?: BeadTypeType,
+    rigId?: string
+  ): Promise<number> {
+    if (rigId) {
+      const rigBeads = BeadRecord.pick({ bead_id: true })
+        .array()
+        .parse([
+          ...this.sql.exec(
+            /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.rig_id} = ? AND ${beads.status} = ?${type ? ` AND ${beads.type} = ?` : ''}`,
+            ...(type ? [rigId, status, type] : [rigId, status])
+          ),
+        ]);
+      if (rigBeads.length === 0) return 0;
+      return beadOps.deleteBeads(
+        this.sql,
+        rigBeads.map(r => r.bead_id)
+      );
+    }
+    return beadOps.deleteBeadsByStatus(this.sql, status, type);
   }
 
   async listBeadEvents(options: {
@@ -1670,14 +1755,6 @@ export class TownDO extends DurableObject<Env> {
     await this.escalateToActiveCadence();
   }
 
-  async popReviewQueue(): Promise<ReviewQueueEntry | null> {
-    return reviewQueue.popReviewQueue(this.sql);
-  }
-
-  async completeReview(entryId: string, status: 'merged' | 'failed'): Promise<void> {
-    reviewQueue.completeReview(this.sql, entryId, status);
-  }
-
   async completeReviewWithResult(input: {
     entry_id: string;
     status: 'merged' | 'failed' | 'conflict';
@@ -1712,10 +1789,9 @@ export class TownDO extends DurableObject<Env> {
       });
     }
 
-    // Rework is handled by the normal scheduling path: the failed/conflict
+    // Rework is handled by the reconciler's scheduling path: the failed/conflict
     // path in completeReviewWithResult sets the source bead to 'open' with
-    // assignee cleared. feedStrandedConvoys or rehookOrphanedBeads will
-    // hook a polecat, and schedulePendingWork will dispatch it.
+    // assignee cleared. The reconciler will hook a polecat and dispatch it.
   }
 
   async agentDone(agentId: string, input: AgentDoneInput): Promise<void> {
@@ -3558,9 +3634,9 @@ export class TownDO extends DurableObject<Env> {
     }
 
     // ── Pre-phase: Observe container status for working agents ────────
-    // Replaces witnessPatrol's zombie detection. Poll the container for
-    // each working/stalled agent and emit container_status events. These
-    // are drained in Phase 0 and applied before reconciliation.
+    // Poll the container for each working/stalled agent and emit
+    // container_status events. These are drained in Phase 0 and applied
+    // before reconciliation.
     try {
       const workingAgentRows = z
         .object({ bead_id: z.string() })
@@ -3624,6 +3700,11 @@ export class TownDO extends DurableObject<Env> {
       pendingEventCount: 0,
     };
 
+    // Fetch town config once and share across Phase 0 and Phase 1 so that
+    // applyEvent can use the full fallback chain (rig → town → default) for
+    // settings like auto_resolve_merge_conflicts.
+    const townConfig = await this.getTownConfig();
+
     // Phase 0: Drain events and apply state transitions
     try {
       const pending = events.drainEvents(this.sql);
@@ -3633,7 +3714,7 @@ export class TownDO extends DurableObject<Env> {
       }
       for (const event of pending) {
         try {
-          reconciler.applyEvent(this.sql, event);
+          reconciler.applyEvent(this.sql, event, { townConfig });
           events.markProcessed(this.sql, event.event_id);
         } catch (err) {
           logger.error('reconciler: applyEvent failed', {
@@ -3674,7 +3755,6 @@ export class TownDO extends DurableObject<Env> {
     // Phase 1: Reconcile — compute desired state vs actual state
     const sideEffects: Array<() => Promise<void>> = [];
     try {
-      const townConfig = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
         draining: this._draining,
         townConfig,
@@ -4064,6 +4144,9 @@ export class TownDO extends DurableObject<Env> {
     const systemPrompt = buildTriageSystemPrompt(pendingRequests);
 
     // Only now create the synthetic bead — preconditions are verified.
+    // Set rig_id so that if Rule 3 resets this bead to 'open' after a
+    // dispatch timeout, Rule 1 of the reconciler can pick it up and
+    // re-dispatch it (with the correct triage system prompt via Option B).
     const triageBead = beadOps.createBead(this.sql, {
       type: 'issue',
       title: `Triage batch: ${pendingCount} request(s)`,
@@ -4071,10 +4154,19 @@ export class TownDO extends DurableObject<Env> {
       priority: 'high',
       labels: [patrol.TRIAGE_BATCH_LABEL],
       created_by: 'patrol',
+      rig_id: rigId,
     });
 
     const triageAgent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
     agents.hookBead(this.sql, triageAgent.id, triageBead.bead_id);
+
+    // Option A: Immediately mark the triage batch bead as in_progress so
+    // the reconciler's Rule 2 (idle agent + open hooked bead → dispatch_agent)
+    // does not re-fire on the next tick if the container start fails. Rule 3
+    // (stale in_progress bead + no working agent + 5-min timeout) will reset
+    // it back to open if the dispatch fails, allowing a clean retry via
+    // maybeDispatchTriageAgent with the correct triage system prompt.
+    beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'in_progress', triageAgent.id);
 
     const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
       townId: this.townId,
@@ -4487,8 +4579,8 @@ export class TownDO extends DurableObject<Env> {
 
     // Only count idle+hooked agents as orphaned if they've been idle for
     // longer than the dispatch cooldown. Agents that were just hooked by
-    // feedStrandedConvoys or restarted with backoff are legitimately
-    // waiting for the next scheduler tick.
+    // the reconciler or restarted with backoff are legitimately waiting
+    // for the next scheduler tick.
     const orphanedHooks = Number(
       [
         ...query(

@@ -112,6 +112,9 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
   const [autoResolvePrFeedback, setAutoResolvePrFeedback] = useState<boolean | undefined>(
     undefined
   );
+  const [autoResolveMergeConflicts, setAutoResolveMergeConflicts] = useState<boolean | undefined>(
+    undefined
+  );
   const [autoMergeDelayMinutes, setAutoMergeDelayMinutes] = useState<number | null | undefined>(
     undefined
   );
@@ -136,6 +139,7 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
       setRefineryCodeReview(cfg.code_review);
       setReviewMode(cfg.review_mode);
       setAutoResolvePrFeedback(cfg.auto_resolve_pr_feedback);
+      setAutoResolveMergeConflicts(cfg.auto_resolve_merge_conflicts);
       setAutoMergeDelayMinutes(cfg.auto_merge_delay_minutes);
       setMergeStrategy(cfg.merge_strategy);
       setConvoyMergeMode(cfg.convoy_merge_mode);
@@ -183,6 +187,7 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
         code_review: refineryCodeReview,
         review_mode: reviewMode,
         auto_resolve_pr_feedback: autoResolvePrFeedback,
+        auto_resolve_merge_conflicts: autoResolveMergeConflicts,
         auto_merge_delay_minutes: autoMergeDelayMinutes,
         merge_strategy: mergeStrategy,
         convoy_merge_mode: convoyMergeMode,
@@ -500,6 +505,46 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
                           }
                           onCheckedChange={v => setAutoResolvePrFeedback(v)}
                           className={autoResolvePrFeedback === undefined ? 'opacity-40' : ''}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <Label className="text-sm text-white/70">
+                          Auto-resolve merge conflicts
+                        </Label>
+                        <p className="text-[11px] text-white/30">
+                          When a PR has merge conflicts, automatically dispatch an agent to rebase
+                          and resolve them.
+                          {townCfg?.refinery?.auto_resolve_merge_conflicts !== undefined && (
+                            <span className="ml-1 text-white/20">
+                              (Town default:{' '}
+                              {townCfg.refinery.auto_resolve_merge_conflicts ? 'on' : 'off'})
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {autoResolveMergeConflicts !== undefined && (
+                          <button
+                            onClick={() => setAutoResolveMergeConflicts(undefined)}
+                            className="rounded p-1 text-white/25 transition-colors hover:bg-white/[0.06] hover:text-white/50"
+                            title="Inherit from town"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        )}
+                        <Switch
+                          checked={
+                            autoResolveMergeConflicts ??
+                            townCfg?.refinery?.auto_resolve_merge_conflicts ??
+                            true
+                          }
+                          onCheckedChange={v => setAutoResolveMergeConflicts(v)}
+                          className={autoResolveMergeConflicts === undefined ? 'opacity-40' : ''}
                         />
                       </div>
                     </div>

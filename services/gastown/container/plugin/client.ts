@@ -430,6 +430,27 @@ export class MayorGastownClient {
     });
   }
 
+  async deleteBeads(rigId: string, beadIds: string[]): Promise<{ deleted: number }> {
+    return this.request<{ deleted: number }>(this.mayorPath(`/rigs/${rigId}/beads/bulk-delete`), {
+      method: 'POST',
+      body: JSON.stringify({ bead_ids: beadIds }),
+    });
+  }
+
+  async deleteBeadsByStatus(
+    rigId: string,
+    status: 'open' | 'in_progress' | 'in_review' | 'closed' | 'failed',
+    type?: string
+  ): Promise<{ deleted: number }> {
+    return this.request<{ deleted: number }>(
+      this.mayorPath(`/rigs/${rigId}/beads/delete-by-status`),
+      {
+        method: 'POST',
+        body: JSON.stringify({ status, ...(type ? { type } : {}) }),
+      }
+    );
+  }
+
   async resetAgent(rigId: string, agentId: string): Promise<void> {
     await this.request<void>(this.mayorPath(`/rigs/${rigId}/agents/${agentId}/reset`), {
       method: 'POST',

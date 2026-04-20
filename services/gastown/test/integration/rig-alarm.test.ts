@@ -158,9 +158,10 @@ describe('Town DO Alarm', () => {
       // fail gracefully and mark the review as 'failed'
       await runDurableObjectAlarm(town);
 
-      // The pending entry should have been popped (no more pending entries)
-      const nextEntry = await town.popReviewQueue();
-      expect(nextEntry).toBeNull();
+      // The MR bead should no longer be open (alarm processed it)
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      expect(mrBeads).toHaveLength(1);
+      expect(mrBeads[0].status).not.toBe('open');
     });
   });
 
@@ -293,9 +294,10 @@ describe('Town DO Alarm', () => {
       // (will fail at container level but that's expected in tests)
       await runDurableObjectAlarm(town);
 
-      // Review queue entry should have been popped and processed (failed in test env)
-      const reviewEntry = await town.popReviewQueue();
-      expect(reviewEntry).toBeNull();
+      // MR bead should have been picked up and processed (failed in test env)
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      expect(mrBeads).toHaveLength(1);
+      expect(mrBeads[0].status).not.toBe('open');
     });
   });
 });

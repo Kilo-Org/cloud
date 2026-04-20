@@ -89,6 +89,10 @@ export async function updateTownConfig(
               update.refinery.auto_resolve_pr_feedback ??
               current.refinery?.auto_resolve_pr_feedback ??
               false,
+            auto_resolve_merge_conflicts:
+              update.refinery.auto_resolve_merge_conflicts ??
+              current.refinery?.auto_resolve_merge_conflicts ??
+              true,
             auto_merge_delay_minutes:
               update.refinery.auto_merge_delay_minutes !== undefined
                 ? update.refinery.auto_merge_delay_minutes
@@ -191,6 +195,7 @@ export type EffectiveConfig = {
   review_mode: 'rework' | 'comments';
   code_review: boolean;
   auto_resolve_pr_feedback: boolean;
+  auto_resolve_merge_conflicts: boolean;
   auto_merge_delay_minutes: number | null;
   merge_strategy: MergeStrategy;
   convoy_merge_mode: 'review-then-land' | 'review-and-merge';
@@ -227,6 +232,10 @@ export function resolveRigConfig(
       rigOverride?.auto_resolve_pr_feedback ??
       townConfig.refinery?.auto_resolve_pr_feedback ??
       false,
+    auto_resolve_merge_conflicts:
+      rigOverride?.auto_resolve_merge_conflicts ??
+      townConfig.refinery?.auto_resolve_merge_conflicts ??
+      true,
     auto_merge_delay_minutes:
       rigOverride?.auto_merge_delay_minutes !== undefined
         ? rigOverride.auto_merge_delay_minutes

@@ -37,13 +37,41 @@ describe('gog shim script', () => {
     vi.restoreAllMocks();
   });
 
-  it('contains command-to-capability routing for gmail and drive/docs/sheets', async () => {
+  it('routes only calendar commands through broker capabilities', async () => {
     const script = await captureShimScript();
-    expect(script).toContain('gmail)');
-    expect(script).toContain('broker_capabilities=\'["gmail_read"]\'');
+    expect(script).toContain('calendar|cal)');
+    expect(script).toContain('broker_capabilities=\'["calendar_read"]\'');
     expect(script).toContain('drive|docs|sheets)');
-    expect(script).toContain('broker_capabilities=\'["drive_read"]\'');
+    expect(script).not.toContain('broker_capabilities=\'["drive_read"]\'');
+    expect(script).not.toContain('broker_capabilities=\'["gmail_read"]\'');
     expect(script).toContain('capabilities\\":\${broker_capabilities}');
+  });
+
+  it('routes gmail and drive/docs/sheets commands to gog.real', async () => {
+    const originalScript = await captureShimScript();
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gog-shim-test-'));
+    const realPath = path.join(tmp, 'gog.real');
+    const shimPath = path.join(tmp, 'gog.sh');
+
+    writeExecutable(realPath, '#!/usr/bin/env bash\nprintf "REAL_GOG %s" "$*"\n');
+
+    const script = originalScript
+      .replace('REAL_GOG="/usr/local/bin/gog.real"', `REAL_GOG="${realPath}"`)
+      .replace('#!/usr/bin/env bash', '#!/bin/bash');
+
+    writeExecutable(shimPath, script);
+
+    const gmailOutput = execFileSync(shimPath, ['gmail', 'list', '--json'], {
+      encoding: 'utf8',
+      env: process.env,
+    });
+    expect(gmailOutput).toContain('REAL_GOG gmail list --json');
+
+    const driveOutput = execFileSync(shimPath, ['drive', 'ls', '--json'], {
+      encoding: 'utf8',
+      env: process.env,
+    });
+    expect(driveOutput).toContain('REAL_GOG drive ls --json');
   });
 
   it('rejects mixed google and non-google auth --services commands', async () => {

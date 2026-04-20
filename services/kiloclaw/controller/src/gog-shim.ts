@@ -216,17 +216,11 @@ case "$cmd" in
       exec "\${REAL_GOG}" "$@"
     fi
     ;;
-  gmail)
-    broker_capabilities='["gmail_read"]'
-    if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
-      exec "\${REAL_GOG}" "$@"
-    fi
-    ;;
-  drive|docs|sheets)
-    broker_capabilities='["drive_read"]'
-    if [[ "\${KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED:-}" == "1" ]]; then
-      exec "\${REAL_GOG}" "$@"
-    fi
+  gmail|drive|docs|sheets)
+    # OAuth connect currently defaults to calendar-only capabilities.
+    # Route non-calendar Google commands to gog.real until broader
+    # capability consent is enabled in the web flow.
+    exec "\${REAL_GOG}" "$@"
     ;;
   *)
     exec "\${REAL_GOG}" "$@"

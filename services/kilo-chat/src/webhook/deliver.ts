@@ -11,6 +11,9 @@ export type WebhookMessage = {
   from: string;
   content: Array<{ type: string; text?: string; [key: string]: unknown }>;
   sentAt: string;
+  inReplyToMessageId?: string;
+  inReplyToBody?: string;
+  inReplyToSender?: string;
 };
 
 type WebhookPayload = {
@@ -19,6 +22,9 @@ type WebhookPayload = {
   from: string;
   text: string;
   sentAt: string;
+  inReplyToMessageId?: string;
+  inReplyToBody?: string;
+  inReplyToSender?: string;
 };
 
 type ConversationStub = {
@@ -36,6 +42,9 @@ function buildPayload(msg: WebhookMessage): WebhookPayload {
     from: msg.from,
     text,
     sentAt: msg.sentAt,
+    ...(msg.inReplyToMessageId !== undefined && { inReplyToMessageId: msg.inReplyToMessageId }),
+    ...(msg.inReplyToBody !== undefined && { inReplyToBody: msg.inReplyToBody }),
+    ...(msg.inReplyToSender !== undefined && { inReplyToSender: msg.inReplyToSender }),
   };
 }
 

@@ -78,4 +78,41 @@ describe('deliverToBot', () => {
       expect.objectContaining({ text: 'Hello world' })
     );
   });
+
+  it('includes reply context fields in payload when present', async () => {
+    const deliverChatWebhook = vi.fn().mockResolvedValue(undefined);
+    const env = { KILOCLAW: { deliverChatWebhook } } as unknown as Env;
+    const convStub = { notifyDeliveryFailed: vi.fn() };
+
+    await deliverToBot(
+      env,
+      convStub,
+      makeMsg({
+        inReplyToMessageId: 'parent-msg-1',
+        inReplyToBody: 'Original text',
+        inReplyToSender: 'user-bob',
+      })
+    );
+
+    expect(deliverChatWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inReplyToMessageId: 'parent-msg-1',
+        inReplyToBody: 'Original text',
+        inReplyToSender: 'user-bob',
+      })
+    );
+  });
+
+  it('omits reply context fields from payload when not present', async () => {
+    const deliverChatWebhook = vi.fn().mockResolvedValue(undefined);
+    const env = { KILOCLAW: { deliverChatWebhook } } as unknown as Env;
+    const convStub = { notifyDeliveryFailed: vi.fn() };
+
+    await deliverToBot(env, convStub, makeMsg());
+
+    const payload = deliverChatWebhook.mock.calls[0]![0];
+    expect(payload.inReplyToMessageId).toBeUndefined();
+    expect(payload.inReplyToBody).toBeUndefined();
+    expect(payload.inReplyToSender).toBeUndefined();
+  });
 });

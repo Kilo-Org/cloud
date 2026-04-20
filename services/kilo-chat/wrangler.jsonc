@@ -30,18 +30,6 @@
     },
   ],
 
-  "queues": {
-    "producers": [{ "binding": "WEBHOOK_QUEUE", "queue": "kilo-chat-webhooks" }],
-    "consumers": [
-      {
-        "queue": "kilo-chat-webhooks",
-        "max_retries": 3,
-        "dead_letter_queue": "kilo-chat-webhooks-dlq",
-      },
-      { "queue": "kilo-chat-webhooks-dlq" },
-    ],
-  },
-
   "services": [
     { "binding": "KILOCLAW", "service": "kiloclaw" },
     { "binding": "EVENT_SERVICE", "service": "event-service" },

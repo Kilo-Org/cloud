@@ -1,3 +1,7 @@
+type KiloclawBinding = Fetcher & {
+  deliverChatWebhook(payload: WebhookPayload & { targetBotId: string }): Promise<void>;
+};
+
 export type WebhookMessage = {
   targetBotId: string;
   conversationId: string;
@@ -7,7 +11,7 @@ export type WebhookMessage = {
   sentAt: string;
 };
 
-export type WebhookPayload = {
+type WebhookPayload = {
   conversationId: string;
   messageId: string;
   from: string;
@@ -15,7 +19,11 @@ export type WebhookPayload = {
   sentAt: string;
 };
 
-export function buildWebhookPayload(msg: WebhookMessage): WebhookPayload {
+type ConversationStub = {
+  notifyDeliveryFailed(messageId: string, senderId: string): Promise<void>;
+};
+
+function buildPayload(msg: WebhookMessage): WebhookPayload {
   const text = msg.content
     .filter(b => b.type === 'text' && typeof b.text === 'string')
     .map(b => b.text)
@@ -27,4 +35,41 @@ export function buildWebhookPayload(msg: WebhookMessage): WebhookPayload {
     text,
     sentAt: msg.sentAt,
   };
+}
+
+const MAX_RETRIES = 2;
+
+/**
+ * Delivers a webhook to a bot via direct RPC to kiloclaw.
+ * Retries up to 2 times, then notifies the conversation of permanent failure.
+ */
+export async function deliverToBot(
+  env: Env,
+  convStub: ConversationStub,
+  msg: WebhookMessage
+): Promise<void> {
+  const payload = buildPayload(msg);
+  let lastErr: unknown;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await (env.KILOCLAW as KiloclawBinding).deliverChatWebhook({
+        targetBotId: msg.targetBotId,
+        ...payload,
+      });
+      return;
+    } catch (err) {
+      lastErr = err;
+      console.error(`Webhook delivery attempt ${attempt + 1} failed:`, err);
+    }
+  }
+
+  console.error(
+    `Webhook permanently failed for message ${msg.messageId} in conversation ${msg.conversationId}`
+  );
+  try {
+    await convStub.notifyDeliveryFailed(msg.messageId, msg.from);
+  } catch (err) {
+    console.error('Failed to notify delivery failure:', err);
+  }
 }

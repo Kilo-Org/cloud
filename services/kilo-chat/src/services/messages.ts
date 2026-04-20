@@ -7,7 +7,7 @@
  * enqueue, and MembershipDO maintenance in one place.
  */
 
-import type { WebhookMessage } from '../webhook/deliver';
+import { deliverToBot } from '../webhook/deliver';
 import {
   extractConversationContext,
   getConversationContext,
@@ -61,25 +61,24 @@ export async function createMessageFor(
 
   const { messageId } = result;
 
-  // Enqueue webhook per bot member (other than the sender). Best-effort:
-  // executionCtx.waitUntil may not be available in every caller (e.g. tests).
+  // Deliver webhook to each bot member (other than the sender) via direct RPC.
   const botMembers = await convStub.getBotMembersExcluding(callerId);
   if (botMembers.length > 0) {
     const now = new Date().toISOString();
-    const sendPromise = Promise.all(
+    const deliverPromise = Promise.all(
       botMembers.map(bot =>
-        env.WEBHOOK_QUEUE.send({
+        deliverToBot(env, convStub, {
           targetBotId: bot.id,
           conversationId,
           messageId,
           from: callerId,
           content,
           sentAt: now,
-        } satisfies WebhookMessage)
+        })
       )
     );
     if (ctx) {
-      ctx.waitUntil(sendPromise);
+      ctx.waitUntil(deliverPromise);
     }
   }
 

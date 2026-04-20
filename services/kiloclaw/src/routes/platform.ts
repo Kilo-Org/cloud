@@ -54,7 +54,7 @@ import {
 import type { ProviderId } from '../schemas/instance-config';
 import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
 import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../db';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import {
   BootstrapProvisionFallbackError,
   bootstrapProvisionedSubscriptionWithFallback,

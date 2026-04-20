@@ -1,3 +1,13 @@
+type EventServiceBinding = {
+  pushEvent: (userId: string, context: string, event: string, payload: unknown) => Promise<void>;
+  userPresent: (userId: string, context: string) => Promise<boolean>;
+};
+
+function getEventService(env: Env): EventServiceBinding | null {
+  if (!env.EVENT_SERVICE) return null;
+  return env.EVENT_SERVICE as unknown as EventServiceBinding;
+}
+
 /**
  * Pushes an event to the event-service for each human member of a conversation.
  * Fire-and-forget: failures are logged but don't block the caller.
@@ -11,26 +21,14 @@ export async function pushEventToHumanMembers(
   event: string,
   payload: unknown
 ): Promise<void> {
-  if (!env.EVENT_SERVICE) return; // Guard: event-service not bound (tests, pre-deploy)
+  const es = getEventService(env);
+  if (!es) return;
   const context = `/kiloclaw/${sandboxId}/${conversationId}`;
   const targets = excludeSenderId
     ? humanMemberIds.filter(id => id !== excludeSenderId)
     : humanMemberIds;
 
-  await Promise.allSettled(
-    targets.map(userId =>
-      (
-        env.EVENT_SERVICE as unknown as {
-          pushEvent: (
-            userId: string,
-            context: string,
-            event: string,
-            payload: unknown
-          ) => Promise<void>;
-        }
-      ).pushEvent(userId, context, event, payload)
-    )
-  );
+  await Promise.allSettled(targets.map(userId => es.pushEvent(userId, context, event, payload)));
 }
 
 /**
@@ -45,26 +43,33 @@ export async function pushInstanceEvent(
   event: string,
   payload: unknown
 ): Promise<void> {
-  if (!env.EVENT_SERVICE) return;
+  const es = getEventService(env);
+  if (!es) return;
   const context = `/kiloclaw/${sandboxId}`;
   const targets = excludeSenderId
     ? humanMemberIds.filter(id => id !== excludeSenderId)
     : humanMemberIds;
 
-  await Promise.allSettled(
-    targets.map(userId =>
-      (
-        env.EVENT_SERVICE as unknown as {
-          pushEvent: (
-            userId: string,
-            context: string,
-            event: string,
-            payload: unknown
-          ) => Promise<void>;
-        }
-      ).pushEvent(userId, context, event, payload)
-    )
-  );
+  await Promise.allSettled(targets.map(userId => es.pushEvent(userId, context, event, payload)));
+}
+
+/**
+ * Checks if a user is present (has an active WS connection) in a conversation context.
+ */
+export async function isUserPresentInConversation(
+  env: Env,
+  userId: string,
+  sandboxId: string,
+  conversationId: string
+): Promise<boolean> {
+  const es = getEventService(env);
+  if (!es) return false;
+  const context = `/kiloclaw/${sandboxId}/${conversationId}`;
+  try {
+    return await es.userPresent(userId, context);
+  } catch {
+    return false;
+  }
 }
 
 /**

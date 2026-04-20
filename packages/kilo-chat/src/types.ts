@@ -92,7 +92,7 @@ export type ReactionRemovedEvent = {
 
 export type ConversationActivityEvent = {
   conversationId: string;
-  messageId: string;
+  lastActivityAt: number;
 };
 
 // ── API request/response types ──────────────────────────────────────

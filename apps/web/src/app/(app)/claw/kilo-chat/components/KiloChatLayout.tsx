@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback, createContext, useContext, useEffect, useRef } from 'react';
+import { useState, useCallback, createContext, useContext, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import type { EventServiceClient } from '@kilocode/event-service';
-import type { KiloChatClient } from '@kilocode/kilo-chat';
+import type { KiloChatClient, ConversationListResponse } from '@kilocode/kilo-chat';
 import { InstanceSwitcher } from './InstanceSwitcher';
 import { ConversationList } from './ConversationList';
 import { useEventService, useInstanceContext } from '../hooks/useEventService';
@@ -69,18 +70,28 @@ export function KiloChatLayout({
   const { eventService, kiloChatClient } = useEventService(getToken);
   useInstanceContext(eventService, selectedSandboxId);
 
+  const queryClient = useQueryClient();
   const params = useParams<{ conversationId?: string }>();
   const [leavingConversationId, setLeavingConversationId] = useState<string | null>(null);
-  const { data, isLoading, refetch } = useConversations(kiloChatClient, selectedSandboxId);
+  const { data, isLoading } = useConversations(kiloChatClient, selectedSandboxId);
 
-  // Refetch conversation list on conversation.activity events
-  const refetchRef = useRef(refetch);
-  refetchRef.current = refetch;
+  // Update conversation list cache in-place when activity events arrive
   useEffect(() => {
-    return kiloChatClient.onConversationActivity(() => {
-      void refetchRef.current();
+    return kiloChatClient.onConversationActivity((_ctx, e) => {
+      queryClient.setQueriesData<ConversationListResponse>(
+        { queryKey: ['kilo-chat', 'conversations'] },
+        old => {
+          if (!old) return old;
+          return {
+            ...old,
+            conversations: old.conversations.map(c =>
+              c.conversationId === e.conversationId ? { ...c, lastActivityAt: e.lastActivityAt } : c
+            ),
+          };
+        }
+      );
     });
-  }, [kiloChatClient]);
+  }, [kiloChatClient, queryClient]);
   const createConversation = useCreateConversation(kiloChatClient);
   const renameConversation = useRenameConversation(kiloChatClient);
   const leaveConversation = useLeaveConversation(kiloChatClient);

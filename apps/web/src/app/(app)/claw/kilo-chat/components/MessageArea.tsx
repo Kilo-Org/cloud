@@ -78,7 +78,6 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     const offs = [
       kiloChatClient.onMessageCreated((_ctx, data) => {
         clearTypingForMember(data.senderId);
-        markReadRef.current(conversationId);
         updateCache({ type: 'message.created', data });
       }),
       kiloChatClient.onMessageUpdated((_ctx, data) => {

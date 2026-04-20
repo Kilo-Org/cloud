@@ -13,6 +13,7 @@ import {
   getConversationContext,
   pushEventToHumanMembers,
   pushInstanceEvent,
+  isUserPresentInConversation,
 } from './event-push';
 
 export type ContentBlock = { type: string; [key: string]: unknown };
@@ -100,9 +101,12 @@ export async function createMessageFor(
       }
     }
 
-    // Push event to human members (reuse info already fetched above).
+    // Push events to human members (reuse info already fetched above).
     const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
     if (sandboxId) {
+      const otherHumans = humanMemberIds.filter(id => id !== callerId);
+
+      // Push message.created on conversation context
       await pushEventToHumanMembers(
         env,
         conversationId,
@@ -113,11 +117,22 @@ export async function createMessageFor(
         { messageId, senderId: callerId, content, inReplyToMessageId: inReplyToMessageId ?? null }
       );
 
-      // Also push on the instance context so the conversation list updates
-      await pushInstanceEvent(env, sandboxId, humanMemberIds, callerId, 'conversation.activity', {
-        conversationId,
-        messageId,
-      });
+      // For each non-sender human member: if they're present in the conversation,
+      // auto-mark read. Otherwise, push conversation.activity on the instance context.
+      await Promise.allSettled(
+        otherHumans.map(async userId => {
+          const present = await isUserPresentInConversation(env, userId, sandboxId, conversationId);
+          if (present) {
+            const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
+            await stub.markRead(conversationId, now);
+          } else {
+            await pushInstanceEvent(env, sandboxId, [userId], undefined, 'conversation.activity', {
+              conversationId,
+              lastActivityAt: now,
+            });
+          }
+        })
+      );
     }
   }
 

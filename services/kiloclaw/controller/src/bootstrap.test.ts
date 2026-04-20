@@ -862,11 +862,13 @@ describe('TOOLS.md section configs', () => {
   // Smoke test on the KiloClaw-specific sections we just added — pin the
   // key directives so a drive-by edit that strips the substance (but keeps
   // the markers) fails loudly.
-  it('KiloClaw Mitigations: names all three additional mitigated checkIds', () => {
+  it('KiloClaw Mitigations: names all additional mitigated checkIds', () => {
     const section = KILOCLAW_MITIGATIONS_SECTION_CONFIG.section;
     expect(section).toContain('gateway.trusted_proxies_missing');
     expect(section).toContain('config.insecure_or_dangerous_flags');
     expect(section).toContain('plugins.tools_reachable_permissive_policy');
+    expect(section).toContain('hooks.default_session_key_unset');
+    expect(section).toContain('hooks.allowed_agent_ids_unrestricted');
     // Does NOT redundantly list gateway.control_ui.insecure_auth as its own
     // bullet — that one is already documented in the base TOOLS.md's
     // "Security Check Context" section. In-body references to it are fine

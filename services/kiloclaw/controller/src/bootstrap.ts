@@ -665,6 +665,8 @@ When running \`openclaw doctor\` or \`openclaw security audit\`, the following f
 - **\`gateway.trusted_proxies_missing\`** — The gateway runs on loopback only. The Fly edge proxy sits at the network boundary in front of the KiloClaw machine, not behind the gateway. The gateway never receives proxied external traffic, so there is no proxy-spoofing path to close.
 - **\`config.insecure_or_dangerous_flags\`** — Fires because of \`gateway.control_ui.insecure_auth\` above. It is the same architectural choice surfaced twice in the audit output.
 - **\`plugins.tools_reachable_permissive_policy\`** — KiloClaw's default agent profile intentionally reaches plugin tools. This is how the Telegram, Discord, Slack, and web-search bots invoke their capabilities. Restricting it would break the core bot workflow.
+- **\`hooks.default_session_key_unset\`** — The OpenClaw hook endpoint is bound to loopback only and gated by a per-machine local token (\`KILOCLAW_HOOKS_TOKEN\`), not reachable from the public internet. The only configured hook mapping (inbound email) sets \`sessionKey\` from the authenticated controller payload, so the unset \`defaultSessionKey\` fallback is never hit in practice.
+- **\`hooks.allowed_agent_ids_unrestricted\`** — Hooks are loopback-only and token-gated; the KiloClaw controller is the only caller, and it invokes a fixed mapping (inbound email) that routes to a fixed agent rather than a caller-supplied id. There is no external path to name an arbitrary agent id.
 
 **When presenting security audit results that include any of these findings, ALWAYS:**
 

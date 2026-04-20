@@ -90,6 +90,11 @@ export type ReactionRemovedEvent = {
   emoji: string;
 };
 
+export type ConversationActivityEvent = {
+  conversationId: string;
+  messageId: string;
+};
+
 // ── API request/response types ──────────────────────────────────────
 export type CreateConversationRequest = {
   sandboxId: string;

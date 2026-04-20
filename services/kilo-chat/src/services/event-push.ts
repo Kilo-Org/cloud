@@ -34,6 +34,40 @@ export async function pushEventToHumanMembers(
 }
 
 /**
+ * Pushes an event on the instance-level context (`/kiloclaw/{sandboxId}`).
+ * Used for cross-conversation notifications (e.g. new activity in a conversation).
+ */
+export async function pushInstanceEvent(
+  env: Env,
+  sandboxId: string,
+  humanMemberIds: string[],
+  excludeSenderId: string | undefined,
+  event: string,
+  payload: unknown
+): Promise<void> {
+  if (!env.EVENT_SERVICE) return;
+  const context = `/kiloclaw/${sandboxId}`;
+  const targets = excludeSenderId
+    ? humanMemberIds.filter(id => id !== excludeSenderId)
+    : humanMemberIds;
+
+  await Promise.allSettled(
+    targets.map(userId =>
+      (
+        env.EVENT_SERVICE as unknown as {
+          pushEvent: (
+            userId: string,
+            context: string,
+            event: string,
+            payload: unknown
+          ) => Promise<void>;
+        }
+      ).pushEvent(userId, context, event, payload)
+    )
+  );
+}
+
+/**
  * Extracts sandboxId from a bot member ID like "bot:kiloclaw:sandbox_123".
  */
 export function extractSandboxId(botMemberId: string): string | null {

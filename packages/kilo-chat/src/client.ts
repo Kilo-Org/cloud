@@ -22,6 +22,7 @@ import type {
   TypingEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
+  ConversationActivityEvent,
 } from './types';
 
 function parseMessageRow(row: MessageRow): Message {
@@ -159,6 +160,13 @@ export class KiloChatClient {
 
   onReactionRemoved(handler: (ctx: string, e: ReactionRemovedEvent) => void): () => void {
     return this.es.on('reaction.removed', handler as (context: string, payload: unknown) => void);
+  }
+
+  onConversationActivity(handler: (ctx: string, e: ConversationActivityEvent) => void): () => void {
+    return this.es.on(
+      'conversation.activity',
+      handler as (context: string, payload: unknown) => void
+    );
   }
 
   // ── Private HTTP helper ───────────────────────────────────────────────────

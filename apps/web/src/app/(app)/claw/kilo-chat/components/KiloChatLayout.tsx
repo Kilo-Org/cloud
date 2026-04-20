@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, createContext, useContext, useEffect } from 'react';
+import { useState, useCallback, createContext, useContext, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import type { EventServiceClient } from '@kilocode/event-service';
@@ -71,7 +71,16 @@ export function KiloChatLayout({
 
   const params = useParams<{ conversationId?: string }>();
   const [leavingConversationId, setLeavingConversationId] = useState<string | null>(null);
-  const { data, isLoading } = useConversations(kiloChatClient, selectedSandboxId);
+  const { data, isLoading, refetch } = useConversations(kiloChatClient, selectedSandboxId);
+
+  // Refetch conversation list on conversation.activity events
+  const refetchRef = useRef(refetch);
+  refetchRef.current = refetch;
+  useEffect(() => {
+    return kiloChatClient.onConversationActivity(() => {
+      void refetchRef.current();
+    });
+  }, [kiloChatClient]);
   const createConversation = useCreateConversation(kiloChatClient);
   const renameConversation = useRenameConversation(kiloChatClient);
   const leaveConversation = useLeaveConversation(kiloChatClient);

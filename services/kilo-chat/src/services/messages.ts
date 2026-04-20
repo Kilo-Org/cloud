@@ -12,6 +12,7 @@ import {
   extractConversationContext,
   getConversationContext,
   pushEventToHumanMembers,
+  pushInstanceEvent,
 } from './event-push';
 
 export type ContentBlock = { type: string; [key: string]: unknown };
@@ -111,6 +112,12 @@ export async function createMessageFor(
         'message.created',
         { messageId, senderId: callerId, content, inReplyToMessageId: inReplyToMessageId ?? null }
       );
+
+      // Also push on the instance context so the conversation list updates
+      await pushInstanceEvent(env, sandboxId, humanMemberIds, callerId, 'conversation.activity', {
+        conversationId,
+        messageId,
+      });
     }
   }
 

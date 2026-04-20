@@ -148,10 +148,7 @@ export async function saveFingerprints(
   });
 
   // Autoban users blocked by Stytch for smart rate limit abuse
-  if (
-    verdict.action === 'BLOCK' &&
-    verdict.reasons.includes('SMART_RATE_LIMIT_BANNED')
-  ) {
+  if (verdict.action === 'BLOCK' && verdict.reasons.includes('SMART_RATE_LIMIT_BANNED')) {
     await db
       .update(kilocode_users)
       .set({ blocked_reason: 'autoban: stytch SMART_RATE_LIMIT_BANNED' })

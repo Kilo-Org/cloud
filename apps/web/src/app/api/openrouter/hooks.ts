@@ -92,7 +92,7 @@ export function useOpenRouterProviders() {
       if (!parsed.success) {
         throw new Error('Failed to parse providers: ' + z.prettifyError(parsed.error));
       }
-      return parsed.data;
+      return { data: parsed.data.providers };
     },
   });
 }

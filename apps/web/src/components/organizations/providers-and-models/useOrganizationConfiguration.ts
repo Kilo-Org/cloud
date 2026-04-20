@@ -26,7 +26,7 @@ export function useOrganizationConfiguration(organizationId: string) {
 
   const isLoading = orgLoading || modelsLoading || providersLoading || providersSnapshotLoading;
 
-  if (isLoading || !organizationData || !modelsData?.data || !providersData?.providers) {
+  if (isLoading || !organizationData || !modelsData?.data || !providersData?.data) {
     return {
       isLoading,
       organizationData,
@@ -43,9 +43,9 @@ export function useOrganizationConfiguration(organizationId: string) {
 
   // Get provider names for display
   const getProviderNames = (slugs: string[]) => {
-    if (!providersData?.providers) return slugs;
+    if (!providersData?.data) return slugs;
     return slugs.map(slug => {
-      const provider = providersData.providers.find((p: NormalizedProvider) => p.slug === slug);
+      const provider = providersData.data.find((p: NormalizedProvider) => p.slug === slug);
       return provider?.displayName || provider?.name || slug;
     });
   };

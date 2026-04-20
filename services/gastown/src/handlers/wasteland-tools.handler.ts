@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
-import { createWastelandClient, WastelandClientError } from '../util/wasteland-client.util';
+import { getTownDOStub } from '../dos/Town.do';
 import type { GastownEnv } from '../gastown.worker';
 
 const HANDLER_LOG = '[wasteland-tools.handler]';
@@ -27,57 +27,46 @@ const WastelandDoneBody = z.object({
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-/**
- * Extract the bearer token from the Authorization header.
- * The mayor auth middleware already validated it; we just forward it
- * to the Wasteland service for user identification.
- */
-function extractAuthToken(c: Context<GastownEnv>): string | null {
-  const header = c.req.header('Authorization');
-  if (!header?.startsWith('Bearer ')) return null;
-  return header.slice(7);
+/** Resolve the userId of the caller from the mayor auth middleware. */
+function resolveUserId(c: Context<GastownEnv>): string | null {
+  const agentJWT = c.get('agentJWT');
+  return agentJWT?.userId ?? null;
 }
 
 /**
- * Build a wasteland client from the Hono context. Uses the Cloudflare
- * service binding when available, falling back to HTTP URL for dev.
+ * Resolve the wasteland ID for this town. Returns null if the town is
+ * not connected to any wasteland.
  */
-function buildWastelandClient(c: Context<GastownEnv>) {
-  const authToken = extractAuthToken(c);
-  if (!authToken) {
-    return null;
-  }
-  return createWastelandClient({
-    wastelandService: c.env.WASTELAND_SERVICE,
-    wastelandApiUrl: c.env.WASTELAND_API_URL,
-    authToken,
-  });
+async function resolveWastelandId(c: Context<GastownEnv>, townId: string): Promise<string | null> {
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const connection = await town.getWastelandConnection();
+  return connection?.wasteland_id ?? null;
 }
 
-/**
- * Format a WastelandClientError into a Hono JSON response.
- */
-function wastelandErrorResponse(c: Context<GastownEnv>, err: unknown) {
-  if (err instanceof WastelandClientError) {
-    const status = err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 502;
-    return c.json(resError(err.message), status as 400);
-  }
-  throw err;
+/** Map a wasteland RPC failure into a Hono response. */
+function wastelandFailureToResponse(
+  c: Context<GastownEnv>,
+  failure: { code: string; message: string }
+) {
+  const status =
+    failure.code === 'PRECONDITION_FAILED' ? 412 : failure.code === 'NOT_FOUND' ? 404 : 502;
+  return c.json(resError(failure.message), status as 400);
 }
 
 // ── Handlers ─────────────────────────────────────────────────────────────
 
 /**
- * GET /api/mayor/:townId/tools/wasteland/:wastelandId/browse
+ * GET /api/mayor/:townId/tools/wasteland/browse
  * Browse the wanted board. Supports optional `status` and `limit` query params.
  */
-export async function handleWastelandBrowse(
-  c: Context<GastownEnv>,
-  params: { townId: string; wastelandId: string }
-) {
-  const client = buildWastelandClient(c);
-  if (!client) {
-    return c.json(resError('Authentication required'), 401);
+export async function handleWastelandBrowse(c: Context<GastownEnv>, params: { townId: string }) {
+  const userId = resolveUserId(c);
+  if (!userId) return c.json(resError('Authentication required'), 401);
+
+  const wastelandId = await resolveWastelandId(c, params.townId);
+  if (!wastelandId) {
+    return c.json(resError('This town is not connected to any wasteland'), 404);
   }
 
   const statusRaw = c.req.query('status');
@@ -93,37 +82,39 @@ export async function handleWastelandBrowse(
   }
 
   console.log(
-    `${HANDLER_LOG} handleWastelandBrowse: townId=${params.townId} wastelandId=${params.wastelandId} status=${statusRaw ?? 'all'} limit=${limitRaw ?? 'default'}`
+    `${HANDLER_LOG} handleWastelandBrowse: townId=${params.townId} wastelandId=${wastelandId} status=${statusRaw ?? 'all'} limit=${limitRaw ?? 'default'}`
   );
 
-  try {
-    let items = await client.browseWantedBoard({ wastelandId: params.wastelandId });
+  const result = await c.env.WASTELAND_SERVICE.browseWantedBoard({
+    wastelandId,
+    userId,
+  });
 
-    // Apply client-side filtering (status and limit)
-    if (statusRaw) {
-      items = items.filter(item => item.status === statusRaw);
-    }
-    if (limit !== undefined) {
-      items = items.slice(0, limit);
-    }
-
-    return c.json(resSuccess(items));
-  } catch (err) {
-    return wastelandErrorResponse(c, err);
+  if (!result.success) {
+    return wastelandFailureToResponse(c, result);
   }
+
+  let items = result.data;
+  if (statusRaw) {
+    items = items.filter(item => item.status === statusRaw);
+  }
+  if (limit !== undefined) {
+    items = items.slice(0, limit);
+  }
+
+  return c.json(resSuccess(items));
 }
 
 /**
- * POST /api/mayor/:townId/tools/wasteland/:wastelandId/claim
- * Claim an open wanted item.
+ * POST /api/mayor/:townId/tools/wasteland/claim
  */
-export async function handleWastelandClaim(
-  c: Context<GastownEnv>,
-  params: { townId: string; wastelandId: string }
-) {
-  const client = buildWastelandClient(c);
-  if (!client) {
-    return c.json(resError('Authentication required'), 401);
+export async function handleWastelandClaim(c: Context<GastownEnv>, params: { townId: string }) {
+  const userId = resolveUserId(c);
+  if (!userId) return c.json(resError('Authentication required'), 401);
+
+  const wastelandId = await resolveWastelandId(c, params.townId);
+  if (!wastelandId) {
+    return c.json(resError('This town is not connected to any wasteland'), 404);
   }
 
   const parsed = WastelandClaimBody.safeParse(await parseJsonBody(c));
@@ -135,31 +126,32 @@ export async function handleWastelandClaim(
   }
 
   console.log(
-    `${HANDLER_LOG} handleWastelandClaim: townId=${params.townId} wastelandId=${params.wastelandId} itemId=${parsed.data.item_id}`
+    `${HANDLER_LOG} handleWastelandClaim: townId=${params.townId} wastelandId=${wastelandId} itemId=${parsed.data.item_id}`
   );
 
-  try {
-    const result = await client.claimWantedItem({
-      wastelandId: params.wastelandId,
-      itemId: parsed.data.item_id,
-    });
-    return c.json(resSuccess(result));
-  } catch (err) {
-    return wastelandErrorResponse(c, err);
+  const result = await c.env.WASTELAND_SERVICE.claimWantedItem({
+    wastelandId,
+    userId,
+    itemId: parsed.data.item_id,
+  });
+
+  if (!result.success) {
+    return wastelandFailureToResponse(c, result);
   }
+
+  return c.json(resSuccess(result.data));
 }
 
 /**
- * POST /api/mayor/:townId/tools/wasteland/:wastelandId/post
- * Post a new wanted item.
+ * POST /api/mayor/:townId/tools/wasteland/post
  */
-export async function handleWastelandPost(
-  c: Context<GastownEnv>,
-  params: { townId: string; wastelandId: string }
-) {
-  const client = buildWastelandClient(c);
-  if (!client) {
-    return c.json(resError('Authentication required'), 401);
+export async function handleWastelandPost(c: Context<GastownEnv>, params: { townId: string }) {
+  const userId = resolveUserId(c);
+  if (!userId) return c.json(resError('Authentication required'), 401);
+
+  const wastelandId = await resolveWastelandId(c, params.townId);
+  if (!wastelandId) {
+    return c.json(resError('This town is not connected to any wasteland'), 404);
   }
 
   const parsed = WastelandPostBody.safeParse(await parseJsonBody(c));
@@ -171,34 +163,35 @@ export async function handleWastelandPost(
   }
 
   console.log(
-    `${HANDLER_LOG} handleWastelandPost: townId=${params.townId} wastelandId=${params.wastelandId} title="${parsed.data.title.slice(0, 80)}"`
+    `${HANDLER_LOG} handleWastelandPost: townId=${params.townId} wastelandId=${wastelandId} title="${parsed.data.title.slice(0, 80)}"`
   );
 
-  try {
-    const result = await client.postWantedItem({
-      wastelandId: params.wastelandId,
-      title: parsed.data.title,
-      description: parsed.data.description,
-      priority: parsed.data.priority,
-      type: parsed.data.type,
-    });
-    return c.json(resSuccess(result), 201);
-  } catch (err) {
-    return wastelandErrorResponse(c, err);
+  const result = await c.env.WASTELAND_SERVICE.postWantedItem({
+    wastelandId,
+    userId,
+    title: parsed.data.title,
+    description: parsed.data.description,
+    priority: parsed.data.priority,
+    type: parsed.data.type,
+  });
+
+  if (!result.success) {
+    return wastelandFailureToResponse(c, result);
   }
+
+  return c.json(resSuccess(result.data), 201);
 }
 
 /**
- * POST /api/mayor/:townId/tools/wasteland/:wastelandId/done
- * Mark a claimed wanted item as done with evidence.
+ * POST /api/mayor/:townId/tools/wasteland/done
  */
-export async function handleWastelandDone(
-  c: Context<GastownEnv>,
-  params: { townId: string; wastelandId: string }
-) {
-  const client = buildWastelandClient(c);
-  if (!client) {
-    return c.json(resError('Authentication required'), 401);
+export async function handleWastelandDone(c: Context<GastownEnv>, params: { townId: string }) {
+  const userId = resolveUserId(c);
+  if (!userId) return c.json(resError('Authentication required'), 401);
+
+  const wastelandId = await resolveWastelandId(c, params.townId);
+  if (!wastelandId) {
+    return c.json(resError('This town is not connected to any wasteland'), 404);
   }
 
   const parsed = WastelandDoneBody.safeParse(await parseJsonBody(c));
@@ -210,17 +203,19 @@ export async function handleWastelandDone(
   }
 
   console.log(
-    `${HANDLER_LOG} handleWastelandDone: townId=${params.townId} wastelandId=${params.wastelandId} itemId=${parsed.data.item_id}`
+    `${HANDLER_LOG} handleWastelandDone: townId=${params.townId} wastelandId=${wastelandId} itemId=${parsed.data.item_id}`
   );
 
-  try {
-    const result = await client.markWantedItemDone({
-      wastelandId: params.wastelandId,
-      itemId: parsed.data.item_id,
-      evidence: parsed.data.evidence,
-    });
-    return c.json(resSuccess(result));
-  } catch (err) {
-    return wastelandErrorResponse(c, err);
+  const result = await c.env.WASTELAND_SERVICE.markWantedItemDone({
+    wastelandId,
+    userId,
+    itemId: parsed.data.item_id,
+    evidence: parsed.data.evidence,
+  });
+
+  if (!result.success) {
+    return wastelandFailureToResponse(c, result);
   }
+
+  return c.json(resSuccess(result.data));
 }

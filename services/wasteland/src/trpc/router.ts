@@ -14,6 +14,8 @@ import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
 import { meterEvent } from '../util/billing.util';
+import * as wantedBoard from '../wanted-board/wanted-board-ops';
+import { WantedBoardOpError } from '../wanted-board/wanted-board-ops';
 import {
   RpcWastelandOutput,
   RpcWastelandMemberOutput,
@@ -47,6 +49,20 @@ function verifyOrgAccess(ctx: TRPCContext, organizationId: string): JwtOrgMember
     });
   }
   return membership;
+}
+
+/** Translate a WantedBoardOpError into the matching TRPCError. */
+function wantedBoardErrorToTRPC(err: unknown): never {
+  if (err instanceof WantedBoardOpError) {
+    const code =
+      err.code === 'PRECONDITION_FAILED'
+        ? 'PRECONDITION_FAILED'
+        : err.code === 'NOT_FOUND'
+          ? 'NOT_FOUND'
+          : 'INTERNAL_SERVER_ERROR';
+    throw new TRPCError({ code, message: err.message });
+  }
+  throw err;
 }
 
 /**
@@ -734,54 +750,15 @@ export const wastelandRouter = router({
     .input(z.object({ wastelandId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
-
-      const doStub = getWastelandDOStub(ctx.env, input.wastelandId);
-      const config = await doStub.getConfig();
-      if (!config?.dolthub_upstream) {
-        return [];
+      try {
+        return await wantedBoard.browseWantedBoard(ctx.env, input.wastelandId, ctx.userId);
+      } catch (err) {
+        // Browse degrades to empty list if not yet configured
+        if (err instanceof WantedBoardOpError && err.code === 'PRECONDITION_FAILED') {
+          return [];
+        }
+        return wantedBoardErrorToTRPC(err);
       }
-
-      const credential = await doStub.getCredential(ctx.userId);
-      if (!credential) {
-        return [];
-      }
-
-      const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
-      if (!rawKey) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Encryption key unavailable',
-        });
-      }
-      const cryptoKey = await deriveEncryptionKey(rawKey);
-      const token = await decryptToken(credential.encrypted_token, cryptoKey);
-
-      const container = getWastelandContainerStub(ctx.env, input.wastelandId);
-      const res = await container.fetch(
-        new Request('http://container/wl/browse', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            DOLTHUB_TOKEN: token,
-          },
-          body: JSON.stringify({ upstream: config.dolthub_upstream }),
-        })
-      );
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Browse failed: ${body || res.statusText}`,
-        });
-      }
-
-      const data: unknown = await res.json();
-      // Container returns { items: [...] }
-      const parsed = z
-        .object({ items: z.array(z.record(z.string(), z.unknown())) })
-        .safeParse(data);
-      return parsed.success ? parsed.data.items : [];
     }),
 
   // ── Wanted Board Mutations ────────────────────────────────────────
@@ -796,66 +773,16 @@ export const wastelandRouter = router({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
-
-      const doStub = getWastelandDOStub(ctx.env, input.wastelandId);
-      const credential = await doStub.getCredential(ctx.userId);
-      if (!credential) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'No DoltHub credential stored — connect DoltHub in settings first',
-        });
+      try {
+        return await wantedBoard.claimWantedItem(
+          ctx.env,
+          input.wastelandId,
+          ctx.userId,
+          input.itemId
+        );
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
       }
-
-      const config = await doStub.getConfig();
-      if (!config?.dolthub_upstream) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Wasteland has no DoltHub upstream configured',
-        });
-      }
-
-      const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
-      if (!rawKey) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Encryption key unavailable',
-        });
-      }
-      const cryptoKey = await deriveEncryptionKey(rawKey);
-      const token = await decryptToken(credential.encrypted_token, cryptoKey);
-
-      const container = getWastelandContainerStub(ctx.env, input.wastelandId);
-      const res = await container.fetch(
-        new Request('http://container/wl/claim', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', DOLTHUB_TOKEN: token },
-          body: JSON.stringify({
-            upstream: config.dolthub_upstream,
-            itemId: input.itemId,
-            userId: ctx.userId,
-          }),
-        })
-      );
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Claim failed: ${body || res.statusText}`,
-        });
-      }
-
-      // Refresh the wanted board cache after mutation
-      await doStub.refreshWantedBoard();
-
-      meterEvent(ctx.env, {
-        event: 'billing.api_operation',
-        userId: ctx.userId,
-        wastelandId: input.wastelandId,
-        label: 'claim',
-      });
-
-      return { success: true };
     }),
 
   postWantedItem: procedure
@@ -871,70 +798,16 @@ export const wastelandRouter = router({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
-
-      const doStub = getWastelandDOStub(ctx.env, input.wastelandId);
-      const credential = await doStub.getCredential(ctx.userId);
-      if (!credential) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'No DoltHub credential stored — connect DoltHub in settings first',
+      try {
+        return await wantedBoard.postWantedItem(ctx.env, input.wastelandId, ctx.userId, {
+          title: input.title,
+          description: input.description,
+          priority: input.priority,
+          type: input.type,
         });
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
       }
-
-      const config = await doStub.getConfig();
-      if (!config?.dolthub_upstream) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Wasteland has no DoltHub upstream configured',
-        });
-      }
-
-      const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
-      if (!rawKey) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Encryption key unavailable',
-        });
-      }
-      const cryptoKey = await deriveEncryptionKey(rawKey);
-      const token = await decryptToken(credential.encrypted_token, cryptoKey);
-
-      const container = getWastelandContainerStub(ctx.env, input.wastelandId);
-      const res = await container.fetch(
-        new Request('http://container/wl/post', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', DOLTHUB_TOKEN: token },
-          body: JSON.stringify({
-            upstream: config.dolthub_upstream,
-            title: input.title,
-            description: input.description,
-            ...(input.priority !== undefined
-              ? { priority: { low: 0, medium: 1, high: 2, critical: 3 }[input.priority] }
-              : {}),
-            ...(input.type !== undefined ? { type: input.type } : {}),
-          }),
-        })
-      );
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Post failed: ${body || res.statusText}`,
-        });
-      }
-
-      // Refresh the wanted board cache after mutation
-      await doStub.refreshWantedBoard();
-
-      meterEvent(ctx.env, {
-        event: 'billing.api_operation',
-        userId: ctx.userId,
-        wastelandId: input.wastelandId,
-        label: 'post',
-      });
-
-      return { success: true };
     }),
 
   markWantedItemDone: procedure
@@ -948,66 +821,14 @@ export const wastelandRouter = router({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
-
-      const doStub = getWastelandDOStub(ctx.env, input.wastelandId);
-      const credential = await doStub.getCredential(ctx.userId);
-      if (!credential) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'No DoltHub credential stored — connect DoltHub in settings first',
+      try {
+        return await wantedBoard.markWantedItemDone(ctx.env, input.wastelandId, ctx.userId, {
+          itemId: input.itemId,
+          evidence: input.evidence,
         });
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
       }
-
-      const config = await doStub.getConfig();
-      if (!config?.dolthub_upstream) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Wasteland has no DoltHub upstream configured',
-        });
-      }
-
-      const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
-      if (!rawKey) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Encryption key unavailable',
-        });
-      }
-      const cryptoKey = await deriveEncryptionKey(rawKey);
-      const token = await decryptToken(credential.encrypted_token, cryptoKey);
-
-      const container = getWastelandContainerStub(ctx.env, input.wastelandId);
-      const res = await container.fetch(
-        new Request('http://container/wl/done', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', DOLTHUB_TOKEN: token },
-          body: JSON.stringify({
-            upstream: config.dolthub_upstream,
-            itemId: input.itemId,
-            evidence: input.evidence,
-          }),
-        })
-      );
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: `Mark done failed: ${body || res.statusText}`,
-        });
-      }
-
-      // Refresh the wanted board cache after mutation
-      await doStub.refreshWantedBoard();
-
-      meterEvent(ctx.env, {
-        event: 'billing.api_operation',
-        userId: ctx.userId,
-        wastelandId: input.wastelandId,
-        label: 'done',
-      });
-
-      return { success: true };
     }),
 });
 

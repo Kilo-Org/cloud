@@ -61,6 +61,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button as UiButton } from '@/components/ui/button';
+import { WastelandSettingsSection } from './WastelandSettingsSection';
 
 type Props = { townId: string; readOnly?: boolean; organizationId?: string };
 
@@ -1225,27 +1226,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                 icon={Globe}
                 index={9}
               >
-                <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                  <div>
-                    <p className="text-sm text-white/70">Not connected</p>
-                    <p className="text-[11px] text-white/30">
-                      Link this town to a Wasteland to enable community bounties and shared
-                      contributions.
-                    </p>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="ml-4 shrink-0 gap-1.5"
-                    disabled={effectiveReadOnly}
-                    onClick={() => {
-                      // TODO: hook up to wasteland connection flow
-                    }}
-                  >
-                    <Globe className="size-3" />
-                    Connect
-                  </Button>
-                </div>
+                <WastelandSettingsSection townId={townId} readOnly={effectiveReadOnly} />
               </SettingsSection>
 
               {/* ── Custom Instructions ────────────────────────────────── */}

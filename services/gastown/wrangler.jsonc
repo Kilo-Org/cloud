@@ -37,7 +37,7 @@
       "class_name": "TownContainerDO",
       "image": "./container/Dockerfile",
       "instance_type": "standard-4",
-      "max_instances": 810,
+      "max_instances": 700,
     },
   ],
 
@@ -101,6 +101,7 @@
     {
       "binding": "WASTELAND_SERVICE",
       "service": "wasteland",
+      "entrypoint": "WastelandRPCEntrypoint",
     },
   ],
 
@@ -159,7 +160,11 @@
         },
         {
           "binding": "WASTELAND_SERVICE",
-          "service": "wasteland",
+          // In dev, wasteland registers as "wasteland-dev" because its
+          // dev script uses `wrangler dev --env dev`. The prod binding
+          // (above) uses the plain "wasteland" service name.
+          "service": "wasteland-dev",
+          "entrypoint": "WastelandRPCEntrypoint",
         },
       ],
       "ai": { "binding": "AI" },

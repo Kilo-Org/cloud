@@ -14,6 +14,8 @@ import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
 import { timingMiddleware } from './middleware/analytics.middleware';
 import { wrappedWastelandRouter } from './trpc/router';
 import { getWastelandRegistryStub } from './dos/WastelandRegistry.do';
+import { getWastelandDOStub } from './dos/Wasteland.do';
+import { getWastelandContainerStub } from './dos/WastelandContainer.do';
 
 // ── DO Exports ──────────────────────────────────────────────────────────
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
@@ -21,6 +23,7 @@ import { getWastelandRegistryStub } from './dos/WastelandRegistry.do';
 export { WastelandDO } from './dos/Wasteland.do';
 export { WastelandContainerDO } from './dos/WastelandContainer.do';
 export { WastelandRegistryDO } from './dos/WastelandRegistry.do';
+export { WastelandRPCEntrypoint } from './wasteland-rpc.entrypoint';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -98,6 +101,75 @@ app.get('/health', async (c: Context<WastelandEnv>) => {
     sentryConfigured: !!env.SENTRY_DSN,
     analyticsEngineConfigured: !!env.WASTELAND_AE,
   });
+});
+
+// ── DEBUG: unauthenticated wasteland introspection ─────────────────────
+// These endpoints are unprotected in dev. In prod they are behind CF Access.
+
+app.get('/debug/wastelands/:wastelandId/status', async c => {
+  const wastelandId = c.req.param('wastelandId');
+  const doStub = getWastelandDOStub(c.env, wastelandId);
+  const config = await doStub.getConfig();
+  const members = await doStub.listMembers();
+  const connectedTowns = await doStub.listConnectedTowns();
+  const wantedBoard = await doStub.getWantedBoard();
+  return c.json({ config, members, connectedTowns, wantedBoardCount: wantedBoard.length });
+});
+
+app.get('/debug/wastelands/:wastelandId/wanted', async c => {
+  const wastelandId = c.req.param('wastelandId');
+  const doStub = getWastelandDOStub(c.env, wastelandId);
+  const board = await doStub.getWantedBoard();
+  return c.json({ items: board });
+});
+
+app.get('/debug/wastelands/:wastelandId/container/config', async c => {
+  const wastelandId = c.req.param('wastelandId');
+  const container = getWastelandContainerStub(c.env, wastelandId);
+  const res = await container.fetch(new Request('http://container/wl/config'));
+  const data: unknown = await res.json();
+  return c.json(data);
+});
+
+app.get('/debug/wastelands/:wastelandId/container/health', async c => {
+  const wastelandId = c.req.param('wastelandId');
+  const container = getWastelandContainerStub(c.env, wastelandId);
+  const res = await container.fetch(new Request('http://container/health'));
+  const data: unknown = await res.json();
+  return c.json(data);
+});
+
+app.post('/debug/wastelands/:wastelandId/container/browse', async c => {
+  const wastelandId = c.req.param('wastelandId');
+  const doStub = getWastelandDOStub(c.env, wastelandId);
+  const config = await doStub.getConfig();
+  if (!config?.dolthub_upstream) {
+    return c.json({ error: 'No upstream configured' }, 400);
+  }
+  const credential = await doStub.getCredential(
+    (await c.req.json().catch(() => ({}))).userId ?? ''
+  );
+  // Use the token from env as fallback for debug
+  const token = credential?.encrypted_token ?? c.req.header('DOLTHUB_TOKEN') ?? '';
+  const container = getWastelandContainerStub(c.env, wastelandId);
+  const res = await container.fetch(
+    new Request('http://container/wl/browse', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        DOLTHUB_TOKEN: token,
+      },
+      body: JSON.stringify({ upstream: config.dolthub_upstream }),
+    })
+  );
+  const data: unknown = await res.json();
+  return c.json(data);
+});
+
+app.get('/debug/registry', async c => {
+  const registry = getWastelandRegistryStub(c.env);
+  const all = await registry.listAll();
+  return c.json({ wastelands: all });
 });
 
 // ── Kilo User Auth ──────────────────────────────────────────────────────

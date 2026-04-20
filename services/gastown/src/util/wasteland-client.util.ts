@@ -105,22 +105,38 @@ async function trpcFetch(
   path: string,
   init: RequestInit
 ): Promise<Response> {
-  const url = deps.wastelandService
-    ? `https://wasteland-service${path}`
-    : `${deps.wastelandApiUrl}${path}`;
-
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${deps.authToken}`);
   headers.set('Content-Type', 'application/json');
 
-  const request = new Request(url, { ...init, headers });
-
+  // Prefer the service binding when available (zero-network-hop in prod).
   if (deps.wastelandService) {
-    return deps.wastelandService.fetch(request);
+    const bindingUrl = `https://wasteland-service${path}`;
+    try {
+      const response = await deps.wastelandService.fetch(
+        new Request(bindingUrl, { ...init, headers })
+      );
+      // In local wrangler dev, a bound service that isn't actually running
+      // returns 503. Fall back to HTTP so dev works without a service
+      // registry. Only fall back on upstream-unavailable codes, not on
+      // application-level errors.
+      if (response.status !== 503 || !deps.wastelandApiUrl) {
+        return response;
+      }
+      console.warn('[wasteland-client] service binding returned 503, falling back to HTTP', {
+        wastelandApiUrl: deps.wastelandApiUrl,
+      });
+    } catch (err) {
+      if (!deps.wastelandApiUrl) throw err;
+      console.warn('[wasteland-client] service binding threw, falling back to HTTP', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   if (deps.wastelandApiUrl) {
-    return fetch(request);
+    const httpUrl = `${deps.wastelandApiUrl}${path}`;
+    return fetch(new Request(httpUrl, { ...init, headers }));
   }
 
   throw new WastelandClientError(

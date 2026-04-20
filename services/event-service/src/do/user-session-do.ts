@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { ClientMessage, ServerMessage } from '../types';
 
-type SerializedState = { contexts: string[] };
+type SerializedState = { contexts: string[]; userId: string };
 
 export class UserSessionDO extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
@@ -10,11 +10,14 @@ export class UserSessionDO extends DurableObject<Env> {
       return new Response('Expected WebSocket upgrade', { status: 426 });
     }
 
+    const url = new URL(request.url);
+    const userId = url.searchParams.get('userId') ?? '';
+
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
 
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ contexts: [] } satisfies SerializedState);
+    server.serializeAttachment({ contexts: [], userId } satisfies SerializedState);
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -40,6 +43,26 @@ export class UserSessionDO extends DurableObject<Env> {
         const state = this.getState(ws);
         for (const ctx of msg.contexts) state.contexts.delete(ctx);
         this.saveState(ws, state);
+        break;
+      }
+      case 'presence.ping': {
+        await this.setLastPingAt(Date.now());
+        break;
+      }
+      case 'presence.show': {
+        const added = await this.setVisible(msg.context);
+        if (added) {
+          const state = this.getState(ws);
+          this.broadcastPresence('presence.joined', ws, msg.context, state.userId);
+        }
+        break;
+      }
+      case 'presence.hide': {
+        const removed = await this.clearVisible(msg.context);
+        if (removed) {
+          const state = this.getState(ws);
+          this.broadcastPresence('presence.left', ws, msg.context, state.userId);
+        }
         break;
       }
     }
@@ -79,7 +102,7 @@ export class UserSessionDO extends DurableObject<Env> {
 
   // ── Presence check ─────────────────────────────────────────────────
 
-  async userPresent(context: string): Promise<boolean> {
+  async isUserInContext(context: string): Promise<boolean> {
     for (const ws of this.ctx.getWebSockets()) {
       const state = this.getState(ws);
       if (state.contexts.has(context)) return true;
@@ -87,14 +110,66 @@ export class UserSessionDO extends DurableObject<Env> {
     return false;
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────
+  // ── DO storage helpers (presence) ──────────────────────────────────
 
-  private getState(ws: WebSocket): { contexts: Set<string> } {
-    const raw = ws.deserializeAttachment() as SerializedState | null;
-    return { contexts: new Set(raw?.contexts ?? []) };
+  private async setLastPingAt(now: number): Promise<void> {
+    await this.ctx.storage.put('presence:lastPingAt', now);
   }
 
-  private saveState(ws: WebSocket, state: { contexts: Set<string> }): void {
-    ws.serializeAttachment({ contexts: [...state.contexts] } satisfies SerializedState);
+  async getLastPingAt(): Promise<number> {
+    return (await this.ctx.storage.get<number>('presence:lastPingAt')) ?? 0;
+  }
+
+  private async setVisible(context: string): Promise<boolean> {
+    const key = `presence:visible:${context}`;
+    const already = await this.ctx.storage.get<true>(key);
+    if (already) return false;
+    await this.ctx.storage.put(key, true);
+    return true;
+  }
+
+  private async clearVisible(context: string): Promise<boolean> {
+    const key = `presence:visible:${context}`;
+    const was = await this.ctx.storage.get<true>(key);
+    if (!was) return false;
+    await this.ctx.storage.delete(key);
+    return true;
+  }
+
+  // ── Broadcast helpers ──────────────────────────────────────────────
+
+  private broadcastPresence(
+    type: 'presence.joined' | 'presence.left',
+    sender: WebSocket,
+    context: string,
+    userId: string
+  ): void {
+    const msg: ServerMessage = { type, context, userId };
+    const text = JSON.stringify(msg);
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws === sender) continue;
+      const state = this.getState(ws);
+      if (state.contexts.has(context)) {
+        try {
+          ws.send(text);
+        } catch {
+          /* dead connection */
+        }
+      }
+    }
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────
+
+  private getState(ws: WebSocket): { contexts: Set<string>; userId: string } {
+    const raw = ws.deserializeAttachment() as SerializedState | null;
+    return { contexts: new Set(raw?.contexts ?? []), userId: raw?.userId ?? '' };
+  }
+
+  private saveState(ws: WebSocket, state: { contexts: Set<string>; userId: string }): void {
+    ws.serializeAttachment({
+      contexts: [...state.contexts],
+      userId: state.userId,
+    } satisfies SerializedState);
   }
 }

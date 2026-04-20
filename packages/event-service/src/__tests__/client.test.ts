@@ -56,7 +56,7 @@ beforeEach(() => {
   vi.stubGlobal('WebSocket', function (url: string) {
     lastMockWs = new MockWebSocket(url);
     // Auto-trigger open asynchronously so connect() can attach handlers first
-    Promise.resolve().then(() => lastMockWs.triggerOpen());
+    void Promise.resolve().then(() => lastMockWs.triggerOpen());
     return lastMockWs;
   });
 });

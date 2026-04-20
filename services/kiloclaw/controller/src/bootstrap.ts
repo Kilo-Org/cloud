@@ -470,6 +470,7 @@ function toConfigWriterDeps(deps: BootstrapDeps): ConfigWriterDeps {
     readFileSync: deps.readFileSync,
     writeFileSync: deps.writeFileSync,
     renameSync: deps.renameSync,
+    chmodSync: deps.chmodSync,
     copyFileSync: deps.copyFileSync,
     readdirSync: deps.readdirSync,
     unlinkSync: deps.unlinkSync,
@@ -506,11 +507,17 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     // Patch the config with env-var-derived fields
     const config = generateBaseConfig(env, CONFIG_PATH, cwDeps);
     const serialized = JSON.stringify(config, null, 2);
-    atomicWrite(CONFIG_PATH, serialized, {
-      writeFileSync: deps.writeFileSync,
-      renameSync: deps.renameSync,
-      unlinkSync: deps.unlinkSync,
-    });
+    atomicWrite(
+      CONFIG_PATH,
+      serialized,
+      {
+        writeFileSync: deps.writeFileSync,
+        renameSync: deps.renameSync,
+        unlinkSync: deps.unlinkSync,
+        chmodSync: deps.chmodSync,
+      },
+      { mode: 0o600 }
+    );
     console.log('Configuration patched successfully');
 
     env.KILOCLAW_FRESH_INSTALL = 'false';

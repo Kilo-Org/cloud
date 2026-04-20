@@ -156,7 +156,7 @@ export function registerConfigRoutes(
       }
 
       backupConfigFile(CONFIG_PATH);
-      atomicWrite(CONFIG_PATH, JSON.stringify(config, null, 2));
+      atomicWrite(CONFIG_PATH, JSON.stringify(config, null, 2), undefined, { mode: 0o600 });
 
       console.log('[controller] Config replaced');
       return c.json({ ok: true });
@@ -192,7 +192,7 @@ export function registerConfigRoutes(
       const config = JSON.parse(raw);
       deepMerge(config, patch as Record<string, unknown>);
       const serialized = JSON.stringify(config, null, 2);
-      atomicWrite(CONFIG_PATH, serialized);
+      atomicWrite(CONFIG_PATH, serialized, undefined, { mode: 0o600 });
       console.log('[controller] Config patched:', JSON.stringify(patch));
       return c.json({ ok: true });
     } catch (err) {

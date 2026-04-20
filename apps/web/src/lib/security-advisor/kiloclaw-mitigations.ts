@@ -90,6 +90,21 @@ export const KILOCLAW_MITIGATED_CHECKS: ReadonlyMap<string, string> = new Map([
     // warns about is not reachable.
     'Hooks bound to loopback; the KiloClaw controller is the only caller and invokes a fixed mapping rather than a caller-supplied agent id.',
   ],
+  [
+    'fs.config.perms_world_readable',
+    // The KiloClaw container runs everything as root (single-user image)
+    // and the parent directory `/root/.openclaw` is chmod 0o700 by the
+    // controller at boot, so no other user can traverse into the dir
+    // regardless of the file's own mode. The controller also now writes
+    // openclaw.json with explicit mode 0o600 on every write (see
+    // controller/src/atomic-write.ts and config-writer.ts), so fresh or
+    // patched configs on new boots are owner-only directly. This
+    // suppression covers already-running instances that still have the
+    // default-umask 0o644 file on disk from before the chmod fix landed:
+    // their threat model is unchanged because of the 0o700 parent dir,
+    // and the file will be tightened the next time anything writes it.
+    'Container runs single-user as root, parent dir /root/.openclaw is 0o700, and the controller now writes openclaw.json with explicit 0o600 mode — file perms are architecturally moot here.',
+  ],
 ]);
 
 /**

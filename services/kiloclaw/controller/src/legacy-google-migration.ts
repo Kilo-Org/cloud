@@ -214,13 +214,7 @@ export async function migrateLegacyGoogleCredentialsToBroker(
     const scopes = asStringArray(exportPayload.scopes);
     const services = asStringArray(exportPayload.services);
 
-    if (
-      !accountEmail ||
-      !accountSubject ||
-      !refreshToken ||
-      !oauthClientId ||
-      !oauthClientSecret
-    ) {
+    if (!accountEmail || !accountSubject || !refreshToken || !oauthClientId || !oauthClientSecret) {
       return { attempted: true, migrated: false, reason: 'invalid_export_payload' };
     }
 

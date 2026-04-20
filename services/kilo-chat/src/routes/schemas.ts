@@ -2,6 +2,9 @@ import { z } from 'zod';
 
 export const ulidSchema = z.string().ulid();
 
+export const SANDBOX_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+export const sandboxIdSchema = z.string().regex(SANDBOX_ID_PATTERN, 'Invalid sandboxId');
+
 export const contentBlockSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string().min(1).max(8000) }),
 ]);

@@ -2,6 +2,7 @@ import { createMiddleware } from 'hono/factory';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { deriveGatewayToken } from './lib/gateway-token';
 import type { AuthContext } from './auth';
+import { SANDBOX_ID_PATTERN } from './routes/schemas';
 
 /** Timing-safe string comparison using Web Crypto. */
 async function timingSafeEqual(a: string, b: string): Promise<boolean> {
@@ -32,8 +33,6 @@ async function timingSafeEqual(a: string, b: string): Promise<boolean> {
   for (let i = 0; i < va.length; i++) diff |= (va[i] ?? 0) ^ (vb[i] ?? 0);
   return diff === 0;
 }
-
-const SANDBOX_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
  * Bot HTTP auth — verifies per-sandbox HMAC gateway token.

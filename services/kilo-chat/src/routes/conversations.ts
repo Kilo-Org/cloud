@@ -7,13 +7,10 @@ import {
   leaveConversationFor,
   markReadFor,
 } from '../services/conversations';
-
-const ulidSchema = z.string().regex(/^[0-9A-Z]{26}$/, 'Invalid ULID');
-
-const SANDBOX_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+import { ulidSchema, sandboxIdSchema } from './schemas';
 
 const createConversationSchema = z.object({
-  sandboxId: z.string().regex(SANDBOX_ID_PATTERN, 'Invalid sandboxId'),
+  sandboxId: sandboxIdSchema,
   title: z.string().max(200).optional(),
 });
 

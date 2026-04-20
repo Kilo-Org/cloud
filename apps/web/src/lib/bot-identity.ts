@@ -25,7 +25,8 @@ export async function resolveKiloUserId(
   state: StateAdapter,
   identity: PlatformIdentity
 ): Promise<string | null> {
-  return state.get<string>(botIdentityRedisKey(identity.platform, identity.teamId, identity.userId));
+  const { platform, teamId, userId } = identity;
+  return state.get<string>(botIdentityRedisKey(platform, teamId, userId));
 }
 
 /**
@@ -36,7 +37,8 @@ export async function linkKiloUser(
   identity: PlatformIdentity,
   kiloUserId: string
 ): Promise<void> {
-  await state.set(botIdentityRedisKey(identity.platform, identity.teamId, identity.userId), kiloUserId);
+  const { platform, teamId, userId } = identity;
+  await state.set(botIdentityRedisKey(platform, teamId, userId), kiloUserId);
 }
 
 /**
@@ -46,7 +48,8 @@ export async function unlinkKiloUser(
   state: StateAdapter,
   identity: PlatformIdentity
 ): Promise<void> {
-  await state.delete(botIdentityRedisKey(identity.platform, identity.teamId, identity.userId));
+  const { platform, teamId, userId } = identity;
+  await state.delete(botIdentityRedisKey(platform, teamId, userId));
 }
 
 // -- HMAC-signed link tokens --------------------------------------------------

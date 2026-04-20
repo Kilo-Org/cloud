@@ -35,6 +35,14 @@ type ResolveAutoModelParams = {
   sessionId: string | null;
 };
 
+function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
+  const modeResult =
+    featureHeader === 'kiloclaw' || featureHeader === 'openclaw'
+      ? { success: true, data: 'KiloClaw' as const }
+      : modeSchema.safeParse(modeHeader?.trim() ?? '');
+  return modeResult.success ? modeResult.data : null;
+}
+
 export async function resolveAutoModel(
   params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
@@ -57,11 +65,7 @@ export async function resolveAutoModel(
         (await balancePromise) > 0 ? GEMMA_4_31B_IT_ID : gemma_4_26b_a4b_it_free_model.public_id,
     };
   }
-  const modeResult =
-    featureHeader === 'kiloclaw' || featureHeader === 'openclaw'
-      ? { success: true, data: 'KiloClaw' as const }
-      : modeSchema.safeParse(modeHeader?.trim() ?? '');
-  const mode = modeResult.success ? modeResult.data : null;
+  const mode = resolveMode(modeHeader, featureHeader);
   if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
     if (featureHeader === 'kiloclaw') {
       const user = await userPromise;

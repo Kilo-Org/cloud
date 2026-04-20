@@ -40,6 +40,7 @@ import {
   KiloClawPlan,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
+  KiloClawProvider,
   KiloClawSubscriptionStatus,
   KiloClawPaymentSource,
   KiloClawSubscriptionAccessOrigin,
@@ -135,6 +136,10 @@ export type AffiliateEventPayloadJson = {
   itemName?: string | null;
   itemSku?: string | null;
   promoCode?: string | null;
+  stripeChargeId?: string | null;
+  impactActionId?: string | null;
+  impactSubmissionUri?: string | null;
+  disputeId?: string | null;
 };
 
 export const credit_transactions = pgTable(
@@ -233,6 +238,7 @@ export const kilocode_users = pgTable(
     openrouter_upstream_safety_identifier: text(),
     vercel_downstream_safety_identifier: text(),
     customer_source: text(),
+    signup_ip: text(),
     account_deletion_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
 
     normalized_email: text(),
@@ -240,6 +246,7 @@ export const kilocode_users = pgTable(
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
+    index('IDX_kilocode_users_signup_ip_created_at').on(table.signup_ip, table.created_at),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
@@ -297,6 +304,9 @@ export const user_affiliate_events = pgTable(
       .$type<AffiliateEventDeliveryState>()
       .default(AffiliateEventDeliveryState.Queued),
     payload_json: jsonb().$type<AffiliateEventPayloadJson>().notNull(),
+    stripe_charge_id: text(),
+    impact_action_id: text(),
+    impact_submission_uri: text(),
     attempt_count: integer().notNull().default(0),
     next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
     claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -318,6 +328,11 @@ export const user_affiliate_events = pgTable(
       table.id
     ),
     index('IDX_user_affiliate_events_parent_event_id').on(table.parent_event_id),
+    index('IDX_user_affiliate_events_provider_event_type_charge').on(
+      table.provider,
+      table.event_type,
+      table.stripe_charge_id
+    ),
     enumCheck('user_affiliate_events_provider_check', table.provider, AffiliateProvider),
     enumCheck('user_affiliate_events_event_type_check', table.event_type, AffiliateEventType),
     enumCheck(
@@ -333,6 +348,28 @@ export const user_affiliate_events = pgTable(
 );
 
 export type UserAffiliateEvent = typeof user_affiliate_events.$inferSelect;
+
+export const pending_impact_sale_reversals = pgTable(
+  'pending_impact_sale_reversals',
+  {
+    stripe_charge_id: text().primaryKey().notNull(),
+    dispute_id: text().notNull(),
+    amount: real().notNull(),
+    currency: text().notNull(),
+    event_date: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    attempt_count: integer().notNull().default(0),
+    last_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    check(
+      'pending_impact_sale_reversals_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type PendingImpactSaleReversal = typeof pending_impact_sale_reversals.$inferSelect;
 
 export const kilo_pass_subscriptions = pgTable(
   'kilo_pass_subscriptions',
@@ -3680,6 +3717,7 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id),
     sandbox_id: text().notNull(),
+    provider: text().$type<KiloClawProvider>().notNull().default(KiloClawProvider.Fly),
     // Null = personal instance. Non-null = org-owned instance.
     organization_id: uuid().references(() => organizations.id),
     name: text(),
@@ -4023,6 +4061,9 @@ export const kiloclaw_email_log = pgTable(
       .where(isNull(table.instance_id)),
     uniqueIndex('UQ_kiloclaw_email_log_user_instance_type')
       .on(table.user_id, table.instance_id, table.email_type)
+      .where(isNotNull(table.instance_id)),
+    index('IDX_kiloclaw_email_log_type_sent_instance')
+      .on(table.email_type, table.sent_at, table.instance_id, table.user_id)
       .where(isNotNull(table.instance_id)),
   ]
 );

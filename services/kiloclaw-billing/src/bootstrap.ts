@@ -13,7 +13,6 @@ import {
 import type { BillingWorkerEnv } from './types.js';
 import { logger } from './logger.js';
 
-const KILOCLAW_EARLYBIRD_EXPIRY_DATE = '2026-09-26';
 const PERSONAL_TRIAL_DURATION_DAYS = 7;
 const ORGANIZATION_TRIAL_DURATION_DAYS = 14;
 const BOOTSTRAP_ACTOR = {
@@ -162,11 +161,12 @@ async function bootstrapOrganizationSubscription(
     throw new Error('Organization not found during subscription bootstrap');
   }
 
-  const hasManagedActiveAccess =
-    latestSeatPurchase?.subscriptionStatus === 'active' ||
-    !organization.requireSeats ||
-    organization.settings.oss_sponsorship_tier != null ||
-    !!organization.settings.suppress_trial_messaging;
+  // Org billing has not rolled out yet. Every org instance gets managed-active
+  // access as a free trial until paid org billing ships. When billing rolls
+  // out, restore the spec-defined classifier (active seat purchase ||
+  // !requireSeats || oss_sponsorship_tier || suppress_trial_messaging) and
+  // keep it aligned with apps/web/src/scripts/db/kiloclaw-subscription-alignment.ts.
+  const hasManagedActiveAccess = true;
 
   logger
     .withFields({
@@ -487,35 +487,33 @@ async function bootstrapPersonalSubscription(
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
   const now = new Date();
 
-  const [existingForInstance, subscriptions, instances, earlybirdPurchase] = await Promise.all([
-    db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.instance_id, input.instanceId))
-      .limit(1)
-      .then(rows => rows[0] ?? null),
-    db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, input.userId)),
-    db
-      .select({
-        id: kiloclaw_instances.id,
-        destroyedAt: kiloclaw_instances.destroyed_at,
-        organizationId: kiloclaw_instances.organization_id,
-      })
-      .from(kiloclaw_instances)
-      .where(eq(kiloclaw_instances.user_id, input.userId)),
-    db
-      .select({
-        id: kiloclaw_earlybird_purchases.id,
-        createdAt: kiloclaw_earlybird_purchases.created_at,
-      })
-      .from(kiloclaw_earlybird_purchases)
-      .where(eq(kiloclaw_earlybird_purchases.user_id, input.userId))
-      .limit(1)
-      .then(rows => rows[0] ?? null),
-  ]);
+  const [existingForInstance, subscriptions, instances, legacyEarlybirdPurchase] =
+    await Promise.all([
+      db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.instance_id, input.instanceId))
+        .limit(1)
+        .then(rows => rows[0] ?? null),
+      db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.user_id, input.userId)),
+      db
+        .select({
+          id: kiloclaw_instances.id,
+          destroyedAt: kiloclaw_instances.destroyed_at,
+          organizationId: kiloclaw_instances.organization_id,
+        })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.user_id, input.userId)),
+      db
+        .select({ id: kiloclaw_earlybird_purchases.id })
+        .from(kiloclaw_earlybird_purchases)
+        .where(eq(kiloclaw_earlybird_purchases.user_id, input.userId))
+        .limit(1)
+        .then(rows => rows[0] ?? null),
+    ]);
 
   if (existingForInstance) {
     logger
@@ -602,10 +600,7 @@ async function bootstrapPersonalSubscription(
     });
   }
 
-  const hasActiveEarlybirdAccess =
-    !!earlybirdPurchase && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE).getTime() > now.getTime();
-
-  if (personalSubscriptions.length > 0 && !hasActiveEarlybirdAccess) {
+  if (personalSubscriptions.length > 0) {
     logger
       .withFields({
         decision: 'rejected_non_access_granting_rows_present',
@@ -619,45 +614,36 @@ async function bootstrapPersonalSubscription(
     );
   }
 
+  if (legacyEarlybirdPurchase) {
+    logger
+      .withFields({
+        decision: 'rejected_legacy_earlybird_purchase_only',
+      })
+      .error(
+        'Personal bootstrap: refusing to create trial — legacy earlybird purchase requires manual remediation'
+      );
+    throw new Error(
+      'Cannot bootstrap personal subscription for legacy earlybird purchase without canonical row'
+    );
+  }
+
   logger
     .withFields({
-      decision: earlybirdPurchase ? 'fresh_earlybird_row' : 'fresh_trial_row',
+      decision: 'fresh_trial_row',
     })
-    .info(
-      earlybirdPurchase
-        ? 'Personal bootstrap: creating earlybird row'
-        : 'Personal bootstrap: creating fresh trial row'
-    );
+    .info('Personal bootstrap: creating fresh trial row');
 
-  const { row: created, created: wasInserted } = await insertSubscriptionIdempotent(
-    db,
-    earlybirdPurchase
-      ? {
-          user_id: input.userId,
-          instance_id: input.instanceId,
-          plan: 'trial',
-          status:
-            new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE).getTime() > now.getTime()
-              ? 'trialing'
-              : 'canceled',
-          access_origin: 'earlybird',
-          payment_source: null,
-          cancel_at_period_end: false,
-          trial_started_at: earlybirdPurchase.createdAt,
-          trial_ends_at: KILOCLAW_EARLYBIRD_EXPIRY_DATE,
-        }
-      : {
-          user_id: input.userId,
-          instance_id: input.instanceId,
-          plan: 'trial',
-          status: 'trialing',
-          access_origin: null,
-          payment_source: null,
-          cancel_at_period_end: false,
-          trial_started_at: now.toISOString(),
-          trial_ends_at: getTrialEndsAt(now),
-        }
-  );
+  const { row: created, created: wasInserted } = await insertSubscriptionIdempotent(db, {
+    user_id: input.userId,
+    instance_id: input.instanceId,
+    plan: 'trial',
+    status: 'trialing',
+    access_origin: null,
+    payment_source: null,
+    cancel_at_period_end: false,
+    trial_started_at: now.toISOString(),
+    trial_ends_at: getTrialEndsAt(now),
+  });
 
   if (!wasInserted) {
     logger
@@ -673,7 +659,7 @@ async function bootstrapPersonalSubscription(
     subscriptionId: created.id,
     actor: BOOTSTRAP_ACTOR,
     action: 'created',
-    reason: earlybirdPurchase ? 'personal_provision_earlybird' : 'personal_provision_trial',
+    reason: 'personal_provision_trial',
     before: null,
     after: created,
   });

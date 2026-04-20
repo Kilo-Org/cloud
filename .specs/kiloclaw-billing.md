@@ -96,10 +96,14 @@ multiple instances, each with its own subscription and renewal cycle.
 All subscriptions deduct from the same user credit balance.
 
 New users who provision an instance without subscribing first
-automatically receive a 7-day free trial. A legacy earlybird purchase
-also grants access until a fixed expiry date. A periodic background job
-enforces expiry, credit renewal, suspension, and eventual instance
-destruction when access lapses, with email notifications at each stage.
+automatically receive a 7-day free trial. Legacy
+`kiloclaw_earlybird_purchases` rows without canonical subscription rows
+MUST NOT mint fresh trial access and instead require manual
+remediation. Canonical earlybird subscription rows continue to grant
+access until their recorded expiry.
+A periodic background job enforces expiry, credit renewal, suspension,
+and eventual instance destruction when access lapses, with email
+notifications at each stage.
 
 ## Rules
 
@@ -211,10 +215,10 @@ rules resolve conflicts.
    instance for the first time. There is no user-facing "start trial"
    action; the trial is bootstrapped during provisioning.
 2. The system MUST create a trial only if the user has no existing
-   subscription record and no earlybird purchase. The instance-record
-   check is not needed at provisioning time because provisioning itself
-   creates the instance, but the billing status endpoint includes the
-   instance check as defense in depth.
+   subscription record. The instance-record check is not needed at
+   provisioning time because provisioning itself creates the instance,
+   but the billing status endpoint includes the instance check as
+   defense in depth.
 3. When a trial is created, the system MUST record the trial start
    timestamp and an end timestamp exactly 7 days later.
 4. The system MUST NOT require a credit card to start a trial.
@@ -260,8 +264,8 @@ rules resolve conflicts.
    and the subscription has not been suspended.
 3. The system MUST grant access when the subscription status is trialing
    and the trial end date is in the future.
-4. The system MUST grant access when the user holds a legacy earlybird
-   purchase and the earlybird expiry date is in the future.
+4. The system MUST grant access when a canonical earlybird subscription
+   row remains in an access-granting state.
 5. When earlybird access expires, the system MUST NOT automatically
    transition the user to a trial or any other plan; the user MUST
    manually subscribe to regain access.
@@ -796,11 +800,15 @@ rows renew.
 
 ### Earlybird Expiry Warnings
 
-1. When the earlybird expiry date is 14 or fewer days away, the system
-   MUST send a warning notification to earlybird users who do not have
-   an active or trialing subscription.
-2. When the earlybird expiry date is 1 or fewer days away, the system
-   MUST send a more urgent expires-tomorrow notification.
+1. When a canonical earlybird subscription row's `trial_ends_at` is 14
+   or fewer days away and the user does not have another active or
+   trialing subscription, the system MUST send a warning notification.
+2. When the row's `trial_ends_at` is 1 or fewer days away, the system
+   MUST send a more urgent expires-tomorrow notification instead of
+   the 14-day notification.
+3. The notification's expiry date and days-remaining MUST be derived
+   from the row's `trial_ends_at`, not from a globally configured
+   earlybird expiry constant.
 
 ### Trial Expiry Enforcement
 
@@ -924,7 +932,7 @@ rows renew.
    earlybird).
 2. The system MUST report trial eligibility as true only when the user
    has no instance records at all (including destroyed instances), no
-   subscription record, and no earlybird purchase.
+   subscription record.
 3. The billing status MUST include trial data (start, end, days
    remaining, expired flag) when a trial exists or existed.
 4. The billing status MUST include subscription data (plan, status,
@@ -952,7 +960,7 @@ rows renew.
    indicator signaling that the standalone-to-credit conversion
    prompt should be shown (see Standalone-to-Credit Conversion).
 8. The billing status MUST include earlybird data (expiry date, days
-   remaining) when the user has an earlybird purchase.
+   remaining) only when a canonical earlybird subscription row exists.
 9. The billing status MUST include instance data (whether an
    undestroyed instance exists, suspension timestamp, destruction
    deadline, and destroyed flag) when any instance record exists.

@@ -576,6 +576,34 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
     );
     expect(result).toEqual(restoredSuccessor);
   });
+
+  it('refuses fresh-trial bootstrap for legacy earlybird purchase without canonical row', async () => {
+    const { db, insertValues, updateSets } = createMockDb({
+      selectRows: [
+        [],
+        [],
+        [{ id: 'instance-new', destroyedAt: null, organizationId: null }],
+        [{ id: 'earlybird-purchase' }],
+      ],
+      txSelectRows: [],
+      insertReturningRows: [],
+      updateReturningRows: [],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    await expect(
+      bootstrapProvisionSubscription(createEnv(), {
+        userId: 'user-1',
+        instanceId: 'instance-new',
+        orgId: null,
+      })
+    ).rejects.toThrow(
+      'Cannot bootstrap personal subscription for legacy earlybird purchase without canonical row'
+    );
+
+    expect(insertValues).toHaveLength(0);
+    expect(updateSets).toHaveLength(0);
+  });
 });
 
 type FreshInsertDbParams = {
@@ -681,7 +709,7 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
         [], // existingForInstance (none seen yet — TOCTOU window)
         [], // subscriptions for user
         [], // instances for user
-        [], // earlybirdPurchase
+        [], // legacy earlybird purchase
         [winnerRow], // reselect after conflict
       ],
       insertFirstReturningRows: [], // onConflictDoNothing swallowed our insert

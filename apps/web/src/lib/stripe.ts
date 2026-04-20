@@ -54,6 +54,7 @@ import {
   handleKiloClawScheduleEvent,
   handleKiloClawInvoicePaid,
 } from '@/lib/kiloclaw/stripe-handlers';
+import { enqueueImpactSaleReversalForCharge } from '@/lib/affiliate-events';
 import { invoiceLooksLikeKiloClawByPriceId } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import {
   STRIPE_TEAMS_MONTHLY_PRICE_ID,
@@ -63,6 +64,18 @@ import {
 } from '@/lib/config.server';
 import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organization-types';
 import { successResult } from '@/lib/maybe-result';
+
+async function isKiloClawCharge(chargeId: string): Promise<boolean> {
+  // The `invoice` field is present at runtime on charges but removed from newer
+  // Stripe TypeScript definitions. Read the response as a structural type.
+  // Errors (Stripe outage, network) propagate so the webhook returns non-2xx and
+  // Stripe retries delivery — avoids both silent drops and false backlog.
+  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
+    await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+  const invoice = charge.invoice;
+  if (!invoice || typeof invoice === 'string') return false;
+  return invoiceLooksLikeKiloClawByPriceId(invoice);
+}
 
 if (!APP_URL) throw new Error('APP_URL constant is not set');
 
@@ -761,6 +774,32 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
+      break;
+    }
+
+    case 'charge.dispute.created': {
+      const dispute = event.data.object;
+      const chargeId =
+        typeof dispute.charge === 'string' ? dispute.charge : (dispute.charge?.id ?? null);
+      if (!chargeId) {
+        break;
+      }
+
+      // Only enqueue reversals for KiloClaw charges — those are the only ones
+      // that produce affiliate sale events. Non-KiloClaw disputes (Kilo Pass,
+      // top-ups, etc.) would otherwise accumulate in pending_impact_sale_reversals
+      // forever because they will never have a matching sale row.
+      if (!(await isKiloClawCharge(chargeId))) {
+        break;
+      }
+
+      await enqueueImpactSaleReversalForCharge({
+        stripeChargeId: chargeId,
+        disputeId: dispute.id,
+        amount: dispute.amount / 100,
+        currency: dispute.currency,
+        eventDate: new Date(dispute.created * 1000),
+      });
       break;
     }
 

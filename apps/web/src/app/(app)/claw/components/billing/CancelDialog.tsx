@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
@@ -24,21 +24,40 @@ type CancelDialogProps = {
 export function CancelDialog({ open, onOpenChange, billing }: CancelDialogProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const cancelMutation = useMutation(trpc.kiloclaw.cancelSubscription.mutationOptions());
+  const cancelMutation = useMutation(trpc.kiloclaw.cancelSubscriptionAtInstance.mutationOptions());
+  const instanceId = billing.instance?.id ?? null;
 
   const isCommit = billing.subscription?.plan === 'commit';
   const periodEnd = billing.subscription?.currentPeriodEnd;
 
   async function handleConfirm() {
-    await cancelMutation.mutateAsync();
-    void queryClient.invalidateQueries({
-      queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
-    });
+    if (!instanceId || cancelMutation.isPending) return;
+    await cancelMutation.mutateAsync({ instanceId });
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({ instanceId }),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
+      }),
+    ]);
     onOpenChange(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={nextOpen => !cancelMutation.isPending && onOpenChange(nextOpen)}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -61,11 +80,26 @@ export function CancelDialog({ open, onOpenChange, billing }: CancelDialogProps)
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={cancelMutation.isPending}
+          >
             Keep Subscription
           </Button>
-          <Button variant="destructive" onClick={handleConfirm}>
-            Cancel Subscription
+          <Button
+            variant="destructive"
+            onClick={handleConfirm}
+            disabled={cancelMutation.isPending || !instanceId}
+          >
+            {cancelMutation.isPending ? (
+              <>
+                <Loader2 className="animate-spin" />
+                Canceling...
+              </>
+            ) : (
+              'Cancel Subscription'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

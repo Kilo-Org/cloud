@@ -16,11 +16,7 @@ import {
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
-import {
-  KILOCLAW_API_URL,
-  STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID,
-  STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID,
-} from '@/lib/config.server';
+import { KILOCLAW_API_URL } from '@/lib/config.server';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
@@ -69,6 +65,7 @@ import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
+import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
   getStripePriceIdForClawPlan,
   getStripePriceIdForClawPlanIntro,
@@ -78,8 +75,10 @@ import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
-import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
-import { getKiloClawSubscriptionAccessReason } from '@/lib/kiloclaw/access-state';
+import {
+  getKiloClawEarlybirdStateForUser,
+  getKiloClawSubscriptionAccessReason,
+} from '@/lib/kiloclaw/access-state';
 import {
   enrollWithCredits as enrollWithCreditsImpl,
   getEffectiveCreditBalancePreview,
@@ -151,18 +150,6 @@ function mapCurrentSubscriptionResolutionError(error: unknown): never {
     });
   }
   throw error;
-}
-
-async function getEarlybirdPurchaseRow(
-  userId: string,
-  executor: typeof db | DrizzleTransaction = db
-): Promise<{ id: string } | null> {
-  const [earlybird] = await executor
-    .select({ id: kiloclaw_earlybird_purchases.id })
-    .from(kiloclaw_earlybird_purchases)
-    .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
-    .limit(1);
-  return earlybird ?? null;
 }
 
 async function resolveDetachedAccessGrantingPersonalSubscription(params: {
@@ -261,10 +248,7 @@ async function resolvePersonalBillingAnchor(params: {
   currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
 }> {
   const executor = params.executor ?? db;
-  const now = new Date();
   const activeInstance = await getActiveInstance(params.userId, executor);
-  const earlybird = await getEarlybirdPurchaseRow(params.userId, executor);
-  const hasActiveEarlybirdAccess = !!earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now;
   const [anySubscription] = await executor
     .select({ id: kiloclaw_subscriptions.id })
     .from(kiloclaw_subscriptions)
@@ -289,7 +273,7 @@ async function resolvePersonalBillingAnchor(params: {
       })
     : null;
 
-  if (activeInstance && !currentRow && !hasActiveEarlybirdAccess && anySubscription) {
+  if (activeInstance && !currentRow && anySubscription) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Active KiloClaw instance is missing its current billing row.',
@@ -899,18 +883,23 @@ async function ensureProvisionAccess(
 }> {
   const now = new Date();
   const activeInstance = await getActiveInstance(userId, executor);
-  const earlybird = await getEarlybirdPurchaseRow(userId, executor);
-  const hasActiveEarlybirdAccess = !!earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now;
   const detachedAccessGrantingSubscription =
     await resolveDetachedAccessGrantingPersonalSubscription({
       userId,
       executor,
     });
-  const [anySubscription] = await executor
-    .select({ id: kiloclaw_subscriptions.id })
-    .from(kiloclaw_subscriptions)
-    .where(eq(kiloclaw_subscriptions.user_id, userId))
-    .limit(1);
+  const [[anySubscription], [legacyEarlybirdPurchase]] = await Promise.all([
+    executor
+      .select({ id: kiloclaw_subscriptions.id })
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, userId))
+      .limit(1),
+    executor
+      .select({ id: kiloclaw_earlybird_purchases.id })
+      .from(kiloclaw_earlybird_purchases)
+      .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
+      .limit(1),
+  ]);
   let currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
   try {
     currentRow = await resolveCurrentPersonalSubscriptionRow({
@@ -921,19 +910,22 @@ async function ensureProvisionAccess(
     mapCurrentSubscriptionResolutionError(error);
   }
 
-  if (
-    activeInstance &&
-    !currentRow &&
-    !detachedAccessGrantingSubscription &&
-    !hasActiveEarlybirdAccess
-  ) {
-    if (!anySubscription) {
-      return {
-        instanceId: activeInstance.id,
-        bootstrapSubscription: true,
-        shouldEnqueueTrialStartAffiliate: true,
-      };
-    }
+  if (legacyEarlybirdPurchase && !currentRow && !detachedAccessGrantingSubscription) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'Legacy earlybird access requires manual remediation before reprovisioning.',
+    });
+  }
+
+  if (activeInstance && !currentRow && !detachedAccessGrantingSubscription && !anySubscription) {
+    return {
+      instanceId: activeInstance.id,
+      bootstrapSubscription: true,
+      shouldEnqueueTrialStartAffiliate: true,
+    };
+  }
+
+  if (activeInstance && !currentRow && !detachedAccessGrantingSubscription) {
     throw new TRPCError({
       code: 'CONFLICT',
       message: 'Active KiloClaw instance is missing its current billing row.',
@@ -955,14 +947,6 @@ async function ensureProvisionAccess(
     };
   }
 
-  if (hasActiveEarlybirdAccess) {
-    return {
-      instanceId: activeInstance?.id ?? null,
-      bootstrapSubscription: false,
-      shouldEnqueueTrialStartAffiliate: false,
-    };
-  }
-
   if (detachedAccessGrantingSubscription) {
     return {
       instanceId: activeInstance?.id ?? null,
@@ -971,7 +955,7 @@ async function ensureProvisionAccess(
     };
   }
 
-  if (!anySubscription && !earlybird) {
+  if (!anySubscription) {
     return {
       instanceId: activeInstance?.id ?? null,
       bootstrapSubscription: activeInstance !== null,
@@ -1062,6 +1046,183 @@ function normalizeTimestamp(value: string | null | undefined): string | null {
 
   const parsed = dayjs(value).utc();
   return parsed.isValid() ? parsed.toISOString() : value;
+}
+
+async function getPersonalBillingStatus(user: {
+  id: string;
+  total_microdollars_acquired: number;
+  microdollars_used: number;
+  kilo_pass_threshold: number | null;
+}): Promise<ClawBillingStatus> {
+  const now = new Date();
+  const { currentPersonalInstance, subscription: sub } =
+    await getDisplayedPersonalKiloclawSubscription({
+      userId: user.id,
+      now,
+    });
+
+  const accessReason: 'trial' | 'subscription' | 'earlybird' | null =
+    getKiloClawSubscriptionAccessReason(sub, now);
+  const hasAccess = accessReason !== null;
+
+  const trialData =
+    sub?.status === 'trialing' || (sub?.trial_started_at && sub?.trial_ends_at)
+      ? {
+          startedAt: sub.trial_started_at ?? sub.created_at,
+          endsAt: sub.trial_ends_at ?? '',
+          daysRemaining: sub.trial_ends_at
+            ? Math.max(
+                0,
+                Math.floor((new Date(sub.trial_ends_at).getTime() - now.getTime()) / 86_400_000)
+              )
+            : 0,
+          expired: sub.trial_ends_at ? new Date(sub.trial_ends_at) <= now : false,
+        }
+      : null;
+
+  const hasPaidSubscription =
+    sub &&
+    sub.plan !== 'trial' &&
+    sub.status !== 'trialing' &&
+    (sub.stripe_subscription_id || sub.payment_source === 'credits');
+
+  const hasStripeFunding = hasPaidSubscription ? !!sub.stripe_subscription_id : false;
+  const kiloPassState = await getKiloPassStateForUser(db, user.id);
+  const hasActiveKiloPass = !!kiloPassState && !isStripeSubscriptionEnded(kiloPassState.status);
+  const showConversionPrompt = hasStripeFunding && hasActiveKiloPass;
+  const renewalCostMicrodollars =
+    hasPaidSubscription && (sub.plan === 'standard' || sub.plan === 'commit')
+      ? KILOCLAW_PLAN_COST_MICRODOLLARS[sub.plan]
+      : null;
+
+  const subscriptionData = hasPaidSubscription
+    ? {
+        plan: sub.plan as 'commit' | 'standard',
+        status: sub.status as 'active' | 'past_due' | 'canceled' | 'unpaid',
+        cancelAtPeriodEnd: sub.cancel_at_period_end,
+        currentPeriodEnd: normalizeTimestamp(sub.current_period_end) ?? '',
+        commitEndsAt: normalizeTimestamp(sub.commit_ends_at),
+        scheduledPlan: sub.scheduled_plan,
+        scheduledBy: sub.scheduled_by,
+        hasStripeFunding,
+        paymentSource: sub.payment_source ?? null,
+        creditRenewalAt: normalizeTimestamp(sub.credit_renewal_at),
+        renewalCostMicrodollars,
+        showConversionPrompt,
+        pendingConversion: sub.pending_conversion ?? false,
+      }
+    : null;
+
+  const isEarlybird = sub?.access_origin === 'earlybird';
+  const earlybirdExpiresAt = isEarlybird
+    ? (sub.trial_ends_at ?? KILOCLAW_EARLYBIRD_EXPIRY_DATE)
+    : null;
+  const earlybirdData =
+    isEarlybird && earlybirdExpiresAt
+      ? {
+          purchased: true,
+          expiresAt: earlybirdExpiresAt,
+          daysRemaining: Math.ceil(
+            (new Date(earlybirdExpiresAt).getTime() - Date.now()) / 86_400_000
+          ),
+        }
+      : null;
+
+  let instanceData: ClawBillingStatus['instance'] = null;
+  if (currentPersonalInstance) {
+    const isDestroyed = currentPersonalInstance.destroyed_at !== null;
+    instanceData = {
+      id: currentPersonalInstance.id,
+      exists: !isDestroyed,
+      status: null,
+      suspendedAt: sub?.suspended_at ?? null,
+      destructionDeadline: sub?.destruction_deadline ?? null,
+      destroyed: isDestroyed,
+    };
+  }
+
+  const [anySubscription, anyPersonalInstance] = await Promise.all([
+    db
+      .select({ id: kiloclaw_subscriptions.id })
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1)
+      .then(rows => rows[0] ?? null),
+    db
+      .select({ id: kiloclaw_instances.id })
+      .from(kiloclaw_instances)
+      .where(
+        and(
+          eq(kiloclaw_instances.user_id, user.id),
+          isNull(kiloclaw_instances.organization_id),
+          isNull(kiloclaw_instances.destroyed_at)
+        )
+      )
+      .limit(1)
+      .then(rows => rows[0] ?? null),
+  ]);
+
+  const creditIntroEligible = !(await hadPriorPaidSubscription(user.id));
+  const creditBalanceMicrodollars = user.total_microdollars_acquired - user.microdollars_used;
+  const standardCreditCostMicrodollars = creditIntroEligible
+    ? KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS
+    : KILOCLAW_PLAN_COST_MICRODOLLARS.standard;
+  const [standardCreditEnrollmentPreview, commitCreditEnrollmentPreview] = await Promise.all([
+    getEffectiveCreditBalancePreview({
+      userId: user.id,
+      balanceMicrodollars: creditBalanceMicrodollars,
+      microdollarsUsed: user.microdollars_used,
+      kiloPassThreshold: user.kilo_pass_threshold,
+      costMicrodollars: standardCreditCostMicrodollars,
+      subscription: kiloPassState,
+    }),
+    getEffectiveCreditBalancePreview({
+      userId: user.id,
+      balanceMicrodollars: creditBalanceMicrodollars,
+      microdollarsUsed: user.microdollars_used,
+      kiloPassThreshold: user.kilo_pass_threshold,
+      costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
+      subscription: kiloPassState,
+    }),
+  ]);
+
+  return {
+    hasAccess,
+    accessReason,
+    trialEligible: !anyPersonalInstance && !anySubscription,
+    creditBalanceMicrodollars,
+    creditIntroEligible,
+    hasActiveKiloPass,
+    creditEnrollmentPreview: {
+      standard: {
+        costMicrodollars: standardCreditCostMicrodollars,
+        ...standardCreditEnrollmentPreview,
+      },
+      commit: {
+        costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
+        ...commitCreditEnrollmentPreview,
+      },
+    },
+    trial: trialData,
+    subscription: subscriptionData,
+    earlybird: earlybirdData,
+    instance: instanceData,
+  } satisfies ClawBillingStatus;
+}
+
+function summarizePersonalBillingStatus(billing: ClawBillingStatus) {
+  const hasActiveInstance = billing.instance?.exists ?? false;
+  const activeInstanceId = hasActiveInstance ? (billing.instance?.id ?? null) : null;
+
+  return {
+    hasActiveInstance,
+    activeInstanceHasAccess: hasActiveInstance && billing.hasAccess,
+    activeInstanceId,
+    creditBalanceMicrodollars: billing.creditBalanceMicrodollars,
+    creditIntroEligible: billing.creditIntroEligible,
+    hasActiveKiloPass: billing.hasActiveKiloPass,
+    creditEnrollmentPreview: billing.creditEnrollmentPreview,
+  };
 }
 
 function serializeKiloclawPersonalSubscription(
@@ -1933,7 +2094,23 @@ export const kiloclawRouter = createTRPCRouter({
         .where(
           and(
             eq(kiloclaw_email_log.user_id, ctx.user.id),
-            sql`${kiloclaw_email_log.email_type} LIKE 'claw_instance_ready:%'`
+            or(
+              destroyedRow
+                ? and(
+                    eq(kiloclaw_email_log.instance_id, destroyedRow.id),
+                    eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
+                  )
+                : undefined,
+              destroyedRow
+                ? and(
+                    isNull(kiloclaw_email_log.instance_id),
+                    eq(
+                      kiloclaw_email_log.email_type,
+                      `claw_instance_ready:${destroyedRow.sandboxId}`
+                    )
+                  )
+                : undefined
+            )
           )
         );
 
@@ -2540,76 +2717,17 @@ export const kiloclawRouter = createTRPCRouter({
   getEarlybirdStatus: baseProcedure
     .output(z.object({ purchased: z.boolean() }))
     .query(async ({ ctx }) => {
-      const rows = await db
-        .select({ id: kiloclaw_earlybird_purchases.id })
-        .from(kiloclaw_earlybird_purchases)
-        .where(eq(kiloclaw_earlybird_purchases.user_id, ctx.user.id))
-        .limit(1);
-      return { purchased: rows.length > 0 };
+      const state = await getKiloClawEarlybirdStateForUser(ctx.user.id);
+      return { purchased: state.purchased };
     }),
 
   createEarlybirdCheckoutSession: baseProcedure
     .output(z.object({ url: z.url().nullable() }))
-    .mutation(async ({ ctx }) => {
-      const existing = await db
-        .select({ id: kiloclaw_earlybird_purchases.id })
-        .from(kiloclaw_earlybird_purchases)
-        .where(eq(kiloclaw_earlybird_purchases.user_id, ctx.user.id))
-        .limit(1);
-
-      if (existing.length > 0) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'You have already purchased the early bird offer.',
-        });
-      }
-
-      const stripeCustomerId = ctx.user.stripe_customer_id;
-      if (!stripeCustomerId) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Missing Stripe customer for user.',
-        });
-      }
-
-      if (!STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Early bird pricing is not configured.',
-        });
-      }
-
-      const session = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        customer: stripeCustomerId,
-        billing_address_collection: 'required',
-        line_items: [{ price: STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID, quantity: 1 }],
-        ...(STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID
-          ? { discounts: [{ coupon: STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID }] }
-          : { allow_promotion_codes: true }),
-        customer_update: {
-          name: 'auto',
-          address: 'auto',
-        },
-        tax_id_collection: {
-          enabled: true,
-          required: 'never',
-        },
-        payment_intent_data: {
-          metadata: {
-            type: 'kiloclaw-earlybird',
-            kiloUserId: ctx.user.id,
-          },
-        },
-        success_url: `${APP_URL}/claw?earlybird_checkout=success`,
-        cancel_url: `${APP_URL}/claw/earlybird?checkout=cancelled`,
-        metadata: {
-          type: 'kiloclaw-earlybird',
-          kiloUserId: ctx.user.id,
-        },
+    .mutation(async () => {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Earlybird offer is no longer available.',
       });
-
-      return { url: typeof session.url === 'string' ? session.url : null };
     }),
 
   // User version pinning endpoints
@@ -2912,183 +3030,16 @@ export const kiloclawRouter = createTRPCRouter({
   // ── Billing endpoints ────────────────────────────────────────────────
 
   getBillingStatus: baseProcedure.query(async ({ ctx }) => {
-    const now = new Date();
-    const { currentPersonalInstance, subscription: sub } =
-      await getDisplayedPersonalKiloclawSubscription({
-        userId: ctx.user.id,
-        now,
-      });
+    return await getPersonalBillingStatus(ctx.user);
+  }),
 
-    const [earlybird] = await db
-      .select({ id: kiloclaw_earlybird_purchases.id })
-      .from(kiloclaw_earlybird_purchases)
-      .where(eq(kiloclaw_earlybird_purchases.user_id, ctx.user.id))
-      .limit(1);
+  getActivePersonalBillingStatus: baseProcedure.query(async ({ ctx }) => {
+    return await getPersonalBillingStatus(ctx.user);
+  }),
 
-    const earlybirdExpiresAt = KILOCLAW_EARLYBIRD_EXPIRY_DATE;
-    const earlybirdDaysRemaining = earlybird
-      ? Math.ceil((new Date(earlybirdExpiresAt).getTime() - Date.now()) / 86_400_000)
-      : 0;
-
-    let accessReason: 'trial' | 'subscription' | 'earlybird' | null =
-      getKiloClawSubscriptionAccessReason(sub, now);
-    let hasAccess = accessReason !== null;
-
-    if (!hasAccess && earlybird && new Date(earlybirdExpiresAt) > now) {
-      hasAccess = true;
-      accessReason = 'earlybird';
-    }
-
-    const trialData =
-      sub?.status === 'trialing' || (sub?.trial_started_at && sub?.trial_ends_at)
-        ? {
-            startedAt: sub.trial_started_at ?? sub.created_at,
-            endsAt: sub.trial_ends_at ?? '',
-            daysRemaining: sub.trial_ends_at
-              ? Math.max(
-                  0,
-                  Math.floor((new Date(sub.trial_ends_at).getTime() - now.getTime()) / 86_400_000)
-                )
-              : 0,
-            expired: sub.trial_ends_at ? new Date(sub.trial_ends_at) <= now : false,
-          }
-        : null;
-
-    // Include subscription data when a paid subscription exists — either Stripe-funded
-    // (stripe_subscription_id present) or credit-funded (payment_source = 'credits').
-    // See Billing Status Reporting rule 4.
-    const hasPaidSubscription =
-      sub &&
-      sub.plan !== 'trial' &&
-      sub.status !== 'trialing' &&
-      (sub.stripe_subscription_id || sub.payment_source === 'credits');
-
-    // Compute Stripe-funding indicator and Kilo Pass state.
-    // See Billing Status Reporting rules 6-7.
-    const hasStripeFunding = hasPaidSubscription ? !!sub.stripe_subscription_id : false;
-    const kiloPassState = await getKiloPassStateForUser(db, ctx.user.id);
-    const hasActiveKiloPass = !!kiloPassState && !isStripeSubscriptionEnded(kiloPassState.status);
-    const showConversionPrompt = hasStripeFunding && hasActiveKiloPass;
-
-    // Renewal cost for the next billing period.
-    // For hybrid subscriptions the actual amount is Stripe-determined; report
-    // the plan-based approximation per Billing Status Reporting rule 5.
-    const renewalCostMicrodollars =
-      hasPaidSubscription && (sub.plan === 'standard' || sub.plan === 'commit')
-        ? KILOCLAW_PLAN_COST_MICRODOLLARS[sub.plan]
-        : null;
-
-    const subscriptionData = hasPaidSubscription
-      ? {
-          plan: sub.plan as 'commit' | 'standard',
-          status: sub.status as 'active' | 'past_due' | 'canceled' | 'unpaid',
-          cancelAtPeriodEnd: sub.cancel_at_period_end,
-          currentPeriodEnd: normalizeTimestamp(sub.current_period_end) ?? '',
-          commitEndsAt: normalizeTimestamp(sub.commit_ends_at),
-          scheduledPlan: sub.scheduled_plan,
-          scheduledBy: sub.scheduled_by,
-          hasStripeFunding,
-          paymentSource: sub.payment_source ?? null,
-          creditRenewalAt: normalizeTimestamp(sub.credit_renewal_at),
-          renewalCostMicrodollars,
-          showConversionPrompt,
-          pendingConversion: sub.pending_conversion ?? false,
-        }
-      : null;
-
-    const earlybirdData = earlybird
-      ? {
-          purchased: true,
-          expiresAt: earlybirdExpiresAt,
-          daysRemaining: earlybirdDaysRemaining,
-        }
-      : null;
-
-    // Determine instance status from KiloClaw service
-    let instanceData: ClawBillingStatus['instance'] = null;
-    if (currentPersonalInstance) {
-      const isDestroyed = currentPersonalInstance.destroyed_at !== null;
-      instanceData = {
-        exists: !isDestroyed,
-        status: null,
-        suspendedAt: sub?.suspended_at ?? null,
-        destructionDeadline: sub?.destruction_deadline ?? null,
-        destroyed: isDestroyed,
-      };
-    }
-
-    // Trial eligibility must match ensureProvisionAccess: any subscription of
-    // any kind disqualifies, and only an active personal instance row blocks a
-    // first-time personal trial path.
-    const [anySubscription, anyPersonalInstance] = await Promise.all([
-      db
-        .select({ id: kiloclaw_subscriptions.id })
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
-        .limit(1)
-        .then(rows => rows[0] ?? null),
-      db
-        .select({ id: kiloclaw_instances.id })
-        .from(kiloclaw_instances)
-        .where(
-          and(
-            eq(kiloclaw_instances.user_id, ctx.user.id),
-            isNull(kiloclaw_instances.organization_id),
-            isNull(kiloclaw_instances.destroyed_at)
-          )
-        )
-        .limit(1)
-        .then(rows => rows[0] ?? null),
-    ]);
-
-    // First-month credit discount eligibility (spec Credit Enrollment rule 3).
-    const creditIntroEligible = !(await hadPriorPaidSubscription(ctx.user.id));
-    const creditBalanceMicrodollars =
-      ctx.user.total_microdollars_acquired - ctx.user.microdollars_used;
-    const standardCreditCostMicrodollars = creditIntroEligible
-      ? KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS
-      : KILOCLAW_PLAN_COST_MICRODOLLARS.standard;
-    const [standardCreditEnrollmentPreview, commitCreditEnrollmentPreview] = await Promise.all([
-      getEffectiveCreditBalancePreview({
-        userId: ctx.user.id,
-        balanceMicrodollars: creditBalanceMicrodollars,
-        microdollarsUsed: ctx.user.microdollars_used,
-        kiloPassThreshold: ctx.user.kilo_pass_threshold,
-        costMicrodollars: standardCreditCostMicrodollars,
-        subscription: kiloPassState,
-      }),
-      getEffectiveCreditBalancePreview({
-        userId: ctx.user.id,
-        balanceMicrodollars: creditBalanceMicrodollars,
-        microdollarsUsed: ctx.user.microdollars_used,
-        kiloPassThreshold: ctx.user.kilo_pass_threshold,
-        costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
-        subscription: kiloPassState,
-      }),
-    ]);
-
-    return {
-      hasAccess,
-      accessReason,
-      trialEligible: !anyPersonalInstance && !anySubscription && !earlybird,
-      creditBalanceMicrodollars,
-      creditIntroEligible,
-      hasActiveKiloPass,
-      creditEnrollmentPreview: {
-        standard: {
-          costMicrodollars: standardCreditCostMicrodollars,
-          ...standardCreditEnrollmentPreview,
-        },
-        commit: {
-          costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
-          ...commitCreditEnrollmentPreview,
-        },
-      },
-      trial: trialData,
-      subscription: subscriptionData,
-      earlybird: earlybirdData,
-      instance: instanceData,
-    } satisfies ClawBillingStatus;
+  getPersonalBillingSummary: baseProcedure.query(async ({ ctx }) => {
+    const billing = await getPersonalBillingStatus(ctx.user);
+    return summarizePersonalBillingStatus(billing);
   }),
 
   // ── Personal subscription management ─────────────────────────────────

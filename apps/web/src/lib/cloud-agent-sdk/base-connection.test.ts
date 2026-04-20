@@ -2,6 +2,7 @@ import {
   createBaseConnection,
   DEFAULT_STALENESS_TIMEOUT_MS,
   type BaseConnectionConfig,
+  type ConnectionLifecycleHooks,
 } from './base-connection';
 
 type MockWebSocket = {
@@ -18,13 +19,37 @@ type MockWebSocket = {
 let sockets: MockWebSocket[];
 let webSocketMock: jest.Mock;
 
-// The source code guards browser APIs with `typeof document/window !== 'undefined'`.
-// In Jest's node environment these don't exist, so we provide minimal mocks.
+// Test-specific lifecycle hooks that use EventTarget mocks instead of browser globals
 let mockDocument: EventTarget & { visibilityState: string };
 let mockWindow: EventTarget;
 
-let savedDocument: typeof globalThis.document;
-let savedWindow: typeof globalThis.window;
+function createTestLifecycleHooks(): ConnectionLifecycleHooks {
+  return {
+    onVisibilityChange: (onResume, onHidden) => {
+      const handler = () => {
+        if (mockDocument.visibilityState === 'hidden') {
+          onHidden();
+        } else {
+          onResume();
+        }
+      };
+      mockDocument.addEventListener('visibilitychange', handler);
+      return () => mockDocument.removeEventListener('visibilitychange', handler);
+    },
+    onPageshow: handler => {
+      const wrapped = (e: Event) => {
+        const persisted = (e as PageTransitionEvent).persisted;
+        handler({ persisted });
+      };
+      mockWindow.addEventListener('pageshow', wrapped);
+      return () => mockWindow.removeEventListener('pageshow', wrapped);
+    },
+    onOnline: handler => {
+      mockWindow.addEventListener('online', handler);
+      return () => mockWindow.removeEventListener('online', handler);
+    },
+  };
+}
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -50,16 +75,8 @@ beforeEach(() => {
   (global.WebSocket as unknown as Record<string, number>).OPEN = 1;
   (global.WebSocket as unknown as Record<string, number>).CLOSED = 3;
 
-  // Set up minimal document/window so base-connection registers event listeners
   mockDocument = Object.assign(new EventTarget(), { visibilityState: 'visible' });
   mockWindow = new EventTarget();
-
-  savedDocument = globalThis.document;
-  savedWindow = globalThis.window;
-  // @ts-expect-error -- minimal mock for browser globals
-  globalThis.document = mockDocument;
-  // @ts-expect-error -- minimal mock for browser globals
-  globalThis.window = mockWindow;
 });
 
 afterEach(() => {
@@ -67,10 +84,6 @@ afterEach(() => {
   jest.restoreAllMocks();
   // @ts-expect-error -- cleanup test global
   delete global.WebSocket;
-
-  // Restore original document/window (undefined in node)
-  globalThis.document = savedDocument;
-  globalThis.window = savedWindow;
 });
 
 function createTestConnection(overrides: Partial<BaseConnectionConfig> = {}) {
@@ -93,6 +106,7 @@ function createTestConnection(overrides: Partial<BaseConnectionConfig> = {}) {
     onDisconnected,
     onReconnected,
     onUnexpectedDisconnect,
+    lifecycleHooks: createTestLifecycleHooks(),
     ...overrides,
   };
 
@@ -568,6 +582,42 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       expect(docRemovedEvents).toContain('visibilitychange');
       expect(winRemovedEvents).toContain('pageshow');
       expect(winRemovedEvents).toContain('online');
+    });
+  });
+
+  describe('no lifecycle hooks (CLI-like environment)', () => {
+    it('connects and receives messages without lifecycle hooks', () => {
+      const { connection, onConnected, onEvent } = createTestConnection({
+        lifecycleHooks: undefined,
+      });
+      connection.connect();
+      connectSocket(0);
+
+      expect(onConnected).toHaveBeenCalledTimes(1);
+      expect(onEvent).toHaveBeenCalledWith('connected-msg');
+
+      connection.destroy();
+    });
+
+    it('ignores visibility and online events when no lifecycle hooks are provided', () => {
+      const { connection, onDisconnected } = createTestConnection({
+        lifecycleHooks: undefined,
+      });
+      connection.connect();
+      connectSocket(0);
+
+      // These dispatch on mockDocument/mockWindow but should have no effect
+      // since no lifecycle hooks are registered
+      simulateVisibilityChange('hidden');
+      simulateVisibilityChange('visible');
+      simulatePageshow(true);
+      mockWindow.dispatchEvent(new Event('online'));
+
+      // Only the original socket should exist — no reconnect triggered
+      expect(sockets).toHaveLength(1);
+      expect(onDisconnected).not.toHaveBeenCalled();
+
+      connection.destroy();
     });
   });
 });

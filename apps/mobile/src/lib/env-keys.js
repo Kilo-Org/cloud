@@ -3,6 +3,8 @@
 export const ENV_KEYS = {
   apiBaseUrl: 'API_BASE_URL',
   webBaseUrl: 'WEB_BASE_URL',
+  cloudAgentWsUrl: 'CLOUD_AGENT_WS_URL',
+  sessionIngestWsUrl: 'SESSION_INGEST_WS_URL',
   appsFlyerDevKey: 'APPSFLYER_DEV_KEY',
   appsFlyerAppId: 'APPSFLYER_APP_ID',
 };

@@ -1,5 +1,6 @@
 import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
+import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -185,6 +186,61 @@ function throwKiloclawAdminError(
     message: err instanceof Error ? `${fallbackMessage}: ${err.message}` : fallbackMessage,
     cause: err instanceof Error ? err : undefined,
   });
+}
+
+type KiloclawSubscriptionRow = typeof kiloclaw_subscriptions.$inferSelect;
+
+async function clearAdminInstanceDestructionDeadlineWithChangeLog(params: {
+  actorUserId: string;
+  userId: string;
+  instanceId: string;
+  reason: string;
+}) {
+  const [before] = await db
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId)
+      )
+    )
+    .limit(1);
+
+  if (!before) {
+    return;
+  }
+
+  const [after] = await db
+    .update(kiloclaw_subscriptions)
+    .set({ destruction_deadline: null })
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId)
+      )
+    )
+    .returning();
+
+  if (!after) {
+    return;
+  }
+
+  try {
+    await insertKiloClawSubscriptionChangeLog(db, {
+      subscriptionId: after.id,
+      actor: {
+        actorType: 'user',
+        actorId: params.actorUserId,
+      },
+      action: 'admin_override',
+      reason: params.reason,
+      before: before satisfies KiloclawSubscriptionRow,
+      after: after satisfies KiloclawSubscriptionRow,
+    });
+  } catch (error) {
+    console.error('[admin-kiloclaw] Failed to write subscription change log:', error);
+  }
 }
 
 /**
@@ -1313,15 +1369,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     // Post-destroy cleanup: best-effort DB tidying that must not report
     // failure after a successful destroy.
     try {
-      await db
-        .update(kiloclaw_subscriptions)
-        .set({ destruction_deadline: null })
-        .where(
-          and(
-            eq(kiloclaw_subscriptions.user_id, instance.user_id),
-            eq(kiloclaw_subscriptions.instance_id, instance.id)
-          )
-        );
+      await clearAdminInstanceDestructionDeadlineWithChangeLog({
+        actorUserId: ctx.user.id,
+        userId: instance.user_id,
+        instanceId: instance.id,
+        reason: 'admin_destroy_clear_lifecycle_state',
+      });
 
       // Clear lifecycle emails so they can fire again if the user re-provisions.
       const resettableEmailTypes = [
@@ -1336,6 +1389,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         .where(
           and(
             eq(kiloclaw_email_log.user_id, instance.user_id),
+            eq(kiloclaw_email_log.instance_id, instance.id),
             inArray(kiloclaw_email_log.email_type, resettableEmailTypes)
           )
         );
@@ -1345,7 +1399,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         .where(
           and(
             eq(kiloclaw_email_log.user_id, instance.user_id),
-            sql`${kiloclaw_email_log.email_type} LIKE 'claw_instance_ready:%'`
+            or(
+              and(
+                eq(kiloclaw_email_log.instance_id, instance.id),
+                eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
+              ),
+              and(
+                isNull(kiloclaw_email_log.instance_id),
+                eq(kiloclaw_email_log.email_type, `claw_instance_ready:${instance.sandbox_id}`)
+              )
+            )
           )
         );
     } catch (cleanupError) {

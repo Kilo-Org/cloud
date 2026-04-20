@@ -9,10 +9,11 @@ import {
   insertSorted,
   isSupportedDeltaField,
   notify,
+  upsertPartDroppingStaleSyntheticTextParts,
 } from './helpers';
 
-function makePart(id: string, text = ''): Part {
-  return { id, sessionID: 's', messageID: 'm', type: 'text', text } as Part;
+function makePart(id: string, text = '', messageID = 'm'): Part {
+  return { id, sessionID: 's', messageID, type: 'text', text } as Part;
 }
 
 describe('insertSorted', () => {
@@ -51,6 +52,47 @@ describe('insertPartSorted', () => {
     const arr = [makePart('a'), makePart('c')];
     insertPartSorted(arr, makePart('b'));
     expect(arr).toHaveLength(2);
+  });
+});
+
+describe('upsertPartDroppingStaleSyntheticTextParts', () => {
+  test('removes stale synthetic text part when real text part arrives', () => {
+    const syntheticPart = { ...makePart('msg-1-text', 'optimistic'), synthetic: true };
+    const realPart = makePart('prt-real', 'authoritative');
+
+    const result = upsertPartDroppingStaleSyntheticTextParts([syntheticPart], realPart);
+
+    expect(result).toEqual([realPart]);
+  });
+
+  test('preserves synthetic text part for a different message when real text part arrives', () => {
+    const existingSynthetic = { ...makePart('msg-1-text', 'optimistic', 'msg-1'), synthetic: true };
+    const realPart = makePart('prt-real', 'authoritative', 'msg-2');
+
+    const result = upsertPartDroppingStaleSyntheticTextParts([existingSynthetic], realPart);
+
+    expect(result.map(part => part.id)).toEqual(['msg-1-text', 'prt-real']);
+  });
+
+  test('preserves synthetic text part when incoming part is synthetic', () => {
+    const existingSynthetic = { ...makePart('msg-1-text', 'optimistic'), synthetic: true };
+    const incomingSynthetic = { ...makePart('prt-synthetic', 'new'), synthetic: true };
+
+    const result = upsertPartDroppingStaleSyntheticTextParts(
+      [existingSynthetic],
+      incomingSynthetic
+    );
+
+    expect(result.map(part => part.id)).toEqual(['msg-1-text', 'prt-synthetic']);
+  });
+
+  test('preserves synthetic text part when incoming part is non-text', () => {
+    const syntheticPart = { ...makePart('msg-1-text', 'optimistic'), synthetic: true };
+    const toolPart = { id: 'tool-1', sessionID: 's', messageID: 'm', type: 'tool' } as Part;
+
+    const result = upsertPartDroppingStaleSyntheticTextParts([syntheticPart], toolPart);
+
+    expect(result.map(part => part.id)).toEqual(['msg-1-text', 'tool-1']);
   });
 });
 

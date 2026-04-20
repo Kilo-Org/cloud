@@ -9,8 +9,8 @@ import {
 import { createCloudAgentSession } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import type { AssistantMessage, UserMessage } from '@/types/opencode.gen';
-import { kiloId, cloudAgentId, stubUserMessage } from './test-helpers';
-import type { CloudStatus, ResolvedSession } from './types';
+import { kiloId, cloudAgentId, stubUserMessage, stubTextPart } from './test-helpers';
+import type { CloudStatus, ResolvedSession, SessionActivity } from './types';
 
 // ---------------------------------------------------------------------------
 // Mock createCloudAgentSession — prevents real WebSocket connections
@@ -32,7 +32,7 @@ const mockSession = {
       callback();
       return () => {};
     }),
-    getActivity: jest.fn(() => ({ type: 'idle' as const })),
+    getActivity: jest.fn((): SessionActivity => ({ type: 'idle' })),
     getStatus: jest.fn<{ type: 'idle' | 'disconnected' }, []>(() => ({ type: 'idle' })),
     getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
     getQuestion: jest.fn(() => null),
@@ -146,14 +146,15 @@ function atomValue<T>(store: ReturnType<typeof createStore>, atom: { read: unkno
 function createStoredMessage(
   messageId: string,
   sessionID: string,
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant',
+  created = 1
 ): StoredMessage {
   const info: UserMessage | AssistantMessage =
     role === 'user'
       ? stubUserMessage({
           id: messageId,
           sessionID,
-          time: { created: 1 },
+          time: { created },
           agent: 'test-agent',
           model: { providerID: 'test-provider', modelID: 'test-model' },
         })
@@ -161,7 +162,7 @@ function createStoredMessage(
           id: messageId,
           sessionID,
           role: 'assistant',
-          time: { created: 1 },
+          time: { created },
           parentID: 'msg-parent',
           modelID: 'test-model',
           providerID: 'test-provider',
@@ -189,6 +190,7 @@ function createStoredMessage(
 
 describe('createSessionManager', () => {
   beforeEach(() => {
+    jest.restoreAllMocks();
     jest.clearAllMocks();
     // Reset mock session to defaults
     mockSession.connect.mockClear();
@@ -429,6 +431,7 @@ describe('createSessionManager', () => {
 
   describe('initial message pre-insertion', () => {
     it('pre-inserts user message for non-initiated sessions with prompt and initialMessageId', async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_123);
       const config = createMockConfig({
         fetchSession: jest.fn().mockResolvedValue({
           ...defaultFetchedSession,
@@ -445,6 +448,7 @@ describe('createSessionManager', () => {
       expect(messages).toHaveLength(1);
       expect(messages[0]?.info.id).toBe('msg_000000000000AAAAAAAAAAAAAA');
       expect(messages[0]?.info.role).toBe('user');
+      expect(messages[0]?.info.time.created).toBe(1_700_000_000_123);
       const textPart = messages[0]?.parts[0];
       expect(textPart?.type).toBe('text');
       if (textPart?.type === 'text') {
@@ -452,7 +456,7 @@ describe('createSessionManager', () => {
       }
     });
 
-    it('does not pre-insert message when session is already initiated', async () => {
+    it('pre-inserts user message for initiated sessions with prompt and initialMessageId', async () => {
       const config = createMockConfig({
         fetchSession: jest.fn().mockResolvedValue({
           ...defaultFetchedSession,
@@ -466,7 +470,8 @@ describe('createSessionManager', () => {
       await mgr.switchSession(kiloId('ses-1'));
 
       const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
-      expect(messages).toHaveLength(0);
+      expect(messages).toHaveLength(1);
+      expect(messages[0]?.info.id).toBe('msg_000000000000AAAAAAAAAAAAAA');
     });
 
     it('does not pre-insert message when initialMessageId is null', async () => {
@@ -566,19 +571,23 @@ describe('createSessionManager', () => {
 
   describe('send', () => {
     it('creates optimistic message and calls session.send', async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_456);
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
       await mgr.switchSession(kiloId('ses-1'));
 
-      mockSession.send.mockResolvedValue(undefined);
-      const accepted = await mgr.send({
-        prompt: 'Hello',
-        mode: 'code',
-        model: 'claude-3-5-sonnet',
-      });
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
 
-      expect(accepted).toBe(true);
+      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(messages).toHaveLength(1);
+      const [optimisticMessage] = messages;
+      expect(optimisticMessage?.info.role).toBe('user');
+      expect(optimisticMessage?.info.time.created).toBe(1_700_000_000_456);
+      expect(optimisticMessage?.info.id).toMatch(/^msg_/);
+      expect(optimisticMessage?.parts[0]?.id).toBe(`${optimisticMessage?.info.id}-text`);
+      expect(optimisticMessage?.parts[0]?.messageID).toBe(optimisticMessage?.info.id);
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
         prompt: 'Hello',
@@ -587,11 +596,49 @@ describe('createSessionManager', () => {
         variant: undefined,
         images: undefined,
       });
+    });
 
-      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
-      expect(messages).toHaveLength(1);
-      expect(messages[0]?.info.role).toBe('user');
-      expect(messages[0]?.info.id).toMatch(/^msg_/);
+    it('reconciles optimistic user text when authoritative part has a different id', async () => {
+      const prompt =
+        "I want to build mobile portrait mode friendly interactive birthday invitation for an upcoming 6 year old girl party. Please suggest some cool ideas and let's implement.";
+      const realPartId = 'prt_ca0395df1001ez5Rq0YoFEEjdO';
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({ prompt, mode: 'code', model: 'claude-3-5-sonnet' });
+
+      const [optimisticMessage] = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const messageId = optimisticMessage?.info.id;
+      if (!messageId) throw new Error('expected optimistic message id');
+
+      latestStorage.upsertMessage(
+        stubUserMessage({
+          id: messageId,
+          sessionID: 'ses-1',
+          time: { created: 1_772_214_640_111 },
+          agent: 'code',
+          model: { providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' },
+        })
+      );
+      latestStorage.upsertPart(
+        messageId,
+        stubTextPart({
+          id: realPartId,
+          sessionID: 'ses-1',
+          messageID: messageId,
+          text: prompt,
+          time: { start: 1_772_214_640_152 },
+        })
+      );
+
+      const [message] = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(message?.parts).toEqual([
+        expect.objectContaining({ id: realPartId, type: 'text', text: prompt }),
+      ]);
     });
 
     it('does not persist optimistic message for remote sessions', async () => {
@@ -646,10 +693,15 @@ describe('createSessionManager', () => {
 
       await mgr.switchSession(kiloId('ses-1'));
 
-      mockSession.send.mockRejectedValue(new Error('fail'));
+      const error = new Error('fail');
+      mockSession.send.mockRejectedValue(error);
       await mgr.send({ prompt: 'My prompt', mode: 'code', model: 'claude-3-5-sonnet' });
 
-      expect(onSendFailed).toHaveBeenCalledWith('My prompt');
+      expect(onSendFailed).toHaveBeenCalledWith(
+        'My prompt',
+        'Connection failed. Please retry in a moment.',
+        error
+      );
     });
 
     it('preserves disconnected status indicator when send fails after transport disconnect', async () => {
@@ -680,7 +732,7 @@ describe('createSessionManager', () => {
       });
 
       expect(accepted).toBe(false);
-      expect(onSendFailed).toHaveBeenCalledWith('My prompt');
+      expect(onSendFailed).toHaveBeenCalledWith('My prompt', expect.any(String), expect.any(Error));
       expect(atomValue<string | null>(config.store, mgr.atoms.failedPrompt)).toBe('My prompt');
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
       expect(
@@ -1372,5 +1424,103 @@ describe('formatError', () => {
     expect(formatError('just a string')).toBe('Something went wrong. Please retry in a moment.');
     expect(formatError(null)).toBe('Something went wrong. Please retry in a moment.');
     expect(formatError(42)).toBe('Something went wrong. Please retry in a moment.');
+  });
+});
+
+describe('isReadOnly during connecting phase', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+    mockSession.connect.mockClear();
+    mockSession.disconnect.mockClear();
+    mockSession.destroy.mockClear();
+    mockSession.send.mockClear();
+    mockSession.interrupt.mockClear();
+    mockSession.respondToPermission.mockClear();
+    mockSession.canSend = true;
+    mockSession.canInterrupt = true;
+    mockSession.state.subscribe.mockImplementation(callback => {
+      callback();
+      return () => {};
+    });
+    mockSession.storage = latestStorage;
+    latestStorage = null;
+    mockSessionCallbacks.onSessionCreated = undefined;
+    mockSessionCallbacks.onQuestionAsked = undefined;
+    mockSessionCallbacks.onQuestionResolved = undefined;
+    mockSessionCallbacks.onPermissionAsked = undefined;
+    mockSessionCallbacks.onPermissionResolved = undefined;
+    mockSessionCallbacks.onResolved = undefined;
+  });
+
+  it('does not flash isReadOnly=true when subscriber fires during connecting with canSend=false', async () => {
+    // Simulate the real behavior: when the session is first created, the
+    // transport hasn't been resolved yet so canSend is false, and the
+    // initial activity is 'connecting'. The state subscriber fires during
+    // connect(), and without the guard this would set isReadOnly=true,
+    // causing a brief "read-only session" flash in the UI.
+    const subscriberCallbackRef: { current: (() => void) | null } = { current: null };
+
+    mockSession.canSend = false;
+    mockSession.state.getActivity.mockReturnValue({ type: 'connecting' as const });
+
+    mockSession.state.subscribe.mockImplementation((callback: () => void) => {
+      subscriberCallbackRef.current = callback;
+      // Fire immediately to simulate the synchronous subscription trigger
+      callback();
+      return () => {};
+    });
+
+    mockSession.connect.mockImplementation(() => {
+      // connect() triggers a state change while still connecting
+      subscriberCallbackRef.current?.();
+    });
+
+    const config = createMockConfig();
+    const mgr = createSessionManager(config);
+    await mgr.switchSession(kiloId('ses-1'));
+
+    // During the 'connecting' phase with canSend=false, isReadOnly must stay false
+    expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
+
+    // Now simulate the transport resolving: activity becomes 'idle', canSend becomes true
+    mockSession.canSend = true;
+    mockSession.state.getActivity.mockReturnValue({ type: 'idle' as const });
+    subscriberCallbackRef.current?.();
+
+    expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
+  });
+
+  it('sets isReadOnly=true for genuinely read-only sessions after connecting', async () => {
+    // For read-only sessions (e.g. historical CLI sessions), after the
+    // transport resolves the activity transitions past 'connecting' but
+    // canSend remains false. isReadOnly should correctly become true.
+    const subscriberCallbackRef: { current: (() => void) | null } = { current: null };
+
+    mockSession.canSend = false;
+    mockSession.state.getActivity.mockReturnValue({ type: 'connecting' as const });
+
+    mockSession.state.subscribe.mockImplementation((callback: () => void) => {
+      subscriberCallbackRef.current = callback;
+      callback();
+      return () => {};
+    });
+
+    mockSession.connect.mockImplementation(() => {
+      subscriberCallbackRef.current?.();
+    });
+
+    const config = createMockConfig();
+    const mgr = createSessionManager(config);
+    await mgr.switchSession(kiloId('ses-1'));
+
+    // Still connecting — isReadOnly should be false
+    expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
+
+    // Transport resolves but canSend stays false (read-only session)
+    mockSession.state.getActivity.mockReturnValue({ type: 'idle' as const });
+    subscriberCallbackRef.current?.();
+
+    expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(true);
   });
 });

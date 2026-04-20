@@ -110,6 +110,7 @@
     "discord-interactions": "^4.4.0",
     "discord.js": "^14.25.1",
     "drizzle-orm": "catalog:",
+    "emoji-mart": "^5.6.0",
     "event-source-polyfill": "^1.0.31",
     "eventsource-parser": "^3.0.6",
     "form-data": "^4.0.5",

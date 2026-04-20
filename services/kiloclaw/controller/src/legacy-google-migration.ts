@@ -44,6 +44,7 @@ export type LegacyGoogleMigrationResult = {
     | 'credentials_list_failed'
     | 'missing_credentials_path'
     | 'invalid_credentials_file'
+    | 'invalid_export_payload'
     | 'migration_endpoint_failed'
     | 'migrated';
 };
@@ -75,6 +76,23 @@ function mapServicesToCapabilities(services: readonly string[]): string[] {
     }
   }
   return [...capabilities].sort();
+}
+
+function asNonEmptyString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function asEmailLike(value: unknown): string | null {
+  const normalized = asNonEmptyString(value);
+  if (!normalized) return null;
+  return normalized.includes('@') ? normalized : null;
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
 }
 
 function parseClientCredentials(
@@ -188,15 +206,36 @@ export async function migrateLegacyGoogleCredentialsToBroker(
       return { attempted: true, migrated: false, reason: 'invalid_credentials_file' };
     }
 
+    const accountEmail = asEmailLike(exportPayload.email) ?? asEmailLike(email);
+    const accountSubject = asNonEmptyString(exportPayload.email) ?? asNonEmptyString(email);
+    const refreshToken = asNonEmptyString(exportPayload.refresh_token);
+    const oauthClientId = asNonEmptyString(credentials.clientId);
+    const oauthClientSecret = asNonEmptyString(credentials.clientSecret);
+    const scopes = asStringArray(exportPayload.scopes);
+    const services = asStringArray(exportPayload.services);
+
+    if (
+      !accountEmail ||
+      !accountSubject ||
+      !refreshToken ||
+      !oauthClientId ||
+      !oauthClientSecret
+    ) {
+      return { attempted: true, migrated: false, reason: 'invalid_export_payload' };
+    }
+
     const body = {
       sandboxId: options.sandboxId,
-      accountEmail: exportPayload.email || email,
-      accountSubject: exportPayload.email || email,
-      refreshToken: exportPayload.refresh_token,
-      oauthClientId: credentials.clientId,
-      oauthClientSecret: credentials.clientSecret,
-      scopes: exportPayload.scopes || [],
-      capabilities: mapServicesToCapabilities(exportPayload.services || []),
+      accountEmail,
+      accountSubject,
+      refreshToken,
+      oauthClientId,
+      oauthClientSecret,
+      scopes,
+      // CodeQL flags file-derived data flowing to outbound requests; we validate
+      // the exported payload fields above and only derive capabilities from the
+      // normalized gog services list before sending to the trusted broker endpoint.
+      capabilities: mapServicesToCapabilities(services),
     };
 
     const endpoint = endpointFor(options.checkinUrl);

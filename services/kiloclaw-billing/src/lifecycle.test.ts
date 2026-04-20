@@ -1049,6 +1049,216 @@ describe('credit renewal sweep affiliate tracking', () => {
     ]);
   });
 
+  it('marks auto-top-up-triggered period and writes changelog before triggering top-up', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const beforeRow = {
+      id: 'sub-1',
+      user_id: 'user-1',
+      email: 'user-1@example.com',
+      instance_id: 'instance-1',
+      instance_row_id: 'instance-1',
+      organization_id: null,
+      instance_destroyed_at: null,
+      plan: 'standard',
+      status: 'active',
+      credit_renewal_at: renewalAt,
+      current_period_end: renewalAt,
+      cancel_at_period_end: false,
+      scheduled_plan: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      total_microdollars_acquired: 1_000_000,
+      microdollars_used: 900_000,
+      auto_top_up_enabled: true,
+      kilo_pass_threshold: null,
+      next_credit_expiration_at: null,
+      user_updated_at: '2026-04-09T09:00:00.000Z',
+    };
+    const afterRow = {
+      ...beforeRow,
+      auto_top_up_triggered_for_period: renewalAt,
+    };
+    const { db, inserts, updates } = createMockDb([[beforeRow]], {
+      updateReturningRows: [[afterRow]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+        input: Record<string, unknown>;
+      };
+
+      switch (body.action) {
+        case 'project_pending_kilo_pass_bonus':
+          return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'trigger_user_auto_top_up':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: 'dadadada-dada-4ada-8ada-dadadadadada',
+        sweep: 'credit_renewal',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals_auto_top_up).toBe(1);
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(updates).toEqual([{ auto_top_up_triggered_for_period: renewalAt }]);
+    expect(inserts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actor_id: 'billing-lifecycle-job',
+          action: 'status_changed',
+          reason: 'credit_renewal_auto_top_up_marked',
+        }),
+      ])
+    );
+
+    const sideEffectCalls = fetch.mock.calls.map(
+      ([, init]) =>
+        JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+          action: string;
+          input: Record<string, unknown>;
+        }
+    );
+
+    expect(sideEffectCalls).toEqual([
+      {
+        action: 'project_pending_kilo_pass_bonus',
+        input: {
+          userId: 'user-1',
+          microdollarsUsed: 9_900_000,
+          kiloPassThreshold: null,
+        },
+      },
+      {
+        action: 'trigger_user_auto_top_up',
+        input: {
+          user: {
+            id: 'user-1',
+            total_microdollars_acquired: 1_000_000,
+            microdollars_used: 900_000,
+            auto_top_up_enabled: true,
+            next_credit_expiration_at: null,
+            updated_at: '2026-04-09T09:00:00.000Z',
+          },
+        },
+      },
+    ]);
+  });
+
+  it('skips auto-top-up trigger when marker update loses concurrent race', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const beforeRow = {
+      id: 'sub-1',
+      user_id: 'user-1',
+      email: 'user-1@example.com',
+      instance_id: 'instance-1',
+      instance_row_id: 'instance-1',
+      organization_id: null,
+      instance_destroyed_at: null,
+      plan: 'standard',
+      status: 'active',
+      credit_renewal_at: renewalAt,
+      current_period_end: renewalAt,
+      cancel_at_period_end: false,
+      scheduled_plan: null,
+      commit_ends_at: null,
+      past_due_since: null,
+      suspended_at: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      total_microdollars_acquired: 1_000_000,
+      microdollars_used: 900_000,
+      auto_top_up_enabled: true,
+      kilo_pass_threshold: null,
+      next_credit_expiration_at: null,
+      user_updated_at: '2026-04-09T09:00:00.000Z',
+    };
+    const { db, inserts, updates } = createMockDb([[beforeRow]], {
+      updateReturningRows: [[]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+        input: Record<string, unknown>;
+      };
+
+      switch (body.action) {
+        case 'project_pending_kilo_pass_bonus':
+          return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'trigger_user_auto_top_up':
+          throw new Error('trigger_user_auto_top_up should not run after lost marker race');
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: 'dededede-dede-4ede-8ede-dededededede',
+        sweep: 'credit_renewal',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals_auto_top_up).toBe(0);
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(updates).toEqual([{ auto_top_up_triggered_for_period: renewalAt }]);
+    expect(inserts).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: 'credit_renewal_auto_top_up_marked',
+        }),
+      ])
+    );
+
+    const sideEffectCalls = fetch.mock.calls.map(
+      ([, init]) =>
+        JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+          action: string;
+          input: Record<string, unknown>;
+        }
+    );
+
+    expect(sideEffectCalls).toEqual([
+      {
+        action: 'project_pending_kilo_pass_bonus',
+        input: {
+          userId: 'user-1',
+          microdollarsUsed: 9_900_000,
+          kiloPassThreshold: null,
+        },
+      },
+    ]);
+  });
+
   it('skips organization-managed rows in personal credit renewal sweep', async () => {
     const { db, txInserts, txUpdates } = createMockDb([
       [

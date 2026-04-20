@@ -43,7 +43,7 @@ describe('getKiloClawCheckoutSuccessPhase', () => {
         },
         timedOut: true,
       })
-    ).toBe('timed_out');
+    ).toBe('timed_out_waiting_for_settlement');
   });
 
   it('keeps activated state even after timeout flips true', () => {
@@ -79,6 +79,15 @@ describe('getKiloClawCheckoutSuccessPhase', () => {
         },
         timedOut: true,
       })
-    ).toBe('timed_out');
+    ).toBe('timed_out_waiting_for_subscription');
+  });
+
+  it('uses neutral timeout state when no subscription row ever appears', () => {
+    expect(
+      getKiloClawCheckoutSuccessPhase({
+        subscription: null,
+        timedOut: true,
+      })
+    ).toBe('timed_out_waiting_for_subscription');
   });
 });

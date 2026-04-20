@@ -7,7 +7,8 @@ export type KiloClawCheckoutSuccessPhase =
   | 'waiting_for_subscription'
   | 'waiting_for_settlement'
   | 'activated'
-  | 'timed_out';
+  | 'timed_out_waiting_for_subscription'
+  | 'timed_out_waiting_for_settlement';
 
 export function getKiloClawCheckoutSuccessPhase(params: {
   subscription: CheckoutSuccessSubscription | undefined;
@@ -20,7 +21,9 @@ export function getKiloClawCheckoutSuccessPhase(params: {
   }
 
   if (params.timedOut) {
-    return 'timed_out';
+    return isActiveSubscription
+      ? 'timed_out_waiting_for_settlement'
+      : 'timed_out_waiting_for_subscription';
   }
 
   if (isActiveSubscription) {

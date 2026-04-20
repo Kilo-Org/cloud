@@ -238,6 +238,7 @@ export const kilocode_users = pgTable(
     openrouter_upstream_safety_identifier: text(),
     vercel_downstream_safety_identifier: text(),
     customer_source: text(),
+    signup_ip: text(),
     account_deletion_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
 
     normalized_email: text(),
@@ -245,6 +246,7 @@ export const kilocode_users = pgTable(
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
+    index('IDX_kilocode_users_signup_ip_created_at').on(table.signup_ip, table.created_at),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')

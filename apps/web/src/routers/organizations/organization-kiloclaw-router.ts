@@ -23,7 +23,6 @@ import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   kiloclaw_cli_runs,
-  kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
@@ -40,6 +39,7 @@ import {
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
+import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
 import {
   getOrganizationProvisionLockKey,
   withKiloclawProvisionContextLock,
@@ -511,15 +511,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
     }
 
     try {
-      await db
-        .update(kiloclaw_subscriptions)
-        .set({ destruction_deadline: null })
-        .where(
-          and(
-            eq(kiloclaw_subscriptions.user_id, ctx.user.id),
-            eq(kiloclaw_subscriptions.instance_id, instance.id)
-          )
-        );
+      await clearSubscriptionLifecycleAfterInstanceDestroy({
+        actorUserId: ctx.user.id,
+        kiloUserId: ctx.user.id,
+        instanceId: instance.id,
+      });
     } catch (cleanupError) {
       console.error('[organization-kiloclaw] Post-destroy cleanup failed:', cleanupError);
     }

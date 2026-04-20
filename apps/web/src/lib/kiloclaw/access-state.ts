@@ -46,9 +46,9 @@ function subscriptionRecency(subscription: KiloClawSubscription): number {
 }
 
 export function getKiloClawSubscriptionActivationState(
-  subscription: Pick<KiloClawSubscription, 'payment_source'> | null | undefined
+  subscription: Pick<KiloClawSubscription, 'payment_source' | 'status'> | null | undefined
 ): KiloClawActivationState {
-  if (subscription?.payment_source === 'stripe') {
+  if (subscription?.payment_source === 'stripe' && subscription.status === 'active') {
     return 'pending_settlement';
   }
 

@@ -65,11 +65,26 @@ export function KiloClawCheckoutSuccessClient() {
             <h1 className="mb-2 text-2xl font-bold">Subscription Active!</h1>
             <p className="text-muted-foreground">Redirecting to your dashboard...</p>
           </>
-        ) : phase === 'timed_out' ? (
+        ) : phase === 'timed_out_waiting_for_settlement' ? (
           <>
             <h1 className="mb-2 text-2xl font-bold">Taking longer than expected</h1>
             <p className="text-muted-foreground mb-4">
               Your payment was received. Hosting still activates after invoice settlement.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push('/claw')}
+              className="bg-brand-primary text-primary-foreground rounded-lg px-6 py-2 font-medium"
+            >
+              Go to Dashboard
+            </button>
+          </>
+        ) : phase === 'timed_out_waiting_for_subscription' ? (
+          <>
+            <h1 className="mb-2 text-2xl font-bold">Taking longer than expected</h1>
+            <p className="text-muted-foreground mb-4">
+              We&apos;re still waiting for your hosting subscription to appear. If this does not
+              update, check your billing history or try again in a moment.
             </p>
             <button
               type="button"

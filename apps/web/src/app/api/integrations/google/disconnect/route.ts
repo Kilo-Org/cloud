@@ -38,19 +38,22 @@ export async function POST(request: NextRequest) {
 
   try {
     if (!isSameOriginMutation(request)) {
-      return NextResponse.redirect(new URL('/claw/settings?error=invalid_origin', APP_URL));
+      return NextResponse.redirect(new URL('/claw/settings?error=invalid_origin', APP_URL), 303);
     }
 
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
     if (authFailedResponse) {
-      return NextResponse.redirect(new URL('/users/sign_in', APP_URL));
+      return NextResponse.redirect(new URL('/users/sign_in', APP_URL), 303);
     }
 
     const organizationIdParam = request.nextUrl.searchParams.get('organizationId');
     if (organizationIdParam) {
       const parsedOrgId = OrganizationIdSchema.safeParse(organizationIdParam);
       if (!parsedOrgId.success) {
-        return NextResponse.redirect(new URL('/claw/settings?error=invalid_organization', APP_URL));
+        return NextResponse.redirect(
+          new URL('/claw/settings?error=invalid_organization', APP_URL),
+          303
+        );
       }
       organizationId = parsedOrgId.data;
       await ensureOrganizationAccess({ user }, organizationId);
@@ -71,7 +74,8 @@ export async function POST(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildDisconnectPath(organizationId, 'error=missing_instance'), APP_URL)
+        new URL(buildDisconnectPath(organizationId, 'error=missing_instance'), APP_URL),
+        303
       );
     }
 
@@ -92,7 +96,8 @@ export async function POST(request: NextRequest) {
     await clearKiloClawGoogleOAuthConnection(instance.id);
 
     return NextResponse.redirect(
-      new URL(buildDisconnectPath(organizationId, 'success=google_disconnected'), APP_URL)
+      new URL(buildDisconnectPath(organizationId, 'success=google_disconnected'), APP_URL),
+      303
     );
   } catch (error) {
     console.error('Error disconnecting Google OAuth:', error);
@@ -108,7 +113,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.redirect(
-      new URL(buildDisconnectPath(organizationId, 'error=disconnect_failed'), APP_URL)
+      new URL(buildDisconnectPath(organizationId, 'error=disconnect_failed'), APP_URL),
+      303
     );
   }
 }

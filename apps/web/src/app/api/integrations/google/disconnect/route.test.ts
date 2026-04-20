@@ -86,7 +86,7 @@ describe('POST /api/integrations/google/disconnect', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest('/api/integrations/google/disconnect') as never);
 
-    expect(response.status).toBe(307);
+    expect(response.status).toBe(303);
     expectRedirectLocation(response, '/users/sign_in');
   });
 
@@ -94,7 +94,7 @@ describe('POST /api/integrations/google/disconnect', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest('/api/integrations/google/disconnect') as never);
 
-    expect(response.status).toBe(307);
+    expect(response.status).toBe(303);
     expectRedirectLocation(response, '/claw/settings?success=google_disconnected');
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: true });
     expect(mockedGetActiveInstance).toHaveBeenCalledWith(USER_ID);
@@ -114,7 +114,7 @@ describe('POST /api/integrations/google/disconnect', () => {
       makeRequest(`/api/integrations/google/disconnect?organizationId=${ORG_ID}`) as never
     );
 
-    expect(response.status).toBe(307);
+    expect(response.status).toBe(303);
     expectRedirectLocation(
       response,
       `/organizations/${ORG_ID}/claw/settings?success=google_disconnected`
@@ -129,7 +129,7 @@ describe('POST /api/integrations/google/disconnect', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest('/api/integrations/google/disconnect') as never);
 
-    expect(response.status).toBe(307);
+    expect(response.status).toBe(303);
     expectRedirectLocation(response, '/claw/settings?error=missing_instance');
     expect(mockedCaptureMessage).toHaveBeenCalledWith(
       'Google disconnect missing active KiloClaw instance',
@@ -143,7 +143,7 @@ describe('POST /api/integrations/google/disconnect', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest('/api/integrations/google/disconnect') as never);
 
-    expect(response.status).toBe(307);
+    expect(response.status).toBe(303);
     expectRedirectLocation(response, '/claw/settings?error=disconnect_failed');
     expect(mockedClearGoogleOAuthConnection).toHaveBeenCalledWith(USER_ID, INSTANCE_ID);
     expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
@@ -155,7 +155,7 @@ describe('POST /api/integrations/google/disconnect', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest('/api/integrations/google/disconnect') as never);
 
-    expect(response.status).toBe(307);
+    expect(response.status).toBe(303);
     expectRedirectLocation(response, '/claw/settings?error=disconnect_failed');
     expect(mockedClearKiloClawGoogleOAuthConnection).not.toHaveBeenCalled();
   });
@@ -169,7 +169,7 @@ describe('POST /api/integrations/google/disconnect', () => {
     const { POST } = await import('./route');
     const response = await POST(request as never);
 
-    expect(response.status).toBe(307);
+    expect(response.status).toBe(303);
     expectRedirectLocation(response, '/claw/settings?error=invalid_origin');
     expect(mockedClearKiloClawGoogleOAuthConnection).not.toHaveBeenCalled();
   });

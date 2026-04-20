@@ -178,6 +178,8 @@ export function deriveBannerState(billing: ClawBillingStatus): ClawBannerState {
 export function deriveLockReason(billing: ClawBillingStatus): ClawLockReason {
   if (!billing.hasAccess) {
     if (billing.subscription?.activationState === 'pending_settlement') {
+      // Deliberately return null here: pending settlement should suppress the
+      // lock dialog entirely until dedicated processing UI handles this state.
       return null;
     }
     // Subscription states checked first — a paid subscription that was canceled

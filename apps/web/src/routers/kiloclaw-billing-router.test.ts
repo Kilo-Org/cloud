@@ -524,6 +524,33 @@ describe('getBillingStatus', () => {
       destroyed: false,
     });
   });
+
+  it('preserves unpaid Stripe-backed rows as failed instead of pending settlement', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      stripe_subscription_id: 'sub_status_unpaid',
+      payment_source: 'stripe',
+      plan: 'standard',
+      status: 'unpaid',
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result.hasAccess).toBe(false);
+    expect(result.accessReason).toBeNull();
+    expect(result.subscription).toMatchObject({
+      plan: 'standard',
+      status: 'unpaid',
+      activationState: 'activated',
+      paymentSource: 'stripe',
+      hasStripeFunding: true,
+    });
+  });
 });
 
 describe('provision detached personal billing recovery', () => {
@@ -866,6 +893,37 @@ describe('subscription center procedures', () => {
     });
   });
 
+  it('preserves failure status for unpaid Stripe-backed personal subscriptions', async () => {
+    const instance = await createInstanceRow({
+      userId: user.id,
+      name: 'Unpaid Stripe Instance',
+    });
+
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: instance.id,
+      stripeSubscriptionId: 'sub_unpaid_list',
+      paymentSource: 'stripe',
+      plan: 'standard',
+      status: 'unpaid',
+      currentPeriodStart: '2026-04-01T00:00:00.000Z',
+      currentPeriodEnd: '2026-05-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.listPersonalSubscriptions();
+
+    expect(result.subscriptions).toHaveLength(1);
+    expect(result.subscriptions[0]).toMatchObject({
+      instanceId: instance.id,
+      plan: 'standard',
+      status: 'unpaid',
+      activationState: 'activated',
+      paymentSource: 'stripe',
+      hasStripeFunding: true,
+    });
+  });
+
   it('returns pending-settlement detail with activationState', async () => {
     const instance = await createInstanceRow({
       userId: user.id,
@@ -891,6 +949,36 @@ describe('subscription center procedures', () => {
       plan: 'standard',
       status: 'active',
       activationState: 'pending_settlement',
+      paymentSource: 'stripe',
+      hasStripeFunding: true,
+    });
+  });
+
+  it('preserves failure status in detail for canceled Stripe-backed subscriptions', async () => {
+    const instance = await createInstanceRow({
+      userId: user.id,
+      name: 'Canceled Stripe Detail',
+    });
+
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: instance.id,
+      stripeSubscriptionId: 'sub_canceled_detail',
+      paymentSource: 'stripe',
+      plan: 'standard',
+      status: 'canceled',
+      currentPeriodStart: '2026-04-01T00:00:00.000Z',
+      currentPeriodEnd: '2026-05-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getSubscriptionDetail({ instanceId: instance.id });
+
+    expect(result).toMatchObject({
+      instanceId: instance.id,
+      plan: 'standard',
+      status: 'canceled',
+      activationState: 'activated',
       paymentSource: 'stripe',
       hasStripeFunding: true,
     });

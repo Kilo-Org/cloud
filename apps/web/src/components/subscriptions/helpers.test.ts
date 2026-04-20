@@ -42,4 +42,24 @@ describe('KiloClaw subscription helpers', () => {
       })
     ).toBe(false);
   });
+
+  it('does not mask failed Stripe-backed rows once activation has fallen back to activated', () => {
+    expect(
+      getKiloclawDisplayStatus({
+        status: 'unpaid',
+        activationState: 'activated',
+      })
+    ).toBe('unpaid');
+    expect(
+      getKiloclawDisplayStatus({
+        status: 'canceled',
+        activationState: 'activated',
+      })
+    ).toBe('canceled');
+    expect(
+      getKiloclawStatusNote({
+        activationState: 'activated',
+      })
+    ).toBeNull();
+  });
 });

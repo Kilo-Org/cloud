@@ -3,7 +3,10 @@
 import { useState, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Pencil, Trash2, Reply, X, Check, AlertCircle } from 'lucide-react';
+import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile } from 'lucide-react';
+import { EmojiQuickPick } from './EmojiQuickPick';
+import { EmojiPicker } from './EmojiPicker';
+import { ReactionPills } from './ReactionPills';
 import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './KiloChatLayout';
@@ -35,6 +38,9 @@ type MessageBubbleProps = {
   onConfirmDelete: (messageId: string) => void;
   onCancelDelete: () => void;
   onReply: (message: Message) => void;
+  onAddReaction: (messageId: string, emoji: string) => void;
+  onRemoveReaction: (messageId: string, emoji: string) => void;
+  currentUserId: string;
 };
 
 export function MessageBubble({
@@ -47,11 +53,16 @@ export function MessageBubble({
   onConfirmDelete,
   onCancelDelete,
   onReply,
+  onAddReaction,
+  onRemoveReaction,
+  currentUserId,
 }: MessageBubbleProps) {
   const { assistantName } = useKiloChatContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const [showActions, setShowActions] = useState(false);
+  const [showQuickPick, setShowQuickPick] = useState(false);
+  const [showFullPicker, setShowFullPicker] = useState(false);
 
   const isBot = message.senderId.startsWith('bot:');
   const isOptimistic = message.id.startsWith('pending-');
@@ -62,6 +73,10 @@ export function MessageBubble({
   });
 
   const textContent = message.deleted ? '' : contentBlocksToText(message.content);
+
+  const myReactions = new Set(
+    message.reactions.filter(r => r.memberIds.includes(currentUserId)).map(r => r.emoji)
+  );
 
   function handleStartEdit() {
     setEditText(textContent);
@@ -79,6 +94,25 @@ export function MessageBubble({
     setEditText('');
   }
 
+  function handleQuickPickSelect(emoji: string) {
+    setShowQuickPick(false);
+    if (myReactions.has(emoji)) {
+      onRemoveReaction(message.id, emoji);
+    } else {
+      onAddReaction(message.id, emoji);
+    }
+  }
+
+  function handleFullPickerSelect(emoji: string) {
+    setShowFullPicker(false);
+    setShowQuickPick(false);
+    if (myReactions.has(emoji)) {
+      onRemoveReaction(message.id, emoji);
+    } else {
+      onAddReaction(message.id, emoji);
+    }
+  }
+
   const isDeleting = pendingDeleteId === message.id;
 
   const actionButtons = showActions && !isEditing && !isDeleting && !message.deleted && (
@@ -87,6 +121,13 @@ export function MessageBubble({
         isOwn ? 'right-full mr-1' : 'left-full ml-1'
       }`}
     >
+      <button
+        onClick={() => setShowQuickPick(prev => !prev)}
+        className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+        title="React"
+      >
+        <Smile className="h-3.5 w-3.5" />
+      </button>
       {isOwn && !message.deliveryFailed && (
         <button
           onClick={handleStartEdit}
@@ -121,7 +162,10 @@ export function MessageBubble({
     <div
       className={`group flex px-4 py-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
       onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
+      onMouseLeave={() => {
+        setShowActions(false);
+        setShowQuickPick(false);
+      }}
     >
       <div className={`flex max-w-[75%] flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
         {isBot && !isOwn && (
@@ -144,6 +188,32 @@ export function MessageBubble({
 
         <div className="relative">
           {actionButtons}
+          {showQuickPick && (
+            <div
+              className={`absolute z-20 ${
+                isOwn ? 'right-full mr-1' : 'left-full ml-1'
+              } top-0`}
+            >
+              <EmojiQuickPick
+                currentUserReactions={myReactions}
+                onSelect={handleQuickPickSelect}
+                onOpenFullPicker={() => {
+                  setShowQuickPick(false);
+                  setShowFullPicker(true);
+                }}
+              />
+            </div>
+          )}
+          {showFullPicker && (
+            <div
+              className={`absolute bottom-full mb-2 z-50 ${isOwn ? 'right-0' : 'left-0'}`}
+            >
+              <EmojiPicker
+                onSelect={handleFullPickerSelect}
+                onClose={() => setShowFullPicker(false)}
+              />
+            </div>
+          )}
           <div
             className={`rounded-2xl px-3 py-2 ${
               isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
@@ -230,6 +300,15 @@ export function MessageBubble({
               <span>{timeStr}</span>
             </div>
           </div>
+          {!message.deleted && !message.deliveryFailed && (
+            <ReactionPills
+              reactions={message.reactions}
+              currentUserId={currentUserId}
+              isOwn={isOwn}
+              onAdd={emoji => onAddReaction(message.id, emoji)}
+              onRemove={emoji => onRemoveReaction(message.id, emoji)}
+            />
+          )}
         </div>
       </div>
     </div>

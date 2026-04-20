@@ -114,13 +114,9 @@ describe('User', () => {
   });
 
   describe('createOrUpdateUser', () => {
-    const originalMaxSignups = process.env.MAX_SIGNUPS_PER_IP_24H;
     const originalExemptIps = process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS;
 
     afterEach(() => {
-      if (originalMaxSignups === undefined) delete process.env.MAX_SIGNUPS_PER_IP_24H;
-      else process.env.MAX_SIGNUPS_PER_IP_24H = originalMaxSignups;
-
       if (originalExemptIps === undefined) delete process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS;
       else process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS = originalExemptIps;
     });
@@ -147,11 +143,11 @@ describe('User', () => {
       expect(result.user.signup_ip).toBe('203.0.113.25');
     });
 
-    it('rejects new signups after the per-IP threshold', async () => {
-      process.env.MAX_SIGNUPS_PER_IP_24H = '2';
+    it('rejects new signups after the per-IP threshold (5)', async () => {
       const signupIp = '203.0.113.50';
-      await insertTestUser({ id: 'ip-limit-1', signup_ip: signupIp });
-      await insertTestUser({ id: 'ip-limit-2', signup_ip: signupIp });
+      for (let i = 1; i <= 5; i++) {
+        await insertTestUser({ id: `ip-limit-${i}`, signup_ip: signupIp });
+      }
 
       const result = await createOrUpdateUser(
         {
@@ -164,7 +160,7 @@ describe('User', () => {
         },
         undefined,
         false,
-        new Headers({ 'x-real-ip': signupIp })
+        new Headers({ 'x-forwarded-for': signupIp })
       );
 
       expect(result.success).toBe(false);
@@ -173,10 +169,11 @@ describe('User', () => {
     });
 
     it('skips rate limiting for exempt signup IPs', async () => {
-      process.env.MAX_SIGNUPS_PER_IP_24H = '1';
       process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS = '198.51.100.7';
       const signupIp = '198.51.100.7';
-      await insertTestUser({ id: 'ip-exempt-1', signup_ip: signupIp });
+      for (let i = 1; i <= 5; i++) {
+        await insertTestUser({ id: `ip-exempt-${i}`, signup_ip: signupIp });
+      }
 
       const result = await createOrUpdateUser(
         {

@@ -118,21 +118,11 @@ if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
   posthogClient.debug();
 }
 
-const DEFAULT_MAX_SIGNUPS_PER_IP_24H = 5;
+const MAX_SIGNUPS_PER_IP_24H = 5;
 const signupsPerIpWindowMs = 24 * 60 * 60 * 1000;
 
 function getSignupIp(requestHeaders?: Headers): string | null {
-  const forwardedFor = requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim();
-  return forwardedFor || requestHeaders?.get('x-real-ip')?.trim() || null;
-}
-
-function getMaxSignupsPerIp24h(): number {
-  const configured = process.env.MAX_SIGNUPS_PER_IP_24H;
-  if (!configured) return DEFAULT_MAX_SIGNUPS_PER_IP_24H;
-
-  const parsed = Number.parseInt(configured, 10);
-  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_MAX_SIGNUPS_PER_IP_24H;
-  return parsed;
+  return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 }
 
 function getSignupIpExemptions(): Set<string> {
@@ -169,7 +159,6 @@ async function checkSignupIpRateLimit(
   const [ns, key] = ipToAdvisoryLockKey(signupIp);
   await tx.execute(sql`SELECT pg_advisory_xact_lock(${ns}, ${key})`);
 
-  const maxSignups = getMaxSignupsPerIp24h();
   const windowStart = new Date(Date.now() - signupsPerIpWindowMs).toISOString();
   const [result] = await tx
     .select({ count: count() })
@@ -179,12 +168,12 @@ async function checkSignupIpRateLimit(
     );
 
   const existingAccounts = result?.count ?? 0;
-  if (existingAccounts < maxSignups) return successResult(null);
+  if (existingAccounts < MAX_SIGNUPS_PER_IP_24H) return successResult(null);
 
   console.warn('[auth] Signup rejected due to per-IP rate limit', {
     ip_address: signupIp,
     existing_accounts_24h: existingAccounts,
-    max_signups_per_ip_24h: maxSignups,
+    max_signups_per_ip_24h: MAX_SIGNUPS_PER_IP_24H,
   });
 
   return failureResult('SIGNUP-RATE-LIMITED');

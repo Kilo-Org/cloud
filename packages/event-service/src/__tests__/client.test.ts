@@ -164,7 +164,7 @@ describe('EventServiceClient', () => {
     wsAfterReconnect.triggerClose();
     expect(client.isConnected()).toBe(false);
 
-    // 5. Advance past the 3s reconnect delay — a new WebSocket should be created
+    // 5. Advance past the max first-attempt delay (1000ms * jitter ≤ 1000ms)
     await vi.advanceTimersByTimeAsync(4000);
 
     // connect() resets destroyed, so onclose schedules a reconnect.

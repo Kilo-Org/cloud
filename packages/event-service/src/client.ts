@@ -10,6 +10,7 @@ export class EventServiceClient {
   private activeContexts = new Set<string>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
+  private reconnectAttempts = 0;
   private hasConnectedBefore = false;
   private reconnectHandlers = new Set<() => void>();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
@@ -52,6 +53,7 @@ export class EventServiceClient {
         const isReconnect = this.hasConnectedBefore;
         this.connected = true;
         this.hasConnectedBefore = true;
+        this.reconnectAttempts = 0;
         this.resubscribeContexts();
         if (isReconnect) {
           for (const handler of this.reconnectHandlers) {
@@ -187,11 +189,14 @@ export class EventServiceClient {
   }
 
   private scheduleReconnect(): void {
+    const base = Math.min(30_000, 1000 * 2 ** this.reconnectAttempts);
+    const delay = base * (0.5 + Math.random() * 0.5);
+    this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect().catch(() => {
         // will retry again via onclose
       });
-    }, 3000);
+    }, delay);
   }
 }

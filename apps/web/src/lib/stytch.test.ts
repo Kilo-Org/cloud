@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { insertTestUser } from '../tests/helpers/user.helper';
 import { db } from './drizzle';
-import { stytch_fingerprints, credit_transactions } from '@kilocode/db/schema';
+import { kilocode_users, stytch_fingerprints, credit_transactions } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { FraudFingerprintLookupResponse } from 'stytch';
 
@@ -211,6 +211,77 @@ describe('Stytch Fingerprint Functions', () => {
       const result = await saveFingerprints(user, fingerprintData, headers);
 
       expect(result.kilo_free_tier_allowed).toBe(false);
+    });
+
+    test('should autoban user when verdict is BLOCK with SMART_RATE_LIMIT_BANNED reason', async () => {
+      const user = await insertTestUser();
+      const fingerprintData = {
+        ...createMockFingerprintData(),
+        verdict: {
+          action: 'BLOCK',
+          detected_device_type: 'desktop',
+          is_authentic_device: false,
+          reasons: ['SMART_RATE_LIMIT_BANNED'],
+          verdict_reason_overrides: [],
+        },
+      };
+
+      await saveFingerprints(user, fingerprintData, createMockHeaders());
+
+      const updatedUser = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+        columns: { blocked_reason: true },
+      });
+      expect(updatedUser?.blocked_reason).toBe('autoban: stytch SMART_RATE_LIMIT_BANNED');
+    });
+
+    test('should not overwrite existing blocked_reason when autobanning', async () => {
+      const user = await insertTestUser();
+      await db
+        .update(kilocode_users)
+        .set({ blocked_reason: 'already blocked' })
+        .where(eq(kilocode_users.id, user.id));
+
+      const fingerprintData = {
+        ...createMockFingerprintData(),
+        verdict: {
+          action: 'BLOCK',
+          detected_device_type: 'desktop',
+          is_authentic_device: false,
+          reasons: ['SMART_RATE_LIMIT_BANNED'],
+          verdict_reason_overrides: [],
+        },
+      };
+
+      await saveFingerprints(user, fingerprintData, createMockHeaders());
+
+      const updatedUser = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+        columns: { blocked_reason: true },
+      });
+      expect(updatedUser?.blocked_reason).toBe('already blocked');
+    });
+
+    test('should not autoban when verdict is BLOCK without SMART_RATE_LIMIT_BANNED reason', async () => {
+      const user = await insertTestUser();
+      const fingerprintData = {
+        ...createMockFingerprintData(),
+        verdict: {
+          action: 'BLOCK',
+          detected_device_type: 'desktop',
+          is_authentic_device: false,
+          reasons: ['suspicious_activity'],
+          verdict_reason_overrides: [],
+        },
+      };
+
+      await saveFingerprints(user, fingerprintData, createMockHeaders());
+
+      const updatedUser = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+        columns: { blocked_reason: true },
+      });
+      expect(updatedUser?.blocked_reason).toBeNull();
     });
   });
 

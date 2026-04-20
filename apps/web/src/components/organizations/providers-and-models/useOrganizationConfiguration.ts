@@ -6,7 +6,7 @@ import {
   useOpenRouterModelsAndProviders,
   useOpenRouterProviders,
 } from '@/app/api/openrouter/hooks';
-import type { OpenRouterProvider } from '@/lib/organizations/organization-types';
+import type { NormalizedProvider } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 export type ConfigurationData = {
   allModelsAllowed: boolean;
@@ -26,7 +26,7 @@ export function useOrganizationConfiguration(organizationId: string) {
 
   const isLoading = orgLoading || modelsLoading || providersLoading || providersSnapshotLoading;
 
-  if (isLoading || !organizationData || !modelsData?.data || !providersData?.data) {
+  if (isLoading || !organizationData || !modelsData?.data || !providersData?.providers) {
     return {
       isLoading,
       organizationData,
@@ -43,9 +43,9 @@ export function useOrganizationConfiguration(organizationId: string) {
 
   // Get provider names for display
   const getProviderNames = (slugs: string[]) => {
-    if (!providersData?.data) return slugs;
+    if (!providersData?.providers) return slugs;
     return slugs.map(slug => {
-      const provider = providersData.data.find((p: OpenRouterProvider) => p.slug === slug);
+      const provider = providersData.providers.find((p: NormalizedProvider) => p.slug === slug);
       return provider?.displayName || provider?.name || slug;
     });
   };

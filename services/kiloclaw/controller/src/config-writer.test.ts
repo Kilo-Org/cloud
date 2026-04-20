@@ -19,6 +19,7 @@ function fakeDeps(existingConfig?: string) {
   const written: { path: string; data: string }[] = [];
   const copied: { src: string; dest: string }[] = [];
   const renamed: { from: string; to: string }[] = [];
+  const chmodded: { path: string; mode: number }[] = [];
   const unlinked: string[] = [];
   const execCalls: { cmd: string; args: string[]; env?: Record<string, string | undefined> }[] = [];
   let dirEntries: string[] = [];
@@ -37,6 +38,9 @@ function fakeDeps(existingConfig?: string) {
       }),
       renameSync: vi.fn((from: string, to: string) => {
         renamed.push({ from, to });
+      }),
+      chmodSync: vi.fn((filePath: string, mode: number) => {
+        chmodded.push({ path: filePath, mode });
       }),
       copyFileSync: vi.fn((src: string, dest: string) => {
         copied.push({ src, dest });
@@ -59,6 +63,7 @@ function fakeDeps(existingConfig?: string) {
     written,
     copied,
     renamed,
+    chmodded,
     unlinked,
     execCalls,
     setDirEntries(entries: string[]) {
@@ -1156,6 +1161,42 @@ describe('writeBaseConfig', () => {
     expect(config.tools.exec.host).toBe('gateway');
   });
 
+  it('chmods the temp file to 0o600 before rename (owner-only commit)', () => {
+    const { deps, written, renamed, chmodded } = fakeDeps();
+    writeBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    // Exactly one chmod and it targets the same temp path that was written,
+    // not the final path. Chmod-before-rename keeps the commit atomic: if
+    // chmod fails, rename never happens and the target file is untouched.
+    expect(chmodded).toHaveLength(1);
+    expect(chmodded[0]).toEqual({ path: written[0].path, mode: 0o600 });
+
+    // Rename happens after chmod (asserted by ordering of mock calls: write
+    // at index 0, chmod at index 0, rename at index 0 — they each fired
+    // exactly once but from different mocks, so arrays remain length-1
+    // with the temp path as the subject).
+    expect(renamed[0].from).toBe(written[0].path);
+    expect(renamed[0].to).toBe('/tmp/openclaw.json');
+  });
+
+  it('propagates chmod failure and leaves target config file untouched', () => {
+    const { deps } = fakeDeps();
+    const chmodError = new Error('chmod failed');
+    (deps.chmodSync as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw chmodError;
+    });
+
+    expect(() => writeBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps)).toThrow(chmodError);
+
+    // Rename must NOT have happened — the target openclaw.json is untouched
+    // by this failed write rather than committed with whatever default-umask
+    // mode the temp file ended up with.
+    expect(deps.renameSync).not.toHaveBeenCalled();
+
+    // Cleanup was attempted against the temp path
+    expect(deps.unlinkSync).toHaveBeenCalled();
+  });
+
   it('passes all required onboard flags for non-interactive setup', () => {
     const { deps, execCalls } = fakeDeps();
     writeBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
@@ -1335,6 +1376,7 @@ function mcporterFakeDeps(existingMcporterConfig?: string) {
         written.push({ path: filePath, data });
       }),
       renameSync: vi.fn(),
+      chmodSync: vi.fn(),
       copyFileSync: vi.fn(),
       readdirSync: vi.fn(() => []),
       unlinkSync: vi.fn(),

@@ -470,6 +470,7 @@ function toConfigWriterDeps(deps: BootstrapDeps): ConfigWriterDeps {
     readFileSync: deps.readFileSync,
     writeFileSync: deps.writeFileSync,
     renameSync: deps.renameSync,
+    chmodSync: deps.chmodSync,
     copyFileSync: deps.copyFileSync,
     readdirSync: deps.readdirSync,
     unlinkSync: deps.unlinkSync,
@@ -506,11 +507,17 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     // Patch the config with env-var-derived fields
     const config = generateBaseConfig(env, CONFIG_PATH, cwDeps);
     const serialized = JSON.stringify(config, null, 2);
-    atomicWrite(CONFIG_PATH, serialized, {
-      writeFileSync: deps.writeFileSync,
-      renameSync: deps.renameSync,
-      unlinkSync: deps.unlinkSync,
-    });
+    atomicWrite(
+      CONFIG_PATH,
+      serialized,
+      {
+        writeFileSync: deps.writeFileSync,
+        renameSync: deps.renameSync,
+        unlinkSync: deps.unlinkSync,
+        chmodSync: deps.chmodSync,
+      },
+      { mode: 0o600 }
+    );
     console.log('Configuration patched successfully');
 
     env.KILOCLAW_FRESH_INSTALL = 'false';
@@ -667,6 +674,7 @@ When running \`openclaw doctor\` or \`openclaw security audit\`, the following f
 - **\`plugins.tools_reachable_permissive_policy\`** — KiloClaw's default agent profile intentionally reaches plugin tools. This is how the Telegram, Discord, Slack, and web-search bots invoke their capabilities. Restricting it would break the core bot workflow.
 - **\`hooks.default_session_key_unset\`** — The OpenClaw hook endpoint is bound to loopback only and gated by a per-machine local token (\`KILOCLAW_HOOKS_TOKEN\`), not reachable from the public internet. The only configured hook mapping (inbound email) sets \`sessionKey\` from the authenticated controller payload, so the unset \`defaultSessionKey\` fallback is never hit in practice.
 - **\`hooks.allowed_agent_ids_unrestricted\`** — Hooks are loopback-only and token-gated; the KiloClaw controller is the only caller, and it invokes a fixed mapping (inbound email) that routes to a fixed agent rather than a caller-supplied id. There is no external path to name an arbitrary agent id.
+- **\`fs.config.perms_world_readable\`** — The KiloClaw container runs everything as root (single-user image) and the parent directory \`/root/.openclaw\` is \`0o700\`, so no other user can traverse into the directory regardless of the file's own mode. The controller also writes \`openclaw.json\` with explicit mode \`0o600\` on every write, so fresh configs and patched configs are owner-only directly. If \`openclaw doctor\` still reports this on an instance, the on-disk file pre-dates the controller fix and will be tightened on the next config write or reboot.
 
 **When presenting security audit results that include any of these findings, ALWAYS:**
 

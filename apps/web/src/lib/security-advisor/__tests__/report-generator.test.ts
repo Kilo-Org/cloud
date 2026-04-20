@@ -252,12 +252,16 @@ describe('generateSecurityReport', () => {
     });
 
     it('shows divergence warning for known checkIds', () => {
-      const configFinding = report.findings.find(
-        f => f.checkId === 'fs.config.perms_world_readable'
-      );
-      expect(configFinding!.kiloClawComparison).not.toBeNull();
-      expect(configFinding!.kiloClawComparison).toContain('KiloClaw default');
-      expect(configFinding!.kiloClawComparison).toContain('diverged');
+      // Use net.no_tls rather than fs.config.perms_world_readable — the
+      // latter is in KILOCLAW_MITIGATED_CHECKS and gets filtered out of
+      // rendered findings on KiloClaw. net.no_tls is not mitigated,
+      // survives the filter, and matches the gateway_exposure coverage
+      // area in buildTestContent() so the divergence framing should
+      // attach to it.
+      const tlsFinding = report.findings.find(f => f.checkId === 'net.no_tls');
+      expect(tlsFinding!.kiloClawComparison).not.toBeNull();
+      expect(tlsFinding!.kiloClawComparison).toContain('KiloClaw default');
+      expect(tlsFinding!.kiloClawComparison).toContain('diverged');
     });
 
     it('returns null comparison for checkIds not in comparison table', () => {

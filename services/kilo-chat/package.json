@@ -24,6 +24,7 @@
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

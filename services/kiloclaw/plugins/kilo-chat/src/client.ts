@@ -1,10 +1,12 @@
+import type { ContentBlock } from '@kilocode/kilo-chat';
+
 export type KiloChatClientOptions = {
   controllerBaseUrl: string;
   gatewayToken: string;
   fetchImpl?: typeof fetch;
 };
 
-export type ContentBlock = { type: string; [key: string]: unknown };
+export type { ContentBlock };
 
 export type CreateMessageParams = {
   conversationId: string;

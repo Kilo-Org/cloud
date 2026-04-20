@@ -7,6 +7,7 @@
  * enqueue, and MembershipDO maintenance in one place.
  */
 
+import type { ContentBlock } from '@kilocode/kilo-chat';
 import { deliverToBot } from '../webhook/deliver';
 import {
   extractConversationContext,
@@ -15,8 +16,6 @@ import {
   pushInstanceEvent,
   isUserPresentInConversation,
 } from './event-push';
-
-export type ContentBlock = { type: string; [key: string]: unknown };
 
 type DeferCtx = { waitUntil: (p: Promise<unknown>) => void } | undefined;
 
@@ -52,7 +51,8 @@ export async function createMessageFor(
     inReplyToMessageId,
   });
   if (!result.ok) {
-    if (result.code === 'forbidden') return { ok: false, code: 'forbidden' as const, error: 'Forbidden' };
+    if (result.code === 'forbidden')
+      return { ok: false, code: 'forbidden' as const, error: 'Forbidden' };
     return { ok: false, code: 'internal' as const, error: result.error };
   }
 
@@ -107,111 +107,105 @@ export async function createMessageFor(
   }
 
   // Auto-title unnamed conversations with the first message text.
-    // Best-effort: the message is already committed, so a title failure must
-    // not reject the send.
-    if (info.title === null) {
-      const text = content
-        .filter(
-          (b): b is { type: 'text'; text: string } =>
-            b.type === 'text' && typeof b.text === 'string'
-        )
-        .map(b => b.text)
-        .join(' ')
-        .replace(/\n/g, ' ')
-        .trim();
-      if (text.length > 0) {
-        const title = text.length > 80 ? text.slice(0, 77) + '...' : text;
-        try {
-          await convStub.updateTitle(title);
-          await Promise.allSettled(
-            info.members.map(member => {
-              const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
-              return stub.updateConversationTitle(conversationId, title);
-            })
-          );
-          if (sandboxId) {
-            await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
-              conversationId,
-              title,
-            });
-          }
-        } catch (err) {
-          console.error('Failed to auto-title conversation:', err);
+  // Best-effort: the message is already committed, so a title failure must
+  // not reject the send.
+  if (info.title === null) {
+    const text = content
+      .filter(
+        (b): b is { type: 'text'; text: string } => b.type === 'text' && typeof b.text === 'string'
+      )
+      .map(b => b.text)
+      .join(' ')
+      .replace(/\n/g, ' ')
+      .trim();
+    if (text.length > 0) {
+      const title = text.length > 80 ? text.slice(0, 77) + '...' : text;
+      try {
+        await convStub.updateTitle(title);
+        await Promise.allSettled(
+          info.members.map(member => {
+            const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
+            return stub.updateConversationTitle(conversationId, title);
+          })
+        );
+        if (sandboxId) {
+          await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
+            conversationId,
+            title,
+          });
         }
+      } catch (err) {
+        console.error('Failed to auto-title conversation:', err);
       }
     }
+  }
 
-    const now = Date.now();
-    const results = await Promise.allSettled(
-      info.members.map(member => {
-        const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
-        return stub.updateLastActivity(conversationId, now);
+  const now = Date.now();
+  const results = await Promise.allSettled(
+    info.members.map(member => {
+      const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
+      return stub.updateLastActivity(conversationId, now);
+    })
+  );
+  for (const r of results) {
+    if (r.status === 'rejected') {
+      console.error('Failed to update MembershipDO lastActivityAt:', r.reason);
+    }
+  }
+  if (sandboxId) {
+    const otherHumans = humanMemberIds.filter(id => id !== callerId);
+
+    // The sender's own conversation is implicitly read — they just sent a message.
+    if (humanMemberIds.includes(callerId)) {
+      const senderStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(callerId));
+      await senderStub.markRead(conversationId, now).catch(() => {});
+    }
+
+    // Push message.created on conversation context
+    await pushEventToHumanMembers(
+      env,
+      conversationId,
+      sandboxId,
+      humanMemberIds,
+      'message.created',
+      {
+        messageId,
+        senderId: callerId,
+        content,
+        inReplyToMessageId: inReplyToMessageId ?? null,
+        clientId: clientId ?? null,
+      }
+    );
+
+    // Implicitly stop typing for human senders (bots manage their own typing lifecycle)
+    if (humanMemberIds.includes(callerId)) {
+      await pushEventToHumanMembers(env, conversationId, sandboxId, humanMemberIds, 'typing.stop', {
+        memberId: callerId,
+      });
+    }
+
+    // For each non-sender human member: if they're present in the conversation,
+    // auto-mark read. Otherwise, push conversation.activity on the instance context.
+    await Promise.allSettled(
+      otherHumans.map(async userId => {
+        const present = await isUserPresentInConversation(env, userId, sandboxId, conversationId);
+        if (present) {
+          const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
+          await stub.markRead(conversationId, now);
+          await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
+            conversationId,
+            memberId: userId,
+            lastReadAt: now,
+          });
+        } else {
+          await pushInstanceEvent(env, sandboxId, [userId], 'conversation.activity', {
+            conversationId,
+            lastActivityAt: now,
+          });
+        }
       })
     );
-    for (const r of results) {
-      if (r.status === 'rejected') {
-        console.error('Failed to update MembershipDO lastActivityAt:', r.reason);
-      }
-    }
-    if (sandboxId) {
-      const otherHumans = humanMemberIds.filter(id => id !== callerId);
-
-      // The sender's own conversation is implicitly read — they just sent a message.
-      if (humanMemberIds.includes(callerId)) {
-        const senderStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(callerId));
-        await senderStub.markRead(conversationId, now).catch(() => {});
-      }
-
-      // Push message.created on conversation context
-      await pushEventToHumanMembers(
-        env,
-        conversationId,
-        sandboxId,
-        humanMemberIds,
-        'message.created',
-        {
-          messageId,
-          senderId: callerId,
-          content,
-          inReplyToMessageId: inReplyToMessageId ?? null,
-          clientId: clientId ?? null,
-        }
-      );
-
-      // Implicitly stop typing for human senders (bots manage their own typing lifecycle)
-      if (humanMemberIds.includes(callerId)) {
-        await pushEventToHumanMembers(
-          env,
-          conversationId,
-          sandboxId,
-          humanMemberIds,
-          'typing.stop',
-          { memberId: callerId }
-        );
-      }
-
-      // For each non-sender human member: if they're present in the conversation,
-      // auto-mark read. Otherwise, push conversation.activity on the instance context.
-      await Promise.allSettled(
-        otherHumans.map(async userId => {
-          const present = await isUserPresentInConversation(env, userId, sandboxId, conversationId);
-          if (present) {
-            const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
-            await stub.markRead(conversationId, now);
-            await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
-              conversationId,
-              memberId: userId,
-              lastReadAt: now,
-            });
-          } else {
-            await pushInstanceEvent(env, sandboxId, [userId], 'conversation.activity', {
-              conversationId,
-              lastActivityAt: now,
-            });
-          }
-        })
-      );
-    }
+  }
 
   return { ok: true, messageId, clientId };
 }

@@ -1,3 +1,4 @@
+import type { ContentBlock } from '@kilocode/kilo-chat';
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -24,7 +25,7 @@ export type ConversationInfo = {
 
 export type CreateMessageParams = {
   senderId: string;
-  content: Array<{ type: string; [key: string]: unknown }>;
+  content: ContentBlock[];
   inReplyToMessageId?: string;
 };
 
@@ -43,19 +44,17 @@ export type MessageReactionSummary = {
   memberIds: string[];
 };
 
-export type MessageContentBlock = { type: string; [key: string]: string };
-
 export type GetMessageResult = {
   id: string;
   senderId: string;
-  content: MessageContentBlock[];
+  content: ContentBlock[];
   deleted: boolean;
 } | null;
 
 export type MessageRow = {
   id: string;
   senderId: string;
-  content: MessageContentBlock[];
+  content: ContentBlock[];
   inReplyToMessageId: string | null;
   updatedAt: number | null;
   clientUpdatedAt: number | null;
@@ -71,7 +70,7 @@ export type ListMessagesResult = {
 export type EditMessageParams = {
   messageId: string;
   senderId: string;
-  content: Array<{ type: string; [key: string]: unknown }>;
+  content: ContentBlock[];
   clientTimestamp: number;
 };
 
@@ -226,7 +225,7 @@ export class ConversationDO extends DurableObject<Env> {
     return {
       id: row.id,
       senderId: row.sender_id,
-      content: row.deleted === 1 ? [] : (JSON.parse(row.content) as MessageContentBlock[]),
+      content: row.deleted === 1 ? [] : (JSON.parse(row.content) as ContentBlock[]),
       deleted: row.deleted === 1,
     };
   }
@@ -270,7 +269,7 @@ export class ConversationDO extends DurableObject<Env> {
       messages: rows.map(row => ({
         id: row.id,
         senderId: row.sender_id,
-        content: row.deleted === 1 ? [] : (JSON.parse(row.content) as MessageContentBlock[]),
+        content: row.deleted === 1 ? [] : (JSON.parse(row.content) as ContentBlock[]),
         inReplyToMessageId: row.in_reply_to_message_id,
         updatedAt: row.updated_at,
         clientUpdatedAt: row.client_updated_at,

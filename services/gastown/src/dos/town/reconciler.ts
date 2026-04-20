@@ -2503,7 +2503,9 @@ function buildConflictResolutionPrompt(
   lines.push('   ```');
   lines.push('');
   lines.push('3. If there are conflicts during rebase, resolve them:');
-  lines.push('   - Edit the conflicting files to resolve the conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)');
+  lines.push(
+    '   - Edit the conflicting files to resolve the conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)'
+  );
   lines.push('   - Stage the resolved files: `git add <file>`');
   lines.push('   - Continue the rebase: `git rebase --continue`');
   lines.push('   - Repeat until the rebase completes');

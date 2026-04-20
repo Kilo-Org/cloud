@@ -12,7 +12,11 @@ import * as fs from 'node:fs/promises';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
 import { buildKiloConfigContent } from './agent-runner';
-import { getCurrentTownConfig, getLastAppliedEnvVarKeys, RESERVED_ENV_KEYS } from './control-server';
+import {
+  getCurrentTownConfig,
+  getLastAppliedEnvVarKeys,
+  RESERVED_ENV_KEYS,
+} from './control-server';
 import { log } from './logger';
 
 const MANAGER_LOG = '[process-manager]';
@@ -1279,7 +1283,7 @@ export async function updateAgentModel(
       if (RESERVED_ENV_KEYS.has(key)) continue;
       freshCustomKeySet.add(key);
       if (value !== undefined && value !== null) {
-        hotSwapEnv[key] = String(value);
+        hotSwapEnv[key] = typeof value === 'string' ? value : JSON.stringify(value);
       } else {
         delete hotSwapEnv[key];
       }

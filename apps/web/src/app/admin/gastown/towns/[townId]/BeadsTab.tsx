@@ -137,7 +137,11 @@ export function BeadsTab({ townId }: { townId: string }) {
     } else if (confirmAction.type === 'bulk-delete') {
       bulkDeleteMutation.mutate({ townId, beadIds: confirmAction.beadIds });
     } else {
-      deleteByStatusMutation.mutate({ townId, status: 'failed', type: typeFilter === 'all' ? undefined : typeFilter });
+      deleteByStatusMutation.mutate({
+        townId,
+        status: 'failed',
+        type: typeFilter === 'all' ? undefined : typeFilter,
+      });
     }
   };
 
@@ -272,9 +276,7 @@ export function BeadsTab({ townId }: { townId: string }) {
               size="sm"
               variant="outline"
               className="h-7 border-red-500/30 text-xs text-red-400 hover:bg-red-500/10"
-              onClick={() =>
-                setConfirmAction({ type: 'bulk-delete', beadIds: [...selectedIds] })
-              }
+              onClick={() => setConfirmAction({ type: 'bulk-delete', beadIds: [...selectedIds] })}
             >
               <Trash2 className="mr-1 size-3" />
               Delete selected

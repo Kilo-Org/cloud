@@ -81,7 +81,6 @@ import type {
   SendMailInput,
   Mail,
   ReviewQueueInput,
-  ReviewQueueEntry,
   AgentDoneInput,
   PrimeContext,
   Molecule,

@@ -780,7 +780,8 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                     [action.bead_id]
                   ),
                 ]);
-              const alreadyMarked = conflictMetaRows[0]?.has_conflicts === 1 ||
+              const alreadyMarked =
+                conflictMetaRows[0]?.has_conflicts === 1 ||
                 conflictMetaRows[0]?.has_conflicts === true;
 
               if (!alreadyMarked) {

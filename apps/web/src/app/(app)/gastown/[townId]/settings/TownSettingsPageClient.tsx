@@ -434,11 +434,11 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
 
             max_polecats_per_rig: cfg.max_polecats_per_rig ?? null,
 
-            github_token_set: !!(cfg.git_auth?.github_token),
-            gitlab_token_set: !!(cfg.git_auth?.gitlab_token),
+            github_token_set: !!cfg.git_auth?.github_token,
+            gitlab_token_set: !!cfg.git_auth?.gitlab_token,
             gitlab_instance_url: cfg.git_auth?.gitlab_instance_url || null,
-            github_cli_pat_set: !!(cfg.github_cli_pat),
-            git_author_name_set: !!(cfg.git_author_name),
+            github_cli_pat_set: !!cfg.github_cli_pat,
+            git_author_name_set: !!cfg.git_author_name,
             // git_author_name and git_author_email intentionally omitted (PII)
             disable_ai_coauthor: cfg.disable_ai_coauthor ?? false,
 
@@ -458,9 +458,9 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
             },
 
             custom_instructions: {
-              mayor_set: !!(cfg.custom_instructions?.mayor),
-              polecat_set: !!(cfg.custom_instructions?.polecat),
-              refinery_set: !!(cfg.custom_instructions?.refinery),
+              mayor_set: !!cfg.custom_instructions?.mayor,
+              polecat_set: !!cfg.custom_instructions?.polecat,
+              refinery_set: !!cfg.custom_instructions?.refinery,
             },
 
             alarm_interval_active: cfg.alarm_interval_active ?? null,

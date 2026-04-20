@@ -27,7 +27,7 @@ export class EventServiceClient {
   private connected = false;
   private rpcCounter = 0;
   private pendingRpcs = new Map<string, PendingRpc>();
-  private eventHandlers = new Map<string, Set<(payload: unknown) => void>>();
+  private eventHandlers = new Map<string, Set<(context: string, payload: unknown) => void>>();
   private activeContexts = new Set<string>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
@@ -118,7 +118,7 @@ export class EventServiceClient {
     });
   }
 
-  on(event: string, handler: (payload: unknown) => void): () => void {
+  on(event: string, handler: (context: string, payload: unknown) => void): () => void {
     let handlers = this.eventHandlers.get(event);
     if (!handlers) {
       handlers = new Set();
@@ -157,11 +157,10 @@ export class EventServiceClient {
         pending.reject(new EventServiceRpcError(message.error.code, message.error.body));
       }
     } else if (message.type === 'event') {
-      const key = `${message.context}:${message.event}`;
-      const handlers = this.eventHandlers.get(key);
+      const handlers = this.eventHandlers.get(message.event);
       if (handlers) {
         for (const handler of handlers) {
-          handler(message.payload);
+          handler(message.context, message.payload);
         }
       }
     }

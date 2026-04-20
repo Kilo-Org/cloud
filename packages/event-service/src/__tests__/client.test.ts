@@ -133,9 +133,9 @@ describe('EventServiceClient', () => {
     const client = makeClient();
     await client.connect();
 
-    const received: unknown[] = [];
-    client.on('room:123:message.created', (payload) => {
-      received.push(payload);
+    const received: Array<{ context: string; payload: unknown }> = [];
+    client.on('message.created', (context, payload) => {
+      received.push({ context, payload });
     });
 
     lastMockWs.triggerMessage({
@@ -146,16 +146,16 @@ describe('EventServiceClient', () => {
     });
 
     expect(received).toHaveLength(1);
-    expect(received[0]).toEqual({ text: 'hello' });
+    expect(received[0]).toEqual({ context: 'room:123', payload: { text: 'hello' } });
   });
 
   it('unsubscribe (off) removes handler — event no longer received', async () => {
     const client = makeClient();
     await client.connect();
 
-    const received: unknown[] = [];
-    const off = client.on('room:123:message.created', (payload) => {
-      received.push(payload);
+    const received: Array<{ context: string; payload: unknown }> = [];
+    const off = client.on('message.created', (context, payload) => {
+      received.push({ context, payload });
     });
 
     // Trigger once — should receive
@@ -178,6 +178,6 @@ describe('EventServiceClient', () => {
     });
 
     expect(received).toHaveLength(1);
-    expect(received[0]).toEqual({ text: 'first' });
+    expect(received[0]).toEqual({ context: 'room:123', payload: { text: 'first' } });
   });
 });

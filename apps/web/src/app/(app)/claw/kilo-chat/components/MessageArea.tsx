@@ -19,7 +19,7 @@ import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
 import { BotStatus } from './BotStatus';
 import { KiloChatApiError } from '@kilocode/kilo-chat';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, ArrowDown } from 'lucide-react';
 
 type MessageAreaProps = {
   conversationId: string;
@@ -37,6 +37,8 @@ export function MessageArea({
   assistantName,
 }: MessageAreaProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isRenamingTitle, setIsRenamingTitle] = useState(false);
@@ -83,23 +85,41 @@ export function MessageArea({
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    if (isNearBottom) {
-      el.scrollTop = el.scrollHeight;
-    }
+    if (!el || !autoScrollRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
-  // Load more on scroll to top
+  // Track scroll position to detect user scrolling away from bottom
   function handleScroll() {
     const el = scrollRef.current;
     if (!el) return;
+
+    // Load more on scroll to top
     if (el.scrollTop < 50 && hasNextPage && !isFetchingNextPage) {
       void fetchNextPage();
     }
+
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    if (isNearBottom) {
+      autoScrollRef.current = true;
+      setShowScrollButton(false);
+    } else {
+      autoScrollRef.current = false;
+      setShowScrollButton(true);
+    }
+  }
+
+  function scrollToBottom() {
+    const el = scrollRef.current;
+    if (!el) return;
+    autoScrollRef.current = true;
+    setShowScrollButton(false);
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }
 
   function handleSend(text: string, inReplyToMessageId?: string) {
+    autoScrollRef.current = true;
+    setShowScrollButton(false);
     sendMessage.mutate(
       {
         conversationId,
@@ -199,40 +219,57 @@ export function MessageArea({
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto py-4" onScroll={handleScroll}>
-        {isFetchingNextPage && (
-          <div className="text-muted-foreground py-2 text-center text-xs">
-            Loading older messages...
-          </div>
-        )}
-        {messages.length === 0 && !isFetchingNextPage && (
-          <div className="flex h-full flex-col items-center justify-center px-6">
-            <div className="border-border bg-muted/50 flex flex-col items-center gap-3 rounded-lg border px-8 py-6">
-              <MessageCircle className="text-muted-foreground/60 h-8 w-8" />
-              <p className="text-muted-foreground text-sm">
-                Ask {assistantName ?? 'KiloClaw'} to draft a message, make a checklist,
-                <br />
-                or help you think through a decision.
-              </p>
+      <div className="relative flex-1 overflow-hidden">
+        <div
+          ref={scrollRef}
+          className="absolute inset-0 overflow-y-auto py-4"
+          onScroll={handleScroll}
+        >
+          {isFetchingNextPage && (
+            <div className="text-muted-foreground py-2 text-center text-xs">
+              Loading older messages...
             </div>
-          </div>
+          )}
+          {messages.length === 0 && !isFetchingNextPage && (
+            <div className="flex h-full flex-col items-center justify-center px-6">
+              <div className="border-border bg-muted/50 flex flex-col items-center gap-3 rounded-lg border px-8 py-6">
+                <MessageCircle className="text-muted-foreground/60 h-8 w-8" />
+                <p className="text-muted-foreground text-sm">
+                  Ask {assistantName ?? 'KiloClaw'} to draft a message, make a checklist,
+                  <br />
+                  or help you think through a decision.
+                </p>
+              </div>
+            </div>
+          )}
+          {messages.map(msg => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              isOwn={msg.senderId === currentUserId}
+              replyToMessage={
+                msg.inReplyToMessageId ? (messageMap.get(msg.inReplyToMessageId) ?? null) : null
+              }
+              pendingDeleteId={pendingDeleteId}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onConfirmDelete={handleConfirmDelete}
+              onCancelDelete={handleCancelDelete}
+              onReply={setReplyingTo}
+            />
+          ))}
+        </div>
+
+        {/* Scroll to bottom button */}
+        {showScrollButton && (
+          <button
+            onClick={scrollToBottom}
+            className="bg-muted hover:bg-accent border-border absolute bottom-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border shadow-md cursor-pointer transition-colors"
+            title="Scroll to bottom"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </button>
         )}
-        {messages.map(msg => (
-          <MessageBubble
-            key={msg.id}
-            message={msg}
-            isOwn={msg.senderId === currentUserId}
-            replyToMessage={
-              msg.inReplyToMessageId ? (messageMap.get(msg.inReplyToMessageId) ?? null) : null
-            }
-            pendingDeleteId={pendingDeleteId}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onConfirmDelete={handleConfirmDelete}
-            onCancelDelete={handleCancelDelete}
-            onReply={setReplyingTo}
-          />
-        ))}
       </div>
 
       {/* Typing indicator — fixed height to prevent layout shift */}

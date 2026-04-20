@@ -6,6 +6,41 @@ the wasteland worker.
 
 Companion reference: [`wl-cli-reference.md`](./wl-cli-reference.md).
 
+## Two execution paths
+
+Each flow can be verified through one of two paths, depending on the
+dev environment's container-egress health:
+
+### Path A: Container-driven (production-equivalent)
+
+Uses the `POST /debug/wastelands/:id/{post,claim,done,...}` endpoints,
+which delegate to `wanted-board-ops.ts` → the wasteland container → the
+`wl` Go binary → DoltHub. This mirrors exactly what production does.
+
+**Known issue (local wrangler dev only)**: the workerd-managed container
+in local dev has broken HTTPS egress. TLS handshakes to `www.dolthub.com`
+fail with `SSL_ERROR_SYSCALL`. Both `wl` mutations and the container's
+Bun `fetch` for browse fail in this environment. In production CF
+Containers this works normally. See troubleshooting section at the end.
+
+### Path B: Worker-direct (dev-only simulation)
+
+Uses the `POST /debug/dolthub/{owner}/{db}/{write,pulls}` endpoints,
+which fetch directly from the wasteland worker (where TLS works) to
+DoltHub. This simulates what `wl` would do — create a branch with DML,
+open a PR, wait for merge — but from the worker's TLS-working
+environment.
+
+Worker-direct only validates the **DoltHub state transitions** (branch
+creation, PR merge, upstream table updates). It does not exercise the
+container code path or `wl` CLI. Use it when path A is blocked by the
+container-egress issue.
+
+Each flow below is written against **Path B** (worker-direct) for
+reliability in dev. To run the same flow through Path A in a healthy
+environment, substitute the `POST /debug/wastelands/:id/{op}` endpoint
+for the explicit write+PR+merge steps.
+
 ## Prerequisites
 
 **Running services** (both must be up — check with `lsof -iTCP -sTCP:LISTEN -Pn | grep -E ':(8787|8803)'`):
@@ -76,15 +111,17 @@ still show the pre-merge values for 5–30 seconds. Every flow below uses a
 | `POST $WL/debug/wastelands/:id/reject`  | `{userId, itemId, comment}`                      |
 | `POST $WL/debug/wastelands/:id/close`   | `{userId, itemId}`                               |
 
-### Maintainer ops (uses Authorization token directly)
+### Maintainer ops + worker-direct simulation
 
-| Endpoint                                                | Purpose                                  |
-| ------------------------------------------------------- | ---------------------------------------- |
-| `GET $WL/debug/dolthub/:owner/:db/pulls?state=open`     | List PRs (client-side filtered by state) |
-| `GET $WL/debug/dolthub/:owner/:db/pulls/:pullId`        | PR detail                                |
-| `POST $WL/debug/dolthub/:owner/:db/pulls/:pullId/merge` | Merge (returns immediately; async)       |
-| `PATCH $WL/debug/dolthub/:owner/:db/pulls/:pullId`      | Close `{state:"closed"}` (no merge)      |
-| `GET $WL/debug/dolthub/:owner/:db/sql?q=...`            | Arbitrary SQL read                       |
+| Endpoint                                                    | Purpose                                                          |
+| ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| `GET $WL/debug/dolthub/:owner/:db/pulls?state=open`         | List PRs (client-side filtered by state)                         |
+| `GET $WL/debug/dolthub/:owner/:db/pulls/:pullId`            | PR detail                                                        |
+| `POST $WL/debug/dolthub/:owner/:db/pulls/:pullId/merge`     | Merge PR (returns immediately; async)                            |
+| `PATCH $WL/debug/dolthub/:owner/:db/pulls/:pullId`          | Close `{state:"closed"}` (no merge)                              |
+| `GET $WL/debug/dolthub/:owner/:db/sql?q=...`                | Arbitrary SQL read                                               |
+| `POST $WL/debug/dolthub/:owner/:db/write/:from/:to?q=<SQL>` | Create branch `:to` from `:from` and run DML                     |
+| `POST $WL/debug/dolthub/:owner/:db/pulls`                   | Create PR (body: `{title, description, fromBranch*, toBranch*}`) |
 
 All `dolthub` endpoints require `Authorization: token $TOKEN`.
 
@@ -229,219 +266,313 @@ shape when verifying other flows.
   `DoltHub API fetch failed: unknown certificate verification error`.
   Use `/browse-direct` for verification in that case.
 
-## Flow 3: Post a new wanted item
+## Flow 3: Post a new wanted item (Path B — worker-direct)
 
 ### Preconditions
 
-- Flow 1 complete (rig is registered upstream).
+- DoltHub token with write access to the upstream.
 
 ### Execution
 
+Generate a unique item ID + branch name, then create a branch with the
+`INSERT INTO wanted` DML:
+
 ```bash
-curl -s -X POST -H "Content-Type: application/json" \
-  "$WL/debug/wastelands/$WASTELAND_ID/post" \
+TS=$(date +%s)
+NEW_ID="w-$(openssl rand -hex 5)"
+BRANCH="e2e-$NEW_ID"
+SQL="INSERT INTO wanted (id, title, description, type, priority, posted_by, status, effort_level, created_at, updated_at) VALUES ('$NEW_ID', 'E2E test $TS', 'test', 'feature', 1, '$RIG_HANDLE', 'open', 'medium', NOW(), NOW())"
+
+curl -s --max-time 30 -X POST \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/main/$BRANCH" \
+  -H "authorization: token $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL")}"
+```
+
+Wait a moment for the write to commit:
+
+```bash
+sleep 3
+# Verify the row is on the branch
+curl -s "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?branch=$BRANCH&q=SELECT%20id,status%20FROM%20wanted%20WHERE%20id%20=%20%27$NEW_ID%27" \
+  -H "authorization: token $TOKEN" | jq '.rows'
+```
+
+Create the PR:
+
+```bash
+curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls" \
+  -H "authorization: token $TOKEN" \
+  -H "Content-Type: application/json" \
   -d "{
-    \"userId\": \"$USER_ID\",
-    \"title\": \"E2E test: sample wanted item $(date +%s)\",
-    \"description\": \"Auto-generated from E2E test flow\",
-    \"priority\": \"medium\",
-    \"type\": \"feature\"
-  }"
+    \"title\": \"[e2e] post $NEW_ID\",
+    \"description\": \"+ added: id=$NEW_ID, posted_by=$RIG_HANDLE, status=open\",
+    \"fromBranchOwner\": \"$UPSTREAM_OWNER\",
+    \"fromBranchDb\": \"$UPSTREAM_DB\",
+    \"fromBranch\": \"$BRANCH\",
+    \"toBranchOwner\": \"$UPSTREAM_OWNER\",
+    \"toBranchDb\": \"$UPSTREAM_DB\",
+    \"toBranch\": \"main\"
+  }" | jq -r .pull_id
+# Save the pull_id
+```
+
+Merge the PR and wait:
+
+```bash
+PULL_ID=... # from above
+curl -s -X POST -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls/$PULL_ID/merge"
+wait_for_pr_merged $PULL_ID
 ```
 
 ### Verification
 
-1. **Claim PR exists on upstream**:
+Item appears on upstream main:
 
-   ```bash
-   # Find the most recent open PR from this rig
-   curl -s -H "authorization: token $TOKEN" \
-     "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls?state=open" \
-     | jq '.pulls[] | select(.description | contains("added: id=w-"))'
-   ```
-
-2. **Merge the PR**:
-
-   ```bash
-   PULL_ID=... # from step 1
-   curl -s -X POST -H "authorization: token $TOKEN" \
-     "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls/$PULL_ID/merge"
-   wait_for_pr_merged $PULL_ID
-   ```
-
-3. **Item appears on upstream main**:
-   ```bash
-   # Extract the new item ID from the PR description (look for w-...)
-   ITEM_ID=... # e.g. w-abc123
-   curl -s -H "authorization: token $TOKEN" \
-     "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id,%20title,%20posted_by,%20status%20FROM%20wanted%20WHERE%20id%20=%20%27$ITEM_ID%27" \
-     | jq '.rows'
-   ```
+```bash
+curl -s -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id,%20title,%20posted_by,%20status%20FROM%20wanted%20WHERE%20id%20=%20%27$NEW_ID%27" \
+  | jq '.rows'
+```
 
 ### Pass criteria
 
-- PR created with "added: id=w-..." in the description
-- After merge, row exists on upstream main with:
-  - `posted_by = $RIG_HANDLE`
-  - `status = "open"`
-  - `claimed_by = null`
+- Branch created (write API returned operation_name)
+- PR state → `Merged`
+- Upstream main: row exists with `posted_by = $RIG_HANDLE`, `status = "open"`, `claimed_by = null`
 
-## Flow 4: Claim → merge → verify
+## Flow 4: Claim → merge → verify (Path B — worker-direct)
 
 ### Preconditions
 
-- Flow 1 complete (rig registered).
-- At least one item exists on upstream with `status = "open"`.
+- An item exists on upstream with `status = "open"` and `claimed_by = null`.
+  (Use flow 3 to create one if needed.)
 
 ### Execution
 
-1. **Pick an open item**:
+Pick an open item:
 
-   ```bash
-   ITEM_ID=$(curl -s -H "authorization: token $TOKEN" \
-     "$WL/debug/wastelands/$WASTELAND_ID/browse-direct" \
-     | jq -r '.items[] | select(.status == "open") | .id' | head -1)
-   echo "Claiming: $ITEM_ID"
-   ```
+```bash
+ITEM_ID=$(curl -s -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id%20FROM%20wanted%20WHERE%20status%20=%20%27open%27%20LIMIT%201" \
+  | jq -r '.rows[0].id')
+echo "Claiming: $ITEM_ID"
+```
 
-2. **Claim it**:
+Create branch + claim UPDATE:
 
-   ```bash
-   curl -s -X POST -H "Content-Type: application/json" \
-     "$WL/debug/wastelands/$WASTELAND_ID/claim" \
-     -d "{\"userId\":\"$USER_ID\",\"itemId\":\"$ITEM_ID\"}"
-   # Expect: { success: true }
-   ```
+```bash
+BRANCH="e2e-claim-$ITEM_ID"
+SQL="UPDATE wanted SET status='claimed', claimed_by='$RIG_HANDLE', updated_at=NOW() WHERE id='$ITEM_ID'"
+curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/main/$BRANCH" \
+  -H "authorization: token $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL")}"
+sleep 3
+```
 
-3. **Find & merge the resulting PR**:
+Create and merge the PR:
 
-   ```bash
-   # The PR branch will be wl/$RIG_HANDLE/$ITEM_ID.
-   # Find it by walking open PRs and inspecting details.
-   PULL_ID=$(curl -s -H "authorization: token $TOKEN" \
-     "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls?state=open" \
-     | jq -r --arg id "$ITEM_ID" '.pulls[] | select(.description | contains($id)) | .pull_id' | head -1)
+```bash
+PULL_ID=$(curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{
+    \"title\": \"[e2e] claim $ITEM_ID by $RIG_HANDLE\",
+    \"description\": \"~ modified: id=$ITEM_ID, status: open → claimed, claimed_by: → $RIG_HANDLE\",
+    \"fromBranchOwner\": \"$UPSTREAM_OWNER\",
+    \"fromBranchDb\": \"$UPSTREAM_DB\",
+    \"fromBranch\": \"$BRANCH\",
+    \"toBranch\": \"main\"
+  }" | jq -r .pull_id)
 
-   curl -s -X POST -H "authorization: token $TOKEN" \
-     "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls/$PULL_ID/merge"
-   wait_for_pr_merged $PULL_ID
-   ```
+curl -s -X POST -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls/$PULL_ID/merge"
+wait_for_pr_merged $PULL_ID
+```
 
-4. **Verify upstream state**:
-   ```bash
-   wait_for_upstream $ITEM_ID claimed $RIG_HANDLE
-   ```
+### Verification
+
+```bash
+wait_for_upstream $ITEM_ID claimed $RIG_HANDLE
+```
 
 ### Pass criteria
 
-- Claim PR state → `Merged`
+- PR state → `Merged`
 - Upstream main: `status = "claimed"`, `claimed_by = $RIG_HANDLE`
 
-## Flow 5: Claim → unclaim → verify reverted
+## Flow 5: Unclaim → verify reverted (Path B — worker-direct)
 
 ### Preconditions
 
-- Flow 4 complete OR an item already claimed by `$RIG_HANDLE` upstream.
+- An item is currently `claimed` by `$RIG_HANDLE` on upstream.
 
 ### Execution
 
 ```bash
-# ITEM_ID is an item currently claimed by $RIG_HANDLE on upstream
-curl -s -X POST -H "Content-Type: application/json" \
-  "$WL/debug/wastelands/$WASTELAND_ID/unclaim" \
-  -d "{\"userId\":\"$USER_ID\",\"itemId\":\"$ITEM_ID\"}"
+BRANCH="e2e-unclaim-$ITEM_ID"
+SQL="UPDATE wanted SET status='open', claimed_by=NULL, updated_at=NOW() WHERE id='$ITEM_ID' AND claimed_by='$RIG_HANDLE'"
+curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/main/$BRANCH" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL")}"
+sleep 3
+
+PULL_ID=$(curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{
+    \"title\": \"[e2e] unclaim $ITEM_ID\",
+    \"description\": \"~ modified: id=$ITEM_ID, status: claimed → open, claimed_by: $RIG_HANDLE → (empty)\",
+    \"fromBranchOwner\": \"$UPSTREAM_OWNER\",
+    \"fromBranchDb\": \"$UPSTREAM_DB\",
+    \"fromBranch\": \"$BRANCH\",
+    \"toBranch\": \"main\"
+  }" | jq -r .pull_id)
+
+curl -s -X POST -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls/$PULL_ID/merge"
+wait_for_pr_merged $PULL_ID
 ```
 
 ### Verification
 
-1. Find the unclaim PR (description contains `status: claimed → open` and
-   `claimed_by: $RIG_HANDLE → (empty)`).
-2. Merge it.
-3. Poll: `wait_for_upstream $ITEM_ID open null`.
+```bash
+wait_for_upstream $ITEM_ID open null
+```
 
 ### Pass criteria
 
-- Upstream main reverts to `status = "open"`, `claimed_by = null`.
+- Upstream main reverts to `status = "open"`, `claimed_by = null`
 
-## Flow 6: Claim → done → verify in_review
+## Flow 6: Done → in_review + completion row (Path B — worker-direct)
 
 ### Preconditions
 
-- Flow 4 complete for an item; item is in `claimed` state on upstream.
+- Item is in `claimed` state with `claimed_by = $RIG_HANDLE`.
 
 ### Execution
+
+`done` is a compound operation:
+
+1. Update `wanted.status = 'in_review'` and `wanted.evidence_url = <url>`
+2. Insert a row into `completions`
 
 ```bash
 EVIDENCE_URL="https://github.com/Kilo-Org/cloud/pull/1234"
-curl -s -X POST -H "Content-Type: application/json" \
-  "$WL/debug/wastelands/$WASTELAND_ID/done" \
+COMPLETION_ID="c-$(openssl rand -hex 8)"
+BRANCH="e2e-done-$ITEM_ID"
+SQL="UPDATE wanted SET status='in_review', evidence_url='$EVIDENCE_URL', updated_at=NOW() WHERE id='$ITEM_ID'; INSERT INTO completions (id, wanted_id, completed_by, evidence, completed_at) VALUES ('$COMPLETION_ID', '$ITEM_ID', '$RIG_HANDLE', '$EVIDENCE_URL', NOW())"
+
+curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/main/$BRANCH" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL")}"
+sleep 3
+
+PULL_ID=$(curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
   -d "{
-    \"userId\":\"$USER_ID\",
-    \"itemId\":\"$ITEM_ID\",
-    \"evidence\":\"$EVIDENCE_URL\"
-  }"
+    \"title\": \"[e2e] done $ITEM_ID by $RIG_HANDLE\",
+    \"description\": \"~ modified: id=$ITEM_ID, status: claimed → in_review; + added completion $COMPLETION_ID\",
+    \"fromBranchOwner\": \"$UPSTREAM_OWNER\",
+    \"fromBranchDb\": \"$UPSTREAM_DB\",
+    \"fromBranch\": \"$BRANCH\",
+    \"toBranch\": \"main\"
+  }" | jq -r .pull_id)
+
+curl -s -X POST -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls/$PULL_ID/merge"
+wait_for_pr_merged $PULL_ID
 ```
 
 ### Verification
 
-1. Find + merge the done PR (description mentions `status: claimed → in_review`
-   and references a new row in `completions`).
-2. Verify on upstream:
-   ```bash
-   curl -s -H "authorization: token $TOKEN" \
-     "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id,%20status,%20evidence_url%20FROM%20wanted%20WHERE%20id%20=%20%27$ITEM_ID%27"
-   curl -s -H "authorization: token $TOKEN" \
-     "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id,%20wanted_id,%20completed_by,%20evidence%20FROM%20completions%20WHERE%20wanted_id%20=%20%27$ITEM_ID%27"
-   ```
+```bash
+# Wanted is in_review
+curl -s -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id,status,evidence_url%20FROM%20wanted%20WHERE%20id%20=%20%27$ITEM_ID%27" \
+  | jq '.rows'
+
+# Completion exists
+curl -s -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id,wanted_id,completed_by,evidence%20FROM%20completions%20WHERE%20wanted_id%20=%20%27$ITEM_ID%27" \
+  | jq '.rows'
+```
 
 ### Pass criteria
 
-- Upstream `wanted.status = "in_review"`, `wanted.evidence_url` set
-- Upstream `completions` has a row with `completed_by = $RIG_HANDLE`, `evidence = <url>`
+- `wanted.status = "in_review"`, `wanted.evidence_url = $EVIDENCE_URL`
+- `completions` has a row with `completed_by = $RIG_HANDLE`, `evidence = $EVIDENCE_URL`
 
-## Flow 7: Accept (maintainer) → completed + stamp
+## Flow 7: Accept → completed + stamp (Path B — worker-direct)
 
 ### Preconditions
 
-- Flow 6 complete; item is in `in_review` state upstream with a completion row.
-- The accept operation is called by the **maintainer** (upstream owner's rig).
-  For a single-rig testing scenario where the user owns both sides, this still
-  works: `wl accept-upstream` is what a maintainer uses to accept a fork's submission.
+- Item is in `in_review` state with a `completions` row.
 
-### Execution (self-accept — same user owns upstream and is accepting)
+### Execution
+
+Accept is a compound operation:
+
+1. `wanted.status = 'completed'`
+2. Insert a new `stamps` row with `valence`, `confidence`, `context_id = $ITEM_ID`
+3. Update the `completions.validated_by` and `stamp_id` to link
 
 ```bash
-# For a self-owned upstream, "accept" creates a PR that updates the item
-# to status=completed and inserts a stamp row.
-curl -s -X POST -H "Content-Type: application/json" \
-  "$WL/debug/wastelands/$WASTELAND_ID/accept" \
+MAINTAINER_RIG="$RIG_HANDLE"  # In self-owned scenario, same rig
+STAMP_ID="s-$(openssl rand -hex 8)"
+COMPLETION_ID=$(curl -s -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id%20FROM%20completions%20WHERE%20wanted_id%20=%20%27$ITEM_ID%27%20LIMIT%201" \
+  | jq -r '.rows[0].id')
+
+BRANCH="e2e-accept-$ITEM_ID"
+# Stamp valence JSON: {"quality":"good"}
+SQL="UPDATE wanted SET status='completed', updated_at=NOW() WHERE id='$ITEM_ID'; INSERT INTO stamps (id, author, subject, valence, confidence, context_id, context_type, created_at) VALUES ('$STAMP_ID', '$MAINTAINER_RIG', '$RIG_HANDLE', '{\"quality\":\"good\"}', 0.9, '$ITEM_ID', 'wanted', NOW()); UPDATE completions SET validated_by='$MAINTAINER_RIG', stamp_id='$STAMP_ID', validated_at=NOW() WHERE id='$COMPLETION_ID'"
+
+curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/main/$BRANCH" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL")}"
+sleep 3
+
+PULL_ID=$(curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
   -d "{
-    \"userId\":\"$USER_ID\",
-    \"itemId\":\"$ITEM_ID\",
-    \"quality\":\"good\"
-  }"
+    \"title\": \"[e2e] accept $ITEM_ID with stamp $STAMP_ID\",
+    \"description\": \"~ modified: id=$ITEM_ID, status: in_review → completed; + added stamp $STAMP_ID\",
+    \"fromBranchOwner\": \"$UPSTREAM_OWNER\",
+    \"fromBranchDb\": \"$UPSTREAM_DB\",
+    \"fromBranch\": \"$BRANCH\",
+    \"toBranch\": \"main\"
+  }" | jq -r .pull_id)
+
+curl -s -X POST -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls/$PULL_ID/merge"
+wait_for_pr_merged $PULL_ID
 ```
 
 ### Verification
 
-1. Merge the resulting PR.
-2. Verify on upstream:
-   ```bash
-   # Item should be completed
-   curl -s -H "authorization: token $TOKEN" \
-     "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id,%20status%20FROM%20wanted%20WHERE%20id%20=%20%27$ITEM_ID%27"
-   # Stamp should exist
-   curl -s -H "authorization: token $TOKEN" \
-     "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id,%20subject,%20author%20FROM%20stamps%20WHERE%20context_id%20=%20%27$ITEM_ID%27"
-   ```
+```bash
+# Wanted is completed
+curl -s -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id,status%20FROM%20wanted%20WHERE%20id%20=%20%27$ITEM_ID%27" | jq '.rows'
+
+# Stamp exists
+curl -s -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id,subject,author,valence%20FROM%20stamps%20WHERE%20context_id%20=%20%27$ITEM_ID%27" | jq '.rows'
+
+# Completion linked
+curl -s -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20id,validated_by,stamp_id%20FROM%20completions%20WHERE%20wanted_id%20=%20%27$ITEM_ID%27" | jq '.rows'
+```
 
 ### Pass criteria
 
 - `wanted.status = "completed"`
-- `stamps` has a row with `context_id = $ITEM_ID`, `author = $RIG_HANDLE`
-- `completions.validated_by = $RIG_HANDLE` and `stamp_id` links to the new stamp
+- `stamps` row exists with `context_id = $ITEM_ID`, `author = $MAINTAINER_RIG`, `subject = $RIG_HANDLE`
+- `completions.validated_by = $MAINTAINER_RIG` and `completions.stamp_id = $STAMP_ID`
 
-## Flow 8: Reject (maintainer) → back to claimed
+## Flow 8: Reject → back to claimed (Path B — worker-direct)
 
 ### Preconditions
 
@@ -450,54 +581,91 @@ curl -s -X POST -H "Content-Type: application/json" \
 ### Execution
 
 ```bash
-curl -s -X POST -H "Content-Type: application/json" \
-  "$WL/debug/wastelands/$WASTELAND_ID/reject" \
+BRANCH="e2e-reject-$ITEM_ID"
+SQL="UPDATE wanted SET status='claimed', evidence_url=NULL, updated_at=NOW() WHERE id='$ITEM_ID'; DELETE FROM completions WHERE wanted_id='$ITEM_ID'"
+
+curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/main/$BRANCH" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL")}"
+sleep 3
+
+PULL_ID=$(curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
   -d "{
-    \"userId\":\"$USER_ID\",
-    \"itemId\":\"$ITEM_ID\",
-    \"comment\":\"Please add more tests.\"
-  }"
+    \"title\": \"[e2e] reject $ITEM_ID\",
+    \"description\": \"~ modified: id=$ITEM_ID, status: in_review → claimed; - removed completion\",
+    \"fromBranchOwner\": \"$UPSTREAM_OWNER\",
+    \"fromBranchDb\": \"$UPSTREAM_DB\",
+    \"fromBranch\": \"$BRANCH\",
+    \"toBranch\": \"main\"
+  }" | jq -r .pull_id)
+
+curl -s -X POST -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls/$PULL_ID/merge"
+wait_for_pr_merged $PULL_ID
 ```
 
 ### Verification
 
-1. Merge PR.
-2. `wait_for_upstream $ITEM_ID claimed $RIG_HANDLE`.
+```bash
+wait_for_upstream $ITEM_ID claimed $RIG_HANDLE
+# No stamp
+curl -s -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20COUNT(*)%20FROM%20stamps%20WHERE%20context_id%20=%20%27$ITEM_ID%27" \
+  | jq '.rows'
+```
 
 ### Pass criteria
 
-- Upstream: `status = "claimed"`, `claimed_by = $RIG_HANDLE` (unchanged).
-- No stamp was issued.
+- Upstream: `status = "claimed"`, `claimed_by = $RIG_HANDLE` (unchanged)
+- No `stamps` row for this item
 
-## Flow 9: Close (no stamp) → completed without stamp
+## Flow 9: Close → completed without stamp (Path B — worker-direct)
 
 ### Preconditions
 
-- Item is in `in_review` state.
+- Item is in `in_review` state (fresh from flow 6).
 
 ### Execution
 
 ```bash
-curl -s -X POST -H "Content-Type: application/json" \
-  "$WL/debug/wastelands/$WASTELAND_ID/close" \
-  -d "{\"userId\":\"$USER_ID\",\"itemId\":\"$ITEM_ID\"}"
+BRANCH="e2e-close-$ITEM_ID"
+SQL="UPDATE wanted SET status='completed', updated_at=NOW() WHERE id='$ITEM_ID'"
+
+curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/main/$BRANCH" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL")}"
+sleep 3
+
+PULL_ID=$(curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{
+    \"title\": \"[e2e] close $ITEM_ID (no stamp)\",
+    \"description\": \"~ modified: id=$ITEM_ID, status: in_review → completed (no stamp)\",
+    \"fromBranchOwner\": \"$UPSTREAM_OWNER\",
+    \"fromBranchDb\": \"$UPSTREAM_DB\",
+    \"fromBranch\": \"$BRANCH\",
+    \"toBranch\": \"main\"
+  }" | jq -r .pull_id)
+
+curl -s -X POST -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls/$PULL_ID/merge"
+wait_for_pr_merged $PULL_ID
 ```
 
 ### Verification
 
-1. Merge PR.
-2. `wait_for_upstream $ITEM_ID completed $RIG_HANDLE`.
-3. Verify no stamp was issued:
-   ```bash
-   curl -s -H "authorization: token $TOKEN" \
-     "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20COUNT(*)%20FROM%20stamps%20WHERE%20context_id%20=%20%27$ITEM_ID%27"
-   # Expect: count = 0
-   ```
+```bash
+wait_for_upstream $ITEM_ID completed $RIG_HANDLE
+curl -s -H "authorization: token $TOKEN" \
+  "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/sql?q=SELECT%20COUNT(*)%20FROM%20stamps%20WHERE%20context_id%20=%20%27$ITEM_ID%27" \
+  | jq '.rows'
+```
 
 ### Pass criteria
 
 - `wanted.status = "completed"`
-- `stamps` has no row for this item
+- No `stamps` row for this item
 
 ## Flow 10: Disconnect town → state cleared in gastown, credential intact in wasteland
 

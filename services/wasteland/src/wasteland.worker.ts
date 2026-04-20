@@ -469,6 +469,56 @@ app.get('/debug/dolthub/:owner/:db/sql', async c => {
   return c.json(data, res.status as 200);
 });
 
+// DoltHub write API — creates a branch and commits the DML in one call.
+// URL: POST /api/v1alpha1/{owner}/{db}/write/{from_branch}/{to_branch}?q=<SQL>
+// The write creates `to_branch` as a new branch forked from `from_branch`,
+// then commits the DML on `to_branch`. Used by E2E tests to simulate what
+// `wl` would do in production.
+app.post('/debug/dolthub/:owner/:db/write/:fromBranch/:toBranch', async c => {
+  const token = getDoltHubToken(c);
+  if (!token) return c.json({ error: 'Missing DoltHub token' }, 401);
+  const { owner, db, fromBranch, toBranch } = c.req.param();
+  const body = await c.req.json().catch(() => ({}));
+  const sql = body.q ?? c.req.query('q');
+  if (!sql) return c.json({ error: 'Missing q (SQL) in body or query' }, 400);
+  const url = `${DOLTHUB_API_BASE}/${owner}/${db}/write/${encodeURIComponent(fromBranch)}/${encodeURIComponent(toBranch)}?q=${encodeURIComponent(String(sql))}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { authorization: `token ${token}` },
+  });
+  const data: unknown = await res.json();
+  return c.json(data, res.status as 200);
+});
+
+// Create a pull request. Used after a write to submit a branch upstream.
+app.post('/debug/dolthub/:owner/:db/pulls', async c => {
+  const token = getDoltHubToken(c);
+  if (!token) return c.json({ error: 'Missing DoltHub token' }, 401);
+  const { owner, db } = c.req.param();
+  const body = await c.req.json().catch(() => ({}));
+  // DoltHub wants camelCase params on POST /pulls
+  const payload = {
+    title: body.title,
+    description: body.description ?? '',
+    fromBranchOwnerName: body.fromBranchOwner,
+    fromBranchRepoName: body.fromBranchDb ?? body.fromBranchRepo,
+    fromBranchName: body.fromBranch,
+    toBranchOwnerName: body.toBranchOwner ?? owner,
+    toBranchRepoName: body.toBranchDb ?? body.toBranchRepo ?? db,
+    toBranchName: body.toBranch ?? 'main',
+  };
+  const res = await fetch(`${DOLTHUB_API_BASE}/${owner}/${db}/pulls`, {
+    method: 'POST',
+    headers: {
+      authorization: `token ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const data: unknown = await res.json();
+  return c.json(data, res.status as 200);
+});
+
 // ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for all /api/*
 // routes. Skipped in development mode for easier local testing.

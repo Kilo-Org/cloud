@@ -58,8 +58,14 @@ export async function createMessageFor(
 
   const { messageId } = result;
 
+  // Single getInfo() call to get all members — avoids separate getBotMembersExcluding RPC.
+  const info = await convStub.getInfo();
+  if (!info) return { ok: true, messageId, clientId };
+
+  const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
+  const botMembers = info.members.filter(m => m.kind === 'bot' && m.id !== callerId);
+
   // Deliver webhook to each bot member (other than the sender) via direct RPC.
-  const botMembers = await convStub.getBotMembersExcluding(callerId);
   if (botMembers.length > 0) {
     const now = new Date().toISOString();
 
@@ -100,14 +106,7 @@ export async function createMessageFor(
     }
   }
 
-  // Update lastActivityAt on every member's MembershipDO so their recency
-  // sort reflects this new message. Best-effort: the message and webhook are
-  // already committed, so a MembershipDO failure must not fail the request.
-  const info = await convStub.getInfo();
-  if (info) {
-    const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
-
-    // Auto-title unnamed conversations with the first message text.
+  // Auto-title unnamed conversations with the first message text.
     // Best-effort: the message is already committed, so a title failure must
     // not reject the send.
     if (info.title === null) {
@@ -213,7 +212,6 @@ export async function createMessageFor(
         })
       );
     }
-  }
 
   return { ok: true, messageId, clientId };
 }

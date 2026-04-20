@@ -17,6 +17,35 @@ import { useCallback } from 'react';
 
 const PAGE_SIZE = 50;
 
+function applyReactionAdded(
+  reactions: ReactionSummary[],
+  emoji: string,
+  memberId: string
+): ReactionSummary[] {
+  const existing = reactions.find(r => r.emoji === emoji);
+  if (existing) {
+    if (existing.memberIds.includes(memberId)) return reactions;
+    return reactions.map(r =>
+      r.emoji === emoji ? { ...r, count: r.count + 1, memberIds: [...r.memberIds, memberId] } : r
+    );
+  }
+  return [...reactions, { emoji, count: 1, memberIds: [memberId] }];
+}
+
+function applyReactionRemoved(
+  reactions: ReactionSummary[],
+  emoji: string,
+  memberId: string
+): ReactionSummary[] {
+  return reactions
+    .map(r => {
+      if (r.emoji !== emoji) return r;
+      const memberIds = r.memberIds.filter(id => id !== memberId);
+      return { ...r, count: memberIds.length, memberIds };
+    })
+    .filter(r => r.count > 0);
+}
+
 export function useMessages(client: KiloChatClient, conversationId: string | null) {
   return useInfiniteQuery({
     queryKey: ['kilo-chat', 'messages', conversationId],
@@ -176,28 +205,14 @@ export function useAddReaction(
         return {
           ...data,
           pages: data.pages.map(page =>
-            page.map(msg => {
-              if (msg.id !== variables.messageId) return msg;
-              const existing = msg.reactions.find(r => r.emoji === variables.emoji);
-              if (existing) {
-                if (existing.memberIds.includes(currentUserId)) return msg;
-                return {
-                  ...msg,
-                  reactions: msg.reactions.map(r =>
-                    r.emoji === variables.emoji
-                      ? { ...r, count: r.count + 1, memberIds: [...r.memberIds, currentUserId] }
-                      : r
-                  ),
-                };
-              }
-              return {
-                ...msg,
-                reactions: [
-                  ...msg.reactions,
-                  { emoji: variables.emoji, count: 1, memberIds: [currentUserId] },
-                ],
-              };
-            })
+            page.map(msg =>
+              msg.id !== variables.messageId
+                ? msg
+                : {
+                    ...msg,
+                    reactions: applyReactionAdded(msg.reactions, variables.emoji, currentUserId),
+                  }
+            )
           ),
         };
       });
@@ -231,17 +246,14 @@ export function useRemoveReaction(
         return {
           ...data,
           pages: data.pages.map(page =>
-            page.map(msg => {
-              if (msg.id !== variables.messageId) return msg;
-              const updated = msg.reactions
-                .map((r: ReactionSummary) => {
-                  if (r.emoji !== variables.emoji) return r;
-                  const memberIds = r.memberIds.filter(id => id !== currentUserId);
-                  return { ...r, count: memberIds.length, memberIds };
-                })
-                .filter((r: ReactionSummary) => r.count > 0);
-              return { ...msg, reactions: updated };
-            })
+            page.map(msg =>
+              msg.id !== variables.messageId
+                ? msg
+                : {
+                    ...msg,
+                    reactions: applyReactionRemoved(msg.reactions, variables.emoji, currentUserId),
+                  }
+            )
           ),
         };
       });
@@ -363,28 +375,11 @@ export function useMessageCacheUpdater(conversationId: string | null) {
             return {
               ...data,
               pages: data.pages.map(page =>
-                page.map(msg => {
-                  if (msg.id !== e.messageId) return msg;
-                  const existing = msg.reactions.find(r => r.emoji === e.emoji);
-                  if (existing) {
-                    if (existing.memberIds.includes(e.memberId)) return msg;
-                    return {
-                      ...msg,
-                      reactions: msg.reactions.map(r =>
-                        r.emoji === e.emoji
-                          ? { ...r, count: r.count + 1, memberIds: [...r.memberIds, e.memberId] }
-                          : r
-                      ),
-                    };
-                  }
-                  return {
-                    ...msg,
-                    reactions: [
-                      ...msg.reactions,
-                      { emoji: e.emoji, count: 1, memberIds: [e.memberId] },
-                    ],
-                  };
-                })
+                page.map(msg =>
+                  msg.id !== e.messageId
+                    ? msg
+                    : { ...msg, reactions: applyReactionAdded(msg.reactions, e.emoji, e.memberId) }
+                )
               ),
             };
           });
@@ -398,17 +393,14 @@ export function useMessageCacheUpdater(conversationId: string | null) {
             return {
               ...data,
               pages: data.pages.map(page =>
-                page.map(msg => {
-                  if (msg.id !== e.messageId) return msg;
-                  const updated = msg.reactions
-                    .map(r => {
-                      if (r.emoji !== e.emoji) return r;
-                      const memberIds = r.memberIds.filter(id => id !== e.memberId);
-                      return { ...r, count: memberIds.length, memberIds };
-                    })
-                    .filter(r => r.count > 0);
-                  return { ...msg, reactions: updated };
-                })
+                page.map(msg =>
+                  msg.id !== e.messageId
+                    ? msg
+                    : {
+                        ...msg,
+                        reactions: applyReactionRemoved(msg.reactions, e.emoji, e.memberId),
+                      }
+                )
               ),
             };
           });

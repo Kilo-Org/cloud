@@ -59,9 +59,11 @@ export function registerConversationRoutes(
   app.get('/v1/conversations', async c => {
     const callerId = c.get('callerId');
     const sandboxId = c.req.query('sandboxId') ?? undefined;
+    const limit = Math.min(Math.max(Number(c.req.query('limit')) || 50, 1), 100);
+    const offset = Math.max(Number(c.req.query('offset')) || 0, 0);
     const stub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
-    const list = await stub.listConversations(sandboxId);
-    return c.json({ conversations: list });
+    const { conversations, total } = await stub.listConversations(sandboxId, limit, offset);
+    return c.json({ conversations, total, limit, offset });
   });
 
   // GET /v1/conversations/:id — get conversation details

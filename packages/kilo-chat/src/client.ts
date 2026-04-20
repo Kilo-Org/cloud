@@ -106,9 +106,12 @@ export class KiloChatClient {
 
   // ── Queries via HTTP ──────────────────────────────────────────────────────
 
-  async listConversations(sandboxId?: string): Promise<ConversationListResponse> {
+  async listConversations(
+    sandboxId?: string,
+    opts?: { limit?: number; offset?: number }
+  ): Promise<ConversationListResponse> {
     return this.httpRequest('/v1/conversations', {
-      query: sandboxId ? { sandboxId } : undefined,
+      query: { sandboxId, limit: opts?.limit, offset: opts?.offset },
     });
   }
 

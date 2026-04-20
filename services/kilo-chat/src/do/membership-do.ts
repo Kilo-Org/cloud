@@ -29,13 +29,26 @@ export class MembershipDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(() => migrate(this.db, migrations));
   }
 
-  listConversations(sandboxId?: string): ConversationEntry[] {
+  listConversations(
+    sandboxId?: string,
+    limit: number = 50,
+    offset: number = 0
+  ): { conversations: ConversationEntry[]; total: number } {
     const where = sandboxId ? eq(conversations.sandbox_id, sandboxId) : undefined;
-    return this.db
+
+    const total = this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(conversations)
+      .where(where)
+      .get()!.count;
+
+    const rows = this.db
       .select()
       .from(conversations)
       .where(where)
       .orderBy(desc(sql`coalesce(${conversations.last_activity_at}, ${conversations.joined_at})`))
+      .limit(limit)
+      .offset(offset)
       .all()
       .map(row => ({
         conversationId: row.conversation_id,
@@ -44,6 +57,8 @@ export class MembershipDO extends DurableObject<Env> {
         lastReadAt: row.last_read_at,
         joinedAt: row.joined_at,
       }));
+
+    return { conversations: rows, total };
   }
 
   addConversation(params: AddConversationParams): void {

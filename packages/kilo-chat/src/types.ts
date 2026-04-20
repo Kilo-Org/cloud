@@ -137,6 +137,9 @@ export type RenameConversationRequest = {
 
 export type ConversationListResponse = {
   conversations: ConversationListItem[];
+  total: number;
+  limit: number;
+  offset: number;
 };
 
 export type MessageListResponse = {

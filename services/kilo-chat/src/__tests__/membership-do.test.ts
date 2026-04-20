@@ -11,7 +11,7 @@ describe('MembershipDO', () => {
   it('returns empty list initially', async () => {
     const stub = getStub('user-1');
     const result = await stub.listConversations();
-    expect(result).toEqual([]);
+    expect(result).toEqual({ conversations: [], total: 0 });
   });
 
   it('adds a conversation and lists it', async () => {
@@ -23,7 +23,8 @@ describe('MembershipDO', () => {
       joinedAt: 1000,
     });
     const result = await stub.listConversations();
-    expect(result).toEqual([
+    expect(result.total).toBe(1);
+    expect(result.conversations).toEqual([
       {
         conversationId: 'conv-1',
         conversationTitle: 'Test Chat',
@@ -44,7 +45,7 @@ describe('MembershipDO', () => {
     });
     await stub.updateLastActivity('conv-1', 5000);
     const result = await stub.listConversations();
-    expect(result[0].lastActivityAt).toBe(5000);
+    expect(result.conversations[0].lastActivityAt).toBe(5000);
   });
 
   it('lists conversations sorted by lastActivityAt descending', async () => {
@@ -64,8 +65,8 @@ describe('MembershipDO', () => {
     await stub.updateLastActivity('conv-a', 3000);
     await stub.updateLastActivity('conv-b', 2500);
     const result = await stub.listConversations();
-    expect(result[0].conversationId).toBe('conv-a');
-    expect(result[1].conversationId).toBe('conv-b');
+    expect(result.conversations[0].conversationId).toBe('conv-a');
+    expect(result.conversations[1].conversationId).toBe('conv-b');
   });
 
   it('marks a conversation as read', async () => {
@@ -79,7 +80,7 @@ describe('MembershipDO', () => {
     await stub.updateLastActivity('conv-1', 5000);
     await stub.markRead('conv-1', 4500);
     const result = await stub.listConversations();
-    expect(result[0].lastReadAt).toBe(4500);
+    expect(result.conversations[0].lastReadAt).toBe(4500);
   });
 
   it('removes a conversation', async () => {
@@ -92,6 +93,6 @@ describe('MembershipDO', () => {
     });
     await stub.removeConversation('conv-1');
     const result = await stub.listConversations();
-    expect(result).toEqual([]);
+    expect(result).toEqual({ conversations: [], total: 0 });
   });
 });

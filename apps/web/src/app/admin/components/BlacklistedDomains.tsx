@@ -208,7 +208,7 @@ function SuspiciousTab() {
             <CardTitle>Suspicious Domains</CardTitle>
             <CardDescription>
               Top 100 registrable domains by blocked account count, then total account count. Only
-              shows domains where at least 1% of accounts have been blocked, to filter out
+              shows domains where at least 30% of accounts have been blocked, to filter out
               legitimate high-volume providers. Use this to spot domains that are accumulating abuse
               but aren&apos;t yet blacklisted.
             </CardDescription>

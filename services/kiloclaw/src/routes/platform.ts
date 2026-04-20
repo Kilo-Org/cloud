@@ -862,6 +862,8 @@ platform.post('/provision', async c => {
       kv: c.env.KV_CLAW_CACHE,
       userId,
       orgId,
+      workerEnv: c.env.WORKER_ENV,
+      defaultProvider: c.env.KILOCLAW_DEFAULT_PROVIDER,
     });
   }
 

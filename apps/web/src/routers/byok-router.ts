@@ -80,7 +80,7 @@ async function fetchSupportedModels() {
   result['codestral'] = ['Codestral (mistralai/codestral-2508)'];
 
   for (const openRouterModel of Object.values(openRouterModelMetadata.data)) {
-    const vercelModel = vercelModelMetadata.data[mapModelIdToVercel(openRouterModel.id)];
+    const vercelModel = vercelModelMetadata.data[mapModelIdToVercel(openRouterModel.id, false)];
     if (!vercelModel) continue;
     if (vercelModel.id.includes('codestral')) continue;
     if (vercelModel.type !== 'language') continue;

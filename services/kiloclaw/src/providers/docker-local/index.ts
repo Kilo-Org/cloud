@@ -12,7 +12,7 @@ type DockerApiError = Error & { status: number };
 type DockerContainerSummary = {
   Id?: string;
   Names?: string[];
-  Ports?: Array<{ PublicPort?: number }>;
+  Ports?: Array<{ PublicPort?: number | null }> | null;
 };
 
 type DockerContainerInspect = {
@@ -65,12 +65,14 @@ function isDockerContainerSummaryArray(value: unknown): value is DockerContainer
     const ports = item.Ports;
     if (
       ports !== undefined &&
+      ports !== null &&
       (!Array.isArray(ports) ||
         ports.some(
           port =>
             !isRecord(port) ||
             ('PublicPort' in port &&
               port.PublicPort !== undefined &&
+              port.PublicPort !== null &&
               typeof port.PublicPort !== 'number')
         ))
     ) {

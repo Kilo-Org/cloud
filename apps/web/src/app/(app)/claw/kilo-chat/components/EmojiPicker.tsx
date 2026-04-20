@@ -29,7 +29,7 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
         onEmojiSelect={(emoji: { native: string }) => {
           onSelect(emoji.native);
         }}
-        theme="dark"
+        theme="auto"
         previewPosition="none"
         skinTonePosition="none"
         maxFrequentRows={1}

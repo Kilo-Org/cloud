@@ -163,8 +163,10 @@ export function MessageBubble({
       className={`group flex px-4 py-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => {
-        setShowActions(false);
-        setShowQuickPick(false);
+        if (!showFullPicker) {
+          setShowActions(false);
+          setShowQuickPick(false);
+        }
       }}
     >
       <div className={`flex max-w-[75%] flex-col ${isOwn ? 'items-end' : 'items-start'}`}>

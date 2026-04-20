@@ -46,17 +46,14 @@ export async function createMessageFor(
   const { conversationId, content, inReplyToMessageId, clientId } = params;
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
 
-  if (!(await convStub.isMember(callerId))) {
-    return { ok: false, code: 'forbidden', error: 'Forbidden' };
-  }
-
   const result = await convStub.createMessage({
     senderId: callerId,
     content,
     inReplyToMessageId,
   });
   if (!result.ok) {
-    return { ok: false, code: 'internal', error: result.error };
+    if (result.code === 'forbidden') return { ok: false, code: 'forbidden' as const, error: 'Forbidden' };
+    return { ok: false, code: 'internal' as const, error: result.error };
   }
 
   const { messageId } = result;

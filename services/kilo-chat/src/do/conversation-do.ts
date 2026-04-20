@@ -28,7 +28,9 @@ export type CreateMessageParams = {
   inReplyToMessageId?: string;
 };
 
-export type CreateMessageResult = { ok: true; messageId: string } | { ok: false; error: string };
+export type CreateMessageResult =
+  | { ok: true; messageId: string }
+  | { ok: false; code: 'forbidden' | 'internal'; error: string };
 
 export type ListMessagesParams = {
   limit: number;
@@ -187,7 +189,11 @@ export class ConversationDO extends DurableObject<Env> {
 
   createMessage(params: CreateMessageParams): CreateMessageResult {
     if (!this.isMember(params.senderId)) {
-      return { ok: false, error: `Sender ${params.senderId} is not a member of this conversation` };
+      return {
+        ok: false,
+        code: 'forbidden',
+        error: `Sender ${params.senderId} is not a member of this conversation`,
+      };
     }
 
     const messageId = this.nextUlid();
@@ -206,7 +212,7 @@ export class ConversationDO extends DurableObject<Env> {
         .run();
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
-        return { ok: false, error: err.message };
+        return { ok: false, code: 'internal', error: err.message };
       }
       throw err;
     }

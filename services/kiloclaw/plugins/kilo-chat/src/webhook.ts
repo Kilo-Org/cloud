@@ -18,6 +18,9 @@ export type KiloChatInboundPayload = {
   text: string;
   messageId: string;
   sentAt: string;
+  inReplyToMessageId?: string;
+  inReplyToBody?: string;
+  inReplyToSender?: string;
 };
 
 export type KiloChatWebhookDeps = {
@@ -40,12 +43,25 @@ export function parseInboundPayload(raw: unknown): KiloChatInboundPayload | null
   if (!isNonEmptyString(o.text)) return null;
   if (!isNonEmptyString(o.messageId)) return null;
   if (!isNonEmptyString(o.sentAt)) return null;
+  const inReplyToMessageId =
+    typeof o.inReplyToMessageId === 'string' && o.inReplyToMessageId.length > 0
+      ? o.inReplyToMessageId
+      : undefined;
+  const inReplyToBody =
+    typeof o.inReplyToBody === 'string' && o.inReplyToBody.length > 0 ? o.inReplyToBody : undefined;
+  const inReplyToSender =
+    typeof o.inReplyToSender === 'string' && o.inReplyToSender.length > 0
+      ? o.inReplyToSender
+      : undefined;
   return {
     conversationId: o.conversationId,
     from: o.from,
     text: o.text,
     messageId: o.messageId,
     sentAt: o.sentAt,
+    inReplyToMessageId,
+    inReplyToBody,
+    inReplyToSender,
   };
 }
 
@@ -74,12 +90,14 @@ export type DeliverWiring = {
 export function buildDeliverWiring(params: {
   client: KiloChatClient;
   conversationId: string;
+  inReplyToMessageId?: string;
   warn: (msg: string, err?: unknown) => void;
 }): DeliverWiring {
   const stream = createPreviewStream({
     client: params.client,
     conversationId: params.conversationId,
     throttleMs: STREAM_THROTTLE_MS,
+    inReplyToMessageId: params.inReplyToMessageId,
     onWarn: params.warn,
   });
   let firstDelivered = false;
@@ -190,6 +208,9 @@ async function dispatchInbound(
     Surface: 'kilo-chat',
     OriginatingChannel: 'kilo-chat',
     OriginatingTo: `kilo-chat:${payload.conversationId}`,
+    ReplyToId: payload.inReplyToMessageId,
+    ReplyToBody: payload.inReplyToBody,
+    ReplyToSender: payload.inReplyToSender,
   });
 
   const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN;
@@ -204,6 +225,7 @@ async function dispatchInbound(
   const wiring = buildDeliverWiring({
     client,
     conversationId: payload.conversationId,
+    inReplyToMessageId: payload.messageId,
     warn: (msg, err) => console.error(`[kilo-chat] ${msg}:`, err),
   });
 

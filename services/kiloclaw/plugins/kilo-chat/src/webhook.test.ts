@@ -34,6 +34,37 @@ describe('parseInboundPayload', () => {
   it('returns null on non-object input', () => {
     expect(parseInboundPayload('not-an-object')).toBeNull();
   });
+
+  it('parses reply context fields when present', () => {
+    const parsed = parseInboundPayload({
+      conversationId: 'c1',
+      from: 'u1',
+      text: 'my reply',
+      messageId: 'm2',
+      sentAt: '2026-01-01T00:00:00Z',
+      inReplyToMessageId: 'm1',
+      inReplyToBody: 'original text',
+      inReplyToSender: 'u2',
+    });
+    expect(parsed).not.toBeNull();
+    expect(parsed!.inReplyToMessageId).toBe('m1');
+    expect(parsed!.inReplyToBody).toBe('original text');
+    expect(parsed!.inReplyToSender).toBe('u2');
+  });
+
+  it('parses successfully when reply context fields are absent', () => {
+    const parsed = parseInboundPayload({
+      conversationId: 'c1',
+      from: 'u1',
+      text: 'hi',
+      messageId: 'm1',
+      sentAt: '2026-01-01T00:00:00Z',
+    });
+    expect(parsed).not.toBeNull();
+    expect(parsed!.inReplyToMessageId).toBeUndefined();
+    expect(parsed!.inReplyToBody).toBeUndefined();
+    expect(parsed!.inReplyToSender).toBeUndefined();
+  });
 });
 
 function makeReq(body: string): IncomingMessage {
@@ -183,6 +214,29 @@ describe('buildDeliverWiring', () => {
       c => (c.args as { content: Array<{ type: string; text: string }> }).content
     );
     expect(allContent.some(blocks => blocks.some(b => b.text === 'second block'))).toBe(true);
+  });
+
+  it('passes inReplyToMessageId to preview stream on first create', async () => {
+    vi.useFakeTimers();
+    try {
+      const calls: { type: string; args: unknown }[] = [];
+      const wiring = buildDeliverWiring({
+        client: fakeClient(calls),
+        conversationId: 'c1',
+        inReplyToMessageId: 'parent-msg-1',
+        warn: () => {},
+      });
+      await wiring.replyOptions.onPartialReply({ text: 'H' });
+      await vi.advanceTimersByTimeAsync(0);
+
+      const creates = calls.filter(c => c.type === 'create');
+      expect(creates).toHaveLength(1);
+      expect((creates[0]!.args as { inReplyToMessageId?: string }).inReplyToMessageId).toBe(
+        'parent-msg-1'
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

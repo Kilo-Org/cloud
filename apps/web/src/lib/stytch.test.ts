@@ -4,6 +4,7 @@ import { db } from './drizzle';
 import { kilocode_users, stytch_fingerprints, credit_transactions } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { FraudFingerprintLookupResponse } from 'stytch';
+import { OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS } from './constants';
 
 import {
   saveFingerprints,
@@ -324,7 +325,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       if (!bonus?.expiry_date) throw new Error('bonus.expiry_date should be set');
       const expiryMs = new Date(bonus.expiry_date).getTime();
-      const expectedMs = Date.now() + 48 * 60 * 60 * 1000;
+      const expectedMs = Date.now() + OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS * 60 * 60 * 1000;
       // Loose ±2 minute window — test DB inserts + clock drift
       expect(Math.abs(expiryMs - expectedMs)).toBeLessThan(2 * 60 * 1000);
     });

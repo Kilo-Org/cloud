@@ -216,8 +216,11 @@ export async function handleSignupPromotion(
   } catch (error) {
     // Don't fail the entire process if credit granting fails
     captureException(error, {
-      tags: { source: 'signup_promotion_credit_grant' },
-      extra: { userId: user.id, email: user.google_user_email },
+      tags: {
+        source: 'signup_promotion_credit_grant',
+        credit_category: 'automatic-welcome-credits',
+      },
+      extra: { userId: user.id, email: user.google_user_email, signupSource },
     });
   }
 
@@ -229,7 +232,10 @@ export async function handleSignupPromotion(
       });
     } catch (error) {
       captureException(error, {
-        tags: { source: 'signup_promotion_credit_grant' },
+        tags: {
+          source: 'signup_promotion_credit_grant',
+          credit_category: 'openclaw-security-advisor-signup-bonus',
+        },
         extra: { userId: user.id, email: user.google_user_email, signupSource },
       });
     }

@@ -89,7 +89,7 @@ export async function upsertKiloClawGoogleOAuthConnection(
 
   let encryptedRefreshToken = input.refreshToken
     ? encryptRefreshToken(input.refreshToken)
-    : existing?.refresh_token_encrypted ?? null;
+    : (existing?.refresh_token_encrypted ?? null);
 
   if (!existing && !encryptedRefreshToken) {
     const [concurrentWinner] = await db

@@ -41,41 +41,44 @@ export class KiloChatClient {
     this.fetchFn = config.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
-  // ── Mutations via event-service RPC ──────────────────────────────────────
+  // ── Mutations via HTTP ────────────────────────────────────────────────────
 
   async sendMessage(req: CreateMessageRequest): Promise<CreateMessageResponse> {
-    return this.es.rpc('kilo-chat', 'sendMessage', req);
+    return this.httpRequest('/v1/messages', { method: 'POST', body: req });
   }
 
   async editMessage(messageId: string, req: EditMessageRequest): Promise<EditMessageResponse> {
-    return this.es.rpc('kilo-chat', 'editMessage', { ...req, messageId });
+    return this.httpRequest(`/v1/messages/${messageId}`, { method: 'PATCH', body: req });
   }
 
   async deleteMessage(messageId: string, req: DeleteMessageRequest): Promise<void> {
-    return this.es.rpc('kilo-chat', 'deleteMessage', { ...req, messageId });
+    return this.httpRequest(`/v1/messages/${messageId}`, {
+      method: 'DELETE',
+      body: req,
+    });
   }
 
   async createConversation(req: CreateConversationRequest): Promise<CreateConversationResponse> {
-    return this.es.rpc('kilo-chat', 'createConversation', req);
+    return this.httpRequest('/v1/conversations', { method: 'POST', body: req });
   }
 
   async renameConversation(
     conversationId: string,
     req: RenameConversationRequest
   ): Promise<{ ok: true }> {
-    return this.es.rpc('kilo-chat', 'renameConversation', { ...req, conversationId });
+    return this.httpRequest(`/v1/conversations/${conversationId}`, { method: 'PATCH', body: req });
   }
 
   async leaveConversation(conversationId: string): Promise<void> {
-    return this.es.rpc('kilo-chat', 'leaveConversation', { conversationId });
+    return this.httpRequest(`/v1/conversations/${conversationId}/leave`, { method: 'POST' });
   }
 
   async sendTyping(conversationId: string): Promise<void> {
-    return this.es.rpc('kilo-chat', 'sendTyping', { conversationId });
+    return this.httpRequest(`/v1/conversations/${conversationId}/typing`, { method: 'POST' });
   }
 
   async markConversationRead(conversationId: string): Promise<void> {
-    return this.es.rpc('kilo-chat', 'markRead', { conversationId });
+    return this.httpRequest(`/v1/conversations/${conversationId}/mark-read`, { method: 'POST' });
   }
 
   async addReaction(
@@ -83,7 +86,10 @@ export class KiloChatClient {
     conversationId: string,
     emoji: string
   ): Promise<{ id: string; added: boolean }> {
-    return this.es.rpc('kilo-chat', 'addReaction', { messageId, conversationId, emoji });
+    return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
+      method: 'POST',
+      body: { conversationId, emoji },
+    });
   }
 
   async removeReaction(
@@ -91,7 +97,10 @@ export class KiloChatClient {
     conversationId: string,
     emoji: string
   ): Promise<{ ok: true }> {
-    return this.es.rpc('kilo-chat', 'removeReaction', { messageId, conversationId, emoji });
+    return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
+      method: 'DELETE',
+      body: { conversationId, emoji },
+    });
   }
 
   // ── Queries via HTTP ──────────────────────────────────────────────────────

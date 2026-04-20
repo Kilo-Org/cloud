@@ -26,7 +26,6 @@ export class UserSessionDO extends DurableObject<Env> {
     try {
       msg = JSON.parse(rawMessage) as ClientMessage;
     } catch {
-      this.sendTo(ws, { id: '', type: 'rpc.error', error: { code: 400, body: 'Invalid JSON' } });
       return;
     }
 
@@ -43,10 +42,6 @@ export class UserSessionDO extends DurableObject<Env> {
         this.saveState(ws, state);
         break;
       }
-      case 'rpc': {
-        await this.handleRpc(ws, msg);
-        break;
-      }
     }
   }
 
@@ -61,47 +56,6 @@ export class UserSessionDO extends DurableObject<Env> {
 
   async webSocketError(ws: WebSocket): Promise<void> {
     ws.close(1011, 'WebSocket error');
-  }
-
-  // ── RPC forwarding ─────────────────────────────────────────────────
-
-  private async handleRpc(
-    ws: WebSocket,
-    msg: { id: string; service: string; method: string; payload: unknown }
-  ): Promise<void> {
-    const binding = this.getServiceBinding(msg.service);
-    if (!binding) {
-      this.sendTo(ws, {
-        id: msg.id,
-        type: 'rpc.error',
-        error: { code: 404, body: `Unknown service: ${msg.service}` },
-      });
-      return;
-    }
-
-    try {
-      const userId = this.ctx.id.name ?? this.ctx.id.toString();
-      const result = await binding.rpc(userId, msg.method, msg.payload);
-      this.sendTo(ws, { id: msg.id, type: 'rpc.response', payload: result });
-    } catch (err) {
-      const code = err instanceof Error && 'code' in err ? (err as { code: number }).code : 500;
-      const body = err instanceof Error ? err.message : 'Internal error';
-      this.sendTo(ws, { id: msg.id, type: 'rpc.error', error: { code, body } });
-    }
-  }
-
-  private getServiceBinding(
-    service: string
-  ): { rpc: (userId: string, method: string, payload: unknown) => Promise<unknown> } | null {
-    const bindings: Record<string, unknown> = {
-      'kilo-chat': this.env.KILO_CHAT,
-    };
-    const binding = bindings[service];
-    if (!binding || typeof binding !== 'object') return null;
-    if (!('rpc' in (binding as Record<string, unknown>))) return null;
-    return binding as {
-      rpc: (userId: string, method: string, payload: unknown) => Promise<unknown>;
-    };
   }
 
   // ── Event push ─────────────────────────────────────────────────────
@@ -124,14 +78,6 @@ export class UserSessionDO extends DurableObject<Env> {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────
-
-  private sendTo(ws: WebSocket, msg: ServerMessage): void {
-    try {
-      ws.send(JSON.stringify(msg));
-    } catch {
-      // Dead connection
-    }
-  }
 
   private getState(ws: WebSocket): { contexts: Set<string> } {
     const raw = ws.deserializeAttachment() as SerializedState | null;

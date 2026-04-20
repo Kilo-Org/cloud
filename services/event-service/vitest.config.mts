@@ -6,25 +6,6 @@ export default defineWorkersConfig({
       workers: {
         wrangler: { configPath: './wrangler.jsonc' },
         isolatedStorage: false,
-        miniflare: {
-          serviceBindings: {
-            KILO_CHAT: 'kilo-chat-stub',
-          },
-          workers: [
-            {
-              name: 'kilo-chat-stub',
-              modules: true,
-              script: `
-                import { WorkerEntrypoint } from 'cloudflare:workers';
-                export default class KiloChatStub extends WorkerEntrypoint {
-                  async rpc(userId, method, payload) {
-                    return { echo: { userId, method, payload } };
-                  }
-                }
-              `,
-            },
-          ],
-        },
       },
     },
   },

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EventServiceClient, EventServiceRpcError } from '../client';
+import { EventServiceClient } from '../client';
 
 class MockWebSocket {
   static OPEN = 1;
@@ -73,59 +73,10 @@ describe('EventServiceClient', () => {
     expect(lastMockWs.url).toBe('ws://localhost:8080/connect?token=test-token');
     expect(client.isConnected()).toBe(true);
 
-    const messages = lastMockWs.sent.map((s) => JSON.parse(s) as unknown);
+    const messages = lastMockWs.sent.map(s => JSON.parse(s) as unknown);
     expect(messages).toContainEqual({
       type: 'context.subscribe',
       contexts: ['room:123', 'user:456'],
-    });
-  });
-
-  it('resolves RPC response by matching id', async () => {
-    const client = makeClient();
-    await client.connect();
-
-    const rpcPromise = client.rpc<{ ok: boolean }>('chat', 'getMessages', { roomId: 'abc' });
-
-    // Find the rpc message that was sent
-    const rpcMsg = lastMockWs.sent
-      .map((s) => JSON.parse(s) as { type: string; id: string })
-      .find((m) => m.type === 'rpc');
-
-    expect(rpcMsg).toBeDefined();
-
-    // Simulate server response
-    lastMockWs.triggerMessage({
-      id: rpcMsg!.id,
-      type: 'rpc.response',
-      payload: { ok: true },
-    });
-
-    const result = await rpcPromise;
-    expect(result).toEqual({ ok: true });
-  });
-
-  it('rejects RPC on error response with EventServiceRpcError', async () => {
-    const client = makeClient();
-    await client.connect();
-
-    const rpcPromise = client.rpc('chat', 'deleteMessage', { id: '1' });
-
-    const rpcMsg = lastMockWs.sent
-      .map((s) => JSON.parse(s) as { type: string; id: string })
-      .find((m) => m.type === 'rpc');
-
-    lastMockWs.triggerMessage({
-      id: rpcMsg!.id,
-      type: 'rpc.error',
-      error: { code: 403, body: { message: 'Forbidden' } },
-    });
-
-    await expect(rpcPromise).rejects.toSatisfy((err: unknown) => {
-      return (
-        err instanceof EventServiceRpcError &&
-        err.code === 403 &&
-        (err.body as { message: string }).message === 'Forbidden'
-      );
     });
   });
 

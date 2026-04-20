@@ -1,23 +1,4 @@
-import type {
-  ClientMessage,
-  EventServiceConfig,
-  ServerMessage,
-} from './types';
-
-export class EventServiceRpcError extends Error {
-  constructor(
-    public readonly code: number,
-    public readonly body: unknown,
-  ) {
-    super(`RPC error ${code}`);
-    this.name = 'EventServiceRpcError';
-  }
-}
-
-type PendingRpc = {
-  resolve: (value: unknown) => void;
-  reject: (reason: unknown) => void;
-};
+import type { ClientMessage, EventServiceConfig, ServerMessage } from './types';
 
 export class EventServiceClient {
   private readonly url: string;
@@ -25,8 +6,6 @@ export class EventServiceClient {
 
   private ws: WebSocket | null = null;
   private connected = false;
-  private rpcCounter = 0;
-  private pendingRpcs = new Map<string, PendingRpc>();
   private eventHandlers = new Map<string, Set<(context: string, payload: unknown) => void>>();
   private activeContexts = new Set<string>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -55,7 +34,6 @@ export class EventServiceClient {
 
       ws.onclose = () => {
         this.connected = false;
-        this.rejectPendingRpcs(new Error('WebSocket closed'));
         if (!this.destroyed) {
           this.scheduleReconnect();
         }
@@ -77,7 +55,6 @@ export class EventServiceClient {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    this.rejectPendingRpcs(new Error('Client disconnected'));
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -107,17 +84,6 @@ export class EventServiceClient {
     }
   }
 
-  async rpc<T>(service: string, method: string, payload: unknown): Promise<T> {
-    const id = `rpc_${++this.rpcCounter}`;
-    return new Promise<T>((resolve, reject) => {
-      this.pendingRpcs.set(id, {
-        resolve: resolve as (value: unknown) => void,
-        reject,
-      });
-      this.send({ id, type: 'rpc', service, method, payload });
-    });
-  }
-
   on(event: string, handler: (context: string, payload: unknown) => void): () => void {
     let handlers = this.eventHandlers.get(event);
     if (!handlers) {
@@ -144,19 +110,7 @@ export class EventServiceClient {
       return;
     }
 
-    if (message.type === 'rpc.response') {
-      const pending = this.pendingRpcs.get(message.id);
-      if (pending) {
-        this.pendingRpcs.delete(message.id);
-        pending.resolve(message.payload);
-      }
-    } else if (message.type === 'rpc.error') {
-      const pending = this.pendingRpcs.get(message.id);
-      if (pending) {
-        this.pendingRpcs.delete(message.id);
-        pending.reject(new EventServiceRpcError(message.error.code, message.error.body));
-      }
-    } else if (message.type === 'event') {
+    if (message.type === 'event') {
       const handlers = this.eventHandlers.get(message.event);
       if (handlers) {
         for (const handler of handlers) {
@@ -173,13 +127,6 @@ export class EventServiceClient {
         contexts: Array.from(this.activeContexts),
       });
     }
-  }
-
-  private rejectPendingRpcs(reason: Error): void {
-    for (const [, pending] of this.pendingRpcs) {
-      pending.reject(reason);
-    }
-    this.pendingRpcs.clear();
   }
 
   private scheduleReconnect(): void {

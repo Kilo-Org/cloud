@@ -1,2 +1,2 @@
-export { EventServiceClient, EventServiceRpcError } from './client';
+export { EventServiceClient } from './client';
 export type * from './types';

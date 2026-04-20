@@ -19,10 +19,6 @@
     { "tag": "v1", "new_classes": ["UserSessionDO"] }
   ],
 
-  "services": [
-    { "binding": "KILO_CHAT", "service": "kilo-chat" }
-  ],
-
   "secrets_store_secrets": [
     {
       "binding": "NEXTAUTH_SECRET",

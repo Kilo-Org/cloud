@@ -2,7 +2,9 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 
 // Helper: connect a WebSocket to a DO stub for a given userId
-async function connectWs(userId: string): Promise<{ ws: WebSocket; stub: ReturnType<typeof env.USER_SESSION_DO.get> }> {
+async function connectWs(
+  userId: string
+): Promise<{ ws: WebSocket; stub: ReturnType<typeof env.USER_SESSION_DO.get> }> {
   const id = env.USER_SESSION_DO.idFromName(userId);
   const stub = env.USER_SESSION_DO.get(id);
   const res = await stub.fetch('https://do/connect', {
@@ -49,9 +51,7 @@ describe('UserSessionDO', () => {
     const userId = 'user-event-match';
     const { ws, stub } = await connectWs(userId);
 
-    ws.send(
-      JSON.stringify({ type: 'context.subscribe', contexts: ['project:abc'] })
-    );
+    ws.send(JSON.stringify({ type: 'context.subscribe', contexts: ['project:abc'] }));
 
     await new Promise(r => setTimeout(r, 50));
 
@@ -74,9 +74,7 @@ describe('UserSessionDO', () => {
     const userId = 'user-event-no-match';
     const { ws, stub } = await connectWs(userId);
 
-    ws.send(
-      JSON.stringify({ type: 'context.subscribe', contexts: ['project:abc'] })
-    );
+    ws.send(JSON.stringify({ type: 'context.subscribe', contexts: ['project:abc'] }));
 
     await new Promise(r => setTimeout(r, 50));
 
@@ -98,14 +96,10 @@ describe('UserSessionDO', () => {
     const userId = 'user-event-unsub';
     const { ws, stub } = await connectWs(userId);
 
-    ws.send(
-      JSON.stringify({ type: 'context.subscribe', contexts: ['project:abc'] })
-    );
+    ws.send(JSON.stringify({ type: 'context.subscribe', contexts: ['project:abc'] }));
     await new Promise(r => setTimeout(r, 50));
 
-    ws.send(
-      JSON.stringify({ type: 'context.unsubscribe', contexts: ['project:abc'] })
-    );
+    ws.send(JSON.stringify({ type: 'context.unsubscribe', contexts: ['project:abc'] }));
     await new Promise(r => setTimeout(r, 50));
 
     let received = false;
@@ -117,67 +111,6 @@ describe('UserSessionDO', () => {
 
     await new Promise(r => setTimeout(r, 100));
     expect(received).toBe(false);
-
-    ws.close();
-  });
-
-  it('forwards RPC calls to kilo-chat and returns echo response', async () => {
-    const userId = 'user-rpc-test';
-    const { ws } = await connectWs(userId);
-
-    const msgPromise = nextMessage(ws);
-
-    ws.send(
-      JSON.stringify({
-        id: 'req-1',
-        type: 'rpc',
-        service: 'kilo-chat',
-        method: 'getMessages',
-        payload: { channelId: 'ch-1' },
-      })
-    );
-
-    const msg = await msgPromise;
-    // The DO uses ctx.id.name ?? ctx.id.toString() for userId; in the test env
-    // miniflare may return the hashed ID string rather than the name, so we
-    // only assert the shape and method/payload echo, not the exact userId value.
-    expect(msg).toMatchObject({
-      id: 'req-1',
-      type: 'rpc.response',
-      payload: {
-        echo: {
-          userId: expect.any(String),
-          method: 'getMessages',
-          payload: { channelId: 'ch-1' },
-        },
-      },
-    });
-
-    ws.close();
-  });
-
-  it('returns rpc.error for unknown service', async () => {
-    const userId = 'user-rpc-unknown';
-    const { ws } = await connectWs(userId);
-
-    const msgPromise = nextMessage(ws);
-
-    ws.send(
-      JSON.stringify({
-        id: 'req-2',
-        type: 'rpc',
-        service: 'nonexistent-service',
-        method: 'doSomething',
-        payload: {},
-      })
-    );
-
-    const msg = await msgPromise;
-    expect(msg).toMatchObject({
-      id: 'req-2',
-      type: 'rpc.error',
-      error: { code: 404 },
-    });
 
     ws.close();
   });

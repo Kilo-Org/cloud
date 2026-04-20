@@ -10,7 +10,6 @@ import { registerReactionsRoutes } from './routes/reactions';
 import { registerTypingRoutes } from './routes/typing';
 import { registerBotRoutes } from './routes/bot-messages';
 import { buildWebhookPayload, type WebhookMessage } from './webhook/deliver';
-import { dispatchRpc } from './rpc';
 
 export { MembershipDO } from './do/membership-do';
 export { ConversationDO } from './do/conversation-do';
@@ -52,10 +51,6 @@ registerBotRoutes(app);
 export default class extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {
     return app.fetch(request, this.env, this.ctx);
-  }
-
-  async rpc(userId: string, method: string, payload: unknown): Promise<unknown> {
-    return dispatchRpc(this.env, userId, method, payload);
   }
 
   async queue(batch: MessageBatch<WebhookMessage>): Promise<void> {

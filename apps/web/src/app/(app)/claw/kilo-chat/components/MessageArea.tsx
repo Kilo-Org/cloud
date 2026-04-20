@@ -233,8 +233,10 @@ export function MessageArea({
             onReply={setReplyingTo}
           />
         ))}
-        <TypingIndicator typingMembers={typingMembers} />
       </div>
+
+      {/* Typing indicator — fixed height to prevent layout shift */}
+      <TypingIndicator typingMembers={typingMembers} />
 
       {/* Input */}
       <MessageInput

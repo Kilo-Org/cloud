@@ -5,8 +5,6 @@ type TypingIndicatorProps = {
 };
 
 export function TypingIndicator({ typingMembers }: TypingIndicatorProps) {
-  if (typingMembers.size === 0) return null;
-
   const names = Array.from(typingMembers.keys()).map(id =>
     id.startsWith('bot:') ? 'KiloClaw' : id
   );
@@ -15,8 +13,10 @@ export function TypingIndicator({ typingMembers }: TypingIndicatorProps) {
     names.length === 1 ? `${names[0]} is typing...` : `${names.join(', ')} are typing...`;
 
   return (
-    <div className="px-4 py-1">
-      <p className="text-muted-foreground animate-pulse text-xs">{text}</p>
+    <div className="h-6 shrink-0 px-4 flex items-center">
+      {typingMembers.size > 0 && (
+        <p className="text-muted-foreground animate-pulse text-xs">{text}</p>
+      )}
     </div>
   );
 }

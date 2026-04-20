@@ -97,94 +97,92 @@ export function ConversationItem({
   const content = (
     <div className="flex items-center justify-between gap-2">
       {isRenaming ? (
-          <input
-            ref={inputRef}
-            value={renameValue}
-            onChange={e => setRenameValue(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') handleConfirmRename();
-              if (e.key === 'Escape') handleCancelRename();
-            }}
-            onBlur={handleConfirmRename}
-            className="bg-transparent min-w-0 flex-1 text-sm font-medium outline-none border-b border-current/20"
-            maxLength={200}
-          />
-        ) : isConfirmingLeave ? (
-          <>
-            <span className="text-sm">Leave?</span>
-            <span className="flex shrink-0 gap-1.5 text-xs">
+        <input
+          ref={inputRef}
+          value={renameValue}
+          onChange={e => setRenameValue(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') handleConfirmRename();
+            if (e.key === 'Escape') handleCancelRename();
+          }}
+          onBlur={handleConfirmRename}
+          className="bg-transparent min-w-0 flex-1 text-sm font-medium outline-none border-b border-current/20"
+          maxLength={200}
+        />
+      ) : isConfirmingLeave ? (
+        <>
+          <span className="text-sm">Leave?</span>
+          <span className="flex shrink-0 gap-1.5 text-xs">
+            <button
+              onClick={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleConfirmLeave();
+              }}
+              className="text-destructive hover:underline font-medium cursor-pointer"
+            >
+              Yes
+            </button>
+            <button
+              onClick={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleCancelLeave();
+              }}
+              className="text-muted-foreground hover:underline cursor-pointer"
+            >
+              No
+            </button>
+          </span>
+        </>
+      ) : (
+        <>
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            <p className="truncate text-sm font-medium">{title}</p>
+            {isUnread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <span className="text-muted-foreground text-xs group-hover:hidden">{displayTime}</span>
+            <div ref={menuRef} className="relative">
               <button
                 onClick={e => {
                   e.preventDefault();
                   e.stopPropagation();
-                  handleConfirmLeave();
+                  setMenuOpen(prev => !prev);
                 }}
-                className="text-destructive hover:underline font-medium cursor-pointer"
+                className="hover:bg-muted hidden rounded p-0.5 group-hover:block cursor-pointer transition-colors"
               >
-                Yes
+                <MoreVertical className="h-3.5 w-3.5" />
               </button>
-              <button
-                onClick={e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleCancelLeave();
-                }}
-                className="text-muted-foreground hover:underline cursor-pointer"
-              >
-                No
-              </button>
-            </span>
-          </>
-        ) : (
-          <>
-            <div className="flex min-w-0 flex-1 items-center gap-1.5">
-              <p className="truncate text-sm font-medium">{title}</p>
-              {isUnread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
+              {menuOpen && (
+                <div className="bg-popover border-border absolute right-0 top-full z-10 mt-1 w-32 rounded-md border py-1 shadow-md">
+                  <button
+                    onClick={e => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleStartRename();
+                    }}
+                    className="hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
+                  >
+                    Rename
+                  </button>
+                  <button
+                    onClick={e => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleStartLeave();
+                    }}
+                    className="text-destructive hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
+                  >
+                    Leave
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="text-muted-foreground text-xs group-hover:hidden">
-                {displayTime}
-              </span>
-              <div ref={menuRef} className="relative">
-                <button
-                  onClick={e => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setMenuOpen(prev => !prev);
-                  }}
-                  className="hover:bg-muted hidden rounded p-0.5 group-hover:block cursor-pointer transition-colors"
-                >
-                  <MoreVertical className="h-3.5 w-3.5" />
-                </button>
-                {menuOpen && (
-                  <div className="bg-popover border-border absolute right-0 top-full z-10 mt-1 w-32 rounded-md border py-1 shadow-md">
-                    <button
-                      onClick={e => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleStartRename();
-                      }}
-                      className="hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      onClick={e => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleStartLeave();
-                      }}
-                      className="text-destructive hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
-                    >
-                      Leave
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
+    </div>
   );
 
   // Use conditional JSX instead of inline component types to avoid unmount/remount

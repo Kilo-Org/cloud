@@ -4,11 +4,7 @@
  */
 
 import { ulid } from 'ulid';
-import {
-  extractConversationContext,
-  extractSandboxId,
-  pushInstanceEvent,
-} from './event-push';
+import { extractConversationContext, extractSandboxId, pushInstanceEvent } from './event-push';
 
 // ─── createConversation ────────────────────────────────────────────────────
 
@@ -195,13 +191,11 @@ export async function markReadFor(
 
   const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
   if (sandboxId) {
-    await pushInstanceEvent(
-      env,
-      sandboxId,
-      humanMemberIds,
-      'conversation.read',
-      { conversationId, memberId: userId, lastReadAt: now }
-    );
+    await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
+      conversationId,
+      memberId: userId,
+      lastReadAt: now,
+    });
   }
 
   return { ok: true };

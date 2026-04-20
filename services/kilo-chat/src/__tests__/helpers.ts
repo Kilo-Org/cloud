@@ -13,7 +13,7 @@ import { registerTypingRoutes } from '../routes/typing';
 export function makeApp(
   callerId: string,
   callerKind: 'user' | 'bot',
-  allowedSandboxIds: string[] = [],
+  allowedSandboxIds: string[] = []
 ) {
   const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(async (c, next) => {
     c.set('callerId', callerId);

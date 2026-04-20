@@ -1,5 +1,8 @@
+import type { EventServiceClient } from '@kilocode/event-service';
+
 // ── Configuration ───────────────────────────────────────────────────
-export type KiloChatConfig = {
+export type KiloChatClientConfig = {
+  eventService: EventServiceClient;
   baseUrl: string;
   getToken: () => Promise<string>;
   fetch?: typeof globalThis.fetch;
@@ -49,7 +52,7 @@ export type MessageRow = {
   deliveryFailed: boolean;
 };
 
-// ── SSE events ──────────────────────────────────────────────────────
+// ── Events ──────────────────────────────────────────────────────────
 export type MessageCreatedEvent = {
   messageId: string;
   senderId: string;
@@ -75,13 +78,16 @@ export type TypingEvent = {
   memberId: string;
 };
 
-export type SSEEventHandler = {
-  onMessageCreated?: (event: MessageCreatedEvent) => void;
-  onMessageUpdated?: (event: MessageUpdatedEvent) => void;
-  onMessageDeleted?: (event: MessageDeletedEvent) => void;
-  onMessageDeliveryFailed?: (event: MessageDeliveryFailedEvent) => void;
-  onTyping?: (event: TypingEvent) => void;
-  onError?: (error: Error) => void;
+export type ReactionAddedEvent = {
+  messageId: string;
+  memberId: string;
+  emoji: string;
+};
+
+export type ReactionRemovedEvent = {
+  messageId: string;
+  memberId: string;
+  emoji: string;
 };
 
 // ── API request/response types ──────────────────────────────────────

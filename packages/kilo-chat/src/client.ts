@@ -1,6 +1,6 @@
 import { KiloChatApiError } from './errors';
 import type {
-  KiloChatConfig,
+  KiloChatClientConfig,
   ConversationListResponse,
   ConversationDetailResponse,
   CreateConversationRequest,
@@ -15,6 +15,13 @@ import type {
   Message,
   MessageRow,
   ContentBlock,
+  MessageCreatedEvent,
+  MessageUpdatedEvent,
+  MessageDeletedEvent,
+  MessageDeliveryFailedEvent,
+  TypingEvent,
+  ReactionAddedEvent,
+  ReactionRemovedEvent,
 } from './types';
 
 function parseMessageRow(row: MessageRow): Message {
@@ -22,17 +29,132 @@ function parseMessageRow(row: MessageRow): Message {
 }
 
 export class KiloChatClient {
-  private baseUrl: string;
-  private getToken: () => Promise<string>;
-  private fetchFn: typeof globalThis.fetch;
+  private readonly es: KiloChatClientConfig['eventService'];
+  private readonly baseUrl: string;
+  private readonly getToken: () => Promise<string>;
+  private readonly fetchFn: typeof globalThis.fetch;
 
-  constructor(config: KiloChatConfig) {
+  constructor(config: KiloChatClientConfig) {
+    this.es = config.eventService;
     this.baseUrl = config.baseUrl;
     this.getToken = config.getToken;
     this.fetchFn = config.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
-  private async request<T>(
+  // ── Mutations via event-service RPC ──────────────────────────────────────
+
+  async sendMessage(req: CreateMessageRequest): Promise<CreateMessageResponse> {
+    return this.es.rpc('kilo-chat', 'sendMessage', req);
+  }
+
+  async editMessage(messageId: string, req: EditMessageRequest): Promise<EditMessageResponse> {
+    return this.es.rpc('kilo-chat', 'editMessage', { ...req, messageId });
+  }
+
+  async deleteMessage(messageId: string, req: DeleteMessageRequest): Promise<void> {
+    return this.es.rpc('kilo-chat', 'deleteMessage', { ...req, messageId });
+  }
+
+  async createConversation(req: CreateConversationRequest): Promise<CreateConversationResponse> {
+    return this.es.rpc('kilo-chat', 'createConversation', req);
+  }
+
+  async renameConversation(
+    conversationId: string,
+    req: RenameConversationRequest
+  ): Promise<{ ok: true }> {
+    return this.es.rpc('kilo-chat', 'renameConversation', { ...req, conversationId });
+  }
+
+  async leaveConversation(conversationId: string): Promise<void> {
+    return this.es.rpc('kilo-chat', 'leaveConversation', { conversationId });
+  }
+
+  async sendTyping(conversationId: string): Promise<void> {
+    return this.es.rpc('kilo-chat', 'sendTyping', { conversationId });
+  }
+
+  async markConversationRead(conversationId: string): Promise<void> {
+    return this.es.rpc('kilo-chat', 'markRead', { conversationId });
+  }
+
+  async addReaction(
+    messageId: string,
+    conversationId: string,
+    emoji: string
+  ): Promise<{ id: string; added: boolean }> {
+    return this.es.rpc('kilo-chat', 'addReaction', { messageId, conversationId, emoji });
+  }
+
+  async removeReaction(
+    messageId: string,
+    conversationId: string,
+    emoji: string
+  ): Promise<{ ok: true }> {
+    return this.es.rpc('kilo-chat', 'removeReaction', { messageId, conversationId, emoji });
+  }
+
+  // ── Queries via HTTP ──────────────────────────────────────────────────────
+
+  async listConversations(sandboxId?: string): Promise<ConversationListResponse> {
+    return this.httpRequest('/v1/conversations', {
+      query: sandboxId ? { sandboxId } : undefined,
+    });
+  }
+
+  async getConversation(conversationId: string): Promise<ConversationDetailResponse> {
+    return this.httpRequest(`/v1/conversations/${conversationId}`);
+  }
+
+  async listMessages(
+    conversationId: string,
+    opts?: { before?: string; limit?: number }
+  ): Promise<Message[]> {
+    const res = await this.httpRequest<MessageListResponse>(
+      `/v1/conversations/${conversationId}/messages`,
+      { query: { before: opts?.before, limit: opts?.limit } }
+    );
+    return res.messages.map(parseMessageRow);
+  }
+
+  // ── Typed event subscriptions ─────────────────────────────────────────────
+
+  onMessageCreated(handler: (ctx: string, e: MessageCreatedEvent) => void): () => void {
+    return this.es.on('message.created', handler as (context: string, payload: unknown) => void);
+  }
+
+  onMessageUpdated(handler: (ctx: string, e: MessageUpdatedEvent) => void): () => void {
+    return this.es.on('message.updated', handler as (context: string, payload: unknown) => void);
+  }
+
+  onMessageDeleted(handler: (ctx: string, e: MessageDeletedEvent) => void): () => void {
+    return this.es.on('message.deleted', handler as (context: string, payload: unknown) => void);
+  }
+
+  onMessageDeliveryFailed(
+    handler: (ctx: string, e: MessageDeliveryFailedEvent) => void
+  ): () => void {
+    return this.es.on(
+      'message.delivery_failed',
+      handler as (context: string, payload: unknown) => void
+    );
+  }
+
+  onTyping(handler: (ctx: string, e: TypingEvent) => void): () => void {
+    return this.es.on('typing', handler as (context: string, payload: unknown) => void);
+  }
+
+  onReactionAdded(handler: (ctx: string, e: ReactionAddedEvent) => void): () => void {
+    return this.es.on('reaction.added', handler as (context: string, payload: unknown) => void);
+  }
+
+  onReactionRemoved(handler: (ctx: string, e: ReactionRemovedEvent) => void): () => void {
+    return this.es.on('reaction.removed', handler as (context: string, payload: unknown) => void);
+  }
+
+  // ── Private HTTP helper ───────────────────────────────────────────────────
+
+  private async httpRequest<T>(
     path: string,
     opts: {
       method?: string;
@@ -68,60 +190,5 @@ export class KiloChatClient {
 
     if (res.status === 204) return undefined as T;
     return res.json() as Promise<T>;
-  }
-
-  async listConversations(sandboxId?: string): Promise<ConversationListResponse> {
-    const query = sandboxId ? `?sandboxId=${encodeURIComponent(sandboxId)}` : '';
-    return this.request(`/v1/conversations${query}`);
-  }
-
-  async getConversation(conversationId: string): Promise<ConversationDetailResponse> {
-    return this.request(`/v1/conversations/${conversationId}`);
-  }
-
-  async createConversation(req: CreateConversationRequest): Promise<CreateConversationResponse> {
-    return this.request('/v1/conversations', { method: 'POST', body: req });
-  }
-
-  async listMessages(
-    conversationId: string,
-    opts?: { before?: string; limit?: number }
-  ): Promise<Message[]> {
-    const res = await this.request<MessageListResponse>(
-      `/v1/conversations/${conversationId}/messages`,
-      { query: { before: opts?.before, limit: opts?.limit } }
-    );
-    return res.messages.map(parseMessageRow);
-  }
-
-  async sendMessage(req: CreateMessageRequest): Promise<CreateMessageResponse> {
-    return this.request('/v1/messages', { method: 'POST', body: req });
-  }
-
-  async editMessage(messageId: string, req: EditMessageRequest): Promise<EditMessageResponse> {
-    return this.request(`/v1/messages/${messageId}`, { method: 'PATCH', body: req });
-  }
-
-  async deleteMessage(messageId: string, req: DeleteMessageRequest): Promise<void> {
-    return this.request(`/v1/messages/${messageId}`, { method: 'DELETE', body: req });
-  }
-
-  async renameConversation(
-    conversationId: string,
-    req: RenameConversationRequest
-  ): Promise<{ ok: true }> {
-    return this.request(`/v1/conversations/${conversationId}`, { method: 'PATCH', body: req });
-  }
-
-  async leaveConversation(conversationId: string): Promise<void> {
-    return this.request(`/v1/conversations/${conversationId}/leave`, { method: 'POST' });
-  }
-
-  async sendTyping(conversationId: string): Promise<void> {
-    await this.request(`/v1/conversations/${conversationId}/typing`, { method: 'POST' });
-  }
-
-  async markConversationRead(conversationId: string): Promise<void> {
-    await this.request(`/v1/conversations/${conversationId}/mark-read`, { method: 'POST' });
   }
 }

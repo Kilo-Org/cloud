@@ -16,6 +16,7 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/kilo-chat/src"
   },
   "dependencies": {
+    "@kilocode/event-service": "workspace:*",
     "ulid": "3.0.1"
   },
   "devDependencies": {

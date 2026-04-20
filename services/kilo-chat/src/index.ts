@@ -6,7 +6,6 @@ import { botAuthMiddleware } from './auth-bot';
 import type { AuthContext } from './auth';
 import { registerConversationRoutes } from './routes/conversations';
 import { registerMessageRoutes } from './routes/messages';
-import { registerEventsRoutes } from './routes/events';
 import { registerReactionsRoutes } from './routes/reactions';
 import { registerTypingRoutes } from './routes/typing';
 import { registerBotRoutes } from './routes/bot-messages';
@@ -32,7 +31,7 @@ app.use(
     },
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     // Bots reach the Worker via RPC; HTTP is humans-only with a JWT bearer.
-    allowHeaders: ['Content-Type', 'Authorization', 'Last-Event-ID'],
+    allowHeaders: ['Content-Type', 'Authorization'],
     exposeHeaders: ['Content-Type'],
     maxAge: 86400,
   })
@@ -43,7 +42,6 @@ app.get('/health', c => c.json({ ok: true }));
 app.use('/v1/*', authMiddleware);
 registerConversationRoutes(app);
 registerMessageRoutes(app);
-registerEventsRoutes(app);
 registerReactionsRoutes(app);
 registerTypingRoutes(app);
 

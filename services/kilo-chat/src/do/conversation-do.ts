@@ -1,11 +1,10 @@
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { eq, lt, gt, desc, ne, and, asc, sql, inArray } from 'drizzle-orm';
+import { eq, lt, desc, ne, and, sql, inArray } from 'drizzle-orm';
 import { conversation, members, messages, reactions } from '../db/conversation-schema';
 import migrations from '../../drizzle/conversation/migrations';
-import { monotonicFactory, decodeTime } from 'ulid';
-import { SSE_PING, formatSseEvent } from '../lib/sse';
+import { monotonicFactory } from 'ulid';
 
 export type InitializeParams = {
   id: string;
@@ -91,15 +90,9 @@ export type RemoveReactionResult =
   | { ok: true; removed: false }
   | { ok: false; error: string };
 
-export const MAX_SSE_PER_MEMBER = 7;
-export const MAX_REPLAY_EVENTS = 500;
-
 export class ConversationDO extends DurableObject<Env> {
   private db;
   private nextUlid = monotonicFactory();
-  private sseClients = new Map<string, WritableStreamDefaultWriter>();
-  private sseClientsByMember = new Map<string, Set<string>>();
-  private encoder = new TextEncoder();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -107,60 +100,8 @@ export class ConversationDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(() => migrate(this.db, migrations));
   }
 
-  private removeSseClient(connId: string): void {
-    this.sseClients.delete(connId);
-    for (const [, conns] of this.sseClientsByMember) {
-      if (conns.delete(connId)) break;
-    }
-  }
-
-  private broadcast(event: string, data: unknown, id?: string): void {
-    const text = formatSseEvent(event, data, id);
-    const bytes = this.encoder.encode(text);
-    for (const [connId, writer] of this.sseClients) {
-      writer.write(bytes).catch(() => {
-        this.removeSseClient(connId);
-        writer.close().catch(() => {});
-      });
-    }
-  }
-
-  private broadcastExcluding(
-    excludeMemberId: string,
-    event: string,
-    data: unknown,
-    id?: string
-  ): void {
-    const text = formatSseEvent(event, data, id);
-    const bytes = this.encoder.encode(text);
-    const excludeConnIds = this.sseClientsByMember.get(excludeMemberId);
-    for (const [connId, writer] of this.sseClients) {
-      if (excludeConnIds?.has(connId)) continue;
-      writer.write(bytes).catch(() => {
-        this.removeSseClient(connId);
-        writer.close().catch(() => {});
-      });
-    }
-  }
-
-  private sendToMember(memberId: string, event: string, data: unknown, id?: string): void {
-    const connIds = this.sseClientsByMember.get(memberId);
-    if (!connIds) return;
-    const text = formatSseEvent(event, data, id);
-    const bytes = this.encoder.encode(text);
-    for (const connId of connIds) {
-      const writer = this.sseClients.get(connId);
-      if (!writer) continue;
-      writer.write(bytes).catch(() => {
-        this.removeSseClient(connId);
-        writer.close().catch(() => {});
-      });
-    }
-  }
-
-  notifyDeliveryFailed(messageId: string, senderId: string): void {
+  notifyDeliveryFailed(messageId: string, _senderId: string): void {
     this.db.update(messages).set({ delivery_failed: 1 }).where(eq(messages.id, messageId)).run();
-    this.sendToMember(senderId, 'message.delivery_failed', { messageId });
   }
 
   initialize(params: InitializeParams): { ok: true } | { ok: false; error: string } {
@@ -263,18 +204,6 @@ export class ConversationDO extends DurableObject<Env> {
       throw err;
     }
 
-    this.broadcastExcluding(
-      params.senderId,
-      'message.created',
-      {
-        messageId,
-        senderId: params.senderId,
-        content: params.content,
-        inReplyToMessageId: params.inReplyToMessageId ?? null,
-      },
-      messageId
-    );
-
     return { ok: true, messageId };
   }
 
@@ -364,17 +293,6 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(messages.id, params.messageId))
       .run();
 
-    this.broadcastExcluding(
-      params.senderId,
-      'message.updated',
-      {
-        messageId: params.messageId,
-        content: params.content,
-        clientUpdatedAt: params.clientTimestamp,
-      },
-      params.messageId
-    );
-
     return { ok: true, stale: false, messageId: params.messageId };
   }
 
@@ -382,7 +300,6 @@ export class ConversationDO extends DurableObject<Env> {
     if (!this.isMember(memberId)) {
       return { ok: false, error: 'Not a member' };
     }
-    this.broadcastExcluding(memberId, 'typing', { memberId });
     return { ok: true };
   }
 
@@ -414,13 +331,6 @@ export class ConversationDO extends DurableObject<Env> {
       .set({ deleted: 1, updated_at: Date.now() })
       .where(eq(messages.id, params.messageId))
       .run();
-
-    this.broadcastExcluding(
-      params.senderId,
-      'message.deleted',
-      { messageId: params.messageId },
-      params.messageId
-    );
 
     return { ok: true };
   }
@@ -455,11 +365,6 @@ export class ConversationDO extends DurableObject<Env> {
             removed_id: null,
           })
           .run();
-        this.broadcast(
-          'reaction.added',
-          { messageId: params.messageId, memberId: params.memberId, emoji: params.emoji, at: now },
-          id
-        );
         return { ok: true, added: true, id };
       }
 
@@ -480,11 +385,6 @@ export class ConversationDO extends DurableObject<Env> {
           )
         )
         .run();
-      this.broadcast(
-        'reaction.added',
-        { messageId: params.messageId, memberId: params.memberId, emoji: params.emoji, at: now },
-        id
-      );
       return { ok: true, added: true, id };
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
@@ -523,11 +423,6 @@ export class ConversationDO extends DurableObject<Env> {
           )
         )
         .run();
-      this.broadcast(
-        'reaction.removed',
-        { messageId: params.messageId, memberId: params.memberId, emoji: params.emoji },
-        removedId
-      );
       return { ok: true, removed: true, removed_id: removedId };
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
@@ -556,232 +451,5 @@ export class ConversationDO extends DurableObject<Env> {
       remainingUsers: active.filter(m => m.kind === 'user'),
       botMembers: active.filter(m => m.kind === 'bot'),
     };
-  }
-
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-
-    if (url.pathname === '/subscribe') {
-      const memberId = url.searchParams.get('memberId');
-      if (!memberId || !this.isMember(memberId)) {
-        return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
-      }
-
-      const memberConns = this.sseClientsByMember.get(memberId);
-      if (memberConns && memberConns.size >= MAX_SSE_PER_MEMBER) {
-        return new Response(JSON.stringify({ error: 'Too many connections' }), { status: 429 });
-      }
-
-      const lastEventId = request.headers.get('last-event-id') ?? undefined;
-
-      // Schedule keepalive alarm if not already set
-      const alarm = await this.ctx.storage.getAlarm();
-      if (!alarm) {
-        await this.ctx.storage.setAlarm(Date.now() + 30_000);
-      }
-
-      const connId = crypto.randomUUID();
-
-      // Build replay data before opening the stream so we can send it immediately
-      let replayBytes: Uint8Array | null = null;
-      if (lastEventId) {
-        const missedMessages = this.db
-          .select()
-          .from(messages)
-          .where(gt(messages.id, lastEventId))
-          .orderBy(asc(messages.id))
-          .limit(MAX_REPLAY_EVENTS)
-          .all();
-
-        // Messages that existed before the cursor but were edited or deleted
-        // while the client was disconnected. The ULID encodes the cursor
-        // timestamp — any updated_at after that point is a missed mutation.
-        const cursorTs = decodeTime(lastEventId);
-        const modifiedPreCursor = this.db
-          .select()
-          .from(messages)
-          .where(and(sql`${messages.id} <= ${lastEventId}`, gt(messages.updated_at, cursorTs)))
-          .orderBy(asc(messages.id))
-          .limit(MAX_REPLAY_EVENTS)
-          .all();
-
-        // UNION ALL forces each arm to hit its dedicated index (reactions_by_id /
-        // reactions_by_removed_id). An OR-shape would be at the mercy of SQLite's
-        // OR-to-UNION optimizer.
-        const reactionEvents = this.db.all<{
-          event_id: string;
-          kind: 'added' | 'removed';
-          message_id: string;
-          member_id: string;
-          emoji: string;
-          at: number | null;
-        }>(sql`
-          SELECT id AS event_id, 'added' AS kind, message_id, member_id, emoji, added_at AS at
-            FROM reactions WHERE id > ${lastEventId}
-          UNION ALL
-          SELECT removed_id AS event_id, 'removed' AS kind, message_id, member_id, emoji, NULL AS at
-            FROM reactions WHERE removed_id IS NOT NULL AND removed_id > ${lastEventId}
-          LIMIT ${MAX_REPLAY_EVENTS}
-        `);
-
-        type ReplayItem = { id: string; text: string };
-        const items: ReplayItem[] = [];
-
-        for (const row of missedMessages) {
-          if (row.deleted === 1) {
-            items.push({
-              id: row.id,
-              text: formatSseEvent('message.deleted', { messageId: row.id }, row.id),
-            });
-          } else {
-            items.push({
-              id: row.id,
-              text: formatSseEvent(
-                'message.created',
-                {
-                  messageId: row.id,
-                  senderId: row.sender_id,
-                  content: JSON.parse(row.content) as Array<{
-                    type: string;
-                    [key: string]: unknown;
-                  }>,
-                  version: row.version,
-                  inReplyToMessageId: row.in_reply_to_message_id,
-                },
-                row.id
-              ),
-            });
-          }
-        }
-
-        // Emit update/delete events for pre-cursor messages that were
-        // modified while the client was disconnected.
-        for (const row of modifiedPreCursor) {
-          if (row.deleted === 1) {
-            items.push({
-              id: row.id,
-              text: formatSseEvent('message.deleted', { messageId: row.id }, row.id),
-            });
-          } else {
-            items.push({
-              id: row.id,
-              text: formatSseEvent(
-                'message.updated',
-                {
-                  messageId: row.id,
-                  content: JSON.parse(row.content) as Array<{
-                    type: string;
-                    [key: string]: unknown;
-                  }>,
-                  version: row.version,
-                },
-                row.id
-              ),
-            });
-          }
-        }
-
-        for (const r of reactionEvents) {
-          if (r.kind === 'added') {
-            items.push({
-              id: r.event_id,
-              text: formatSseEvent(
-                'reaction.added',
-                { messageId: r.message_id, memberId: r.member_id, emoji: r.emoji, at: r.at },
-                r.event_id
-              ),
-            });
-          } else {
-            items.push({
-              id: r.event_id,
-              text: formatSseEvent(
-                'reaction.removed',
-                { messageId: r.message_id, memberId: r.member_id, emoji: r.emoji },
-                r.event_id
-              ),
-            });
-          }
-        }
-
-        items.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-
-        const truncated = items.length > MAX_REPLAY_EVENTS;
-        if (truncated) {
-          items.length = MAX_REPLAY_EVENTS;
-        }
-
-        if (items.length > 0 || truncated) {
-          let text = items.map(i => i.text).join('');
-          if (truncated) {
-            text += formatSseEvent('replay.truncated', { limit: MAX_REPLAY_EVENTS });
-          }
-          replayBytes = this.encoder.encode(text);
-        }
-      }
-
-      const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
-      const writer = writable.getWriter();
-      this.sseClients.set(connId, writer);
-      const conns = this.sseClientsByMember.get(memberId) ?? new Set();
-      conns.add(connId);
-      this.sseClientsByMember.set(memberId, conns);
-
-      // Send replay immediately
-      if (replayBytes !== null) {
-        writer.write(replayBytes).catch(() => {
-          this.removeSseClient(connId);
-          writer.close().catch(() => {});
-        });
-      }
-
-      // Wrap readable in a new ReadableStream with a cancel callback that cleans up
-      // the writer when the HTTP client disconnects (cancels the response body).
-      const reader = readable.getReader();
-      const outputReadable = new ReadableStream<Uint8Array>({
-        pull(controller) {
-          return reader
-            .read()
-            .then(({ done, value }) => {
-              if (done) {
-                controller.close();
-              } else if (value !== undefined) {
-                controller.enqueue(value);
-              }
-            })
-            .catch(() => {
-              // Stream was cancelled by the client — nothing to do.
-            });
-        },
-        cancel: () => {
-          this.removeSseClient(connId);
-          reader.cancel().catch(() => {});
-          writer.close().catch(() => {});
-        },
-      });
-
-      return new Response(outputReadable, {
-        headers: {
-          'content-type': 'text/event-stream',
-          'cache-control': 'no-cache',
-          connection: 'keep-alive',
-        },
-      });
-    }
-
-    return new Response('Not Found', { status: 404 });
-  }
-
-  async alarm(): Promise<void> {
-    if (this.sseClients.size === 0) return;
-    const ping = this.encoder.encode(SSE_PING);
-    for (const [connId, writer] of this.sseClients) {
-      writer.write(ping).catch(() => {
-        this.removeSseClient(connId);
-        writer.close().catch(() => {});
-      });
-    }
-    if (this.sseClients.size > 0) {
-      await this.ctx.storage.setAlarm(Date.now() + 30_000);
-    }
   }
 }

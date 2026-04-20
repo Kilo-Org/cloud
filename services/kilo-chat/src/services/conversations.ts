@@ -147,9 +147,7 @@ export type MarkReadParams = {
   conversationId: string;
 };
 
-export type MarkReadResult =
-  | { ok: true }
-  | { ok: false; code: 'forbidden'; error: string };
+export type MarkReadResult = { ok: true } | { ok: false; code: 'forbidden'; error: string };
 
 export async function markReadFor(
   env: Env,

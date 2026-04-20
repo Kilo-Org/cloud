@@ -63,9 +63,10 @@ export async function getConversationContext(
  * Derives conversation context from an already-fetched ConversationInfo members array.
  * Use this to avoid a redundant getInfo() call when info is already available.
  */
-export function extractConversationContext(
-  members: Array<{ id: string; kind: string }>
-): { humanMemberIds: string[]; sandboxId: string | null } {
+export function extractConversationContext(members: Array<{ id: string; kind: string }>): {
+  humanMemberIds: string[];
+  sandboxId: string | null;
+} {
   const humanMemberIds = members.filter(m => m.kind === 'user').map(m => m.id);
   const botMember = members.find(m => m.kind === 'bot');
   const sandboxId = botMember ? extractSandboxId(botMember.id) : null;

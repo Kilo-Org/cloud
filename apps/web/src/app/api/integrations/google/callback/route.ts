@@ -18,7 +18,6 @@ function buildGoogleRedirectPath(
   owner: VerifiedGoogleOAuthState['owner'] | null | undefined,
   queryParam: string
 ): string {
-
   if (owner?.type === 'org') {
     return `/organizations/${owner.id}/claw/settings?${queryParam}`;
   }
@@ -30,7 +29,10 @@ function buildGoogleRedirectPath(
   return `/claw/settings?${queryParam}`;
 }
 
-function sanitizeOAuthProviderError(error: string | null, errorDescription: string | null): string | null {
+function sanitizeOAuthProviderError(
+  error: string | null,
+  errorDescription: string | null
+): string | null {
   const source = errorDescription ?? error;
   if (!source) return null;
   const normalized = source.trim();
@@ -229,7 +231,10 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.redirect(
-      new URL(buildGoogleRedirectPath(verifyGoogleOAuthState(state)?.owner, 'error=connection_failed'), APP_URL)
+      new URL(
+        buildGoogleRedirectPath(verifyGoogleOAuthState(state)?.owner, 'error=connection_failed'),
+        APP_URL
+      )
     );
   }
 }

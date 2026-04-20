@@ -45,8 +45,6 @@ export function useSendMessage(
     mutationFn: (req: SendMessageVariables) => client.sendMessage(req),
     onMutate: async (variables: SendMessageVariables) => {
       if (!conversationId) return;
-      // Signal typing stopped before sending
-      void client.sendTypingStop(conversationId);
       const queryKey = ['kilo-chat', 'messages', conversationId];
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData(queryKey);

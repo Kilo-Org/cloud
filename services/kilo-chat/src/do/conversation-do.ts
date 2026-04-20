@@ -43,6 +43,13 @@ export type MessageReactionSummary = {
 
 export type MessageContentBlock = { type: string; [key: string]: string };
 
+export type GetMessageResult = {
+  id: string;
+  senderId: string;
+  content: MessageContentBlock[];
+  deleted: boolean;
+} | null;
+
 export type MessageRow = {
   id: string;
   senderId: string;
@@ -205,6 +212,17 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     return { ok: true, messageId };
+  }
+
+  getMessage(messageId: string): GetMessageResult {
+    const row = this.db.select().from(messages).where(eq(messages.id, messageId)).get();
+    if (!row) return null;
+    return {
+      id: row.id,
+      senderId: row.sender_id,
+      content: row.deleted === 1 ? [] : (JSON.parse(row.content) as MessageContentBlock[]),
+      deleted: row.deleted === 1,
+    };
   }
 
   listMessages(params: ListMessagesParams): ListMessagesResult {

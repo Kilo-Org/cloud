@@ -474,6 +474,48 @@ describe('ConversationDO', () => {
     });
   });
 
+  it('getMessage - returns message data for existing message', async () => {
+    const stub = getStub('conv-getmsg-1');
+    await stub.initialize(BASE_PARAMS);
+    const createResult = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Hello!' }],
+    });
+    expect(createResult.ok).toBe(true);
+    if (!createResult.ok) return;
+
+    const msg = await stub.getMessage(createResult.messageId);
+    expect(msg).not.toBeNull();
+    expect(msg!.id).toBe(createResult.messageId);
+    expect(msg!.senderId).toBe('user-alice');
+    expect(msg!.content).toEqual([{ type: 'text', text: 'Hello!' }]);
+    expect(msg!.deleted).toBe(false);
+  });
+
+  it('getMessage - returns null for non-existent message', async () => {
+    const stub = getStub('conv-getmsg-2');
+    await stub.initialize(BASE_PARAMS);
+    const msg = await stub.getMessage('NONEXISTENT00000000000000');
+    expect(msg).toBeNull();
+  });
+
+  it('getMessage - returns deleted=true for soft-deleted message', async () => {
+    const stub = getStub('conv-getmsg-3');
+    await stub.initialize(BASE_PARAMS);
+    const createResult = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Delete me' }],
+    });
+    expect(createResult.ok).toBe(true);
+    if (!createResult.ok) return;
+
+    await stub.deleteMessage({ messageId: createResult.messageId, senderId: 'user-alice' });
+    const msg = await stub.getMessage(createResult.messageId);
+    expect(msg).not.toBeNull();
+    expect(msg!.deleted).toBe(true);
+    expect(msg!.content).toEqual([]);
+  });
+
   describe('schema constraints', () => {
     it('rejects a reply that points at a non-existent parent message (FK)', async () => {
       const stub = getStub('conv-fk-reply');

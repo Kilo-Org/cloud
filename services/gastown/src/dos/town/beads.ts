@@ -721,13 +721,13 @@ export function deleteBeads(sql: SqlStorage, beadIds: string[]): number {
   const allIds = new Set(beadIds);
 
   // Expand with child beads (molecule steps, etc.)
-  const childRows = [
-    ...query(
-      sql,
-      /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.parent_bead_id} IN (${beadIds.map(() => '?').join(',')})`,
-      [...beadIds]
-    ),
-  ];
+  // Dynamic IN clauses use sql.exec directly — the type-safe query()
+  // wrapper can't infer placeholder count from runtime-built strings.
+  const ph = (ids: string[]) => ids.map(() => '?').join(',');
+  const childRows = [...sql.exec(
+    /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.parent_bead_id} IN (${ph(beadIds)})`,
+    ...beadIds
+  )];
   const childIds = BeadRecord.pick({ bead_id: true })
     .array()
     .parse(childRows)
@@ -746,61 +746,51 @@ export function deleteBeads(sql: SqlStorage, beadIds: string[]): number {
   }
 
   const allIdsArr = [...allIds];
-  const placeholders = allIdsArr.map(() => '?').join(',');
+  const placeholders = ph(allIdsArr);
 
   // Unhook agents assigned to any of these beads
-  query(
-    sql,
-    /* sql */ `
-      UPDATE ${agent_metadata}
+  sql.exec(
+    /* sql */ `UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.current_hook_bead_id} = NULL,
           ${agent_metadata.columns.status} = 'idle'
-      WHERE ${agent_metadata.current_hook_bead_id} IN (${placeholders})
-    `,
-    [...allIdsArr]
+      WHERE ${agent_metadata.current_hook_bead_id} IN (${placeholders})`,
+    ...allIdsArr
   );
 
   // Delete dependencies referencing any of these beads
-  query(
-    sql,
+  sql.exec(
     /* sql */ `DELETE FROM ${bead_dependencies} WHERE ${bead_dependencies.bead_id} IN (${placeholders}) OR ${bead_dependencies.depends_on_bead_id} IN (${placeholders})`,
-    [...allIdsArr, ...allIdsArr]
+    ...allIdsArr, ...allIdsArr
   );
 
   // Delete events
-  query(
-    sql,
+  sql.exec(
     /* sql */ `DELETE FROM ${bead_events} WHERE ${bead_events.bead_id} IN (${placeholders})`,
-    [...allIdsArr]
+    ...allIdsArr
   );
 
   // Delete satellite metadata
-  query(
-    sql,
+  sql.exec(
     /* sql */ `DELETE FROM ${agent_metadata} WHERE ${agent_metadata.bead_id} IN (${placeholders})`,
-    [...allIdsArr]
+    ...allIdsArr
   );
-  query(
-    sql,
+  sql.exec(
     /* sql */ `DELETE FROM ${review_metadata} WHERE ${review_metadata.bead_id} IN (${placeholders})`,
-    [...allIdsArr]
+    ...allIdsArr
   );
-  query(
-    sql,
+  sql.exec(
     /* sql */ `DELETE FROM ${escalation_metadata} WHERE ${escalation_metadata.bead_id} IN (${placeholders})`,
-    [...allIdsArr]
+    ...allIdsArr
   );
-  query(
-    sql,
+  sql.exec(
     /* sql */ `DELETE FROM ${convoy_metadata} WHERE ${convoy_metadata.bead_id} IN (${placeholders})`,
-    [...allIdsArr]
+    ...allIdsArr
   );
 
   // Delete the beads themselves
-  query(
-    sql,
+  sql.exec(
     /* sql */ `DELETE FROM ${beads} WHERE ${beads.bead_id} IN (${placeholders})`,
-    [...allIdsArr]
+    ...allIdsArr
   );
 
   return allIdsArr.length;
@@ -809,10 +799,9 @@ export function deleteBeads(sql: SqlStorage, beadIds: string[]): number {
 function collectChildBeadIds(sql: SqlStorage, parentIds: string[]): string[] {
   if (parentIds.length === 0) return [];
   const childRows = [
-    ...query(
-      sql,
+    ...sql.exec(
       /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.parent_bead_id} IN (${parentIds.map(() => '?').join(',')})`,
-      [...parentIds]
+      ...parentIds
     ),
   ];
   const childIds = BeadRecord.pick({ bead_id: true })
@@ -838,10 +827,9 @@ export function deleteBeadsByStatus(
   }
 
   const rows = [
-    ...query(
-      sql,
+    ...sql.exec(
       /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${conditions.join(' AND ')}`,
-      values
+      ...values
     ),
   ];
   const beadIds = BeadRecord.pick({ bead_id: true })

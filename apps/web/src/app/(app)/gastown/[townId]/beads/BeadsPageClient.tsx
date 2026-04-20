@@ -168,15 +168,14 @@ export function BeadsPageClient({ townId }: BeadsPageClientProps) {
 
     if (deleteConfirm.kind === 'selected') {
       const { ids, rigId } = deleteConfirm;
-      deleteBeadMutation.mutate({ rigId, beadId: ids, townId });
+      for (const id of ids) {
+        deleteBeadMutation.mutate({ rigId, beadId: id, townId });
+      }
     } else {
-      // Delete all failed beads — collect all IDs and bulk-delete via the array endpoint.
-      // Using the first rig's ID for ownership verification; the town DO deletes by IDs.
-      const { rigIds } = deleteConfirm;
-      const firstRigId = rigIds[0];
-      if (!firstRigId) return;
-      const failedIds = failedBeads.map(b => b.bead_id);
-      deleteBeadMutation.mutate({ rigId: firstRigId, beadId: failedIds, townId });
+      // Delete all failed beads one by one (no bulk endpoint).
+      for (const bead of failedBeads) {
+        deleteBeadMutation.mutate({ rigId: bead.rigId, beadId: bead.bead_id, townId });
+      }
     }
   };
 

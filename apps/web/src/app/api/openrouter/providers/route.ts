@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import type { OpenRouterProvider } from '@/lib/organizations/organization-types';
+import { OpenRouterProvidersResponseSchema } from '@/lib/organizations/organization-types';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { redisGet } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
@@ -10,7 +10,7 @@ const getProviders = createCachedFetch(
   async () => {
     const raw = await redisGet(GATEWAY_METADATA_REDIS_KEYS.openrouterProviders);
     if (raw === null) return null;
-    return JSON.parse(raw) as OpenRouterProvider[];
+    return OpenRouterProvidersResponseSchema.shape.data.parse(JSON.parse(raw));
   },
   60_000, // 60 seconds in-process TTL
   null

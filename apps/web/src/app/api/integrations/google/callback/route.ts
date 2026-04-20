@@ -36,7 +36,7 @@ function sanitizeOAuthProviderError(error: string | null, errorDescription: stri
   const normalized = source.trim();
   if (!normalized) return null;
 
-  if (!/^[A-Za-z0-9 _.:/\-]{1,200}$/.test(normalized)) {
+  if (!/^[A-Za-z0-9 _.:/-]{1,200}$/.test(normalized)) {
     return 'oauth_error';
   }
 

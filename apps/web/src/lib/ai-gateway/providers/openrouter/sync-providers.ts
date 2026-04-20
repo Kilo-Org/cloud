@@ -345,19 +345,11 @@ export async function syncAndStoreProviders() {
   const openrouter_data = await fetchGatewayModels(PROVIDERS.OPENROUTER);
   const vercel_data = await fetchGatewayModels(PROVIDERS.VERCEL_AI_GATEWAY);
 
-  // Best-effort: no readers yet, and a temporary failure here must not
-  // prevent the primary (openrouter/vercel/providers) snapshot from refreshing.
-  let openrouter_providers: OpenRouterApiProvidersResponse | null = null;
-  try {
-    const fetched = await fetchOpenRouterApiProviders();
-    if (fetched.data.length < 10) {
-      throw new Error(
-        `Suspicious: total number of OpenRouter API providers is ${fetched.data.length} < 10`
-      );
-    }
-    openrouter_providers = fetched;
-  } catch (err) {
-    console.error('[syncAndStoreProviders] Failed to fetch /api/v1/providers:', err);
+  const openrouter_providers = await fetchOpenRouterApiProviders();
+  if (openrouter_providers.data.length < 10) {
+    throw new Error(
+      `Suspicious: total number of OpenRouter API providers is ${openrouter_providers.data.length} < 10`
+    );
   }
 
   const providers = await syncProviders();

@@ -80,7 +80,6 @@ export async function deliverToBot(
         msg.conversationId,
         convContext.sandboxId,
         convContext.humanMemberIds,
-        undefined,
         'message.delivery_failed',
         { messageId: msg.messageId }
       );

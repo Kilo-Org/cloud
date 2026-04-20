@@ -105,13 +105,12 @@ export async function createMessageFor(
     if (sandboxId) {
       const otherHumans = humanMemberIds.filter(id => id !== callerId);
 
-      // Push message.created on conversation context (include sender for multi-client)
+      // Push message.created on conversation context
       await pushEventToHumanMembers(
         env,
         conversationId,
         sandboxId,
         humanMemberIds,
-        undefined,
         'message.created',
         {
           messageId,
@@ -129,7 +128,6 @@ export async function createMessageFor(
           conversationId,
           sandboxId,
           humanMemberIds,
-          undefined,
           'typing.stop',
           { memberId: callerId }
         );
@@ -144,7 +142,7 @@ export async function createMessageFor(
             const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
             await stub.markRead(conversationId, now);
           } else {
-            await pushInstanceEvent(env, sandboxId, [userId], undefined, 'conversation.activity', {
+            await pushInstanceEvent(env, sandboxId, [userId], 'conversation.activity', {
               conversationId,
               lastActivityAt: now,
             });
@@ -217,7 +215,6 @@ export async function editMessageFor(
       conversationId,
       convContext.sandboxId,
       convContext.humanMemberIds,
-      undefined,
       'message.updated',
       { messageId: result.messageId, content, clientUpdatedAt: timestamp }
     );
@@ -268,7 +265,6 @@ export async function deleteMessageFor(
       conversationId,
       convContext.sandboxId,
       convContext.humanMemberIds,
-      undefined,
       'message.deleted',
       { messageId }
     );

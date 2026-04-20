@@ -17,18 +17,16 @@ export async function pushEventToHumanMembers(
   conversationId: string,
   sandboxId: string,
   humanMemberIds: string[],
-  excludeSenderId: string | undefined,
   event: string,
   payload: unknown
 ): Promise<void> {
   const es = getEventService(env);
   if (!es) return;
   const context = `/kiloclaw/${sandboxId}/${conversationId}`;
-  const targets = excludeSenderId
-    ? humanMemberIds.filter(id => id !== excludeSenderId)
-    : humanMemberIds;
 
-  await Promise.allSettled(targets.map(userId => es.pushEvent(userId, context, event, payload)));
+  await Promise.allSettled(
+    humanMemberIds.map(userId => es.pushEvent(userId, context, event, payload))
+  );
 }
 
 /**
@@ -39,18 +37,16 @@ export async function pushInstanceEvent(
   env: Env,
   sandboxId: string,
   humanMemberIds: string[],
-  excludeSenderId: string | undefined,
   event: string,
   payload: unknown
 ): Promise<void> {
   const es = getEventService(env);
   if (!es) return;
   const context = `/kiloclaw/${sandboxId}`;
-  const targets = excludeSenderId
-    ? humanMemberIds.filter(id => id !== excludeSenderId)
-    : humanMemberIds;
 
-  await Promise.allSettled(targets.map(userId => es.pushEvent(userId, context, event, payload)));
+  await Promise.allSettled(
+    humanMemberIds.map(userId => es.pushEvent(userId, context, event, payload))
+  );
 }
 
 /**

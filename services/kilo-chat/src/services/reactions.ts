@@ -38,7 +38,6 @@ export async function addReactionFor(
         params.conversationId,
         convContext.sandboxId,
         convContext.humanMemberIds,
-        undefined, // don't exclude — reactions go to everyone
         'reaction.added',
         { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
       );
@@ -83,7 +82,6 @@ export async function removeReactionFor(
       params.conversationId,
       convContext.sandboxId,
       convContext.humanMemberIds,
-      undefined, // don't exclude — reactions go to everyone
       'reaction.removed',
       { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
     );

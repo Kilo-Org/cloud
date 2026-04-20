@@ -63,7 +63,7 @@ export async function createConversationFor(
   ]);
 
   // Notify all human members on the instance context so their conversation list updates.
-  await pushInstanceEvent(env, params.sandboxId, [userId], undefined, 'conversation.created', {
+  await pushInstanceEvent(env, params.sandboxId, [userId], 'conversation.created', {
     conversationId,
   });
 

@@ -41,7 +41,6 @@ async function pushTypingEvent(
       params.conversationId,
       convContext.sandboxId,
       convContext.humanMemberIds,
-      undefined,
       event,
       { memberId: callerId }
     );

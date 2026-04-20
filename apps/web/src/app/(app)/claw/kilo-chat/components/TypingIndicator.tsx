@@ -13,7 +13,7 @@ export function TypingIndicator({ typingMembers }: TypingIndicatorProps) {
     names.length === 1 ? `${names[0]} is typing...` : `${names.join(', ')} are typing...`;
 
   return (
-    <div className="h-6 shrink-0 px-4 flex items-center">
+    <div className={`shrink-0 px-4 flex items-center ${typingMembers.size > 0 ? 'h-6' : 'h-0'}`}>
       {typingMembers.size > 0 && (
         <p className="text-muted-foreground animate-pulse text-xs">{text}</p>
       )}

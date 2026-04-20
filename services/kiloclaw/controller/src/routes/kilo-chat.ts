@@ -217,28 +217,18 @@ export function registerKiloChatReactionDeleteRoute(
  */
 export function registerKiloChatTypingRoute(app: Hono, options: KiloChatRouteOptions): void {
   const fetchImpl = options.fetchImpl ?? fetch;
+
   app.post('/_kilo/kilo-chat/typing', async c => {
     const unauthorized = authorize(c, options);
     if (unauthorized) return unauthorized;
 
-    const read = await readBodyWithLimit(c, MAX_SMALL_BODY_BYTES);
-    if (!read.ok) return read.response;
-
-    let body: { conversationId?: unknown };
-    try {
-      body = JSON.parse(read.body) as { conversationId?: unknown };
-    } catch {
-      return c.json({ error: 'Invalid JSON' }, 400);
-    }
-    const conversationId = body.conversationId;
-    if (typeof conversationId !== 'string' || conversationId.length === 0) {
-      return c.json({ error: 'conversationId required' }, 400);
-    }
+    const convId = await parseConversationId(c);
+    if (typeof convId !== 'string') return convId;
 
     let upstream: Response;
     try {
       upstream = await fetchImpl(
-        upstreamUrl(options, `/conversations/${encodeURIComponent(conversationId)}/typing`),
+        upstreamUrl(options, `/conversations/${encodeURIComponent(convId)}/typing`),
         { method: 'POST', headers: outboundHeaders(options) }
       );
     } catch {
@@ -246,4 +236,40 @@ export function registerKiloChatTypingRoute(app: Hono, options: KiloChatRouteOpt
     }
     return relay(upstream);
   });
+
+  app.post('/_kilo/kilo-chat/typing/stop', async c => {
+    const unauthorized = authorize(c, options);
+    if (unauthorized) return unauthorized;
+
+    const convId = await parseConversationId(c);
+    if (typeof convId !== 'string') return convId;
+
+    let upstream: Response;
+    try {
+      upstream = await fetchImpl(
+        upstreamUrl(options, `/conversations/${encodeURIComponent(convId)}/typing/stop`),
+        { method: 'POST', headers: outboundHeaders(options) }
+      );
+    } catch {
+      return c.json({ error: 'Bad Gateway' }, 502);
+    }
+    return relay(upstream);
+  });
+}
+
+async function parseConversationId(c: import('hono').Context): Promise<string | Response> {
+  const read = await readBodyWithLimit(c, MAX_SMALL_BODY_BYTES);
+  if (!read.ok) return read.response;
+
+  let body: { conversationId?: unknown };
+  try {
+    body = JSON.parse(read.body) as { conversationId?: unknown };
+  } catch {
+    return c.json({ error: 'Invalid JSON' }, 400);
+  }
+  const conversationId = body.conversationId;
+  if (typeof conversationId !== 'string' || conversationId.length === 0) {
+    return c.json({ error: 'conversationId required' }, 400);
+  }
+  return conversationId;
 }

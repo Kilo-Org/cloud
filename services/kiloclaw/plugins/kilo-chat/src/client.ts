@@ -33,6 +33,7 @@ export type KiloChatClient = {
   editMessage(p: EditMessageParams): Promise<EditMessageResult>;
   deleteMessage(p: DeleteMessageParams): Promise<void>;
   sendTyping(p: SendTypingParams): Promise<void>;
+  sendTypingStop(p: SendTypingParams): Promise<void>;
   addReaction(p: AddReactionParams): Promise<AddReactionResult>;
   removeReaction(p: RemoveReactionParams): Promise<void>;
 };
@@ -128,6 +129,20 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     void response.body?.cancel();
   }
 
+  async function sendTypingStop(params: SendTypingParams): Promise<void> {
+    const response = await fetchImpl(`${base}/_kilo/kilo-chat/typing/stop`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ conversationId: params.conversationId }),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller /typing/stop responded ${response.status}: ${await response.text()}`
+      );
+    }
+    void response.body?.cancel();
+  }
+
   async function addReaction(params: AddReactionParams): Promise<AddReactionResult> {
     const response = await fetchImpl(
       `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}/reactions`,
@@ -171,6 +186,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     editMessage,
     deleteMessage,
     sendTyping,
+    sendTypingStop,
     addReaction,
     removeReaction,
   };

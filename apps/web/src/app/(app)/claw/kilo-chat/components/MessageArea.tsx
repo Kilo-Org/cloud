@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ulid } from 'ulid';
 import type { Message, ContentBlock } from '@kilocode/kilo-chat';
@@ -173,52 +173,64 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     );
   }
 
-  function handleEdit(messageId: string, content: ContentBlock[]) {
-    editMessage.mutate(
-      { messageId, conversationId, content, timestamp: Date.now() },
-      {
-        onError: err => {
-          if (err instanceof KiloChatApiError && err.status === 409) {
-            toast.error('Message was edited by someone else — please try again');
-          } else {
-            toast.error('Failed to edit message');
-          }
-        },
-      }
-    );
-  }
+  const handleEdit = useCallback(
+    (messageId: string, content: ContentBlock[]) => {
+      editMessage.mutate(
+        { messageId, conversationId, content, timestamp: Date.now() },
+        {
+          onError: err => {
+            if (err instanceof KiloChatApiError && err.status === 409) {
+              toast.error('Message was edited by someone else — please try again');
+            } else {
+              toast.error('Failed to edit message');
+            }
+          },
+        }
+      );
+    },
+    [editMessage.mutate, conversationId]
+  );
 
-  function handleDelete(messageId: string) {
+  const handleDelete = useCallback((messageId: string) => {
     setPendingDeleteId(messageId);
-  }
+  }, []);
 
-  function handleConfirmDelete(messageId: string) {
-    deleteMessage.mutate(
-      { messageId, conversationId },
-      {
-        onSettled: () => setPendingDeleteId(null),
-        onError: () => toast.error('Failed to delete message'),
-      }
-    );
-  }
+  const handleConfirmDelete = useCallback(
+    (messageId: string) => {
+      deleteMessage.mutate(
+        { messageId, conversationId },
+        {
+          onSettled: () => setPendingDeleteId(null),
+          onError: () => toast.error('Failed to delete message'),
+        }
+      );
+    },
+    [deleteMessage.mutate, conversationId]
+  );
 
-  function handleCancelDelete() {
+  const handleCancelDelete = useCallback(() => {
     setPendingDeleteId(null);
-  }
+  }, []);
 
-  function handleAddReaction(messageId: string, emoji: string) {
-    addReaction.mutate(
-      { messageId, emoji },
-      { onError: () => toast.error('Failed to add reaction') }
-    );
-  }
+  const handleAddReaction = useCallback(
+    (messageId: string, emoji: string) => {
+      addReaction.mutate(
+        { messageId, emoji },
+        { onError: () => toast.error('Failed to add reaction') }
+      );
+    },
+    [addReaction.mutate]
+  );
 
-  function handleRemoveReaction(messageId: string, emoji: string) {
-    removeReaction.mutate(
-      { messageId, emoji },
-      { onError: () => toast.error('Failed to remove reaction') }
-    );
-  }
+  const handleRemoveReaction = useCallback(
+    (messageId: string, emoji: string) => {
+      removeReaction.mutate(
+        { messageId, emoji },
+        { onError: () => toast.error('Failed to remove reaction') }
+      );
+    },
+    [removeReaction.mutate]
+  );
 
   const messageMap = new Map(messages.map(m => [m.id, m]));
 

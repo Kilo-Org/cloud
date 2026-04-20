@@ -43,7 +43,7 @@ type MessageBubbleProps = {
   currentUserId: string;
 };
 
-export function MessageBubble({
+export const MessageBubble = memo(function MessageBubble({
   message,
   isOwn,
   replyToMessage,
@@ -310,4 +310,4 @@ export function MessageBubble({
       </div>
     </div>
   );
-}
+});

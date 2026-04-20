@@ -57,6 +57,7 @@ export function useSendMessage(
         clientUpdatedAt: null,
         deleted: false,
         deliveryFailed: false,
+        reactions: [],
       };
       queryClient.setQueryData(queryKey, (old: unknown) => {
         if (!old || typeof old !== 'object') return old;
@@ -173,6 +174,7 @@ export function useMessageCacheUpdater(conversationId: string | null) {
             clientUpdatedAt: null,
             deleted: false,
             deliveryFailed: false,
+            reactions: [],
           };
           queryClient.setQueryData(queryKey, (old: unknown) => {
             if (!old || typeof old !== 'object') return old;

@@ -12,6 +12,13 @@ export type KiloChatClientConfig = {
 export type TextBlock = { type: 'text'; text: string };
 export type ContentBlock = TextBlock; // union — extend when new types land
 
+// ── Reactions ───────────────────────────────────────────────────────
+export type ReactionSummary = {
+  emoji: string;
+  count: number;
+  memberIds: string[];
+};
+
 // ── Conversations ───────────────────────────────────────────────────
 export type ConversationListItem = {
   conversationId: string;
@@ -39,6 +46,7 @@ export type Message = {
   clientUpdatedAt: number | null;
   deleted: boolean;
   deliveryFailed: boolean;
+  reactions: ReactionSummary[];
 };
 
 export type MessageRow = {
@@ -50,6 +58,7 @@ export type MessageRow = {
   clientUpdatedAt: number | null;
   deleted: boolean;
   deliveryFailed: boolean;
+  reactions: ReactionSummary[];
 };
 
 // ── Events ──────────────────────────────────────────────────────────

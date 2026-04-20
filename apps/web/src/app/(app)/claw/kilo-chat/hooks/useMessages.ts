@@ -234,15 +234,11 @@ export function useRemoveReaction(
             page.map(msg => {
               if (msg.id !== variables.messageId) return msg;
               const updated = msg.reactions
-                .map((r: ReactionSummary) =>
-                  r.emoji === variables.emoji
-                    ? {
-                        ...r,
-                        count: r.count - 1,
-                        memberIds: r.memberIds.filter(id => id !== currentUserId),
-                      }
-                    : r
-                )
+                .map((r: ReactionSummary) => {
+                  if (r.emoji !== variables.emoji) return r;
+                  const memberIds = r.memberIds.filter(id => id !== currentUserId);
+                  return { ...r, count: memberIds.length, memberIds };
+                })
                 .filter((r: ReactionSummary) => r.count > 0);
               return { ...msg, reactions: updated };
             })
@@ -391,15 +387,11 @@ export function useMessageCacheUpdater(conversationId: string | null) {
                 page.map(msg => {
                   if (msg.id !== e.messageId) return msg;
                   const updated = msg.reactions
-                    .map(r =>
-                      r.emoji === e.emoji
-                        ? {
-                            ...r,
-                            count: r.count - 1,
-                            memberIds: r.memberIds.filter(id => id !== e.memberId),
-                          }
-                        : r
-                    )
+                    .map(r => {
+                      if (r.emoji !== e.emoji) return r;
+                      const memberIds = r.memberIds.filter(id => id !== e.memberId);
+                      return { ...r, count: memberIds.length, memberIds };
+                    })
                     .filter(r => r.count > 0);
                   return { ...msg, reactions: updated };
                 })

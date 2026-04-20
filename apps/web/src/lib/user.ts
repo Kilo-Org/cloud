@@ -61,6 +61,7 @@ import {
   contributor_champion_events,
   contributor_champion_memberships,
   contributor_champion_contributors,
+  email_verification_state,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from './constants';
@@ -685,6 +686,9 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(user_affiliate_events).where(eq(user_affiliate_events.user_id, userId));
     await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
     await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
+    await tx
+      .delete(email_verification_state)
+      .where(eq(email_verification_state.email, originalEmail.trim().toLowerCase()));
 
     // Remove from organizations
     await tx

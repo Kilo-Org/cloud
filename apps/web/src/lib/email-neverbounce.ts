@@ -1,17 +1,38 @@
 import { NEVERBOUNCE_API_KEY } from '@/lib/config.server';
 import { captureMessage } from '@sentry/nextjs';
+import type { EmailVerificationResult } from '@kilocode/db/schema-types';
 
-type NeverBounceResult = 'valid' | 'invalid' | 'disposable' | 'catchall' | 'unknown';
-
-type NeverBounceResponse = {
+export type NeverBounceResponse = {
   status: string;
-  result: NeverBounceResult;
+  result: EmailVerificationResult;
   flags: string[];
   suggested_correction: string;
   execution_time: number;
 };
 
-const BLOCKED_RESULTS = new Set<NeverBounceResult>(['invalid', 'disposable']);
+export type NeverBounceCheckOutcome =
+  | {
+      kind: 'checked';
+      result: EmailVerificationResult;
+      status: string;
+      flags: string[];
+      suggestedCorrection: string | null;
+      shouldSend: boolean;
+    }
+  | {
+      kind: 'allowed_without_check';
+      reason:
+        | 'missing_api_key'
+        | 'bypass_domain'
+        | 'http_error'
+        | 'non_success_status'
+        | 'exception';
+      status?: string;
+      error?: string;
+      shouldSend: true;
+    };
+
+const BLOCKED_RESULTS = new Set<EmailVerificationResult>(['invalid', 'disposable']);
 
 // Domains where NeverBounce verification is skipped because their email
 // infrastructure is known to cause false negatives (legitimate addresses
@@ -23,17 +44,13 @@ function shouldBypassVerification(email: string): boolean {
   return domain !== undefined && NEVERBOUNCE_BYPASS_DOMAINS.has(domain);
 }
 
-/**
- * Returns true if the email is safe to send to, false if it should be skipped.
- * If NeverBounce is not configured or the check fails, defaults to allowing the send.
- */
-export async function verifyEmail(email: string): Promise<boolean> {
+export async function checkEmailWithNeverBounce(email: string): Promise<NeverBounceCheckOutcome> {
   if (!NEVERBOUNCE_API_KEY) {
-    return true;
+    return { kind: 'allowed_without_check', reason: 'missing_api_key', shouldSend: true };
   }
 
   if (shouldBypassVerification(email)) {
-    return true;
+    return { kind: 'allowed_without_check', reason: 'bypass_domain', shouldSend: true };
   }
 
   try {
@@ -44,7 +61,12 @@ export async function verifyEmail(email: string): Promise<boolean> {
     const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
     if (!response.ok) {
       console.warn(`[neverbounce] API returned ${response.status} for ${email}, allowing send`);
-      return true;
+      return {
+        kind: 'allowed_without_check',
+        reason: 'http_error',
+        status: String(response.status),
+        shouldSend: true,
+      };
     }
 
     const data: NeverBounceResponse = await response.json();
@@ -56,20 +78,33 @@ export async function verifyEmail(email: string): Promise<boolean> {
         tags: { source: 'neverbounce' },
         extra: { email, status: data.status },
       });
-      return true;
+      return {
+        kind: 'allowed_without_check',
+        reason: 'non_success_status',
+        status: data.status,
+        shouldSend: true,
+      };
     }
 
-    if (BLOCKED_RESULTS.has(data.result)) {
+    const shouldSend = !BLOCKED_RESULTS.has(data.result);
+
+    if (!shouldSend) {
       captureMessage(`Blocked email send to ${data.result} address`, {
         level: 'info',
         tags: { source: 'neverbounce', result: data.result },
         extra: { email, flags: data.flags, suggested_correction: data.suggested_correction },
       });
       console.log(`[neverbounce] Blocked send to ${email}: result=${data.result}`);
-      return false;
     }
 
-    return true;
+    return {
+      kind: 'checked',
+      result: data.result,
+      status: data.status,
+      flags: data.flags,
+      suggestedCorrection: data.suggested_correction || null,
+      shouldSend,
+    };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.warn(`[neverbounce] Check failed for ${email}: ${errorMessage}, allowing send`);
@@ -78,6 +113,20 @@ export async function verifyEmail(email: string): Promise<boolean> {
       tags: { source: 'neverbounce' },
       extra: { email, error: errorMessage },
     });
-    return true;
+    return {
+      kind: 'allowed_without_check',
+      reason: 'exception',
+      error: errorMessage,
+      shouldSend: true,
+    };
   }
+}
+
+/**
+ * Returns true if the email is safe to send to, false if it should be skipped.
+ * If NeverBounce is not configured or the check fails, defaults to allowing the send.
+ */
+export async function verifyEmail(email: string): Promise<boolean> {
+  const outcome = await checkEmailWithNeverBounce(email);
+  return outcome.shouldSend;
 }

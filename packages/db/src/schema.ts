@@ -49,6 +49,8 @@ import {
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
+  EmailVerificationResult,
+  EmailVerificationOverrideState,
 } from './schema-types';
 import type { CustomLlmDefinition, KiloClawAdminAuditAction } from './schema-types';
 import type {
@@ -122,6 +124,8 @@ export const SCHEMA_CHECK_ENUMS = {
   AffiliateProvider,
   AffiliateEventType,
   AffiliateEventDeliveryState,
+  EmailVerificationResult,
+  EmailVerificationOverrideState,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -2132,6 +2136,45 @@ export const magic_link_tokens = pgTable(
 );
 
 export type MagicLinkToken = typeof magic_link_tokens.$inferSelect;
+
+/**
+ * Stores exact-email verification state and admin overrides.
+ *
+ * This table contains PII. Update softDeleteUser() in src/lib/user.ts
+ * (and src/lib/user.test.ts) when changing this table.
+ */
+export const email_verification_state = pgTable(
+  'email_verification_state',
+  {
+    email: text().primaryKey().notNull(),
+    verification_result: text().$type<EmailVerificationResult>(),
+    checked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    override_state: text().$type<EmailVerificationOverrideState>(),
+    override_reason: text(),
+    override_actor_user_id: text(),
+    override_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('IDX_email_verification_state_checked_at').on(table.checked_at),
+    check(
+      'email_verification_state_email_canonical_check',
+      sql`${table.email} = lower(btrim(${table.email}))`
+    ),
+    enumCheck(
+      'email_verification_state_verification_result_check',
+      table.verification_result,
+      EmailVerificationResult
+    ),
+    enumCheck(
+      'email_verification_state_override_state_check',
+      table.override_state,
+      EmailVerificationOverrideState
+    ),
+  ]
+);
+
+export type EmailVerificationState = typeof email_verification_state.$inferSelect;
+export type NewEmailVerificationState = typeof email_verification_state.$inferInsert;
 export type WebhookEvent = typeof webhook_events.$inferSelect;
 
 // ============ MODEL STATS ============

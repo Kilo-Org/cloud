@@ -42,6 +42,7 @@ import {
   kiloclaw_admin_audit_logs,
   user_push_tokens,
   security_advisor_scans,
+  email_verification_state,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import {
@@ -100,6 +101,7 @@ describe('User', () => {
     await db.delete(cloud_agent_feedback);
     await db.delete(user_admin_notes);
     await db.delete(magic_link_tokens);
+    await db.delete(email_verification_state);
     await db.delete(bot_requests);
     await db.delete(stytch_fingerprints);
     await db.delete(kiloclaw_cli_runs);
@@ -1089,6 +1091,41 @@ describe('User', () => {
       await softDeleteUser(user.id);
 
       expect((await db.select({ count: count() }).from(magic_link_tokens))[0].count).toBe(0);
+    });
+
+    it('should delete email verification state by original email', async () => {
+      const user = await insertTestUser({ google_user_email: 'verification@example.com' });
+      const otherUser = await insertTestUser({ google_user_email: 'other@example.com' });
+
+      await db.insert(email_verification_state).values([
+        {
+          email: 'verification@example.com',
+          verification_result: 'invalid',
+          checked_at: new Date().toISOString(),
+        },
+        {
+          email: otherUser.google_user_email,
+          verification_result: 'valid',
+          checked_at: new Date().toISOString(),
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(email_verification_state)
+          .where(eq(email_verification_state.email, 'verification@example.com'))
+          .then(rows => rows[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(email_verification_state)
+          .where(eq(email_verification_state.email, 'other@example.com'))
+          .then(rows => rows[0].count)
+      ).toBe(1);
     });
 
     it('should retain kiloclaw_version_pins for the user', async () => {

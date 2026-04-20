@@ -1,11 +1,11 @@
 import { captureMessage } from '@sentry/nextjs';
-import { verifyEmail } from '@/lib/email-neverbounce';
+import { checkEmailWithNeverBounce, verifyEmail } from '@/lib/email-neverbounce';
 
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-const mockCaptureMessage = captureMessage as jest.MockedFunction<typeof captureMessage>;
+const mockCaptureMessage = jest.mocked(captureMessage);
 
 let mockApiKey: string | undefined = 'test-api-key';
 
@@ -15,20 +15,22 @@ jest.mock('@/lib/config.server', () => ({
   },
 }));
 
-const mockFetch = jest.fn();
+const mockFetch = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>();
 global.fetch = mockFetch;
 
 function mockNeverBounceResponse(result: string, status = 'success') {
-  mockFetch.mockResolvedValue({
-    ok: true,
-    json: async () => ({
-      status,
-      result,
-      flags: ['has_dns', 'has_dns_mx'],
-      suggested_correction: '',
-      execution_time: 100,
-    }),
-  });
+  mockFetch.mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        status,
+        result,
+        flags: ['has_dns', 'has_dns_mx'],
+        suggested_correction: '',
+        execution_time: 100,
+      }),
+      { status: 200 }
+    )
+  );
 }
 
 beforeEach(() => {
@@ -36,43 +38,83 @@ beforeEach(() => {
   mockApiKey = 'test-api-key';
 });
 
-describe('verifyEmail', () => {
-  it('returns true when API key is not configured', async () => {
+describe('checkEmailWithNeverBounce', () => {
+  it('allows without checking when API key is not configured', async () => {
     mockApiKey = undefined;
-    expect(await verifyEmail('test@example.com')).toBe(true);
+
+    await expect(checkEmailWithNeverBounce('test@example.com')).resolves.toEqual({
+      kind: 'allowed_without_check',
+      reason: 'missing_api_key',
+      shouldSend: true,
+    });
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('skips NeverBounce and returns true for icloud.com emails', async () => {
-    expect(await verifyEmail('user@icloud.com')).toBe(true);
+  it('skips NeverBounce for icloud.com emails', async () => {
+    await expect(checkEmailWithNeverBounce('user@icloud.com')).resolves.toEqual({
+      kind: 'allowed_without_check',
+      reason: 'bypass_domain',
+      shouldSend: true,
+    });
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('skips NeverBounce and returns true for me.com emails', async () => {
-    expect(await verifyEmail('user@me.com')).toBe(true);
+  it('skips NeverBounce for me.com emails', async () => {
+    await expect(checkEmailWithNeverBounce('user@me.com')).resolves.toEqual({
+      kind: 'allowed_without_check',
+      reason: 'bypass_domain',
+      shouldSend: true,
+    });
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('skips NeverBounce for bypass domains regardless of case', async () => {
-    expect(await verifyEmail('user@ICLOUD.COM')).toBe(true);
+    await expect(checkEmailWithNeverBounce('user@ICLOUD.COM')).resolves.toEqual({
+      kind: 'allowed_without_check',
+      reason: 'bypass_domain',
+      shouldSend: true,
+    });
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('does not skip NeverBounce for non-bypass domains', async () => {
     mockNeverBounceResponse('valid');
-    expect(await verifyEmail('user@gmail.com')).toBe(true);
+
+    await expect(checkEmailWithNeverBounce('user@gmail.com')).resolves.toEqual(
+      expect.objectContaining({
+        kind: 'checked',
+        result: 'valid',
+        shouldSend: true,
+      })
+    );
     expect(mockFetch).toHaveBeenCalled();
   });
 
-  it('returns true for valid emails', async () => {
+  it('returns a checked deliverable result for valid emails', async () => {
     mockNeverBounceResponse('valid');
-    expect(await verifyEmail('good@example.com')).toBe(true);
+
+    await expect(checkEmailWithNeverBounce('good@example.com')).resolves.toEqual({
+      kind: 'checked',
+      result: 'valid',
+      status: 'success',
+      flags: ['has_dns', 'has_dns_mx'],
+      suggestedCorrection: null,
+      shouldSend: true,
+    });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 
-  it('returns false for invalid emails and reports to Sentry', async () => {
+  it('returns a checked blocked result for invalid emails and reports to Sentry', async () => {
     mockNeverBounceResponse('invalid');
-    expect(await verifyEmail('bad@example.com')).toBe(false);
+
+    await expect(checkEmailWithNeverBounce('bad@example.com')).resolves.toEqual({
+      kind: 'checked',
+      result: 'invalid',
+      status: 'success',
+      flags: ['has_dns', 'has_dns_mx'],
+      suggestedCorrection: null,
+      shouldSend: false,
+    });
     expect(mockCaptureMessage).toHaveBeenCalledWith(
       'Blocked email send to invalid address',
       expect.objectContaining({
@@ -82,38 +124,77 @@ describe('verifyEmail', () => {
     );
   });
 
-  it('returns false for disposable emails', async () => {
+  it('returns a checked blocked result for disposable emails', async () => {
     mockNeverBounceResponse('disposable');
-    expect(await verifyEmail('temp@mailinator.com')).toBe(false);
+
+    await expect(checkEmailWithNeverBounce('temp@mailinator.com')).resolves.toEqual(
+      expect.objectContaining({
+        kind: 'checked',
+        result: 'disposable',
+        shouldSend: false,
+      })
+    );
   });
 
-  it('returns true for catchall emails', async () => {
+  it('returns a checked deliverable result for catchall emails', async () => {
     mockNeverBounceResponse('catchall');
-    expect(await verifyEmail('anyone@catchall.com')).toBe(true);
+
+    await expect(checkEmailWithNeverBounce('anyone@catchall.com')).resolves.toEqual(
+      expect.objectContaining({
+        kind: 'checked',
+        result: 'catchall',
+        shouldSend: true,
+      })
+    );
   });
 
-  it('returns true for unknown emails', async () => {
+  it('returns a checked deliverable result for unknown emails', async () => {
     mockNeverBounceResponse('unknown');
-    expect(await verifyEmail('mystery@example.com')).toBe(true);
+
+    await expect(checkEmailWithNeverBounce('mystery@example.com')).resolves.toEqual(
+      expect.objectContaining({
+        kind: 'checked',
+        result: 'unknown',
+        shouldSend: true,
+      })
+    );
   });
 
-  it('returns true on HTTP error (fail-open)', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 500 });
-    expect(await verifyEmail('test@example.com')).toBe(true);
+  it('allows without checking on HTTP error', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 500 }));
+
+    await expect(checkEmailWithNeverBounce('test@example.com')).resolves.toEqual({
+      kind: 'allowed_without_check',
+      reason: 'http_error',
+      status: '500',
+      shouldSend: true,
+    });
   });
 
-  it('returns true on network error (fail-open) and reports to Sentry', async () => {
+  it('allows without checking on network error and reports to Sentry', async () => {
     mockFetch.mockRejectedValue(new Error('fetch failed'));
-    expect(await verifyEmail('test@example.com')).toBe(true);
+
+    await expect(checkEmailWithNeverBounce('test@example.com')).resolves.toEqual({
+      kind: 'allowed_without_check',
+      reason: 'exception',
+      error: 'fetch failed',
+      shouldSend: true,
+    });
     expect(mockCaptureMessage).toHaveBeenCalledWith(
       'NeverBounce verification check failed',
       expect.objectContaining({ level: 'warning' })
     );
   });
 
-  it('returns true on non-success API status and reports to Sentry', async () => {
+  it('allows without checking on non-success API status and reports to Sentry', async () => {
     mockNeverBounceResponse('valid', 'auth_failure');
-    expect(await verifyEmail('test@example.com')).toBe(true);
+
+    await expect(checkEmailWithNeverBounce('test@example.com')).resolves.toEqual({
+      kind: 'allowed_without_check',
+      reason: 'non_success_status',
+      status: 'auth_failure',
+      shouldSend: true,
+    });
     expect(mockCaptureMessage).toHaveBeenCalledWith(
       'NeverBounce API returned non-success status: auth_failure',
       expect.objectContaining({ level: 'warning' })
@@ -122,8 +203,18 @@ describe('verifyEmail', () => {
 
   it('passes email and API key as query parameters', async () => {
     mockNeverBounceResponse('valid');
-    await verifyEmail('user@test.com');
-    const calledUrl = new URL(mockFetch.mock.calls[0][0]);
+
+    await checkEmailWithNeverBounce('user@test.com');
+
+    const calledUrlInput = mockFetch.mock.calls[0]?.[0];
+    if (
+      calledUrlInput === undefined ||
+      (!(typeof calledUrlInput === 'string') && !(calledUrlInput instanceof URL))
+    ) {
+      throw new Error('Expected fetch to be called with a URL string');
+    }
+
+    const calledUrl = new URL(calledUrlInput);
     expect(calledUrl.origin + calledUrl.pathname).toBe(
       'https://api.neverbounce.com/v4.2/single/check'
     );
@@ -133,8 +224,24 @@ describe('verifyEmail', () => {
 
   it('sets a 5-second timeout on the fetch call', async () => {
     mockNeverBounceResponse('valid');
-    await verifyEmail('user@test.com');
+
+    await checkEmailWithNeverBounce('user@test.com');
+
     const fetchOptions = mockFetch.mock.calls[0][1];
-    expect(fetchOptions.signal).toBeDefined();
+    expect(fetchOptions?.signal).toBeDefined();
+  });
+});
+
+describe('verifyEmail', () => {
+  it('returns false for a blocked live result', async () => {
+    mockNeverBounceResponse('invalid');
+
+    await expect(verifyEmail('bad@example.com')).resolves.toBe(false);
+  });
+
+  it('returns true for allowed-without-check outcomes', async () => {
+    mockApiKey = undefined;
+
+    await expect(verifyEmail('test@example.com')).resolves.toBe(true);
   });
 });

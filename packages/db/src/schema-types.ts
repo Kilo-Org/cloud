@@ -225,6 +225,25 @@ export const AffiliateEventDeliveryState = {
 export type AffiliateEventDeliveryState =
   (typeof AffiliateEventDeliveryState)[keyof typeof AffiliateEventDeliveryState];
 
+export const EmailVerificationResult = {
+  Valid: 'valid',
+  Invalid: 'invalid',
+  Disposable: 'disposable',
+  Catchall: 'catchall',
+  Unknown: 'unknown',
+} as const;
+
+export type EmailVerificationResult =
+  (typeof EmailVerificationResult)[keyof typeof EmailVerificationResult];
+
+export const EmailVerificationOverrideState = {
+  ForceAllow: 'force_allow',
+  ForceBlock: 'force_block',
+} as const;
+
+export type EmailVerificationOverrideState =
+  (typeof EmailVerificationOverrideState)[keyof typeof EmailVerificationOverrideState];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.extend',

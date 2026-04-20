@@ -70,6 +70,21 @@ export const KILOCLAW_MITIGATED_CHECKS: ReadonlyMap<string, string> = new Map([
     // not a misconfiguration.
     'Default profile intentionally reaches plugin tools so bots (Telegram/Discord/Slack/web-search) can invoke their capabilities.',
   ],
+  [
+    'summary.attack_surface',
+    // Informational aggregate of the gateway's attack surface (groups,
+    // tool reachability, hook types, browser/trust model). The finding's
+    // implicit framing is "you composed this attack surface and may want
+    // to reduce it" — accurate for self-hosted OpenClaw operators who
+    // pick their own channels and tool policies, misleading on KiloClaw
+    // where the bundled channel set, tool reachability, and trust model
+    // are product-fixed rather than user-chosen. Showing it on KiloClaw
+    // without that framing being actionable just adds noise to the
+    // report. Genuinely concerning items in the same domain (e.g.
+    // open-internet exposure, missing TLS) have their own checkIds and
+    // continue to surface on KiloClaw.
+    'Aggregate attack-surface summary aimed at self-hosted operators who composed their own gateway; KiloClaw bundles the channel set and trust model as product-fixed defaults so the framing is not actionable here.',
+  ],
 ]);
 
 /**

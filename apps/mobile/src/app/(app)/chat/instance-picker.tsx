@@ -22,7 +22,7 @@ export default function InstancePickerScreen() {
       return;
     }
     router.dismissAll();
-    router.replace(`/(app)/chat/${sandboxId}` as Href);
+    router.push(`/(app)/chat/${sandboxId}` as Href);
   };
 
   return (

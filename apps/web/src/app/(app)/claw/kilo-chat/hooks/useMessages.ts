@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import { KiloChatClient } from '@kilocode/kilo-chat';
+import type { KiloChatClient } from '@kilocode/kilo-chat';
 import type {
   Message,
   CreateMessageRequest,
@@ -10,17 +10,11 @@ import type {
   MessageDeletedEvent,
   MessageDeliveryFailedEvent,
 } from '@kilocode/kilo-chat';
-import { useCallback, useMemo } from 'react';
-import { KILO_CHAT_URL } from '@/lib/constants';
+import { useCallback } from 'react';
 
 const PAGE_SIZE = 50;
 
-function useClient(getToken: () => Promise<string>) {
-  return useMemo(() => new KiloChatClient({ baseUrl: KILO_CHAT_URL, getToken }), [getToken]);
-}
-
-export function useMessages(getToken: () => Promise<string>, conversationId: string | null) {
-  const client = useClient(getToken);
+export function useMessages(client: KiloChatClient, conversationId: string | null) {
   return useInfiniteQuery({
     queryKey: ['kilo-chat', 'messages', conversationId],
     queryFn: async ({ pageParam }) => {
@@ -42,11 +36,10 @@ export function useMessages(getToken: () => Promise<string>, conversationId: str
 export type SendMessageVariables = CreateMessageRequest & { clientId: string };
 
 export function useSendMessage(
-  getToken: () => Promise<string>,
+  client: KiloChatClient,
   conversationId: string | null,
   currentUserId: string
 ) {
-  const client = useClient(getToken);
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (req: SendMessageVariables) => client.sendMessage(req),
@@ -95,8 +88,7 @@ export function useSendMessage(
   });
 }
 
-export function useEditMessage(getToken: () => Promise<string>, conversationId: string | null) {
-  const client = useClient(getToken);
+export function useEditMessage(client: KiloChatClient, conversationId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId, ...req }: EditMessageRequest & { messageId: string }) =>
@@ -130,8 +122,7 @@ export function useEditMessage(getToken: () => Promise<string>, conversationId: 
   });
 }
 
-export function useDeleteMessage(getToken: () => Promise<string>, conversationId: string | null) {
-  const client = useClient(getToken);
+export function useDeleteMessage(client: KiloChatClient, conversationId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId, ...req }: DeleteMessageRequest & { messageId: string }) =>
@@ -162,7 +153,7 @@ export function useDeleteMessage(getToken: () => Promise<string>, conversationId
 }
 
 /**
- * Returns a callback that applies SSE events to the React Query message cache.
+ * Returns a callback that applies real-time events to the React Query message cache.
  */
 export function useMessageCacheUpdater(conversationId: string | null) {
   const queryClient = useQueryClient();

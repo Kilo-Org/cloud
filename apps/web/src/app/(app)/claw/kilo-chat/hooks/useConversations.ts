@@ -1,17 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { KiloChatClient } from '@kilocode/kilo-chat';
+import type { KiloChatClient } from '@kilocode/kilo-chat';
 import type { CreateConversationRequest, ConversationListResponse } from '@kilocode/kilo-chat';
-import { useMemo } from 'react';
-import { KILO_CHAT_URL } from '@/lib/constants';
 
 const POLL_INTERVAL = 30_000;
 
-function useClient(getToken: () => Promise<string>) {
-  return useMemo(() => new KiloChatClient({ baseUrl: KILO_CHAT_URL, getToken }), [getToken]);
-}
-
-export function useConversations(getToken: () => Promise<string>, sandboxId: string | null) {
-  const client = useClient(getToken);
+export function useConversations(client: KiloChatClient, sandboxId: string | null) {
   return useQuery({
     queryKey: ['kilo-chat', 'conversations', sandboxId],
     queryFn: () => client.listConversations(sandboxId ?? undefined),
@@ -20,11 +13,7 @@ export function useConversations(getToken: () => Promise<string>, sandboxId: str
   });
 }
 
-export function useConversationDetail(
-  getToken: () => Promise<string>,
-  conversationId: string | null
-) {
-  const client = useClient(getToken);
+export function useConversationDetail(client: KiloChatClient, conversationId: string | null) {
   return useQuery({
     queryKey: ['kilo-chat', 'conversation', conversationId],
     queryFn: () => client.getConversation(conversationId ?? ''),
@@ -32,8 +21,7 @@ export function useConversationDetail(
   });
 }
 
-export function useCreateConversation(getToken: () => Promise<string>) {
-  const client = useClient(getToken);
+export function useCreateConversation(client: KiloChatClient) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (req: CreateConversationRequest) => client.createConversation(req),
@@ -43,8 +31,7 @@ export function useCreateConversation(getToken: () => Promise<string>) {
   });
 }
 
-export function useRenameConversation(getToken: () => Promise<string>) {
-  const client = useClient(getToken);
+export function useRenameConversation(client: KiloChatClient) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ conversationId, title }: { conversationId: string; title: string }) =>
@@ -55,8 +42,7 @@ export function useRenameConversation(getToken: () => Promise<string>) {
   });
 }
 
-export function useLeaveConversation(getToken: () => Promise<string>) {
-  const client = useClient(getToken);
+export function useLeaveConversation(client: KiloChatClient) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (conversationId: string) => client.leaveConversation(conversationId),
@@ -68,8 +54,7 @@ export function useLeaveConversation(getToken: () => Promise<string>) {
   });
 }
 
-export function useMarkConversationRead(getToken: () => Promise<string>) {
-  const client = useClient(getToken);
+export function useMarkConversationRead(client: KiloChatClient) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (conversationId: string) => client.markConversationRead(conversationId),

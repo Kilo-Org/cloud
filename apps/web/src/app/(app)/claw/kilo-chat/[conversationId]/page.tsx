@@ -10,11 +10,10 @@ import { MessageArea } from '../components/MessageArea';
 export default function KiloChatConversationPage() {
   const params = useParams<{ conversationId: string }>();
   const router = useRouter();
-  const { getToken, currentUserId, instanceStatus, leavingConversationId, assistantName } =
-    useKiloChatContext();
+  const { kiloChatClient, leavingConversationId } = useKiloChatContext();
   const isLeaving = leavingConversationId === params.conversationId;
   const conversationDetail = useConversationDetail(
-    getToken,
+    kiloChatClient,
     isLeaving ? null : params.conversationId
   );
 
@@ -33,13 +32,5 @@ export default function KiloChatConversationPage() {
     return null;
   }
 
-  return (
-    <MessageArea
-      conversationId={params.conversationId}
-      currentUserId={currentUserId}
-      getToken={getToken}
-      instanceStatus={instanceStatus}
-      assistantName={assistantName}
-    />
-  );
+  return <MessageArea conversationId={params.conversationId} />;
 }

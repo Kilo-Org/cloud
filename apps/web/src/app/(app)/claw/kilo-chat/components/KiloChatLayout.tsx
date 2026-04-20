@@ -3,8 +3,11 @@
 import { useState, useCallback, createContext, useContext, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
+import type { EventServiceClient } from '@kilocode/event-service';
+import type { KiloChatClient } from '@kilocode/kilo-chat';
 import { InstanceSwitcher } from './InstanceSwitcher';
 import { ConversationList } from './ConversationList';
+import { useEventService } from '../hooks/useEventService';
 import {
   useConversations,
   useCreateConversation,
@@ -19,6 +22,9 @@ type KiloChatContextValue = {
   instanceStatus: string | null;
   leavingConversationId: string | null;
   assistantName: string | null;
+  sandboxId: string | null;
+  eventService: EventServiceClient;
+  kiloChatClient: KiloChatClient;
 };
 
 const KiloChatContext = createContext<KiloChatContextValue | null>(null);
@@ -60,12 +66,14 @@ export function KiloChatLayout({
     }
   }, [instances, selectedSandboxId]);
 
+  const { eventService, kiloChatClient } = useEventService(getToken);
+
   const params = useParams<{ conversationId?: string }>();
   const [leavingConversationId, setLeavingConversationId] = useState<string | null>(null);
-  const { data, isLoading } = useConversations(getToken, selectedSandboxId);
-  const createConversation = useCreateConversation(getToken);
-  const renameConversation = useRenameConversation(getToken);
-  const leaveConversation = useLeaveConversation(getToken);
+  const { data, isLoading } = useConversations(kiloChatClient, selectedSandboxId);
+  const createConversation = useCreateConversation(kiloChatClient);
+  const renameConversation = useRenameConversation(kiloChatClient);
+  const leaveConversation = useLeaveConversation(kiloChatClient);
 
   const handleRename = useCallback(
     (conversationId: string, title: string) => {
@@ -109,7 +117,16 @@ export function KiloChatLayout({
 
   return (
     <KiloChatContext.Provider
-      value={{ getToken, currentUserId, instanceStatus, leavingConversationId, assistantName }}
+      value={{
+        getToken,
+        currentUserId,
+        instanceStatus,
+        leavingConversationId,
+        assistantName,
+        sandboxId: selectedSandboxId,
+        eventService,
+        kiloChatClient,
+      }}
     >
       <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
         {/* Conversation sidebar */}

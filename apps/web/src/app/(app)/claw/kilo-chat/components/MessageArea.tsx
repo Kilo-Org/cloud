@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ulid } from 'ulid';
 import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import {
@@ -10,13 +10,14 @@ import {
   useDeleteMessage,
   useMessageCacheUpdater,
 } from '../hooks/useMessages';
-import { useSSE } from '../hooks/useSSE';
+import { useConversationContext } from '../hooks/useEventService';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
 import {
   useConversationDetail,
   useRenameConversation,
   useMarkConversationRead,
 } from '../hooks/useConversations';
+import { useKiloChatContext } from './KiloChatLayout';
 import { toast } from 'sonner';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
@@ -27,19 +28,12 @@ import { MessageCircle, ArrowDown } from 'lucide-react';
 
 type MessageAreaProps = {
   conversationId: string;
-  currentUserId: string;
-  getToken: () => Promise<string>;
-  instanceStatus: string | null;
-  assistantName: string | null;
 };
 
-export function MessageArea({
-  conversationId,
-  currentUserId,
-  getToken,
-  instanceStatus,
-  assistantName,
-}: MessageAreaProps) {
+export function MessageArea({ conversationId }: MessageAreaProps) {
+  const { currentUserId, instanceStatus, assistantName, sandboxId, eventService, kiloChatClient } =
+    useKiloChatContext();
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -48,23 +42,26 @@ export function MessageArea({
   const [isRenamingTitle, setIsRenamingTitle] = useState(false);
   const [renameText, setRenameText] = useState('');
 
+  // Subscribe to this conversation's events via the event-service WebSocket
+  useConversationContext(eventService, sandboxId, conversationId);
+
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
-    getToken,
+    kiloChatClient,
     conversationId
   );
   const messages = data?.messages ?? [];
 
-  const conversationDetail = useConversationDetail(getToken, conversationId);
-  const renameConversation = useRenameConversation(getToken);
-  const sendMessage = useSendMessage(getToken, conversationId, currentUserId);
-  const editMessage = useEditMessage(getToken, conversationId);
-  const deleteMessage = useDeleteMessage(getToken, conversationId);
+  const conversationDetail = useConversationDetail(kiloChatClient, conversationId);
+  const renameConversation = useRenameConversation(kiloChatClient);
+  const sendMessage = useSendMessage(kiloChatClient, conversationId, currentUserId);
+  const editMessage = useEditMessage(kiloChatClient, conversationId);
+  const deleteMessage = useDeleteMessage(kiloChatClient, conversationId);
 
   const updateCache = useMessageCacheUpdater(conversationId);
   const { typingMembers, handleTypingEvent, clearTypingForMember } = useTypingState(currentUserId);
-  const sendTyping = useTypingSender(getToken, conversationId);
+  const sendTyping = useTypingSender(kiloChatClient, conversationId);
 
-  const markRead = useMarkConversationRead(getToken);
+  const markRead = useMarkConversationRead(kiloChatClient);
   const markReadRef = useRef(markRead.mutate);
   markReadRef.current = markRead.mutate;
   const lastMarkedRef = useRef<string | null>(null);
@@ -76,28 +73,30 @@ export function MessageArea({
     markReadRef.current(conversationId);
   }, [conversationId]);
 
-  // SSE connection
-  useSSE({
-    conversationId,
-    getToken,
-    onEvent: useCallback(
-      event => {
-        if (event.type === 'typing') {
-          handleTypingEvent(event.data);
-        } else if (event.type === 'message.delivery_failed') {
-          updateCache(event);
-          toast.error('Message could not be delivered to the bot');
-        } else {
-          if (event.type === 'message.created') {
-            clearTypingForMember((event.data as { senderId: string }).senderId);
-            markReadRef.current(conversationId);
-          }
-          updateCache(event);
-        }
-      },
-      [handleTypingEvent, clearTypingForMember, updateCache]
-    ),
-  });
+  // Register typed event handlers on the shared kiloChatClient
+  useEffect(() => {
+    const offs = [
+      kiloChatClient.onMessageCreated((_ctx, data) => {
+        clearTypingForMember(data.senderId);
+        markReadRef.current(conversationId);
+        updateCache({ type: 'message.created', data });
+      }),
+      kiloChatClient.onMessageUpdated((_ctx, data) => {
+        updateCache({ type: 'message.updated', data });
+      }),
+      kiloChatClient.onMessageDeleted((_ctx, data) => {
+        updateCache({ type: 'message.deleted', data });
+      }),
+      kiloChatClient.onMessageDeliveryFailed((_ctx, data) => {
+        updateCache({ type: 'message.delivery_failed', data });
+        toast.error('Message could not be delivered to the bot');
+      }),
+      kiloChatClient.onTyping((_ctx, data) => {
+        handleTypingEvent(data);
+      }),
+    ];
+    return () => offs.forEach(off => off());
+  }, [kiloChatClient, updateCache, handleTypingEvent, clearTypingForMember, conversationId]);
 
   // Auto-scroll whenever content height changes (new messages or streaming updates)
   useEffect(() => {

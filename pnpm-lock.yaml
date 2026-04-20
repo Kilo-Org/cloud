@@ -468,6 +468,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/event-service':
+        specifier: workspace:*
+        version: link:../../packages/event-service
       '@kilocode/kilo-chat':
         specifier: workspace:*
         version: link:../../packages/kilo-chat

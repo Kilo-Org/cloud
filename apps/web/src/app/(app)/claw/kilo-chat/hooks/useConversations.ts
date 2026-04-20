@@ -2,14 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
 import type { CreateConversationRequest, ConversationListResponse } from '@kilocode/kilo-chat';
 
-const POLL_INTERVAL = 30_000;
-
 export function useConversations(client: KiloChatClient, sandboxId: string | null) {
   return useQuery({
     queryKey: ['kilo-chat', 'conversations', sandboxId],
     queryFn: () => client.listConversations(sandboxId ?? undefined),
     enabled: !!sandboxId,
-    refetchInterval: POLL_INTERVAL,
   });
 }
 

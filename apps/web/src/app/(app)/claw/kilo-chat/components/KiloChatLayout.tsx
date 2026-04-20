@@ -77,20 +77,28 @@ export function KiloChatLayout({
 
   // Update conversation list cache in-place when activity events arrive
   useEffect(() => {
-    return kiloChatClient.onConversationActivity((_ctx, e) => {
-      queryClient.setQueriesData<ConversationListResponse>(
-        { queryKey: ['kilo-chat', 'conversations'] },
-        old => {
-          if (!old) return old;
-          return {
-            ...old,
-            conversations: old.conversations.map(c =>
-              c.conversationId === e.conversationId ? { ...c, lastActivityAt: e.lastActivityAt } : c
-            ),
-          };
-        }
-      );
-    });
+    const offs = [
+      kiloChatClient.onConversationCreated(() => {
+        void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
+      }),
+      kiloChatClient.onConversationActivity((_ctx, e) => {
+        queryClient.setQueriesData<ConversationListResponse>(
+          { queryKey: ['kilo-chat', 'conversations'] },
+          old => {
+            if (!old) return old;
+            return {
+              ...old,
+              conversations: old.conversations.map(c =>
+                c.conversationId === e.conversationId
+                  ? { ...c, lastActivityAt: e.lastActivityAt }
+                  : c
+              ),
+            };
+          }
+        );
+      }),
+    ];
+    return () => offs.forEach(off => off());
   }, [kiloChatClient, queryClient]);
   const createConversation = useCreateConversation(kiloChatClient);
   const renameConversation = useRenameConversation(kiloChatClient);

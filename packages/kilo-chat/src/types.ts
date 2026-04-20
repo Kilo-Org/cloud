@@ -99,6 +99,10 @@ export type ReactionRemovedEvent = {
   emoji: string;
 };
 
+export type ConversationCreatedEvent = {
+  conversationId: string;
+};
+
 export type ConversationActivityEvent = {
   conversationId: string;
   lastActivityAt: number;

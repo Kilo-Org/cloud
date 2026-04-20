@@ -4,6 +4,7 @@
  */
 
 import { ulid } from 'ulid';
+import { pushInstanceEvent } from './event-push';
 
 // ─── createConversation ────────────────────────────────────────────────────
 
@@ -60,6 +61,11 @@ export async function createConversationFor(
     userMembership.addConversation(memberParams),
     botMembership.addConversation(memberParams),
   ]);
+
+  // Notify all human members on the instance context so their conversation list updates.
+  await pushInstanceEvent(env, params.sandboxId, [userId], undefined, 'conversation.created', {
+    conversationId,
+  });
 
   return { ok: true, conversationId };
 }

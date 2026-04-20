@@ -5,6 +5,7 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
+import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 
@@ -81,6 +82,11 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
 export const BALANCED_CODEX_MODEL: ResolvedAutoModel = {
   model: GPT_53_CODEX_ID,
   reasoning: { enabled: true, effort: 'low' },
+};
+
+export const BALANCED_CLAW_MODEL: ResolvedAutoModel = {
+  model: qwen36_plus_model.public_id,
+  reasoning: { enabled: true },
 };
 
 export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {

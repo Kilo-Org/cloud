@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { ReactionSummary } from '@kilocode/kilo-chat';
 import { EmojiPicker } from './EmojiPicker';
 
@@ -20,6 +20,7 @@ export function ReactionPills({
   onRemove,
 }: ReactionPillsProps) {
   const [showPicker, setShowPicker] = useState(false);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
 
   const handlePickerSelect = useCallback(
     (emoji: string) => {
@@ -46,32 +47,33 @@ export function ReactionPills({
             onClick={() => (isMine ? onRemove(r.emoji) : onAdd(r.emoji))}
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs cursor-pointer transition-colors border ${
               isMine
-                ? 'bg-primary/10 border-primary/30 hover:bg-primary/20'
+                ? 'bg-primary/20 border-primary/50 hover:bg-primary/30'
                 : 'bg-muted border-border hover:bg-accent'
             }`}
             title={isMine ? `Remove ${r.emoji}` : `React with ${r.emoji}`}
           >
             <span className="text-sm">{r.emoji}</span>
-            <span className={isMine ? 'text-primary font-medium' : 'text-muted-foreground'}>
+            <span className={isMine ? 'text-primary font-bold' : 'text-muted-foreground'}>
               {r.count}
             </span>
           </button>
         );
       })}
-      <div className="relative">
-        <button
-          onClick={() => setShowPicker(prev => !prev)}
-          className="inline-flex items-center rounded-full px-2 py-0.5 text-xs cursor-pointer transition-colors border bg-muted border-border hover:bg-accent text-muted-foreground"
-          title="Add reaction"
-        >
-          +
-        </button>
-        {showPicker && (
-          <div className={`absolute bottom-full mb-2 z-50 ${isOwn ? 'right-0' : 'left-0'}`}>
-            <EmojiPicker onSelect={handlePickerSelect} onClose={() => setShowPicker(false)} />
-          </div>
-        )}
-      </div>
+      <button
+        ref={addButtonRef}
+        onClick={() => setShowPicker(prev => !prev)}
+        className="inline-flex items-center rounded-full px-2 py-0.5 text-xs cursor-pointer transition-colors border bg-muted border-border hover:bg-accent text-muted-foreground"
+        title="Add reaction"
+      >
+        +
+      </button>
+      {showPicker && (
+        <EmojiPicker
+          onSelect={handlePickerSelect}
+          onClose={() => setShowPicker(false)}
+          anchorRef={addButtonRef}
+        />
+      )}
     </div>
   );
 }

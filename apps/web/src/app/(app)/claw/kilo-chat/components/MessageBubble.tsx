@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, memo } from 'react';
+import { useState, useRef, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile } from 'lucide-react';
@@ -63,6 +63,7 @@ export function MessageBubble({
   const [showActions, setShowActions] = useState(false);
   const [showQuickPick, setShowQuickPick] = useState(false);
   const [showFullPicker, setShowFullPicker] = useState(false);
+  const bubbleRef = useRef<HTMLDivElement>(null);
 
   const isBot = message.senderId.startsWith('bot:');
   const isOptimistic = message.id.startsWith('pending-');
@@ -203,14 +204,14 @@ export function MessageBubble({
             </div>
           )}
           {showFullPicker && (
-            <div className={`absolute bottom-full mb-2 z-50 ${isOwn ? 'right-0' : 'left-0'}`}>
-              <EmojiPicker
-                onSelect={handleFullPickerSelect}
-                onClose={() => setShowFullPicker(false)}
-              />
-            </div>
+            <EmojiPicker
+              onSelect={handleFullPickerSelect}
+              onClose={() => setShowFullPicker(false)}
+              anchorRef={bubbleRef}
+            />
           )}
           <div
+            ref={bubbleRef}
             className={`rounded-2xl px-3 py-2 ${
               isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
             }`}

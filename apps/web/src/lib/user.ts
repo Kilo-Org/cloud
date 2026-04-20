@@ -1,9 +1,9 @@
-import { createStripeCustomer } from '@/lib/stripe-client';
+import { createStripeCustomer, deleteStripeCustomer } from '@/lib/stripe-client';
 import { randomUUID } from 'crypto';
 import { createTimer } from '@/lib/timer';
 import PostHogClient from '@/lib/posthog';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
@@ -62,7 +62,7 @@ import {
   contributor_champion_memberships,
   contributor_champion_contributors,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, isNotNull, isNull, sql, or } from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
@@ -116,6 +116,39 @@ export async function findUserByStripeCustomerId(
 const posthogClient = PostHogClient();
 if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
   posthogClient.debug();
+}
+
+const SIGNUP_RATE_LIMIT_MAX = 5;
+const SIGNUP_RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function getSignupIp(requestHeaders?: Headers): string | null {
+  return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
+}
+
+async function checkSignupIpRateLimit(
+  signupIp: string | null,
+  tx: DrizzleTransaction
+): Promise<Result<null, AuthErrorType>> {
+  if (!signupIp) return successResult(null);
+
+  const windowStart = new Date(Date.now() - SIGNUP_RATE_LIMIT_WINDOW_MS).toISOString();
+  const [result] = await tx
+    .select({ count: count() })
+    .from(kilocode_users)
+    .where(
+      and(eq(kilocode_users.signup_ip, signupIp), gte(kilocode_users.created_at, windowStart))
+    );
+
+  const existingAccounts = result?.count ?? 0;
+  if (existingAccounts < SIGNUP_RATE_LIMIT_MAX) return successResult(null);
+
+  console.warn('[auth] Signup rejected due to per-IP rate limit', {
+    ip_address: signupIp,
+    existing_accounts_24h: existingAccounts,
+    max_signups: SIGNUP_RATE_LIMIT_MAX,
+  });
+
+  return failureResult('SIGNUP-RATE-LIMITED');
 }
 
 /**
@@ -311,9 +344,13 @@ export async function createOrUpdateUser(
   if (turnstile_guid && (await findUserById(turnstile_guid)))
     throw new Error('Abuser warning: turnstile guid reuse detected ' + turnstile_guid);
 
+  const signupIp = getSignupIp(requestHeaders);
   const newUserId = turnstile_guid ?? randomUUID();
 
-  // New user creation path
+  // New user creation path — Stripe customer is created before the DB
+  // transaction because stripe_customer_id is NOT NULL. If the transaction
+  // fails (rate limit, constraint violation, etc.) we clean up the Stripe
+  // customer to prevent orphans.
   const stripeCustomer = await createStripeCustomer({
     email: args.google_user_email,
     name: args.google_user_name,
@@ -328,39 +365,65 @@ export async function createOrUpdateUser(
     hosted_domain: args.hosted_domain,
     is_admin: shouldBeAdmin(args.google_user_email, args.hosted_domain),
     stripe_customer_id: stripeCustomer.id,
+    signup_ip: signupIp,
     openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
     vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
     normalized_email: normalizeEmail(args.google_user_email),
     email_domain: extractEmailDomain(args.google_user_email),
   } satisfies typeof kilocode_users.$inferInsert;
 
-  const savedUser = await db.transaction(async tx => {
-    const [savedUser] = await tx.insert(kilocode_users).values(newUser).returning();
-    assert(savedUser, 'Failed to save new user');
+  type TxResult = Result<{ user: User }, AuthErrorType>;
+  let txResult: TxResult;
+  let caughtError: unknown;
+  try {
+    txResult = await db.transaction(async tx => {
+      const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
+      if (!signupRateLimitResult.success) return signupRateLimitResult;
 
-    await tx.insert(user_auth_provider).values({
-      kilo_user_id: savedUser.id,
-      provider: args.provider,
-      provider_account_id: args.provider_account_id,
-      avatar_url: args.google_user_image_url,
-      email: args.google_user_email,
-      display_name: args.display_name ?? null,
-      hosted_domain: args.hosted_domain,
-    });
+      const [inserted] = await tx.insert(kilocode_users).values(newUser).returning();
+      assert(inserted, 'Failed to save new user');
 
-    if (affiliateTrackingId?.trim()) {
-      await recordAffiliateAttributionAndQueueParentEvent({
-        database: tx,
-        userId: savedUser.id,
-        provider: 'impact',
-        trackingId: affiliateTrackingId,
-        customerEmail: savedUser.google_user_email,
-        eventDate: new Date(savedUser.created_at),
+      await tx.insert(user_auth_provider).values({
+        kilo_user_id: inserted.id,
+        provider: args.provider,
+        provider_account_id: args.provider_account_id,
+        avatar_url: args.google_user_image_url,
+        email: args.google_user_email,
+        display_name: args.display_name ?? null,
+        hosted_domain: args.hosted_domain,
       });
-    }
 
-    return savedUser;
-  });
+      if (affiliateTrackingId?.trim()) {
+        await recordAffiliateAttributionAndQueueParentEvent({
+          database: tx,
+          userId: inserted.id,
+          provider: 'impact',
+          trackingId: affiliateTrackingId,
+          customerEmail: inserted.google_user_email,
+          eventDate: new Date(inserted.created_at),
+        });
+      }
+
+      return successResult({ user: inserted });
+    });
+  } catch (error) {
+    caughtError = error;
+    txResult = failureResult('SYSTEM_ERROR');
+  }
+
+  // Clean up the Stripe customer when signup didn't succeed (thrown error
+  // or returned failure like rate-limit rejection).
+  if (!txResult.success) {
+    deleteStripeCustomer(stripeCustomer.id).catch(cleanupErr =>
+      captureException(cleanupErr, {
+        tags: { source: 'signup-stripe-cleanup' },
+        extra: { stripeCustomerId: stripeCustomer.id },
+      })
+    );
+    if (caughtError) throw caughtError;
+    return txResult;
+  }
+  const savedUser = txResult.user;
 
   fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);
 
@@ -584,6 +647,7 @@ export async function softDeleteUser(userId: string) {
         cohorts: {},
         is_admin: false,
         customer_source: null,
+        signup_ip: null,
       })
       .where(eq(kilocode_users.id, userId));
 

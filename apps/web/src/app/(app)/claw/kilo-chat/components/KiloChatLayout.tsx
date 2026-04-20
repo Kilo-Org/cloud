@@ -112,6 +112,20 @@ export function KiloChatLayout({
           }
         );
       }),
+      kiloChatClient.onConversationRead((_ctx, e) => {
+        queryClient.setQueriesData<ConversationListResponse>(
+          { queryKey: ['kilo-chat', 'conversations'] },
+          old => {
+            if (!old) return old;
+            return {
+              ...old,
+              conversations: old.conversations.map(c =>
+                c.conversationId === e.conversationId ? { ...c, lastReadAt: e.lastReadAt } : c
+              ),
+            };
+          }
+        );
+      }),
       kiloChatClient.onConversationActivity((_ctx, e) => {
         queryClient.setQueriesData<ConversationListResponse>(
           { queryKey: ['kilo-chat', 'conversations'] },

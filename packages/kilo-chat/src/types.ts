@@ -113,6 +113,12 @@ export type ConversationLeftEvent = {
   conversationId: string;
 };
 
+export type ConversationReadEvent = {
+  conversationId: string;
+  memberId: string;
+  lastReadAt: number;
+};
+
 export type ConversationActivityEvent = {
   conversationId: string;
   lastActivityAt: number;

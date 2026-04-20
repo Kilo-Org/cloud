@@ -4,7 +4,12 @@
  */
 
 import { ulid } from 'ulid';
-import { extractConversationContext, extractSandboxId, pushInstanceEvent } from './event-push';
+import {
+  extractConversationContext,
+  extractSandboxId,
+  getConversationContext,
+  pushInstanceEvent,
+} from './event-push';
 
 // ─── createConversation ────────────────────────────────────────────────────
 
@@ -183,8 +188,20 @@ export async function markReadFor(
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }
 
+  const now = Date.now();
   const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
-  await stub.markRead(conversationId, Date.now());
+  await stub.markRead(conversationId, now);
+
+  const convContext = await getConversationContext(env, conversationId);
+  if (convContext?.sandboxId) {
+    await pushInstanceEvent(
+      env,
+      convContext.sandboxId,
+      convContext.humanMemberIds,
+      'conversation.read',
+      { conversationId, memberId: userId, lastReadAt: now }
+    );
+  }
 
   return { ok: true };
 }

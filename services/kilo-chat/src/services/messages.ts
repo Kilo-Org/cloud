@@ -169,6 +169,11 @@ export async function createMessageFor(
           if (present) {
             const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
             await stub.markRead(conversationId, now);
+            await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
+              conversationId,
+              memberId: userId,
+              lastReadAt: now,
+            });
           } else {
             await pushInstanceEvent(env, sandboxId, [userId], 'conversation.activity', {
               conversationId,

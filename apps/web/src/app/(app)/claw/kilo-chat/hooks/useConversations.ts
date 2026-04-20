@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { KiloChatClient } from '@kilocode/kilo-chat';
-import type { CreateConversationRequest } from '@kilocode/kilo-chat';
+import type { CreateConversationRequest, ConversationListResponse } from '@kilocode/kilo-chat';
 import { useMemo } from 'react';
 import { KILO_CHAT_URL } from '@/lib/constants';
 
@@ -73,8 +73,21 @@ export function useMarkConversationRead(getToken: () => Promise<string>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (conversationId: string) => client.markConversationRead(conversationId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
+    onMutate: conversationId => {
+      // Optimistically set lastReadAt = now in all cached conversation lists
+      const now = Date.now();
+      queryClient.setQueriesData<ConversationListResponse>(
+        { queryKey: ['kilo-chat', 'conversations'] },
+        old => {
+          if (!old) return old;
+          return {
+            ...old,
+            conversations: old.conversations.map(c =>
+              c.conversationId === conversationId ? { ...c, lastReadAt: now } : c
+            ),
+          };
+        }
+      );
     },
   });
 }

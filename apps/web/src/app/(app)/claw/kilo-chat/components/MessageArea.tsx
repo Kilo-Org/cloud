@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import type { ConversationListResponse } from '@kilocode/kilo-chat';
 import { ulid } from 'ulid';
 import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import {
@@ -66,29 +64,14 @@ export function MessageArea({
   const { typingMembers, handleTypingEvent, clearTypingForMember } = useTypingState(currentUserId);
   const sendTyping = useTypingSender(getToken, conversationId);
 
-  const queryClient = useQueryClient();
   const markRead = useMarkConversationRead(getToken);
   const markReadRef = useRef(markRead.mutate);
   markReadRef.current = markRead.mutate;
 
-  // Mark conversation as read on mount / conversationId change (if unread)
+  // Mark conversation as read when opened (only if actually unread)
   useEffect(() => {
-    // Find the conversation in any cached conversations query (key includes sandboxId)
-    const queries = queryClient.getQueriesData<ConversationListResponse>({
-      queryKey: ['kilo-chat', 'conversations'],
-    });
-    for (const [, data] of queries) {
-      const conv = data?.conversations.find(c => c.conversationId === conversationId);
-      if (!conv) continue;
-      const isUnread =
-        conv.lastActivityAt != null &&
-        (conv.lastReadAt == null || conv.lastActivityAt > conv.lastReadAt);
-      if (isUnread) {
-        markReadRef.current(conversationId);
-      }
-      return;
-    }
-  }, [conversationId, queryClient]);
+    markReadRef.current(conversationId);
+  }, [conversationId]);
 
   // SSE connection
   useSSE({

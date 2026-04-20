@@ -792,20 +792,44 @@ Discovered during E2E verification. Check `SHOW CREATE TABLE <t>` on upstream ma
 
 ## Verification Results
 
-Status of each flow after initial E2E verification run.
+Status of each flow after the E2E verification run on 2026-04-20.
 
-| Flow                | Status                                                   | Notes                                                                                                                                                                                                                                                      |
-| ------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 — Join & register | ✅ Verified (manual)                                     | Registration PR #1 was manually merged; `jfawcett` now appears in `jrf0110/wl-commons.rigs` on main                                                                                                                                                        |
-| 2 — Browse          | ✅ Verified via sub-agent                                | `/debug/wastelands/:id/browse` fails in local dev due to container TLS egress issue; `/debug/wastelands/:id/browse-direct` returned 54 items matching `SELECT COUNT(*) FROM wanted`                                                                        |
-| 3 — Post            | ✅ Verified manually and via Flow 4 prerequisite         | Path A (`/debug/wastelands/:id/post`) fails in local dev due to `wl post` getting `EOF` from DoltHub write API via the container; Path B (worker-direct) succeeded and item `w-0e5abc1976` landed on upstream main with `posted_by=jrf0110`, `status=open` |
-| 4 — Claim           | ✅ Verified via sub-agent                                | Item `w-0e5abc1976` transitioned from `open` → `claimed` by `jrf0110` via PR #5 merge                                                                                                                                                                      |
-| 5 — Unclaim         | Not yet executed                                         | Requires fresh item + claim                                                                                                                                                                                                                                |
-| 6 — Done            | ✅ Verified via sub-agent                                | Item `w-0e5abc1976` transitioned to `in_review`, `completions` row `c-1db551a29b6ce749` inserted via PR #6 merge. Also discovered: multi-statement writes silently no-op in DoltHub's write API                                                            |
-| 7 — Accept + stamp  | ⚠️ Partial — blocked by `stamps.author != subject` check | Confirmed the constraint exists via `SHOW CREATE TABLE stamps`; fully executing flow requires a distinct maintainer rig (`jrf0110` was registered via PR #7) and a contributor rig (`jfawcett`) on a new item                                              |
-| 8 — Reject          | Not yet executed                                         | Requires fresh in_review item                                                                                                                                                                                                                              |
-| 9 — Close           | Not yet executed                                         | Requires fresh in_review item                                                                                                                                                                                                                              |
-| 10 — Disconnect     | Not yet executed                                         | Requires manually invoking the `disconnectTownFromWasteland` tRPC                                                                                                                                                                                          |
+| Flow                | Status                             | Notes                                                                                                                                                                                                                                                                  |
+| ------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — Join & register | ✅ Verified (manual)               | Registration PR #1 was manually merged; `jfawcett` appears in `jrf0110/wl-commons.rigs` on main. Maintainer rig `jrf0110` also registered via PR #7 during E2E setup.                                                                                                  |
+| 2 — Browse          | ✅ Verified via sub-agent          | `/debug/wastelands/:id/browse` fails in local dev due to container TLS egress issue; `/debug/wastelands/:id/browse-direct` returned 54 items matching `SELECT COUNT(*) FROM wanted`.                                                                                   |
+| 3 — Post            | ✅ Verified via sub-agent (PR #8)  | Item `w-870be07fbc` landed on upstream main with `posted_by=jfawcett, status=open`. Path A (container-driven) fails in local dev due to `wl post` getting `EOF` from DoltHub write API; Path B (worker-direct) succeeded.                                              |
+| 4 — Claim           | ✅ Verified via sub-agent (PR #9)  | Item `w-870be07fbc` → `claimed, claimed_by=jfawcett`. Also separately via PR #5 earlier.                                                                                                                                                                               |
+| 5 — Unclaim         | ✅ Verified via sub-agent (PR #14) | Fresh item `w-68aa4ab1dd`: open → claimed → open with `claimed_by=null`.                                                                                                                                                                                               |
+| 6 — Done            | ✅ Verified via sub-agent (PR #10) | Item `w-870be07fbc` → `in_review` with `evidence_url` set; completion `c-58cd6cc527b5bf3b` inserted. Required split writes (multi-statement SQL silently drops rows).                                                                                                  |
+| 7 — Accept + stamp  | ✅ Verified via sub-agent (PR #11) | Item `w-870be07fbc` → `completed`. Stamp `s-35e8a923fe63c8cd` created with `author=jrf0110, subject=jfawcett` (CHECK `author != subject` satisfied); completion linked via `validated_by=jrf0110, stamp_id=s-35e8a923...`. Required 3 split writes on a single branch. |
+| 8 — Reject          | ✅ Verified via sub-agent (PR #18) | Fresh item `w-d2cf6acf6a`: open → claimed → in_review → claimed (reject). Final state: `status=claimed, evidence_url=null`, no completion, no stamp.                                                                                                                   |
+| 9 — Close           | ✅ Verified via sub-agent (PR #22) | Fresh item `w-89e6720ca4`: open → claimed → in_review → completed (close with no stamp). Final state: `status=completed`, no stamp.                                                                                                                                    |
+| 10 — Disconnect     | Not yet executed                   | Requires manually invoking the `disconnectTownFromWasteland` tRPC. Lower priority since town disconnect is strictly a gastown operation and doesn't touch upstream data.                                                                                               |
+
+### PR history (all merged on jrf0110/wl-commons)
+
+| PR  | Flow                      | Item ID        |
+| --- | ------------------------- | -------------- |
+| 4   | post (smoke; jrf0110)     | `w-0e5abc1976` |
+| 5   | claim                     | `w-0e5abc1976` |
+| 6   | done                      | `w-0e5abc1976` |
+| 7   | register rig: jrf0110     | —              |
+| 8   | post (jfawcett lifecycle) | `w-870be07fbc` |
+| 9   | claim                     | `w-870be07fbc` |
+| 10  | done                      | `w-870be07fbc` |
+| 11  | accept                    | `w-870be07fbc` |
+| 12  | post (flow 5)             | `w-68aa4ab1dd` |
+| 13  | claim                     | `w-68aa4ab1dd` |
+| 14  | unclaim                   | `w-68aa4ab1dd` |
+| 15  | post (flow 8)             | `w-d2cf6acf6a` |
+| 16  | claim                     | `w-d2cf6acf6a` |
+| 17  | done                      | `w-d2cf6acf6a` |
+| 18  | reject                    | `w-d2cf6acf6a` |
+| 19  | post (flow 9)             | `w-89e6720ca4` |
+| 20  | claim                     | `w-89e6720ca4` |
+| 21  | done                      | `w-89e6720ca4` |
+| 22  | close                     | `w-89e6720ca4` |
 
 ### Findings that drove doc updates
 

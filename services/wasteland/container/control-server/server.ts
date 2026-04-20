@@ -95,6 +95,50 @@ const StatusBodySchema = z.object({
   itemId: z.string().min(1),
 });
 
+const UnclaimBodySchema = z.object({
+  upstream: z.string().min(1),
+  itemId: z.string().min(1),
+});
+
+const AcceptBodySchema = z.object({
+  upstream: z.string().min(1),
+  itemId: z.string().min(1),
+  quality: z.enum(['excellent', 'good', 'fair', 'poor']),
+  comment: z.string().optional(),
+});
+
+const RejectBodySchema = z.object({
+  upstream: z.string().min(1),
+  itemId: z.string().min(1),
+  comment: z.string().min(1),
+});
+
+const CloseBodySchema = z.object({
+  upstream: z.string().min(1),
+  itemId: z.string().min(1),
+});
+
+const AcceptUpstreamBodySchema = z.object({
+  upstream: z.string().min(1),
+  itemId: z.string().min(1),
+  rigHandle: z.string().min(1),
+  quality: z.enum(['excellent', 'good', 'fair', 'poor']),
+  comment: z.string().optional(),
+});
+
+const RejectUpstreamBodySchema = z.object({
+  upstream: z.string().min(1),
+  itemId: z.string().min(1),
+  rigHandle: z.string().min(1),
+  comment: z.string().min(1),
+});
+
+const CloseUpstreamBodySchema = z.object({
+  upstream: z.string().min(1),
+  itemId: z.string().min(1),
+  rigHandle: z.string().min(1),
+});
+
 // ---------------------------------------------------------------------------
 // Mutex for serializing mutations
 // ---------------------------------------------------------------------------
@@ -590,6 +634,208 @@ async function handlePost(req: Request): Promise<Response> {
   }
 }
 
+// Simple wrapper for `wl` commands that take an itemId and no body options.
+async function runWlItemCmd(
+  req: Request,
+  schema: typeof UnclaimBodySchema | typeof CloseBodySchema,
+  wlCmd: 'unclaim' | 'close',
+  label: string
+): Promise<Response> {
+  const token = extractToken(req);
+  if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
+
+  const body = await parseBody(req, schema);
+  if ('error' in body) return body.error;
+
+  await ensureInit();
+
+  await mutationMutex.acquire();
+  try {
+    const env = buildEnv(token, body.data.upstream);
+    const result = await execWl([wlCmd, body.data.itemId], env);
+    if (result.exitCode !== 0) {
+      log.error(`wl ${wlCmd} failed`, { stderr: result.stderr, itemId: body.data.itemId });
+      return errorResponse(`wl ${wlCmd} failed: ${result.stderr}`, 502);
+    }
+    lastOperationTimestamp = new Date().toISOString();
+    log.info(`wl ${wlCmd} completed`, { itemId: body.data.itemId });
+    return jsonResponse({ success: true });
+  } finally {
+    mutationMutex.release();
+  }
+}
+
+async function handleUnclaim(req: Request): Promise<Response> {
+  return runWlItemCmd(req, UnclaimBodySchema, 'unclaim', 'unclaim');
+}
+
+async function handleClose(req: Request): Promise<Response> {
+  return runWlItemCmd(req, CloseBodySchema, 'close', 'close');
+}
+
+async function handleAccept(req: Request): Promise<Response> {
+  const token = extractToken(req);
+  if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
+
+  const body = await parseBody(req, AcceptBodySchema);
+  if ('error' in body) return body.error;
+
+  await ensureInit();
+
+  await mutationMutex.acquire();
+  try {
+    const env = buildEnv(token, body.data.upstream);
+    const args = ['accept', body.data.itemId, '--quality', body.data.quality];
+    if (body.data.comment) {
+      args.push('--comment', body.data.comment);
+    }
+    const result = await execWl(args, env);
+    if (result.exitCode !== 0) {
+      log.error('wl accept failed', { stderr: result.stderr, itemId: body.data.itemId });
+      return errorResponse(`wl accept failed: ${result.stderr}`, 502);
+    }
+    lastOperationTimestamp = new Date().toISOString();
+    log.info('wl accept completed', { itemId: body.data.itemId });
+    return jsonResponse({ success: true });
+  } finally {
+    mutationMutex.release();
+  }
+}
+
+async function handleReject(req: Request): Promise<Response> {
+  const token = extractToken(req);
+  if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
+
+  const body = await parseBody(req, RejectBodySchema);
+  if ('error' in body) return body.error;
+
+  await ensureInit();
+
+  await mutationMutex.acquire();
+  try {
+    const env = buildEnv(token, body.data.upstream);
+    const result = await execWl(['reject', body.data.itemId, '--comment', body.data.comment], env);
+    if (result.exitCode !== 0) {
+      log.error('wl reject failed', { stderr: result.stderr, itemId: body.data.itemId });
+      return errorResponse(`wl reject failed: ${result.stderr}`, 502);
+    }
+    lastOperationTimestamp = new Date().toISOString();
+    log.info('wl reject completed', { itemId: body.data.itemId });
+    return jsonResponse({ success: true });
+  } finally {
+    mutationMutex.release();
+  }
+}
+
+async function handleAcceptUpstream(req: Request): Promise<Response> {
+  const token = extractToken(req);
+  if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
+
+  const body = await parseBody(req, AcceptUpstreamBodySchema);
+  if ('error' in body) return body.error;
+
+  await ensureInit();
+
+  await mutationMutex.acquire();
+  try {
+    const env = buildEnv(token, body.data.upstream);
+    const args = [
+      'accept-upstream',
+      body.data.itemId,
+      body.data.rigHandle,
+      '--quality',
+      body.data.quality,
+    ];
+    if (body.data.comment) {
+      args.push('--comment', body.data.comment);
+    }
+    const result = await execWl(args, env);
+    if (result.exitCode !== 0) {
+      log.error('wl accept-upstream failed', {
+        stderr: result.stderr,
+        itemId: body.data.itemId,
+        rigHandle: body.data.rigHandle,
+      });
+      return errorResponse(`wl accept-upstream failed: ${result.stderr}`, 502);
+    }
+    lastOperationTimestamp = new Date().toISOString();
+    log.info('wl accept-upstream completed', {
+      itemId: body.data.itemId,
+      rigHandle: body.data.rigHandle,
+    });
+    return jsonResponse({ success: true });
+  } finally {
+    mutationMutex.release();
+  }
+}
+
+async function handleRejectUpstream(req: Request): Promise<Response> {
+  const token = extractToken(req);
+  if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
+
+  const body = await parseBody(req, RejectUpstreamBodySchema);
+  if ('error' in body) return body.error;
+
+  await ensureInit();
+
+  await mutationMutex.acquire();
+  try {
+    const env = buildEnv(token, body.data.upstream);
+    const result = await execWl(
+      ['reject-upstream', body.data.itemId, body.data.rigHandle, '--comment', body.data.comment],
+      env
+    );
+    if (result.exitCode !== 0) {
+      log.error('wl reject-upstream failed', {
+        stderr: result.stderr,
+        itemId: body.data.itemId,
+        rigHandle: body.data.rigHandle,
+      });
+      return errorResponse(`wl reject-upstream failed: ${result.stderr}`, 502);
+    }
+    lastOperationTimestamp = new Date().toISOString();
+    log.info('wl reject-upstream completed', {
+      itemId: body.data.itemId,
+      rigHandle: body.data.rigHandle,
+    });
+    return jsonResponse({ success: true });
+  } finally {
+    mutationMutex.release();
+  }
+}
+
+async function handleCloseUpstream(req: Request): Promise<Response> {
+  const token = extractToken(req);
+  if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
+
+  const body = await parseBody(req, CloseUpstreamBodySchema);
+  if ('error' in body) return body.error;
+
+  await ensureInit();
+
+  await mutationMutex.acquire();
+  try {
+    const env = buildEnv(token, body.data.upstream);
+    const result = await execWl(['close-upstream', body.data.itemId, body.data.rigHandle], env);
+    if (result.exitCode !== 0) {
+      log.error('wl close-upstream failed', {
+        stderr: result.stderr,
+        itemId: body.data.itemId,
+        rigHandle: body.data.rigHandle,
+      });
+      return errorResponse(`wl close-upstream failed: ${result.stderr}`, 502);
+    }
+    lastOperationTimestamp = new Date().toISOString();
+    log.info('wl close-upstream completed', {
+      itemId: body.data.itemId,
+      rigHandle: body.data.rigHandle,
+    });
+    return jsonResponse({ success: true });
+  } finally {
+    mutationMutex.release();
+  }
+}
+
 async function handleSync(req: Request): Promise<Response> {
   const token = extractToken(req);
   if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
@@ -746,6 +992,7 @@ type RouteHandler = (req: Request) => Promise<Response>;
 const routes: Array<{ method: string; path: string; handler: RouteHandler }> = [
   { method: 'POST', path: '/wl/browse', handler: handleBrowse },
   { method: 'POST', path: '/wl/claim', handler: handleClaim },
+  { method: 'POST', path: '/wl/unclaim', handler: handleUnclaim },
   { method: 'GET', path: '/wl/config', handler: handleConfig },
   { method: 'POST', path: '/wl/done', handler: handleDone },
   { method: 'POST', path: '/wl/init', handler: handleInit },
@@ -753,6 +1000,12 @@ const routes: Array<{ method: string; path: string; handler: RouteHandler }> = [
   { method: 'POST', path: '/wl/sync', handler: handleSync },
   { method: 'POST', path: '/wl/join', handler: handleJoin },
   { method: 'POST', path: '/wl/status', handler: handleStatus },
+  { method: 'POST', path: '/wl/accept', handler: handleAccept },
+  { method: 'POST', path: '/wl/reject', handler: handleReject },
+  { method: 'POST', path: '/wl/close', handler: handleClose },
+  { method: 'POST', path: '/wl/accept-upstream', handler: handleAcceptUpstream },
+  { method: 'POST', path: '/wl/reject-upstream', handler: handleRejectUpstream },
+  { method: 'POST', path: '/wl/close-upstream', handler: handleCloseUpstream },
   { method: 'GET', path: '/health', handler: handleHealth },
 ];
 

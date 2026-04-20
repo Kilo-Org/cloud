@@ -312,8 +312,6 @@ async function fetchOpenRouterApiProviders(): Promise<OpenRouterApiProvidersResp
   return parsed;
 }
 
-// Best-effort mirror of the synced data into Redis. Consumers are not wired
-// up yet; failures are logged but never block the DB write.
 async function mirrorToRedis(values: {
   providers: NormalizedOpenRouterResponse;
   openrouter: Record<string, StoredModel>;

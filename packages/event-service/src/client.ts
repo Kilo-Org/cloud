@@ -19,7 +19,8 @@ export class EventServiceClient {
   async connect(): Promise<void> {
     // Step 1: Exchange JWT for a single-use connection ticket
     const token = await this.getToken();
-    const res = await fetch(`${this.url}/connect/ticket`, {
+    const httpUrl = this.url.replace(/^ws(s?):\/\//, 'http$1://');
+    const res = await fetch(`${httpUrl}/connect/ticket`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });

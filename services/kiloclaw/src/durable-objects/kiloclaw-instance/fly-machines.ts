@@ -344,7 +344,7 @@ export async function startExistingMachine(
  * Create a new Fly Machine. Persists the machine ID immediately before
  * waiting for startup.
  *
- * @param envFlyRegion - The FLY_REGION env var fallback (from worker env).
+ * @param envFlyRegion - The FLY_REGION env var fallback for volume-less machines.
  */
 export async function createNewMachine(
   flyConfig: FlyClientConfig,
@@ -358,9 +358,16 @@ export async function createNewMachine(
   if (!onProviderResult) {
     throw new Error('createNewMachine requires a persistence callback');
   }
+  const machineRegion = providerState.region || undefined;
+  if (providerState.volumeId && !machineRegion) {
+    throw new Error(
+      `Cannot create Fly machine for volume ${providerState.volumeId}: missing volume region`
+    );
+  }
+
   const machine = await fly.createMachine(flyConfig, machineConfig, {
     name: state.sandboxId ?? undefined,
-    region: providerState.region ?? envFlyRegion ?? undefined,
+    region: machineRegion ?? envFlyRegion ?? undefined,
     minSecretsVersion,
   });
   const nextProviderState = {

@@ -1376,7 +1376,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (flyState.volumeId) {
         try {
           const volume = await fly.getVolume(flyConfig, flyState.volumeId);
-          if (volume.region !== flyState.region) {
+          if (!volume.region) {
+            doWarn(this.s, 'Volume region missing during drift check; keeping cached flyRegion', {
+              volumeId: flyState.volumeId,
+              cachedRegion: flyState.region,
+            });
+          } else if (volume.region !== flyState.region) {
             doWarn(this.s, 'flyRegion drift detected', {
               cachedRegion: flyState.region,
               actualRegion: volume.region,
@@ -1388,23 +1393,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             await this.persistProviderResult({ providerState: flyState });
           }
         } catch (err) {
-          if (fly.isFlyNotFound(err)) {
-            doWarn(this.s, 'Volume not found during region check, clearing');
-            await this.persistProviderResult({
-              providerState: {
-                ...flyState,
-                volumeId: null,
-                region: null,
-              },
-            });
-            await this.persistProviderResult(
-              await this.provider().ensureStorage({
-                env: this.env,
-                state: this.s,
-                reason: 'start',
-              })
-            );
-          }
+          if (!fly.isFlyNotFound(err)) throw err;
+
+          doWarn(this.s, 'Volume not found during region check, clearing');
+          await this.persistProviderResult({
+            providerState: {
+              ...flyState,
+              volumeId: null,
+              region: null,
+            },
+          });
+          await this.persistProviderResult(
+            await this.provider().ensureStorage({
+              env: this.env,
+              state: this.s,
+              reason: 'start',
+            })
+          );
         }
       }
 

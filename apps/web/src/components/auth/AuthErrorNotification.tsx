@@ -44,9 +44,12 @@ export function AuthErrorNotification({ error }: { error: string }) {
   if (error === 'SIGNUP-RATE-LIMITED')
     return (
       <div data-error-notification>
-        <ErrorNotificationBox title="Too Many Signups">
-          Too many accounts have been created from this network recently. Please try again later or
-          contact support if you believe this is an error.
+        <ErrorNotificationBox title="Signup Blocked">
+          Automated account creation was detected and blocked. If this was a mistake, please{' '}
+          <a href="https://kilo.ai/support" className="underline hover:text-red-100">
+            contact support
+          </a>{' '}
+          and we&apos;ll get you sorted out.
         </ErrorNotificationBox>
       </div>
     );

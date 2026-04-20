@@ -3645,13 +3645,17 @@ describe('start: volume region validation', () => {
     await seedProvisioned(storage, { flyMachineId: null, flyRegion: null });
 
     (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
 
-    await expect(instance.start('user-1')).rejects.toThrow(
-      'Cannot create Fly machine for volume vol-1: missing volume region'
-    );
+    await instance.start('user-1');
 
     expect(storage._store.get('flyRegion')).toBeNull();
-    expect(flyClient.createMachine).not.toHaveBeenCalled();
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ region: undefined })
+    );
   });
 
   it('handles volume gone (404) during region check by creating a new volume', async () => {

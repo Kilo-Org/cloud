@@ -381,16 +381,13 @@ export async function createNewMachine(
   if (!onProviderResult) {
     throw new Error('createNewMachine requires a persistence callback');
   }
-  const machineRegion = providerState.region || undefined;
-  if (providerState.volumeId && !machineRegion) {
-    throw new Error(
-      `Cannot create Fly machine for volume ${providerState.volumeId}: missing volume region`
-    );
-  }
+  const machineRegion = providerState.volumeId
+    ? (providerState.region ?? undefined)
+    : (providerState.region ?? envFlyRegion ?? undefined);
 
   const machine = await fly.createMachine(flyConfig, machineConfig, {
     name: state.sandboxId ?? undefined,
-    region: machineRegion ?? envFlyRegion ?? undefined,
+    region: machineRegion,
     minSecretsVersion,
   });
   const nextProviderState = {

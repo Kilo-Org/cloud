@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-q
 import type { KiloChatClient } from '@kilocode/kilo-chat';
 import type {
   Message,
+  ReactionSummary,
   CreateMessageRequest,
   EditMessageRequest,
   DeleteMessageRequest,
@@ -9,6 +10,8 @@ import type {
   MessageUpdatedEvent,
   MessageDeletedEvent,
   MessageDeliveryFailedEvent,
+  ReactionAddedEvent,
+  ReactionRemovedEvent,
 } from '@kilocode/kilo-chat';
 import { useCallback } from 'react';
 
@@ -153,6 +156,109 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
   });
 }
 
+export function useAddReaction(
+  client: KiloChatClient,
+  conversationId: string | null,
+  currentUserId: string
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
+      client.addReaction(messageId, conversationId ?? '', emoji),
+    onMutate: async variables => {
+      if (!conversationId) return;
+      const queryKey = ['kilo-chat', 'messages', conversationId];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData(queryKey);
+      queryClient.setQueryData(queryKey, (old: unknown) => {
+        if (!old || typeof old !== 'object') return old;
+        const data = old as { pages: Message[][]; pageParams: unknown[] };
+        return {
+          ...data,
+          pages: data.pages.map(page =>
+            page.map(msg => {
+              if (msg.id !== variables.messageId) return msg;
+              const existing = msg.reactions.find(r => r.emoji === variables.emoji);
+              if (existing) {
+                if (existing.memberIds.includes(currentUserId)) return msg;
+                return {
+                  ...msg,
+                  reactions: msg.reactions.map(r =>
+                    r.emoji === variables.emoji
+                      ? { ...r, count: r.count + 1, memberIds: [...r.memberIds, currentUserId] }
+                      : r
+                  ),
+                };
+              }
+              return {
+                ...msg,
+                reactions: [
+                  ...msg.reactions,
+                  { emoji: variables.emoji, count: 1, memberIds: [currentUserId] },
+                ],
+              };
+            })
+          ),
+        };
+      });
+      return { previous, queryKey };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
+    },
+  });
+}
+
+export function useRemoveReaction(
+  client: KiloChatClient,
+  conversationId: string | null,
+  currentUserId: string
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
+      client.removeReaction(messageId, conversationId ?? '', emoji),
+    onMutate: async variables => {
+      if (!conversationId) return;
+      const queryKey = ['kilo-chat', 'messages', conversationId];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData(queryKey);
+      queryClient.setQueryData(queryKey, (old: unknown) => {
+        if (!old || typeof old !== 'object') return old;
+        const data = old as { pages: Message[][]; pageParams: unknown[] };
+        return {
+          ...data,
+          pages: data.pages.map(page =>
+            page.map(msg => {
+              if (msg.id !== variables.messageId) return msg;
+              const updated = msg.reactions
+                .map((r: ReactionSummary) =>
+                  r.emoji === variables.emoji
+                    ? {
+                        ...r,
+                        count: r.count - 1,
+                        memberIds: r.memberIds.filter(id => id !== currentUserId),
+                      }
+                    : r
+                )
+                .filter((r: ReactionSummary) => r.count > 0);
+              return { ...msg, reactions: updated };
+            })
+          ),
+        };
+      });
+      return { previous, queryKey };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
+    },
+  });
+}
+
 /**
  * Returns a callback that applies real-time events to the React Query message cache.
  */
@@ -234,6 +340,69 @@ export function useMessageCacheUpdater(conversationId: string | null) {
               ...data,
               pages: data.pages.map(page =>
                 page.map(msg => (msg.id === e.messageId ? { ...msg, deliveryFailed: true } : msg))
+              ),
+            };
+          });
+          break;
+        }
+        case 'reaction.added': {
+          const e = event.data as ReactionAddedEvent;
+          queryClient.setQueryData(queryKey, (old: unknown) => {
+            if (!old || typeof old !== 'object') return old;
+            const data = old as { pages: Message[][]; pageParams: unknown[] };
+            return {
+              ...data,
+              pages: data.pages.map(page =>
+                page.map(msg => {
+                  if (msg.id !== e.messageId) return msg;
+                  const existing = msg.reactions.find(r => r.emoji === e.emoji);
+                  if (existing) {
+                    if (existing.memberIds.includes(e.memberId)) return msg;
+                    return {
+                      ...msg,
+                      reactions: msg.reactions.map(r =>
+                        r.emoji === e.emoji
+                          ? { ...r, count: r.count + 1, memberIds: [...r.memberIds, e.memberId] }
+                          : r
+                      ),
+                    };
+                  }
+                  return {
+                    ...msg,
+                    reactions: [
+                      ...msg.reactions,
+                      { emoji: e.emoji, count: 1, memberIds: [e.memberId] },
+                    ],
+                  };
+                })
+              ),
+            };
+          });
+          break;
+        }
+        case 'reaction.removed': {
+          const e = event.data as ReactionRemovedEvent;
+          queryClient.setQueryData(queryKey, (old: unknown) => {
+            if (!old || typeof old !== 'object') return old;
+            const data = old as { pages: Message[][]; pageParams: unknown[] };
+            return {
+              ...data,
+              pages: data.pages.map(page =>
+                page.map(msg => {
+                  if (msg.id !== e.messageId) return msg;
+                  const updated = msg.reactions
+                    .map(r =>
+                      r.emoji === e.emoji
+                        ? {
+                            ...r,
+                            count: r.count - 1,
+                            memberIds: r.memberIds.filter(id => id !== e.memberId),
+                          }
+                        : r
+                    )
+                    .filter(r => r.count > 0);
+                  return { ...msg, reactions: updated };
+                })
               ),
             };
           });

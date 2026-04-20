@@ -40,7 +40,7 @@ const getVercelModels = createCachedFetch(
       .filter(model => model.type === 'language' && model.endpoints.length > 0)
       .map(model => model.id);
   },
-  60,
+  60_000,
   []
 );
 

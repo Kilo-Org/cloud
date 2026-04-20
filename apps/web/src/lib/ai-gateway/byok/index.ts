@@ -23,7 +23,7 @@ const getVercelMetadataCached = createCachedFetch(
     z
       .record(z.string(), StoredModelSchema)
       .parse(JSON.parse((await redisGet(GATEWAY_METADATA_REDIS_KEYS.vercelModels)) ?? '{}')),
-  60,
+  60_000,
   {}
 );
 

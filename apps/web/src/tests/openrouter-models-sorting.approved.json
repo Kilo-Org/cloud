@@ -703,51 +703,6 @@
       }
     },
     {
-      "id": "arcee-ai/trinity-large-thinking:free",
-      "canonical_slug": "arcee-ai/trinity-large-thinking:free",
-      "hugging_face_id": "",
-      "name": "Arcee AI: Trinity Large Thinking (free)",
-      "created": 1756238927,
-      "description": "A powerful open source reasoning model from Arcee AI. Strong performance in multi-turn tool use, context coherence, and instruction following across long-horizon agent runs in tools like OpenClaw and KiloClaw. **Note:** For the free endpoint, all prompts and output are logged to improve the provider's model and its product and services. Please do not upload any personal, confidential, or otherwise sensitive information.",
-      "context_length": 262144,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.000000000000",
-        "completion": "0.000000000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.000000000000"
-      },
-      "top_provider": {
-        "context_length": 262144,
-        "max_completion_tokens": 262144,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "default_parameters": {},
-      "isFree": true,
-      "opencode": {}
-    },
-    {
       "id": "kilo-auto/small",
       "name": "Kilo Auto Small",
       "created": 0,

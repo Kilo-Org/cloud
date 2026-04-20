@@ -1,16 +1,19 @@
 process.env.STRIPE_KILOCLAW_COMMIT_PRICE_ID ||= 'price_commit';
 process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID ||= 'price_standard';
 process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
+process.env.KILOCLAW_API_URL ||= 'https://claw.test';
+process.env.KILOCLAW_INTERNAL_API_SECRET ||= 'test-secret';
 
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { createCallerFactory } from '@/lib/trpc/init';
-import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
+  kiloclaw_subscription_change_log,
+  kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -20,6 +23,7 @@ type AnyMock = jest.Mock<(...args: any[]) => any>;
 type KiloClawClientMock = {
   KiloClawInternalClient: AnyMock;
   __getStatusMock: AnyMock;
+  __destroyMock: AnyMock;
 };
 
 jest.mock('@/lib/stripe-client', () => {
@@ -60,11 +64,23 @@ jest.mock('next/headers', () => {
   };
 });
 
+jest.mock('@/lib/config.server', () => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+  const actual = jest.requireActual<typeof import('@/lib/config.server')>('@/lib/config.server');
+  return {
+    ...actual,
+    KILOCLAW_API_URL: 'https://claw.test',
+    KILOCLAW_INTERNAL_API_SECRET: 'test-secret',
+  };
+});
+
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const getStatusMock = jest.fn();
+  const destroyMock = jest.fn();
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       getStatus: getStatusMock,
+      destroy: destroyMock,
     })),
     KiloClawApiError: class KiloClawApiError extends Error {
       statusCode: number;
@@ -76,19 +92,30 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       }
     },
     __getStatusMock: getStatusMock,
+    __destroyMock: destroyMock,
   };
 });
 
-const createCaller = createCallerFactory(kiloclawRouter);
+let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) => {
+  getStatus: () => Promise<unknown>;
+  cycleInboundEmailAddress: () => Promise<{ inboundEmailAddress: string }>;
+  destroy: () => Promise<{ ok: true }>;
+};
 const kiloclawClientMock = jest.requireMock<KiloClawClientMock>(
   '@/lib/kiloclaw/kiloclaw-internal-client'
 );
+
+beforeAll(async () => {
+  const mod = await import('@/routers/kiloclaw-router');
+  createCaller = createCallerFactory(mod.kiloclawRouter);
+});
 
 describe('kiloclawRouter getStatus', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
     kiloclawClientMock.KiloClawInternalClient.mockClear();
     kiloclawClientMock.__getStatusMock.mockReset();
+    kiloclawClientMock.__destroyMock.mockReset();
   });
 
   it('returns a no-instance sentinel without querying the legacy worker path', async () => {
@@ -127,7 +154,7 @@ describe('kiloclawRouter getStatus', () => {
       botNature: null,
       botVibe: null,
       botEmoji: null,
-      workerUrl: 'https://claw.kilo.ai',
+      workerUrl: 'https://claw.test',
       name: null,
       instanceId: null,
       inboundEmailAddress: null,
@@ -160,5 +187,81 @@ describe('kiloclawRouter getStatus', () => {
       .where(eq(kiloclaw_inbound_email_aliases.instance_id, instanceId));
     expect(rows.find(row => row.alias === alias)?.retired_at).not.toBeNull();
     expect(rows.filter(row => row.retired_at === null)).toHaveLength(1);
+  });
+});
+
+describe('kiloclawRouter destroy', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.KiloClawInternalClient.mockClear();
+    kiloclawClientMock.__destroyMock.mockReset();
+    kiloclawClientMock.__destroyMock.mockResolvedValue({ ok: true });
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+  });
+
+  it('clears subscription destruction lifecycle and writes changelog', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-destroy-test-${Math.random()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'standard',
+      status: 'active',
+      suspended_at: '2026-04-10T00:00:00.000Z',
+      destruction_deadline: '2026-04-12T00:00:00.000Z',
+    });
+
+    const caller = createCaller({ user });
+    const result = await caller.destroy();
+
+    expect(result).toEqual({ ok: true });
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, instanceId))
+      .limit(1);
+
+    expect(subscription.suspended_at).toBeNull();
+    expect(subscription.destruction_deadline).toBeNull();
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toEqual(
+      expect.objectContaining({
+        actor_type: 'user',
+        actor_id: user.id,
+        action: 'status_changed',
+        reason: 'instance_destroyed',
+      })
+    );
+    expect(logs[0]?.before_state).toEqual(
+      expect.objectContaining({
+        suspended_at: expect.stringContaining('2026-04-10'),
+        destruction_deadline: expect.stringContaining('2026-04-12'),
+      })
+    );
+    expect(logs[0]?.after_state).toEqual(
+      expect.objectContaining({
+        suspended_at: null,
+        destruction_deadline: null,
+      })
+    );
   });
 });

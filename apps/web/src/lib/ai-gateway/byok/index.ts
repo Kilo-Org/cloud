@@ -1,6 +1,6 @@
-import { readDb, type db } from '@/lib/drizzle';
-import { byok_api_keys, modelsByProvider } from '@kilocode/db/schema';
-import { eq, and, inArray, desc } from 'drizzle-orm';
+import { type db } from '@/lib/drizzle';
+import { byok_api_keys } from '@kilocode/db/schema';
+import { eq, and, inArray } from 'drizzle-orm';
 import type { EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -10,43 +10,42 @@ import {
   type UserByokProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
-import { unstable_cache } from 'next/cache';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
+import { redisGet } from '@/lib/redis';
+import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
+import { StoredModelSchema } from '@kilocode/db';
+import * as z from 'zod';
+import { createCachedFetch } from '@/lib/cached-fetch';
 
-const getModelUserByokProviders_cached = unstable_cache(
-  async (modelId: string) => {
-    const vercelModelMetadata = (
-      await readDb
-        .select({ vercel: modelsByProvider.vercel })
-        .from(modelsByProvider)
-        .orderBy(desc(modelsByProvider.id))
-        .limit(1)
-    ).at(0)?.vercel;
-    if (!vercelModelMetadata) {
-      console.error('[getModelUserByokProviders_cached] no Vercel model metadata in the database');
-      return [];
-    }
-    const providers =
-      vercelModelMetadata[mapModelIdToVercel(modelId)]?.endpoints
-        .map(ep => VercelUserByokInferenceProviderIdSchema.safeParse(ep.tag).data)
-        .filter(providerId => providerId !== undefined) ?? [];
-    if (providers.length === 0) {
-      console.debug(`[getModelUserByokProviders_cached] no user byok providers for ${modelId}`);
-      return [];
-    }
-    console.debug(
-      `[getModelUserByokProviders_cached] found user byok providers for ${modelId}`,
-      providers
-    );
-    return providers;
-  },
-  undefined,
-  { revalidate: 300 }
+const getVercelMetadataCached = createCachedFetch(
+  async () =>
+    z
+      .record(z.string(), StoredModelSchema)
+      .parse(JSON.parse((await redisGet(GATEWAY_METADATA_REDIS_KEYS.vercelModels)) ?? '{}')),
+  60_000,
+  {}
 );
 
-export async function getModelUserByokProviders(model: string): Promise<UserByokProviderId[]> {
-  return isCodestralModel(model) ? ['codestral'] : await getModelUserByokProviders_cached(model);
+export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
+  if (isCodestralModel(modelId)) {
+    return ['codestral'];
+  }
+  const vercelModelMetadata = await getVercelMetadataCached();
+  if (Object.keys(vercelModelMetadata).length == 0) {
+    console.error('[getModelUserByokProviders] no Vercel model metadata in the database');
+    return [];
+  }
+  const providers =
+    vercelModelMetadata[mapModelIdToVercel(modelId)]?.endpoints
+      .map(ep => VercelUserByokInferenceProviderIdSchema.safeParse(ep.tag).data)
+      .filter(providerId => providerId !== undefined) ?? [];
+  if (providers.length === 0) {
+    console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
+    return [];
+  }
+  console.debug(`[getModelUserByokProviders] found user byok providers for ${modelId}`, providers);
+  return providers;
 }
 
 export function decryptByokRow({

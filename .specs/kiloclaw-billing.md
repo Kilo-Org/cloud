@@ -96,10 +96,14 @@ multiple instances, each with its own subscription and renewal cycle.
 All subscriptions deduct from the same user credit balance.
 
 New users who provision an instance without subscribing first
-automatically receive a 7-day free trial. A legacy earlybird purchase
-also grants access until a fixed expiry date. A periodic background job
-enforces expiry, credit renewal, suspension, and eventual instance
-destruction when access lapses, with email notifications at each stage.
+automatically receive a 7-day free trial. Legacy
+`kiloclaw_earlybird_purchases` rows without canonical subscription rows
+MUST NOT mint fresh trial access and instead require manual
+remediation. Canonical earlybird subscription rows continue to grant
+access until their recorded expiry.
+A periodic background job enforces expiry, credit renewal, suspension,
+and eventual instance destruction when access lapses, with email
+notifications at each stage.
 
 ## Rules
 
@@ -114,8 +118,11 @@ destruction when access lapses, with email notifications at each stage.
 5. The system MUST enforce at most one subscription record per
    instance. Each subscription MUST reference the instance it funds.
    A user MAY have multiple instances, each with its own subscription.
-6. The user-visible price for each plan MUST be identical regardless
-   of payment source.
+6. The base user-visible price for each plan MUST be identical
+   regardless of payment source. Payment-provider-native promotions,
+   coupons, or other checkout-side adjustments are excluded from this
+   parity rule and are governed by the payment-source-specific rules
+   below.
 7. Stripe-funded billing MUST use configured payment-provider price
    identifiers. Credit-funded billing MUST use internal microdollar
    amounts that correspond to the same plan prices.
@@ -123,18 +130,30 @@ destruction when access lapses, with email notifications at each stage.
    configuration for the selected plan is missing. For Stripe-funded
    billing this includes the payment-provider price identifier.
 9. Each plan MUST support two payment sources: payment-provider
-   (Stripe) and credits. Plan pricing, access rules, failure handling,
-   and suspension/destruction timelines MUST be identical regardless
-   of payment source. The payment mechanism and the internal
-   implementation of plan switching and cancellation differ by payment
-   source (see Plan Switching and Cancellation and Reactivation).
+   (Stripe) and credits. Base plan pricing, built-in first-period
+   pricing defined by this spec, access rules, failure handling, and
+   suspension/destruction timelines MUST be identical regardless of
+   payment source. Payment-provider-native promotions, coupons, and
+   checkout-side adjustments MAY differ by payment source. The payment
+   mechanism and the internal implementation of plan switching and
+   cancellation differ by payment source (see Plan Switching and
+   Cancellation and Reactivation).
 
 ### Payment Sources
 
+The rules in this section govern paid self-service KiloClaw
+subscription rows. Trial rows are temporary bootstrap rows and are
+exempt from the paid funding invariants in rules 2 and 3. Current
+organizational bootstrap rows that grant temporary `managed-active`
+access before org billing launches are also outside these funding
+invariants; they remain a temporary carveout until org billing
+integration ships.
+
 1. The system MUST record a payment source for each subscription. The
    value MUST be either `stripe` or `credits`.
-2. The system MUST enforce exactly three valid combinations of payment
-   source and payment provider subscription ID:
+2. For paid self-service rows, the system MUST enforce exactly three
+   valid combinations of payment source and payment provider
+   subscription ID:
 
    | State         | payment_source | provider subscription ID |
    | ------------- | -------------- | ------------------------ |
@@ -148,8 +167,9 @@ destruction when access lapses, with email notifications at each stage.
    (hybrid) or a null one (pure credit). No other combination is
    valid.
 
-3. A subscription with payment source `credits` MUST record a credit
-   renewal timestamp indicating when the next credit deduction is due.
+3. A paid self-service subscription with payment source `credits`
+   MUST record a credit renewal timestamp indicating when the next
+   credit deduction is due.
 4. At most one subscription record per instance is allowed regardless
    of payment source (see Plans rule 5).
 5. User-initiated switching between payment sources is not supported
@@ -211,10 +231,10 @@ rules resolve conflicts.
    instance for the first time. There is no user-facing "start trial"
    action; the trial is bootstrapped during provisioning.
 2. The system MUST create a trial only if the user has no existing
-   subscription record and no earlybird purchase. The instance-record
-   check is not needed at provisioning time because provisioning itself
-   creates the instance, but the billing status endpoint includes the
-   instance check as defense in depth.
+   subscription record. The instance-record check is not needed at
+   provisioning time because provisioning itself creates the instance,
+   but the billing status endpoint includes the instance check as
+   defense in depth.
 3. When a trial is created, the system MUST record the trial start
    timestamp and an end timestamp exactly 7 days later.
 4. The system MUST NOT require a credit card to start a trial.
@@ -260,8 +280,8 @@ rules resolve conflicts.
    and the subscription has not been suspended.
 3. The system MUST grant access when the subscription status is trialing
    and the trial end date is in the future.
-4. The system MUST grant access when the user holds a legacy earlybird
-   purchase and the earlybird expiry date is in the future.
+4. The system MUST grant access when a canonical earlybird subscription
+   row remains in an access-granting state.
 5. When earlybird access expires, the system MUST NOT automatically
    transition the user to a trial or any other plan; the user MUST
    manually subscribe to regain access.
@@ -282,9 +302,15 @@ rules resolve conflicts.
    customer before creating a new checkout session, to guard against
    concurrent checkouts. This check does not cover provider-side
    subscriptions in past-due status.
-4. The system MUST NOT allow promotional codes for either plan.
-5. The system MUST apply a provider-configured first-month discount
-   coupon when creating a standard plan checkout session.
+4. The system MUST allow payment-provider promotional codes for either
+   plan. These promotions are payment-provider-native checkout
+   adjustments and do not require an equivalent user-entered mechanism
+   in the credit-enrollment flow.
+5. The system MUST apply the configured first-month discount when
+   creating a standard plan checkout session without consuming the
+   promotional-code input. The implementation MAY use a dedicated
+   intro price or another provider-supported mechanism that keeps
+   user-entered promotional codes available.
 6. When a configurable billing start date is set and is in the future,
    the system MUST create the subscription with a delayed billing period
    that begins on that date.
@@ -315,10 +341,11 @@ rules resolve conflicts.
 2. The system MUST allow credit enrollment when the existing
    subscription status is trialing or canceled.
 3. The system MUST apply a first-month discounted price when enrolling
-   in the standard plan via credits, identical to the Stripe-configured
-   first-month discount (see Subscription Checkout rule 5). The
-   discounted cost is 4,000,000 microdollars. A user qualifies for the
-   discount when no prior paid subscription exists; a canceled trial
+   in the standard plan via credits, identical to the built-in Stripe
+   first-month discount defined in Subscription Checkout rule 5. This
+   rule does not attempt to mirror user-entered payment-provider promo
+   codes. The discounted cost is 4,000,000 microdollars. A user
+   qualifies for the discount when no prior paid subscription exists; a canceled trial
    subscription (plan = 'trial') MUST NOT count as a prior paid
    subscription. When the user has a canceled non-trial subscription,
    the system MUST charge the regular standard price of 9,000,000
@@ -495,7 +522,7 @@ rows renew.
 4. The deduction amount MUST equal the settled invoice amount. The
    system MUST NOT substitute locally defined plan cost constants.
    Payment-provider-side adjustments (first-month discounts,
-   prorations) flow through as-is.
+   promotional codes, coupons, prorations) flow through as-is.
 5. Settlement MUST be idempotent. Processing the same invoice twice
    MUST NOT produce duplicate credits or duplicate deductions.
 6. On successful settlement the system MUST:
@@ -796,11 +823,15 @@ rows renew.
 
 ### Earlybird Expiry Warnings
 
-1. When the earlybird expiry date is 14 or fewer days away, the system
-   MUST send a warning notification to earlybird users who do not have
-   an active or trialing subscription.
-2. When the earlybird expiry date is 1 or fewer days away, the system
-   MUST send a more urgent expires-tomorrow notification.
+1. When a canonical earlybird subscription row's `trial_ends_at` is 14
+   or fewer days away and the user does not have another active or
+   trialing subscription, the system MUST send a warning notification.
+2. When the row's `trial_ends_at` is 1 or fewer days away, the system
+   MUST send a more urgent expires-tomorrow notification instead of
+   the 14-day notification.
+3. The notification's expiry date and days-remaining MUST be derived
+   from the row's `trial_ends_at`, not from a globally configured
+   earlybird expiry constant.
 
 ### Trial Expiry Enforcement
 
@@ -924,7 +955,7 @@ rows renew.
    earlybird).
 2. The system MUST report trial eligibility as true only when the user
    has no instance records at all (including destroyed instances), no
-   subscription record, and no earlybird purchase.
+   subscription record.
 3. The billing status MUST include trial data (start, end, days
    remaining, expired flag) when a trial exists or existed.
 4. The billing status MUST include subscription data (plan, status,
@@ -952,7 +983,7 @@ rows renew.
    indicator signaling that the standalone-to-credit conversion
    prompt should be shown (see Standalone-to-Credit Conversion).
 8. The billing status MUST include earlybird data (expiry date, days
-   remaining) when the user has an earlybird purchase.
+   remaining) only when a canonical earlybird subscription row exists.
 9. The billing status MUST include instance data (whether an
    undestroyed instance exists, suspension timestamp, destruction
    deadline, and destroyed flag) when any instance record exists.
@@ -973,11 +1004,18 @@ rows renew.
 
 ### User Data Deletion
 
-1. When a user is soft-deleted, the system MUST delete all subscription
-   records for that user.
-2. When a user is soft-deleted, the system MUST delete all email
-   notification log entries for that user.
-3. Credit transaction records created by subscription deductions are
+1. When a user is soft-deleted, the system MUST retain
+   `kiloclaw_instance` and `kiloclaw_subscription` rows for that
+   user. Ownership references and directly identifying user fields
+   MUST be anonymized rather than deleted.
+2. When a user is soft-deleted, the system MUST retain subscription
+   change-log rows as canonical audit history. Any directly
+   identifying actor or ownership fields in those rows MUST be
+   anonymized while preserving the audit trail's meaning.
+3. When a user is soft-deleted, the system MUST delete auxiliary
+   KiloClaw billing records whose purpose is operational rather than
+   canonical state, such as email notification log entries.
+4. Credit transaction records created by subscription deductions are
    managed by the credit system's own data deletion rules, not by
    KiloClaw billing. This spec does not impose additional deletion
    requirements on credit transaction records.
@@ -1063,7 +1101,8 @@ Previous values:
 New values:
 
 - Trial duration: 7 days (existing trials keep their original end date)
-- Standard plan: $9/month with $4 first month via coupon, no promotional codes
+- Standard plan: $9/month with $4 first month while still allowing
+  promotional codes
 - Commit plan: $48/6 months
 - Trial expiry warning: 2 days before expiry
 - 14 existing subscribers migrated to new pricing at next billing cycle

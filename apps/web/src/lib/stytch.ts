@@ -3,8 +3,8 @@ import type { FraudFingerprintLookupResponse } from 'stytch';
 import { Client, envs } from 'stytch';
 import { db } from '@/lib/drizzle';
 import type { User } from '@kilocode/db/schema';
-import { stytch_fingerprints } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { kilocode_users, stytch_fingerprints } from '@kilocode/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
 import { getFraudDetectionHeaders } from './utils';
 import { captureException } from '@sentry/nextjs';
 import { updateStytchValidation } from './customerInfo';
@@ -146,6 +146,19 @@ export async function saveFingerprints(
     ...user,
     has_validation_stytch: kilo_free_tier_allowed,
   });
+
+  // Autoban users blocked by Stytch for smart rate limit abuse
+  if (verdict.action === 'BLOCK' && verdict.reasons.includes('SMART_RATE_LIMIT_BANNED')) {
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'autoban: stytch SMART_RATE_LIMIT_BANNED' })
+      .where(and(eq(kilocode_users.id, user.id), isNull(kilocode_users.blocked_reason)));
+    if (process.env.NODE_ENV !== 'test')
+      console.log('SECURITY: autobanned user for SMART_RATE_LIMIT_BANNED:', {
+        userId: user.id,
+        email: user.google_user_email,
+      });
+  }
 
   // User created event in PostHog
   try {

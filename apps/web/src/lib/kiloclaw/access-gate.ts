@@ -4,8 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
-import { kiloclaw_earlybird_purchases, kiloclaw_instances } from '@kilocode/db/schema';
-import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
+import { kiloclaw_instances } from '@kilocode/db/schema';
 import {
   getCurrentPersonalKiloClawSubscriptionForUser,
   getKiloClawSubscriptionAccessReason,
@@ -15,7 +14,7 @@ import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-pe
 import { baseProcedure } from '@/lib/trpc/init';
 
 /**
- * Check whether a user has active KiloClaw access via subscription, trial, or earlybird.
+ * Check whether a user has active KiloClaw access via subscription or trial.
  * Throws TRPCError FORBIDDEN if the user has no valid access.
  */
 export async function requireKiloClawAccess(userId: string): Promise<void> {
@@ -49,17 +48,6 @@ export async function requireKiloClawAccess(userId: string): Promise<void> {
     throw error;
   }
 
-  // 2. Earlybird not expired
-  const [earlybird] = await db
-    .select({ id: kiloclaw_earlybird_purchases.id })
-    .from(kiloclaw_earlybird_purchases)
-    .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
-    .limit(1);
-
-  if (earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now) {
-    return;
-  }
-
   console.warn(
     JSON.stringify({
       event: 'kiloclaw_access_denied',
@@ -74,13 +62,12 @@ export async function requireKiloClawAccess(userId: string): Promise<void> {
           }
         : 'none',
       accessReason,
-      earlybirdFound: !!earlybird,
     })
   );
 
   throw new TRPCError({
     code: 'FORBIDDEN',
-    message: 'KiloClaw access requires an active subscription, trial, or earlybird purchase.',
+    message: 'KiloClaw access requires an active subscription or trial.',
   });
 }
 
@@ -137,19 +124,9 @@ export async function requireKiloClawAccessAtInstance(
     throw error;
   }
 
-  const [earlybird] = await db
-    .select({ id: kiloclaw_earlybird_purchases.id })
-    .from(kiloclaw_earlybird_purchases)
-    .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
-    .limit(1);
-
-  if (earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now) {
-    return;
-  }
-
   throw new TRPCError({
     code: 'FORBIDDEN',
-    message: 'KiloClaw access requires an active subscription, trial, or earlybird purchase.',
+    message: 'KiloClaw access requires an active subscription or trial.',
   });
 }
 

@@ -1,8 +1,17 @@
+import {
+  markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  type KiloClawSubscriptionChangeActor,
+} from '@kilocode/db';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { kilocode_users, kiloclaw_access_codes, kiloclaw_instances } from '@kilocode/db/schema';
 import { eq, and, isNull, gt, sql } from 'drizzle-orm';
 
 export { getWorkerDb, type WorkerDb };
+
+const KILOCLAW_WORKER_DESTROY_ACTOR = {
+  actorType: 'system',
+  actorId: 'kiloclaw-worker',
+} satisfies KiloClawSubscriptionChangeActor;
 
 export async function findPepperByUserId(db: WorkerDb, userId: string) {
   const row = await db
@@ -153,14 +162,32 @@ export async function getInstanceByIdIncludingDestroyed(
 }
 
 export async function markInstanceDestroyed(db: WorkerDb, userId: string, sandboxId: string) {
-  await db
-    .update(kiloclaw_instances)
-    .set({ destroyed_at: sql`NOW()` })
-    .where(
-      and(
-        eq(kiloclaw_instances.user_id, userId),
-        eq(kiloclaw_instances.sandbox_id, sandboxId),
-        isNull(kiloclaw_instances.destroyed_at)
+  await db.transaction(async tx => {
+    const row = await tx
+      .select({
+        id: kiloclaw_instances.id,
+      })
+      .from(kiloclaw_instances)
+      .where(
+        and(
+          eq(kiloclaw_instances.user_id, userId),
+          eq(kiloclaw_instances.sandbox_id, sandboxId),
+          isNull(kiloclaw_instances.destroyed_at)
+        )
       )
-    );
+      .limit(1)
+      .then(rows => rows[0] ?? null);
+
+    if (!row) {
+      return;
+    }
+
+    await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+      actor: KILOCLAW_WORKER_DESTROY_ACTOR,
+      executor: tx,
+      instanceId: row.id,
+      reason: 'destroy_path_inline_collapse',
+      userId,
+    });
+  });
 }

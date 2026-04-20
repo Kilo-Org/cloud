@@ -1,10 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
-import {
-  kiloclaw_earlybird_purchases,
-  kiloclaw_subscriptions,
-  type KiloClawSubscription,
-} from '@kilocode/db/schema';
+import { kiloclaw_subscriptions, type KiloClawSubscription } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 import {
@@ -13,9 +9,10 @@ import {
 } from '@/lib/kiloclaw/current-personal-subscription';
 
 export type KiloClawAccessReason = 'trial' | 'subscription' | 'earlybird';
+export type KiloClawActivationState = 'pending_settlement' | 'activated';
 export type KiloClawSubscriptionAccessRecord = Pick<
   KiloClawSubscription,
-  'status' | 'trial_ends_at' | 'suspended_at' | 'access_origin'
+  'status' | 'trial_ends_at' | 'suspended_at' | 'access_origin' | 'payment_source'
 >;
 export type KiloClawEarlybirdState = {
   purchased: boolean;
@@ -48,11 +45,22 @@ function subscriptionRecency(subscription: KiloClawSubscription): number {
   );
 }
 
+export function getKiloClawSubscriptionActivationState(
+  subscription: Pick<KiloClawSubscription, 'payment_source' | 'status'> | null | undefined
+): KiloClawActivationState {
+  if (subscription?.payment_source === 'stripe' && subscription.status === 'active') {
+    return 'pending_settlement';
+  }
+
+  return 'activated';
+}
+
 export function getKiloClawSubscriptionAccessReason(
   subscription: KiloClawSubscriptionAccessRecord | null | undefined,
   now = new Date()
 ): KiloClawAccessReason | null {
   if (!subscription) return null;
+  if (getKiloClawSubscriptionActivationState(subscription) === 'pending_settlement') return null;
   if (subscription.status === 'active') return 'subscription';
   if (subscription.status === 'past_due' && !subscription.suspended_at) return 'subscription';
   if (
@@ -126,20 +134,6 @@ export async function getKiloClawEarlybirdStateForUser(
       purchased: true,
       hasAccess: getKiloClawSubscriptionAccessReason(subscription, now) === 'earlybird',
       expiresAt: subscription?.trial_ends_at ?? KILOCLAW_EARLYBIRD_EXPIRY_DATE,
-    };
-  }
-
-  const [legacyPurchase] = await db
-    .select({ createdAt: kiloclaw_earlybird_purchases.created_at })
-    .from(kiloclaw_earlybird_purchases)
-    .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
-    .limit(1);
-
-  if (legacyPurchase) {
-    return {
-      purchased: true,
-      hasAccess: new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now,
-      expiresAt: KILOCLAW_EARLYBIRD_EXPIRY_DATE,
     };
   }
 

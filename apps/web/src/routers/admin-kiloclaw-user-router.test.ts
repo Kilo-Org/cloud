@@ -3,7 +3,6 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   kiloclaw_admin_audit_logs,
-  kiloclaw_earlybird_purchases,
   kiloclaw_subscription_change_log,
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -191,28 +190,6 @@ describe('admin.users.getKiloClawState', () => {
       })
     );
     expect(result.subscriptions).toHaveLength(1);
-  });
-
-  it('returns earlybird access from legacy purchase row before backfill', async () => {
-    await db.insert(kiloclaw_earlybird_purchases).values({
-      user_id: targetUser.id,
-      stripe_charge_id: `ch_${crypto.randomUUID().replace(/-/g, '')}`,
-      amount_cents: 9900,
-    });
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
-
-    expect(result.subscription).toBeNull();
-    expect(result.hasAccess).toBe(true);
-    expect(result.accessReason).toBe('earlybird');
-    expect(result.earlybird).toEqual(
-      expect.objectContaining({
-        purchased: true,
-        expiresAt: expect.any(String),
-        daysRemaining: expect.any(Number),
-      })
-    );
   });
 
   it('returns activeInstanceId when the user has an active instance', async () => {

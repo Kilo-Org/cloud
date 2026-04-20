@@ -266,7 +266,7 @@ export function MessageArea({
         {showScrollButton && (
           <button
             onClick={scrollToBottom}
-            className="bg-muted hover:bg-accent border-border absolute bottom-8 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border shadow-md cursor-pointer transition-colors"
+            className="bg-muted hover:bg-accent border-border absolute bottom-16 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border shadow-md cursor-pointer transition-colors"
             title="Scroll to bottom"
           >
             <ArrowDown className="h-4 w-4" />

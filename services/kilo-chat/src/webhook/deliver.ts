@@ -1,3 +1,5 @@
+import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
+
 type KiloclawBinding = Fetcher & {
   deliverChatWebhook(payload: WebhookPayload & { targetBotId: string }): Promise<void>;
 };
@@ -69,6 +71,20 @@ export async function deliverToBot(
   );
   try {
     await convStub.notifyDeliveryFailed(msg.messageId, msg.from);
+
+    // Push delivery_failed event to human members
+    const convContext = await getConversationContext(env, msg.conversationId);
+    if (convContext?.sandboxId) {
+      await pushEventToHumanMembers(
+        env,
+        msg.conversationId,
+        convContext.sandboxId,
+        convContext.humanMemberIds,
+        undefined,
+        'message.delivery_failed',
+        { messageId: msg.messageId }
+      );
+    }
   } catch (err) {
     console.error('Failed to notify delivery failure:', err);
   }

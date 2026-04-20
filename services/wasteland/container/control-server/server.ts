@@ -245,34 +245,53 @@ async function runDolt(args: string[], cwd?: string): Promise<ExecResult> {
   return { stdout, stderr, exitCode };
 }
 
-function getDoltClonePath(): string | null {
-  const upstream = process.env.WL_UPSTREAM;
-  if (!upstream) return null;
-  return `/root/.local/share/wasteland/${upstream}`;
-}
+// ---------------------------------------------------------------------------
+// DoltHub SQL API — queries the upstream database via REST (no local clone)
+// ---------------------------------------------------------------------------
 
-async function doltSql(
-  query: string
+const DOLTHUB_API_BASE = 'https://www.dolthub.com/api/v1alpha1';
+
+async function dolthubSql(
+  upstream: string,
+  query: string,
+  token: string
 ): Promise<{ rows: Record<string, unknown>[]; error?: string }> {
-  const clonePath = getDoltClonePath();
-  if (!clonePath) return { rows: [], error: 'No upstream configured' };
+  const url = `${DOLTHUB_API_BASE}/${upstream}/main?q=${encodeURIComponent(query)}`;
 
-  const result = await runDolt(['sql', '-q', query, '--result-format', 'json'], clonePath);
-  if (result.exitCode !== 0) {
-    return { rows: [], error: result.stderr || result.stdout };
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { authorization: `token ${token}` },
+    });
+  } catch (err) {
+    return {
+      rows: [],
+      error: `DoltHub API fetch failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    return { rows: [], error: `DoltHub API ${res.status}: ${body.slice(0, 300)}` };
   }
 
   try {
-    const parsed: unknown = JSON.parse(result.stdout);
-    // dolt sql --result-format json returns { rows: [...] }
-    const obj = z.object({ rows: z.array(z.record(z.string(), z.unknown())) }).safeParse(parsed);
-    if (obj.success) return { rows: obj.data.rows };
-    // Some versions return an array directly
-    const arr = z.array(z.record(z.string(), z.unknown())).safeParse(parsed);
+    const data: unknown = await res.json();
+    // DoltHub REST API returns { query_execution_status: "Success", ..., rows: [...] }
+    const parsed = z
+      .object({ rows: z.array(z.record(z.string(), z.unknown())) })
+      .passthrough()
+      .safeParse(data);
+    if (parsed.success) return { rows: parsed.data.rows };
+    // Fallback: maybe the response is just an array
+    const arr = z.array(z.record(z.string(), z.unknown())).safeParse(data);
     if (arr.success) return { rows: arr.data };
-    return { rows: [], error: 'Unexpected dolt sql output format' };
+    return {
+      rows: [],
+      error: `Unexpected DoltHub API response format: ${JSON.stringify(data).slice(0, 300)}`,
+    };
   } catch {
-    return { rows: [], error: `Failed to parse dolt sql output: ${result.stdout.slice(0, 200)}` };
+    return { rows: [], error: 'Failed to parse DoltHub API response' };
   }
 }
 
@@ -439,27 +458,27 @@ async function handleBrowse(req: Request): Promise<Response> {
 
   await ensureInit();
 
-  // First sync with upstream to get latest data
-  const env = buildEnv(token, body.data.upstream);
-  await execWl(['sync'], env);
-
-  // Query dolt directly for full wanted board data
-  const result = await doltSql(
+  // Query the upstream wanted board directly via DoltHub SQL API.
+  // The wl CLI defaults to remote mode (DoltHub REST API) — there is no
+  // local dolt clone to query, so we hit the API directly.
+  const result = await dolthubSql(
+    body.data.upstream,
     `SELECT id, title, description, project, type, priority, tags,
             posted_by, claimed_by, status, effort_level, evidence_url,
             sandbox_required, sandbox_scope, sandbox_min_tier,
             created_at, updated_at
      FROM wanted
-     ORDER BY priority ASC, created_at DESC`
+     ORDER BY priority ASC, created_at DESC`,
+    token
   );
 
   if (result.error) {
-    log.error('dolt sql browse failed', { error: result.error });
+    log.error('dolthub sql browse failed', { error: result.error });
     return errorResponse(`Browse query failed: ${result.error}`, 502);
   }
 
   lastOperationTimestamp = new Date().toISOString();
-  log.info('browse completed via dolt sql', { itemCount: result.rows.length });
+  log.info('browse completed via dolthub api', { itemCount: result.rows.length });
   return jsonResponse({ items: result.rows });
 }
 

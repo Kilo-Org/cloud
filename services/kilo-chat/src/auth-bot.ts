@@ -55,7 +55,7 @@ export const botAuthMiddleware = createMiddleware<{
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
-  const secret = c.env.GATEWAY_TOKEN_SECRET;
+  const secret = await c.env.GATEWAY_TOKEN_SECRET.get();
   if (!secret) {
     return c.json({ error: 'Configuration error' }, 503);
   }

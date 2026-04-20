@@ -15,8 +15,12 @@ function createApp() {
   return app;
 }
 
+function mockSecret(value: string | undefined) {
+  return { get: () => Promise.resolve(value ?? null) };
+}
+
 function mockEnv(overrides: Partial<Env> = {}): Env {
-  return { GATEWAY_TOKEN_SECRET: SECRET, ...overrides } as unknown as Env;
+  return { GATEWAY_TOKEN_SECRET: mockSecret(SECRET), ...overrides } as unknown as Env;
 }
 
 describe('botAuthMiddleware', () => {
@@ -48,7 +52,9 @@ describe('botAuthMiddleware', () => {
         method: 'POST',
         headers: { authorization: 'Bearer some-token' },
       }),
-      mockEnv({ GATEWAY_TOKEN_SECRET: undefined as unknown as string })
+      mockEnv({
+        GATEWAY_TOKEN_SECRET: mockSecret(undefined) as unknown as Env['GATEWAY_TOKEN_SECRET'],
+      })
     );
     expect(res.status).toBe(503);
   });

@@ -12,7 +12,7 @@ const SECRET = 'test-gateway-secret';
 
 /** Build an env that has all DO bindings from the test harness plus the secret. */
 function makeEnv(): Env {
-  return { ...env, GATEWAY_TOKEN_SECRET: SECRET } as Env;
+  return { ...env, GATEWAY_TOKEN_SECRET: { get: () => Promise.resolve(SECRET) } } as unknown as Env;
 }
 
 /** App with bot auth middleware + bot routes. Also registers conversation + message

@@ -57,11 +57,9 @@ export async function posthogQuery(name: string, query: string): Promise<PostHog
     body: await response.json(),
   };
 }
+
 const CACHE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
 
-// `name` is used directly as the Redis cache key suffix, so each call site must
-// use a globally unique `name`. Reusing a name for a different query would
-// return stale/incorrect cached data.
 export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
   const parse = (name: string, raw: unknown): Output[] => {
     const result = schema.safeParse(raw);
@@ -74,13 +72,9 @@ export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
   return async (name: string, query: string): Promise<Output[]> => {
     const key = `posthog-query:${name}`;
 
-    try {
-      const cached = await redisGet(key);
-      if (cached !== null) {
-        return parse(name, JSON.parse(cached));
-      }
-    } catch (err) {
-      console.warn(`[cachedPosthogQuery] ${name} redis get failed, falling through`, err);
+    const cached = await redisGet(key);
+    if (cached !== null) {
+      return parse(name, JSON.parse(cached));
     }
 
     const startTime = performance.now();
@@ -93,11 +87,7 @@ export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
       `[cachedPosthogQuery] ${name} returned ${data.length} rows in ${performance.now() - startTime}ms`
     );
 
-    try {
-      await redisSet(key, JSON.stringify(response.body.results), CACHE_TTL_SECONDS);
-    } catch (err) {
-      console.warn(`[cachedPosthogQuery] ${name} redis set failed`, err);
-    }
+    await redisSet(key, JSON.stringify(response.body.results), CACHE_TTL_SECONDS);
 
     return data;
   };

@@ -190,6 +190,50 @@ describe('createPreviewStream', () => {
     }
   });
 
+  it('first POST includes inReplyToMessageId when provided', async () => {
+    const { client, createMessage } = makeClientSpies();
+    const stream = createPreviewStream({
+      client,
+      conversationId: 'c1',
+      throttleMs: 100,
+      inReplyToMessageId: 'parent-msg-1',
+    });
+    await stream.finalize('Hello');
+    expect(createMessage).toHaveBeenCalledWith({
+      conversationId: 'c1',
+      content: [{ type: 'text', text: 'Hello' }],
+      inReplyToMessageId: 'parent-msg-1',
+    });
+  });
+
+  it('first update POST includes inReplyToMessageId, subsequent PATCHes do not', async () => {
+    vi.useFakeTimers();
+    try {
+      const { client, createMessage, editMessage } = makeClientSpies();
+      const stream = createPreviewStream({
+        client,
+        conversationId: 'c1',
+        throttleMs: 100,
+        inReplyToMessageId: 'parent-msg-1',
+      });
+      stream.update('H');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(createMessage).toHaveBeenCalledWith({
+        conversationId: 'c1',
+        content: [{ type: 'text', text: 'H' }],
+        inReplyToMessageId: 'parent-msg-1',
+      });
+
+      stream.update('Hello');
+      await vi.advanceTimersByTimeAsync(100);
+      expect(editMessage).toHaveBeenCalledWith(
+        expect.not.objectContaining({ inReplyToMessageId: expect.anything() })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('warns when the finalize PATCH itself is stale', async () => {
     vi.useFakeTimers();
     try {

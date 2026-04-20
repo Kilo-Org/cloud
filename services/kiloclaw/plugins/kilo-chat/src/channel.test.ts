@@ -49,6 +49,36 @@ describe('kilo-chat outbound.sendText', () => {
       process.env = originalEnv;
     }
   });
+
+  it('passes replyToId as inReplyToMessageId to createMessage', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ messageId: 'm42' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    ) as unknown as typeof fetch;
+
+    const originalEnv = { ...process.env };
+    process.env.OPENCLAW_GATEWAY_TOKEN = 'gwt';
+    process.env.KILOCLAW_CONTROLLER_URL = 'http://127.0.0.1:18789';
+    __pluginInternals.fetchImpl = fetchImpl;
+    try {
+      await kiloChatPlugin.outbound!.sendText!({
+        cfg: {} as never,
+        to: 'conv-1',
+        text: 'reply text',
+        replyToId: 'parent-msg-1',
+      } as never);
+
+      const [, init] = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]!;
+      const body = JSON.parse((init as RequestInit).body as string);
+      expect(body.inReplyToMessageId).toBe('parent-msg-1');
+    } finally {
+      __pluginInternals.fetchImpl = undefined;
+      process.env = originalEnv;
+    }
+  });
 });
 
 describe('kilo-chat messaging adapter', () => {

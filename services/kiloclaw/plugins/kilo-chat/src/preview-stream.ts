@@ -12,6 +12,7 @@ export type CreatePreviewStreamOptions = {
   client: KiloChatClient;
   conversationId: string;
   throttleMs: number;
+  inReplyToMessageId?: string;
   onWarn?: (message: string, err?: unknown) => void;
 };
 
@@ -63,7 +64,11 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
     if (messageId === undefined) {
       // First send: POST.
       const p = opts.client
-        .createMessage({ conversationId: opts.conversationId, content: [{ type: 'text', text }] })
+        .createMessage({
+          conversationId: opts.conversationId,
+          content: [{ type: 'text', text }],
+          inReplyToMessageId: opts.inReplyToMessageId,
+        })
         .then(res => {
           messageId = res.messageId;
           lastSentText = text;
@@ -149,6 +154,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
         const res = await opts.client.createMessage({
           conversationId: opts.conversationId,
           content: [{ type: 'text', text: finalText }],
+          inReplyToMessageId: opts.inReplyToMessageId,
         });
         messageId = res.messageId;
         lastSentText = finalText;

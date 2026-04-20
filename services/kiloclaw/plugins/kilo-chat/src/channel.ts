@@ -135,6 +135,7 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         const { messageId } = await client.createMessage({
           conversationId: params.to,
           content: [{ type: 'text', text: params.text }],
+          inReplyToMessageId: params.replyToId ?? undefined,
         });
         return { messageId };
       },

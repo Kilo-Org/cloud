@@ -79,9 +79,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const kiloclawClient = new KiloClawInternalClient();
-    await kiloclawClient.clearGoogleOAuthConnection(user.id, instance.id);
-
     const existingConnection = await getKiloClawGoogleOAuthConnection(instance.id);
     if (existingConnection) {
       console.log('[google-disconnect] removing connection', {
@@ -93,7 +90,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Revoke broker credentials first so disconnect fails closed if any later
+    // cleanup step errors.
     await clearKiloClawGoogleOAuthConnection(instance.id);
+
+    const kiloclawClient = new KiloClawInternalClient();
+    await kiloclawClient.clearGoogleOAuthConnection(user.id, instance.id);
 
     return NextResponse.redirect(
       new URL(buildDisconnectPath(organizationId, 'success=google_disconnected'), APP_URL),

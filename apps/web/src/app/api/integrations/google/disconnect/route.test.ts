@@ -104,8 +104,8 @@ describe('POST /api/integrations/google/disconnect', () => {
 
     const doClearOrder = mockedClearGoogleOAuthConnection.mock.invocationCallOrder[0] ?? -1;
     const dbClearOrder = mockedClearKiloClawGoogleOAuthConnection.mock.invocationCallOrder[0] ?? -1;
-    expect(doClearOrder).toBeGreaterThan(0);
-    expect(dbClearOrder).toBeGreaterThan(doClearOrder);
+    expect(dbClearOrder).toBeGreaterThan(0);
+    expect(doClearOrder).toBeGreaterThan(dbClearOrder);
   });
 
   test('disconnects org flow and redirects to org claw settings', async () => {
@@ -145,11 +145,11 @@ describe('POST /api/integrations/google/disconnect', () => {
 
     expect(response.status).toBe(303);
     expectRedirectLocation(response, '/claw/settings?error=disconnect_failed');
-    expect(mockedClearGoogleOAuthConnection).toHaveBeenCalledWith(USER_ID, INSTANCE_ID);
+    expect(mockedClearGoogleOAuthConnection).not.toHaveBeenCalled();
     expect(mockedCaptureException).toHaveBeenCalledWith(expect.any(Error), expect.any(Object));
   });
 
-  test('does not delete DB row if DO clear fails', async () => {
+  test('still deletes DB row when DO clear fails (fail-closed)', async () => {
     mockedClearGoogleOAuthConnection.mockRejectedValue(new Error('do down'));
 
     const { POST } = await import('./route');
@@ -157,7 +157,7 @@ describe('POST /api/integrations/google/disconnect', () => {
 
     expect(response.status).toBe(303);
     expectRedirectLocation(response, '/claw/settings?error=disconnect_failed');
-    expect(mockedClearKiloClawGoogleOAuthConnection).not.toHaveBeenCalled();
+    expect(mockedClearKiloClawGoogleOAuthConnection).toHaveBeenCalledWith(INSTANCE_ID);
   });
 
   test('rejects invalid origin', async () => {

@@ -24,7 +24,7 @@ import { redisSet } from '@/lib/redis';
 
 const GATEWAY_METADATA_REDIS_KEYS = {
   allProviders: 'ai-gateway.metadata:all-providers',
-  openrouterModels: 'ai-gateway.metadata"."openrouter-models',
+  openrouterModels: 'ai-gateway.metadata:openrouter-models',
   vercelModels: 'ai-gateway.metadata:vercel-models',
   openrouterProviders: 'ai-gateway.metadata:openrouter-providers',
 } as const;

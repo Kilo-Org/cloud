@@ -331,6 +331,48 @@ describe('account-verification redirect logic', () => {
 
       expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
     });
+
+    // Defense-in-depth for the blocker called out in the post-merge review
+    // on PR #2622: even if a user manually reaches /account-verification
+    // with callbackPath=/openclaw-advisor (bypassing the page-level
+    // short-circuit in openclaw-advisor/page.tsx), bonus attribution must
+    // still refuse when no valid device-auth code accompanies the path.
+    // The code is the "real plugin flow" signal; without it any visitor
+    // could self-award the bonus by visiting the sign-in URL directly.
+    it('does NOT attribute when callbackPath=/openclaw-advisor has no code param', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/openclaw-advisor' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    it('does NOT attribute when callbackPath=/openclaw-advisor code is malformed', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      // `.` and `_` survive URL parsing but fall outside the device-auth
+      // charset `[A-Za-z0-9-]`. Must not qualify for the bonus even
+      // though the pathname exact-matches.
+      await renderPage({ callbackPath: '/openclaw-advisor?code=ab.cd' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    it('does NOT attribute when callbackPath=/openclaw-advisor code exceeds 16 chars', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      // 17 ASCII alphanumerics — within the charset but longer than the
+      // device-auth generator ever produces. Rejected by the format guard.
+      await renderPage({ callbackPath: '/openclaw-advisor?code=ABCDEFGHIJKLMNOPQ' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
   });
 
   // ---------------------------------------------------------------

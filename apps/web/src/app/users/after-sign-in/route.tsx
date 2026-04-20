@@ -12,6 +12,7 @@ import {
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';
+import { isOpenclawAdvisorCallback } from '@/lib/signup-source';
 
 /**
  * Resolves a product identifier from the signup entry point. Returns null when
@@ -26,7 +27,12 @@ function resolveSignupProduct(callbackPath: string | null, hasSource: boolean): 
   if (callbackPath.startsWith('/code-reviews')) return 'code-reviews';
   if (callbackPath.startsWith('/app-builder')) return 'app-builder';
   if (callbackPath.startsWith('/install')) return 'kilo-code';
-  if (callbackPath.startsWith('/openclaw-advisor')) return 'openclaw-security-advisor';
+  // Exact-pathname match via shared helper — a naive startsWith check would
+  // also attribute `/openclaw-advisor-fake` and any sibling path sharing the
+  // prefix. The account-verification bonus path already uses this helper for
+  // the same reason; keeping both sides on the shared check prevents the two
+  // attribution paths from drifting.
+  if (isOpenclawAdvisorCallback(callbackPath)) return 'openclaw-security-advisor';
   return null;
 }
 

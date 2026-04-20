@@ -67,6 +67,7 @@ export type MessageCreatedEvent = {
   senderId: string;
   content: ContentBlock[];
   inReplyToMessageId: string | null;
+  clientId: string | null;
 };
 
 export type MessageUpdatedEvent = {

@@ -285,18 +285,18 @@ export function useMessageCacheUpdater(conversationId: string | null) {
             for (const page of data.pages) {
               if (page.some(msg => msg.id === e.messageId)) return data;
             }
-            // Replace pending optimistic message from same sender if present
-            for (const page of data.pages) {
-              const pendingIdx = page.findIndex(
-                msg => msg.id.startsWith('pending-') && msg.senderId === e.senderId
-              );
-              if (pendingIdx >= 0) {
-                return {
-                  ...data,
-                  pages: data.pages.map(p =>
-                    p === page ? page.map((msg, i) => (i === pendingIdx ? newMessage : msg)) : p
-                  ),
-                };
+            // Replace the matching pending optimistic message if clientId correlates
+            if (e.clientId) {
+              const pendingId = `pending-${e.clientId}`;
+              for (const page of data.pages) {
+                if (page.some(msg => msg.id === pendingId)) {
+                  return {
+                    ...data,
+                    pages: data.pages.map(p =>
+                      p.map(msg => (msg.id === pendingId ? newMessage : msg))
+                    ),
+                  };
+                }
               }
             }
             const firstPage = data.pages[0] ?? [];

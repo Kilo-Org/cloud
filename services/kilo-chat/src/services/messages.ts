@@ -113,7 +113,13 @@ export async function createMessageFor(
         humanMemberIds,
         undefined,
         'message.created',
-        { messageId, senderId: callerId, content, inReplyToMessageId: inReplyToMessageId ?? null }
+        {
+          messageId,
+          senderId: callerId,
+          content,
+          inReplyToMessageId: inReplyToMessageId ?? null,
+          clientId: clientId ?? null,
+        }
       );
 
       // Implicitly stop typing for human senders (bots manage their own typing lifecycle)

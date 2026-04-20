@@ -20,6 +20,7 @@
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "@kilocode/event-service": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "hono": "catalog:",
     "zod": "catalog:"

@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, Tabs, useRouter } from 'expo-router';
 import { Bot, House, MessageSquare } from 'lucide-react-native';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,9 +20,16 @@ export default function TabsLayout() {
   const { bottom } = useSafeAreaInsets();
   const router = useRouter();
   const { data: instances } = useAllKiloClawInstances();
+  const [lastActiveHydrated, setLastActiveHydrated] = useState(false);
 
   useEffect(() => {
-    void loadLastActiveInstance();
+    void (async () => {
+      try {
+        await loadLastActiveInstance();
+      } finally {
+        setLastActiveHydrated(true);
+      }
+    })();
   }, []);
 
   return (
@@ -62,10 +69,11 @@ export default function TabsLayout() {
         listeners={{
           tabPress: e => {
             void Haptics.selectionAsync();
-            // While instances are still loading, block the tab switch so the user
-            // doesn't briefly land on the (1_kiloclaw) empty state before the
-            // redirect into their last-active chat happens.
-            if (instances === undefined) {
+            // While instances or the persisted last-active id are still loading,
+            // block the tab switch so the user doesn't briefly land on the
+            // (1_kiloclaw) empty state, and so we don't redirect into the wrong
+            // chat before the persisted instance has been hydrated.
+            if (instances === undefined || !lastActiveHydrated) {
               e.preventDefault();
               return;
             }

@@ -66,7 +66,10 @@ import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
-import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
+import {
+  KILOCLAW_EARLYBIRD_EXPIRY_DATE,
+  KILOCLAW_TRIAL_DURATION_DAYS,
+} from '@/lib/kiloclaw/constants';
 import {
   getStripePriceIdForClawPlan,
   getStripePriceIdForClawPlanIntro,
@@ -2349,6 +2352,18 @@ export const kiloclawRouter = createTRPCRouter({
           bootstrapSubscription,
         });
         if (shouldEnqueueTrialStartAffiliate) {
+          const trialEndsAt = new Date(
+            Date.now() + KILOCLAW_TRIAL_DURATION_DAYS * 86_400_000
+          ).toISOString();
+          PostHogClient().capture({
+            distinctId: ctx.user.google_user_email,
+            event: 'claw_trial_started',
+            properties: {
+              user_id: ctx.user.id,
+              plan: 'trial',
+              trial_ends_at: trialEndsAt,
+            },
+          });
           await enqueueProvisionTrialStartAffiliateEvent({
             userId: ctx.user.id,
             instanceId: result.instanceId,
@@ -2378,6 +2393,18 @@ export const kiloclawRouter = createTRPCRouter({
           bootstrapSubscription,
         });
         if (shouldEnqueueTrialStartAffiliate) {
+          const trialEndsAt = new Date(
+            Date.now() + KILOCLAW_TRIAL_DURATION_DAYS * 86_400_000
+          ).toISOString();
+          PostHogClient().capture({
+            distinctId: ctx.user.google_user_email,
+            event: 'claw_trial_started',
+            properties: {
+              user_id: ctx.user.id,
+              plan: 'trial',
+              trial_ends_at: trialEndsAt,
+            },
+          });
           await enqueueProvisionTrialStartAffiliateEvent({
             userId: ctx.user.id,
             instanceId: result.instanceId,

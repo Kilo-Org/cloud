@@ -72,12 +72,8 @@ export function useMarkConversationRead(getToken: () => Promise<string>) {
   const client = useClient(getToken);
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (conversationId: string) => {
-      console.log('[mark-read] mutationFn firing request for:', conversationId);
-      return client.markConversationRead(conversationId);
-    },
+    mutationFn: (conversationId: string) => client.markConversationRead(conversationId),
     onMutate: conversationId => {
-      console.log('[mark-read] onMutate optimistic update for:', conversationId);
       // Optimistically set lastReadAt = now in all cached conversation lists
       const now = Date.now();
       queryClient.setQueriesData<ConversationListResponse>(

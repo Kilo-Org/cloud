@@ -774,19 +774,15 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
     `);
   }
 
+  const keepKiloOwnedState = existing && existing.credential_profile === 'kilo_owned';
+
   await stub.updateGoogleOAuthConnection({
-    status: 'active',
-    accountEmail:
-      existing && existing.credential_profile === 'kilo_owned'
-        ? existing.account_email
-        : parsed.data.accountEmail,
-    accountSubject:
-      existing && existing.credential_profile === 'kilo_owned'
-        ? existing.account_subject
-        : parsed.data.accountSubject,
-    scopes,
+    status: keepKiloOwnedState ? existing.status : 'active',
+    accountEmail: keepKiloOwnedState ? existing.account_email : parsed.data.accountEmail,
+    accountSubject: keepKiloOwnedState ? existing.account_subject : parsed.data.accountSubject,
+    scopes: keepKiloOwnedState ? [...new Set(existing.scopes ?? [])].sort() : scopes,
     capabilities,
-    lastError: null,
+    lastError: keepKiloOwnedState ? (existing.last_error ?? null) : null,
   });
 
   return c.json({ migrated: true, profile: existing?.credential_profile ?? 'legacy' }, 200);

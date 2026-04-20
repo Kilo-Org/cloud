@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { redisGet } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
+import { OpenRouterApiProvidersResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 /**
  * Test using:
@@ -15,5 +16,7 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
       { status: 503 }
     );
   }
-  return NextResponse.json(JSON.parse(cached) as unknown);
+  const { data } = OpenRouterApiProvidersResponse.parse(JSON.parse(cached));
+  // The v1 API omits displayName; derive it from name for consumer compatibility.
+  return NextResponse.json({ data: data.map(p => ({ ...p, displayName: p.name })) });
 }

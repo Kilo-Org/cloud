@@ -9,7 +9,11 @@ import { registerMessageRoutes } from './routes/messages';
 import { registerReactionsRoutes } from './routes/reactions';
 import { registerTypingRoutes } from './routes/typing';
 import { registerBotRoutes } from './routes/bot-messages';
-import { buildWebhookPayload, type WebhookMessage } from './webhook/deliver';
+import { buildWebhookPayload, type WebhookMessage, type WebhookPayload } from './webhook/deliver';
+
+type KiloclawBinding = Fetcher & {
+  deliverChatWebhook(payload: WebhookPayload & { targetBotId: string }): Promise<void>;
+};
 
 export { MembershipDO } from './do/membership-do';
 export { ConversationDO } from './do/conversation-do';
@@ -61,7 +65,7 @@ export default class extends WorkerEntrypoint<Env> {
     for (const msg of batch.messages) {
       try {
         const payload = buildWebhookPayload(msg.body);
-        await this.env.KILOCLAW.deliverChatWebhook({
+        await (this.env.KILOCLAW as KiloclawBinding).deliverChatWebhook({
           targetBotId: msg.body.targetBotId,
           ...payload,
         });

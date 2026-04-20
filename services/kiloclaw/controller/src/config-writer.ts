@@ -121,6 +121,7 @@ export type ConfigWriterDeps = {
   readFileSync: (path: string, encoding: BufferEncoding) => string;
   writeFileSync: (path: string, data: string) => void;
   renameSync: (oldPath: string, newPath: string) => void;
+  chmodSync: (path: string, mode: number) => void;
   copyFileSync: (src: string, dest: string) => void;
   readdirSync: (dir: string) => string[];
   unlinkSync: (path: string) => void;
@@ -132,6 +133,7 @@ const defaultDeps: ConfigWriterDeps = {
   readFileSync: (p, encoding) => fs.readFileSync(p, encoding),
   writeFileSync: (p, data) => fs.writeFileSync(p, data),
   renameSync: (oldPath, newPath) => fs.renameSync(oldPath, newPath),
+  chmodSync: (p, mode) => fs.chmodSync(p, mode),
   copyFileSync: (src, dest) => fs.copyFileSync(src, dest),
   readdirSync: dir => fs.readdirSync(dir),
   unlinkSync: p => fs.unlinkSync(p),
@@ -700,8 +702,19 @@ export function writeBaseConfig(
     const serialized = JSON.stringify(config, null, 2);
     JSON.parse(serialized); // belt-and-suspenders: should never fail
 
-    // 6. Write patched config to the temp file, then atomically rename into place
+    // 6. Write patched config to the temp file, chmod it while still at the
+    // temp path, then atomically rename into place. Chmod-before-rename
+    // keeps the commit atomic from the perspective of the target path:
+    // if chmod throws, the catch below unlinks the still-present temp
+    // file and configPath is untouched; if the rename throws, same
+    // cleanup applies. The target never gets committed at the default
+    // umask mode (0o644) when we intended 0o600. openclaw.json contains
+    // API keys and gateway tokens; the parent directory is already
+    // 0o700, but tightening the file itself closes the
+    // fs.config.perms_world_readable audit finding and is defense-in-
+    // depth if anything ever drops priv inside the container.
     deps.writeFileSync(tmpPath, serialized);
+    deps.chmodSync(tmpPath, 0o600);
     deps.renameSync(tmpPath, configPath);
 
     console.log('Configuration patched successfully');

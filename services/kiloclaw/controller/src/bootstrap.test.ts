@@ -869,6 +869,7 @@ describe('TOOLS.md section configs', () => {
     expect(section).toContain('plugins.tools_reachable_permissive_policy');
     expect(section).toContain('hooks.default_session_key_unset');
     expect(section).toContain('hooks.allowed_agent_ids_unrestricted');
+    expect(section).toContain('fs.config.perms_world_readable');
     // Does NOT redundantly list gateway.control_ui.insecure_auth as its own
     // bullet — that one is already documented in the base TOOLS.md's
     // "Security Check Context" section. In-body references to it are fine

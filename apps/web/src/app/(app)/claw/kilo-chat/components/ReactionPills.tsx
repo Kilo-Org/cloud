@@ -35,10 +35,12 @@ export function ReactionPills({
     [reactions, currentUserId, onAdd, onRemove]
   );
 
-  if (reactions.length === 0 && !showPicker) return null;
+  if (reactions.length === 0 && !showPicker) return <div className="mt-1 min-h-[22px]" />;
 
   return (
-    <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+    <div
+      className={`flex flex-wrap gap-1 mt-1 min-h-[22px] ${isOwn ? 'justify-end' : 'justify-start'}`}
+    >
       {reactions.map(r => {
         const isMine = r.memberIds.includes(currentUserId);
         return (

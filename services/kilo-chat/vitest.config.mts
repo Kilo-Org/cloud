@@ -14,6 +14,7 @@ export default defineWorkersConfig({
           // to worker" errors.
           serviceBindings: {
             KILOCLAW: 'kiloclaw-stub',
+            EVENT_SERVICE: 'event-service-stub',
           },
           workers: [
             {
@@ -24,6 +25,18 @@ export default defineWorkersConfig({
                 export default class KiloclawStub extends WorkerEntrypoint {
                   async deliverChatWebhook(_payload) {
                     // no-op stub — webhook delivery is not tested here
+                  }
+                }
+              `,
+            },
+            {
+              name: 'event-service-stub',
+              modules: true,
+              script: `
+                import { WorkerEntrypoint } from 'cloudflare:workers';
+                export default class EventServiceStub extends WorkerEntrypoint {
+                  async fetch(request) {
+                    return new Response('ok');
                   }
                 }
               `,

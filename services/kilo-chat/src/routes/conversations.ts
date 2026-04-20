@@ -1,7 +1,12 @@
 import type { Hono } from 'hono';
 import { z } from 'zod';
-import { ulid } from 'ulid';
 import type { AuthContext } from '../auth';
+import {
+  createConversationFor,
+  renameConversationFor,
+  leaveConversationFor,
+  markReadFor,
+} from '../services/conversations';
 
 const ulidSchema = z.string().regex(/^[0-9A-Z]{26}$/, 'Invalid ULID');
 
@@ -40,47 +45,14 @@ export function registerConversationRoutes(
 
     const callerId = c.get('callerId');
     const allowedSandboxIds = c.get('allowedSandboxIds');
-    if (!allowedSandboxIds.includes(body.data.sandboxId)) {
-      return c.json({ error: 'You do not have access to this sandbox' }, 403);
+
+    const result = await createConversationFor(c.env, callerId, body.data, allowedSandboxIds);
+    if (!result.ok) {
+      if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+      return c.json({ error: result.error }, 500);
     }
 
-    const conversationId = ulid();
-    const now = Date.now();
-    const botId = `bot:kiloclaw:${body.data.sandboxId}`;
-
-    // Initialize ConversationDO
-    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
-    const initResult = await convStub.initialize({
-      id: conversationId,
-      title: body.data.title ?? null,
-      createdBy: callerId,
-      createdAt: now,
-      members: [
-        { id: callerId, kind: 'user' },
-        { id: botId, kind: 'bot' },
-      ],
-    });
-
-    if (!initResult.ok) {
-      return c.json({ error: 'Failed to initialize conversation' }, 500);
-    }
-
-    // Update MembershipDOs for both members
-    const memberParams = {
-      conversationId,
-      conversationTitle: body.data.title ?? null,
-      sandboxId: body.data.sandboxId,
-      joinedAt: now,
-    };
-
-    const userMembership = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
-    const botMembership = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(botId));
-    await Promise.all([
-      userMembership.addConversation(memberParams),
-      botMembership.addConversation(memberParams),
-    ]);
-
-    return c.json({ conversationId }, 201);
+    return c.json({ conversationId: result.conversationId }, 201);
   });
 
   // GET /v1/conversations — list my conversations, optionally filtered by sandboxId
@@ -139,22 +111,12 @@ export function registerConversationRoutes(
     }
 
     const callerId = c.get('callerId');
-    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
-
-    if (!(await convStub.isMember(callerId))) {
-      return c.json({ error: 'Forbidden' }, 403);
-    }
-
-    await convStub.updateTitle(body.data.title);
-
-    const info = await convStub.getInfo();
-    if (info) {
-      await Promise.all(
-        info.members.map(member => {
-          const memberStub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(member.id));
-          return memberStub.updateConversationTitle(conversationId, body.data.title);
-        })
-      );
+    const result = await renameConversationFor(c.env, callerId, {
+      conversationId,
+      title: body.data.title,
+    });
+    if (!result.ok) {
+      return c.json({ error: result.error }, 403);
     }
 
     return c.json({ ok: true });
@@ -174,27 +136,9 @@ export function registerConversationRoutes(
     const conversationId = idParam.data;
 
     const callerId = c.get('callerId');
-    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
-
-    if (!(await convStub.isMember(callerId))) {
-      return c.json({ error: 'Forbidden' }, 403);
-    }
-
-    // Soft-leave: mark member as left in ConversationDO (preserves FK integrity)
-    const { remainingUsers, botMembers } = await convStub.leaveMember(callerId);
-
-    // Remove conversation from the caller's membership index
-    const callerMembership = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
-    await callerMembership.removeConversation(conversationId);
-
-    // If no users remain, clean up bot memberships too
-    if (remainingUsers.length === 0) {
-      await Promise.all(
-        botMembers.map(member => {
-          const memberStub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(member.id));
-          return memberStub.removeConversation(conversationId);
-        })
-      );
+    const result = await leaveConversationFor(c.env, callerId, { conversationId });
+    if (!result.ok) {
+      return c.json({ error: result.error }, 403);
     }
 
     return c.body(null, 204);
@@ -209,14 +153,10 @@ export function registerConversationRoutes(
     const conversationId = idParam.data;
 
     const callerId = c.get('callerId');
-    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
-
-    if (!(await convStub.isMember(callerId))) {
-      return c.json({ error: 'Forbidden' }, 403);
+    const result = await markReadFor(c.env, callerId, { conversationId });
+    if (!result.ok) {
+      return c.json({ error: result.error }, 403);
     }
-
-    const stub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
-    await stub.markRead(conversationId, Date.now());
 
     return c.body(null, 204);
   });

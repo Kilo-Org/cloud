@@ -42,7 +42,10 @@
     ],
   },
 
-  "services": [{ "binding": "KILOCLAW", "service": "kiloclaw" }],
+  "services": [
+    { "binding": "KILOCLAW", "service": "kiloclaw" },
+    { "binding": "EVENT_SERVICE", "service": "event-service" },
+  ],
 
   "secrets_store_secrets": [
     {

@@ -118,8 +118,8 @@ if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
   posthogClient.debug();
 }
 
-const MAX_SIGNUPS_PER_IP_24H = 5;
-const signupsPerIpWindowMs = 24 * 60 * 60 * 1000;
+const SIGNUP_RATE_LIMIT_MAX = 5;
+const SIGNUP_RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function getSignupIp(requestHeaders?: Headers): string | null {
   return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
@@ -131,7 +131,7 @@ async function checkSignupIpRateLimit(
 ): Promise<Result<null, AuthErrorType>> {
   if (!signupIp) return successResult(null);
 
-  const windowStart = new Date(Date.now() - signupsPerIpWindowMs).toISOString();
+  const windowStart = new Date(Date.now() - SIGNUP_RATE_LIMIT_WINDOW_MS).toISOString();
   const [result] = await tx
     .select({ count: count() })
     .from(kilocode_users)
@@ -140,12 +140,12 @@ async function checkSignupIpRateLimit(
     );
 
   const existingAccounts = result?.count ?? 0;
-  if (existingAccounts < MAX_SIGNUPS_PER_IP_24H) return successResult(null);
+  if (existingAccounts < SIGNUP_RATE_LIMIT_MAX) return successResult(null);
 
   console.warn('[auth] Signup rejected due to per-IP rate limit', {
     ip_address: signupIp,
     existing_accounts_24h: existingAccounts,
-    max_signups_per_ip_24h: MAX_SIGNUPS_PER_IP_24H,
+    max_signups: SIGNUP_RATE_LIMIT_MAX,
   });
 
   return failureResult('SIGNUP-RATE-LIMITED');

@@ -1,5 +1,7 @@
 /** Identity-agnostic reaction operations. See services/messages.ts for rationale. */
 
+import { getConversationContext, pushEventToHumanMembers } from './event-push';
+
 export type AddReactionParams = {
   conversationId: string;
   messageId: string;
@@ -27,6 +29,22 @@ export async function addReactionFor(
   if (!result.ok) {
     return { ok: false, code: 'internal', error: result.error };
   }
+
+  if (result.added) {
+    const convContext = await getConversationContext(env, params.conversationId);
+    if (convContext?.sandboxId) {
+      await pushEventToHumanMembers(
+        env,
+        params.conversationId,
+        convContext.sandboxId,
+        convContext.humanMemberIds,
+        undefined, // don't exclude — reactions go to everyone
+        'reaction.added',
+        { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
+      );
+    }
+  }
+
   return { ok: true, id: result.id, added: result.added };
 }
 
@@ -57,5 +75,19 @@ export async function removeReactionFor(
   if (!result.ok) {
     return { ok: false, code: 'internal', error: result.error };
   }
+
+  const convContext = await getConversationContext(env, params.conversationId);
+  if (convContext?.sandboxId) {
+    await pushEventToHumanMembers(
+      env,
+      params.conversationId,
+      convContext.sandboxId,
+      convContext.humanMemberIds,
+      undefined, // don't exclude — reactions go to everyone
+      'reaction.removed',
+      { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
+    );
+  }
+
   return { ok: true };
 }

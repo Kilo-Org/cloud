@@ -8,6 +8,11 @@
  */
 
 import type { WebhookMessage } from '../webhook/deliver';
+import {
+  extractConversationContext,
+  getConversationContext,
+  pushEventToHumanMembers,
+} from './event-push';
 
 export type ContentBlock = { type: string; [key: string]: unknown };
 
@@ -93,6 +98,20 @@ export async function createMessageFor(
         console.error('Failed to update MembershipDO lastActivityAt:', r.reason);
       }
     }
+
+    // Push event to human members (reuse info already fetched above).
+    const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
+    if (sandboxId) {
+      await pushEventToHumanMembers(
+        env,
+        conversationId,
+        sandboxId,
+        humanMemberIds,
+        callerId,
+        'message.created',
+        { messageId, senderId: callerId, content, inReplyToMessageId: inReplyToMessageId ?? null }
+      );
+    }
   }
 
   return { ok: true, messageId, clientId };
@@ -150,6 +169,20 @@ export async function editMessageFor(
   if (result.stale) {
     return { ok: true, stale: true, messageId: result.messageId };
   }
+
+  const convContext = await getConversationContext(env, conversationId);
+  if (convContext?.sandboxId) {
+    await pushEventToHumanMembers(
+      env,
+      conversationId,
+      convContext.sandboxId,
+      convContext.humanMemberIds,
+      callerId,
+      'message.updated',
+      { messageId: result.messageId, content, clientUpdatedAt: timestamp }
+    );
+  }
+
   return {
     ok: true,
     stale: false,
@@ -187,5 +220,19 @@ export async function deleteMessageFor(
     if (result.code === 'not_found') return { ok: false, code: 'not_found', error: 'Not found' };
     return { ok: false, code: 'internal', error: result.error };
   }
+
+  const convContext = await getConversationContext(env, conversationId);
+  if (convContext?.sandboxId) {
+    await pushEventToHumanMembers(
+      env,
+      conversationId,
+      convContext.sandboxId,
+      convContext.humanMemberIds,
+      callerId,
+      'message.deleted',
+      { messageId }
+    );
+  }
+
   return { ok: true };
 }

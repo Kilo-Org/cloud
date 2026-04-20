@@ -63,7 +63,7 @@ import {
   contributor_champion_contributors,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
-import { allow_fake_login } from './constants';
+import { allow_fake_login, IS_DEVELOPMENT } from './constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import { strict as assert } from 'node:assert';
@@ -129,6 +129,7 @@ async function checkSignupIpRateLimit(
   signupIp: string | null,
   tx: DrizzleTransaction
 ): Promise<Result<null, AuthErrorType>> {
+  if (IS_DEVELOPMENT) return successResult(null);
   if (!signupIp) return successResult(null);
 
   const windowStart = new Date(Date.now() - SIGNUP_RATE_LIMIT_WINDOW_MS).toISOString();

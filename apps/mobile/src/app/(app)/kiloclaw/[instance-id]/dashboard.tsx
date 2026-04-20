@@ -145,7 +145,7 @@ export default function DashboardScreen() {
                 <Pressable
                   className="flex-row items-center gap-3 px-4 py-3 active:opacity-70"
                   onPress={() => {
-                    router.push(`/(app)/(tabs)/(1_kiloclaw)/${instanceId}/billing` as Href);
+                    router.push(`/(app)/kiloclaw/${instanceId}/billing` as Href);
                   }}
                 >
                   <CreditCard size={18} color={colors.foreground} />
@@ -157,7 +157,7 @@ export default function DashboardScreen() {
             <Pressable
               className="flex-row items-center gap-3 px-4 py-3 active:opacity-70"
               onPress={() => {
-                router.push(`/(app)/(tabs)/(1_kiloclaw)/${instanceId}/changelog` as Href);
+                router.push(`/(app)/kiloclaw/${instanceId}/changelog` as Href);
               }}
             >
               <Newspaper size={18} color={colors.foreground} />
@@ -184,7 +184,7 @@ export default function DashboardScreen() {
                       onPress: () => {
                         mutations.destroy.mutate(undefined);
                         router.dismissAll();
-                        router.replace('/(app)/(tabs)/(1_kiloclaw)');
+                        router.replace('/(app)/(tabs)/(0_home)' as Href);
                       },
                     },
                   ]

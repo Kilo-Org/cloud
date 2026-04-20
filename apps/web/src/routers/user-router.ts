@@ -255,6 +255,12 @@ async function enrichDeductionsWithInstanceNames(
 }
 
 export const userRouter = createTRPCRouter({
+  getProfile: baseProcedure.query(({ ctx }) => ({
+    name: ctx.user.google_user_name,
+    email: ctx.user.google_user_email,
+    imageUrl: ctx.user.google_user_image_url,
+  })),
+
   // Account linking routes
   getAuthProviders: baseProcedure.query(async ({ ctx }) => {
     const providers = await getUserAuthProviders(ctx.user.id);

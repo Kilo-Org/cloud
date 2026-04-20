@@ -163,7 +163,7 @@ export function ModelPicker() {
       <Pressable
         className="items-center py-2 active:opacity-70"
         onPress={() => {
-          router.push(`/(app)/(tabs)/(1_kiloclaw)/${instanceId}/settings/model-list` as Href);
+          router.push(`/(app)/kiloclaw/${instanceId}/settings/model-list` as Href);
         }}
       >
         <Text className="text-sm text-muted-foreground">or select from 500+ models</Text>

@@ -4,6 +4,6 @@ export const unstable_settings = {
   initialRouteName: 'index',
 };
 
-export default function KiloClawLayout() {
+export default function HomeLayout() {
   return <Stack screenOptions={{ headerShown: false }} />;
 }

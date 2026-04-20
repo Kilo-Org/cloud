@@ -92,7 +92,7 @@ export function SettingsList() {
             <Pressable
               className="flex-row items-center gap-3 px-4 py-3 active:opacity-70"
               onPress={() => {
-                router.push(`/(app)/(tabs)/(1_kiloclaw)/${instanceId}/${item.path}` as Href);
+                router.push(`/(app)/kiloclaw/${instanceId}/${item.path}` as Href);
               }}
               accessibilityLabel={item.label}
             >

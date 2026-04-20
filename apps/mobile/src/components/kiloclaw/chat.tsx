@@ -17,6 +17,7 @@ import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw-queries';
+import { setLastActiveInstance } from '@/lib/last-active-instance';
 import { type NotificationData, setActiveChatInstance } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
 
@@ -53,6 +54,7 @@ export function KiloClawChat({
     useCallback(() => {
       isFocusedRef.current = true;
       setActiveChatInstance(instanceId);
+      setLastActiveInstance(instanceId);
       markChatRead({ channelId: instanceId });
 
       // If a notification for this chat arrives while the screen is already open it is

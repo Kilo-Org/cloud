@@ -14,6 +14,7 @@ import {
   useRemoveReaction,
 } from '../hooks/useMessages';
 import { useConversationContext } from '../hooks/useEventService';
+import { usePresence } from '../hooks/usePresence';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
 import {
   useConversationDetail,
@@ -48,6 +49,8 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
 
   // Subscribe to this conversation's events via the event-service WebSocket
   useConversationContext(eventService, sandboxId, conversationId);
+  const conversationContext = sandboxId ? `/kiloclaw/${sandboxId}/${conversationId}` : null;
+  const _presentMembers = usePresence(eventService, conversationContext);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
     kiloChatClient,

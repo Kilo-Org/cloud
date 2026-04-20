@@ -1,8 +1,9 @@
-import { KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import {
   computeMonthlyCadenceBonusPercent,
   computeYearlyCadenceMonthlyBonusUsd,
   getMonthlyPriceUsd,
+  isKiloPassSelectionEligibleForKiloclawCommitUpsell,
 } from './bonus';
 
 import {
@@ -267,6 +268,40 @@ describe('kilo pass bonus utilities', () => {
       expect(computeYearlyCadenceMonthlyBonusUsd(KiloPassTier.Tier199)).toBe(
         KILO_PASS_TIER_CONFIG.tier_199.monthlyPriceUsd * KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT
       );
+    });
+  });
+
+  describe('isKiloPassSelectionEligibleForKiloclawCommitUpsell', () => {
+    const commitCostMicrodollars = 48_000_000;
+
+    it('rejects monthly tiers whose configured price is below the commit threshold', () => {
+      expect(
+        isKiloPassSelectionEligibleForKiloclawCommitUpsell({
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          commitCostMicrodollars,
+        })
+      ).toBe(false);
+    });
+
+    it('allows monthly tiers whose configured price covers the commit threshold', () => {
+      expect(
+        isKiloPassSelectionEligibleForKiloclawCommitUpsell({
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Monthly,
+          commitCostMicrodollars,
+        })
+      ).toBe(true);
+    });
+
+    it('keeps annual tiers eligible under current upsell policy', () => {
+      expect(
+        isKiloPassSelectionEligibleForKiloclawCommitUpsell({
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Yearly,
+          commitCostMicrodollars,
+        })
+      ).toBe(true);
     });
   });
 });

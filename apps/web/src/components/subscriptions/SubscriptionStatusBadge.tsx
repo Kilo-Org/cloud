@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
+  pending_settlement: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
   trialing: 'bg-blue-500/10 text-blue-300 border-blue-500/20',
   past_due: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
   unpaid: 'bg-red-500/10 text-red-300 border-red-500/20',

@@ -1,11 +1,11 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { redisGet, redisSet } from '@/lib/redis';
 import {
-  VERCEL_ROUTING_REDIS_KEY,
   GatewayConfigSchema,
   GatewayConfigInputSchema,
   DEFAULT_GATEWAY_CONFIG,
 } from '@/lib/gateway-config';
+import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import type { GatewayConfig } from '@/lib/gateway-config';
 import { TRPCError } from '@trpc/server';
 

@@ -83,6 +83,7 @@ export type ClawBillingStatus = {
   subscription: {
     plan: 'commit' | 'standard';
     status: 'active' | 'past_due' | 'canceled' | 'unpaid';
+    activationState: 'pending_settlement' | 'activated';
     cancelAtPeriodEnd: boolean;
     currentPeriodEnd: string;
     commitEndsAt: string | null;
@@ -146,6 +147,7 @@ export type ClawLockReason =
 export function deriveBannerState(billing: ClawBillingStatus): ClawBannerState {
   // Subscription states take priority
   if (billing.subscription) {
+    if (billing.subscription.activationState === 'pending_settlement') return 'none';
     if (billing.subscription.status === 'past_due' || billing.subscription.status === 'unpaid')
       return 'subscription_past_due';
     if (billing.subscription.cancelAtPeriodEnd && billing.subscription.pendingConversion)
@@ -175,6 +177,11 @@ export function deriveBannerState(billing: ClawBillingStatus): ClawBannerState {
 
 export function deriveLockReason(billing: ClawBillingStatus): ClawLockReason {
   if (!billing.hasAccess) {
+    if (billing.subscription?.activationState === 'pending_settlement') {
+      // Deliberately return null here: pending settlement should suppress the
+      // lock dialog entirely until dedicated processing UI handles this state.
+      return null;
+    }
     // Subscription states checked first — a paid subscription that was canceled
     // or fell past-due must not be masked by historical trial data.
     if (billing.subscription?.status === 'canceled') {

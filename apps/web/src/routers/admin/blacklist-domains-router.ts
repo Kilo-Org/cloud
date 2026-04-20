@@ -1,12 +1,12 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { redisGet, redisSet } from '@/lib/redis';
 import {
-  BLACKLIST_DOMAINS_REDIS_KEY,
   BlacklistDomainsConfigSchema,
   BlacklistDomainsInputSchema,
   DEFAULT_BLACKLIST_DOMAINS_CONFIG,
   getBlacklistedDomains,
 } from '@/lib/blacklist-domains-config';
+import { BLACKLIST_DOMAINS_REDIS_KEY } from '@/lib/redis-keys';
 import type { BlacklistDomainsConfig } from '@/lib/blacklist-domains-config';
 import { TRPCError } from '@trpc/server';
 import { db } from '@/lib/drizzle';

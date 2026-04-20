@@ -179,6 +179,7 @@ export function getLowerDomainFromEmail(email: string): string | null {
  * - Lowercases the entire address
  * - Strips `+` aliases (e.g. `user+tag@example.com` → `user@example.com`)
  * - For Gmail/Googlemail: removes dots from the local part
+ * - Normalizes `googlemail.com` → `gmail.com` (same mailbox)
  */
 export function normalizeEmail(email: string): string {
   const trimmed = email.trim().toLowerCase();
@@ -194,12 +195,13 @@ export function normalizeEmail(email: string): string {
     local = local.slice(0, plusIndex);
   }
 
-  // Gmail ignores dots in the local part
-  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+  // Gmail and Googlemail are the same mailbox; normalize dots and domain
+  const isGmail = domain === 'gmail.com' || domain === 'googlemail.com';
+  if (isGmail) {
     local = local.replace(/\./g, '');
   }
 
-  return `${local}@${domain}`;
+  return `${local}@${isGmail ? 'gmail.com' : domain}`;
 }
 
 /**

@@ -3,6 +3,7 @@ import { addMonths, format } from 'date-fns';
 
 import type { WorkerDb } from '@kilocode/db';
 import {
+  markInstanceDestroyedWithPersonalSubscriptionCollapse,
   getWorkerDb,
   insertKiloClawSubscriptionChangeLog,
   type KiloClawSubscription,
@@ -1269,10 +1270,31 @@ async function processCreditRenewalRow(
   }
 
   if (row.auto_top_up_enabled && !row.auto_top_up_triggered_for_period) {
-    await database
+    const [updated] = await database
       .update(kiloclaw_subscriptions)
       .set({ auto_top_up_triggered_for_period: renewalAt })
-      .where(eq(kiloclaw_subscriptions.id, row.id));
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.id, row.id),
+          isNull(kiloclaw_subscriptions.auto_top_up_triggered_for_period)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      return;
+    }
+
+    await insertLifecycleChangeLogBestEffort(database, {
+      subscriptionId: row.id,
+      action: 'status_changed',
+      reason: 'credit_renewal_auto_top_up_marked',
+      before: {
+        ...updated,
+        auto_top_up_triggered_for_period: null,
+      },
+      after: updated,
+    });
 
     try {
       await triggerUserAutoTopUp(env, context, {
@@ -1819,12 +1841,30 @@ async function runInstanceDestructionSweep(
       await destroyInstanceForEnforcement(env, context, row);
 
       if (row.instance_id) {
-        await database
-          .update(kiloclaw_instances)
-          .set({ destroyed_at: now })
-          .where(
-            and(eq(kiloclaw_instances.id, row.instance_id), isNull(kiloclaw_instances.destroyed_at))
-          );
+        const instanceId = row.instance_id;
+        await database.transaction(async tx => {
+          await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+            actor: LIFECYCLE_ACTOR,
+            changeLogFailurePolicy: 'log',
+            destroyedAt: now,
+            executor: tx,
+            instanceId,
+            onChangeLogFailure: ({ error, subscriptionId, userId, reason }) => {
+              log('error', 'Failed to write personal subscription collapse change log', {
+                event: 'subscription_change_log_failed',
+                outcome: 'failed',
+                subscriptionId,
+                userId,
+                instanceId,
+                action: 'reassigned',
+                reason,
+                error: errorMessage(error),
+              });
+            },
+            reason: 'destroy_path_inline_collapse',
+            userId: row.user_id,
+          });
+        });
       }
 
       const before = await getSubscriptionById(database, row.id);

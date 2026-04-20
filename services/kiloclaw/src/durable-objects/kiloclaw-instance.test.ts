@@ -3622,6 +3622,42 @@ describe('start: volume region validation', () => {
     );
   });
 
+  it('keeps cached flyRegion when Fly omits the volume region', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyMachineId: null, flyRegion: 'sjc' });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'sjc' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(storage._store.get('flyRegion')).toBe('sjc');
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ region: 'sjc' })
+    );
+  });
+
+  it('does not fall back to env regions when a mounted volume has no known region', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyMachineId: null, flyRegion: null });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(storage._store.get('flyRegion')).toBeNull();
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ region: undefined })
+    );
+  });
+
   it('handles volume gone (404) during region check by creating a new volume', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { flyMachineId: null });

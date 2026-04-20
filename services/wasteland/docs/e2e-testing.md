@@ -65,7 +65,13 @@ for the explicit write+PR+merge steps.
   `config.dolthub_upstream`)
 - `RIG_HANDLE` — the rig handle for this town's connection (via
   `GET /debug/wastelands/:WASTELAND_ID/container/config` → `dolthubOrg`;
-  the rig handle typically matches the DoltHub org)
+  the rig handle typically matches the DoltHub org). For the **contributor**
+  (posts and claims items).
+- `MAINTAINER_RIG` — a separate registered rig that accepts PRs. For
+  self-owned upstreams, the upstream owner's rig (e.g. `jrf0110`) is
+  registered and used for accept/reject operations. Required because
+  `stamps` has a `CHECK (author != subject)` constraint — the rig that
+  authors a stamp must not be the rig that is the subject.
 
 ## Conventions
 
@@ -458,15 +464,30 @@ wait_for_upstream $ITEM_ID open null
 1. Update `wanted.status = 'in_review'` and `wanted.evidence_url = <url>`
 2. Insert a row into `completions`
 
+**IMPORTANT**: DoltHub's write API doesn't reliably execute multi-statement
+SQL (`UPDATE ...; INSERT ...;`) in a single call — the operation returns
+`Success` but nothing lands on the branch. Split into separate writes
+targeting the **same branch**: first write uses `main` as fromBranch to
+create the branch, subsequent writes use the new branch as both `from`
+and `to` to append to it.
+
 ```bash
 EVIDENCE_URL="https://github.com/Kilo-Org/cloud/pull/1234"
 COMPLETION_ID="c-$(openssl rand -hex 8)"
 BRANCH="e2e-done-$ITEM_ID"
-SQL="UPDATE wanted SET status='in_review', evidence_url='$EVIDENCE_URL', updated_at=NOW() WHERE id='$ITEM_ID'; INSERT INTO completions (id, wanted_id, completed_by, evidence, completed_at) VALUES ('$COMPLETION_ID', '$ITEM_ID', '$RIG_HANDLE', '$EVIDENCE_URL', NOW())"
 
+# Write 1: create the branch with the UPDATE
+SQL1="UPDATE wanted SET status='in_review', evidence_url='$EVIDENCE_URL', updated_at=NOW() WHERE id='$ITEM_ID'"
 curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/main/$BRANCH" \
   -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
-  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL")}"
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL1")}"
+sleep 3
+
+# Write 2: append the completions INSERT on the same branch
+SQL2="INSERT INTO completions (id, wanted_id, completed_by, evidence, completed_at) VALUES ('$COMPLETION_ID', '$ITEM_ID', '$RIG_HANDLE', '$EVIDENCE_URL', NOW())"
+curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/$BRANCH/$BRANCH" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL2")}"
 sleep 3
 
 PULL_ID=$(curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls" \
@@ -526,12 +547,28 @@ COMPLETION_ID=$(curl -s -H "authorization: token $TOKEN" \
   | jq -r '.rows[0].id')
 
 BRANCH="e2e-accept-$ITEM_ID"
-# Stamp valence JSON: {"quality":"good"}
-SQL="UPDATE wanted SET status='completed', updated_at=NOW() WHERE id='$ITEM_ID'; INSERT INTO stamps (id, author, subject, valence, confidence, context_id, context_type, created_at) VALUES ('$STAMP_ID', '$MAINTAINER_RIG', '$RIG_HANDLE', '{\"quality\":\"good\"}', 0.9, '$ITEM_ID', 'wanted', NOW()); UPDATE completions SET validated_by='$MAINTAINER_RIG', stamp_id='$STAMP_ID', validated_at=NOW() WHERE id='$COMPLETION_ID'"
 
+# Write 1 (create branch): UPDATE wanted to completed
+SQL1="UPDATE wanted SET status='completed', updated_at=NOW() WHERE id='$ITEM_ID'"
 curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/main/$BRANCH" \
   -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
-  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL")}"
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL1")}"
+sleep 3
+
+# Write 2 (same branch): INSERT stamp
+# NOTE: valence must use numeric quality (1-5 scale) per the commons
+# convention and MUST satisfy CHECK (author != subject).
+SQL2="INSERT INTO stamps (id, author, subject, valence, confidence, context_id, context_type, created_at) VALUES ('$STAMP_ID', '$MAINTAINER_RIG', '$RIG_HANDLE', '{\"quality\":5,\"reliability\":5}', 0.9, '$ITEM_ID', 'wanted', NOW())"
+curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/$BRANCH/$BRANCH" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL2")}"
+sleep 3
+
+# Write 3 (same branch): UPDATE completions to link to the stamp
+SQL3="UPDATE completions SET validated_by='$MAINTAINER_RIG', stamp_id='$STAMP_ID', validated_at=NOW() WHERE id='$COMPLETION_ID'"
+curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/$BRANCH/$BRANCH" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL3")}"
 sleep 3
 
 PULL_ID=$(curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls" \
@@ -582,11 +619,19 @@ curl -s -H "authorization: token $TOKEN" \
 
 ```bash
 BRANCH="e2e-reject-$ITEM_ID"
-SQL="UPDATE wanted SET status='claimed', evidence_url=NULL, updated_at=NOW() WHERE id='$ITEM_ID'; DELETE FROM completions WHERE wanted_id='$ITEM_ID'"
 
+# Write 1 (create branch): UPDATE wanted back to claimed, clear evidence
+SQL1="UPDATE wanted SET status='claimed', evidence_url=NULL, updated_at=NOW() WHERE id='$ITEM_ID'"
 curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/main/$BRANCH" \
   -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
-  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL")}"
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL1")}"
+sleep 3
+
+# Write 2 (same branch): DELETE the completion
+SQL2="DELETE FROM completions WHERE wanted_id='$ITEM_ID'"
+curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/write/$BRANCH/$BRANCH" \
+  -H "authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"q\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$SQL2")}"
 sleep 3
 
 PULL_ID=$(curl -s -X POST "$WL/debug/dolthub/$UPSTREAM_OWNER/$UPSTREAM_DB/pulls" \
@@ -721,11 +766,26 @@ interfering with each other's runs, each flow should:
 
 Most failures fall into these buckets:
 
-| Symptom                                        | Likely cause                             | Fix                                                                                      |
-| ---------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `Browse query failed: unknown certificate ...` | Container Bun TLS broken in local dev    | Use `/browse-direct` instead                                                             |
-| `wl claim failed: push failed`                 | Dolt JWK missing or mismatched           | Reconnect via onboarding dialog with correct JWK                                         |
-| `wl claim failed: rig not found`               | Registration PR not merged yet           | Merge flow 1's PR first                                                                  |
-| PR state stuck on `Open` after merge call      | DoltHub async processing                 | Wait 5–30s; use `wait_for_pr_merged`                                                     |
-| `cannot merge pull that is not open`           | PR already merged or closed              | Check current state; pick a different PR                                                 |
-| Container not responding (`[not connected]`)   | Wrangler dev registry missed the binding | Restart gastown wrangler dev; check binding shows `wasteland-dev#WastelandRPCEntrypoint` |
+| Symptom                                                      | Likely cause                                                                                                                     | Fix                                                                                               |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `Browse query failed: unknown certificate ...`               | Container Bun TLS broken in local dev                                                                                            | Use `/browse-direct` instead                                                                      |
+| `wl claim failed: push failed`                               | Dolt JWK missing or mismatched                                                                                                   | Reconnect via onboarding dialog with correct JWK                                                  |
+| `wl claim failed: rig not found`                             | Registration PR not merged yet                                                                                                   | Merge flow 1's PR first                                                                           |
+| `wl post failed: EOF` or all container writes fail           | workerd container HTTPS egress broken in local dev                                                                               | Use Path B (worker-direct) flows instead                                                          |
+| DoltHub write returns `Success` but nothing lands on branch  | Multi-statement SQL silently skipped, OR check constraint violation (e.g. `stamps.author != subject`)                            | Split into separate writes per statement; verify against `SHOW CREATE TABLE <t>` check constraints |
+| PR state stuck on `Open` after merge call                    | DoltHub async processing                                                                                                         | Wait 5–30s; use `wait_for_pr_merged`                                                              |
+| `cannot merge pull that is not open`                         | PR already merged or closed                                                                                                      | Check current state; pick a different PR                                                          |
+| Container not responding (`[not connected]`)                 | Wrangler dev registry missed the binding                                                                                         | Restart gastown wrangler dev; check binding shows `wasteland-dev#WastelandRPCEntrypoint`          |
+| `stamps` INSERT succeeds but doesn't commit                  | Violating `CHECK (author != subject)` constraint                                                                                 | Ensure `author` and `subject` are different rig handles                                           |
+
+## Schema constraints
+
+Discovered during E2E verification. Check `SHOW CREATE TABLE <t>` on upstream main for the authoritative list.
+
+| Table         | Constraint                  | Implication for tests                                                   |
+| ------------- | --------------------------- | ----------------------------------------------------------------------- |
+| `stamps`      | `CHECK (author != subject)` | Contributor and maintainer must be different rigs                       |
+| `stamps`      | `valence` is NOT NULL JSON  | Must provide valid JSON object (can use MySQL `JSON_OBJECT(...)`)        |
+| `wanted`      | (PK: id)                    | Use unique `w-<hex>` IDs per item                                       |
+| `completions` | (PK: id)                    | Use unique `c-<hex>` IDs                                                |
+| `rigs`        | (PK: handle)                | Register each rig before it can appear as `author`/`subject` on a stamp |

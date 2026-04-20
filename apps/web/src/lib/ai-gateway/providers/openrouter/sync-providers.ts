@@ -21,13 +21,7 @@ import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@/lib/ai-gateway/providers/vercel/types';
 import { EndpointsSchema, ModelsSchema } from '@/lib/ai-gateway/providers/vercel/types';
 import { redisSet } from '@/lib/redis';
-
-const GATEWAY_METADATA_REDIS_KEYS = {
-  allProviders: 'ai-gateway.metadata:all-providers',
-  openrouterModels: 'ai-gateway.metadata:openrouter-models',
-  vercelModels: 'ai-gateway.metadata:vercel-models',
-  openrouterProviders: 'ai-gateway.metadata:openrouter-providers',
-} as const;
+import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
 
 const ATTRIBUTION_HEADERS = {
   'HTTP-Referer': 'https://kilocode.ai',

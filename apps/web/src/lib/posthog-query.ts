@@ -1,5 +1,6 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import { redisGet, redisSet } from '@/lib/redis';
+import { posthogQueryRedisKey } from '@/lib/redis-keys';
 import * as z from 'zod';
 
 /**
@@ -70,7 +71,7 @@ export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
   };
 
   return async (name: string, query: string): Promise<Output[]> => {
-    const key = `posthog-query:${name}`;
+    const key = posthogQueryRedisKey(name);
 
     const cached = await redisGet(key);
     if (cached !== null) {

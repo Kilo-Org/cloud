@@ -21,11 +21,8 @@ import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
-import {
-  VERCEL_ROUTING_REDIS_KEY,
-  GatewayPercentageSchema,
-  DEFAULT_VERCEL_PERCENTAGE,
-} from '@/lib/gateway-config';
+import { GatewayPercentageSchema, DEFAULT_VERCEL_PERCENTAGE } from '@/lib/gateway-config';
+import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
 
 const getVercelRoutingPercentage = createCachedFetch(

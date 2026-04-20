@@ -2,6 +2,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import type { StateAdapter } from 'chat';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { botIdentityRedisKey } from '@/lib/redis-keys';
 
 /**
  * Platform identity coordinates — the minimum info needed to identify
@@ -16,12 +17,6 @@ export type PlatformIdentity = {
   userId: string;
 };
 
-// -- Redis key helpers --------------------------------------------------------
-
-function redisKey({ platform, teamId, userId }: PlatformIdentity): string {
-  return `identity:${platform}:${teamId}:${userId}`;
-}
-
 /**
  * Look up the Kilo user ID linked to a chat-platform user.
  * Returns `null` when no mapping exists yet.
@@ -30,7 +25,7 @@ export async function resolveKiloUserId(
   state: StateAdapter,
   identity: PlatformIdentity
 ): Promise<string | null> {
-  return state.get<string>(redisKey(identity));
+  return state.get<string>(botIdentityRedisKey(identity.platform, identity.teamId, identity.userId));
 }
 
 /**
@@ -41,7 +36,7 @@ export async function linkKiloUser(
   identity: PlatformIdentity,
   kiloUserId: string
 ): Promise<void> {
-  await state.set(redisKey(identity), kiloUserId);
+  await state.set(botIdentityRedisKey(identity.platform, identity.teamId, identity.userId), kiloUserId);
 }
 
 /**
@@ -51,7 +46,7 @@ export async function unlinkKiloUser(
   state: StateAdapter,
   identity: PlatformIdentity
 ): Promise<void> {
-  await state.delete(redisKey(identity));
+  await state.delete(botIdentityRedisKey(identity.platform, identity.teamId, identity.userId));
 }
 
 // -- HMAC-signed link tokens --------------------------------------------------

@@ -470,12 +470,12 @@ function ConnectDoltHubDialog({
             label="Dolt Credential (JWK)"
             hint="Contents of your ~/.dolt/creds/*.jwk file. Required for dolt push. Run 'dolt creds ls' to find your active credential."
           >
-            <textarea
+            <Input
+              type="password"
               value={doltCredsJwk}
               onChange={e => setDoltCredsJwk(e.target.value)}
               placeholder='{"kid":"...","kty":"OKP",...}'
-              rows={3}
-              className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 font-mono text-xs text-white/85 placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-white/20"
+              className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
             />
           </FieldGroup>
         </div>

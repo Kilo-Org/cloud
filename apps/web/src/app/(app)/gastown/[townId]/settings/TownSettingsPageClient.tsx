@@ -35,6 +35,7 @@ import {
   X,
   Bug,
   Copy,
+  Globe,
 } from 'lucide-react';
 import {
   Accordion,
@@ -76,6 +77,7 @@ const SECTIONS = [
   { id: 'merge-strategy', label: 'Merge Strategy', icon: GitPullRequest },
   { id: 'refinery', label: 'Refinery', icon: Shield },
   { id: 'container', label: 'Container', icon: Container },
+  { id: 'wasteland', label: 'Wasteland', icon: Globe },
   { id: 'custom-instructions', label: 'Custom Instructions', icon: MessageSquareText },
   { id: 'debug', label: 'Debug', icon: Bug },
   { id: 'danger-zone', label: 'Danger Zone', icon: Trash2 },
@@ -1215,13 +1217,44 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                 </div>
               </SettingsSection>
 
+              {/* ── Wasteland ──────────────────────────────────────── */}
+              <SettingsSection
+                id="wasteland"
+                title="Wasteland"
+                description="Connect this town to a Wasteland for shared bounties and community contributions."
+                icon={Globe}
+                index={9}
+              >
+                <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <div>
+                    <p className="text-sm text-white/70">Not connected</p>
+                    <p className="text-[11px] text-white/30">
+                      Link this town to a Wasteland to enable community bounties and shared
+                      contributions.
+                    </p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="ml-4 shrink-0 gap-1.5"
+                    disabled={effectiveReadOnly}
+                    onClick={() => {
+                      // TODO: hook up to wasteland connection flow
+                    }}
+                  >
+                    <Globe className="size-3" />
+                    Connect
+                  </Button>
+                </div>
+              </SettingsSection>
+
               {/* ── Custom Instructions ────────────────────────────────── */}
               <SettingsSection
                 id="custom-instructions"
                 title="Custom Instructions"
                 description="Customize the system prompt for each agent role. These instructions are appended to the default prompt and apply to all agents of that role."
                 icon={MessageSquareText}
-                index={10}
+                index={11}
               >
                 <div className="space-y-5">
                   {(
@@ -1255,7 +1288,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                 title="Debug"
                 description="Copy diagnostic information to share with support. No sensitive data is included."
                 icon={Bug}
-                index={11}
+                index={12}
               >
                 <div className="space-y-3">
                   <p className="text-xs text-white/40">
@@ -1280,7 +1313,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                 title="Danger Zone"
                 description="Irreversible actions for this town."
                 icon={Trash2}
-                index={12}
+                index={13}
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3">

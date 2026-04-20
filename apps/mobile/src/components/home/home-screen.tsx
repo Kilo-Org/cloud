@@ -5,7 +5,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
 import { AgentsPromoCard } from '@/components/home/agents-promo-card';
-import { buildTimedGreeting, extractFirstName, Greeting } from '@/components/home/greeting';
+import { buildTimedGreeting, Greeting } from '@/components/home/greeting';
 import { KiloClawCard } from '@/components/home/kiloclaw-card';
 import { KiloClawPromoCard } from '@/components/home/kiloclaw-promo-card';
 import { NewTaskButton } from '@/components/home/new-task-button';
@@ -15,7 +15,6 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
-import { useUserProfile } from '@/lib/hooks/use-user-profile';
 import { useOrganization } from '@/lib/organization-context';
 
 type ClawInstance = NonNullable<ReturnType<typeof useAllKiloClawInstances>['data']>[number];
@@ -25,7 +24,6 @@ export function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const { organizationId } = useOrganization();
-  const { data: profile } = useUserProfile();
   const {
     data: instances,
     isPending: instancesPending,
@@ -45,8 +43,7 @@ export function HomeScreen() {
   const hasAnySession = storedSessions.length > 0 || activeSessions.length > 0;
   const isFirstTime = !hasInstance && !hasAnySession && !instancesError;
 
-  const firstName = extractFirstName(profile?.name);
-  const title = isFirstTime ? 'Welcome to Kilo' : buildTimedGreeting(firstName);
+  const title = isFirstTime ? 'Welcome to Kilo' : buildTimedGreeting(null);
 
   const handleRefresh = useCallback(() => {
     void (async () => {

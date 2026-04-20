@@ -16,18 +16,6 @@ function timeOfDay(hour: number): 'morning' | 'afternoon' | 'evening' {
   return 'evening';
 }
 
-export function extractFirstName(fullName: string | null | undefined): string | null {
-  if (!fullName) {
-    return null;
-  }
-  const trimmed = fullName.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-  const [first] = trimmed.split(/\s+/);
-  return first ?? null;
-}
-
 export function buildTimedGreeting(firstName: string | null): string {
   const period = timeOfDay(new Date().getHours());
   return firstName ? `Good ${period}, ${firstName}` : `Good ${period}`;

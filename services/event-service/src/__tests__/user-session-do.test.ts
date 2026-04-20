@@ -92,37 +92,37 @@ describe('UserSessionDO', () => {
     ws.close();
   });
 
-  it('userPresent returns true when connection has matching context', async () => {
+  it('isUserInContext returns true when connection has matching context', async () => {
     const userId = 'user-present-match';
     const { ws, stub } = await connectWs(userId);
 
     ws.send(JSON.stringify({ type: 'context.subscribe', contexts: ['project:present'] }));
     await new Promise(r => setTimeout(r, 50));
 
-    const result = await stub.userPresent('project:present');
+    const result = await stub.isUserInContext('project:present');
     expect(result).toBe(true);
 
     ws.close();
   });
 
-  it('userPresent returns false when no matching context', async () => {
+  it('isUserInContext returns false when no matching context', async () => {
     const userId = 'user-present-no-match';
     const { ws, stub } = await connectWs(userId);
 
     ws.send(JSON.stringify({ type: 'context.subscribe', contexts: ['project:a'] }));
     await new Promise(r => setTimeout(r, 50));
 
-    const result = await stub.userPresent('project:b');
+    const result = await stub.isUserInContext('project:b');
     expect(result).toBe(false);
 
     ws.close();
   });
 
-  it('userPresent returns false when no connections', async () => {
+  it('isUserInContext returns false when no connections', async () => {
     const id = env.USER_SESSION_DO.idFromName('user-present-no-connections');
     const stub = env.USER_SESSION_DO.get(id);
 
-    const result = await stub.userPresent('project:any');
+    const result = await stub.isUserInContext('project:any');
     expect(result).toBe(false);
   });
 

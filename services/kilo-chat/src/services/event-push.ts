@@ -1,6 +1,6 @@
 type EventServiceBinding = {
   pushEvent: (userId: string, context: string, event: string, payload: unknown) => Promise<void>;
-  userPresent: (userId: string, context: string) => Promise<boolean>;
+  isUserInContext: (userId: string, context: string) => Promise<boolean>;
 };
 
 function getEventService(env: Env): EventServiceBinding | null {
@@ -62,7 +62,7 @@ export async function isUserPresentInConversation(
   if (!es) return false;
   const context = `/kiloclaw/${sandboxId}/${conversationId}`;
   try {
-    return await es.userPresent(userId, context);
+    return await es.isUserInContext(userId, context);
   } catch {
     return false;
   }

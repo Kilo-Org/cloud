@@ -68,6 +68,20 @@ describe('MembershipDO', () => {
     expect(result[1].conversationId).toBe('conv-b');
   });
 
+  it('marks a conversation as read', async () => {
+    const stub = getStub('user-mark-read');
+    await stub.addConversation({
+      conversationId: 'conv-1',
+      conversationTitle: null,
+      sandboxId: 'sandbox-1',
+      joinedAt: 1000,
+    });
+    await stub.updateLastActivity('conv-1', 5000);
+    await stub.markRead('conv-1', 4500);
+    const result = await stub.listConversations();
+    expect(result[0].lastReadAt).toBe(4500);
+  });
+
   it('removes a conversation', async () => {
     const stub = getStub('user-5');
     await stub.addConversation({

@@ -67,6 +67,14 @@ export class MembershipDO extends DurableObject<Env> {
       .run();
   }
 
+  markRead(conversationId: string, readAt: number): void {
+    this.db
+      .update(conversations)
+      .set({ last_read_at: readAt })
+      .where(eq(conversations.conversation_id, conversationId))
+      .run();
+  }
+
   updateConversationTitle(conversationId: string, title: string | null): void {
     this.db
       .update(conversations)

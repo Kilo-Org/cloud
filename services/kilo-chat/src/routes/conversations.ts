@@ -199,4 +199,25 @@ export function registerConversationRoutes(
 
     return c.body(null, 204);
   });
+
+  // POST /v1/conversations/:id/mark-read — mark conversation as read
+  app.post('/v1/conversations/:id/mark-read', async c => {
+    const idParam = ulidSchema.safeParse(c.req.param('id'));
+    if (!idParam.success) {
+      return c.json({ error: 'Invalid conversation ID' }, 400);
+    }
+    const conversationId = idParam.data;
+
+    const callerId = c.get('callerId');
+    const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
+
+    if (!(await convStub.isMember(callerId))) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const stub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
+    await stub.markRead(conversationId, Date.now());
+
+    return c.body(null, 204);
+  });
 }

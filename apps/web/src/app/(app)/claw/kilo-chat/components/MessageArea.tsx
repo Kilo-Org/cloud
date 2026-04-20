@@ -82,12 +82,18 @@ export function MessageArea({
     ),
   });
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll whenever content height changes (new messages or streaming updates)
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || !autoScrollRef.current) return;
-    el.scrollTop = el.scrollHeight;
-  }, [messages.length]);
+    if (!el) return;
+    const observer = new MutationObserver(() => {
+      if (autoScrollRef.current) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+    observer.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, []);
 
   // Track scroll position to detect user scrolling away from bottom
   function handleScroll() {
@@ -219,12 +225,8 @@ export function MessageArea({
       </div>
 
       {/* Messages */}
-      <div className="relative flex-1 overflow-hidden">
-        <div
-          ref={scrollRef}
-          className="absolute inset-0 overflow-y-auto py-4"
-          onScroll={handleScroll}
-        >
+      <div className="relative min-h-0 flex-1">
+        <div ref={scrollRef} className="h-full overflow-y-auto py-4" onScroll={handleScroll}>
           {isFetchingNextPage && (
             <div className="text-muted-foreground py-2 text-center text-xs">
               Loading older messages...

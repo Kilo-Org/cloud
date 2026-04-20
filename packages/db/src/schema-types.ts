@@ -652,25 +652,6 @@ export const OpenRouterProvidersResponse = z.union([
   z.array(OpenRouterProvider),
 ]);
 
-// Response shape for the public OpenRouter API endpoint GET /api/v1/providers.
-// Distinct from the frontend `all-providers` endpoint above: this returns a
-// smaller, stable public view used by external API consumers.
-export type OpenRouterApiProvider = z.infer<typeof OpenRouterApiProvider>;
-export const OpenRouterApiProvider = z.object({
-  name: z.string(),
-  slug: z.string(),
-  privacy_policy_url: z.string().nullable(),
-  terms_of_service_url: z.string().nullable(),
-  status_page_url: z.string().nullable(),
-  headquarters: z.string().nullable(),
-  datacenters: z.array(z.string()).nullable(),
-});
-
-export type OpenRouterApiProvidersResponse = z.infer<typeof OpenRouterApiProvidersResponse>;
-export const OpenRouterApiProvidersResponse = z.object({
-  data: z.array(OpenRouterApiProvider),
-});
-
 export type NormalizedProvider = z.infer<typeof NormalizedProvider>;
 export const NormalizedProvider = z.object({
   name: z.string(),

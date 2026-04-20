@@ -26,10 +26,10 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'qwen/qwen3-32b': 'alibaba/qwen-3-32b',
 };
 
-export function mapModelIdToVercel(modelId: string, reasoningDisabled = false) {
+export function mapModelIdToVercel(modelId: string, reasoningExplicitlyDisabled: boolean) {
   const hardcodedVercelId = vercelModelIdMapping[modelId];
   if (hardcodedVercelId) {
-    if (reasoningDisabled && hardcodedVercelId.endsWith('-reasoning')) {
+    if (reasoningExplicitlyDisabled && hardcodedVercelId.endsWith('-reasoning')) {
       return hardcodedVercelId.replace(/-reasoning$/, '-non-reasoning');
     }
     return hardcodedVercelId;

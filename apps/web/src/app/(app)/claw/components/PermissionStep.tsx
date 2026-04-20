@@ -1,22 +1,18 @@
 'use client';
 
 import type { ExecPreset } from './claw.types';
-import {
-  LEGACY_ONBOARDING_PERMISSIONS_STEP,
-  LEGACY_ONBOARDING_TOTAL_STEPS,
-} from './ClawOnboardingFlow.state';
 import { OnboardingStepView } from './OnboardingStepView';
 import { PermissionPresetCards } from './PermissionPresetCards';
 
 export function PermissionStep({
   instanceRunning,
-  currentStep = LEGACY_ONBOARDING_PERMISSIONS_STEP,
-  totalSteps = LEGACY_ONBOARDING_TOTAL_STEPS,
+  currentStep,
+  totalSteps,
   onSelect,
 }: {
   instanceRunning: boolean;
-  currentStep?: number;
-  totalSteps?: number;
+  currentStep: number;
+  totalSteps: number;
   onSelect: (preset: ExecPreset) => void;
 }) {
   return (

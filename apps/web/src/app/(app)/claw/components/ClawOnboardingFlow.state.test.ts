@@ -3,6 +3,13 @@ import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import {
   CLAW_ONBOARDING_ERROR_STATUSES,
   CLAW_ONBOARDING_PROVISIONING_STATUSES,
+  LEGACY_ONBOARDING_CHANNELS_STEP,
+  LEGACY_ONBOARDING_IDENTITY_STEP,
+  LEGACY_ONBOARDING_PAIRING_STEP,
+  LEGACY_ONBOARDING_PERMISSIONS_STEP,
+  LEGACY_ONBOARDING_PROVISIONING_STEP,
+  LEGACY_ONBOARDING_TOTAL_STEPS,
+  LEGACY_ONBOARDING_TOTAL_STEPS_WITH_PAIRING,
   type ClawOnboardingFlowStateInput,
   getClawOnboardingFlowState,
   hasPopulatedStatus,
@@ -380,5 +387,15 @@ describe('ClawOnboardingFlow state machine', () => {
         })
       ).renderStep
     ).toBe('complete');
+  });
+
+  test('exposes the canonical legacy step constants for leaf components and walkthroughs', () => {
+    expect(LEGACY_ONBOARDING_IDENTITY_STEP).toBe(2);
+    expect(LEGACY_ONBOARDING_PERMISSIONS_STEP).toBe(3);
+    expect(LEGACY_ONBOARDING_CHANNELS_STEP).toBe(4);
+    expect(LEGACY_ONBOARDING_PROVISIONING_STEP).toBe(5);
+    expect(LEGACY_ONBOARDING_PAIRING_STEP).toBe(6);
+    expect(LEGACY_ONBOARDING_TOTAL_STEPS).toBe(5);
+    expect(LEGACY_ONBOARDING_TOTAL_STEPS_WITH_PAIRING).toBe(6);
   });
 });

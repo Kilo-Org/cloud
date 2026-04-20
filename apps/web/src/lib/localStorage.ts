@@ -6,34 +6,40 @@
 
 const IS_SERVER = typeof window === 'undefined';
 
+type SafeStorage = {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+  removeItem: (key: string) => void;
+};
+
 // Note: Return types are intentionally omitted here for simplicity.
 // The nullStorage object is only used as a fallback when localStorage is unavailable,
 // and TypeScript can infer the types from the safeLocalStorage implementation below.
-const nullStorage = {
+const nullStorage: SafeStorage = {
   getItem: () => null,
   setItem: () => {},
   removeItem: () => {},
 };
 
-function createSafeStorage(storage: Storage) {
+function createSafeStorage(getStorage: () => Storage): SafeStorage {
   return {
     getItem: (key: string): string | null => {
       try {
-        return storage.getItem(key);
+        return getStorage().getItem(key);
       } catch {
         return null;
       }
     },
     setItem: (key: string, value: string): void => {
       try {
-        storage.setItem(key, value);
+        getStorage().setItem(key, value);
       } catch {
         // Silently fail if storage is unavailable
       }
     },
     removeItem: (key: string): void => {
       try {
-        storage.removeItem(key);
+        getStorage().removeItem(key);
       } catch {
         // Silently fail if storage is unavailable
       }
@@ -41,8 +47,10 @@ function createSafeStorage(storage: Storage) {
   };
 }
 
-export const safeLocalStorage = IS_SERVER ? nullStorage : createSafeStorage(window.localStorage);
+export const safeLocalStorage = IS_SERVER
+  ? nullStorage
+  : createSafeStorage(() => window.localStorage);
 
 export const safeSessionStorage = IS_SERVER
   ? nullStorage
-  : createSafeStorage(window.sessionStorage);
+  : createSafeStorage(() => window.sessionStorage);

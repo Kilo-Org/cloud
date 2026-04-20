@@ -5,10 +5,6 @@ import { CheckCircle2, Loader2, Send, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClawPairing, useClawRefreshPairing } from '../hooks/useClawHooks';
 import { Button } from '@/components/ui/button';
-import {
-  LEGACY_ONBOARDING_PAIRING_STEP,
-  LEGACY_ONBOARDING_TOTAL_STEPS_WITH_PAIRING,
-} from './ClawOnboardingFlow.state';
 import type { ClawMutations } from './claw.types';
 import { OnboardingStepView } from './OnboardingStepView';
 
@@ -30,15 +26,15 @@ const CHANNEL_META: Record<PairingChannelId, { label: string; instruction: strin
 export function ChannelPairingStep({
   channelId,
   mutations,
-  currentStep = LEGACY_ONBOARDING_PAIRING_STEP,
-  totalSteps = LEGACY_ONBOARDING_TOTAL_STEPS_WITH_PAIRING,
+  currentStep,
+  totalSteps,
   onComplete,
   onSkip,
 }: {
   channelId: PairingChannelId;
   mutations: ClawMutations;
-  currentStep?: number;
-  totalSteps?: number;
+  currentStep: number;
+  totalSteps: number;
   onComplete: () => void;
   onSkip: () => void;
 }) {
@@ -119,8 +115,8 @@ type ChannelPairingStepViewProps = {
   channelId: PairingChannelId;
   matchingRequest: { code: string; channel: string; id: string } | null;
   isApproving?: boolean;
-  currentStep?: number;
-  totalSteps?: number;
+  currentStep: number;
+  totalSteps: number;
   onApprove?: (channel: string, code: string) => void;
   onSkip?: () => void;
 };
@@ -129,8 +125,8 @@ export function ChannelPairingStepView({
   channelId,
   matchingRequest,
   isApproving = false,
-  currentStep = LEGACY_ONBOARDING_PAIRING_STEP,
-  totalSteps = LEGACY_ONBOARDING_TOTAL_STEPS_WITH_PAIRING,
+  currentStep,
+  totalSteps,
   onApprove,
   onSkip,
 }: ChannelPairingStepViewProps) {

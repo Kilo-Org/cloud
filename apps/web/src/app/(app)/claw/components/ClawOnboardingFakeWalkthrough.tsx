@@ -5,6 +5,11 @@ import { TriangleAlert } from 'lucide-react';
 import type { PopulatedClawStatus } from './ClawOnboardingFlow.state';
 import {
   CLAW_ONBOARDING_FAKE_STEPS,
+  LEGACY_ONBOARDING_CHANNELS_STEP,
+  LEGACY_ONBOARDING_IDENTITY_STEP,
+  LEGACY_ONBOARDING_PAIRING_STEP,
+  LEGACY_ONBOARDING_PERMISSIONS_STEP,
+  LEGACY_ONBOARDING_PROVISIONING_STEP,
   LEGACY_ONBOARDING_TOTAL_STEPS,
   LEGACY_ONBOARDING_TOTAL_STEPS_WITH_PAIRING,
   type ClawOnboardingRenderStep,
@@ -187,13 +192,29 @@ function renderFakeStep({
     case 'create-instance':
       return <CreateInstanceCardView onCreate={() => setStep('identity')} />;
     case 'identity':
-      return <BotIdentityStep instanceRunning={false} onContinue={() => setStep('permissions')} />;
+      return (
+        <BotIdentityStep
+          instanceRunning={false}
+          currentStep={LEGACY_ONBOARDING_IDENTITY_STEP}
+          totalSteps={LEGACY_ONBOARDING_TOTAL_STEPS}
+          onContinue={() => setStep('permissions')}
+        />
+      );
     case 'permissions':
-      return <PermissionStep instanceRunning={false} onSelect={() => setStep('channels')} />;
+      return (
+        <PermissionStep
+          instanceRunning={false}
+          currentStep={LEGACY_ONBOARDING_PERMISSIONS_STEP}
+          totalSteps={LEGACY_ONBOARDING_TOTAL_STEPS}
+          onSelect={() => setStep('channels')}
+        />
+      );
     case 'channels':
       return (
         <ChannelSelectionStepView
           instanceRunning={false}
+          currentStep={LEGACY_ONBOARDING_CHANNELS_STEP}
+          totalSteps={LEGACY_ONBOARDING_TOTAL_STEPS}
           defaultSelected={isPairingChannel(selectedChannelId) ? selectedChannelId : null}
           onSelect={channelId => {
             setSelectedChannelId(channelId);
@@ -208,7 +229,10 @@ function renderFakeStep({
     case 'provisioning':
       return (
         <div className="flex flex-col gap-4">
-          <ProvisioningStepView totalSteps={totalSteps} />
+          <ProvisioningStepView
+            currentStep={LEGACY_ONBOARDING_PROVISIONING_STEP}
+            totalSteps={totalSteps}
+          />
           <Card>
             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-muted-foreground text-sm">
@@ -236,6 +260,8 @@ function renderFakeStep({
       return (
         <ChannelPairingStepView
           channelId={pairingChannelId}
+          currentStep={LEGACY_ONBOARDING_PAIRING_STEP}
+          totalSteps={LEGACY_ONBOARDING_TOTAL_STEPS_WITH_PAIRING}
           matchingRequest={{
             channel: pairingChannelId,
             code: '123456',

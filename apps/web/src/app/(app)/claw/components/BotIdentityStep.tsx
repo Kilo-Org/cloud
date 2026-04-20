@@ -6,10 +6,6 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { OnboardingStepView } from './OnboardingStepView';
-import {
-  LEGACY_ONBOARDING_IDENTITY_STEP,
-  LEGACY_ONBOARDING_TOTAL_STEPS,
-} from './ClawOnboardingFlow.state';
 import type { BotIdentity } from './claw.types';
 import { cn } from '@/lib/utils';
 
@@ -63,13 +59,13 @@ const NATURE_PRESETS: NaturePreset[] = [
 
 export function BotIdentityStep({
   instanceRunning,
-  currentStep = LEGACY_ONBOARDING_IDENTITY_STEP,
-  totalSteps = LEGACY_ONBOARDING_TOTAL_STEPS,
+  currentStep,
+  totalSteps,
   onContinue,
 }: {
   instanceRunning: boolean;
-  currentStep?: number;
-  totalSteps?: number;
+  currentStep: number;
+  totalSteps: number;
   onContinue: (identity: BotIdentity) => void;
 }) {
   const [botName, setBotName] = useState('');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
@@ -22,6 +22,58 @@ import { WelcomePage } from '../components/billing/WelcomePage';
 
 const ClawOnboardingWithBoundary = withStatusQueryBoundary(ClawOnboardingFlow);
 
+export function getCreateFlowStartedAtFromMarker(
+  markerForCurrentUser: boolean,
+  now: () => number = Date.now
+): number | null {
+  return markerForCurrentUser ? now() : null;
+}
+
+export function getClawNewMode({
+  createFlowStartedAt,
+  hasActiveInstance,
+  onboardingInProgress,
+}: {
+  createFlowStartedAt: number | null;
+  hasActiveInstance: boolean;
+  onboardingInProgress: boolean;
+}): ClawOnboardingMode {
+  return createFlowStartedAt !== null || !hasActiveInstance || onboardingInProgress
+    ? 'create-first'
+    : 'post-provisioning';
+}
+
+export function getCreateFirstFlowFlags({
+  mode,
+  autoStartFailed,
+  onboardingInProgress,
+  hasActiveInstance,
+}: {
+  mode: ClawOnboardingMode;
+  autoStartFailed: boolean;
+  onboardingInProgress: boolean;
+  hasActiveInstance: boolean;
+}): {
+  skipCreateInstanceStep: boolean;
+  autoProvisionOnMount: boolean;
+} {
+  return {
+    skipCreateInstanceStep: mode === 'create-first' && !autoStartFailed,
+    autoProvisionOnMount:
+      mode === 'create-first' && !autoStartFailed && !onboardingInProgress && !hasActiveInstance,
+  };
+}
+
+export function shouldApplyCreateFlowCallback({
+  activeUserId,
+  callbackUserId,
+}: {
+  activeUserId: string | null;
+  callbackUserId: string | null;
+}): boolean {
+  return activeUserId === callbackUserId;
+}
+
 function LoadingState() {
   return (
     <div
@@ -39,18 +91,18 @@ function ClawNewLoader({
   billingUpdatedAt,
   skipCreateInstanceStep,
   autoProvisionOnMount,
-  personalUserId,
   onCreateFlowStarted,
   onCreateFlowFailed,
+  onCreateFlowComplete,
 }: {
   mode: ClawOnboardingMode;
   createFlowStartedAt: number | null;
   billingUpdatedAt: number;
   skipCreateInstanceStep: boolean;
   autoProvisionOnMount: boolean;
-  personalUserId: string | null;
   onCreateFlowStarted: () => void;
   onCreateFlowFailed: () => void;
+  onCreateFlowComplete: () => void;
 }) {
   const statusQuery = useKiloClawStatus();
 
@@ -67,9 +119,9 @@ function ClawNewLoader({
         createFlowStarted={createFlowStartedAt !== null}
         skipCreateInstanceStep={skipCreateInstanceStep}
         autoProvisionOnMount={autoProvisionOnMount}
-        personalUserId={personalUserId}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
+        onCreateFlowComplete={onCreateFlowComplete}
       />
     );
   }
@@ -90,9 +142,9 @@ function ClawNewLoader({
       createFlowStarted={createFlowStartedAt !== null}
       skipCreateInstanceStep={skipCreateInstanceStep}
       autoProvisionOnMount={autoProvisionOnMount}
-      personalUserId={personalUserId}
       onCreateFlowStarted={onCreateFlowStarted}
       onCreateFlowFailed={onCreateFlowFailed}
+      onCreateFlowComplete={onCreateFlowComplete}
     />
   );
 }
@@ -114,9 +166,7 @@ function ClawNewLiveClient() {
   const { data: user, isLoading: userLoading } = useUser();
   const billingQuery = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
   const currentUserId = user?.id ?? null;
-  const [syncedMarkerUserId, setSyncedMarkerUserId] = useState<string | null | undefined>(
-    undefined
-  );
+  const currentUserIdRef = useRef<string | null>(currentUserId);
   const [onboardingInProgress, setOnboardingInProgress] = useState(false);
   // Re-seed `createFlowStartedAt` when resuming onboarding after a refresh so
   // `ClawNewLoader`'s status timestamp filter lets fresh status data through.
@@ -126,32 +176,66 @@ function ClawNewLiveClient() {
   const [autoStartFailed, setAutoStartFailed] = useState(false);
 
   useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  useEffect(() => {
     if (userLoading) return;
 
     const markerForCurrentUser = readPersonalOnboardingInProgress(currentUserId);
     setOnboardingInProgress(markerForCurrentUser);
-    setCreateFlowStartedAt(markerForCurrentUser ? Date.now() : null);
+    setCreateFlowStartedAt(getCreateFlowStartedAtFromMarker(markerForCurrentUser));
     setAutoStartFailed(false);
-    setSyncedMarkerUserId(currentUserId);
   }, [currentUserId, userLoading]);
 
   const onCreateFlowStarted = useCallback(() => {
+    const callbackUserId = currentUserId;
     markPersonalOnboardingInProgress(currentUserId);
+    if (
+      !shouldApplyCreateFlowCallback({
+        activeUserId: currentUserIdRef.current,
+        callbackUserId,
+      })
+    ) {
+      return;
+    }
     setOnboardingInProgress(true);
     setAutoStartFailed(false);
     setCreateFlowStartedAt(Date.now());
-    setSyncedMarkerUserId(currentUserId);
   }, [currentUserId]);
 
   const onCreateFlowFailed = useCallback(() => {
+    const callbackUserId = currentUserId;
     clearPersonalOnboardingInProgress(currentUserId);
+    if (
+      !shouldApplyCreateFlowCallback({
+        activeUserId: currentUserIdRef.current,
+        callbackUserId,
+      })
+    ) {
+      return;
+    }
     setOnboardingInProgress(false);
     setAutoStartFailed(true);
     setCreateFlowStartedAt(null);
-    setSyncedMarkerUserId(currentUserId);
   }, [currentUserId]);
 
-  if (userLoading || syncedMarkerUserId !== currentUserId || billingQuery.isLoading) {
+  const handleCreateFlowComplete = useCallback(() => {
+    const callbackUserId = currentUserId;
+    clearPersonalOnboardingInProgress(currentUserId);
+    if (
+      !shouldApplyCreateFlowCallback({
+        activeUserId: currentUserIdRef.current,
+        callbackUserId,
+      })
+    ) {
+      return;
+    }
+    setOnboardingInProgress(false);
+    setCreateFlowStartedAt(null);
+  }, [currentUserId]);
+
+  if (userLoading || billingQuery.isLoading) {
     return <LoadingState />;
   }
 
@@ -190,22 +274,22 @@ function ClawNewLiveClient() {
 
   const hasActiveInstance =
     billing?.instance?.exists === true && billing.instance.destroyed === false;
-  const mode: ClawOnboardingMode =
-    createFlowStartedAt !== null || !hasActiveInstance || onboardingInProgress
-      ? 'create-first'
-      : 'post-provisioning';
+  const mode = getClawNewMode({
+    createFlowStartedAt,
+    hasActiveInstance,
+    onboardingInProgress,
+  });
 
   // Show identity (not the intro card) as the first screen whenever the
   // personal create-first wizard is shown — including refreshes during an
   // in-progress session. Falls back to the legacy intro card only if
   // auto-start has failed, so the user still has a manual retry button.
-  const skipCreateInstanceStep = mode === 'create-first' && !autoStartFailed;
-
-  // Only auto-kick the provisioning mutation on fresh entries — never on a
-  // refresh where provisioning was already triggered in a previous session.
-  // The onboarding-in-progress marker tells us that case.
-  const autoProvisionOnMount =
-    mode === 'create-first' && !autoStartFailed && !onboardingInProgress && !hasActiveInstance;
+  const { skipCreateInstanceStep, autoProvisionOnMount } = getCreateFirstFlowFlags({
+    mode,
+    autoStartFailed,
+    onboardingInProgress,
+    hasActiveInstance,
+  });
 
   return (
     <ClawNewLoader
@@ -214,9 +298,9 @@ function ClawNewLiveClient() {
       billingUpdatedAt={billingQuery.dataUpdatedAt}
       skipCreateInstanceStep={skipCreateInstanceStep}
       autoProvisionOnMount={autoProvisionOnMount}
-      personalUserId={currentUserId}
       onCreateFlowStarted={onCreateFlowStarted}
       onCreateFlowFailed={onCreateFlowFailed}
+      onCreateFlowComplete={handleCreateFlowComplete}
     />
   );
 }

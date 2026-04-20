@@ -5,10 +5,6 @@ import { ChevronRight, ExternalLink, PlayCircle } from 'lucide-react';
 import { validateFieldValue } from '@kilocode/kiloclaw-secret-catalog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import {
-  LEGACY_ONBOARDING_CHANNELS_STEP,
-  LEGACY_ONBOARDING_TOTAL_STEPS,
-} from './ClawOnboardingFlow.state';
 import { OnboardingStepView } from './OnboardingStepView';
 import { DiscordIcon } from './icons/DiscordIcon';
 import { ChannelTokenInput } from './ChannelTokenInput';
@@ -100,15 +96,15 @@ function pickChannelTokens(
 
 export function ChannelSelectionStepView({
   instanceRunning,
-  currentStep = LEGACY_ONBOARDING_CHANNELS_STEP,
-  totalSteps = LEGACY_ONBOARDING_TOTAL_STEPS,
+  currentStep,
+  totalSteps,
   onSelect,
   onSkip,
   defaultSelected = null,
 }: {
   instanceRunning?: boolean;
-  currentStep?: number;
-  totalSteps?: number;
+  currentStep: number;
+  totalSteps: number;
   onSelect?: (channelId: ChannelId, tokens: Record<string, string>) => void;
   onSkip?: () => void;
   defaultSelected?: ChannelId | null;

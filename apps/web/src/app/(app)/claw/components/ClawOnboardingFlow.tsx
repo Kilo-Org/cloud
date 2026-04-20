@@ -7,6 +7,7 @@ import { Check, Sparkles, TriangleAlert, X } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
+import { useUser } from '@/hooks/useUser';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -55,20 +56,20 @@ export function ClawOnboardingFlow({
   status,
   mode,
   organizationId,
-  personalUserId,
   createFlowStarted = false,
   onCreateFlowStarted,
   onCreateFlowFailed,
+  onCreateFlowComplete,
   skipCreateInstanceStep = false,
   autoProvisionOnMount = false,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   organizationId?: string;
-  personalUserId?: string | null;
   createFlowStarted?: boolean;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
+  onCreateFlowComplete?: () => void;
   /**
    * When true (personal flow only), the intro `create-instance` screen is
    * skipped and the user lands directly on `BotIdentityStep`. Controls the
@@ -89,9 +90,9 @@ export function ClawOnboardingFlow({
         status={status}
         mode={mode}
         createFlowStarted={createFlowStarted}
-        personalUserId={personalUserId ?? null}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
+        onCreateFlowComplete={onCreateFlowComplete}
         skipCreateInstanceStep={skipCreateInstanceStep}
         autoProvisionOnMount={autoProvisionOnMount}
       />
@@ -103,22 +104,24 @@ function ClawOnboardingFlowInner({
   status,
   mode,
   createFlowStarted,
-  personalUserId,
   onCreateFlowStarted,
   onCreateFlowFailed,
+  onCreateFlowComplete,
   skipCreateInstanceStep,
   autoProvisionOnMount,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   createFlowStarted: boolean;
-  personalUserId: string | null;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
+  onCreateFlowComplete?: () => void;
   skipCreateInstanceStep: boolean;
   autoProvisionOnMount: boolean;
 }) {
   const { organizationId } = useClawContext();
+  const { data: user } = useUser();
+  const personalUserId = organizationId ? null : (user?.id ?? null);
 
   const personalMutations = useKiloClawMutations();
   const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
@@ -206,8 +209,9 @@ function ClawOnboardingFlowInner({
     if (organizationId) return;
     if (flowState.renderStep === 'complete' || flowState.renderStep === 'error') {
       clearPersonalOnboardingInProgress(personalUserId);
+      onCreateFlowComplete?.();
     }
-  }, [organizationId, personalUserId, flowState.renderStep]);
+  }, [organizationId, onCreateFlowComplete, personalUserId, flowState.renderStep]);
 
   const resetWizardSelections = useCallback(() => {
     setOnboardingStep('identity');

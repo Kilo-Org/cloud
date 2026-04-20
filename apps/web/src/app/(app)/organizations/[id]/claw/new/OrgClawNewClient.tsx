@@ -53,7 +53,6 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
         status={createStatus}
         mode="create-first"
         organizationId={organizationId}
-        personalUserId={null}
         createFlowStarted
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
@@ -67,7 +66,6 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
         statusQuery={statusQuery}
         mode="post-provisioning"
         organizationId={organizationId}
-        personalUserId={null}
         createFlowStarted={createFlowStartedAt !== null}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
@@ -83,7 +81,6 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
         statusQuery={{ data: undefined, isLoading: true, error: null }}
         mode="post-provisioning"
         organizationId={organizationId}
-        personalUserId={null}
         createFlowStarted={createFlowStartedAt !== null}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
@@ -100,7 +97,6 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
       statusQuery={{ ...statusQuery, data: settledStatus }}
       mode={mode}
       organizationId={organizationId}
-      personalUserId={null}
       createFlowStarted={createFlowStartedAt !== null}
       onCreateFlowStarted={onCreateFlowStarted}
       onCreateFlowFailed={onCreateFlowFailed}

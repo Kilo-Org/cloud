@@ -47,8 +47,6 @@ import {
   kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
-  kiloclaw_earlybird_purchases,
-  kiloclaw_email_log,
   user_period_cache,
   user_feedback,
   app_builder_feedback,
@@ -569,6 +567,7 @@ export class SoftDeletePreconditionError extends Error {
  * - deployments, app_builder_projects (user assets)
  * - stytch_fingerprints (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
+ * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email, name, avatar, urls)
@@ -592,7 +591,7 @@ export class SoftDeletePreconditionError extends Error {
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
- *   kiloclaw_instances/inbound_email_aliases/access_codes, kiloclaw_subscriptions, user_period_cache,
+ *   kiloclaw_instances/inbound_email_aliases/access_codes, user_period_cache,
  *   kilo_pass_scheduled_changes)
  */
 export async function softDeleteUser(userId: string) {
@@ -748,19 +747,12 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
-    // kiloclaw_subscriptions, kiloclaw_cli_runs, kiloclaw_google_oauth_connections,
-    // and kiloclaw_inbound_email_aliases all reference kiloclaw_instances.
-    // Delete them before instances to satisfy FK constraints.
-    await tx.delete(kiloclaw_subscriptions).where(eq(kiloclaw_subscriptions.user_id, userId));
-    await tx
-      .delete(kiloclaw_earlybird_purchases)
-      .where(eq(kiloclaw_earlybird_purchases.user_id, userId));
-    await tx.delete(kiloclaw_email_log).where(eq(kiloclaw_email_log.user_id, userId));
     await tx
       .update(kiloclaw_cli_runs)
       .set({ initiated_by_admin_id: null })
       .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
+    // Remove stored Google OAuth credentials for all instances owned by this user.
     await tx
       .delete(kiloclaw_google_oauth_connections)
       .where(

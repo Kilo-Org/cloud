@@ -138,6 +138,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
               review_mode?: 'rework' | 'comments' | undefined;
               code_review?: boolean | undefined;
               auto_resolve_pr_feedback?: boolean | undefined;
+              auto_resolve_merge_conflicts?: boolean | undefined;
               auto_merge_delay_minutes?: number | null | undefined;
               merge_strategy?: 'direct' | 'pr' | undefined;
               convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
@@ -209,6 +210,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           review_mode?: 'rework' | 'comments' | undefined;
           code_review?: boolean | undefined;
           auto_resolve_pr_feedback?: boolean | undefined;
+          auto_resolve_merge_conflicts?: boolean | undefined;
           auto_merge_delay_minutes?: number | null | undefined;
           merge_strategy?: 'direct' | 'pr' | undefined;
           convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
@@ -555,6 +557,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
               code_review: boolean;
               review_mode: 'comments' | 'rework';
               auto_resolve_pr_feedback: boolean;
+              auto_resolve_merge_conflicts: boolean;
               auto_merge_delay_minutes: number | null;
             }
           | undefined;
@@ -619,6 +622,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
                 code_review?: boolean | undefined;
                 review_mode?: 'comments' | 'rework' | undefined;
                 auto_resolve_pr_feedback?: boolean | undefined;
+                auto_resolve_merge_conflicts?: boolean | undefined;
                 auto_merge_delay_minutes?: number | null | undefined;
               }
             | undefined;
@@ -677,6 +681,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
               code_review: boolean;
               review_mode: 'comments' | 'rework';
               auto_resolve_pr_feedback: boolean;
+              auto_resolve_merge_conflicts: boolean;
               auto_merge_delay_minutes: number | null;
             }
           | undefined;
@@ -1537,6 +1542,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                   review_mode?: 'rework' | 'comments' | undefined;
                   code_review?: boolean | undefined;
                   auto_resolve_pr_feedback?: boolean | undefined;
+                  auto_resolve_merge_conflicts?: boolean | undefined;
                   auto_merge_delay_minutes?: number | null | undefined;
                   merge_strategy?: 'direct' | 'pr' | undefined;
                   convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
@@ -1608,6 +1614,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               review_mode?: 'rework' | 'comments' | undefined;
               code_review?: boolean | undefined;
               auto_resolve_pr_feedback?: boolean | undefined;
+              auto_resolve_merge_conflicts?: boolean | undefined;
               auto_merge_delay_minutes?: number | null | undefined;
               merge_strategy?: 'direct' | 'pr' | undefined;
               convoy_merge_mode?: 'review-then-land' | 'review-and-merge' | undefined;
@@ -1954,6 +1961,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                   code_review: boolean;
                   review_mode: 'comments' | 'rework';
                   auto_resolve_pr_feedback: boolean;
+                  auto_resolve_merge_conflicts: boolean;
                   auto_merge_delay_minutes: number | null;
                 }
               | undefined;
@@ -2018,6 +2026,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                     code_review?: boolean | undefined;
                     review_mode?: 'comments' | 'rework' | undefined;
                     auto_resolve_pr_feedback?: boolean | undefined;
+                    auto_resolve_merge_conflicts?: boolean | undefined;
                     auto_merge_delay_minutes?: number | null | undefined;
                   }
                 | undefined;
@@ -2076,6 +2085,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                   code_review: boolean;
                   review_mode: 'comments' | 'rework';
                   auto_resolve_pr_feedback: boolean;
+                  auto_resolve_merge_conflicts: boolean;
                   auto_merge_delay_minutes: number | null;
                 }
               | undefined;

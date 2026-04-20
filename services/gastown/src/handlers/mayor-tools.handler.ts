@@ -648,9 +648,9 @@ export async function handleMayorBulkDeleteBeads(
     return c.json(resError('Rig not found in this town'), 403);
   }
 
-  const parsed = await parseJsonBody(c, MayorBulkDeleteBeadsBody);
+  const parsed = MayorBulkDeleteBeadsBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
-    return c.json(resError('Invalid request body', parsed.error), 400);
+    return c.json(resError(`Invalid request body: ${parsed.error.message}`), 400);
   }
 
   const { bead_ids } = parsed.data;
@@ -681,9 +681,9 @@ export async function handleMayorDeleteBeadsByStatus(
     return c.json(resError('Rig not found in this town'), 403);
   }
 
-  const parsed = await parseJsonBody(c, MayorDeleteBeadsByStatusBody);
+  const parsed = MayorDeleteBeadsByStatusBody.safeParse(await parseJsonBody(c));
   if (!parsed.success) {
-    return c.json(resError('Invalid request body', parsed.error), 400);
+    return c.json(resError(`Invalid request body: ${parsed.error.message}`), 400);
   }
 
   const { status, type } = parsed.data;

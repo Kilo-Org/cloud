@@ -191,7 +191,10 @@ export function BeadsTab({ townId }: { townId: string }) {
     if (confirmAction.type === 'bulk-delete') {
       return `Delete ${confirmAction.beadIds.length} selected bead${confirmAction.beadIds.length === 1 ? '' : 's'}? This cannot be undone.`;
     }
-    return `Delete ${confirmAction.count} failed bead${confirmAction.count === 1 ? '' : 's'}? This cannot be undone.`;
+    if (confirmAction.type === 'delete-all-failed') {
+      return `Delete ${confirmAction.count} failed bead${confirmAction.count === 1 ? '' : 's'}? This cannot be undone.`;
+    }
+    return '';
   };
 
   const isDestructiveConfirm =

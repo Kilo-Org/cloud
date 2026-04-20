@@ -1148,10 +1148,9 @@ export class TownDO extends DurableObject<Env> {
       const rigBeads = BeadRecord.pick({ bead_id: true })
         .array()
         .parse([
-          ...query(
-            this.sql,
+          ...this.sql.exec(
             /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.rig_id} = ? AND ${beads.status} = ?${type ? ` AND ${beads.type} = ?` : ''}`,
-            type ? [rigId, status, type] : [rigId, status]
+            ...(type ? [rigId, status, type] : [rigId, status])
           ),
         ]);
       if (rigBeads.length === 0) return 0;

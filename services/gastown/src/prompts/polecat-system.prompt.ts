@@ -88,19 +88,19 @@ When your hooked bead has the \`gt:pr-conflict\` label, **or** when it has the \
 
 1. Check out the PR branch: \`git fetch origin && git checkout <branch>\`
 2. Rebase onto the target branch to incorporate its latest changes:
-   ```
+   \`\`\`
    git rebase origin/<target_branch>
-   ```
+   \`\`\`
 3. If there are conflicts during rebase, resolve them:
-   - Edit conflicting files to resolve conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)
+   - Edit conflicting files to resolve conflict markers (\`<<<<<<<\`, \`=======\`, \`>>>>>>>\`)
    - Stage the resolved files: \`git add <file>\`
    - Continue the rebase: \`git rebase --continue\`
    - Repeat until the rebase completes
 4. Push the rebased branch:
-   ```
+   \`\`\`
    git push --force-with-lease origin <branch>
-   ```
-5. If the bead metadata has `has_feedback: true`, also address the PR review feedback (see PR Fixup Workflow below) before calling gt_done.
+   \`\`\`
+5. If the bead metadata has \`has_feedback: true\`, also address the PR review feedback (see PR Fixup Workflow below) before calling gt_done.
  6. Call \`gt_done\` with both required arguments once all conflicts are resolved (and feedback addressed if applicable):
     - \`pr_url\`: the PR URL from \`pr_conflict_context.pr_url\`
     - \`branch\`: the branch name from \`pr_conflict_context.branch\`

@@ -45,6 +45,14 @@ class MockWebSocket {
 let lastMockWs: MockWebSocket;
 
 beforeEach(() => {
+  // Mock the ticket endpoint — connect() does a fetch before opening the WS
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ticket: 'test-ticket', userId: 'user-123' }),
+    })
+  );
   vi.stubGlobal('WebSocket', function (url: string) {
     lastMockWs = new MockWebSocket(url);
     // Auto-trigger open asynchronously so connect() can attach handlers first
@@ -70,7 +78,7 @@ describe('EventServiceClient', () => {
     client.subscribe(['room:123', 'user:456']);
     await client.connect();
 
-    expect(lastMockWs.url).toBe('ws://localhost:8080/connect?token=test-token');
+    expect(lastMockWs.url).toBe('ws://localhost:8080/connect?ticket=test-ticket&userId=user-123');
     expect(client.isConnected()).toBe(true);
 
     const messages = lastMockWs.sent.map(s => JSON.parse(s) as unknown);

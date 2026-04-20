@@ -17,9 +17,22 @@ export class EventServiceClient {
   }
 
   async connect(): Promise<void> {
+    // Step 1: Exchange JWT for a single-use connection ticket
     const token = await this.getToken();
+    const res = await fetch(`${this.url}/connect/ticket`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      throw new Error(`Ticket request failed: ${res.status}`);
+    }
+    const { ticket, userId } = (await res.json()) as { ticket: string; userId: string };
+
+    // Step 2: Connect WebSocket using the ticket
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`${this.url}/connect?token=${token}`);
+      const ws = new WebSocket(
+        `${this.url}/connect?ticket=${encodeURIComponent(ticket)}&userId=${encodeURIComponent(userId)}`
+      );
       this.ws = ws;
 
       ws.onopen = () => {

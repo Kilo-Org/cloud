@@ -18,11 +18,13 @@
 
   "durable_objects": {
     "bindings": [
-      { "name": "USER_SESSION_DO", "class_name": "UserSessionDO" }
+      { "name": "USER_SESSION_DO", "class_name": "UserSessionDO" },
+      { "name": "TICKET_DO", "class_name": "TicketDO" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_classes": ["UserSessionDO"] }
+    { "tag": "v1", "new_classes": ["UserSessionDO"] },
+    { "tag": "v2", "new_classes": ["TicketDO"] }
   ],
 
   "secrets_store_secrets": [

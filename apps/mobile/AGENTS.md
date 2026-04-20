@@ -113,7 +113,11 @@ After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any i
 ### Tabs
 
 - Set `freezeOnBlur: true` on tab `screenOptions` to prevent re-render flicker when switching tabs.
-- Use `expo-haptics` (`Haptics.selectionAsync()`) on tab press and interactive buttons for tactile feedback.
+- Fire a haptic on tab press — see **Haptics** below.
+
+### Haptics
+
+Use `expo-haptics` where appropriate — to reinforce commits and outcomes, not passive UI. Err on the side of fewer haptics when in doubt, and don't double-fire (a press haptic immediately followed by an outcome haptic is redundant).
 
 ### Images
 

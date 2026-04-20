@@ -18,7 +18,7 @@ const workos = new WorkOS(WORKOS_API_KEY);
 async function processSSOInternal(
   args: CreateOrUpdateUserArgs,
   requestHeaders?: Headers
-): Promise<boolean> {
+): Promise<string | true> {
   if (args.provider !== 'workos') {
     throw new Error('Only SSO logins supported');
   }
@@ -53,6 +53,9 @@ async function processSSOInternal(
 
   const res = await createOrUpdateUser(args, undefined, true, requestHeaders);
   if (!res.success) {
+    if (res.error === 'SIGNUP-RATE-LIMITED') {
+      return `${SSO_SIGNIN_PATH}?error=SIGNUP-RATE-LIMITED`;
+    }
     throw new Error(res.error);
   }
   if (res.user.blocked_reason) {

@@ -4,12 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 
-export function useOrgKiloClawStatus(organizationId: string) {
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+
+export function useOrgKiloClawStatus(organizationId?: string) {
   const trpc = useTRPC();
+  const resolvedOrganizationId = organizationId ?? NIL_UUID;
   return useQuery(
     trpc.organizations.kiloclaw.getStatus.queryOptions(
-      { organizationId },
-      { refetchInterval: 10_000 }
+      { organizationId: resolvedOrganizationId },
+      { enabled: !!organizationId, refetchInterval: organizationId ? 10_000 : false }
     )
   );
 }

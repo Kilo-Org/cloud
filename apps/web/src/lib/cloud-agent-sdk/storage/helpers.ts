@@ -6,7 +6,7 @@ function insertSorted(arr: string[], id: string): string[] {
     high = result.length;
   while (low < high) {
     const mid = (low + high) >>> 1;
-    if (result[mid] < id) low = mid + 1;
+    if ((result[mid] ?? '') < id) low = mid + 1;
     else high = mid;
   }
   result.splice(low, 0, id);
@@ -19,11 +19,36 @@ function insertPartSorted(arr: Part[], part: Part): Part[] {
     high = result.length;
   while (low < high) {
     const mid = (low + high) >>> 1;
-    if (result[mid].id < part.id) low = mid + 1;
+    const midPart = result[mid];
+    if (midPart !== undefined && midPart.id < part.id) low = mid + 1;
     else high = mid;
   }
   result.splice(low, 0, part);
   return result;
+}
+
+function upsertPartDroppingStaleSyntheticTextParts(arr: Part[], part: Part): Part[] {
+  const nextPart = clonePart(part);
+  const incomingIsSynthetic = Reflect.get(part, 'synthetic') === true;
+  const shouldDropSyntheticText = !incomingIsSynthetic && part.type === 'text';
+  const filtered = shouldDropSyntheticText
+    ? arr.filter(
+        existing =>
+          existing.id === part.id ||
+          existing.messageID !== part.messageID ||
+          existing.type !== 'text' ||
+          Reflect.get(existing, 'synthetic') !== true
+      )
+    : arr;
+  const idx = filtered.findIndex(p => p.id === part.id);
+
+  if (idx >= 0) {
+    const nextArr = [...filtered];
+    nextArr[idx] = nextPart;
+    return nextArr;
+  }
+
+  return insertPartSorted(filtered, nextPart);
 }
 
 const STRUCTURAL_PART_FIELDS = new Set(['id', 'messageID', 'sessionID', 'type']);
@@ -87,4 +112,5 @@ export {
   insertSorted,
   isSupportedDeltaField,
   notify,
+  upsertPartDroppingStaleSyntheticTextParts,
 };

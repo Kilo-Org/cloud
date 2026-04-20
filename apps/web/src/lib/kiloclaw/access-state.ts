@@ -1,13 +1,23 @@
 import { db } from '@/lib/drizzle';
+import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import { kiloclaw_subscriptions, type KiloClawSubscription } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import {
   CurrentPersonalSubscriptionResolutionError,
   resolveCurrentPersonalSubscriptionRow,
 } from '@/lib/kiloclaw/current-personal-subscription';
 
-export type KiloClawAccessReason = 'trial' | 'subscription';
+export type KiloClawAccessReason = 'trial' | 'subscription' | 'earlybird';
+export type KiloClawSubscriptionAccessRecord = Pick<
+  KiloClawSubscription,
+  'status' | 'trial_ends_at' | 'suspended_at' | 'access_origin'
+>;
+export type KiloClawEarlybirdState = {
+  purchased: boolean;
+  hasAccess: boolean;
+  expiresAt: string | null;
+};
 
 function parseTimestamp(value: string | null | undefined): number {
   if (!value) return 0;
@@ -19,9 +29,10 @@ function subscriptionPriority(subscription: KiloClawSubscription, now: Date): nu
   const accessReason = getKiloClawSubscriptionAccessReason(subscription, now);
   if (accessReason === 'subscription') return 0;
   if (accessReason === 'trial') return 1;
-  if (subscription.plan !== 'trial') return 2;
-  if (subscription.status === 'trialing') return 3;
-  return 4;
+  if (accessReason === 'earlybird') return 2;
+  if (subscription.plan !== 'trial') return 3;
+  if (subscription.status === 'trialing') return 4;
+  return 5;
 }
 
 function subscriptionRecency(subscription: KiloClawSubscription): number {
@@ -34,10 +45,7 @@ function subscriptionRecency(subscription: KiloClawSubscription): number {
 }
 
 export function getKiloClawSubscriptionAccessReason(
-  subscription:
-    | Pick<KiloClawSubscription, 'status' | 'trial_ends_at' | 'suspended_at'>
-    | null
-    | undefined,
+  subscription: KiloClawSubscriptionAccessRecord | null | undefined,
   now = new Date()
 ): KiloClawAccessReason | null {
   if (!subscription) return null;
@@ -48,6 +56,9 @@ export function getKiloClawSubscriptionAccessReason(
     subscription.trial_ends_at &&
     new Date(subscription.trial_ends_at) > now
   ) {
+    if (subscription.access_origin === 'earlybird') {
+      return 'earlybird';
+    }
     return 'trial';
   }
   return null;
@@ -88,6 +99,36 @@ export async function getEffectiveKiloClawSubscriptionForUser(
     subscription,
     accessReason: getKiloClawSubscriptionAccessReason(subscription, now),
     subscriptionCount: subscriptions.length,
+  };
+}
+
+export async function getKiloClawEarlybirdStateForUser(
+  userId: string,
+  now = new Date()
+): Promise<KiloClawEarlybirdState> {
+  const earlybirdSubscriptions = await db
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        eq(kiloclaw_subscriptions.access_origin, 'earlybird')
+      )
+    );
+
+  if (earlybirdSubscriptions.length > 0) {
+    const subscription = getEffectiveKiloClawSubscription(earlybirdSubscriptions, now);
+    return {
+      purchased: true,
+      hasAccess: getKiloClawSubscriptionAccessReason(subscription, now) === 'earlybird',
+      expiresAt: subscription?.trial_ends_at ?? KILOCLAW_EARLYBIRD_EXPIRY_DATE,
+    };
+  }
+
+  return {
+    purchased: false,
+    hasAccess: false,
+    expiresAt: null,
   };
 }
 

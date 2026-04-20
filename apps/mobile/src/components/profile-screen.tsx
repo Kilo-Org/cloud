@@ -2,7 +2,6 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { ChevronDown, KeyRound, LogOut, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -31,7 +31,8 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
-  const [selectedOrgId, setSelectedOrgId] = useState<string | undefined>(undefined);
+  const { organizationId, setOrganizationId } = useOrganization();
+  const selectedOrgId = organizationId ?? undefined;
 
   const {
     data: balance,
@@ -91,11 +92,11 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
           return;
         }
         if (index === 0) {
-          setSelectedOrgId(undefined);
+          setOrganizationId(null);
         } else {
           const org = orgs[index - 1];
           if (org) {
-            setSelectedOrgId(org.organizationId);
+            setOrganizationId(org.organizationId);
           }
         }
       }

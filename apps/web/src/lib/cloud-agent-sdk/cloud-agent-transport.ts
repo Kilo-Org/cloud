@@ -6,8 +6,8 @@
  * the WebSocket connects with `?replay=false`, avoiding a blank flash while
  * the DO replays stored events.
  */
-import { CLOUD_AGENT_NEXT_WS_URL } from '@/lib/constants';
 import { createConnection, type Connection } from './cloud-agent-connection';
+import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import { normalize, isChatEvent } from './normalizer';
 import type { ServiceEvent } from './normalizer';
 import type { CloudAgentSessionId, KiloSessionId, SessionSnapshot } from './types';
@@ -26,12 +26,14 @@ type CloudAgentTransportConfig = {
     sessionId: CloudAgentSessionId
   ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
   fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
-  websocketBaseUrl?: string;
+  websocketBaseUrl: string;
   onError?: (message: string) => void;
+  lifecycleHooks?: ConnectionLifecycleHooks;
+  websocketHeaders?: WebSocketHeaders;
 };
 
 function createCloudAgentTransport(config: CloudAgentTransportConfig): TransportFactory {
-  const websocketBaseUrl = config.websocketBaseUrl ?? CLOUD_AGENT_NEXT_WS_URL;
+  const websocketBaseUrl = config.websocketBaseUrl;
 
   function buildWebsocketUrl(): string {
     const url = new URL('/stream', websocketBaseUrl);
@@ -80,6 +82,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       const nextConnection = createConnection({
         websocketUrl: buildWebsocketUrl(),
         ticket,
+        lifecycleHooks: config.lifecycleHooks,
+        websocketHeaders: config.websocketHeaders,
         onEvent: raw => {
           const event = normalize(raw);
           if (!event) return;

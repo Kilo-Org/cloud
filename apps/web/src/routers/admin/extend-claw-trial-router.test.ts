@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
-import { kiloclaw_subscriptions } from '@kilocode/db/schema';
+import { kiloclaw_subscription_change_log, kiloclaw_subscriptions } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import type { User } from '@kilocode/db/schema';
@@ -127,13 +128,16 @@ describe('extendTrials — 1-year ceiling', () => {
 
 describe('extendTrials — normal extension', () => {
   it('extends a trialing subscription by the requested days', async () => {
-    await db.insert(kiloclaw_subscriptions).values({
-      user_id: target.id,
-      plan: 'trial',
-      status: 'trialing',
-      trial_started_at: new Date().toISOString(),
-      trial_ends_at: new Date().toISOString(),
-    });
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: target.id,
+        plan: 'trial',
+        status: 'trialing',
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: new Date().toISOString(),
+      })
+      .returning();
 
     const caller = await createCallerForUser(admin.id);
     const results = await caller.admin.extendClawTrial.extendTrials({
@@ -150,16 +154,31 @@ describe('extendTrials — normal extension', () => {
     const expected = Date.now() + 7 * MS_PER_DAY;
     expect(newEnd).toBeGreaterThan(expected - MS_PER_DAY);
     expect(newEnd).toBeLessThan(expected + MS_PER_DAY);
+
+    const [changeLog] = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+    expect(changeLog).toEqual(
+      expect.objectContaining({
+        actor_id: admin.id,
+        action: 'admin_override',
+        reason: 'bulk_extend_trial',
+      })
+    );
   });
 
   it('resurrects a canceled subscription as a fresh trial', async () => {
-    await db.insert(kiloclaw_subscriptions).values({
-      user_id: target.id,
-      plan: 'trial',
-      status: 'canceled',
-      trial_started_at: new Date(Date.now() - 30 * MS_PER_DAY).toISOString(),
-      trial_ends_at: new Date(Date.now() - 10 * MS_PER_DAY).toISOString(),
-    });
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: target.id,
+        plan: 'trial',
+        status: 'canceled',
+        trial_started_at: new Date(Date.now() - 30 * MS_PER_DAY).toISOString(),
+        trial_ends_at: new Date(Date.now() - 10 * MS_PER_DAY).toISOString(),
+      })
+      .returning();
 
     const caller = await createCallerForUser(admin.id);
     const results = await caller.admin.extendClawTrial.extendTrials({
@@ -178,5 +197,17 @@ describe('extendTrials — normal extension', () => {
     const oneYearFromNow = calendarYearFromNow.getTime();
     expect(newEnd).toBeGreaterThan(oneYearFromNow - MS_PER_DAY);
     expect(newEnd).toBeLessThanOrEqual(oneYearFromNow + 5_000);
+
+    const [changeLog] = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+    expect(changeLog).toEqual(
+      expect.objectContaining({
+        actor_id: admin.id,
+        action: 'reactivated',
+        reason: 'bulk_restart_trial',
+      })
+    );
   });
 });

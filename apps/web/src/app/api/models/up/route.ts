@@ -55,6 +55,7 @@ const HEALTH_CHECK_EXCLUSIONS = new Set([
   'google/gemini-3.1-pro-preview',
   // We don't control when this model may be retracted by OpenRouter.
   'openrouter/elephant-alpha',
+  'openai/gpt-5.4',
 ]);
 
 function emptyMetrics(): Omit<ModelHealthMetrics, 'monitored'> {

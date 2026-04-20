@@ -259,6 +259,22 @@ export function isFlyNotFound(err: unknown): boolean {
   return err instanceof FlyApiError && err.status === 404;
 }
 
+const MISSING_VOLUME_STATUS_CODES = [400, 404, 422];
+const MISSING_VOLUME_MARKERS = [
+  'volume does not exist',
+  'volume not found',
+  'could not find volume',
+];
+
+export function isFlyMissingVolume(err: unknown): boolean {
+  if (!(err instanceof FlyApiError) || !MISSING_VOLUME_STATUS_CODES.includes(err.status)) {
+    return false;
+  }
+
+  const searchText = `${err.message}\n${err.body}`.toLowerCase();
+  return MISSING_VOLUME_MARKERS.some(marker => searchText.includes(marker));
+}
+
 /**
  * Status codes that Fly uses for capacity/resource exhaustion errors.
  * - 400: "no capacity" on createVolume (observed in production)

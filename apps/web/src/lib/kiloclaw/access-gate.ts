@@ -1,19 +1,20 @@
 import 'server-only';
 
 import { TRPCError } from '@trpc/server';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
-import { kiloclaw_earlybird_purchases } from '@kilocode/db/schema';
-import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
+import { kiloclaw_instances } from '@kilocode/db/schema';
 import {
   getCurrentPersonalKiloClawSubscriptionForUser,
+  getKiloClawSubscriptionAccessReason,
   CurrentPersonalSubscriptionResolutionError,
 } from '@/lib/kiloclaw/access-state';
+import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
 import { baseProcedure } from '@/lib/trpc/init';
 
 /**
- * Check whether a user has active KiloClaw access via subscription, trial, or earlybird.
+ * Check whether a user has active KiloClaw access via subscription or trial.
  * Throws TRPCError FORBIDDEN if the user has no valid access.
  */
 export async function requireKiloClawAccess(userId: string): Promise<void> {
@@ -47,17 +48,6 @@ export async function requireKiloClawAccess(userId: string): Promise<void> {
     throw error;
   }
 
-  // 2. Earlybird not expired
-  const [earlybird] = await db
-    .select({ id: kiloclaw_earlybird_purchases.id })
-    .from(kiloclaw_earlybird_purchases)
-    .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
-    .limit(1);
-
-  if (earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now) {
-    return;
-  }
-
   console.warn(
     JSON.stringify({
       event: 'kiloclaw_access_denied',
@@ -72,13 +62,71 @@ export async function requireKiloClawAccess(userId: string): Promise<void> {
           }
         : 'none',
       accessReason,
-      earlybirdFound: !!earlybird,
     })
   );
 
   throw new TRPCError({
     code: 'FORBIDDEN',
-    message: 'KiloClaw access requires an active subscription, trial, or earlybird purchase.',
+    message: 'KiloClaw access requires an active subscription or trial.',
+  });
+}
+
+export async function requireKiloClawAccessAtInstance(
+  userId: string,
+  instanceId: string
+): Promise<void> {
+  const [instance] = await db
+    .select({ id: kiloclaw_instances.id })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.id, instanceId),
+        eq(kiloclaw_instances.user_id, userId),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+
+  if (!instance) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'No active KiloClaw instance found',
+    });
+  }
+
+  const now = new Date();
+
+  try {
+    const row = await resolveCurrentPersonalSubscriptionRow({
+      userId,
+      instanceId,
+      dbOrTx: db,
+    });
+    if (getKiloClawSubscriptionAccessReason(row?.subscription, now)) {
+      return;
+    }
+  } catch (error) {
+    if (error instanceof CurrentPersonalSubscriptionResolutionError) {
+      console.warn(
+        JSON.stringify({
+          event: 'kiloclaw_access_quarantined_multiple_current_rows',
+          userId,
+          instanceId: error.instanceId ?? instanceId,
+          message: error.message,
+        })
+      );
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'KiloClaw billing state needs support review before access can be restored.',
+      });
+    }
+    throw error;
+  }
+
+  throw new TRPCError({
+    code: 'FORBIDDEN',
+    message: 'KiloClaw access requires an active subscription or trial.',
   });
 }
 

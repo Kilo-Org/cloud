@@ -94,25 +94,9 @@ export function ConversationItem({
     isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/50'
   }`;
 
-  // Wrap content in a Link unless renaming (input needs to capture clicks)
-  const Wrapper = isRenaming
-    ? ({ children }: { children: React.ReactNode }) => (
-        <div className={sharedClassName}>{children}</div>
-      )
-    : ({ children }: { children: React.ReactNode }) => (
-        <Link
-          href={`/claw/kilo-chat/${conversation.conversationId}`}
-          prefetch={false}
-          className={sharedClassName}
-        >
-          {children}
-        </Link>
-      );
-
-  return (
-    <Wrapper>
-      <div className="flex items-center justify-between gap-2">
-        {isRenaming ? (
+  const content = (
+    <div className="flex items-center justify-between gap-2">
+      {isRenaming ? (
           <input
             ref={inputRef}
             value={renameValue}
@@ -201,6 +185,18 @@ export function ConversationItem({
           </>
         )}
       </div>
-    </Wrapper>
+  );
+
+  // Use conditional JSX instead of inline component types to avoid unmount/remount
+  return isRenaming ? (
+    <div className={sharedClassName}>{content}</div>
+  ) : (
+    <Link
+      href={`/claw/kilo-chat/${conversation.conversationId}`}
+      prefetch={false}
+      className={sharedClassName}
+    >
+      {content}
+    </Link>
   );
 }

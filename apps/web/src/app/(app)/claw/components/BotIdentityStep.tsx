@@ -59,9 +59,13 @@ const NATURE_PRESETS: NaturePreset[] = [
 
 export function BotIdentityStep({
   instanceRunning,
+  currentStep = 2,
+  totalSteps = 5,
   onContinue,
 }: {
   instanceRunning: boolean;
+  currentStep?: number;
+  totalSteps?: number;
   onContinue: (identity: BotIdentity) => void;
 }) {
   const [botName, setBotName] = useState('');
@@ -113,8 +117,8 @@ export function BotIdentityStep({
 
   return (
     <OnboardingStepView
-      currentStep={2}
-      totalSteps={5}
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       title="Give your bot an identity"
       description="Make it yours. You can always change this later."
       showProvisioningBanner={!instanceRunning}

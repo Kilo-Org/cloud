@@ -68,6 +68,22 @@ export type ClawOnboardingFlowStateInput = {
   selectedChannelId: string | null;
   gatewayState?: GatewayProcessStatusResponse['state'] | null;
   debugLogSource?: string;
+  /**
+   * When true, the onboarding flow skips the intro `create-instance` screen
+   * and lands the user directly on `identity`. Provisioning is expected to
+   * start automatically before this screen renders. Falls back to showing
+   * `create-instance` only when auto-start fails (parent sets this back to
+   * false).
+   */
+  skipCreateInstanceStep?: boolean;
+};
+
+export type OnboardingStepNumbers = {
+  identity: number;
+  permissions: number;
+  channels: number;
+  provisioning: number;
+  pairing: number;
 };
 
 export type ClawOnboardingFlowState = {
@@ -80,6 +96,8 @@ export type ClawOnboardingFlowState = {
   postProvisioningReady: boolean;
   hasPairingStep: boolean;
   totalSteps: number;
+  stepNumbers: OnboardingStepNumbers;
+  skipCreateInstanceStep: boolean;
 };
 
 export function hasPopulatedStatus(
@@ -109,6 +127,7 @@ export function getClawOnboardingFlowState({
   selectedChannelId,
   gatewayState,
   debugLogSource = 'default',
+  skipCreateInstanceStep = false,
 }: ClawOnboardingFlowStateInput): ClawOnboardingFlowState {
   const instanceStatus = hasPopulatedStatus(status) ? status : null;
   const isRunning = instanceStatus?.status === 'running';
@@ -118,7 +137,11 @@ export function getClawOnboardingFlowState({
   const createSetupActive =
     mode === 'create-first' && (createSetupStarted || instanceStatus !== null);
   const hasPairingStep = isPairingChannel(selectedChannelId);
-  const totalSteps = hasPairingStep ? 6 : 5;
+  // When the intro `create-instance` screen is skipped, identity becomes the
+  // first indicator step (step 1 of 4/5). Otherwise identity remains step 2,
+  // because the intro card counts as step 1 even though it has no indicator.
+  const totalSteps = computeTotalSteps({ hasPairingStep, skipCreateInstanceStep });
+  const stepNumbers = computeStepNumbers({ skipCreateInstanceStep });
   const renderStepDecision = getRenderStepDecision({
     mode,
     createSetupStarted,
@@ -128,6 +151,7 @@ export function getClawOnboardingFlowState({
     selectedPreset,
     hasBotIdentity,
     hasPairingStep,
+    skipCreateInstanceStep,
   });
   const flowState = {
     renderStep: renderStepDecision.renderStep,
@@ -139,6 +163,8 @@ export function getClawOnboardingFlowState({
     postProvisioningReady,
     hasPairingStep,
     totalSteps,
+    stepNumbers,
+    skipCreateInstanceStep,
   } satisfies ClawOnboardingFlowState;
 
   logClawOnboardingFlowStateDecision({
@@ -159,10 +185,47 @@ export function getClawOnboardingFlowState({
     postProvisioningReady,
     hasPairingStep,
     totalSteps,
+    skipCreateInstanceStep,
     renderStepDecision,
   });
 
   return flowState;
+}
+
+function computeTotalSteps({
+  hasPairingStep,
+  skipCreateInstanceStep,
+}: {
+  hasPairingStep: boolean;
+  skipCreateInstanceStep: boolean;
+}): number {
+  if (skipCreateInstanceStep) {
+    return hasPairingStep ? 5 : 4;
+  }
+  return hasPairingStep ? 6 : 5;
+}
+
+function computeStepNumbers({
+  skipCreateInstanceStep,
+}: {
+  skipCreateInstanceStep: boolean;
+}): OnboardingStepNumbers {
+  if (skipCreateInstanceStep) {
+    return {
+      identity: 1,
+      permissions: 2,
+      channels: 3,
+      provisioning: 4,
+      pairing: 5,
+    };
+  }
+  return {
+    identity: 2,
+    permissions: 3,
+    channels: 4,
+    provisioning: 5,
+    pairing: 6,
+  };
 }
 
 type RenderStepInput = Pick<
@@ -172,6 +235,7 @@ type RenderStepInput = Pick<
   instanceStatus: PopulatedClawStatus | null;
   postProvisioningReady: boolean;
   hasPairingStep: boolean;
+  skipCreateInstanceStep: boolean;
 };
 
 type RenderStepDecision = {
@@ -189,6 +253,7 @@ type ClawOnboardingFlowDebugLogInput = ClawOnboardingFlowStateInput & {
   postProvisioningReady: boolean;
   hasPairingStep: boolean;
   totalSteps: number;
+  skipCreateInstanceStep: boolean;
   renderStepDecision: RenderStepDecision;
 };
 
@@ -210,6 +275,7 @@ function getRenderStepDecision({
   selectedPreset,
   hasBotIdentity,
   hasPairingStep,
+  skipCreateInstanceStep,
 }: RenderStepInput): RenderStepDecision {
   if (instanceStatus && isClawOnboardingErrorStatus(instanceStatus.status)) {
     return {
@@ -241,6 +307,13 @@ function getRenderStepDecision({
   }
 
   if (instanceStatus === null && !createSetupStarted) {
+    if (skipCreateInstanceStep) {
+      return {
+        renderStep: 'identity',
+        reason:
+          'skipCreateInstanceStep is enabled, so identity is rendered while auto-start runs in the background',
+      };
+    }
     return {
       renderStep: 'create-instance',
       reason: 'create-first mode has no instance status and setup has not started',
@@ -318,6 +391,7 @@ function logClawOnboardingFlowStateDecision({
   postProvisioningReady,
   hasPairingStep,
   totalSteps,
+  skipCreateInstanceStep,
   renderStepDecision,
 }: ClawOnboardingFlowDebugLogInput): void {
   if (typeof window === 'undefined') return;
@@ -333,6 +407,7 @@ function logClawOnboardingFlowStateDecision({
       gatewayState: gatewayState ?? null,
       status: status?.status ?? null,
       hasStatusResponse: status !== undefined,
+      skipCreateInstanceStep,
     },
     null,
     2

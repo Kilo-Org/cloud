@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { Brain, ChevronRight, MessageSquare, Sun, Wrench, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+import type { PostHog } from 'posthog-js';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { KILO_AUTO_BALANCED_MODEL } from '@/lib/kilo-auto';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,52 @@ function getBrowserTimeZone(): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+export type ClawProvisionTrigger = 'manual' | 'auto';
+
+/**
+ * Shared entry point for starting KiloClaw provisioning.
+ *
+ * Used by both the legacy `CreateInstanceCard` button and the auto-start
+ * effect in `ClawOnboardingFlow`. Accepts a `trigger` field so analytics
+ * can distinguish user-initiated vs auto-started provisioning.
+ */
+export function startClawProvision({
+  mutations,
+  posthog,
+  trigger,
+  onProvisionStart,
+  onProvisionFailed,
+}: {
+  mutations: ClawMutations;
+  posthog?: PostHog;
+  trigger: ClawProvisionTrigger;
+  onProvisionStart?: () => void;
+  onProvisionFailed?: () => void;
+}): void {
+  const selectedModel = KILO_AUTO_BALANCED_MODEL.id;
+  posthog?.capture('claw_create_instance_clicked', {
+    selected_model: selectedModel,
+    trigger,
+  });
+
+  // Enter the onboarding wizard before the mutation fires so the UI
+  // shows the wizard immediately instead of racing with status polling.
+  onProvisionStart?.();
+
+  mutations.provision.mutate(
+    {
+      kilocodeDefaultModel: `kilocode/${selectedModel}`,
+      userTimezone: getBrowserTimeZone(),
+    },
+    {
+      onError: err => {
+        onProvisionFailed?.();
+        toast.error(`Failed to create: ${err.message}`);
+      },
+    }
+  );
 }
 
 type CreateInstanceCardViewProps = {
@@ -123,36 +169,18 @@ export function CreateInstanceCard({
   // $feature/button-vs-card to events fired in this component.
   useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
-  const hasCapturedPageView = useRef(false);
+  // `claw_page_viewed` is now owned by `ClawOnboardingFlow`, which mounts
+  // before this card and already captures the event. Capturing here as well
+  // would double-fire in the auto-start-failure fallback path.
 
-  useEffect(() => {
-    if (hasCapturedPageView.current) return;
-    hasCapturedPageView.current = true;
-    posthog?.capture('claw_page_viewed');
-  }, [posthog]);
-
-  const selectedModel = KILO_AUTO_BALANCED_MODEL.id;
   function handleCreate() {
-    posthog?.capture('claw_create_instance_clicked', {
-      selected_model: selectedModel,
+    startClawProvision({
+      mutations,
+      posthog: posthog ?? undefined,
+      trigger: 'manual',
+      onProvisionStart,
+      onProvisionFailed,
     });
-
-    // Enter the onboarding wizard before the mutation fires so the UI
-    // shows the wizard immediately instead of racing with status polling.
-    onProvisionStart?.();
-
-    mutations.provision.mutate(
-      {
-        kilocodeDefaultModel: `kilocode/${selectedModel}`,
-        userTimezone: getBrowserTimeZone(),
-      },
-      {
-        onError: err => {
-          onProvisionFailed?.();
-          toast.error(`Failed to create: ${err.message}`);
-        },
-      }
-    );
   }
 
   return (

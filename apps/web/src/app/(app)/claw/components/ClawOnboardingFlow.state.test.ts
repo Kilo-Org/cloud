@@ -61,6 +61,7 @@ function createInput(
     hasBotIdentity: false,
     selectedChannelId: null,
     gatewayState: null,
+    skipCreateInstanceStep: false,
     ...overrides,
   };
 }
@@ -269,6 +270,73 @@ describe('ClawOnboardingFlow state machine', () => {
     expect(startingGatewayState.isRunning).toBe(true);
     expect(startingGatewayState.gatewayReady).toBe(false);
     expect(startingGatewayState.instanceRunning).toBe(false);
+  });
+
+  test('renders identity immediately when skipCreateInstanceStep is enabled and no setup has started', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        skipCreateInstanceStep: true,
+      })
+    );
+
+    expect(state.renderStep).toBe('identity');
+    expect(state.createSetupActive).toBe(false);
+    expect(state.instanceStatus).toBeNull();
+    expect(state.skipCreateInstanceStep).toBe(true);
+  });
+
+  test('uses compact step numbering when skipCreateInstanceStep is enabled', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        skipCreateInstanceStep: true,
+      })
+    );
+
+    expect(state.totalSteps).toBe(4);
+    expect(state.stepNumbers).toEqual({
+      identity: 1,
+      permissions: 2,
+      channels: 3,
+      provisioning: 4,
+      pairing: 5,
+    });
+  });
+
+  test('uses compact pairing step numbering when pairing channel is selected and skipCreateInstanceStep is enabled', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        skipCreateInstanceStep: true,
+        selectedChannelId: 'telegram',
+      })
+    );
+
+    expect(state.totalSteps).toBe(5);
+    expect(state.stepNumbers.pairing).toBe(5);
+  });
+
+  test('keeps legacy step numbering when skipCreateInstanceStep is disabled', () => {
+    const state = getClawOnboardingFlowState(createInput());
+
+    expect(state.totalSteps).toBe(5);
+    expect(state.stepNumbers).toEqual({
+      identity: 2,
+      permissions: 3,
+      channels: 4,
+      provisioning: 5,
+      pairing: 6,
+    });
+  });
+
+  test('falls back to the intro card when skipCreateInstanceStep is off (auto-start failure case)', () => {
+    // Simulates the parent disabling skipCreateInstanceStep after auto-start fails.
+    const state = getClawOnboardingFlowState(
+      createInput({
+        skipCreateInstanceStep: false,
+      })
+    );
+
+    expect(state.renderStep).toBe('create-instance');
+    expect(state.totalSteps).toBe(5);
   });
 
   test('normalizes impossible local wizard states to the earliest safe prerequisite', () => {

@@ -10,6 +10,7 @@ import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/us
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { clearPersonalOnboardingInProgress } from '@/lib/kiloclaw/onboarding-progress';
 import { useClawServiceDegraded } from '../hooks/useClawHooks';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { BillingWrapper } from './billing/BillingWrapper';
@@ -19,7 +20,7 @@ import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
-import { CreateInstanceCard } from './CreateInstanceCard';
+import { CreateInstanceCard, startClawProvision } from './CreateInstanceCard';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep, ProvisioningStepView } from './ProvisioningStep';
 import type { BotIdentity, ExecPreset } from './claw.types';
@@ -57,6 +58,8 @@ export function ClawOnboardingFlow({
   createFlowStarted = false,
   onCreateFlowStarted,
   onCreateFlowFailed,
+  skipCreateInstanceStep = false,
+  autoProvisionOnMount = false,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
@@ -64,6 +67,19 @@ export function ClawOnboardingFlow({
   createFlowStarted?: boolean;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
+  /**
+   * When true (personal flow only), the intro `create-instance` screen is
+   * skipped and the user lands directly on `BotIdentityStep`. Controls the
+   * step indicator and render decision only.
+   */
+  skipCreateInstanceStep?: boolean;
+  /**
+   * When true, the flow also auto-starts the `provision` mutation on mount.
+   * The parent should only set this on fresh personal entries — never on
+   * refreshes where provisioning was already triggered in a previous
+   * session, to avoid calling `provision` against an existing instance.
+   */
+  autoProvisionOnMount?: boolean;
 }) {
   return (
     <ClawContextProvider organizationId={organizationId}>
@@ -73,6 +89,8 @@ export function ClawOnboardingFlow({
         createFlowStarted={createFlowStarted}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
+        skipCreateInstanceStep={skipCreateInstanceStep}
+        autoProvisionOnMount={autoProvisionOnMount}
       />
     </ClawContextProvider>
   );
@@ -84,12 +102,16 @@ function ClawOnboardingFlowInner({
   createFlowStarted,
   onCreateFlowStarted,
   onCreateFlowFailed,
+  skipCreateInstanceStep,
+  autoProvisionOnMount,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   createFlowStarted: boolean;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
+  skipCreateInstanceStep: boolean;
+  autoProvisionOnMount: boolean;
 }) {
   const { organizationId } = useClawContext();
 
@@ -117,6 +139,7 @@ function ClawOnboardingFlowInner({
     selectedPreset,
     hasBotIdentity: botIdentity !== null,
     selectedChannelId,
+    skipCreateInstanceStep,
   };
   const preGatewayFlowState = getClawOnboardingFlowState({
     ...stateInput,
@@ -141,6 +164,15 @@ function ClawOnboardingFlowInner({
   const { data: isServiceDegraded } = useClawServiceDegraded();
   const posthog = usePostHog();
 
+  // Fire `claw_page_viewed` from the flow mount so the event still captures
+  // when the intro `create-instance` screen is skipped.
+  const hasCapturedPageView = useRef(false);
+  useEffect(() => {
+    if (hasCapturedPageView.current) return;
+    hasCapturedPageView.current = true;
+    posthog?.capture('claw_page_viewed');
+  }, [posthog]);
+
   useEffect(() => {
     if (!flowState.createSetupActive || hasCapturedIdentityView.current) return;
     hasCapturedIdentityView.current = true;
@@ -158,6 +190,18 @@ function ClawOnboardingFlowInner({
     hasCapturedDoneView.current = true;
     posthog?.capture('claw_setup_done_viewed');
   }, [mode, flowState.postProvisioningReady, posthog]);
+
+  // Clear the refresh-safety marker once the personal wizard reaches its
+  // terminal state (complete or error). We deliberately do this as a side
+  // effect instead of directly in the pairing/provisioning completion
+  // handlers so the marker is also cleared when the user closes/refreshes
+  // the page after the wizard is already done.
+  useEffect(() => {
+    if (organizationId) return;
+    if (flowState.renderStep === 'complete' || flowState.renderStep === 'error') {
+      clearPersonalOnboardingInProgress();
+    }
+  }, [organizationId, flowState.renderStep]);
 
   const resetWizardSelections = useCallback(() => {
     setOnboardingStep('identity');
@@ -180,6 +224,44 @@ function ClawOnboardingFlowInner({
     onCreateFlowFailed?.();
   }, [onCreateFlowFailed, resetWizardSelections]);
 
+  // Auto-start provisioning on mount when enabled (personal flow only).
+  // Guarded with a ref so it never runs twice even across re-renders or React
+  // strict-mode double invocations. Mutations intentionally excluded from
+  // deps; `startClawProvision` reads them synchronously and we only want this
+  // effect to re-evaluate the auto-start conditions.
+  const hasAutoStartedRef = useRef(false);
+  useEffect(() => {
+    if (!autoProvisionOnMount) return;
+    if (mode !== 'create-first') return;
+    if (organizationId) return;
+    if (hasAutoStartedRef.current) return;
+    if (createSetupStarted) return;
+    if (flowState.instanceStatus) return;
+    if (mutations.provision.isPending) return;
+
+    hasAutoStartedRef.current = true;
+    startClawProvision({
+      mutations,
+      posthog: posthog ?? undefined,
+      trigger: 'auto',
+      onProvisionStart: handleCreateFlowStarted,
+      onProvisionFailed: () => {
+        hasAutoStartedRef.current = false;
+        handleCreateFlowFailed();
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutations object changes each render; guarded by hasAutoStartedRef
+  }, [
+    autoProvisionOnMount,
+    mode,
+    organizationId,
+    createSetupStarted,
+    flowState.instanceStatus,
+    handleCreateFlowStarted,
+    handleCreateFlowFailed,
+    posthog,
+  ]);
+
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
 
   function renderCreateInstanceStep() {
@@ -196,6 +278,8 @@ function ClawOnboardingFlowInner({
     return (
       <BotIdentityStep
         instanceRunning={flowState.instanceRunning}
+        currentStep={flowState.stepNumbers.identity}
+        totalSteps={flowState.totalSteps}
         onContinue={identity => {
           posthog?.capture('claw_setup_identity_completed', {
             bot_name_is_custom: identity.botName !== 'KiloClaw',
@@ -214,6 +298,8 @@ function ClawOnboardingFlowInner({
     return (
       <PermissionStep
         instanceRunning={flowState.instanceRunning}
+        currentStep={flowState.stepNumbers.permissions}
+        totalSteps={flowState.totalSteps}
         onSelect={preset => {
           posthog?.capture('claw_setup_permissions_completed', { preset });
           posthog?.capture('claw_setup_channels_viewed');
@@ -228,6 +314,8 @@ function ClawOnboardingFlowInner({
     return (
       <ChannelSelectionStepView
         instanceRunning={flowState.instanceRunning}
+        currentStep={flowState.stepNumbers.channels}
+        totalSteps={flowState.totalSteps}
         onSelect={(channelId, tokens) => {
           posthog?.capture('claw_setup_channels_completed', {
             channel: channelId,
@@ -253,7 +341,14 @@ function ClawOnboardingFlowInner({
   }
 
   function renderProvisioningStep() {
-    if (mode === 'post-provisioning') return <ProvisioningStepView />;
+    if (mode === 'post-provisioning') {
+      return (
+        <ProvisioningStepView
+          currentStep={flowState.stepNumbers.provisioning}
+          totalSteps={flowState.totalSteps}
+        />
+      );
+    }
     if (selectedPreset === null) return renderPermissionsStep();
 
     return (
@@ -263,6 +358,7 @@ function ClawOnboardingFlowInner({
         botIdentity={botIdentity}
         instanceRunning={flowState.instanceRunning}
         mutations={mutations}
+        currentStep={flowState.stepNumbers.provisioning}
         totalSteps={flowState.totalSteps}
         onComplete={() => {
           posthog?.capture('claw_setup_provisioned');
@@ -282,6 +378,8 @@ function ClawOnboardingFlowInner({
       <ChannelPairingStep
         channelId={selectedChannelId}
         mutations={mutations}
+        currentStep={flowState.stepNumbers.pairing}
+        totalSteps={flowState.totalSteps}
         onComplete={() => {
           posthog?.capture('claw_setup_pairing_completed', {
             channel: selectedChannelId,

@@ -96,11 +96,15 @@ function pickChannelTokens(
 
 export function ChannelSelectionStepView({
   instanceRunning,
+  currentStep = 4,
+  totalSteps = 5,
   onSelect,
   onSkip,
   defaultSelected = null,
 }: {
   instanceRunning?: boolean;
+  currentStep?: number;
+  totalSteps?: number;
   onSelect?: (channelId: ChannelId, tokens: Record<string, string>) => void;
   onSkip?: () => void;
   defaultSelected?: ChannelId | null;
@@ -140,8 +144,8 @@ export function ChannelSelectionStepView({
 
   return (
     <OnboardingStepView
-      currentStep={4}
-      totalSteps={5}
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       title="Where do you want to chat?"
       description="Pick where you'd like to talk to your KiloClaw bot. You can add more channels any time from settings."
       showProvisioningBanner={instanceRunning === false}

@@ -3,6 +3,7 @@ import { addMonths, format } from 'date-fns';
 
 import type { WorkerDb } from '@kilocode/db';
 import {
+  markInstanceDestroyedWithPersonalSubscriptionCollapse,
   getWorkerDb,
   insertKiloClawSubscriptionChangeLog,
   type KiloClawSubscription,
@@ -1840,12 +1841,30 @@ async function runInstanceDestructionSweep(
       await destroyInstanceForEnforcement(env, context, row);
 
       if (row.instance_id) {
-        await database
-          .update(kiloclaw_instances)
-          .set({ destroyed_at: now })
-          .where(
-            and(eq(kiloclaw_instances.id, row.instance_id), isNull(kiloclaw_instances.destroyed_at))
-          );
+        const instanceId = row.instance_id;
+        await database.transaction(async tx => {
+          await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+            actor: LIFECYCLE_ACTOR,
+            changeLogFailurePolicy: 'log',
+            destroyedAt: now,
+            executor: tx,
+            instanceId,
+            onChangeLogFailure: ({ error, subscriptionId, userId, reason }) => {
+              log('error', 'Failed to write personal subscription collapse change log', {
+                event: 'subscription_change_log_failed',
+                outcome: 'failed',
+                subscriptionId,
+                userId,
+                instanceId,
+                action: 'reassigned',
+                reason,
+                error: errorMessage(error),
+              });
+            },
+            reason: 'destroy_path_inline_collapse',
+            userId: row.user_id,
+          });
+        });
       }
 
       const before = await getSubscriptionById(database, row.id);

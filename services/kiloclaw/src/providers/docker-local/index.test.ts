@@ -152,10 +152,16 @@ describe('dockerLocalProviderAdapter', () => {
         });
       }
       if (url.includes('/containers/json?all=1')) {
-        return new Response(JSON.stringify([{ Ports: [{ PublicPort: 45000 }] }]), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify([
+            { Ports: null },
+            { Ports: [{ PublicPort: null }, { PublicPort: 45000 }] },
+          ]),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        );
       }
       if (url.endsWith('/containers/kiloclaw-sandbox-1/json')) {
         events.push('inspect-container');

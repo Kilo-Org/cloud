@@ -69,6 +69,39 @@ describe('provider rollout config', () => {
     ).resolves.toBe('fly');
   });
 
+  it('selects the configured default provider in development', async () => {
+    await expect(
+      selectProviderForProvision({
+        kv: createKv(),
+        userId: 'user-1',
+        workerEnv: 'development',
+        defaultProvider: 'docker-local',
+      })
+    ).resolves.toBe('docker-local');
+  });
+
+  it('uses rollout rather than local defaults outside development', async () => {
+    await expect(
+      selectProviderForProvision({
+        kv: createKv(),
+        userId: 'user-1',
+        workerEnv: 'production',
+        defaultProvider: 'docker-local',
+      })
+    ).resolves.toBe('fly');
+  });
+
+  it('ignores invalid default provider values in development', async () => {
+    await expect(
+      selectProviderForProvision({
+        kv: createKv(),
+        userId: 'user-1',
+        workerEnv: 'development',
+        defaultProvider: 'bogus',
+      })
+    ).resolves.toBe('fly');
+  });
+
   it('does not select Northflank for orgs that are not opted in', async () => {
     const kv = createKv(
       JSON.stringify({

@@ -10,6 +10,7 @@ import { storageUpdate } from './state';
 import { doWarn, toLoggable } from './log';
 
 const MINT_TIMEOUT_MS = 5_000;
+const DOCKER_HOST_INTERNAL = 'host.docker.internal';
 
 /**
  * Resolve the Docker image tag for this instance.
@@ -38,6 +39,27 @@ export function resolveRuntimeImageRef(state: InstanceMutableState, env: KiloCla
     return env.DOCKER_LOCAL_IMAGE ?? 'kiloclaw:local';
   }
   return resolveImageRef(state, env);
+}
+
+export function resolveDockerLocalKiloCodeApiBaseUrl(
+  backendApiUrl: string | undefined
+): string | null {
+  if (!backendApiUrl) return null;
+
+  let url: URL;
+  try {
+    url = new URL(backendApiUrl);
+  } catch {
+    return null;
+  }
+
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]') {
+    url.hostname = DOCKER_HOST_INTERNAL;
+  }
+  url.pathname = '/api/gateway/';
+  url.search = '';
+  url.hash = '';
+  return url.toString();
 }
 
 /**
@@ -169,6 +191,13 @@ export async function buildUserEnvVars(
       customSecretMeta: state.customSecretMeta ?? undefined,
     }
   );
+
+  if (state.provider === 'docker-local') {
+    const dockerLocalBaseUrl = resolveDockerLocalKiloCodeApiBaseUrl(env.BACKEND_API_URL);
+    if (dockerLocalBaseUrl) {
+      plainEnv.KILOCODE_API_BASE_URL = dockerLocalBaseUrl;
+    }
+  }
 
   // Inject latest Gmail historyId for controller to patch gog state on startup.
   if (state.gmailLastHistoryId) {

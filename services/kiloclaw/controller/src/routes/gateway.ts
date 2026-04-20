@@ -3,14 +3,28 @@ import type { Hono } from 'hono';
 import { timingSafeTokenEqual } from '../auth';
 import type { Supervisor } from '../supervisor';
 
-// shared-cpu-2x gives ~6% of 2 physical cores, so even modest load
-// averages represent heavy pressure. After boot completes, an idle
-// system sits near 0. A threshold of 0.1 ensures boot CPU work has
-// fully subsided before we tell the frontend it's safe to proceed.
+// shared-cpu Fly machines can see high load averages from modest boot work.
+// Performance Fly machines and non-Fly local Docker runs should not block
+// provisioning on host load average settling.
 const LOAD_SETTLED_THRESHOLD = 0.1;
 
-function loadFields(): { loadAverage: number[]; settled: boolean } {
+type LoadEnv = Record<string, string | undefined>;
+
+export function shouldCheckLoadSettled(env: LoadEnv = process.env): boolean {
+  const isFly = env.KILOCLAW_RUNTIME_PROVIDER
+    ? env.KILOCLAW_RUNTIME_PROVIDER === 'fly'
+    : Boolean(env.FLY_MACHINE_ID);
+  return isFly && env.KILOCLAW_MACHINE_CPU_KIND === 'shared';
+}
+
+export function loadFields(env: LoadEnv = process.env): {
+  loadAverage: number[];
+  settled: boolean;
+} {
   const loadAverage = os.loadavg();
+  if (!shouldCheckLoadSettled(env)) {
+    return { loadAverage, settled: true };
+  }
   return { loadAverage, settled: loadAverage[0] < LOAD_SETTLED_THRESHOLD };
 }
 

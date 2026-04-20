@@ -70,6 +70,26 @@ export const KILOCLAW_MITIGATED_CHECKS: ReadonlyMap<string, string> = new Map([
     // not a misconfiguration.
     'Default profile intentionally reaches plugin tools so bots (Telegram/Discord/Slack/web-search) can invoke their capabilities.',
   ],
+  [
+    'hooks.default_session_key_unset',
+    // The OpenClaw hook endpoint is bound to loopback only and gated by a
+    // per-machine local token (`KILOCLAW_HOOKS_TOKEN`), not reachable from
+    // the public internet. The only configured hook mapping (inbound email)
+    // sets `sessionKey` from the authenticated controller payload, so the
+    // unset `defaultSessionKey` fallback that this check guards against is
+    // never hit in practice.
+    'Hooks bound to loopback and reached only from the KiloClaw controller via a local token; the one configured mapping (inbound email) sets sessionKey from the authenticated payload.',
+  ],
+  [
+    'hooks.allowed_agent_ids_unrestricted',
+    // Hooks are loopback-only and gated by a per-machine local token, so
+    // there is no authenticated external caller that could name an
+    // arbitrary agent id. The KiloClaw controller is the sole caller and
+    // invokes a fixed mapping (inbound email) that routes to a fixed agent,
+    // never a caller-supplied id — so the wildcard routing this check
+    // warns about is not reachable.
+    'Hooks bound to loopback; the KiloClaw controller is the only caller and invokes a fixed mapping rather than a caller-supplied agent id.',
+  ],
 ]);
 
 /**

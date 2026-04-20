@@ -1475,7 +1475,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       envVars,
       bootstrapEnv,
       this.s.machineSize,
-      identity
+      identity,
+      this.s.provider
     );
 
     const startResult = await this.provider().startRuntime({
@@ -2735,7 +2736,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         envVars,
         bootstrapEnv,
         this.s.machineSize,
-        identity
+        identity,
+        this.s.provider
       );
 
       const restart = await this.provider().restartRuntime({

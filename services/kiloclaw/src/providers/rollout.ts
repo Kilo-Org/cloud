@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ProviderId } from '../schemas/instance-config';
+import { ProviderIdSchema, type ProviderId } from '../schemas/instance-config';
 
 export const PROVIDER_ROLLOUT_KV_KEY = 'provider-rollout';
 export const NORTHFLANK_ROLLOUT_AVAILABLE = false;
@@ -88,11 +88,26 @@ async function selectProviderFromRollout(params: {
   return (await rolloutBucket(params.key)) < params.percent ? 'northflank' : 'fly';
 }
 
+function resolveDevelopmentDefaultProvider(params: {
+  workerEnv?: string;
+  defaultProvider?: string;
+}): ProviderId | null {
+  if (params.workerEnv !== 'development') return null;
+
+  const parsed = ProviderIdSchema.safeParse(params.defaultProvider);
+  return parsed.success ? parsed.data : null;
+}
+
 export async function selectProviderForProvision(params: {
   kv: TextKVReader;
   userId: string;
   orgId?: string | null;
+  workerEnv?: string;
+  defaultProvider?: string;
 }): Promise<ProviderId> {
+  const developmentDefault = resolveDevelopmentDefaultProvider(params);
+  if (developmentDefault) return developmentDefault;
+
   const { config } = await readProviderRolloutConfig(params.kv);
   const orgId = params.orgId ?? null;
   if (orgId && !config.northflank.enabledOrganizationIds.includes(orgId)) return 'fly';

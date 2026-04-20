@@ -10,7 +10,26 @@ export type ContextUnsubscribeMessage = {
   contexts: string[];
 };
 
-export type ClientMessage = ContextSubscribeMessage | ContextUnsubscribeMessage;
+export type PresencePingMessage = {
+  type: 'presence.ping';
+};
+
+export type PresenceShowMessage = {
+  type: 'presence.show';
+  context: string;
+};
+
+export type PresenceHideMessage = {
+  type: 'presence.hide';
+  context: string;
+};
+
+export type ClientMessage =
+  | ContextSubscribeMessage
+  | ContextUnsubscribeMessage
+  | PresencePingMessage
+  | PresenceShowMessage
+  | PresenceHideMessage;
 
 // ── Server → Client ─────────────────────────────────────────────────
 
@@ -21,4 +40,16 @@ export type EventMessage = {
   payload: unknown;
 };
 
-export type ServerMessage = EventMessage;
+export type PresenceJoinedMessage = {
+  type: 'presence.joined';
+  context: string;
+  userId: string;
+};
+
+export type PresenceLeftMessage = {
+  type: 'presence.left';
+  context: string;
+  userId: string;
+};
+
+export type ServerMessage = EventMessage | PresenceJoinedMessage | PresenceLeftMessage;

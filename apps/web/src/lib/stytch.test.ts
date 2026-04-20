@@ -304,6 +304,78 @@ describe('Stytch Fingerprint Functions', () => {
     });
   });
 
+  describe('handleSignupPromotion with signupSource', () => {
+    test('grants both welcome and openclaw-security-advisor bonus when passed + source matches', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'osa-bonus-pass@example.com',
+      });
+
+      await handleSignupPromotion(user, true, 'openclaw-security-advisor');
+
+      const grants = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      });
+
+      const byCategory = new Map(grants.map(g => [g.credit_category, g]));
+      expect(byCategory.get('automatic-welcome-credits')?.amount_microdollars).toBe(2_500_000);
+
+      const bonus = byCategory.get('openclaw-security-advisor-signup-bonus');
+      expect(bonus?.amount_microdollars).toBe(7_130_000);
+
+      if (!bonus?.expiry_date) throw new Error('bonus.expiry_date should be set');
+      const expiryMs = new Date(bonus.expiry_date).getTime();
+      const expectedMs = Date.now() + 48 * 60 * 60 * 1000;
+      // Loose ±2 minute window — test DB inserts + clock drift
+      expect(Math.abs(expiryMs - expectedMs)).toBeLessThan(2 * 60 * 1000);
+    });
+
+    test('grants only welcome credit when signupSource is null', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'osa-bonus-nosource@example.com',
+      });
+
+      await handleSignupPromotion(user, true, null);
+
+      const grants = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      });
+
+      expect(grants.map(g => g.credit_category).sort()).toEqual(['automatic-welcome-credits']);
+    });
+
+    test('grants nothing when Stytch validation fails even with source set', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'osa-bonus-stytchfail@example.com',
+      });
+
+      await handleSignupPromotion(user, false, 'openclaw-security-advisor');
+
+      const grants = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      });
+
+      expect(grants).toHaveLength(0);
+    });
+
+    test('bonus grant is idempotent: repeat call inserts no additional row', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'osa-bonus-idempotent@example.com',
+      });
+
+      await handleSignupPromotion(user, true, 'openclaw-security-advisor');
+      await handleSignupPromotion(user, true, 'openclaw-security-advisor');
+
+      const bonusRows = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      });
+
+      const bonusOnly = bonusRows.filter(
+        g => g.credit_category === 'openclaw-security-advisor-signup-bonus'
+      );
+      expect(bonusOnly).toHaveLength(1);
+    });
+  });
+
   describe('Integration: saveFingerprints -> getStoredFingerprint -> isKnownFingerprintOfOtherUser', () => {
     test('should demonstrate complete workflow with multiple users', async () => {
       const user1 = await insertTestUser({ google_user_email: 'fp-workflow-alice@example.com' });

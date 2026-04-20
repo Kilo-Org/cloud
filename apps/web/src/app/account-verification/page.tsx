@@ -5,7 +5,7 @@ import { StytchClient } from '@/components/auth/StytchClient';
 import { AnimatedLogo } from '@/components/AnimatedLogo';
 import BigLoader from '@/components/BigLoader';
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
-import { getStytchStatus, handleSignupPromotion } from '@/lib/stytch';
+import { getStytchStatus, handleSignupPromotion, type SignupSource } from '@/lib/stytch';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
@@ -16,7 +16,14 @@ export default async function AccountVerificationPage({ searchParams }: AppPageP
   const telemetry_id = typeof params.telemetry_id === 'string' ? params.telemetry_id : null;
   const stytchStatus = await getStytchStatus(user, telemetry_id, await headers());
 
-  await handleSignupPromotion(user, stytchStatus || false);
+  const rawCallback = params.callbackPath;
+  const callbackStr = typeof rawCallback === 'string' ? rawCallback : null;
+  const signupSource: SignupSource =
+    callbackStr && isValidCallbackPath(callbackStr) && callbackStr.startsWith('/openclaw-advisor')
+      ? 'openclaw-security-advisor'
+      : null;
+
+  await handleSignupPromotion(user, stytchStatus || false, signupSource);
 
   if (stytchStatus !== null) {
     const callbackPath = params.callbackPath;

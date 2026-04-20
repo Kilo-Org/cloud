@@ -193,23 +193,44 @@ export async function saveFingerprints(
   return { kilo_free_tier_allowed };
 }
 
+export type SignupSource = 'openclaw-security-advisor' | null;
+
 /**
  * Handles signup promotion logic: grants credits for users who pass
- * both Turnstile and Stytch validation
+ * both Turnstile and Stytch validation. When signupSource is set, layers
+ * an additional product-specific bonus on top of the base welcome credit.
  */
-export async function handleSignupPromotion(user: User, passedValidations: boolean): Promise<void> {
-  if (passedValidations) {
+export async function handleSignupPromotion(
+  user: User,
+  passedValidations: boolean,
+  signupSource: SignupSource = null
+): Promise<void> {
+  if (!passedValidations) return;
+
+  try {
+    // Grant automatic-welcome-credits for passing both Turnstile and Stytch validation
+    await grantCreditForCategory(user, {
+      credit_category: 'automatic-welcome-credits',
+      counts_as_selfservice: false,
+    });
+  } catch (error) {
+    // Don't fail the entire process if credit granting fails
+    captureException(error, {
+      tags: { source: 'signup_promotion_credit_grant' },
+      extra: { userId: user.id, email: user.google_user_email },
+    });
+  }
+
+  if (signupSource === 'openclaw-security-advisor') {
     try {
-      // Grant automatic-welcome-credits for passing both Turnstile and Stytch validation
       await grantCreditForCategory(user, {
-        credit_category: 'automatic-welcome-credits',
+        credit_category: 'openclaw-security-advisor-signup-bonus',
         counts_as_selfservice: false,
       });
     } catch (error) {
-      // Don't fail the entire process if credit granting fails
       captureException(error, {
         tags: { source: 'signup_promotion_credit_grant' },
-        extra: { userId: user.id, email: user.google_user_email },
+        extra: { userId: user.id, email: user.google_user_email, signupSource },
       });
     }
   }

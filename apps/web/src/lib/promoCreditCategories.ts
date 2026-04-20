@@ -9,6 +9,7 @@ import {
   REFERRAL_BONUS_AMOUNT,
   PROMO_CREDIT_EXPIRY_HRS,
   WELCOME_CREDIT_EXPIRY_HRS,
+  OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS,
 } from '@/lib/constants';
 import { promoCategoriesOld } from '@/lib/promoCreditCategoriesOld';
 import {
@@ -177,6 +178,13 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     amount_usd: 2.5,
     is_idempotent: true,
     expiry_hours: WELCOME_CREDIT_EXPIRY_HRS,
+  },
+  {
+    credit_category: 'openclaw-security-advisor-signup-bonus',
+    description: 'Bonus for new users signing up via the OpenClaw Security Advisor plugin',
+    amount_usd: 7.13,
+    is_idempotent: true,
+    expiry_hours: OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS,
   },
   {
     credit_category: 'autocomplete-rollout-2025-11',

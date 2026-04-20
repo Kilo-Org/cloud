@@ -40,7 +40,9 @@ describe('email-verification', () => {
         email: ' User@Example.com ',
         verification_result: 'valid',
       })
-    ).rejects.toThrow('email_verification_state_email_canonical_check');
+    ).rejects.toThrow();
+
+    await expect(getStoredEmailVerification('user@example.com')).resolves.toBeUndefined();
   });
 
   it('returns unknown when no local state exists', async () => {

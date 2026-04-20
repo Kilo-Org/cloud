@@ -687,6 +687,13 @@
       "when": 1776670788432,
       "tag": "0097_fast_tempest",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1776688381153,
+      "tag": "0098_groovy_mandroid",
+      "breakpoints": true
     }
   ]
 }

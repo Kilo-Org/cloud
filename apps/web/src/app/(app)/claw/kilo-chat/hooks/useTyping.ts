@@ -3,7 +3,7 @@ import type { KiloChatClient } from '@kilocode/kilo-chat';
 import type { TypingEvent } from '@kilocode/kilo-chat';
 
 const TYPING_COOLDOWN = 3000;
-const TYPING_DISPLAY_TIMEOUT = 4000;
+const TYPING_DISPLAY_TIMEOUT = 5000;
 
 /**
  * Sends typing indicator pings (debounced, 3s cooldown).
@@ -21,7 +21,7 @@ export function useTypingSender(client: KiloChatClient, conversationId: string |
 
 /**
  * Tracks who is typing based on incoming typing events.
- * Clears a member's typing state after 4s of no pings.
+ * Clears a member's typing state after 5s of no pings.
  */
 export function useTypingState(currentUserId: string | null) {
   const [typingMembers, setTypingMembers] = useState<Map<string, number>>(new Map());

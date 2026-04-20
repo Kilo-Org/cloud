@@ -1205,10 +1205,29 @@ describe('createKiloPassUpsellCheckout', () => {
         hostingPlan: 'commit',
       })
     ).rejects.toThrow(
-      'Kilo Pass tier 19 monthly does not include enough credits for commit hosting.'
+      'Selected Kilo Pass option does not include enough credits for commit hosting.'
     );
 
     expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('allows commit hosting for yearly tier 19', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    stripeMock.checkout.sessions.create.mockResolvedValue({
+      url: 'https://checkout.stripe.com/test',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.kiloclaw.createKiloPassUpsellCheckout({
+        instanceId: instance.id,
+        tier: '19',
+        cadence: 'yearly',
+        hostingPlan: 'commit',
+      })
+    ).resolves.toEqual({ url: 'https://checkout.stripe.com/test' });
+
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalled();
   });
 });
 

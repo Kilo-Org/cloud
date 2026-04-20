@@ -72,6 +72,7 @@ import {
 } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
 import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { isKiloPassSelectionEligibleForKiloclawCommitUpsell } from '@/lib/kilo-pass/bonus';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
@@ -3411,12 +3412,6 @@ export const kiloclawRouter = createTRPCRouter({
       if (!stripeCustomerId) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
       }
-      if (input.hostingPlan === 'commit' && input.cadence === 'monthly' && input.tier === '19') {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Kilo Pass tier 19 monthly does not include enough credits for commit hosting.',
-        });
-      }
 
       const { anchorInstance } = await resolvePersonalBillingAnchor({
         userId: ctx.user.id,
@@ -3461,6 +3456,20 @@ export const kiloclawRouter = createTRPCRouter({
 
       const kiloPassTier = tierMap[input.tier];
       const kiloPassCadence = cadenceMap[input.cadence];
+      if (
+        input.hostingPlan === 'commit' &&
+        !isKiloPassSelectionEligibleForKiloclawCommitUpsell({
+          tier: kiloPassTier,
+          cadence: kiloPassCadence,
+          commitCostMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
+        })
+      ) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Selected Kilo Pass option does not include enough credits for commit hosting.',
+        });
+      }
+
       const priceId = getStripePriceIdForKiloPass({
         tier: kiloPassTier,
         cadence: kiloPassCadence,

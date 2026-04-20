@@ -18,12 +18,14 @@ import { review_metadata, ReviewMetadataRecord } from '../../db/tables/review-me
 import { convoy_metadata, ConvoyMetadataRecord } from '../../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { agent_nudges } from '../../db/tables/agent-nudges.table';
+import { escalation_metadata } from '../../db/tables/escalation-metadata.table';
 import { query } from '../../util/query.util';
 import {
   GUPP_ESCALATE_MS,
   GUPP_FORCE_STOP_MS,
   AGENT_GC_RETENTION_MS,
   TRIAGE_LABEL_LIKE,
+  createTriageRequest,
 } from './patrol';
 import { MAX_DISPATCH_ATTEMPTS } from './scheduling';
 import * as reviewQueue from './review-queue';
@@ -544,12 +546,16 @@ export function applyEvent(
         // Conflict bead blocks the MR bead (same pattern as feedback beads)
         beadOps.insertDependency(sql, mrBeadId, conflictBead.bead_id, 'blocks');
       } else {
-        // auto_resolve_merge_conflicts disabled — create an escalation bead
-        beadOps.createBead(sql, {
+        // auto_resolve_merge_conflicts disabled — route through the full
+        // escalation pipeline so escalation_metadata, triage request, and
+        // mayor notification are all created (same path as routeEscalation()).
+        const escalationBead = beadOps.createBead(sql, {
           type: 'escalation',
           title: `Merge conflict detected: ${branch}`,
           body: `PR ${prUrl} (branch ${branch}) has merge conflicts that require manual resolution.`,
           priority: 'high',
+          rig_id: mrBead.rig_id ?? undefined,
+          labels: ['gt:escalation', 'severity:high'],
           metadata: {
             pr_url: prUrl,
             branch,
@@ -558,6 +564,36 @@ export function applyEvent(
             source_bead_id: sourceBead,
             conflict: true,
           },
+        });
+        query(
+          sql,
+          /* sql */ `
+            INSERT INTO ${escalation_metadata} (
+              ${escalation_metadata.columns.bead_id},
+              ${escalation_metadata.columns.severity},
+              ${escalation_metadata.columns.category},
+              ${escalation_metadata.columns.acknowledged},
+              ${escalation_metadata.columns.re_escalation_count},
+              ${escalation_metadata.columns.acknowledged_at}
+            ) VALUES (?, ?, ?, ?, ?, ?)
+          `,
+          [escalationBead.bead_id, 'high', 'merge_conflict', 0, 0, null]
+        );
+        createTriageRequest(sql, {
+          triageType: 'escalation',
+          agentBeadId: null,
+          title: `Escalation (high): Merge conflict on ${branch}`,
+          context: {
+            escalation_bead_id: escalationBead.bead_id,
+            severity: 'high',
+            rig_id: mrBead.rig_id,
+            category: 'merge_conflict',
+            pr_url: prUrl,
+            branch,
+            mr_bead_id: mrBeadId,
+          },
+          options: ['ESCALATE_TO_MAYOR', 'RESTART', 'CLOSE_BEAD', 'REASSIGN_BEAD'],
+          rigId: mrBead.rig_id ?? undefined,
         });
       }
       return;
@@ -1990,34 +2026,40 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
           if (elapsed < cooldownMs) continue;
         }
 
-        // Fix 3 (#2260): Check that tracked beads have at least one MR with a PR URL
-        const convoyBeadsWithPr = z
-          .object({ cnt: z.number() })
-          .array()
-          .parse([
-            ...query(
-              sql,
-              /* sql */ `
-                SELECT count(*) as cnt
-                FROM ${bead_dependencies} track_dep
-                INNER JOIN ${bead_dependencies} mr_dep
-                  ON mr_dep.${bead_dependencies.columns.depends_on_bead_id} = track_dep.${bead_dependencies.columns.bead_id}
-                INNER JOIN ${review_metadata} rm
-                  ON rm.${review_metadata.columns.bead_id} = mr_dep.${bead_dependencies.columns.bead_id}
-                WHERE track_dep.${bead_dependencies.columns.depends_on_bead_id} = ?
-                  AND track_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
-                  AND mr_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
-                  AND rm.${review_metadata.columns.pr_url} IS NOT NULL
-              `,
-              [convoy.bead_id]
-            ),
-          ]);
+        // Fix 3 (#2260): Check that tracked beads have at least one MR with a PR URL.
+        // For review-then-land convoys using direct merge strategy, intermediate bead
+        // merges go straight into the feature branch without persisting a pr_url —
+        // skip this guard and always create the landing MR when all beads are closed.
+        const needsPrUrl = convoy.merge_mode !== 'review-then-land';
+        if (needsPrUrl) {
+          const convoyBeadsWithPr = z
+            .object({ cnt: z.number() })
+            .array()
+            .parse([
+              ...query(
+                sql,
+                /* sql */ `
+                  SELECT count(*) as cnt
+                  FROM ${bead_dependencies} track_dep
+                  INNER JOIN ${bead_dependencies} mr_dep
+                    ON mr_dep.${bead_dependencies.columns.depends_on_bead_id} = track_dep.${bead_dependencies.columns.bead_id}
+                  INNER JOIN ${review_metadata} rm
+                    ON rm.${review_metadata.columns.bead_id} = mr_dep.${bead_dependencies.columns.bead_id}
+                  WHERE track_dep.${bead_dependencies.columns.depends_on_bead_id} = ?
+                    AND track_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
+                    AND mr_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
+                    AND rm.${review_metadata.columns.pr_url} IS NOT NULL
+                `,
+                [convoy.bead_id]
+              ),
+            ]);
 
-        if ((convoyBeadsWithPr[0]?.cnt ?? 0) === 0) {
-          console.warn(
-            `${LOG} convoy ${convoy.bead_id} has no beads with pr_url — skipping create_landing_mr`
-          );
-          continue;
+          if ((convoyBeadsWithPr[0]?.cnt ?? 0) === 0) {
+            console.warn(
+              `${LOG} convoy ${convoy.bead_id} has no beads with pr_url — skipping create_landing_mr`
+            );
+            continue;
+          }
         }
 
         // No landing MR exists yet and cooldown has passed — create one

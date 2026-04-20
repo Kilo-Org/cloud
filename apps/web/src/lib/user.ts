@@ -151,6 +151,26 @@ async function checkSignupIpRateLimit(
   return failureResult('SIGNUP-RATE-LIMITED');
 }
 
+async function checkNormalizedEmailUnique(
+  normalizedEmail: string,
+  tx: DrizzleTransaction
+): Promise<Result<null, AuthErrorType>> {
+  const [existing] = await tx
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.normalized_email, normalizedEmail))
+    .limit(1);
+
+  if (!existing) return successResult(null);
+
+  console.warn('[auth] Signup rejected: normalized_email already in use', {
+    normalized_email: normalizedEmail,
+    existing_user_id: existing.id,
+  });
+
+  return failureResult('EMAIL-ALREADY-USED');
+}
+
 /**
  * Determines if a user should have admin privileges based on their email and hosted domain.
  * Centralized logic ensures all auth providers (Google, magic link, GitHub, etc.) get
@@ -379,6 +399,9 @@ export async function createOrUpdateUser(
     txResult = await db.transaction(async tx => {
       const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
       if (!signupRateLimitResult.success) return signupRateLimitResult;
+
+      const dedupResult = await checkNormalizedEmailUnique(newUser.normalized_email, tx);
+      if (!dedupResult.success) return dedupResult;
 
       const [inserted] = await tx.insert(kilocode_users).values(newUser).returning();
       assert(inserted, 'Failed to save new user');

@@ -21,6 +21,7 @@ const INSTANCE_LIFECYCLE_ACTOR = {
   actorType: 'system',
   actorId: 'web-instance-lifecycle',
 } as const;
+const INSTANCE_DESTROYED_REASON = 'instance_destroyed';
 
 type ActiveInstance = {
   id: string;
@@ -68,6 +69,58 @@ function subscriptionFilterForUser(kiloUserId: string, instanceId?: string) {
         eq(kiloclaw_subscriptions.user_id, kiloUserId),
         isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       );
+}
+
+export async function clearSubscriptionLifecycleAfterInstanceDestroy(params: {
+  actorUserId: string;
+  kiloUserId: string;
+  instanceId: string;
+}): Promise<void> {
+  await db.transaction(async tx => {
+    const [subscription] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(subscriptionFilterForUser(params.kiloUserId, params.instanceId))
+      .limit(1);
+
+    if (!subscription) {
+      return;
+    }
+
+    const clearFields: { destruction_deadline: null; suspended_at?: null } = {
+      destruction_deadline: null,
+    };
+
+    if (subscription.status !== 'past_due') {
+      clearFields.suspended_at = null;
+    }
+
+    const [updatedSubscription] = await tx
+      .update(kiloclaw_subscriptions)
+      .set(clearFields)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id))
+      .returning();
+
+    const clearedSuspension =
+      subscription.destruction_deadline !== null ||
+      (subscription.status !== 'past_due' && subscription.suspended_at !== null);
+
+    if (!updatedSubscription || !clearedSuspension) {
+      return;
+    }
+
+    await insertKiloClawSubscriptionChangeLog(tx, {
+      subscriptionId: subscription.id,
+      actor: {
+        actorType: 'user',
+        actorId: params.actorUserId,
+      },
+      action: 'status_changed',
+      reason: INSTANCE_DESTROYED_REASON,
+      before: subscription,
+      after: updatedSubscription,
+    });
+  });
 }
 
 async function clearAutoResumeState(

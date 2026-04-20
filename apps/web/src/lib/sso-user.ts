@@ -53,8 +53,8 @@ async function processSSOInternal(
 
   const res = await createOrUpdateUser(args, undefined, true, requestHeaders);
   if (!res.success) {
-    if (res.error === 'SIGNUP-RATE-LIMITED') {
-      return `${SSO_SIGNIN_PATH}?error=SIGNUP-RATE-LIMITED`;
+    if (res.error === 'SIGNUP-RATE-LIMITED' || res.error === 'EMAIL-ALREADY-USED') {
+      return `${SSO_SIGNIN_PATH}?error=${res.error}`;
     }
     throw new Error(res.error);
   }

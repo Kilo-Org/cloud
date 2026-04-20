@@ -9,6 +9,7 @@ import type {
   OpenRouterProvider,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import {
+  OpenRouterApiProvidersResponse,
   OpenRouterProvidersResponse,
   OpenRouterSearchResponse,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
@@ -19,9 +20,23 @@ import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@/lib/ai-gateway/providers/vercel/types';
 import { EndpointsSchema, ModelsSchema } from '@/lib/ai-gateway/providers/vercel/types';
+import { redisSet } from '@/lib/redis';
+
+const GATEWAY_METADATA_REDIS_KEYS = {
+  allProviders: 'ai-gateway.metadata:all-providers',
+  openrouterModels: 'ai-gateway.metadata:openrouter-models',
+  vercelModels: 'ai-gateway.metadata:vercel-models',
+  openrouterProviders: 'ai-gateway.metadata:openrouter-providers',
+} as const;
+
+const ATTRIBUTION_HEADERS = {
+  'HTTP-Referer': 'https://kilocode.ai',
+  'X-Title': 'Kilo Code',
+} as const;
 
 async function fetchGatewayModels(gateway: Provider) {
   const headers = {
+    ...ATTRIBUTION_HEADERS,
     authorization: `Bearer ${gateway.apiKey}`,
   };
 
@@ -71,11 +86,7 @@ async function fetchProviders(): Promise<OpenRouterProvider[]> {
 
   const response = await fetch(`https://openrouter.ai/api/frontend/all-providers`, {
     method: 'GET',
-    headers: {
-      // NOTE: Changing HTTP-Referer; per OpenRouter docs it would identify us as a different app, but can be merged by Openrouter later
-      'HTTP-Referer': 'https://kilocode.ai',
-      'X-Title': 'Kilo Code',
-    },
+    headers: ATTRIBUTION_HEADERS,
   });
 
   if (!response.ok) {
@@ -112,11 +123,7 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
 
   const response = await fetch(`https://openrouter.ai/api/frontend/models/find?${searchParams}`, {
     method: 'GET',
-    headers: {
-      // NOTE: Changing HTTP-Referer; per OpenRouter docs it would identify us as a different app, but can be merged by Openrouter later
-      'HTTP-Referer': 'https://kilocode.ai',
-      'X-Title': 'Kilo Code',
-    },
+    headers: ATTRIBUTION_HEADERS,
   });
 
   if (!response.ok) {
@@ -286,11 +293,54 @@ async function syncProviders() {
   return result;
 }
 
+async function fetchOpenRouterApiProviders(): Promise<OpenRouterApiProvidersResponse> {
+  console.log('Fetching OpenRouter providers from public API endpoint...');
+
+  const response = await fetch('https://openrouter.ai/api/v1/providers', {
+    method: 'GET',
+    headers: ATTRIBUTION_HEADERS,
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch OpenRouter API providers: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const parsed = OpenRouterApiProvidersResponse.parse(await response.json());
+  console.log(`Found ${parsed.data.length} providers from /api/v1/providers`);
+  return parsed;
+}
+
+async function mirrorToRedis(values: {
+  providers: NormalizedOpenRouterResponse;
+  openrouter: Record<string, StoredModel>;
+  vercel: Record<string, StoredModel>;
+  openrouterProviders: OpenRouterApiProvidersResponse | null;
+}): Promise<void> {
+  const entries: [string, unknown][] = [
+    [GATEWAY_METADATA_REDIS_KEYS.allProviders, values.providers],
+    [GATEWAY_METADATA_REDIS_KEYS.openrouterModels, values.openrouter],
+    [GATEWAY_METADATA_REDIS_KEYS.vercelModels, values.vercel],
+  ];
+  if (values.openrouterProviders) {
+    entries.push([GATEWAY_METADATA_REDIS_KEYS.openrouterProviders, values.openrouterProviders]);
+  }
+  await Promise.all(entries.map(([key, value]) => redisSet(key, JSON.stringify(value))));
+}
+
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
   const openrouter_data = await fetchGatewayModels(PROVIDERS.OPENROUTER);
   const vercel_data = await fetchGatewayModels(PROVIDERS.VERCEL_AI_GATEWAY);
+
+  const openrouter_providers = await fetchOpenRouterApiProviders();
+  if (openrouter_providers.data.length < 10) {
+    throw new Error(
+      `Suspicious: total number of OpenRouter API providers is ${openrouter_providers.data.length} < 10`
+    );
+  }
 
   const providers = await syncProviders();
 
@@ -305,10 +355,21 @@ export async function syncAndStoreProviders() {
   const result = await db.transaction(async tx => {
     const results = await tx
       .insert(modelsByProvider)
-      .values({ data: providers, openrouter: openrouter_data, vercel: vercel_data })
+      .values({
+        data: providers,
+        openrouter: openrouter_data,
+        vercel: vercel_data,
+      })
       .returning();
     await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
     return results[0];
+  });
+
+  await mirrorToRedis({
+    providers,
+    openrouter: openrouter_data,
+    vercel: vercel_data,
+    openrouterProviders: openrouter_providers,
   });
 
   return {

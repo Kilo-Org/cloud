@@ -53,6 +53,7 @@ import {
   getPersonalProvisionLockKey,
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
+import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
 
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import {
@@ -72,11 +73,13 @@ import {
 } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
 import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { isKiloPassSelectionEligibleForKiloclawCommitUpsell } from '@/lib/kilo-pass/bonus';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
 import {
   getKiloClawEarlybirdStateForUser,
+  getKiloClawSubscriptionActivationState,
   getKiloClawSubscriptionAccessReason,
 } from '@/lib/kiloclaw/access-state';
 import {
@@ -138,6 +141,45 @@ async function insertUserSubscriptionChangeLog(
   });
 }
 
+async function mutateUserSubscriptionWithChangeLog(params: {
+  subscriptionId: string;
+  userId: string;
+  action: Parameters<typeof insertUserSubscriptionChangeLog>[1]['action'];
+  reason: string;
+  mutate: (
+    tx: DrizzleTransaction,
+    before: typeof kiloclaw_subscriptions.$inferSelect
+  ) => Promise<typeof kiloclaw_subscriptions.$inferSelect | null>;
+}) {
+  return db.transaction(async tx => {
+    const [before] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, params.subscriptionId))
+      .limit(1);
+
+    if (!before) {
+      return null;
+    }
+
+    const after = await params.mutate(tx, before);
+    if (!after) {
+      return null;
+    }
+
+    await insertUserSubscriptionChangeLog(tx, {
+      subscriptionId: params.subscriptionId,
+      userId: params.userId,
+      action: params.action,
+      reason: params.reason,
+      before,
+      after,
+    });
+
+    return { before, after };
+  });
+}
+
 function mapCurrentSubscriptionResolutionError(error: unknown): never {
   if (error instanceof CurrentPersonalSubscriptionResolutionError) {
     sentryLogger('kiloclaw-billing', 'error')('Multiple current personal subscription rows', {
@@ -169,9 +211,14 @@ async function resolveDetachedAccessGrantingPersonalSubscription(params: {
       )
     );
 
-  const accessGrantingRows = rows.filter(
-    row => getKiloClawSubscriptionAccessReason(row, now) !== null
-  );
+  const accessGrantingRows = rows.filter(row => {
+    if (row.status === 'active') return true;
+    if (row.status === 'past_due' && !row.suspended_at) return true;
+    if (row.status === 'trialing' && row.trial_ends_at && new Date(row.trial_ends_at) > now) {
+      return true;
+    }
+    return false;
+  });
   if (accessGrantingRows.length > 1) {
     throw new TRPCError({
       code: 'CONFLICT',
@@ -977,6 +1024,7 @@ const KiloclawInstanceSwitchPlanInputSchema = z.object({
   instanceId: z.string().uuid(),
   toPlan: z.enum(['commit', 'standard']),
 });
+const KiloclawActivationStateSchema = z.enum(['pending_settlement', 'activated']);
 
 const KiloclawPersonalSubscriptionSchema = z.object({
   instanceId: z.string().uuid(),
@@ -985,6 +1033,7 @@ const KiloclawPersonalSubscriptionSchema = z.object({
   destroyedAt: z.string().nullable(),
   plan: z.string(),
   status: z.string(),
+  activationState: KiloclawActivationStateSchema,
   cancelAtPeriodEnd: z.boolean(),
   pendingConversion: z.boolean(),
   scheduledPlan: z.string().nullable(),
@@ -1099,6 +1148,7 @@ async function getPersonalBillingStatus(user: {
     ? {
         plan: sub.plan as 'commit' | 'standard',
         status: sub.status as 'active' | 'past_due' | 'canceled' | 'unpaid',
+        activationState: getKiloClawSubscriptionActivationState(sub),
         cancelAtPeriodEnd: sub.cancel_at_period_end,
         currentPeriodEnd: normalizeTimestamp(sub.current_period_end) ?? '',
         commitEndsAt: normalizeTimestamp(sub.commit_ends_at),
@@ -1141,7 +1191,7 @@ async function getPersonalBillingStatus(user: {
     };
   }
 
-  const [anySubscription, anyPersonalInstance] = await Promise.all([
+  const [anySubscription, anyPersonalInstanceHistory] = await Promise.all([
     db
       .select({ id: kiloclaw_subscriptions.id })
       .from(kiloclaw_subscriptions)
@@ -1152,11 +1202,7 @@ async function getPersonalBillingStatus(user: {
       .select({ id: kiloclaw_instances.id })
       .from(kiloclaw_instances)
       .where(
-        and(
-          eq(kiloclaw_instances.user_id, user.id),
-          isNull(kiloclaw_instances.organization_id),
-          isNull(kiloclaw_instances.destroyed_at)
-        )
+        and(eq(kiloclaw_instances.user_id, user.id), isNull(kiloclaw_instances.organization_id))
       )
       .limit(1)
       .then(rows => rows[0] ?? null),
@@ -1189,7 +1235,7 @@ async function getPersonalBillingStatus(user: {
   return {
     hasAccess,
     accessReason,
-    trialEligible: !anyPersonalInstance && !anySubscription,
+    trialEligible: !anyPersonalInstanceHistory && !anySubscription,
     creditBalanceMicrodollars,
     creditIntroEligible,
     hasActiveKiloPass,
@@ -1230,6 +1276,7 @@ function serializeKiloclawPersonalSubscription(
   hasActiveKiloPass: boolean
 ) {
   const hasStripeFunding = Boolean(row.subscription.stripe_subscription_id);
+  const activationState = getKiloClawSubscriptionActivationState(row.subscription);
 
   return {
     instanceId: row.instance.id,
@@ -1238,6 +1285,7 @@ function serializeKiloclawPersonalSubscription(
     destroyedAt: normalizeTimestamp(row.instance.destroyedAt),
     plan: row.subscription.plan,
     status: row.subscription.status,
+    activationState,
     cancelAtPeriodEnd: row.subscription.cancel_at_period_end,
     pendingConversion: row.subscription.pending_conversion,
     scheduledPlan: row.subscription.scheduled_plan ?? null,
@@ -1365,28 +1413,50 @@ async function cancelKiloclawSubscriptionForRow(params: {
       cancel_at_period_end: true,
     });
 
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({
-        cancel_at_period_end: true,
-        ...(scheduleIdToRelease
-          ? { stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null }
-          : {}),
-      })
-      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    await mutateUserSubscriptionWithChangeLog({
+      subscriptionId: subscription.id,
+      userId,
+      action: 'canceled',
+      reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.cancelRequested,
+      mutate: async tx => {
+        const [after] = await tx
+          .update(kiloclaw_subscriptions)
+          .set({
+            cancel_at_period_end: true,
+            ...(scheduleIdToRelease
+              ? { stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null }
+              : {}),
+          })
+          .where(eq(kiloclaw_subscriptions.id, subscription.id))
+          .returning();
+
+        return after ?? null;
+      },
+    });
     return;
   }
 
   if (subscription.payment_source === 'credits') {
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({
-        cancel_at_period_end: true,
-        stripe_schedule_id: null,
-        scheduled_plan: null,
-        scheduled_by: null,
-      })
-      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    await mutateUserSubscriptionWithChangeLog({
+      subscriptionId: subscription.id,
+      userId,
+      action: 'canceled',
+      reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.cancelRequested,
+      mutate: async tx => {
+        const [after] = await tx
+          .update(kiloclaw_subscriptions)
+          .set({
+            cancel_at_period_end: true,
+            stripe_schedule_id: null,
+            scheduled_plan: null,
+            scheduled_by: null,
+          })
+          .where(eq(kiloclaw_subscriptions.id, subscription.id))
+          .returning();
+
+        return after ?? null;
+      },
+    });
     return;
   }
 
@@ -1446,15 +1516,26 @@ async function acceptKiloclawConversionForRow(params: {
     }
   }
 
-  await db
-    .update(kiloclaw_subscriptions)
-    .set({
-      pending_conversion: true,
-      ...(scheduleIdToRelease
-        ? { stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null }
-        : {}),
-    })
-    .where(eq(kiloclaw_subscriptions.id, subscription.id));
+  await mutateUserSubscriptionWithChangeLog({
+    subscriptionId: subscription.id,
+    userId,
+    action: 'status_changed',
+    reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.conversionPrepared,
+    mutate: async tx => {
+      const [after] = await tx
+        .update(kiloclaw_subscriptions)
+        .set({
+          pending_conversion: true,
+          ...(scheduleIdToRelease
+            ? { stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null }
+            : {}),
+        })
+        .where(eq(kiloclaw_subscriptions.id, subscription.id))
+        .returning();
+
+      return after ?? null;
+    },
+  });
 
   try {
     await stripe.subscriptions.update(subscription.stripe_subscription_id, {
@@ -1470,10 +1551,21 @@ async function acceptKiloclawConversionForRow(params: {
     }
 
     if (stripeApplied === false) {
-      await db
-        .update(kiloclaw_subscriptions)
-        .set({ pending_conversion: false })
-        .where(eq(kiloclaw_subscriptions.id, subscription.id));
+      await mutateUserSubscriptionWithChangeLog({
+        subscriptionId: subscription.id,
+        userId,
+        action: 'status_changed',
+        reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.conversionPrepareRolledBack,
+        mutate: async tx => {
+          const [after] = await tx
+            .update(kiloclaw_subscriptions)
+            .set({ pending_conversion: false })
+            .where(eq(kiloclaw_subscriptions.id, subscription.id))
+            .returning();
+
+          return after ?? null;
+        },
+      });
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -1500,10 +1592,21 @@ async function acceptKiloclawConversionForRow(params: {
     }
   }
 
-  await db
-    .update(kiloclaw_subscriptions)
-    .set({ cancel_at_period_end: true })
-    .where(eq(kiloclaw_subscriptions.id, subscription.id));
+  await mutateUserSubscriptionWithChangeLog({
+    subscriptionId: subscription.id,
+    userId,
+    action: 'canceled',
+    reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.conversionRequested,
+    mutate: async tx => {
+      const [after] = await tx
+        .update(kiloclaw_subscriptions)
+        .set({ cancel_at_period_end: true })
+        .where(eq(kiloclaw_subscriptions.id, subscription.id))
+        .returning();
+
+      return after ?? null;
+    },
+  });
 }
 
 async function reactivateKiloclawSubscriptionForRow(params: {
@@ -1523,10 +1626,21 @@ async function reactivateKiloclawSubscriptionForRow(params: {
     await stripe.subscriptions.update(subscription.stripe_subscription_id, {
       cancel_at_period_end: false,
     });
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({ cancel_at_period_end: false, pending_conversion: false })
-      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    await mutateUserSubscriptionWithChangeLog({
+      subscriptionId: subscription.id,
+      userId,
+      action: 'reactivated',
+      reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.reactivated,
+      mutate: async tx => {
+        const [after] = await tx
+          .update(kiloclaw_subscriptions)
+          .set({ cancel_at_period_end: false, pending_conversion: false })
+          .where(eq(kiloclaw_subscriptions.id, subscription.id))
+          .returning();
+
+        return after ?? null;
+      },
+    });
 
     try {
       await ensureAutoIntroSchedule(subscription.stripe_subscription_id, userId);
@@ -1540,10 +1654,21 @@ async function reactivateKiloclawSubscriptionForRow(params: {
   }
 
   if (subscription.payment_source === 'credits') {
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({ cancel_at_period_end: false, pending_conversion: false })
-      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    await mutateUserSubscriptionWithChangeLog({
+      subscriptionId: subscription.id,
+      userId,
+      action: 'reactivated',
+      reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.reactivated,
+      mutate: async tx => {
+        const [after] = await tx
+          .update(kiloclaw_subscriptions)
+          .set({ cancel_at_period_end: false, pending_conversion: false })
+          .where(eq(kiloclaw_subscriptions.id, subscription.id))
+          .returning();
+
+        return after ?? null;
+      },
+    });
     return;
   }
 
@@ -1555,9 +1680,10 @@ async function reactivateKiloclawSubscriptionForRow(params: {
 
 async function switchKiloclawPlanForRow(params: {
   subscription: typeof kiloclaw_subscriptions.$inferSelect;
+  userId: string;
   toPlan: 'commit' | 'standard';
 }) {
-  const { subscription, toPlan } = params;
+  const { subscription, toPlan, userId } = params;
 
   if (subscription.status !== 'active') {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to switch.' });
@@ -1628,22 +1754,59 @@ async function switchKiloclawPlanForRow(params: {
           ],
         });
 
-        await db
-          .update(kiloclaw_subscriptions)
-          .set({
-            stripe_schedule_id: effectiveScheduleId,
-            scheduled_plan: toPlan,
-            scheduled_by: 'user',
-          })
-          .where(eq(kiloclaw_subscriptions.id, subscription.id));
+        await mutateUserSubscriptionWithChangeLog({
+          subscriptionId: subscription.id,
+          userId,
+          action: 'schedule_changed',
+          reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanScheduled,
+          mutate: async tx => {
+            const [after] = await tx
+              .update(kiloclaw_subscriptions)
+              .set({
+                stripe_schedule_id: effectiveScheduleId,
+                scheduled_plan: toPlan,
+                scheduled_by: 'user',
+              })
+              .where(eq(kiloclaw_subscriptions.id, subscription.id))
+              .returning();
+
+            return after ?? null;
+          },
+        });
 
         return;
       } catch (error) {
         if (!isScheduleAlreadyInactive(error)) throw error;
-        await db
-          .update(kiloclaw_subscriptions)
-          .set({ stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null })
-          .where(eq(kiloclaw_subscriptions.id, subscription.id));
+        await mutateUserSubscriptionWithChangeLog({
+          subscriptionId: subscription.id,
+          userId,
+          action: 'schedule_changed',
+          reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanScheduled,
+          mutate: async tx => {
+            const [before] = await tx
+              .select()
+              .from(kiloclaw_subscriptions)
+              .where(eq(kiloclaw_subscriptions.id, subscription.id))
+              .limit(1);
+
+            if (
+              !before ||
+              (before.stripe_schedule_id === null &&
+                before.scheduled_plan === null &&
+                before.scheduled_by === null)
+            ) {
+              return null;
+            }
+
+            const [after] = await tx
+              .update(kiloclaw_subscriptions)
+              .set({ stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null })
+              .where(eq(kiloclaw_subscriptions.id, subscription.id))
+              .returning();
+
+            return after ?? null;
+          },
+        });
       }
     }
 
@@ -1683,22 +1846,32 @@ async function switchKiloclawPlanForRow(params: {
         ],
       });
 
-      const updated = await db
-        .update(kiloclaw_subscriptions)
-        .set({
-          stripe_schedule_id: schedule.id,
-          scheduled_plan: toPlan,
-          scheduled_by: 'user',
-        })
-        .where(
-          and(
-            eq(kiloclaw_subscriptions.id, subscription.id),
-            isNull(kiloclaw_subscriptions.stripe_schedule_id)
-          )
-        )
-        .returning({ id: kiloclaw_subscriptions.id });
+      const scheduleLog = await mutateUserSubscriptionWithChangeLog({
+        subscriptionId: subscription.id,
+        userId,
+        action: 'schedule_changed',
+        reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanScheduled,
+        mutate: async tx => {
+          const [after] = await tx
+            .update(kiloclaw_subscriptions)
+            .set({
+              stripe_schedule_id: schedule.id,
+              scheduled_plan: toPlan,
+              scheduled_by: 'user',
+            })
+            .where(
+              and(
+                eq(kiloclaw_subscriptions.id, subscription.id),
+                isNull(kiloclaw_subscriptions.stripe_schedule_id)
+              )
+            )
+            .returning();
 
-      if (updated.length === 0) {
+          return after ?? null;
+        },
+      });
+
+      if (!scheduleLog) {
         await stripe.subscriptionSchedules.release(schedule.id);
         stripeScheduleId = null;
         throw new TRPCError({
@@ -1728,10 +1901,21 @@ async function switchKiloclawPlanForRow(params: {
       });
     }
 
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({ scheduled_plan: toPlan, scheduled_by: 'user' })
-      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    await mutateUserSubscriptionWithChangeLog({
+      subscriptionId: subscription.id,
+      userId,
+      action: 'schedule_changed',
+      reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanScheduled,
+      mutate: async tx => {
+        const [after] = await tx
+          .update(kiloclaw_subscriptions)
+          .set({ scheduled_plan: toPlan, scheduled_by: 'user' })
+          .where(eq(kiloclaw_subscriptions.id, subscription.id))
+          .returning();
+
+        return after ?? null;
+      },
+    });
     return;
   }
 
@@ -1767,10 +1951,21 @@ async function cancelKiloclawPlanSwitchForRow(params: {
       });
     }
 
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({ stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null })
-      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    await mutateUserSubscriptionWithChangeLog({
+      subscriptionId: subscription.id,
+      userId,
+      action: 'schedule_changed',
+      reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanCanceled,
+      mutate: async tx => {
+        const [after] = await tx
+          .update(kiloclaw_subscriptions)
+          .set({ stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null })
+          .where(eq(kiloclaw_subscriptions.id, subscription.id))
+          .returning();
+
+        return after ?? null;
+      },
+    });
 
     try {
       if (subscription.stripe_subscription_id) {
@@ -1785,10 +1980,21 @@ async function cancelKiloclawPlanSwitchForRow(params: {
     return;
   }
 
-  await db
-    .update(kiloclaw_subscriptions)
-    .set({ scheduled_plan: null, scheduled_by: null })
-    .where(eq(kiloclaw_subscriptions.id, subscription.id));
+  await mutateUserSubscriptionWithChangeLog({
+    subscriptionId: subscription.id,
+    userId,
+    action: 'schedule_changed',
+    reason: KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON.switchPlanCanceled,
+    mutate: async tx => {
+      const [after] = await tx
+        .update(kiloclaw_subscriptions)
+        .set({ scheduled_plan: null, scheduled_by: null })
+        .where(eq(kiloclaw_subscriptions.id, subscription.id))
+        .returning();
+
+      return after ?? null;
+    },
+  });
 }
 
 export const kiloclawRouter = createTRPCRouter({
@@ -2042,34 +2248,12 @@ export const kiloclawRouter = createTRPCRouter({
       // send warning emails or attempt a redundant destroy.
       // Current billing row stays anchored to destroyed instance until
       // reprovision bootstrap creates successor row on next provision.
-      // Only clear suspended_at for non-past_due subscriptions — nulling it
-      // on a past_due row would re-enable access without fixing payment.
       if (destroyedRow) {
-        const [sub] = await db
-          .select({ status: kiloclaw_subscriptions.status })
-          .from(kiloclaw_subscriptions)
-          .where(
-            and(
-              eq(kiloclaw_subscriptions.user_id, ctx.user.id),
-              eq(kiloclaw_subscriptions.instance_id, destroyedRow.id)
-            )
-          )
-          .limit(1);
-        const clearFields: { destruction_deadline: null; suspended_at?: null } = {
-          destruction_deadline: null,
-        };
-        if (sub && sub.status !== 'past_due') {
-          clearFields.suspended_at = null;
-        }
-        await db
-          .update(kiloclaw_subscriptions)
-          .set(clearFields)
-          .where(
-            and(
-              eq(kiloclaw_subscriptions.user_id, ctx.user.id),
-              eq(kiloclaw_subscriptions.instance_id, destroyedRow.id)
-            )
-          );
+        await clearSubscriptionLifecycleAfterInstanceDestroy({
+          actorUserId: ctx.user.id,
+          kiloUserId: ctx.user.id,
+          instanceId: destroyedRow.id,
+        });
       }
 
       // Clear lifecycle emails so they can fire again if the user re-provisions.
@@ -3231,6 +3415,7 @@ export const kiloclawRouter = createTRPCRouter({
       });
       await switchKiloclawPlanForRow({
         subscription: row.subscription,
+        userId: ctx.user.id,
         toPlan: input.toPlan,
       });
       return { success: true };
@@ -3455,6 +3640,20 @@ export const kiloclawRouter = createTRPCRouter({
 
       const kiloPassTier = tierMap[input.tier];
       const kiloPassCadence = cadenceMap[input.cadence];
+      if (
+        input.hostingPlan === 'commit' &&
+        !isKiloPassSelectionEligibleForKiloclawCommitUpsell({
+          tier: kiloPassTier,
+          cadence: kiloPassCadence,
+          commitCostMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
+        })
+      ) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Selected Kilo Pass option does not include enough credits for commit hosting.',
+        });
+      }
+
       const priceId = getStripePriceIdForKiloPass({
         tier: kiloPassTier,
         cadence: kiloPassCadence,

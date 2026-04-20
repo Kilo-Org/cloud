@@ -1269,10 +1269,31 @@ async function processCreditRenewalRow(
   }
 
   if (row.auto_top_up_enabled && !row.auto_top_up_triggered_for_period) {
-    await database
+    const [updated] = await database
       .update(kiloclaw_subscriptions)
       .set({ auto_top_up_triggered_for_period: renewalAt })
-      .where(eq(kiloclaw_subscriptions.id, row.id));
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.id, row.id),
+          isNull(kiloclaw_subscriptions.auto_top_up_triggered_for_period)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      return;
+    }
+
+    await insertLifecycleChangeLogBestEffort(database, {
+      subscriptionId: row.id,
+      action: 'status_changed',
+      reason: 'credit_renewal_auto_top_up_marked',
+      before: {
+        ...updated,
+        auto_top_up_triggered_for_period: null,
+      },
+      after: updated,
+    });
 
     try {
       await triggerUserAutoTopUp(env, context, {

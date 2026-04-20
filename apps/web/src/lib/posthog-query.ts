@@ -1,5 +1,5 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import { unstable_cache } from 'next/cache';
+import { redisGet, redisSet } from '@/lib/redis';
 import * as z from 'zod';
 
 /**
@@ -57,24 +57,38 @@ export async function posthogQuery(name: string, query: string): Promise<PostHog
     body: await response.json(),
   };
 }
+
+const CACHE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
+
 export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
-  return unstable_cache(
-    async (name: string, query: string) => {
-      const startTime = performance.now();
-      const response = await posthogQuery(name, query);
-      if (response.status !== 'ok') {
-        throw new Error(`${name} query failed: ${JSON.stringify(response.error, undefined, 2)}`);
-      }
-      const result = schema.safeParse(response.body.results);
-      if (!result.success) {
-        throw new Error(`${name} parse failed: ${z.prettifyError(result.error)}`);
-      }
-      console.debug(
-        `[cachedPosthogQuery] ${name} returned ${result.data.length} rows in ${performance.now() - startTime}ms`
-      );
-      return result.data;
-    },
-    undefined,
-    { revalidate: 60 * 60 * 24 } // 24 hours
-  );
+  const parse = (name: string, raw: unknown): Output[] => {
+    const result = schema.safeParse(raw);
+    if (!result.success) {
+      throw new Error(`${name} parse failed: ${z.prettifyError(result.error)}`);
+    }
+    return result.data;
+  };
+
+  return async (name: string, query: string): Promise<Output[]> => {
+    const key = `posthog-query:${name}`;
+
+    const cached = await redisGet(key);
+    if (cached !== null) {
+      return parse(name, JSON.parse(cached));
+    }
+
+    const startTime = performance.now();
+    const response = await posthogQuery(name, query);
+    if (response.status !== 'ok') {
+      throw new Error(`${name} query failed: ${JSON.stringify(response.error, undefined, 2)}`);
+    }
+    const data = parse(name, response.body.results);
+    console.debug(
+      `[cachedPosthogQuery] ${name} returned ${data.length} rows in ${performance.now() - startTime}ms`
+    );
+
+    await redisSet(key, JSON.stringify(response.body.results), CACHE_TTL_SECONDS);
+
+    return data;
+  };
 }

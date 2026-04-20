@@ -7,6 +7,8 @@ export {
   OpenRouterSearchResponse,
   OpenRouterProvider,
   OpenRouterProvidersResponse,
+  OpenRouterApiProvider,
+  OpenRouterApiProvidersResponse,
   NormalizedProvider,
   NormalizedOpenRouterResponse,
 } from '@kilocode/db/schema-types';

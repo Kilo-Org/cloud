@@ -44,6 +44,35 @@ function PaymentSourceBadge({
   return null;
 }
 
+function PendingSettlementSubscriptionCard({ billing }: { billing: ClawBillingStatus }) {
+  const sub = billing.subscription;
+  if (!sub) return null;
+
+  return (
+    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🦀</span>
+          <span className="text-foreground text-sm font-semibold">KiloClaw Subscription</span>
+        </div>
+        <PaymentSourceBadge subscription={sub} />
+      </div>
+
+      <div className="flex items-start gap-3">
+        <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-blue-400" />
+        <div className="text-muted-foreground space-y-1 text-sm">
+          <div>
+            <span>Status:</span> <span className="text-blue-300">Processing payment</span>
+          </div>
+          <p className="text-blue-300">
+            Hosting activates after invoice settlement. This usually takes just a moment.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ActiveSubscriptionCard({
   billing,
   onCancelClick,
@@ -474,6 +503,9 @@ export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardPro
   }
 
   if (billing.subscription) {
+    if (billing.subscription.activationState === 'pending_settlement') {
+      return <PendingSettlementSubscriptionCard billing={billing} />;
+    }
     if (billing.subscription.status === 'past_due' || billing.subscription.status === 'unpaid') {
       return (
         <PastDueSubscriptionCard billing={billing} onUpdatePaymentClick={handleUpdatePayment} />

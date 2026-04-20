@@ -104,6 +104,10 @@ on application logs that may be rotated or incomplete.
 3. When a user account is deleted (e.g., GDPR right-to-erasure),
    instance and subscription records MUST be retained. Ownership
    references MUST be anonymized rather than cascaded or removed.
+   Subscription change log rows MUST also be retained as canonical
+   audit history. Any directly identifying fields in those rows MUST
+   be anonymized under the GDPR exception in Subscription Change Log
+   rule 14.
    Foreign key constraints on these tables MUST NOT cascade deletes
    from parent tables.
 
@@ -115,7 +119,12 @@ on application logs that may be rotated or incomplete.
    the instance INSERT and the subscription INSERT where the
    instance has no subscription. Outside that bounded creation
    window, there MUST NOT exist an instance record without a
-   subscription record. This invariant is enforced at the
+   subscription record, except an instance explicitly quarantined
+   for bootstrap remediation after both primary and fallback
+   subscription-bootstrap paths failed (rule 22). That exception
+   MUST be rare, MUST cause the provisioning request to fail, and
+   MUST NOT be treated as a live provisioned instance for user
+   access or onboarding completion. This invariant is enforced at the
    application layer; the creation-order rules define the sequence
    that satisfies it.
 5. Each subscription record MUST reference exactly one instance. The
@@ -191,8 +200,11 @@ and serves as the authoritative audit trail for subscription state.
     g. An optional context or reason string providing additional
     detail (e.g., `stripe_invoice:inv_xxx`, `insufficient_credits`,
     `user_requested`, `trial_expired`).
-14. Change log entries MUST NOT be updated or deleted. The log is
-    strictly append-only.
+14. Change log entries MUST NOT be updated or deleted during normal
+    operation. The log is strictly append-only. GDPR-required
+    anonymization of directly identifying fields is the sole
+    exception. That anonymization MUST preserve the event's audit
+    meaning, timestamps, action labels, and non-identifying context.
 15. When the change log entry is written in the same database
     transaction as the mutation, a change log failure that aborts
     the transaction is acceptable — the entire operation will be
@@ -242,9 +254,17 @@ complete).
     instance record is persisted. This call MUST occur as part of
     the same provisioning request — the window between instance
     commit and subscription creation (see rule 4) MUST be bounded
-    to the duration of that request. If subscription creation
-    fails, the provisioning service MUST retry or mark the instance
-    as requiring remediation so the orphan is not silently ignored.
+    to the duration of that request. If the primary subscription
+    bootstrap path fails after the instance row is persisted, the
+    provisioning service MUST retry or run a fallback path that
+    still creates canonical subscription state before the request
+    exits. The request MUST NOT complete successfully while leaving
+    a silently unpaired instance row. If both primary and fallback
+    bootstrap fail, the provisioning request MUST fail and the
+    instance MUST be explicitly quarantined for remediation rather
+    than left as an unnoticed orphan. This quarantine state is the
+    sole temporary exception to rule 4 and MUST NOT be surfaced as a
+    successful provisioned instance.
 23. The onboarding flow MUST NOT be considered complete (and MUST NOT
     play the completion "ding" sound) until both the instance record
     and the subscription record have been persisted to the database.

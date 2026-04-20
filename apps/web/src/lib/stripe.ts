@@ -647,7 +647,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
-      if (invoiceLooksLikeKiloClawByPriceId(invoice) && invoice.amount_paid > 0) {
+      if (invoiceLooksLikeKiloClawByPriceId(invoice)) {
         await handleKiloClawInvoicePaid({ eventId: event.id, invoice });
         break;
       }

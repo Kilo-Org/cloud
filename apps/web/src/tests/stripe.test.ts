@@ -1,3 +1,5 @@
+process.env.STRIPE_KILOCLAW_COMMIT_PRICE_ID ||= 'price_commit';
+process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID ||= 'price_standard';
 process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
 
 import { describe, test, expect, beforeEach } from '@jest/globals';
@@ -71,6 +73,7 @@ import {
   KiloPassScheduledChangeStatus,
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
+import type * as kiloclawStripeHandlersModule from '@/lib/kiloclaw/stripe-handlers';
 import { cleanupDbForTest } from '@/lib/drizzle';
 import { processTopUp } from '@/lib/credits';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
@@ -1845,6 +1848,76 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       expect(orgConfig?.attempt_started_at).toBeNull();
     } finally {
       processOrgTopUpMock.mockRestore();
+    }
+  });
+
+  test('invoice.paid dispatches zero-dollar KiloClaw invoices to settlement', async () => {
+    const handleKiloClawInvoicePaid = jest.fn<
+      Promise<void>,
+      [{ eventId: string; invoice: Stripe.Invoice }]
+    >();
+    handleKiloClawInvoicePaid.mockResolvedValue(undefined);
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_zero_invoice_dispatch',
+      type: 'invoice.paid',
+      data: {
+        object: {
+          id: 'in_zero_invoice_dispatch',
+          object: 'invoice',
+          amount_paid: 0,
+          charge: null,
+          currency: 'usd',
+          parent: {
+            subscription_details: {
+              subscription: 'sub_zero_invoice_dispatch',
+            },
+          },
+          lines: {
+            data: [
+              {
+                pricing: {
+                  price_details: { price: process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID },
+                },
+                period: {
+                  start: Math.floor(new Date('2026-04-01T00:00:00.000Z').getTime() / 1000),
+                  end: Math.floor(new Date('2026-05-01T00:00:00.000Z').getTime() / 1000),
+                },
+              },
+            ],
+          },
+        } as unknown as Stripe.Invoice,
+        previous_attributes: {},
+      },
+    };
+
+    try {
+      jest.resetModules();
+      jest.doMock('@/lib/kiloclaw/stripe-handlers', () => {
+        const actual = jest.requireActual<typeof kiloclawStripeHandlersModule>(
+          '@/lib/kiloclaw/stripe-handlers'
+        );
+        return {
+          __esModule: true,
+          ...actual,
+          handleKiloClawInvoicePaid,
+        };
+      });
+
+      await jest.isolateModulesAsync(async () => {
+        const { processStripePaymentEventHook: isolatedProcessStripePaymentEventHook } =
+          await import('@/lib/stripe');
+        await isolatedProcessStripePaymentEventHook(event);
+      });
+
+      expect(handleKiloClawInvoicePaid).toHaveBeenCalledWith({
+        eventId: 'evt_zero_invoice_dispatch',
+        invoice: event.data.object,
+      });
+    } finally {
+      jest.dontMock('@/lib/kiloclaw/stripe-handlers');
+      jest.resetModules();
     }
   });
 });

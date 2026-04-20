@@ -821,6 +821,21 @@ describe('POST /google/token', () => {
     expect(response.status).toBe(403);
   });
 
+  it('returns 400 when capabilities is an empty list', async () => {
+    const headers = await makeAuthHeaders();
+    const response = await controller.request(
+      '/google/token',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sandboxId, capabilities: [] }),
+      },
+      makeEnv({ hyperdriveConnectionString: 'postgres://example' })
+    );
+
+    expect(response.status).toBe(400);
+  });
+
   it('returns 404 when no google oauth connection exists for the instance', async () => {
     const env = makeEnv({ hyperdriveConnectionString: 'postgres://example' });
     const headers = await makeAuthHeaders();

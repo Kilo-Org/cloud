@@ -72,7 +72,7 @@ const CheckinSchema = z.object({
 
 const GoogleTokenRequestSchema = z.object({
   sandboxId: z.string().min(1),
-  capabilities: z.array(z.string().min(1)).default(['calendar_read']),
+  capabilities: z.array(z.string().min(1)).min(1).default(['calendar_read']),
 });
 
 const GoogleStatusRequestSchema = z.object({

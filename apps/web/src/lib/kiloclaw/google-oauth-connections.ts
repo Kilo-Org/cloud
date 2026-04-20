@@ -87,11 +87,18 @@ export async function upsertKiloClawGoogleOAuthConnection(
     .where(eq(kiloclaw_google_oauth_connections.instance_id, input.instanceId))
     .limit(1);
 
-  const existingEncryptedRefreshToken = existing?.refresh_token_encrypted ?? null;
-
-  const encryptedRefreshToken = input.refreshToken
+  let encryptedRefreshToken = input.refreshToken
     ? encryptRefreshToken(input.refreshToken)
-    : existingEncryptedRefreshToken;
+    : existing?.refresh_token_encrypted ?? null;
+
+  if (!existing && !encryptedRefreshToken) {
+    const [concurrentWinner] = await db
+      .select()
+      .from(kiloclaw_google_oauth_connections)
+      .where(eq(kiloclaw_google_oauth_connections.instance_id, input.instanceId))
+      .limit(1);
+    encryptedRefreshToken = concurrentWinner?.refresh_token_encrypted ?? null;
+  }
 
   if (!encryptedRefreshToken) {
     throw new Error(
@@ -170,8 +177,6 @@ export async function upsertKiloClawGoogleOAuthConnection(
         credential_profile: 'kilo_owned',
         refresh_token_encrypted: encryptedRefreshToken,
         scopes: nextScopes,
-        grants_by_source: grantsBySource,
-        capabilities: effectiveCapabilities,
         status,
         last_error: null,
         last_error_at: null,
@@ -180,11 +185,38 @@ export async function upsertKiloClawGoogleOAuthConnection(
       },
     });
 
+  const [current] = await db
+    .select()
+    .from(kiloclaw_google_oauth_connections)
+    .where(eq(kiloclaw_google_oauth_connections.instance_id, input.instanceId))
+    .limit(1);
+
+  if (!current) {
+    throw new Error('Google OAuth connection row missing after insert/upsert');
+  }
+
+  const mergedGrantsBySource = deriveGrantsBySource(current, oauthCapabilities);
+  const mergedEffectiveCapabilities = effectiveCapabilitiesFromGrants(mergedGrantsBySource);
+  const shouldUpdateConnectedAt =
+    current.status !== 'active' ||
+    !equalSortedLists(current.capabilities ?? [], mergedEffectiveCapabilities) ||
+    !equalSortedLists(current.scopes ?? [], nextScopes);
+
+  await db
+    .update(kiloclaw_google_oauth_connections)
+    .set({
+      grants_by_source: mergedGrantsBySource,
+      capabilities: mergedEffectiveCapabilities,
+      connected_at: shouldUpdateConnectedAt ? now : current.connected_at,
+      updated_at: now,
+    })
+    .where(eq(kiloclaw_google_oauth_connections.id, current.id));
+
   return {
     status,
     accountEmail: input.accountEmail,
     scopes: nextScopes,
-    capabilities: effectiveCapabilities,
+    capabilities: mergedEffectiveCapabilities,
   };
 }
 

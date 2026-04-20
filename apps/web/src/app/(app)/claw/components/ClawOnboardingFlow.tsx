@@ -164,14 +164,15 @@ function ClawOnboardingFlowInner({
   const { data: isServiceDegraded } = useClawServiceDegraded();
   const posthog = usePostHog();
 
-  // Fire `claw_page_viewed` from the flow mount so the event still captures
-  // when the intro `create-instance` screen is skipped.
+  // Preserve the original event meaning: the personal create-first
+  // onboarding entry was shown, even when the intro screen is skipped.
   const hasCapturedPageView = useRef(false);
   useEffect(() => {
+    if (mode !== 'create-first' || organizationId) return;
     if (hasCapturedPageView.current) return;
     hasCapturedPageView.current = true;
     posthog?.capture('claw_page_viewed');
-  }, [posthog]);
+  }, [mode, organizationId, posthog]);
 
   useEffect(() => {
     if (!flowState.createSetupActive || hasCapturedIdentityView.current) return;

@@ -1,4 +1,4 @@
-import { safeLocalStorage } from '@/lib/localStorage';
+import { safeSessionStorage } from '@/lib/localStorage';
 
 /**
  * Marker that the personal KiloClaw onboarding wizard is in progress.
@@ -9,18 +9,21 @@ import { safeLocalStorage } from '@/lib/localStorage';
  * during auto-started provisioning would jump the user to `post-provisioning`
  * (or `complete`) and silently skip identity/permissions/channels input.
  *
+ * This marker is intentionally session-scoped so stale progress does not leak
+ * across account switches or browser restarts.
+ *
  * Scope: personal flow only. Organization onboarding is unchanged.
  */
 const CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY = 'kiloclaw-personal-onboarding-in-progress';
 
 export function readPersonalOnboardingInProgress(): boolean {
-  return safeLocalStorage.getItem(CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY) === '1';
+  return safeSessionStorage.getItem(CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY) === '1';
 }
 
 export function markPersonalOnboardingInProgress(): void {
-  safeLocalStorage.setItem(CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY, '1');
+  safeSessionStorage.setItem(CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY, '1');
 }
 
 export function clearPersonalOnboardingInProgress(): void {
-  safeLocalStorage.removeItem(CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY);
+  safeSessionStorage.removeItem(CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY);
 }

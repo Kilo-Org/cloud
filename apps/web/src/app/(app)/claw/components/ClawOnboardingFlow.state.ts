@@ -86,6 +86,39 @@ export type OnboardingStepNumbers = {
   pairing: number;
 };
 
+export const COMPACT_ONBOARDING_STEP_NUMBERS = {
+  identity: 1,
+  permissions: 2,
+  channels: 3,
+  provisioning: 4,
+  pairing: 5,
+} satisfies OnboardingStepNumbers;
+
+export const LEGACY_ONBOARDING_STEP_NUMBERS = {
+  identity: 2,
+  permissions: 3,
+  channels: 4,
+  provisioning: 5,
+  pairing: 6,
+} satisfies OnboardingStepNumbers;
+
+export const COMPACT_ONBOARDING_TOTAL_STEPS = 4;
+export const COMPACT_ONBOARDING_TOTAL_STEPS_WITH_PAIRING = 5;
+export const LEGACY_ONBOARDING_TOTAL_STEPS = 5;
+export const LEGACY_ONBOARDING_TOTAL_STEPS_WITH_PAIRING = 6;
+
+export const COMPACT_ONBOARDING_IDENTITY_STEP = COMPACT_ONBOARDING_STEP_NUMBERS.identity;
+export const COMPACT_ONBOARDING_PERMISSIONS_STEP = COMPACT_ONBOARDING_STEP_NUMBERS.permissions;
+export const COMPACT_ONBOARDING_CHANNELS_STEP = COMPACT_ONBOARDING_STEP_NUMBERS.channels;
+export const COMPACT_ONBOARDING_PROVISIONING_STEP = COMPACT_ONBOARDING_STEP_NUMBERS.provisioning;
+export const COMPACT_ONBOARDING_PAIRING_STEP = COMPACT_ONBOARDING_STEP_NUMBERS.pairing;
+
+export const LEGACY_ONBOARDING_IDENTITY_STEP = LEGACY_ONBOARDING_STEP_NUMBERS.identity;
+export const LEGACY_ONBOARDING_PERMISSIONS_STEP = LEGACY_ONBOARDING_STEP_NUMBERS.permissions;
+export const LEGACY_ONBOARDING_CHANNELS_STEP = LEGACY_ONBOARDING_STEP_NUMBERS.channels;
+export const LEGACY_ONBOARDING_PROVISIONING_STEP = LEGACY_ONBOARDING_STEP_NUMBERS.provisioning;
+export const LEGACY_ONBOARDING_PAIRING_STEP = LEGACY_ONBOARDING_STEP_NUMBERS.pairing;
+
 export type ClawOnboardingFlowState = {
   renderStep: ClawOnboardingRenderStep;
   instanceStatus: PopulatedClawStatus | null;
@@ -200,9 +233,13 @@ function computeTotalSteps({
   skipCreateInstanceStep: boolean;
 }): number {
   if (skipCreateInstanceStep) {
-    return hasPairingStep ? 5 : 4;
+    return hasPairingStep
+      ? COMPACT_ONBOARDING_TOTAL_STEPS_WITH_PAIRING
+      : COMPACT_ONBOARDING_TOTAL_STEPS;
   }
-  return hasPairingStep ? 6 : 5;
+  return hasPairingStep
+    ? LEGACY_ONBOARDING_TOTAL_STEPS_WITH_PAIRING
+    : LEGACY_ONBOARDING_TOTAL_STEPS;
 }
 
 function computeStepNumbers({
@@ -212,19 +249,19 @@ function computeStepNumbers({
 }): OnboardingStepNumbers {
   if (skipCreateInstanceStep) {
     return {
-      identity: 1,
-      permissions: 2,
-      channels: 3,
-      provisioning: 4,
-      pairing: 5,
+      identity: COMPACT_ONBOARDING_IDENTITY_STEP,
+      permissions: COMPACT_ONBOARDING_PERMISSIONS_STEP,
+      channels: COMPACT_ONBOARDING_CHANNELS_STEP,
+      provisioning: COMPACT_ONBOARDING_PROVISIONING_STEP,
+      pairing: COMPACT_ONBOARDING_PAIRING_STEP,
     };
   }
   return {
-    identity: 2,
-    permissions: 3,
-    channels: 4,
-    provisioning: 5,
-    pairing: 6,
+    identity: LEGACY_ONBOARDING_IDENTITY_STEP,
+    permissions: LEGACY_ONBOARDING_PERMISSIONS_STEP,
+    channels: LEGACY_ONBOARDING_CHANNELS_STEP,
+    provisioning: LEGACY_ONBOARDING_PROVISIONING_STEP,
+    pairing: LEGACY_ONBOARDING_PAIRING_STEP,
   };
 }
 

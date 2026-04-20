@@ -5,6 +5,8 @@ import { TriangleAlert } from 'lucide-react';
 import type { PopulatedClawStatus } from './ClawOnboardingFlow.state';
 import {
   CLAW_ONBOARDING_FAKE_STEPS,
+  LEGACY_ONBOARDING_TOTAL_STEPS,
+  LEGACY_ONBOARDING_TOTAL_STEPS_WITH_PAIRING,
   type ClawOnboardingRenderStep,
   isPairingChannel,
   type PairingChannelId,
@@ -90,7 +92,9 @@ export function ClawOnboardingFakeWalkthrough({
   const pairingChannelId: PairingChannelId = isPairingChannel(selectedChannelId)
     ? selectedChannelId
     : 'telegram';
-  const totalSteps = isPairingChannel(selectedChannelId) ? 6 : 5;
+  const totalSteps = isPairingChannel(selectedChannelId)
+    ? LEGACY_ONBOARDING_TOTAL_STEPS_WITH_PAIRING
+    : LEGACY_ONBOARDING_TOTAL_STEPS;
 
   return (
     <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">

@@ -6,6 +6,10 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useClawGatewayReady } from '../hooks/useClawHooks';
 import {
+  LEGACY_ONBOARDING_PROVISIONING_STEP,
+  LEGACY_ONBOARDING_TOTAL_STEPS,
+} from './ClawOnboardingFlow.state';
+import {
   type BotIdentity,
   type ExecPreset,
   type ClawMutations,
@@ -38,8 +42,8 @@ export function ProvisioningStep({
   botIdentity,
   instanceRunning,
   mutations,
-  currentStep = 5,
-  totalSteps = 5,
+  currentStep = LEGACY_ONBOARDING_PROVISIONING_STEP,
+  totalSteps = LEGACY_ONBOARDING_TOTAL_STEPS,
   onComplete,
 }: {
   preset: ExecPreset;
@@ -214,8 +218,8 @@ const PROVISIONING_PHRASES = [
 
 /** Error view shown when the gateway returns a 502 during provisioning. */
 export function ProvisioningErrorView({
-  currentStep = 5,
-  totalSteps = 5,
+  currentStep = LEGACY_ONBOARDING_PROVISIONING_STEP,
+  totalSteps = LEGACY_ONBOARDING_TOTAL_STEPS,
 }: {
   currentStep?: number;
   totalSteps?: number;
@@ -255,8 +259,8 @@ export function ProvisioningErrorView({
 
 /** Pure visual shell — extracted so Storybook can render it without wiring up mutations. */
 export function ProvisioningStepView({
-  currentStep = 5,
-  totalSteps = 5,
+  currentStep = LEGACY_ONBOARDING_PROVISIONING_STEP,
+  totalSteps = LEGACY_ONBOARDING_TOTAL_STEPS,
 }: {
   currentStep?: number;
   totalSteps?: number;

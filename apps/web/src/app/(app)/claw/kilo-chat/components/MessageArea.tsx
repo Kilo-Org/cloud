@@ -232,7 +232,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     [removeReaction.mutate]
   );
 
-  const messageMap = new Map(messages.map(m => [m.id, m]));
+  const messageMap = useMemo(() => new Map(messages.map(m => [m.id, m])), [messages]);
 
   const title = conversationDetail.data?.title ?? 'Untitled';
 

@@ -29,7 +29,7 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
         { status: 503 }
       );
     }
-    return NextResponse.json(data);
+    return NextResponse.json({ data });
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'openrouter/providers' },

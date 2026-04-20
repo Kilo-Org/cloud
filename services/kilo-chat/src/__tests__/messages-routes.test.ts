@@ -1,26 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, vi } from 'vitest';
-import { Hono } from 'hono';
-import { createMiddleware } from 'hono/factory';
-import type { AuthContext } from '../auth';
-import { registerConversationRoutes } from '../routes/conversations';
-import { registerMessageRoutes } from '../routes/messages';
 import type { ConversationDO } from '../do/conversation-do';
-
-function makeApp(callerId: string, callerKind: 'user' | 'bot', allowedSandboxIds: string[] = []) {
-  const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(async (c, next) => {
-    c.set('callerId', callerId);
-    c.set('callerKind', callerKind);
-    c.set('allowedSandboxIds', allowedSandboxIds);
-    await next();
-  });
-
-  const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
-  app.use('/v1/*', mockAuth);
-  registerConversationRoutes(app);
-  registerMessageRoutes(app);
-  return app;
-}
+import { makeApp } from './helpers';
 
 function getConvStub(convId: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(convId));

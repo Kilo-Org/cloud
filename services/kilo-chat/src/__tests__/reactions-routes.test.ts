@@ -1,26 +1,6 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
-import { Hono } from 'hono';
-import { createMiddleware } from 'hono/factory';
-import type { AuthContext } from '../auth';
-import { registerConversationRoutes } from '../routes/conversations';
-import { registerMessageRoutes } from '../routes/messages';
-import { registerReactionsRoutes } from '../routes/reactions';
-
-function makeApp(callerId: string, callerKind: 'user' | 'bot', allowedSandboxIds: string[] = []) {
-  const mockAuth = createMiddleware<{ Bindings: Env; Variables: AuthContext }>(async (c, next) => {
-    c.set('callerId', callerId);
-    c.set('callerKind', callerKind);
-    c.set('allowedSandboxIds', allowedSandboxIds);
-    await next();
-  });
-  const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
-  app.use('/v1/*', mockAuth);
-  registerConversationRoutes(app);
-  registerMessageRoutes(app);
-  registerReactionsRoutes(app);
-  return app;
-}
+import { makeApp } from './helpers';
 
 async function setup(suffix: string) {
   const userId = `user-${suffix}`;

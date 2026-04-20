@@ -138,6 +138,16 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'nextjs', 'kiloclaw'],
     dir: 'services/kiloclaw-billing',
   },
+  'event-service': {
+    group: 'kiloclaw',
+    dependsOn: [],
+    dir: 'services/event-service',
+  },
+  'kilo-chat': {
+    group: 'kiloclaw',
+    dependsOn: ['kiloclaw', 'event-service'],
+    dir: 'services/kilo-chat',
+  },
   // observability
   'cloudflare-o11y': {
     group: 'observability',

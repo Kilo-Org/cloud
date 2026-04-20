@@ -162,7 +162,7 @@ export function KiloChatLayout({
         { onError: () => toast.error('Failed to rename conversation') }
       );
     },
-    [renameConversation]
+    [renameConversation.mutate]
   );
 
   const handleLeave = useCallback(
@@ -179,7 +179,7 @@ export function KiloChatLayout({
         },
       });
     },
-    [leaveConversation, params?.conversationId, router]
+    [leaveConversation.mutate, params?.conversationId, router]
   );
 
   const handleNewConversation = useCallback(() => {
@@ -193,7 +193,7 @@ export function KiloChatLayout({
         onError: () => toast.error('Failed to create conversation'),
       }
     );
-  }, [selectedSandboxId, createConversation, router]);
+  }, [selectedSandboxId, createConversation.mutate, router]);
 
   return (
     <KiloChatContext.Provider

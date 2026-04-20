@@ -73,18 +73,20 @@ export function MessageArea({
 
   // Mark conversation as read on mount / conversationId change (if unread)
   useEffect(() => {
-    const cached = queryClient.getQueryData<ConversationListResponse>([
-      'kilo-chat',
-      'conversations',
-    ]);
-    if (!cached) return;
-    const conv = cached.conversations.find(c => c.conversationId === conversationId);
-    if (!conv) return;
-    const isUnread =
-      conv.lastActivityAt != null &&
-      (conv.lastReadAt == null || conv.lastActivityAt > conv.lastReadAt);
-    if (isUnread) {
-      markReadRef.current(conversationId);
+    // Find the conversation in any cached conversations query (key includes sandboxId)
+    const queries = queryClient.getQueriesData<ConversationListResponse>({
+      queryKey: ['kilo-chat', 'conversations'],
+    });
+    for (const [, data] of queries) {
+      const conv = data?.conversations.find(c => c.conversationId === conversationId);
+      if (!conv) continue;
+      const isUnread =
+        conv.lastActivityAt != null &&
+        (conv.lastReadAt == null || conv.lastActivityAt > conv.lastReadAt);
+      if (isUnread) {
+        markReadRef.current(conversationId);
+      }
+      return;
     }
   }, [conversationId, queryClient]);
 

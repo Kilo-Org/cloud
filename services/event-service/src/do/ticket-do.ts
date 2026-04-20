@@ -15,29 +15,40 @@ type TicketEntry = { userId: string; expiresAt: number };
  *   4. Worker calls ticketDO.redeem(ticket) → userId (single-use, deleted on redeem)
  */
 export class TicketDO extends DurableObject<Env> {
-  private tickets = new Map<string, TicketEntry>();
-
   async create(userId: string): Promise<string> {
     const ticket = crypto.randomUUID();
-    this.tickets.set(ticket, { userId, expiresAt: Date.now() + TICKET_TTL_MS });
+    await this.ctx.storage.put<TicketEntry>(`ticket:${ticket}`, {
+      userId,
+      expiresAt: Date.now() + TICKET_TTL_MS,
+    });
     await this.scheduleCleanup();
     return ticket;
   }
 
   async redeem(ticket: string): Promise<string | null> {
-    const entry = this.tickets.get(ticket);
+    const entry = await this.ctx.storage.get<TicketEntry>(`ticket:${ticket}`);
     if (!entry) return null;
-    this.tickets.delete(ticket);
+    await this.ctx.storage.delete(`ticket:${ticket}`);
     if (Date.now() > entry.expiresAt) return null;
     return entry.userId;
   }
 
   async alarm(): Promise<void> {
     const now = Date.now();
-    for (const [ticket, entry] of this.tickets) {
-      if (now > entry.expiresAt) this.tickets.delete(ticket);
+    const all = await this.ctx.storage.list<TicketEntry>({ prefix: 'ticket:' });
+    const expired: string[] = [];
+    let remaining = 0;
+    for (const [key, entry] of all) {
+      if (now > entry.expiresAt) {
+        expired.push(key);
+      } else {
+        remaining++;
+      }
     }
-    if (this.tickets.size > 0) {
+    if (expired.length > 0) {
+      await this.ctx.storage.delete(expired);
+    }
+    if (remaining > 0) {
       await this.ctx.storage.setAlarm(Date.now() + CLEANUP_INTERVAL_MS);
     }
   }

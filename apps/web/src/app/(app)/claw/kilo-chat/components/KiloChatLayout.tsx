@@ -81,6 +81,24 @@ export function KiloChatLayout({
       kiloChatClient.onConversationCreated(() => {
         void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
       }),
+      kiloChatClient.onConversationRenamed((_ctx, e) => {
+        queryClient.setQueriesData<ConversationListResponse>(
+          { queryKey: ['kilo-chat', 'conversations'] },
+          old => {
+            if (!old) return old;
+            return {
+              ...old,
+              conversations: old.conversations.map(c =>
+                c.conversationId === e.conversationId ? { ...c, conversationTitle: e.title } : c
+              ),
+            };
+          }
+        );
+        // Also update the conversation detail cache if it's loaded
+        void queryClient.invalidateQueries({
+          queryKey: ['kilo-chat', 'conversation', e.conversationId],
+        });
+      }),
       kiloChatClient.onConversationActivity((_ctx, e) => {
         queryClient.setQueriesData<ConversationListResponse>(
           { queryKey: ['kilo-chat', 'conversations'] },

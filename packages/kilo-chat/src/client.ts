@@ -23,6 +23,7 @@ import type {
   ReactionAddedEvent,
   ReactionRemovedEvent,
   ConversationCreatedEvent,
+  ConversationRenamedEvent,
   ConversationActivityEvent,
 } from './types';
 
@@ -177,6 +178,13 @@ export class KiloChatClient {
   onConversationCreated(handler: (ctx: string, e: ConversationCreatedEvent) => void): () => void {
     return this.es.on(
       'conversation.created',
+      handler as (context: string, payload: unknown) => void
+    );
+  }
+
+  onConversationRenamed(handler: (ctx: string, e: ConversationRenamedEvent) => void): () => void {
+    return this.es.on(
+      'conversation.renamed',
       handler as (context: string, payload: unknown) => void
     );
   }

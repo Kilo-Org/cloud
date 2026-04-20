@@ -87,6 +87,8 @@ export async function createMessageFor(
   // already committed, so a MembershipDO failure must not fail the request.
   const info = await convStub.getInfo();
   if (info) {
+    const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
+
     // Auto-title unnamed conversations with the first message text.
     if (info.title === null) {
       const text = content
@@ -107,6 +109,12 @@ export async function createMessageFor(
             return stub.updateConversationTitle(conversationId, title);
           })
         );
+        if (sandboxId) {
+          await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
+            conversationId,
+            title,
+          });
+        }
       }
     }
 
@@ -122,9 +130,6 @@ export async function createMessageFor(
         console.error('Failed to update MembershipDO lastActivityAt:', r.reason);
       }
     }
-
-    // Push events to human members (reuse info already fetched above).
-    const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
     if (sandboxId) {
       const otherHumans = humanMemberIds.filter(id => id !== callerId);
 

@@ -104,6 +104,11 @@ export type ConversationCreatedEvent = {
   conversationId: string;
 };
 
+export type ConversationRenamedEvent = {
+  conversationId: string;
+  title: string;
+};
+
 export type ConversationActivityEvent = {
   conversationId: string;
   lastActivityAt: number;

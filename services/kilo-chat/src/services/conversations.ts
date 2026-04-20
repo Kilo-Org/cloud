@@ -4,7 +4,7 @@
  */
 
 import { ulid } from 'ulid';
-import { pushInstanceEvent } from './event-push';
+import { extractConversationContext, pushInstanceEvent } from './event-push';
 
 // ─── createConversation ────────────────────────────────────────────────────
 
@@ -103,6 +103,13 @@ export async function renameConversationFor(
         return memberStub.updateConversationTitle(conversationId, title);
       })
     );
+    const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
+    if (sandboxId) {
+      await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
+        conversationId,
+        title,
+      });
+    }
   }
 
   return { ok: true };

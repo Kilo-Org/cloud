@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "event-service",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-02-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "logpush": true,
+  "placement": { "mode": "smart" },
+  "dev": { "port": 8803 },
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "USER_SESSION_DO", "class_name": "UserSessionDO" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_classes": ["UserSessionDO"] }
+  ],
+
+  "services": [
+    { "binding": "KILO_CHAT", "service": "kilo-chat" }
+  ],
+
+  "secrets_store_secrets": [
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "NEXTAUTH_SECRET_PROD"
+    }
+  ]
+}

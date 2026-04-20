@@ -208,6 +208,9 @@ function ConnectWastelandDialog({
   const [dolthubToken, setDolthubToken] = useState('');
   const [dolthubOrg, setDolthubOrg] = useState('');
   const [doltCredsJwk, setDoltCredsJwk] = useState('');
+  // Only editable in the "Create new" flow — when selecting an existing
+  // wasteland, its upstream is used.
+  const [upstreamInput, setUpstreamInput] = useState(DEFAULT_UPSTREAM);
 
   // Step 2: Identity
   const [rigHandle, setRigHandle] = useState('');
@@ -239,6 +242,7 @@ function ConnectWastelandDialog({
       setStep('select');
       setSelectedWastelandId(null);
       setConnectedUpstream(DEFAULT_UPSTREAM);
+      setUpstreamInput(DEFAULT_UPSTREAM);
       setDolthubToken('');
       setDolthubOrg('');
       setDoltCredsJwk('');
@@ -324,15 +328,15 @@ function ConnectWastelandDialog({
     try {
       let wastelandId = selectedWastelandId;
       const selectedWasteland = wastelands.find(w => w.wasteland_id === wastelandId);
-      const upstream = selectedWasteland?.dolthub_upstream ?? DEFAULT_UPSTREAM;
+      const upstream = selectedWasteland?.dolthub_upstream ?? upstreamInput.trim();
       setConnectedUpstream(upstream);
 
       if (!wastelandId) {
-        // Create a new wasteland for this user connected to the commons
+        // Create a new wasteland pointing at the chosen upstream
         const created = await wastelandClient.wasteland.createWasteland.mutate({
-          name: `${dolthubOrg}-commons`,
+          name: `${dolthubOrg}-${upstream.split('/')[1] ?? 'wasteland'}`,
           ownerType: 'user',
-          dolthubUpstream: DEFAULT_UPSTREAM,
+          dolthubUpstream: upstream,
         });
         wastelandId = created.wasteland_id;
       }
@@ -375,7 +379,10 @@ function ConnectWastelandDialog({
     }
   };
 
-  const credentialsValid = dolthubToken.trim().length > 0 && dolthubOrg.trim().length > 0;
+  const upstreamValid =
+    selectedWastelandId !== null || /^[^/\s]+\/[^/\s]+$/.test(upstreamInput.trim());
+  const credentialsValid =
+    dolthubToken.trim().length > 0 && dolthubOrg.trim().length > 0 && upstreamValid;
   const identityValid = rigHandle.trim().length > 0;
 
   return (
@@ -463,6 +470,19 @@ function ConnectWastelandDialog({
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
+              {selectedWastelandId === null && (
+                <FieldGroup
+                  label="DoltHub Upstream"
+                  hint="The repo to fork and submit PRs against. Format: org/db"
+                >
+                  <Input
+                    value={upstreamInput}
+                    onChange={e => setUpstreamInput(e.target.value)}
+                    placeholder="hop/wl-commons"
+                    className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                  />
+                </FieldGroup>
+              )}
               <FieldGroup
                 label="DoltHub API Token"
                 hint="Create one at dolthub.com/settings/tokens"

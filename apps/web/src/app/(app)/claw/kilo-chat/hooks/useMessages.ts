@@ -281,9 +281,23 @@ export function useMessageCacheUpdater(conversationId: string | null) {
           queryClient.setQueryData(queryKey, (old: unknown) => {
             if (!old || typeof old !== 'object') return old;
             const data = old as { pages: Message[][]; pageParams: unknown[] };
-            // Skip if this messageId already exists (optimistic insert already replaced)
+            // Skip if this messageId already exists
             for (const page of data.pages) {
               if (page.some(msg => msg.id === e.messageId)) return data;
+            }
+            // Replace pending optimistic message from same sender if present
+            for (const page of data.pages) {
+              const pendingIdx = page.findIndex(
+                msg => msg.id.startsWith('pending-') && msg.senderId === e.senderId
+              );
+              if (pendingIdx >= 0) {
+                return {
+                  ...data,
+                  pages: data.pages.map(p =>
+                    p === page ? page.map((msg, i) => (i === pendingIdx ? newMessage : msg)) : p
+                  ),
+                };
+              }
             }
             const firstPage = data.pages[0] ?? [];
             return { ...data, pages: [[newMessage, ...firstPage], ...data.pages.slice(1)] };

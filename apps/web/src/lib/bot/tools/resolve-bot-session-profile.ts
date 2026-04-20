@@ -32,7 +32,7 @@ export async function resolveBotSessionProfile(
       : { type: 'user', id: ownerRef.id };
   const userIdForMerge = ownerRef.kind === 'org' ? ticketUserId : undefined;
 
-  const repoFullName = args.githubRepo ?? args.gitlabProject;
+  const repoFullName = args.gitlabProject ?? args.githubRepo;
   const platform: 'github' | 'gitlab' = args.gitlabProject ? 'gitlab' : 'github';
 
   return mergeProfileConfiguration({

@@ -104,11 +104,9 @@ export function KiloChatLayout({
           { queryKey: ['kilo-chat', 'conversations'] },
           old => {
             if (!old) return old;
-            return {
-              ...old,
-              conversations: old.conversations.filter(c => c.conversationId !== e.conversationId),
-              total: old.total - 1,
-            };
+            const filtered = old.conversations.filter(c => c.conversationId !== e.conversationId);
+            if (filtered.length === old.conversations.length) return old;
+            return { ...old, conversations: filtered, total: old.total - 1 };
           }
         );
       }),

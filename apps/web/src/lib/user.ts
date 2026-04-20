@@ -374,6 +374,7 @@ export async function createOrUpdateUser(
 
   type TxResult = Result<{ user: User }, AuthErrorType>;
   let txResult: TxResult;
+  let caughtError: unknown;
   try {
     txResult = await db.transaction(async tx => {
       const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
@@ -406,25 +407,20 @@ export async function createOrUpdateUser(
       return successResult({ user: inserted });
     });
   } catch (error) {
-    // Clean up the Stripe customer if the DB transaction threw
-    deleteStripeCustomer(stripeCustomer.id).catch(cleanupErr =>
-      captureException(cleanupErr, {
-        tags: { source: 'signup-stripe-cleanup' },
-        extra: { stripeCustomerId: stripeCustomer.id, originalError: String(error) },
-      })
-    );
-    throw error;
+    caughtError = error;
+    txResult = failureResult('SYSTEM_ERROR');
   }
 
-  // Clean up the Stripe customer if the transaction returned a failure
-  // (e.g. rate limit rejection) without throwing.
+  // Clean up the Stripe customer when signup didn't succeed (thrown error
+  // or returned failure like rate-limit rejection).
   if (!txResult.success) {
     deleteStripeCustomer(stripeCustomer.id).catch(cleanupErr =>
       captureException(cleanupErr, {
         tags: { source: 'signup-stripe-cleanup' },
-        extra: { stripeCustomerId: stripeCustomer.id, error: txResult.error },
+        extra: { stripeCustomerId: stripeCustomer.id },
       })
     );
+    if (caughtError) throw caughtError;
     return txResult;
   }
   const savedUser = txResult.user;

@@ -36,11 +36,10 @@ type ResolveAutoModelParams = {
 };
 
 function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
-  const modeResult =
-    featureHeader === 'kiloclaw' || featureHeader === 'openclaw'
-      ? { success: true, data: 'KiloClaw' as const }
-      : modeSchema.safeParse(modeHeader?.trim() ?? '');
-  return modeResult.success ? modeResult.data : null;
+  const parsedMode = modeSchema.safeParse(modeHeader?.trim() ?? '');
+  if (parsedMode.success) return parsedMode.data;
+  if (featureHeader === 'kiloclaw' || featureHeader === 'openclaw') return 'KiloClaw' as const;
+  return null;
 }
 
 export async function resolveAutoModel(

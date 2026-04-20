@@ -235,3 +235,17 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
   }
   return (request.body.reasoning?.effort ?? request.body.reasoning_effort) === 'none';
 }
+
+export function enableReasoningSummaries(request: GatewayRequest) {
+  if (
+    request.kind === 'messages' &&
+    request.body.thinking &&
+    (request.body.thinking.type === 'enabled' || request.body.thinking.type === 'adaptive') &&
+    !request.body.thinking.display
+  ) {
+    request.body.thinking.display = 'summarized';
+  }
+  if (request.kind === 'responses' && request.body.reasoning && !request.body.reasoning.summary) {
+    request.body.reasoning.summary = 'auto';
+  }
+}

@@ -100,6 +100,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
     openrouter_upstream_safety_identifier: null,
     vercel_downstream_safety_identifier: null,
     customer_source: null,
+    signup_ip: null,
     account_deletion_requested_at: null,
     normalized_email: null,
     email_domain: null,

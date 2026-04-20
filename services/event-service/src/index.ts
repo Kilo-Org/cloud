@@ -30,4 +30,10 @@ export default class extends WorkerEntrypoint<Env> {
     const stub = this.env.USER_SESSION_DO.get(doId);
     await stub.pushEvent(context, event, payload);
   }
+
+  async userPresent(userId: string, context: string): Promise<boolean> {
+    const doId = this.env.USER_SESSION_DO.idFromName(userId);
+    const stub = this.env.USER_SESSION_DO.get(doId);
+    return stub.userPresent(context);
+  }
 }

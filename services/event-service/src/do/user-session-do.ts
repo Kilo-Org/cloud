@@ -77,6 +77,16 @@ export class UserSessionDO extends DurableObject<Env> {
     }
   }
 
+  // ── Presence check ─────────────────────────────────────────────────
+
+  async userPresent(context: string): Promise<boolean> {
+    for (const ws of this.ctx.getWebSockets()) {
+      const state = this.getState(ws);
+      if (state.contexts.has(context)) return true;
+    }
+    return false;
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────
 
   private getState(ws: WebSocket): { contexts: Set<string> } {

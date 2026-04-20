@@ -9,6 +9,8 @@ import {
   useEditMessage,
   useDeleteMessage,
   useMessageCacheUpdater,
+  useAddReaction,
+  useRemoveReaction,
 } from '../hooks/useMessages';
 import { useConversationContext } from '../hooks/useEventService';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
@@ -56,6 +58,8 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const sendMessage = useSendMessage(kiloChatClient, conversationId, currentUserId);
   const editMessage = useEditMessage(kiloChatClient, conversationId);
   const deleteMessage = useDeleteMessage(kiloChatClient, conversationId);
+  const addReaction = useAddReaction(kiloChatClient, conversationId, currentUserId);
+  const removeReaction = useRemoveReaction(kiloChatClient, conversationId, currentUserId);
 
   const updateCache = useMessageCacheUpdater(conversationId);
   const { typingMembers, handleTypingEvent, clearTypingForMember } = useTypingState(currentUserId);
@@ -94,6 +98,12 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       }),
       kiloChatClient.onTypingStop((_ctx, data) => {
         clearTypingForMember(data.memberId);
+      }),
+      kiloChatClient.onReactionAdded((_ctx, data) => {
+        updateCache({ type: 'reaction.added', data });
+      }),
+      kiloChatClient.onReactionRemoved((_ctx, data) => {
+        updateCache({ type: 'reaction.removed', data });
       }),
     ];
     return () => offs.forEach(off => off());
@@ -187,6 +197,20 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     setPendingDeleteId(null);
   }
 
+  function handleAddReaction(messageId: string, emoji: string) {
+    addReaction.mutate(
+      { messageId, emoji },
+      { onError: () => toast.error('Failed to add reaction') }
+    );
+  }
+
+  function handleRemoveReaction(messageId: string, emoji: string) {
+    removeReaction.mutate(
+      { messageId, emoji },
+      { onError: () => toast.error('Failed to remove reaction') }
+    );
+  }
+
   const messageMap = new Map(messages.map(m => [m.id, m]));
 
   const title = conversationDetail.data?.title ?? 'Untitled';
@@ -275,6 +299,9 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
               onConfirmDelete={handleConfirmDelete}
               onCancelDelete={handleCancelDelete}
               onReply={setReplyingTo}
+              onAddReaction={handleAddReaction}
+              onRemoveReaction={handleRemoveReaction}
+              currentUserId={currentUserId}
             />
           ))}
         </div>

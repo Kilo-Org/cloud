@@ -189,11 +189,7 @@ export function MessageBubble({
         <div className="relative">
           {actionButtons}
           {showQuickPick && (
-            <div
-              className={`absolute z-20 ${
-                isOwn ? 'right-full mr-1' : 'left-full ml-1'
-              } top-0`}
-            >
+            <div className={`absolute z-20 ${isOwn ? 'right-full mr-1' : 'left-full ml-1'} top-0`}>
               <EmojiQuickPick
                 currentUserReactions={myReactions}
                 onSelect={handleQuickPickSelect}
@@ -205,9 +201,7 @@ export function MessageBubble({
             </div>
           )}
           {showFullPicker && (
-            <div
-              className={`absolute bottom-full mb-2 z-50 ${isOwn ? 'right-0' : 'left-0'}`}
-            >
+            <div className={`absolute bottom-full mb-2 z-50 ${isOwn ? 'right-0' : 'left-0'}`}>
               <EmojiPicker
                 onSelect={handleFullPickerSelect}
                 onClose={() => setShowFullPicker(false)}

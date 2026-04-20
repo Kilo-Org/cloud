@@ -1032,7 +1032,7 @@ describe('createSubscriptionCheckout', () => {
     );
   });
 
-  it('uses the intro price and allow_promotion_codes for new standard subscribers', async () => {
+  it('uses the intro price and allows promotion codes for new standard subscribers', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -1056,7 +1056,6 @@ describe('createSubscriptionCheckout', () => {
     >;
     // Should use intro price
     expect(callArgs.line_items).toEqual([{ price: 'price_standard_intro', quantity: 1 }]);
-    // Should allow promotion codes on hosted checkout.
     expect(callArgs.allow_promotion_codes).toBe(true);
     // Should NOT have discounts (coupon removed)
     expect(callArgs.discounts).toBeUndefined();
@@ -1118,7 +1117,7 @@ describe('createSubscriptionCheckout', () => {
     expect(callArgs.line_items).toEqual([{ price: 'price_standard_intro', quantity: 1 }]);
   });
 
-  it('uses allow_promotion_codes for commit plan', async () => {
+  it('allows promotion codes for commit plan', async () => {
     const instance = await createKiloclawInstance(user.id);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -1190,6 +1189,45 @@ describe('createSubscriptionCheckout', () => {
         },
       })
     );
+  });
+});
+
+describe('createKiloPassUpsellCheckout', () => {
+  it('rejects commit hosting for monthly tier 19', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    const caller = await createCallerForUser(user.id);
+
+    await expect(
+      caller.kiloclaw.createKiloPassUpsellCheckout({
+        instanceId: instance.id,
+        tier: '19',
+        cadence: 'monthly',
+        hostingPlan: 'commit',
+      })
+    ).rejects.toThrow(
+      'Selected Kilo Pass option does not include enough credits for commit hosting.'
+    );
+
+    expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('allows commit hosting for yearly tier 19', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    stripeMock.checkout.sessions.create.mockResolvedValue({
+      url: 'https://checkout.stripe.com/test',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.kiloclaw.createKiloPassUpsellCheckout({
+        instanceId: instance.id,
+        tier: '19',
+        cadence: 'yearly',
+        hostingPlan: 'commit',
+      })
+    ).resolves.toEqual({ url: 'https://checkout.stripe.com/test' });
+
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalled();
   });
 });
 

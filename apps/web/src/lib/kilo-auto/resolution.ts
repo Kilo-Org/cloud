@@ -34,6 +34,7 @@ type ResolveAutoModelParams = {
   modeHeader: string | null;
   featureHeader: FeatureValue | null;
   sessionId: string | null;
+  requestKind?: GatewayRequest['kind'];
 };
 
 export async function resolveAutoModel(
@@ -41,7 +42,7 @@ export async function resolveAutoModel(
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ): Promise<ResolvedAutoModel> {
-  const { model, modeHeader, featureHeader, sessionId } = params;
+  const { model, modeHeader, featureHeader, sessionId, requestKind } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
     if (
       sessionId &&
@@ -74,7 +75,7 @@ export async function resolveAutoModel(
     if (featureHeader === 'openclaw') {
       return BALANCED_CLAW_MODEL;
     }
-    return BALANCED_CODEX_MODEL;
+    return requestKind !== 'chat_completions' ? BALANCED_CODEX_MODEL : BALANCED_CLAW_MODEL;
   }
   return (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL;
 }
@@ -85,7 +86,11 @@ export async function applyResolvedAutoModel(
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ) {
-  const resolved = await resolveAutoModel(params, userPromise, balancePromise);
+  const resolved = await resolveAutoModel(
+    { ...params, requestKind: request.kind },
+    userPromise,
+    balancePromise
+  );
   request.body.model = resolved.model;
   if (resolved.reasoning) {
     if (request.kind === 'messages') {

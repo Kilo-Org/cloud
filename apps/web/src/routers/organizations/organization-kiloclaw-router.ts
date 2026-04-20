@@ -175,6 +175,11 @@ const updateKiloCodeConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
 });
 
+const patchWebSearchConfigSchema = z.object({
+  organizationId: z.uuid(),
+  exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
+});
+
 const patchChannelsSchema = z.object({
   organizationId: z.uuid(),
   telegramBotToken: z.string().nullable().optional(),
@@ -592,6 +597,18 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
       return client.patchExecPreset(ctx.user.id, input, workerInstanceId(instance));
+    }),
+
+  patchWebSearchConfig: organizationMemberMutationProcedure
+    .input(patchWebSearchConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.patchWebSearchConfig(
+        ctx.user.id,
+        { exaMode: input.exaMode },
+        workerInstanceId(instance)
+      );
     }),
 
   patchBotIdentity: organizationMemberMutationProcedure

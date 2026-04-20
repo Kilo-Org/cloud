@@ -12,6 +12,11 @@ export class EventServiceClient {
   private destroyed = false;
   private hasConnectedBefore = false;
   private reconnectHandlers = new Set<() => void>();
+  private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private presenceHandlers = {
+    joined: new Set<(context: string, userId: string) => void>(),
+    left: new Set<(context: string, userId: string) => void>(),
+  };
 
   constructor(config: EventServiceConfig) {
     this.url = config.url;
@@ -49,6 +54,7 @@ export class EventServiceClient {
           }
         }
         resolve();
+        this.startPing();
       };
 
       ws.onmessage = (event: MessageEvent) => {
@@ -82,6 +88,7 @@ export class EventServiceClient {
       this.ws.close();
       this.ws = null;
     }
+    this.stopPing();
     this.connected = false;
   }
 
@@ -114,6 +121,32 @@ export class EventServiceClient {
     };
   }
 
+  showPresence(context: string): void {
+    if (this.isConnected()) {
+      this.send({ type: 'presence.show', context });
+    }
+  }
+
+  hidePresence(context: string): void {
+    if (this.isConnected()) {
+      this.send({ type: 'presence.hide', context });
+    }
+  }
+
+  onPresenceJoined(handler: (context: string, userId: string) => void): () => void {
+    this.presenceHandlers.joined.add(handler);
+    return () => {
+      this.presenceHandlers.joined.delete(handler);
+    };
+  }
+
+  onPresenceLeft(handler: (context: string, userId: string) => void): () => void {
+    this.presenceHandlers.left.add(handler);
+    return () => {
+      this.presenceHandlers.left.delete(handler);
+    };
+  }
+
   on(event: string, handler: (context: string, payload: unknown) => void): () => void {
     let handlers = this.eventHandlers.get(event);
     if (!handlers) {
@@ -140,13 +173,42 @@ export class EventServiceClient {
       return;
     }
 
-    if (message.type === 'event') {
-      const handlers = this.eventHandlers.get(message.event);
-      if (handlers) {
-        for (const handler of handlers) {
-          handler(message.context, message.payload);
+    switch (message.type) {
+      case 'event': {
+        const handlers = this.eventHandlers.get(message.event);
+        if (handlers) {
+          for (const handler of handlers) {
+            handler(message.context, message.payload);
+          }
         }
+        break;
       }
+      case 'presence.joined': {
+        for (const handler of this.presenceHandlers.joined) {
+          handler(message.context, message.userId);
+        }
+        break;
+      }
+      case 'presence.left': {
+        for (const handler of this.presenceHandlers.left) {
+          handler(message.context, message.userId);
+        }
+        break;
+      }
+    }
+  }
+
+  private startPing(): void {
+    this.stopPing();
+    this.pingTimer = setInterval(() => {
+      this.send({ type: 'presence.ping' });
+    }, 5000);
+  }
+
+  private stopPing(): void {
+    if (this.pingTimer !== null) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
     }
   }
 

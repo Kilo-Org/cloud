@@ -87,6 +87,29 @@ export async function createMessageFor(
   // already committed, so a MembershipDO failure must not fail the request.
   const info = await convStub.getInfo();
   if (info) {
+    // Auto-title unnamed conversations with the first message text.
+    if (info.title === null) {
+      const text = content
+        .filter(
+          (b): b is { type: 'text'; text: string } =>
+            b.type === 'text' && typeof b.text === 'string'
+        )
+        .map(b => b.text)
+        .join(' ')
+        .replace(/\n/g, ' ')
+        .trim();
+      if (text.length > 0) {
+        const title = text.length > 80 ? text.slice(0, 77) + '...' : text;
+        await convStub.updateTitle(title);
+        await Promise.allSettled(
+          info.members.map(member => {
+            const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
+            return stub.updateConversationTitle(conversationId, title);
+          })
+        );
+      }
+    }
+
     const now = Date.now();
     const results = await Promise.allSettled(
       info.members.map(member => {

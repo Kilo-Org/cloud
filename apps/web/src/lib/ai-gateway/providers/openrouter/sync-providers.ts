@@ -29,8 +29,14 @@ const GATEWAY_METADATA_REDIS_KEYS = {
   openrouterProviders: 'ai-gateway.metadata.openrouter-providers',
 } as const;
 
+const ATTRIBUTION_HEADERS = {
+  'HTTP-Referer': 'https://kilocode.ai',
+  'X-Title': 'Kilo Code',
+} as const;
+
 async function fetchGatewayModels(gateway: Provider) {
   const headers = {
+    ...ATTRIBUTION_HEADERS,
     authorization: `Bearer ${gateway.apiKey}`,
   };
 
@@ -80,11 +86,7 @@ async function fetchProviders(): Promise<OpenRouterProvider[]> {
 
   const response = await fetch(`https://openrouter.ai/api/frontend/all-providers`, {
     method: 'GET',
-    headers: {
-      // NOTE: Changing HTTP-Referer; per OpenRouter docs it would identify us as a different app, but can be merged by Openrouter later
-      'HTTP-Referer': 'https://kilocode.ai',
-      'X-Title': 'Kilo Code',
-    },
+    headers: ATTRIBUTION_HEADERS,
   });
 
   if (!response.ok) {
@@ -121,11 +123,7 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
 
   const response = await fetch(`https://openrouter.ai/api/frontend/models/find?${searchParams}`, {
     method: 'GET',
-    headers: {
-      // NOTE: Changing HTTP-Referer; per OpenRouter docs it would identify us as a different app, but can be merged by Openrouter later
-      'HTTP-Referer': 'https://kilocode.ai',
-      'X-Title': 'Kilo Code',
-    },
+    headers: ATTRIBUTION_HEADERS,
   });
 
   if (!response.ok) {
@@ -300,10 +298,7 @@ async function fetchOpenRouterApiProviders(): Promise<OpenRouterApiProvidersResp
 
   const response = await fetch('https://openrouter.ai/api/v1/providers', {
     method: 'GET',
-    headers: {
-      'HTTP-Referer': 'https://kilocode.ai',
-      'X-Title': 'Kilo Code',
-    },
+    headers: ATTRIBUTION_HEADERS,
   });
 
   if (!response.ok) {

@@ -7,7 +7,6 @@ import { ulid } from 'ulid';
 import {
   extractConversationContext,
   extractSandboxId,
-  getConversationContext,
   pushInstanceEvent,
 } from './event-push';
 
@@ -184,7 +183,9 @@ export async function markReadFor(
   const { conversationId } = params;
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
 
-  if (!(await convStub.isMember(userId))) {
+  // Single getInfo() call for both membership check and context extraction.
+  const info = await convStub.getInfo();
+  if (!info || !info.members.some(m => m.id === userId)) {
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }
 
@@ -192,12 +193,12 @@ export async function markReadFor(
   const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
   await stub.markRead(conversationId, now);
 
-  const convContext = await getConversationContext(env, conversationId);
-  if (convContext?.sandboxId) {
+  const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
+  if (sandboxId) {
     await pushInstanceEvent(
       env,
-      convContext.sandboxId,
-      convContext.humanMemberIds,
+      sandboxId,
+      humanMemberIds,
       'conversation.read',
       { conversationId, memberId: userId, lastReadAt: now }
     );

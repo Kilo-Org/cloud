@@ -7,7 +7,7 @@ import type { EventServiceClient } from '@kilocode/event-service';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
 import { InstanceSwitcher } from './InstanceSwitcher';
 import { ConversationList } from './ConversationList';
-import { useEventService } from '../hooks/useEventService';
+import { useEventService, useInstanceContext } from '../hooks/useEventService';
 import {
   useConversations,
   useCreateConversation,
@@ -67,6 +67,7 @@ export function KiloChatLayout({
   }, [instances, selectedSandboxId]);
 
   const { eventService, kiloChatClient } = useEventService(getToken);
+  useInstanceContext(eventService, selectedSandboxId);
 
   const params = useParams<{ conversationId?: string }>();
   const [leavingConversationId, setLeavingConversationId] = useState<string | null>(null);

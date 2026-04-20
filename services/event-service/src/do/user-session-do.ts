@@ -46,23 +46,7 @@ export class UserSessionDO extends DurableObject<Env> {
         break;
       }
       case 'presence.ping': {
-        await this.setLastPingAt(Date.now());
-        break;
-      }
-      case 'presence.show': {
-        const added = await this.setVisible(msg.context);
-        if (added) {
-          const state = this.getState(ws);
-          this.broadcastPresence('presence.joined', ws, msg.context, state.userId);
-        }
-        break;
-      }
-      case 'presence.hide': {
-        const removed = await this.clearVisible(msg.context);
-        if (removed) {
-          const state = this.getState(ws);
-          this.broadcastPresence('presence.left', ws, msg.context, state.userId);
-        }
+        await this.ctx.storage.put('presence:lastPingAt', Date.now());
         break;
       }
     }
@@ -100,7 +84,7 @@ export class UserSessionDO extends DurableObject<Env> {
     }
   }
 
-  // ── Presence check ─────────────────────────────────────────────────
+  // ── Presence ───────────────────────────────────────────────────────
 
   async isUserInContext(context: string): Promise<boolean> {
     for (const ws of this.ctx.getWebSockets()) {
@@ -110,53 +94,8 @@ export class UserSessionDO extends DurableObject<Env> {
     return false;
   }
 
-  // ── DO storage helpers (presence) ──────────────────────────────────
-
-  private async setLastPingAt(now: number): Promise<void> {
-    await this.ctx.storage.put('presence:lastPingAt', now);
-  }
-
   async getLastPingAt(): Promise<number> {
     return (await this.ctx.storage.get<number>('presence:lastPingAt')) ?? 0;
-  }
-
-  private async setVisible(context: string): Promise<boolean> {
-    const key = `presence:visible:${context}`;
-    const already = await this.ctx.storage.get<true>(key);
-    if (already) return false;
-    await this.ctx.storage.put(key, true);
-    return true;
-  }
-
-  private async clearVisible(context: string): Promise<boolean> {
-    const key = `presence:visible:${context}`;
-    const was = await this.ctx.storage.get<true>(key);
-    if (!was) return false;
-    await this.ctx.storage.delete(key);
-    return true;
-  }
-
-  // ── Broadcast helpers ──────────────────────────────────────────────
-
-  private broadcastPresence(
-    type: 'presence.joined' | 'presence.left',
-    sender: WebSocket,
-    context: string,
-    userId: string
-  ): void {
-    const msg: ServerMessage = { type, context, userId };
-    const text = JSON.stringify(msg);
-    for (const ws of this.ctx.getWebSockets()) {
-      if (ws === sender) continue;
-      const state = this.getState(ws);
-      if (state.contexts.has(context)) {
-        try {
-          ws.send(text);
-        } catch {
-          /* dead connection */
-        }
-      }
-    }
   }
 
   // ── Helpers ────────────────────────────────────────────────────────

@@ -34,7 +34,7 @@ export function useRenameConversation(client: KiloChatClient) {
     mutationFn: ({ conversationId, title }: { conversationId: string; title: string }) =>
       client.renameConversation(conversationId, { title }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['kilo-chat'] });
+      void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
     },
   });
 }

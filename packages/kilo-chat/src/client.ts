@@ -78,6 +78,10 @@ export class KiloChatClient {
     return this.httpRequest(`/v1/conversations/${conversationId}/typing`, { method: 'POST' });
   }
 
+  async sendTypingStop(conversationId: string): Promise<void> {
+    return this.httpRequest(`/v1/conversations/${conversationId}/typing/stop`, { method: 'POST' });
+  }
+
   async markConversationRead(conversationId: string): Promise<void> {
     return this.httpRequest(`/v1/conversations/${conversationId}/mark-read`, { method: 'POST' });
   }
@@ -155,6 +159,10 @@ export class KiloChatClient {
 
   onTyping(handler: (ctx: string, e: TypingEvent) => void): () => void {
     return this.es.on('typing', handler as (context: string, payload: unknown) => void);
+  }
+
+  onTypingStop(handler: (ctx: string, e: TypingEvent) => void): () => void {
+    return this.es.on('typing.stop', handler as (context: string, payload: unknown) => void);
   }
 
   onReactionAdded(handler: (ctx: string, e: ReactionAddedEvent) => void): () => void {

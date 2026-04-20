@@ -12,7 +12,7 @@ import type { ZodSchema } from 'zod';
 import type { AuthContext } from '../auth';
 import { createMessageFor, deleteMessageFor, editMessageFor } from '../services/messages';
 import { addReactionFor, removeReactionFor } from '../services/reactions';
-import { setTypingFor } from '../services/typing';
+import { setTypingFor, stopTypingFor } from '../services/typing';
 import {
   ulidSchema,
   createMessageSchema,
@@ -187,6 +187,18 @@ export async function handleSetTyping(c: HonoCtx) {
 
   const callerId = c.get('callerId');
   const result = await setTypingFor(c.env, callerId, { conversationId: convId.data });
+  if (!result.ok) {
+    return c.json({ error: result.error }, 403);
+  }
+  return new Response(null, { status: 204 });
+}
+
+export async function handleStopTyping(c: HonoCtx) {
+  const convId = parseConversationId(c);
+  if (!convId.ok) return convId.response;
+
+  const callerId = c.get('callerId');
+  const result = await stopTypingFor(c.env, callerId, { conversationId: convId.data });
   if (!result.ok) {
     return c.json({ error: result.error }, 403);
   }

@@ -1,16 +1,33 @@
-/** Identity-agnostic typing indicator. See services/messages.ts for rationale. */
+/** Identity-agnostic typing indicators. See services/messages.ts for rationale. */
 
 import { getConversationContext, pushEventToHumanMembers } from './event-push';
 
-export type SetTypingParams = { conversationId: string };
+export type TypingParams = { conversationId: string };
 
-export type SetTypingResult = { ok: true } | { ok: false; code: 'forbidden'; error: string };
+export type TypingResult = { ok: true } | { ok: false; code: 'forbidden'; error: string };
 
 export async function setTypingFor(
   env: Env,
   callerId: string,
-  params: SetTypingParams
-): Promise<SetTypingResult> {
+  params: TypingParams
+): Promise<TypingResult> {
+  return pushTypingEvent(env, callerId, params, 'typing');
+}
+
+export async function stopTypingFor(
+  env: Env,
+  callerId: string,
+  params: TypingParams
+): Promise<TypingResult> {
+  return pushTypingEvent(env, callerId, params, 'typing.stop');
+}
+
+async function pushTypingEvent(
+  env: Env,
+  callerId: string,
+  params: TypingParams,
+  event: 'typing' | 'typing.stop'
+): Promise<TypingResult> {
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId));
   const result = await convStub.setTyping(callerId);
   if (!result.ok) {
@@ -25,7 +42,7 @@ export async function setTypingFor(
       convContext.sandboxId,
       convContext.humanMemberIds,
       callerId,
-      'typing',
+      event,
       { memberId: callerId }
     );
   }

@@ -77,7 +77,6 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   useEffect(() => {
     const offs = [
       kiloChatClient.onMessageCreated((_ctx, data) => {
-        clearTypingForMember(data.senderId);
         updateCache({ type: 'message.created', data });
       }),
       kiloChatClient.onMessageUpdated((_ctx, data) => {
@@ -92,6 +91,9 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       }),
       kiloChatClient.onTyping((_ctx, data) => {
         handleTypingEvent(data);
+      }),
+      kiloChatClient.onTypingStop((_ctx, data) => {
+        clearTypingForMember(data.memberId);
       }),
     ];
     return () => offs.forEach(off => off());

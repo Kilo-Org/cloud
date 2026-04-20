@@ -13,16 +13,12 @@ import type {
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { unstable_cache } from 'next/cache';
-import { readDb } from '@/lib/drizzle';
-import { modelsByProvider } from '@kilocode/db/schema';
-import { desc } from 'drizzle-orm';
 import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { GatewayPercentageSchema, DEFAULT_VERCEL_PERCENTAGE } from '@/lib/gateway-config';
-import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
+import { GATEWAY_METADATA_REDIS_KEYS, VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
 
 const getVercelRoutingPercentage = createCachedFetch(
@@ -34,32 +30,14 @@ const getVercelRoutingPercentage = createCachedFetch(
   DEFAULT_VERCEL_PERCENTAGE
 );
 
-const getVercelModels_cached = unstable_cache(
-  async () => {
-    const result = await readDb
-      .select({ vercel: modelsByProvider.vercel })
-      .from(modelsByProvider)
-      .orderBy(desc(modelsByProvider.id))
-      .limit(1);
-    return Object.values(z.record(z.string(), StoredModelSchema).parse(result.at(0)?.vercel))
-      .filter(model => model.type === 'language' && model.endpoints.length > 0)
-      .map(model => model.id);
-  },
-  undefined,
-  { revalidate: 3600 }
-);
-
 async function getVercelModels() {
-  let models = new Array<string>();
-  const startTime = performance.now();
-  try {
-    models = await getVercelModels_cached();
-  } catch (e) {
-    console.error('[getVercelModels]', e);
-  }
-  console.debug(`[getVercelModels] took ${performance.now() - startTime}ms`);
-  return models;
+  const result = JSON.parse((await redisGet(GATEWAY_METADATA_REDIS_KEYS.vercelModels)) ?? 'null');
+  return Object.values(z.record(z.string(), StoredModelSchema).parse(result))
+    .filter(model => model.type === 'language' && model.endpoints.length > 0)
+    .map(model => model.id);
 }
+
+const getVercelModelsCached = createCachedFetch(getVercelModels, 60, []);
 
 export async function shouldRouteToVercel(
   requestedModel: string,
@@ -89,7 +67,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const vercelModels = await getVercelModels();
+  const vercelModels = await getVercelModelsCached();
   const vercelModelId = mapModelIdToVercel(requestedModel);
   if (!vercelModels.includes(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);

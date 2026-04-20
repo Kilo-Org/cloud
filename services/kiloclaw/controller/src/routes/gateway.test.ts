@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import os from 'node:os';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
-import { registerGatewayRoutes } from './gateway';
+import { loadFields, registerGatewayRoutes } from './gateway';
 import type { Supervisor } from '../supervisor';
 
 function createMockSupervisor(): Supervisor {
@@ -25,6 +26,42 @@ function createMockSupervisor(): Supervisor {
 function authHeaders(token = 'test-token'): HeadersInit {
   return { Authorization: `Bearer ${token}` };
 }
+
+type RuntimeEnvSnapshot = {
+  FLY_MACHINE_ID: string | undefined;
+  KILOCLAW_RUNTIME_PROVIDER: string | undefined;
+  KILOCLAW_MACHINE_CPU_KIND: string | undefined;
+};
+
+function snapshotRuntimeEnv(): RuntimeEnvSnapshot {
+  return {
+    FLY_MACHINE_ID: process.env.FLY_MACHINE_ID,
+    KILOCLAW_RUNTIME_PROVIDER: process.env.KILOCLAW_RUNTIME_PROVIDER,
+    KILOCLAW_MACHINE_CPU_KIND: process.env.KILOCLAW_MACHINE_CPU_KIND,
+  };
+}
+
+function restoreRuntimeEnv(snapshot: RuntimeEnvSnapshot): void {
+  for (const [key, value] of Object.entries(snapshot)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
+let runtimeEnvSnapshot: RuntimeEnvSnapshot;
+
+beforeEach(() => {
+  runtimeEnvSnapshot = snapshotRuntimeEnv();
+});
+
+afterEach(() => {
+  restoreRuntimeEnv(runtimeEnvSnapshot);
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe('/_kilo/gateway routes', () => {
   it('enforces bearer auth on GET /_kilo/gateway/status', async () => {
@@ -82,5 +119,47 @@ describe('/_kilo/gateway routes', () => {
     const resp = await app.request('/_kilo/gateway/status');
     expect(resp.status).toBe(401);
     expect(await resp.json()).toEqual({ error: 'Unauthorized' });
+  });
+
+  it('marks high load as unsettled on Fly shared CPU instances', () => {
+    vi.spyOn(os, 'loadavg').mockReturnValue([0.5, 0.2, 0.1]);
+
+    expect(
+      loadFields({
+        KILOCLAW_RUNTIME_PROVIDER: 'fly',
+        KILOCLAW_MACHINE_CPU_KIND: 'shared',
+      })
+    ).toEqual({
+      loadAverage: [0.5, 0.2, 0.1],
+      settled: false,
+    });
+  });
+
+  it('does not wait for load settling on Fly performance CPU instances', () => {
+    vi.spyOn(os, 'loadavg').mockReturnValue([0.5, 0.2, 0.1]);
+
+    expect(
+      loadFields({
+        KILOCLAW_RUNTIME_PROVIDER: 'fly',
+        KILOCLAW_MACHINE_CPU_KIND: 'performance',
+      })
+    ).toEqual({
+      loadAverage: [0.5, 0.2, 0.1],
+      settled: true,
+    });
+  });
+
+  it('does not wait for load settling on docker-local instances', () => {
+    vi.spyOn(os, 'loadavg').mockReturnValue([0.5, 0.2, 0.1]);
+
+    expect(
+      loadFields({
+        KILOCLAW_RUNTIME_PROVIDER: 'docker-local',
+        KILOCLAW_MACHINE_CPU_KIND: 'shared',
+      })
+    ).toEqual({
+      loadAverage: [0.5, 0.2, 0.1],
+      settled: true,
+    });
   });
 });

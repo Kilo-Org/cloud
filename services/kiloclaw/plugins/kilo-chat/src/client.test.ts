@@ -62,6 +62,55 @@ describe('createKiloChatClient', () => {
     ).rejects.toThrow(/500/);
   });
 
+  it('createMessage includes inReplyToMessageId in request body when provided', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ messageId: 'm1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await client.createMessage({
+      conversationId: 'c1',
+      content: [{ type: 'text', text: 'reply' }],
+      inReplyToMessageId: 'parent-msg-1',
+    });
+
+    const [, init] = fetchImpl.mock.calls[0]!;
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.inReplyToMessageId).toBe('parent-msg-1');
+  });
+
+  it('createMessage omits inReplyToMessageId from request body when not provided', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ messageId: 'm1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await client.createMessage({
+      conversationId: 'c1',
+      content: [{ type: 'text', text: 'no reply' }],
+    });
+
+    const [, init] = fetchImpl.mock.calls[0]!;
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.inReplyToMessageId).toBeUndefined();
+  });
+
   it('createMessage posts to /_kilo/kilo-chat/send and returns messageId', async () => {
     const fetchImpl = vi.fn(
       async () =>

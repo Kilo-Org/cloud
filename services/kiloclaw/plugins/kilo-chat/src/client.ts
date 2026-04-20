@@ -9,6 +9,7 @@ export type ContentBlock = { type: string; [key: string]: unknown };
 export type CreateMessageParams = {
   conversationId: string;
   content: ContentBlock[];
+  inReplyToMessageId?: string;
 };
 export type CreateMessageResult = { messageId: string };
 export type EditMessageResult = { messageId: string; stale?: boolean };
@@ -62,7 +63,13 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     const response = await fetchImpl(`${base}/_kilo/kilo-chat/send`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ conversationId: params.conversationId, content: params.content }),
+      body: JSON.stringify({
+        conversationId: params.conversationId,
+        content: params.content,
+        ...(params.inReplyToMessageId !== undefined && {
+          inReplyToMessageId: params.inReplyToMessageId,
+        }),
+      }),
     });
     if (!response.ok) {
       throw new Error(

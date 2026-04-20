@@ -18,6 +18,8 @@ import {
   KILO_CLI_SECTION_CONFIG,
   OP_SECTION_CONFIG,
   LINEAR_SECTION_CONFIG,
+  KILOCLAW_MITIGATIONS_SECTION_CONFIG,
+  PLUGIN_INSTALL_SECTION_CONFIG,
   buildGatewayArgs,
   bootstrapCritical,
   bootstrapNonCritical,
@@ -846,6 +848,8 @@ describe('TOOLS.md section configs', () => {
     KILO_CLI_SECTION_CONFIG,
     OP_SECTION_CONFIG,
     LINEAR_SECTION_CONFIG,
+    KILOCLAW_MITIGATIONS_SECTION_CONFIG,
+    PLUGIN_INSTALL_SECTION_CONFIG,
   ];
 
   for (const config of configs) {
@@ -854,6 +858,30 @@ describe('TOOLS.md section configs', () => {
       expect(config.section).toContain(config.endMarker);
     });
   }
+
+  // Smoke test on the KiloClaw-specific sections we just added — pin the
+  // key directives so a drive-by edit that strips the substance (but keeps
+  // the markers) fails loudly.
+  it('KiloClaw Mitigations: names all three additional mitigated checkIds', () => {
+    const section = KILOCLAW_MITIGATIONS_SECTION_CONFIG.section;
+    expect(section).toContain('gateway.trusted_proxies_missing');
+    expect(section).toContain('config.insecure_or_dangerous_flags');
+    expect(section).toContain('plugins.tools_reachable_permissive_policy');
+    // Does NOT redundantly list gateway.control_ui.insecure_auth as its own
+    // bullet — that one is already documented in the base TOOLS.md's
+    // "Security Check Context" section. In-body references to it are fine
+    // (the config.insecure_or_dangerous_flags explanation points back at
+    // it), but a duplicate top-level bullet would mean the agent sees it
+    // twice in workspace context.
+    expect(section).not.toContain('- **`gateway.control_ui.insecure_auth`**');
+  });
+
+  it('Plugin Install: references the CLI command and plugins.allow field', () => {
+    const section = PLUGIN_INSTALL_SECTION_CONFIG.section;
+    expect(section).toContain('openclaw plugins install');
+    expect(section).toContain('plugins.allow');
+    expect(section).toContain('ALWAYS');
+  });
 });
 
 // ---- buildGatewayArgs ----

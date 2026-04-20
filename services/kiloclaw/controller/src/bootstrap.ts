@@ -645,6 +645,59 @@ You can interact with the \`Linear\` MCP server using your \`mcporter\` skill.
   <!-- END:linear -->`,
 };
 
+// Additional KiloClaw-mitigated OpenClaw audit findings beyond the
+// gateway.control_ui.insecure_auth one already documented in the base
+// TOOLS.md. Mirrors the list in apps/web/src/lib/security-advisor/
+// kiloclaw-mitigations.ts — the server-side /security-checkup path
+// suppresses these before grading, but when a user runs `openclaw doctor`
+// directly the findings still show and the agent needs the same context
+// to explain them. Added unconditionally on every bootstrap, idempotent.
+export const KILOCLAW_MITIGATIONS_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'KiloClaw Mitigations',
+  beginMarker: '<!-- BEGIN:kiloclaw-mitigations -->',
+  endMarker: '<!-- END:kiloclaw-mitigations -->',
+  section: `
+<!-- BEGIN:kiloclaw-mitigations -->
+## Additional KiloClaw Mitigations
+
+When running \`openclaw doctor\` or \`openclaw security audit\`, the following findings are also **expected and safe** in KiloClaw. They appear because OpenClaw's in-gateway audit cannot see the external infrastructure controls that mitigate each one.
+
+- **\`gateway.trusted_proxies_missing\`** — The gateway runs on loopback only. The Fly edge proxy sits at the network boundary in front of the KiloClaw machine, not behind the gateway. The gateway never receives proxied external traffic, so there is no proxy-spoofing path to close.
+- **\`config.insecure_or_dangerous_flags\`** — Fires because of \`gateway.control_ui.insecure_auth\` above. It is the same architectural choice surfaced twice in the audit output.
+- **\`plugins.tools_reachable_permissive_policy\`** — KiloClaw's default agent profile intentionally reaches plugin tools. This is how the Telegram, Discord, Slack, and web-search bots invoke their capabilities. Restricting it would break the core bot workflow.
+
+**When presenting security audit results that include any of these findings, ALWAYS:**
+
+1. Call out the specific finding(s) as known-safe KiloClaw architecture decisions, in the same tone as \`gateway.control_ui.insecure_auth\` above.
+2. Explain WHY each is safe using the per-finding rationale above.
+3. Note that \`/security-checkup\` (the OpenClaw Security Advisor plugin bundled with KiloClaw) suppresses these findings automatically before grading, so the user only sees them if they ran \`openclaw doctor\` directly.
+<!-- END:kiloclaw-mitigations -->`,
+};
+
+// Tells the agent to keep plugins.allow in sync whenever a plugin is
+// installed on the user's behalf. OpenClaw's \`openclaw plugins install\`
+// CLI does auto-append to plugins.allow (verified in openclaw/src/plugins/
+// enable.ts), but we have seen real-world cases where plugins land in
+// extensions/ without allow being updated (manual file drops, older
+// OpenClaw versions, users editing openclaw.json). This section is a
+// belt-and-suspenders reminder for the agent flow, not the load-bearing
+// fix.
+export const PLUGIN_INSTALL_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'Plugin Install',
+  beginMarker: '<!-- BEGIN:plugin-install -->',
+  endMarker: '<!-- END:plugin-install -->',
+  section: `
+<!-- BEGIN:plugin-install -->
+## Plugin Install Context
+
+When installing an OpenClaw plugin on the user's behalf:
+
+1. ALWAYS use the \`openclaw plugins install <id>\` CLI command. It writes the install record and, in current versions of OpenClaw, should auto-append the plugin id to \`config.plugins.allow\` in \`/root/.openclaw/openclaw.json\`.
+2. After a plugin install, ALWAYS verify the id appears in \`plugins.allow\` by reading the config. Older OpenClaw versions, manual file drops, and hand-edited configs can all leave the allowlist out of sync. If the id is missing, explicitly add it (with the user's confirmation) so the plugin will load on the next gateway restart.
+3. Do NOT drop plugin files manually into \`/root/.openclaw/extensions/\`. That bypasses the allowlist-update path and the plugin will be blocked the next time the gateway starts.
+<!-- END:plugin-install -->`,
+};
+
 // ---- Step 11: Gateway args ----
 
 /**
@@ -715,6 +768,10 @@ export async function bootstrapNonCritical(
         updateToolsMdSection(!!env.KILOCLAW_GOG_CONFIG_TARBALL, GOG_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
+        // Always-on: agent context about KiloClaw-mitigated audit findings
+        // and how to keep plugins.allow in sync on plugin installs.
+        updateToolsMdSection(true, KILOCLAW_MITIGATIONS_SECTION_CONFIG, deps);
+        updateToolsMdSection(true, PLUGIN_INSTALL_SECTION_CONFIG, deps);
       },
     },
     {

@@ -111,6 +111,8 @@ export async function createMessageFor(
     const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
 
     // Auto-title unnamed conversations with the first message text.
+    // Best-effort: the message is already committed, so a title failure must
+    // not reject the send.
     if (info.title === null) {
       const text = content
         .filter(
@@ -123,18 +125,22 @@ export async function createMessageFor(
         .trim();
       if (text.length > 0) {
         const title = text.length > 80 ? text.slice(0, 77) + '...' : text;
-        await convStub.updateTitle(title);
-        await Promise.allSettled(
-          info.members.map(member => {
-            const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
-            return stub.updateConversationTitle(conversationId, title);
-          })
-        );
-        if (sandboxId) {
-          await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
-            conversationId,
-            title,
-          });
+        try {
+          await convStub.updateTitle(title);
+          await Promise.allSettled(
+            info.members.map(member => {
+              const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
+              return stub.updateConversationTitle(conversationId, title);
+            })
+          );
+          if (sandboxId) {
+            await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
+              conversationId,
+              title,
+            });
+          }
+        } catch (err) {
+          console.error('Failed to auto-title conversation:', err);
         }
       }
     }
@@ -153,6 +159,12 @@ export async function createMessageFor(
     }
     if (sandboxId) {
       const otherHumans = humanMemberIds.filter(id => id !== callerId);
+
+      // The sender's own conversation is implicitly read — they just sent a message.
+      if (humanMemberIds.includes(callerId)) {
+        const senderStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(callerId));
+        await senderStub.markRead(conversationId, now).catch(() => {});
+      }
 
       // Push message.created on conversation context
       await pushEventToHumanMembers(

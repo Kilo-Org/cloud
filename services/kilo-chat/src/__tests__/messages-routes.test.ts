@@ -659,3 +659,86 @@ describe('Webhook reply context', () => {
     expect(call.inReplyToSender).toBeUndefined();
   });
 });
+
+describe('sender conversation read state after sending', () => {
+  it('marks sender conversation as read when they send a message', async () => {
+    const { conversationId, userId, sandboxId, userApp } =
+      await createConversation('msg-sender-unread');
+
+    // Check initial state — both should be null
+    const memberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
+    const before = await memberStub.listConversations(sandboxId);
+    const convBefore = before.conversations.find(c => c.conversationId === conversationId);
+    expect(convBefore).toBeDefined();
+    expect(convBefore!.lastActivityAt).toBeNull();
+    expect(convBefore!.lastReadAt).toBeNull();
+
+    // User sends a message
+    const res = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      env
+    );
+    expect(res.status).toBe(201);
+
+    // Check sender's MembershipDO — both should be bumped
+    const after = await memberStub.listConversations(sandboxId);
+    const convAfter = after.conversations.find(c => c.conversationId === conversationId);
+    expect(convAfter).toBeDefined();
+    expect(convAfter!.lastActivityAt).not.toBeNull();
+    // Sender's lastReadAt is updated so the conversation doesn't look unread
+    expect(convAfter!.lastReadAt).not.toBeNull();
+    expect(convAfter!.lastReadAt).toBe(convAfter!.lastActivityAt);
+  });
+});
+
+describe('auto-title on first message', () => {
+  it('auto-titles an untitled conversation from first message text', async () => {
+    const userId = 'user-autotitle';
+    const sandboxId = 'sandbox-autotitle';
+    const userApp = makeApp(userId, 'user', [sandboxId]);
+
+    // Create conversation WITHOUT a title
+    const convRes = await userApp.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId }),
+      },
+      env
+    );
+    expect(convRes.status).toBe(201);
+    const { conversationId } = await convRes.json<{ conversationId: string }>();
+
+    const convStub = getConvStub(conversationId);
+    expect((await convStub.getInfo())!.title).toBeNull();
+
+    // Send a message — triggers auto-title
+    const res = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Hello world' }],
+        }),
+      },
+      env
+    );
+    expect(res.status).toBe(201);
+
+    // Both the message and auto-title should succeed, and auto-title failure
+    // is wrapped in try-catch so it cannot reject the send.
+    const infoAfter = await convStub.getInfo();
+    expect(infoAfter!.title).toBe('Hello world');
+
+    const { messages } = await convStub.listMessages({ limit: 10 });
+    expect(messages).toHaveLength(1);
+  });
+});

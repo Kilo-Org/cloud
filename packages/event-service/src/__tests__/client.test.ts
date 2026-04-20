@@ -43,8 +43,10 @@ class MockWebSocket {
 }
 
 let lastMockWs: MockWebSocket;
+let allMockWs: MockWebSocket[];
 
 beforeEach(() => {
+  allMockWs = [];
   // Mock the ticket endpoint — connect() does a fetch before opening the WS
   vi.stubGlobal(
     'fetch',
@@ -55,6 +57,7 @@ beforeEach(() => {
   );
   vi.stubGlobal('WebSocket', function (url: string) {
     lastMockWs = new MockWebSocket(url);
+    allMockWs.push(lastMockWs);
     // Auto-trigger open asynchronously so connect() can attach handlers first
     void Promise.resolve().then(() => lastMockWs.triggerOpen());
     return lastMockWs;
@@ -138,5 +141,53 @@ describe('EventServiceClient', () => {
 
     expect(received).toHaveLength(1);
     expect(received[0]).toEqual({ context: 'room:123', payload: { text: 'first' } });
+  });
+
+  it('auto-reconnects after disconnect() → connect() cycle', async () => {
+    vi.useFakeTimers();
+    const client = makeClient();
+
+    // 1. Connect normally
+    await client.connect();
+    expect(client.isConnected()).toBe(true);
+
+    // 2. Disconnect — sets destroyed = true internally
+    client.disconnect();
+    expect(client.isConnected()).toBe(false);
+
+    // 3. Re-connect on the same instance (e.g. React remount with stable ref)
+    await client.connect();
+    expect(client.isConnected()).toBe(true);
+    const wsAfterReconnect = lastMockWs;
+
+    // 4. Simulate unexpected socket close — should trigger auto-reconnect
+    wsAfterReconnect.triggerClose();
+    expect(client.isConnected()).toBe(false);
+
+    // 5. Advance past the 3s reconnect delay — a new WebSocket should be created
+    await vi.advanceTimersByTimeAsync(4000);
+
+    // connect() resets destroyed, so onclose schedules a reconnect.
+    // 3 WebSockets total: initial + re-connect + auto-reconnect
+    expect(allMockWs).toHaveLength(3);
+
+    vi.useRealTimers();
+  });
+
+  it('closes previous WebSocket on repeated connect() calls', async () => {
+    const client = makeClient();
+
+    // First connect
+    await client.connect();
+    const ws1 = lastMockWs;
+    expect(ws1.readyState).toBe(1); // OPEN
+
+    // Second connect without disconnect — should close the first socket
+    await client.connect();
+    const ws2 = lastMockWs;
+
+    expect(ws1).not.toBe(ws2);
+    expect(ws1.readyState).toBe(3); // CLOSED — properly cleaned up
+    expect(allMockWs).toHaveLength(2);
   });
 });

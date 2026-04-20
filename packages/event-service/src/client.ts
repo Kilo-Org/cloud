@@ -20,6 +20,15 @@ export class EventServiceClient {
   }
 
   async connect(): Promise<void> {
+    this.destroyed = false;
+
+    // Close any existing socket to avoid leaking connections
+    if (this.ws) {
+      this.ws.onclose = null;
+      this.ws.close();
+      this.ws = null;
+    }
+
     // Step 1: Exchange JWT for a single-use connection ticket
     const token = await this.getToken();
     const httpUrl = this.url.replace(/^ws(s?):\/\//, 'http$1://');

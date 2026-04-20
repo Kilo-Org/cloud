@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Shield, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Shield, Users } from 'lucide-react';
 
 function EditTab() {
   const trpc = useTRPC();
@@ -192,6 +192,122 @@ function StatsTab() {
   );
 }
 
+function SuspiciousTab() {
+  const trpc = useTRPC();
+
+  const { data, isLoading } = useQuery(trpc.admin.blacklistDomains.suspicious.queryOptions());
+
+  const domains = data?.domains ?? [];
+  const blacklistedCount = domains.filter(d => d.isBlacklisted).length;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Suspicious Domains</CardTitle>
+            <CardDescription>
+              Top 100 registrable domains by blocked account count, then total account count. Only
+              shows domains where at least 1% of accounts have been blocked, to filter out
+              legitimate high-volume providers. Use this to spot domains that are accumulating abuse
+              but aren&apos;t yet blacklisted.
+            </CardDescription>
+          </div>
+          {data && (
+            <div className="flex gap-4 text-sm">
+              <Badge variant="secondary" className="px-3 py-1">
+                {domains.length} {domains.length === 1 ? 'domain' : 'domains'}
+              </Badge>
+              <Badge variant="outline" className="px-3 py-1">
+                <Shield className="mr-1 h-3 w-3" />
+                {blacklistedCount} already blacklisted
+              </Badge>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+        ) : domains.length === 0 ? (
+          <div className="text-muted-foreground py-8 text-center">No data</div>
+        ) : (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Domain</TableHead>
+                  <TableHead className="text-right">Accounts</TableHead>
+                  <TableHead className="text-right">Blocked</TableHead>
+                  <TableHead className="text-right">% Blocked</TableHead>
+                  <TableHead>First seen</TableHead>
+                  <TableHead>Last seen</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {domains.map(domain => (
+                  <TableRow
+                    key={domain.domain}
+                    className={domain.isBlacklisted ? 'bg-muted/60' : undefined}
+                  >
+                    <TableCell>
+                      {domain.isBlacklisted ? (
+                        <Badge variant="secondary" className="gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Blacklisted
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Not blacklisted
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell
+                      className={domain.isBlacklisted ? 'text-muted-foreground' : 'font-medium'}
+                    >
+                      <code className="bg-muted rounded px-2 py-1 text-sm">{domain.domain}</code>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {domain.accountCount.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {domain.blockedAccountCount > 0 ? (
+                        <Badge
+                          variant={domain.blockedAccountCount > 100 ? 'destructive' : 'secondary'}
+                        >
+                          {domain.blockedAccountCount.toLocaleString()}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">0</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-right text-xs">
+                      {domain.blockedAccountPercent.toFixed(2)}%
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {formatTimestamp(domain.firstSeen)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {formatTimestamp(domain.lastSeen)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatTimestamp(value: string | null): string {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString();
+}
+
 const tabTriggerClass =
   'text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
 
@@ -207,12 +323,18 @@ export function BlacklistedDomains() {
         <TabsTrigger value="stats" className={tabTriggerClass}>
           Stats
         </TabsTrigger>
+        <TabsTrigger value="suspicious" className={tabTriggerClass}>
+          Suspicious
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="edit" className="mt-4">
         <EditTab />
       </TabsContent>
       <TabsContent value="stats" className="mt-4">
         {activeTab === 'stats' && <StatsTab />}
+      </TabsContent>
+      <TabsContent value="suspicious" className="mt-4">
+        {activeTab === 'suspicious' && <SuspiciousTab />}
       </TabsContent>
     </Tabs>
   );

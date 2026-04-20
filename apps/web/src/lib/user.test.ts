@@ -105,6 +105,7 @@ describe('User', () => {
       const user = await insertTestUser({
         google_user_email: 'real-email@example.com',
         normalized_email: 'real-email@example.com',
+        email_domain: 'example.com',
         google_user_name: 'Real Name',
         google_user_image_url: 'https://example.com/avatar.png',
         linkedin_url: 'https://linkedin.com/in/testuser',
@@ -121,6 +122,7 @@ describe('User', () => {
       expect(softDeleted).toBeDefined();
       expect(softDeleted!.google_user_email).toBe(`deleted+${user.id}@deleted.invalid`);
       expect(softDeleted!.normalized_email).toBeNull();
+      expect(softDeleted!.email_domain).toBeNull();
       expect(softDeleted!.google_user_name).toBe('Deleted User');
       expect(softDeleted!.google_user_image_url).toBe('');
       expect(softDeleted!.hosted_domain).toBeNull();

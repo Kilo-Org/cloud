@@ -12,6 +12,7 @@ import {
   type SecurityAdvisorResponse,
 } from '@/lib/security-advisor/schemas';
 import { generateSecurityReport } from '@/lib/security-advisor/report-generator';
+import { getSecurityAdvisorContent } from '@/lib/security-advisor/content-loader';
 import {
   checkSecurityAdvisorRateLimit,
   recordSecurityAdvisorScan,
@@ -96,10 +97,12 @@ export async function POST(request: NextRequest) {
 
   // 6. Generate report
   const isKiloClaw = payload.source.platform === 'kiloclaw';
+  const content = await getSecurityAdvisorContent();
   const report = generateSecurityReport({
     audit: payload.audit,
     publicIp: payload.publicIp,
     isKiloClaw,
+    content,
   });
 
   // 7. Record scan in DB (synchronous — must complete before response

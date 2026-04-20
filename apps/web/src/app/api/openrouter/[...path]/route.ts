@@ -52,7 +52,7 @@ import {
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { repairTools } from '@/lib/ai-gateway/tool-calling';
+import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
 import { isFreePromptTrainingAllowed } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   rewriteFreeModelResponse_ChatCompletions,
@@ -486,6 +486,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   applyTrackingIds(requestBodyParsed, provider, user.id, taskId ?? null);
+
+  sanitizeBinaryToolResults(requestBodyParsed);
 
   if (requestBodyParsed.kind === 'chat_completions') {
     // Mostly a workaround for bugs in the old extension.

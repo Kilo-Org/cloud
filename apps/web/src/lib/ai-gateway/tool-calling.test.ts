@@ -1,5 +1,10 @@
-import type { OpenRouterChatCompletionRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { repairTools } from './tool-calling';
+import type {
+  GatewayMessagesRequest,
+  GatewayRequest,
+  GatewayResponsesRequest,
+  OpenRouterChatCompletionRequest,
+} from '@/lib/ai-gateway/providers/openrouter/types';
+import { repairTools, sanitizeBinaryToolResults } from './tool-calling';
 
 function createRequest(
   overrides: Partial<OpenRouterChatCompletionRequest> = {}
@@ -599,6 +604,376 @@ describe('repairTools', () => {
         tool_call_id: 'call_1',
         content: 'Result 1',
       });
+    });
+  });
+});
+
+const EXPECTED_REPLACEMENT = expect.stringContaining('NUL bytes');
+
+describe('sanitizeBinaryToolResults', () => {
+  describe('chat_completions format', () => {
+    it('should replace string tool result containing NUL characters', () => {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: createRequest({
+          messages: [
+            { role: 'user', content: 'Read the file' },
+            {
+              role: 'assistant',
+              content: '',
+              tool_calls: [
+                { id: 'call_1', type: 'function', function: { name: 'read', arguments: '{}' } },
+              ],
+            },
+            { role: 'tool', tool_call_id: 'call_1', content: 'binary\0data\0here' },
+          ],
+        }),
+      };
+
+      sanitizeBinaryToolResults(request);
+
+      const toolMsg = request.body.messages[2];
+      expect(toolMsg.role).toBe('tool');
+      if (toolMsg.role === 'tool') {
+        expect(toolMsg.content).toEqual(EXPECTED_REPLACEMENT);
+      }
+    });
+
+    it('should replace text parts in array content containing NUL characters', () => {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: createRequest({
+          messages: [
+            { role: 'user', content: 'Read the file' },
+            {
+              role: 'assistant',
+              content: '',
+              tool_calls: [
+                { id: 'call_1', type: 'function', function: { name: 'read', arguments: '{}' } },
+              ],
+            },
+            {
+              role: 'tool',
+              tool_call_id: 'call_1',
+              content: [
+                { type: 'text', text: 'clean text' },
+                { type: 'text', text: 'has\0nul' },
+              ],
+            },
+          ],
+        }),
+      };
+
+      sanitizeBinaryToolResults(request);
+
+      const toolMsg = request.body.messages[2];
+      if (toolMsg.role === 'tool' && Array.isArray(toolMsg.content)) {
+        expect(toolMsg.content[0]).toEqual({ type: 'text', text: 'clean text' });
+        expect(toolMsg.content[1]).toEqual({ type: 'text', text: EXPECTED_REPLACEMENT });
+      }
+    });
+
+    it('should not modify tool results without NUL characters', () => {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: createRequest({
+          messages: [
+            { role: 'user', content: 'Read the file' },
+            {
+              role: 'assistant',
+              content: '',
+              tool_calls: [
+                { id: 'call_1', type: 'function', function: { name: 'read', arguments: '{}' } },
+              ],
+            },
+            { role: 'tool', tool_call_id: 'call_1', content: 'normal content' },
+          ],
+        }),
+      };
+
+      sanitizeBinaryToolResults(request);
+
+      const toolMsg = request.body.messages[2];
+      if (toolMsg.role === 'tool') {
+        expect(toolMsg.content).toBe('normal content');
+      }
+    });
+
+    it('should not modify non-tool messages', () => {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: createRequest({
+          messages: [{ role: 'user', content: 'has\0nul but is user message' }],
+        }),
+      };
+
+      sanitizeBinaryToolResults(request);
+
+      expect(request.body.messages[0]).toEqual({
+        role: 'user',
+        content: 'has\0nul but is user message',
+      });
+    });
+
+    it('should not sanitize NUL content from non-read tools', () => {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: createRequest({
+          messages: [
+            { role: 'user', content: 'Execute the command' },
+            {
+              role: 'assistant',
+              content: '',
+              tool_calls: [
+                {
+                  id: 'call_1',
+                  type: 'function',
+                  function: { name: 'execute_command', arguments: '{}' },
+                },
+              ],
+            },
+            { role: 'tool', tool_call_id: 'call_1', content: 'binary\0data\0here' },
+          ],
+        }),
+      };
+
+      sanitizeBinaryToolResults(request);
+
+      const toolMsg = request.body.messages[2];
+      if (toolMsg.role === 'tool') {
+        expect(toolMsg.content).toBe('binary\0data\0here');
+      }
+    });
+  });
+
+  describe('responses format', () => {
+    function createResponsesRequest(
+      input: GatewayResponsesRequest['input']
+    ): GatewayRequest & { kind: 'responses' } {
+      return {
+        kind: 'responses',
+        body: { model: 'test-model', input } as GatewayResponsesRequest,
+      };
+    }
+
+    it('should replace function_call_output string containing NUL characters', () => {
+      const request = createResponsesRequest([
+        { type: 'function_call', call_id: 'call_1', name: 'read', arguments: '{}' },
+        { type: 'function_call_output', call_id: 'call_1', output: 'binary\0data' },
+      ]);
+
+      sanitizeBinaryToolResults(request);
+
+      const items = request.body.input as Array<{ type: string; output?: unknown }>;
+      expect(items[1].output).toEqual(EXPECTED_REPLACEMENT);
+    });
+
+    it('should replace function_call_output array text parts containing NUL characters', () => {
+      const request = createResponsesRequest([
+        { type: 'function_call', call_id: 'call_1', name: 'read', arguments: '{}' },
+        {
+          type: 'function_call_output',
+          call_id: 'call_1',
+          output: [
+            { type: 'input_text', text: 'clean' },
+            { type: 'input_text', text: 'has\0nul' },
+          ],
+        },
+      ]);
+
+      sanitizeBinaryToolResults(request);
+
+      const items = request.body.input as Array<{ type: string; output?: unknown }>;
+      expect(items[1].output).toEqual([
+        { type: 'input_text', text: 'clean' },
+        { type: 'input_text', text: EXPECTED_REPLACEMENT },
+      ]);
+    });
+
+    it('should not modify function_call_output without NUL characters', () => {
+      const request = createResponsesRequest([
+        { type: 'function_call', call_id: 'call_1', name: 'read', arguments: '{}' },
+        { type: 'function_call_output', call_id: 'call_1', output: 'clean output' },
+      ]);
+
+      sanitizeBinaryToolResults(request);
+
+      const items = request.body.input as Array<{ type: string; output?: unknown }>;
+      expect(items[1].output).toBe('clean output');
+    });
+
+    it('should not sanitize NUL content from non-read function_call_output', () => {
+      const request = createResponsesRequest([
+        { type: 'function_call', call_id: 'call_1', name: 'execute_command', arguments: '{}' },
+        { type: 'function_call_output', call_id: 'call_1', output: 'binary\0data' },
+      ]);
+
+      sanitizeBinaryToolResults(request);
+
+      const items = request.body.input as Array<{ type: string; output?: unknown }>;
+      expect(items[1].output).toBe('binary\0data');
+    });
+  });
+
+  describe('messages format (Anthropic)', () => {
+    it('should replace tool_result string content containing NUL characters', () => {
+      const request: GatewayRequest = {
+        kind: 'messages',
+        body: {
+          model: 'test-model',
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'assistant',
+              content: [{ type: 'tool_use', id: 'tu_1', name: 'read', input: {} }],
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'tool_result',
+                  tool_use_id: 'tu_1',
+                  content: 'binary\0data',
+                },
+              ],
+            },
+          ],
+        } as GatewayMessagesRequest,
+      };
+
+      sanitizeBinaryToolResults(request);
+
+      if (request.kind === 'messages') {
+        const msg = request.body.messages[1];
+        if (msg.role === 'user' && Array.isArray(msg.content)) {
+          const block = msg.content[0];
+          if (typeof block === 'object' && block.type === 'tool_result') {
+            expect(block.content).toEqual(EXPECTED_REPLACEMENT);
+          }
+        }
+      }
+    });
+
+    it('should replace tool_result array content text parts containing NUL characters', () => {
+      const request: GatewayRequest = {
+        kind: 'messages',
+        body: {
+          model: 'test-model',
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'assistant',
+              content: [{ type: 'tool_use', id: 'tu_1', name: 'read', input: {} }],
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'tool_result',
+                  tool_use_id: 'tu_1',
+                  content: [
+                    { type: 'text', text: 'clean' },
+                    { type: 'text', text: 'has\0nul' },
+                  ],
+                },
+              ],
+            },
+          ],
+        } as GatewayMessagesRequest,
+      };
+
+      sanitizeBinaryToolResults(request);
+
+      if (request.kind === 'messages') {
+        const msg = request.body.messages[1];
+        if (msg.role === 'user' && Array.isArray(msg.content)) {
+          const block = msg.content[0];
+          if (
+            typeof block === 'object' &&
+            block.type === 'tool_result' &&
+            Array.isArray(block.content)
+          ) {
+            expect(block.content[0]).toEqual({ type: 'text', text: 'clean' });
+            expect(block.content[1]).toEqual({ type: 'text', text: EXPECTED_REPLACEMENT });
+          }
+        }
+      }
+    });
+
+    it('should not modify tool_result without NUL characters', () => {
+      const request: GatewayRequest = {
+        kind: 'messages',
+        body: {
+          model: 'test-model',
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'assistant',
+              content: [{ type: 'tool_use', id: 'tu_1', name: 'read', input: {} }],
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'tool_result',
+                  tool_use_id: 'tu_1',
+                  content: 'normal result',
+                },
+              ],
+            },
+          ],
+        } as GatewayMessagesRequest,
+      };
+
+      sanitizeBinaryToolResults(request);
+
+      if (request.kind === 'messages') {
+        const msg = request.body.messages[1];
+        if (msg.role === 'user' && Array.isArray(msg.content)) {
+          const block = msg.content[0];
+          if (typeof block === 'object' && block.type === 'tool_result') {
+            expect(block.content).toBe('normal result');
+          }
+        }
+      }
+    });
+
+    it('should not sanitize NUL content from non-read tool_result', () => {
+      const request: GatewayRequest = {
+        kind: 'messages',
+        body: {
+          model: 'test-model',
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'assistant',
+              content: [{ type: 'tool_use', id: 'tu_1', name: 'execute_command', input: {} }],
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'tool_result',
+                  tool_use_id: 'tu_1',
+                  content: 'binary\0data',
+                },
+              ],
+            },
+          ],
+        } as GatewayMessagesRequest,
+      };
+
+      sanitizeBinaryToolResults(request);
+
+      if (request.kind === 'messages') {
+        const msg = request.body.messages[1];
+        if (msg.role === 'user' && Array.isArray(msg.content)) {
+          const block = msg.content[0];
+          if (typeof block === 'object' && block.type === 'tool_result') {
+            expect(block.content).toBe('binary\0data');
+          }
+        }
+      }
     });
   });
 });

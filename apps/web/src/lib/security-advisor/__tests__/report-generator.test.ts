@@ -1,6 +1,91 @@
 import { describe, it, expect } from '@jest/globals';
 import { generateSecurityReport } from '../report-generator';
 import type { SecurityAdvisorRequest } from '../schemas';
+import type { LoadedSecurityAdvisorContent } from '../content-loader';
+
+/**
+ * Build a test fixture that mirrors the seeded DB content.
+ *
+ * Tests used to rely on module-level hardcoded maps in report-generator.ts.
+ * Now that content comes from the DB via content-loader, each test constructs
+ * an equivalent in-memory content object. This keeps tests hermetic while
+ * still exercising the server-authoritative severity override + comparison
+ * framing behavior.
+ */
+function buildTestContent(): LoadedSecurityAdvisorContent {
+  const checkCatalog = new Map<
+    string,
+    { severity: 'critical' | 'warn' | 'info'; explanation: string; risk: string }
+  >();
+  checkCatalog.set('fs.config.perms_world_readable', {
+    severity: 'critical',
+    explanation: 'The OpenClaw configuration file is readable by all users on the system.',
+    risk: 'Any process can read your secrets.',
+  });
+  checkCatalog.set('auth.no_authentication', {
+    severity: 'critical',
+    explanation: 'The OpenClaw instance has no authentication configured.',
+    risk: 'Unauthorized users can execute commands.',
+  });
+  checkCatalog.set('net.no_allowlist', {
+    severity: 'warn',
+    explanation: 'No IP allow list is configured.',
+    risk: 'Authentication is the only barrier.',
+  });
+  checkCatalog.set('net.no_tls', {
+    severity: 'warn',
+    explanation: 'Traffic to the gateway is not encrypted.',
+    risk: 'Plaintext traffic can be intercepted.',
+  });
+  checkCatalog.set('version.outdated', {
+    severity: 'warn',
+    explanation: 'OpenClaw version is outdated.',
+    risk: 'Older versions may contain known vulnerabilities.',
+  });
+  checkCatalog.set('summary.attack_surface', {
+    severity: 'info',
+    explanation: 'Summary of the attack surface.',
+    risk: 'More entry points mean more risk.',
+  });
+
+  const kiloclawCoverage = [
+    {
+      area: 'config_permissions',
+      summary: 'Config files restricted to owner only',
+      detail: 'KiloClaw provisions strict file permissions.',
+      matchCheckIds: ['fs.config.perms_world_readable'],
+    },
+    {
+      area: 'gateway_exposure',
+      summary: 'Gateway bound to localhost only',
+      detail: 'Reverse proxy handles external access.',
+      matchCheckIds: ['net.no_tls', 'summary.attack_surface'],
+    },
+    {
+      area: 'network_allowlist',
+      summary: 'Strict IP allow listing',
+      detail: 'Default deny firewall.',
+      matchCheckIds: ['net.no_allowlist'],
+    },
+  ];
+
+  // Only the six Tier 1 editable keys. Section headings, summary-line
+  // formats, and per-finding labels are inline in report-generator.ts and
+  // are not looked up from content.
+  const content = new Map<string, string>([
+    ['section.next_step', '## Next step: try KiloClaw free'],
+    ['cta.body', '**Start a free trial at [kilo.ai/kiloclaw](https://kilo.ai/kiloclaw).**'],
+    ['framing.openclaw', '**How KiloClaw handles this:** {summary}. {detail}'],
+    [
+      'framing.kiloclaw',
+      '**KiloClaw default:** {summary}. Your instance has diverged from this default configuration.',
+    ],
+    ['fallback.risk', 'Review this finding: {detail}'],
+    ['fallback.recommendation_action', 'Address finding: {title} ({checkId})'],
+  ]);
+
+  return { checkCatalog, kiloclawCoverage, content };
+}
 
 const FIXTURE_AUDIT: SecurityAdvisorRequest['audit'] = {
   ts: 1775491369820,
@@ -55,18 +140,19 @@ const FIXTURE_AUDIT: SecurityAdvisorRequest['audit'] = {
 
 describe('generateSecurityReport', () => {
   describe('for openclaw source (isKiloClaw=false)', () => {
+    const content = buildTestContent();
     const report = generateSecurityReport({
       audit: FIXTURE_AUDIT,
       publicIp: '1.2.3.4',
       isKiloClaw: false,
+      content,
     });
 
     it('returns summary counts recomputed from server-mapped severity', () => {
-      // auth.no_authentication is client-reported as warn but server maps to critical
-      expect(report.summary.critical).toBe(2); // fs.config + auth.no_auth
-      expect(report.summary.warn).toBe(3); // no_allowlist, outdated, no_tls
+      expect(report.summary.critical).toBe(2);
+      expect(report.summary.warn).toBe(3);
       expect(report.summary.info).toBe(1);
-      expect(report.summary.passed).toBe(1); // gateway deep check passed
+      expect(report.summary.passed).toBe(1);
     });
 
     it('maps all findings', () => {
@@ -83,10 +169,8 @@ describe('generateSecurityReport', () => {
     });
 
     it('falls back to audit detail for unknown checkIds', () => {
-      // summary.attack_surface has a template, but let's test with our fixture
       const attackSurface = report.findings.find(f => f.checkId === 'summary.attack_surface');
       expect(attackSurface).toBeDefined();
-      // This one has a known template
       expect(attackSurface!.explanation).toBeTruthy();
     });
 
@@ -133,20 +217,18 @@ describe('generateSecurityReport', () => {
     });
 
     it('does not leak agent-directive HTML comments to end users', () => {
-      // Earlier iterations included a <!-- display-verbatim --> directive as
-      // a hint to LLMs. Small summarizing models (e.g. gpt-4.1-nano) ignored
-      // the directive AND rendered the literal HTML comment into their
-      // reply. We no longer emit it.
       expect(report.markdown).not.toContain('<!--');
       expect(report.markdown).not.toContain('display-verbatim');
     });
   });
 
   describe('for kiloclaw source (isKiloClaw=true)', () => {
+    const content = buildTestContent();
     const report = generateSecurityReport({
       audit: FIXTURE_AUDIT,
       publicIp: '10.0.0.1',
       isKiloClaw: true,
+      content,
     });
 
     it('shows divergence warning for known checkIds', () => {
@@ -159,8 +241,6 @@ describe('generateSecurityReport', () => {
     });
 
     it('returns null comparison for checkIds not in comparison table', () => {
-      // summary.attack_surface IS in the comparison table (gateway_exposure area)
-      // so let's check that unknown checkIds still return null
       const report2 = generateSecurityReport({
         audit: {
           ts: 1000,
@@ -176,6 +256,7 @@ describe('generateSecurityReport', () => {
           ],
         },
         isKiloClaw: true,
+        content,
       });
       expect(report2.findings[0]!.kiloClawComparison).toBeNull();
     });
@@ -187,6 +268,7 @@ describe('generateSecurityReport', () => {
   });
 
   describe('with empty findings', () => {
+    const content = buildTestContent();
     const report = generateSecurityReport({
       audit: {
         ts: 1000,
@@ -194,6 +276,7 @@ describe('generateSecurityReport', () => {
         findings: [],
       },
       isKiloClaw: false,
+      content,
     });
 
     it('returns zero counts', () => {
@@ -214,6 +297,7 @@ describe('generateSecurityReport', () => {
   });
 
   describe('with findings but no deep scan', () => {
+    const content = buildTestContent();
     const report = generateSecurityReport({
       audit: {
         ts: 1000,
@@ -229,6 +313,7 @@ describe('generateSecurityReport', () => {
         ],
       },
       isKiloClaw: false,
+      content,
     });
 
     it('reports passed as 0 when no deep scan was run', () => {
@@ -250,7 +335,7 @@ describe('generateSecurityReport', () => {
           findings: [
             {
               checkId: 'fs.config.perms_world_readable',
-              severity: 'info', // client says info, server knows it's critical
+              severity: 'info',
               title: 'Config file is world-readable',
               detail: 'test',
               remediation: 'chmod 600 /root/.openclaw/openclaw.json',
@@ -258,14 +343,12 @@ describe('generateSecurityReport', () => {
           ],
         },
         isKiloClaw: false,
+        content: buildTestContent(),
       });
 
-      // Server overrides to critical
       expect(report.findings[0]!.severity).toBe('critical');
-      // Summary counts are recomputed from server-mapped findings, not client
       expect(report.summary.critical).toBe(1);
       expect(report.summary.info).toBe(0);
-      // Should appear in recommendations as immediate priority (not skipped as info)
       expect(report.recommendations.length).toBeGreaterThan(0);
       expect(report.recommendations[0]!.priority).toBe('immediate');
     });
@@ -286,6 +369,7 @@ describe('generateSecurityReport', () => {
           ],
         },
         isKiloClaw: false,
+        content: buildTestContent(),
       });
 
       expect(report.findings[0]!.severity).toBe('warn');
@@ -299,7 +383,7 @@ describe('generateSecurityReport', () => {
           findings: [
             {
               checkId: 'auth.no_authentication',
-              severity: 'info', // client downgraded, server knows critical
+              severity: 'info',
               title: 'No auth',
               detail: 'test',
               remediation: 'Enable auth',
@@ -307,11 +391,35 @@ describe('generateSecurityReport', () => {
           ],
         },
         isKiloClaw: false,
+        content: buildTestContent(),
       });
 
       expect(report.findings[0]!.severity).toBe('critical');
-      // Should render in Critical Findings section, not Informational
       expect(report.markdown).toContain('## Critical Findings');
+    });
+  });
+
+  describe('unknown checkId fallback', () => {
+    it('uses fallback.risk template when no checkTemplate matches', () => {
+      const report = generateSecurityReport({
+        audit: {
+          ts: 1000,
+          summary: { critical: 0, warn: 1, info: 0 },
+          findings: [
+            {
+              checkId: 'custom.brand_new_check',
+              severity: 'warn',
+              title: 'New check',
+              detail: 'Something was reported',
+              remediation: null,
+            },
+          ],
+        },
+        isKiloClaw: false,
+        content: buildTestContent(),
+      });
+
+      expect(report.findings[0]!.risk).toBe('Review this finding: Something was reported');
     });
   });
 });

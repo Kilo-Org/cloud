@@ -120,4 +120,8 @@ export class KiloChatClient {
   async sendTyping(conversationId: string): Promise<void> {
     await this.request(`/v1/conversations/${conversationId}/typing`, { method: 'POST' });
   }
+
+  async markConversationRead(conversationId: string): Promise<void> {
+    await this.request(`/v1/conversations/${conversationId}/mark-read`, { method: 'POST' });
+  }
 }

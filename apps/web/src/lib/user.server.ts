@@ -51,6 +51,7 @@ import type { FailureResult } from '@/lib/maybe-result';
 import { failureResult, whenOk } from '@/lib/maybe-result';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials, SSO_SIGNIN_PATH } from '@/lib/auth/constants';
+import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
@@ -352,6 +353,54 @@ function createAccountInfo(
   return accountInfo;
 }
 
+export type SignInRedirectContext = {
+  callbackPath?: string;
+  signup?: boolean;
+};
+
+/**
+ * Extracts the sign-in redirect context from the NextAuth callback-url cookie
+ * value. Exported so the parsing logic can be tested without mocking the
+ * next/headers cookie store.
+ *
+ * The NextAuth callback-url cookie holds the post-auth destination, e.g.
+ * `/users/after-sign-in?callbackPath=/device-auth?code=<CODE>`. We lift
+ * `callbackPath` and `signup` out so that bouncing back to `/users/sign_in`
+ * on an auth error preserves the mobile device-auth context and the signup
+ * UI mode the user originally requested.
+ */
+export function parseSignInRedirectContext(
+  callbackUrlCookieValue: string | undefined
+): SignInRedirectContext {
+  if (!callbackUrlCookieValue) return {};
+
+  let callbackUrl: URL;
+  try {
+    callbackUrl = new URL(callbackUrlCookieValue, 'http://localhost');
+  } catch {
+    return {};
+  }
+
+  const nestedCallbackPath = callbackUrl.searchParams.get('callbackPath')?.trim();
+  const nestedSignup = callbackUrl.searchParams.get('signup') === 'true';
+
+  return {
+    callbackPath:
+      nestedCallbackPath && isValidCallbackPath(nestedCallbackPath)
+        ? nestedCallbackPath
+        : undefined,
+    signup: nestedSignup || undefined,
+  };
+}
+
+async function getSignInRedirectContext(): Promise<SignInRedirectContext> {
+  const cookieStore = await cookies();
+  const raw =
+    cookieStore.get('__Secure-next-auth.callback-url')?.value ??
+    cookieStore.get('next-auth.callback-url')?.value;
+  return parseSignInRedirectContext(raw);
+}
+
 async function getAffiliateTrackingIdFromAuthFlow(): Promise<string | null> {
   const cookieStore = await cookies();
 
@@ -529,13 +578,25 @@ const authOptions: NextAuthOptions = {
       let accountInfo: CreateOrUpdateUserArgs | undefined;
       let isAccountLinking: boolean | null = null;
       let linkingSession: AccountLinkingSession | null = null;
+      const redirectContext = await getSignInRedirectContext();
       const redirectUrlForCode = (error: AuthErrorType, email?: string): string => {
-        const baseUrl = isAccountLinking ? '/connected-accounts' : '/users/sign_in';
         const params = new URLSearchParams({ error });
         if (email) {
           params.set('email', email);
         }
-        return `${baseUrl}?${params.toString()}`;
+        if (isAccountLinking) {
+          return `/connected-accounts?${params.toString()}`;
+        }
+        // Preserve the original sign-in context so an error bounce (e.g. BLOCKED,
+        // USER-NOT-FOUND, DIFFERENT-OAUTH) doesn't strand a mobile device-auth
+        // flow on a plain sign-in page without the code or signup mode.
+        if (redirectContext.callbackPath) {
+          params.set('callbackPath', redirectContext.callbackPath);
+        }
+        if (redirectContext.signup) {
+          params.set('signup', 'true');
+        }
+        return `/users/sign_in?${params.toString()}`;
       };
       try {
         if (!account) return `TRAP: No account found`;

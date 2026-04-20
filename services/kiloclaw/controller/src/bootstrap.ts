@@ -693,7 +693,9 @@ export const PLUGIN_INSTALL_SECTION_CONFIG: ToolsMdSectionConfig = {
 When installing an OpenClaw plugin on the user's behalf:
 
 1. ALWAYS use the \`openclaw plugins install <id>\` CLI command. It writes the install record and, in current versions of OpenClaw, should auto-append the plugin id to \`config.plugins.allow\` in \`/root/.openclaw/openclaw.json\`.
-2. After a plugin install, ALWAYS verify the id appears in \`plugins.allow\` by reading the config. Older OpenClaw versions, manual file drops, and hand-edited configs can all leave the allowlist out of sync. If the id is missing, explicitly add it (with the user's confirmation) so the plugin will load on the next gateway restart.
+2. After a plugin install, read \`plugins.allow\` from the config and reconcile carefully. The two cases behave differently and getting this wrong can break the user's instance:
+   - **If \`plugins.allow\` is an existing array**, verify the new id is in it. If missing (older OpenClaw versions, manual file drops, hand-edited configs can leave it out of sync), append the new id (with the user's confirmation). Do NOT remove or reorder existing ids.
+   - **If \`plugins.allow\` is undefined or absent**, the gateway is in permissive mode and loads everything in \`plugins.load.paths\`. DO NOT create \`plugins.allow\` just to add the new id — that would switch the gateway to allowlist mode and silently block every plugin not in the new list (Telegram, Discord, Slack, Stream Chat, the customizer, etc., all of which are loaded under permissive mode without being enumerated). Leave \`plugins.allow\` undefined and rely on \`plugins.load.paths\` instead.
 3. Do NOT drop plugin files manually into \`/root/.openclaw/extensions/\`. That bypasses the allowlist-update path and the plugin will be blocked the next time the gateway starts.
 <!-- END:plugin-install -->`,
 };

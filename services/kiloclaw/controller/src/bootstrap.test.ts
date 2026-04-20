@@ -881,6 +881,14 @@ describe('TOOLS.md section configs', () => {
     expect(section).toContain('openclaw plugins install');
     expect(section).toContain('plugins.allow');
     expect(section).toContain('ALWAYS');
+    // Safety: must explicitly tell the agent NOT to create plugins.allow
+    // from scratch on permissive instances. Creating a single-element
+    // allowlist would silently block bundled channel plugins (Telegram,
+    // Discord, Slack, Stream Chat, etc.) that are loaded under permissive
+    // mode without being enumerated. See the kilo-code-bot review on
+    // PR #2597 for the production incident this guards against.
+    expect(section).toContain('DO NOT create');
+    expect(section).toContain('permissive mode');
   });
 });
 

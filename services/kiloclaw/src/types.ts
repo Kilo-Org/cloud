@@ -172,6 +172,9 @@ export type ChatWebhookPayload = {
   from: string;
   text: string;
   sentAt: string;
+  inReplyToMessageId?: string;
+  inReplyToBody?: string;
+  inReplyToSender?: string;
 };
 
 /**

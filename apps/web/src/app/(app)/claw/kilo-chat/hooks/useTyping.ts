@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
 import type { TypingEvent } from '@kilocode/kilo-chat';
 
@@ -60,6 +60,15 @@ export function useTypingState(currentUserId: string | null) {
       next.delete(memberId);
       return next;
     });
+  }, []);
+
+  // Clear all pending timers on unmount
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      timers.forEach(clearTimeout);
+      timers.clear();
+    };
   }, []);
 
   return { typingMembers, handleTypingEvent, clearTypingForMember };

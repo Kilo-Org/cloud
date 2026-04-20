@@ -68,8 +68,10 @@ export function MessageArea({
   const markReadRef = useRef(markRead.mutate);
   markReadRef.current = markRead.mutate;
 
-  // Mark conversation as read when opened (only if actually unread)
+  // Mark conversation as read when opened
   useEffect(() => {
+    console.log('[mark-read] useEffect fired, conversationId:', conversationId);
+    console.trace('[mark-read] useEffect call stack');
     markReadRef.current(conversationId);
   }, [conversationId]);
 
@@ -87,6 +89,7 @@ export function MessageArea({
         } else {
           if (event.type === 'message.created') {
             clearTypingForMember((event.data as { senderId: string }).senderId);
+            console.log('[mark-read] SSE message.created, conversationId:', conversationId);
             markReadRef.current(conversationId);
           }
           updateCache(event);

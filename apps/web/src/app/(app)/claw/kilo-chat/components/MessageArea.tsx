@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import type { ConversationListResponse } from '@kilocode/kilo-chat';
 import { ulid } from 'ulid';
 import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import {
@@ -12,7 +14,11 @@ import {
 } from '../hooks/useMessages';
 import { useSSE } from '../hooks/useSSE';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
-import { useConversationDetail, useRenameConversation } from '../hooks/useConversations';
+import {
+  useConversationDetail,
+  useRenameConversation,
+  useMarkConversationRead,
+} from '../hooks/useConversations';
 import { toast } from 'sonner';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
@@ -60,6 +66,28 @@ export function MessageArea({
   const { typingMembers, handleTypingEvent, clearTypingForMember } = useTypingState(currentUserId);
   const sendTyping = useTypingSender(getToken, conversationId);
 
+  const queryClient = useQueryClient();
+  const markRead = useMarkConversationRead(getToken);
+  const markReadRef = useRef(markRead.mutate);
+  markReadRef.current = markRead.mutate;
+
+  // Mark conversation as read on mount / conversationId change (if unread)
+  useEffect(() => {
+    const cached = queryClient.getQueryData<ConversationListResponse>([
+      'kilo-chat',
+      'conversations',
+    ]);
+    if (!cached) return;
+    const conv = cached.conversations.find(c => c.conversationId === conversationId);
+    if (!conv) return;
+    const isUnread =
+      conv.lastActivityAt != null &&
+      (conv.lastReadAt == null || conv.lastActivityAt > conv.lastReadAt);
+    if (isUnread) {
+      markReadRef.current(conversationId);
+    }
+  }, [conversationId, queryClient]);
+
   // SSE connection
   useSSE({
     conversationId,
@@ -74,6 +102,7 @@ export function MessageArea({
         } else {
           if (event.type === 'message.created') {
             clearTypingForMember((event.data as { senderId: string }).senderId);
+            markReadRef.current(conversationId);
           }
           updateCache(event);
         }

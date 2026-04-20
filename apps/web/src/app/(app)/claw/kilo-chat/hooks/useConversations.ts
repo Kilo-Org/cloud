@@ -67,3 +67,14 @@ export function useLeaveConversation(getToken: () => Promise<string>) {
     },
   });
 }
+
+export function useMarkConversationRead(getToken: () => Promise<string>) {
+  const client = useClient(getToken);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) => client.markConversationRead(conversationId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
+    },
+  });
+}

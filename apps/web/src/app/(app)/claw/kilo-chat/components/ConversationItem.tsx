@@ -85,6 +85,11 @@ export function ConversationItem({
 
   const title = conversation.conversationTitle ?? 'Untitled';
 
+  const isUnread =
+    !isActive &&
+    conversation.lastActivityAt != null &&
+    (conversation.lastReadAt == null || conversation.lastActivityAt > conversation.lastReadAt);
+
   const sharedClassName = `group relative block rounded-md px-3 py-2 ${
     isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/50'
   }`;
@@ -148,7 +153,10 @@ export function ConversationItem({
           </>
         ) : (
           <>
-            <p className="truncate text-sm font-medium">{title}</p>
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <p className="truncate text-sm font-medium">{title}</p>
+              {isUnread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
+            </div>
             <div className="flex shrink-0 items-center gap-1">
               <span className="text-muted-foreground text-xs group-hover:hidden">
                 {displayTime}

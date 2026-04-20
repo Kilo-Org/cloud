@@ -1338,7 +1338,21 @@ describe('POST /google/migrate-legacy', () => {
     const headers = await makeAuthHeaders();
 
     mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
-    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValue(null);
+    mockGetGoogleOAuthConnectionByInstanceId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        makeGoogleConnection(encryptionKey, {
+          credential_profile: 'legacy',
+          account_email: 'legacy@example.com',
+          account_subject: 'legacy-subject',
+          oauth_client_id: 'legacy-client-id',
+          oauth_client_secret_encrypted: encryptWithSymmetricKey('legacy-client-secret', encryptionKey),
+          refresh_token_encrypted: encryptWithSymmetricKey('legacy-refresh-token', encryptionKey),
+          grants_by_source: { legacy: ['calendar_read'] },
+          capabilities: ['calendar_read'],
+          status: 'active',
+        })
+      );
 
     const response = await controller.request(
       '/google/migrate-legacy',
@@ -1366,6 +1380,71 @@ describe('POST /google/migrate-legacy', () => {
     const instanceStub = getInstanceStub(env);
     expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'active' })
+    );
+  });
+
+  it('does not clobber concurrent kilo_owned row when migration insert conflicts', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const execute = vi.fn().mockResolvedValue(undefined);
+    mockGetWorkerDb.mockReturnValue({ execute });
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        makeGoogleConnection(encryptionKey, {
+          credential_profile: 'kilo_owned',
+          account_email: 'existing@example.com',
+          account_subject: 'existing-subject',
+          capabilities: ['calendar_read'],
+          grants_by_source: { oauth: ['calendar_read'] },
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          status: 'action_required',
+          last_error: 'invalid_grant',
+        })
+      );
+
+    const response = await controller.request(
+      '/google/migrate-legacy',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sandboxId,
+          accountEmail: 'legacy@example.com',
+          accountSubject: 'legacy-subject',
+          oauthClientId: 'legacy-client-id',
+          oauthClientSecret: 'legacy-client-secret',
+          refreshToken: 'legacy-refresh-token',
+          scopes: [
+            'https://www.googleapis.com/auth/calendar.readonly',
+            'https://www.googleapis.com/auth/gmail.readonly',
+          ],
+          capabilities: ['gmail_read'],
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ migrated: true, profile: 'kilo_owned' });
+    expect(mockUpdateGoogleOAuthConnectionTokenData).not.toHaveBeenCalled();
+
+    const instanceStub = getInstanceStub(env);
+    expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'action_required',
+        accountEmail: 'existing@example.com',
+        accountSubject: 'existing-subject',
+        scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        capabilities: ['calendar_read', 'gmail_read'],
+        lastError: 'invalid_grant',
+      })
     );
   });
 

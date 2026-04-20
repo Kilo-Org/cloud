@@ -79,6 +79,8 @@ const GoogleStatusRequestSchema = z.object({
   sandboxId: z.string().min(1),
 });
 
+type GoogleOAuthConnectionStatus = 'active' | 'action_required' | 'disconnected';
+
 const GoogleMigrateLegacyRequestSchema = z.object({
   sandboxId: z.string().min(1),
   accountEmail: z.string().email(),
@@ -771,21 +773,62 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
         last_error_at = NULL,
         connected_at = EXCLUDED.connected_at,
         updated_at = EXCLUDED.updated_at
+      WHERE kiloclaw_google_oauth_connections.credential_profile <> 'kilo_owned'
     `);
   }
 
-  const keepKiloOwnedState = existing && existing.credential_profile === 'kilo_owned';
+  const current = await getGoogleOAuthConnectionByInstanceId(db, instance.id);
+  if (!current) {
+    return c.json({ error: 'Google OAuth connection not found after migration write' }, 500);
+  }
+
+  let resolvedCapabilities = capabilities;
+  let resolvedScopes = scopes;
+  let resolvedStatus: GoogleOAuthConnectionStatus = 'active';
+  let resolvedAccountEmail = parsed.data.accountEmail;
+  let resolvedAccountSubject = parsed.data.accountSubject;
+  let resolvedLastError: string | null = null;
+  let resolvedProfile: 'legacy' | 'kilo_owned' = current.credential_profile;
+
+  if (current.credential_profile === 'kilo_owned') {
+    const currentGrants = parseGoogleGrantsBySource(current.grants_by_source);
+    const mergedLegacyGrants = normalizeCapabilities([
+      ...(currentGrants.legacy ?? []),
+      ...migratedLegacyCapabilities,
+    ]);
+    const mergedOauthGrants = normalizeCapabilities(currentGrants.oauth ?? []);
+    const mergedGrantsBySource: GoogleGrantsBySource = {};
+    if (mergedLegacyGrants.length > 0) mergedGrantsBySource.legacy = mergedLegacyGrants;
+    if (mergedOauthGrants.length > 0) mergedGrantsBySource.oauth = mergedOauthGrants;
+
+    resolvedCapabilities = effectiveGoogleCapabilities(mergedGrantsBySource);
+    resolvedScopes = [...new Set(current.scopes ?? [])].sort();
+    resolvedStatus = current.status;
+    resolvedAccountEmail = current.account_email;
+    resolvedAccountSubject = current.account_subject;
+    resolvedLastError = current.last_error ?? null;
+    resolvedProfile = 'kilo_owned';
+
+    await db.execute(sql`
+      UPDATE kiloclaw_google_oauth_connections
+      SET
+        grants_by_source = ${JSON.stringify(mergedGrantsBySource)}::jsonb,
+        capabilities = ${resolvedCapabilities},
+        updated_at = ${now}
+      WHERE instance_id = ${instance.id}
+    `);
+  }
 
   await stub.updateGoogleOAuthConnection({
-    status: keepKiloOwnedState ? existing.status : 'active',
-    accountEmail: keepKiloOwnedState ? existing.account_email : parsed.data.accountEmail,
-    accountSubject: keepKiloOwnedState ? existing.account_subject : parsed.data.accountSubject,
-    scopes: keepKiloOwnedState ? [...new Set(existing.scopes ?? [])].sort() : scopes,
-    capabilities,
-    lastError: keepKiloOwnedState ? (existing.last_error ?? null) : null,
+    status: resolvedStatus,
+    accountEmail: resolvedAccountEmail,
+    accountSubject: resolvedAccountSubject,
+    scopes: resolvedScopes,
+    capabilities: resolvedCapabilities,
+    lastError: resolvedLastError,
   });
 
-  return c.json({ migrated: true, profile: existing?.credential_profile ?? 'legacy' }, 200);
+  return c.json({ migrated: true, profile: resolvedProfile }, 200);
 });
 
 export { controller };

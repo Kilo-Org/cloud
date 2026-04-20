@@ -114,13 +114,6 @@ describe('User', () => {
   });
 
   describe('createOrUpdateUser', () => {
-    const originalExemptIps = process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS;
-
-    afterEach(() => {
-      if (originalExemptIps === undefined) delete process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS;
-      else process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS = originalExemptIps;
-    });
-
     it('stores the signup IP for new users', async () => {
       const headers = new Headers({ 'x-forwarded-for': '203.0.113.25, 10.0.0.1' });
 
@@ -166,30 +159,6 @@ describe('User', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error).toBe('SIGNUP-RATE-LIMITED');
-    });
-
-    it('skips rate limiting for exempt signup IPs', async () => {
-      process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS = '198.51.100.7';
-      const signupIp = '198.51.100.7';
-      for (let i = 1; i <= 5; i++) {
-        await insertTestUser({ id: `ip-exempt-${i}`, signup_ip: signupIp });
-      }
-
-      const result = await createOrUpdateUser(
-        {
-          google_user_email: 'exempt@example.com',
-          google_user_name: 'Exempt User',
-          google_user_image_url: 'https://example.com/avatar.png',
-          hosted_domain: null,
-          provider: 'google',
-          provider_account_id: 'google-exempt',
-        },
-        undefined,
-        false,
-        new Headers({ 'x-forwarded-for': signupIp })
-      );
-
-      expect(result.success).toBe(true);
     });
   });
 

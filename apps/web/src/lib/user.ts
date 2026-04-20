@@ -125,20 +125,11 @@ function getSignupIp(requestHeaders?: Headers): string | null {
   return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 }
 
-function getSignupIpExemptions(): Set<string> {
-  return new Set(
-    (process.env.SIGNUP_RATE_LIMIT_EXEMPT_IPS ?? '')
-      .split(',')
-      .map(ip => ip.trim())
-      .filter(ip => ip.length > 0)
-  );
-}
-
 async function checkSignupIpRateLimit(
   signupIp: string | null,
   tx: DrizzleTransaction
 ): Promise<Result<null, AuthErrorType>> {
-  if (!signupIp || getSignupIpExemptions().has(signupIp)) return successResult(null);
+  if (!signupIp) return successResult(null);
 
   const windowStart = new Date(Date.now() - signupsPerIpWindowMs).toISOString();
   const [result] = await tx

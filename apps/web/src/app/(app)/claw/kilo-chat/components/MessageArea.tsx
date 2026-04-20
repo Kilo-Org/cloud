@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ulid } from 'ulid';
 import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import {
@@ -35,6 +36,7 @@ type MessageAreaProps = {
 export function MessageArea({ conversationId }: MessageAreaProps) {
   const { currentUserId, instanceStatus, assistantName, sandboxId, eventService, kiloChatClient } =
     useKiloChatContext();
+  const queryClient = useQueryClient();
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
@@ -108,6 +110,13 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     ];
     return () => offs.forEach(off => off());
   }, [kiloChatClient, updateCache, handleTypingEvent, clearTypingForMember, conversationId]);
+
+  // Refetch messages on WebSocket reconnect (events may have been missed)
+  useEffect(() => {
+    return eventService.onReconnect(() => {
+      void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'messages', conversationId] });
+    });
+  }, [eventService, queryClient, conversationId]);
 
   // Auto-scroll whenever content height changes (new messages or streaming updates)
   useEffect(() => {

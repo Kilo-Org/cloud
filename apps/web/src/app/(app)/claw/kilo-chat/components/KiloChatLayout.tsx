@@ -100,6 +100,14 @@ export function KiloChatLayout({
     ];
     return () => offs.forEach(off => off());
   }, [kiloChatClient, queryClient]);
+
+  // Refetch conversations on WebSocket reconnect (events may have been missed)
+  useEffect(() => {
+    return eventService.onReconnect(() => {
+      void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
+    });
+  }, [eventService, queryClient]);
+
   const createConversation = useCreateConversation(kiloChatClient);
   const renameConversation = useRenameConversation(kiloChatClient);
   const leaveConversation = useLeaveConversation(kiloChatClient);

@@ -10,6 +10,8 @@ export class EventServiceClient {
   private activeContexts = new Set<string>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
+  private hasConnectedBefore = false;
+  private reconnectHandlers = new Set<() => void>();
 
   constructor(config: EventServiceConfig) {
     this.url = config.url;
@@ -37,8 +39,15 @@ export class EventServiceClient {
       this.ws = ws;
 
       ws.onopen = () => {
+        const isReconnect = this.hasConnectedBefore;
         this.connected = true;
+        this.hasConnectedBefore = true;
         this.resubscribeContexts();
+        if (isReconnect) {
+          for (const handler of this.reconnectHandlers) {
+            handler();
+          }
+        }
         resolve();
       };
 
@@ -96,6 +105,13 @@ export class EventServiceClient {
     if (this.isConnected()) {
       this.send({ type: 'context.unsubscribe', contexts });
     }
+  }
+
+  onReconnect(handler: () => void): () => void {
+    this.reconnectHandlers.add(handler);
+    return () => {
+      this.reconnectHandlers.delete(handler);
+    };
   }
 
   on(event: string, handler: (context: string, payload: unknown) => void): () => void {

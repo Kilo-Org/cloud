@@ -20,6 +20,7 @@ function formatError(error: unknown): string {
 type WithStatusProp = {
   status: KiloClawDashboardStatus | undefined;
   organizationId?: string;
+  personalUserId?: string | null;
 };
 
 export function withStatusQueryBoundary<P extends WithStatusProp>(Component: ComponentType<P>) {
@@ -27,9 +28,10 @@ export function withStatusQueryBoundary<P extends WithStatusProp>(Component: Com
     props: Omit<P, keyof WithStatusProp> & {
       statusQuery: StatusQueryLike;
       organizationId?: string;
+      personalUserId?: string | null;
     }
   ) {
-    const { statusQuery, organizationId, ...componentPropsWithoutStatus } = props;
+    const { statusQuery, organizationId, personalUserId, ...componentPropsWithoutStatus } = props;
 
     if (statusQuery.isLoading) {
       return (
@@ -59,6 +61,7 @@ export function withStatusQueryBoundary<P extends WithStatusProp>(Component: Com
       ...componentPropsWithoutStatus,
       status: statusQuery.data,
       organizationId,
+      personalUserId,
     } as unknown as P;
 
     return <Component {...componentProps} />;

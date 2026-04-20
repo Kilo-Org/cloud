@@ -55,6 +55,7 @@ export function ClawOnboardingFlow({
   status,
   mode,
   organizationId,
+  personalUserId,
   createFlowStarted = false,
   onCreateFlowStarted,
   onCreateFlowFailed,
@@ -64,6 +65,7 @@ export function ClawOnboardingFlow({
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   organizationId?: string;
+  personalUserId?: string | null;
   createFlowStarted?: boolean;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
@@ -87,6 +89,7 @@ export function ClawOnboardingFlow({
         status={status}
         mode={mode}
         createFlowStarted={createFlowStarted}
+        personalUserId={personalUserId ?? null}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
         skipCreateInstanceStep={skipCreateInstanceStep}
@@ -100,6 +103,7 @@ function ClawOnboardingFlowInner({
   status,
   mode,
   createFlowStarted,
+  personalUserId,
   onCreateFlowStarted,
   onCreateFlowFailed,
   skipCreateInstanceStep,
@@ -108,6 +112,7 @@ function ClawOnboardingFlowInner({
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   createFlowStarted: boolean;
+  personalUserId: string | null;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
   skipCreateInstanceStep: boolean;
@@ -200,9 +205,9 @@ function ClawOnboardingFlowInner({
   useEffect(() => {
     if (organizationId) return;
     if (flowState.renderStep === 'complete' || flowState.renderStep === 'error') {
-      clearPersonalOnboardingInProgress();
+      clearPersonalOnboardingInProgress(personalUserId);
     }
-  }, [organizationId, flowState.renderStep]);
+  }, [organizationId, personalUserId, flowState.renderStep]);
 
   const resetWizardSelections = useCallback(() => {
     setOnboardingStep('identity');

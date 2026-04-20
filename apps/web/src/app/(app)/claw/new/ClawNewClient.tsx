@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
+import { useUser } from '@/hooks/useUser';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
   clearPersonalOnboardingInProgress,
@@ -38,6 +39,7 @@ function ClawNewLoader({
   billingUpdatedAt,
   skipCreateInstanceStep,
   autoProvisionOnMount,
+  personalUserId,
   onCreateFlowStarted,
   onCreateFlowFailed,
 }: {
@@ -46,6 +48,7 @@ function ClawNewLoader({
   billingUpdatedAt: number;
   skipCreateInstanceStep: boolean;
   autoProvisionOnMount: boolean;
+  personalUserId: string | null;
   onCreateFlowStarted: () => void;
   onCreateFlowFailed: () => void;
 }) {
@@ -64,6 +67,7 @@ function ClawNewLoader({
         createFlowStarted={createFlowStartedAt !== null}
         skipCreateInstanceStep={skipCreateInstanceStep}
         autoProvisionOnMount={autoProvisionOnMount}
+        personalUserId={personalUserId}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
       />
@@ -86,6 +90,7 @@ function ClawNewLoader({
       createFlowStarted={createFlowStartedAt !== null}
       skipCreateInstanceStep={skipCreateInstanceStep}
       autoProvisionOnMount={autoProvisionOnMount}
+      personalUserId={personalUserId}
       onCreateFlowStarted={onCreateFlowStarted}
       onCreateFlowFailed={onCreateFlowFailed}
     />
@@ -106,38 +111,47 @@ export function ClawNewClient({
 
 function ClawNewLiveClient() {
   const trpc = useTRPC();
+  const { data: user, isLoading: userLoading } = useUser();
   const billingQuery = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
-  // Lazy init so the first client render sees the correct refresh-safety
-  // value. `safeLocalStorage` returns null on the server, so SSR still renders
-  // with `false` and hydration stays in sync.
-  const [onboardingInProgress, setOnboardingInProgress] = useState<boolean>(() =>
-    readPersonalOnboardingInProgress()
+  const currentUserId = user?.id ?? null;
+  const [syncedMarkerUserId, setSyncedMarkerUserId] = useState<string | null | undefined>(
+    undefined
   );
+  const [onboardingInProgress, setOnboardingInProgress] = useState(false);
   // Re-seed `createFlowStartedAt` when resuming onboarding after a refresh so
-  // `ClawNewLoader`'s status timestamp filter lets fresh status data through
-  // — otherwise the provisioning step cannot detect `instanceRunning`.
-  const [createFlowStartedAt, setCreateFlowStartedAt] = useState<number | null>(() =>
-    readPersonalOnboardingInProgress() ? Date.now() : null
-  );
+  // `ClawNewLoader`'s status timestamp filter lets fresh status data through.
+  const [createFlowStartedAt, setCreateFlowStartedAt] = useState<number | null>(null);
   // Falls back to showing the legacy intro card when auto-start fails so the
   // user still has a manual retry button.
   const [autoStartFailed, setAutoStartFailed] = useState(false);
 
+  useEffect(() => {
+    if (userLoading) return;
+
+    const markerForCurrentUser = readPersonalOnboardingInProgress(currentUserId);
+    setOnboardingInProgress(markerForCurrentUser);
+    setCreateFlowStartedAt(markerForCurrentUser ? Date.now() : null);
+    setAutoStartFailed(false);
+    setSyncedMarkerUserId(currentUserId);
+  }, [currentUserId, userLoading]);
+
   const onCreateFlowStarted = useCallback(() => {
-    markPersonalOnboardingInProgress();
+    markPersonalOnboardingInProgress(currentUserId);
     setOnboardingInProgress(true);
     setAutoStartFailed(false);
     setCreateFlowStartedAt(Date.now());
-  }, []);
+    setSyncedMarkerUserId(currentUserId);
+  }, [currentUserId]);
 
   const onCreateFlowFailed = useCallback(() => {
-    clearPersonalOnboardingInProgress();
+    clearPersonalOnboardingInProgress(currentUserId);
     setOnboardingInProgress(false);
     setAutoStartFailed(true);
     setCreateFlowStartedAt(null);
-  }, []);
+    setSyncedMarkerUserId(currentUserId);
+  }, [currentUserId]);
 
-  if (billingQuery.isLoading) {
+  if (userLoading || syncedMarkerUserId !== currentUserId || billingQuery.isLoading) {
     return <LoadingState />;
   }
 
@@ -200,6 +214,7 @@ function ClawNewLiveClient() {
       billingUpdatedAt={billingQuery.dataUpdatedAt}
       skipCreateInstanceStep={skipCreateInstanceStep}
       autoProvisionOnMount={autoProvisionOnMount}
+      personalUserId={currentUserId}
       onCreateFlowStarted={onCreateFlowStarted}
       onCreateFlowFailed={onCreateFlowFailed}
     />

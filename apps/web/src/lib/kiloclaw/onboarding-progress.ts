@@ -9,21 +9,28 @@ import { safeSessionStorage } from '@/lib/localStorage';
  * during auto-started provisioning would jump the user to `post-provisioning`
  * (or `complete`) and silently skip identity/permissions/channels input.
  *
- * This marker is intentionally session-scoped so stale progress does not leak
- * across account switches or browser restarts.
+ * This marker is intentionally session-scoped and user-scoped so stale
+ * progress does not leak across account switches or browser restarts.
  *
  * Scope: personal flow only. Organization onboarding is unchanged.
  */
 const CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY = 'kiloclaw-personal-onboarding-in-progress';
 
-export function readPersonalOnboardingInProgress(): boolean {
-  return safeSessionStorage.getItem(CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY) === '1';
+function getPersonalOnboardingInProgressKey(userId: string): string {
+  return `${CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY}:${userId}`;
 }
 
-export function markPersonalOnboardingInProgress(): void {
-  safeSessionStorage.setItem(CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY, '1');
+export function readPersonalOnboardingInProgress(userId: string | null | undefined): boolean {
+  if (!userId) return false;
+  return safeSessionStorage.getItem(getPersonalOnboardingInProgressKey(userId)) === '1';
 }
 
-export function clearPersonalOnboardingInProgress(): void {
-  safeSessionStorage.removeItem(CLAW_PERSONAL_ONBOARDING_IN_PROGRESS_KEY);
+export function markPersonalOnboardingInProgress(userId: string | null | undefined): void {
+  if (!userId) return;
+  safeSessionStorage.setItem(getPersonalOnboardingInProgressKey(userId), '1');
+}
+
+export function clearPersonalOnboardingInProgress(userId: string | null | undefined): void {
+  if (!userId) return;
+  safeSessionStorage.removeItem(getPersonalOnboardingInProgressKey(userId));
 }

@@ -160,6 +160,33 @@ describe('User', () => {
       if (result.success) return;
       expect(result.error).toBe('SIGNUP-RATE-LIMITED');
     });
+
+    it('rejects new signups whose normalized_email is already in use', async () => {
+      await insertTestUser({
+        id: 'existing-normalized',
+        google_user_email: 'dedup.user@gmail.com',
+        normalized_email: 'dedupuser@gmail.com',
+      });
+
+      // New signup with a different raw email but same normalized form
+      // (Gmail dots + plus-alias both collapse to dedupuser@gmail.com).
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'dedup.user+alias@gmail.com',
+          google_user_name: 'Dedup User',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'github',
+          provider_account_id: 'github-dedup',
+        },
+        undefined,
+        false
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('EMAIL-ALREADY-USED');
+    });
   });
 
   describe('softDeleteUser', () => {

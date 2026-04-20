@@ -332,6 +332,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
 
       {/* Input */}
       <MessageInput
+        key={conversationId}
         onSend={handleSend}
         onTyping={sendTyping}
         replyingTo={replyingTo}

@@ -99,6 +99,19 @@ export function KiloChatLayout({
           queryKey: ['kilo-chat', 'conversation', e.conversationId],
         });
       }),
+      kiloChatClient.onConversationLeft((_ctx, e) => {
+        queryClient.setQueriesData<ConversationListResponse>(
+          { queryKey: ['kilo-chat', 'conversations'] },
+          old => {
+            if (!old) return old;
+            return {
+              ...old,
+              conversations: old.conversations.filter(c => c.conversationId !== e.conversationId),
+              total: old.total - 1,
+            };
+          }
+        );
+      }),
       kiloChatClient.onConversationActivity((_ctx, e) => {
         queryClient.setQueriesData<ConversationListResponse>(
           { queryKey: ['kilo-chat', 'conversations'] },

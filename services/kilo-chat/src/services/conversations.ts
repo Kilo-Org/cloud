@@ -4,7 +4,7 @@
  */
 
 import { ulid } from 'ulid';
-import { extractConversationContext, pushInstanceEvent } from './event-push';
+import { extractConversationContext, extractSandboxId, pushInstanceEvent } from './event-push';
 
 // ─── createConversation ────────────────────────────────────────────────────
 
@@ -149,6 +149,15 @@ export async function leaveConversationFor(
         return memberStub.removeConversation(conversationId);
       })
     );
+  }
+
+  // Notify the user's other clients so their conversation list updates.
+  const botMember = botMembers[0];
+  const sandboxId = botMember ? extractSandboxId(botMember.id) : null;
+  if (sandboxId) {
+    await pushInstanceEvent(env, sandboxId, [userId], 'conversation.left', {
+      conversationId,
+    });
   }
 
   return { ok: true };

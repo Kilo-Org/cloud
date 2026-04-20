@@ -59,6 +59,7 @@ export function MessageInput({
           onKeyDown={handleKeyDown}
           disabled={disabled}
           rows={1}
+          autoFocus
         />
         <button
           onClick={handleSubmit}

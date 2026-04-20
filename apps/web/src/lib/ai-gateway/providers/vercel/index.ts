@@ -30,14 +30,19 @@ const getVercelRoutingPercentage = createCachedFetch(
   DEFAULT_VERCEL_PERCENTAGE
 );
 
-async function getVercelModels() {
-  const result = JSON.parse((await redisGet(GATEWAY_METADATA_REDIS_KEYS.vercelModels)) ?? 'null');
-  return Object.values(z.record(z.string(), StoredModelSchema).parse(result))
-    .filter(model => model.type === 'language' && model.endpoints.length > 0)
-    .map(model => model.id);
-}
-
-const getVercelModelsCached = createCachedFetch(getVercelModels, 60, []);
+const getVercelModels = createCachedFetch(
+  async function () {
+    const result = JSON.parse((await redisGet(GATEWAY_METADATA_REDIS_KEYS.vercelModels)) ?? 'null');
+    if (Object.keys(result).length === 0) {
+      console.debug('[getVercelModels] no Vercel models found in Redis');
+    }
+    return Object.values(z.record(z.string(), StoredModelSchema).parse(result))
+      .filter(model => model.type === 'language' && model.endpoints.length > 0)
+      .map(model => model.id);
+  },
+  60,
+  []
+);
 
 export async function shouldRouteToVercel(
   requestedModel: string,
@@ -67,7 +72,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const vercelModels = await getVercelModelsCached();
+  const vercelModels = await getVercelModels();
   const vercelModelId = mapModelIdToVercel(requestedModel);
   if (!vercelModels.includes(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);

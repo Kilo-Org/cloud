@@ -1,10 +1,6 @@
 import { describe, expect, it, beforeAll, beforeEach, jest } from '@jest/globals';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
-import {
-  kiloclaw_earlybird_purchases,
-  kiloclaw_instances,
-  kiloclaw_subscriptions,
-} from '@kilocode/db/schema';
+import { kiloclaw_instances, kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 
@@ -124,11 +120,9 @@ describe('kiloclaw.sendChatMessage', () => {
   });
 
   describe('ownership validation', () => {
-    it('rejects when user has no active instance (no instanceId)', async () => {
-      await db.insert(kiloclaw_earlybird_purchases).values({
-        user_id: user.id,
-        amount_cents: 2500,
-      });
+    it('rejects when user has access but no active instance (no instanceId)', async () => {
+      const destroyedInstanceId = await createDestroyedInstance(user.id);
+      await grantKiloClawAccess(user.id, destroyedInstanceId);
       const caller = await createCallerForUser(user.id);
 
       await expect(caller.kiloclaw.sendChatMessage({ message: 'test' })).rejects.toMatchObject({

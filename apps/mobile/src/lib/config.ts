@@ -15,3 +15,6 @@ export const API_BASE_URL: string = required('apiBaseUrl');
 export const WEB_BASE_URL: string = required('webBaseUrl');
 export const APPSFLYER_DEV_KEY: string = required('appsFlyerDevKey');
 export const APPSFLYER_APP_ID: string = required('appsFlyerAppId');
+
+export const CLOUD_AGENT_WS_URL: string = required('cloudAgentWsUrl');
+export const SESSION_INGEST_WS_URL: string = required('sessionIngestWsUrl');

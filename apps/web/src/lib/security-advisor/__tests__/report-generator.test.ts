@@ -1,7 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
 import { generateSecurityReport } from '../report-generator';
-import type { SecurityAdvisorRequest } from '../schemas';
+import type { AuditFinding, SecurityAdvisorRequest } from '../schemas';
 import type { LoadedSecurityAdvisorContent } from '../content-loader';
+import { KILOCLAW_MITIGATED_CHECKS } from '../kiloclaw-mitigations';
 
 /**
  * Build a test fixture that mirrors the seeded DB content.
@@ -203,12 +204,31 @@ describe('generateSecurityReport', () => {
 
     it('renders markdown with all sections', () => {
       expect(report.markdown).toContain('# Security Audit Report');
+      expect(report.markdown).toContain('## Security Grade:');
       expect(report.markdown).toContain('## Summary');
       expect(report.markdown).toContain('## Critical Findings');
       expect(report.markdown).toContain('## Warnings');
       expect(report.markdown).toContain('## Informational');
       expect(report.markdown).toContain('## Recommendations');
       expect(report.markdown).toContain('**Public IP:** `1.2.3.4`');
+    });
+
+    it('computes a grade + score based on findings', () => {
+      // Fixture: 2 critical (after server override) + 3 warn → 100 - 70 - 12 = 18 → F
+      expect(report.score).toBe(18);
+      expect(report.grade).toBe('F');
+      expect(report.markdown).toContain('## Security Grade: F');
+      expect(report.markdown).toContain('**Score:** 18 / 100');
+    });
+
+    it('uses severity-matching labels on recommendation badges', () => {
+      // Previously the badges said [IMMEDIATE] / [HIGH] which didn't match the
+      // "critical" / "warning" vocabulary in the rest of the report. Rendered
+      // labels now mirror severity so there's one vocabulary throughout.
+      expect(report.markdown).toContain('[CRITICAL]');
+      expect(report.markdown).toContain('[WARNING]');
+      expect(report.markdown).not.toContain('[IMMEDIATE]');
+      expect(report.markdown).not.toContain('[HIGH]');
     });
 
     it('includes CTA for non-KiloClaw users', () => {
@@ -420,6 +440,188 @@ describe('generateSecurityReport', () => {
       });
 
       expect(report.findings[0]!.risk).toBe('Review this finding: Something was reported');
+    });
+  });
+
+  describe('KiloClaw-mitigated finding suppression', () => {
+    // The list lives in kiloclaw-mitigations.ts. These tests guard filtering
+    // BEHAVIOR (dropped from rendered findings, not counted in grade,
+    // disclosure note rendered) — test inputs are derived from the live
+    // KILOCLAW_MITIGATED_CHECKS map so adding or removing entries doesn't
+    // silently break assertions here.
+    const MITIGATED_IDS = Array.from(KILOCLAW_MITIGATED_CHECKS.keys());
+    const MITIGATED_EXAMPLE = MITIGATED_IDS[0]!;
+    const NOT_MITIGATED_EXAMPLE = 'tools.exec.security_full_configured';
+
+    function auditWith(checkIds: string[]): SecurityAdvisorRequest['audit'] {
+      return {
+        ts: 1,
+        summary: { critical: 0, warn: checkIds.length, info: 0 },
+        findings: checkIds.map((id, i) => ({
+          checkId: id,
+          severity: 'warn' as const,
+          title: `t${i}`,
+          detail: `d${i}`,
+          remediation: null,
+        })),
+      };
+    }
+
+    it('drops mitigated findings on KiloClaw and excludes them from the grade', () => {
+      const content = buildTestContent();
+      const report = generateSecurityReport({
+        audit: auditWith([MITIGATED_EXAMPLE, NOT_MITIGATED_EXAMPLE]),
+        isKiloClaw: true,
+        content,
+      });
+
+      // Only the non-mitigated finding survives into the rendered findings.
+      expect(report.findings).toHaveLength(1);
+      expect(report.findings[0]!.checkId).toBe(NOT_MITIGATED_EXAMPLE);
+
+      // Grade is computed on the filtered count (1 warn, not 2).
+      expect(report.score).toBe(96);
+      expect(report.grade).toBe('A');
+    });
+
+    it('keeps the same finding visible on self-hosted OpenClaw', () => {
+      const content = buildTestContent();
+      const report = generateSecurityReport({
+        audit: auditWith([MITIGATED_EXAMPLE, NOT_MITIGATED_EXAMPLE]),
+        isKiloClaw: false,
+        content,
+      });
+
+      // Nothing is suppressed for OpenClaw — both findings are real issues there.
+      expect(report.findings).toHaveLength(2);
+      expect(report.markdown).not.toContain('hidden');
+      expect(report.score).toBe(92);
+    });
+
+    it('renders a disclosure note when any findings are suppressed', () => {
+      const content = buildTestContent();
+      const report = generateSecurityReport({
+        audit: auditWith([MITIGATED_EXAMPLE, NOT_MITIGATED_EXAMPLE]),
+        isKiloClaw: true,
+        content,
+      });
+
+      // Plural-aware message, references external mitigation, not silent.
+      expect(report.markdown).toContain('1 additional finding hidden');
+      expect(report.markdown).toContain("KiloClaw's managed infrastructure");
+      expect(report.markdown).toContain('Not counted toward the grade');
+    });
+
+    it('pluralizes the disclosure note correctly for multiple suppressions', () => {
+      // Guard: this test specifically exercises the plural branch, so it
+      // requires >=2 entries in the live list. If the list ever shrinks to
+      // 1, fail loudly here with a clear pointer rather than silently
+      // asserting against the wrong message.
+      expect(MITIGATED_IDS.length).toBeGreaterThanOrEqual(2);
+
+      const content = buildTestContent();
+      const report = generateSecurityReport({
+        audit: auditWith(MITIGATED_IDS),
+        isKiloClaw: true,
+        content,
+      });
+
+      expect(report.markdown).toContain(`${MITIGATED_IDS.length} additional findings hidden`);
+      expect(report.findings).toHaveLength(0);
+      expect(report.grade).toBe('A'); // All findings suppressed → clean 100.
+    });
+
+    it('omits the disclosure note entirely when nothing was suppressed', () => {
+      const content = buildTestContent();
+      const report = generateSecurityReport({
+        audit: auditWith([NOT_MITIGATED_EXAMPLE]),
+        isKiloClaw: true,
+        content,
+      });
+
+      expect(report.markdown).not.toContain('hidden');
+      expect(report.markdown).not.toContain('additional finding');
+    });
+  });
+
+  describe('grade computation', () => {
+    const content = buildTestContent();
+
+    function gradeFor(audit: { critical: number; warn: number; info: number }): {
+      score: number;
+      grade: string;
+    } {
+      // Build synthetic findings that pass through client severity (no catalog
+      // match) so the count lands as specified.
+      const findings: AuditFinding[] = [];
+      for (let i = 0; i < audit.critical; i++)
+        findings.push({
+          checkId: `synthetic.crit.${i}`,
+          severity: 'critical',
+          title: `c${i}`,
+          detail: '',
+          remediation: null,
+        });
+      for (let i = 0; i < audit.warn; i++)
+        findings.push({
+          checkId: `synthetic.warn.${i}`,
+          severity: 'warn',
+          title: `w${i}`,
+          detail: '',
+          remediation: null,
+        });
+      for (let i = 0; i < audit.info; i++)
+        findings.push({
+          checkId: `synthetic.info.${i}`,
+          severity: 'info',
+          title: `i${i}`,
+          detail: '',
+          remediation: null,
+        });
+
+      const report = generateSecurityReport({
+        audit: {
+          ts: 1,
+          summary: { critical: audit.critical, warn: audit.warn, info: audit.info },
+          findings,
+        },
+        isKiloClaw: false,
+        content,
+      });
+      return { score: report.score, grade: report.grade };
+    }
+
+    it('scores a clean audit as A / 100', () => {
+      expect(gradeFor({ critical: 0, warn: 0, info: 0 })).toEqual({ score: 100, grade: 'A' });
+    });
+
+    it('info findings do not affect the score', () => {
+      expect(gradeFor({ critical: 0, warn: 0, info: 5 })).toEqual({ score: 100, grade: 'A' });
+    });
+
+    it('scores the real-world 7-warnings example as C', () => {
+      // Baseline calibration: 100 - 4*7 = 72 → C
+      expect(gradeFor({ critical: 0, warn: 7, info: 1 })).toEqual({ score: 72, grade: 'C' });
+    });
+
+    it('drops a single critical to D', () => {
+      expect(gradeFor({ critical: 1, warn: 0, info: 0 })).toEqual({ score: 65, grade: 'D' });
+    });
+
+    it('two criticals lands in F territory', () => {
+      expect(gradeFor({ critical: 2, warn: 0, info: 0 })).toEqual({ score: 30, grade: 'F' });
+    });
+
+    it('clamps extreme finding counts at 0', () => {
+      const { score, grade } = gradeFor({ critical: 10, warn: 20, info: 0 });
+      expect(score).toBe(0);
+      expect(grade).toBe('F');
+    });
+
+    it('boundary: 90 is the A/B cutoff', () => {
+      // 100 - 4*2 = 92 → A; 100 - 4*3 = 88 → B
+      expect(gradeFor({ critical: 0, warn: 2, info: 0 }).grade).toBe('A');
+      expect(gradeFor({ critical: 0, warn: 3, info: 0 }).grade).toBe('B');
     });
   });
 });

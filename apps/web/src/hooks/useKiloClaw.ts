@@ -137,9 +137,17 @@ export function useKiloClawMutations() {
 
   const invalidateStatusAndBilling = async () => {
     await invalidateStatus();
-    await queryClient.invalidateQueries({
-      queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
-    });
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
+      }),
+    ]);
   };
 
   // Wipe all instance-scoped caches so no stale data (e.g. gatewayReady
@@ -148,9 +156,17 @@ export function useKiloClawMutations() {
   // only marks stale but leaves the old value readable synchronously.
   const resetAllInstanceState = async () => {
     await invalidateStatus();
-    await queryClient.invalidateQueries({
-      queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
-    });
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
+      }),
+    ]);
     queryClient.removeQueries({ queryKey: trpc.kiloclaw.gatewayReady.queryKey() });
     queryClient.removeQueries({ queryKey: trpc.kiloclaw.gatewayStatus.queryKey() });
     queryClient.removeQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });

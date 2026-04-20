@@ -44,18 +44,25 @@ type BillingWrapperProps = {
 export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { data: billing } = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
+  const { data: billing } = useQuery(trpc.kiloclaw.getActivePersonalBillingStatus.queryOptions());
+  const instanceId = billing?.instance?.id ?? null;
 
   const [showPlanDialog, setShowPlanDialog] = useState(false);
 
-  const reactivate = useMutation(trpc.kiloclaw.reactivateSubscription.mutationOptions());
-  const billingPortal = useMutation(trpc.kiloclaw.createBillingPortalSession.mutationOptions());
+  const reactivate = useMutation(trpc.kiloclaw.reactivateSubscriptionAtInstance.mutationOptions());
+  const billingPortal = useMutation(trpc.kiloclaw.getCustomerPortalUrl.mutationOptions());
   const destroy = useMutation(
     trpc.kiloclaw.destroy.mutationOptions({
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() });
         void queryClient.invalidateQueries({
-          queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
+          queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
         });
       },
     })
@@ -73,21 +80,43 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
   }
 
   function handleReactivate() {
-    reactivate.mutate(undefined, {
-      onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
-        });
-      },
-    });
+    if (!instanceId || reactivate.isPending) return;
+    reactivate.mutate(
+      { instanceId },
+      {
+        onSuccess: () => {
+          void Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
+            }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
+            }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
+            }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({ instanceId }),
+            }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
+            }),
+          ]);
+        },
+      }
+    );
   }
 
   function handleUpdatePayment() {
-    billingPortal.mutate(undefined, {
-      onSuccess: result => {
-        window.location.href = result.url;
-      },
-    });
+    if (!instanceId) return;
+    billingPortal.mutate(
+      { instanceId, returnUrl: `${window.location.origin}/claw` },
+      {
+        onSuccess: result => {
+          window.location.href = result.url;
+        },
+      }
+    );
   }
 
   return (
@@ -105,6 +134,7 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
             onSubscribeClick={handleSubscribe}
             onReactivateClick={handleReactivate}
             onUpdatePaymentClick={handleUpdatePayment}
+            isReactivating={reactivate.isPending}
           />
         ))}
 

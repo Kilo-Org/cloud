@@ -15,6 +15,7 @@ Updated 2026-04-01 -- aligned with revised Impact integration document and imple
 Updated 2026-04-06 -- clarify that conversion events require an affiliate attribution record.
 Updated 2026-04-09 -- treat pure-credit KiloClaw periods as sale events and exclude admin/org flows.
 Updated 2026-04-09 -- require a 5-minute delay after SIGNUP delivery before child dispatch.
+Updated 2026-04-17 -- define dispute-triggered sale reversals.
 
 ## Conventions
 
@@ -136,6 +137,18 @@ eligible for affiliate tracking.
 21. Admin-only subscription interventions (for example admin trial resets, admin cancellations, or manual trial-date
     edits) MUST NOT emit affiliate conversion events. These are internal overrides, not customer lifecycle events.
 
+22. When a Stripe-backed personal KiloClaw SALE later receives a `charge.dispute.created` event, the system MUST
+    submit a reversal for the full associated Impact.com commission.
+
+23. Partial Stripe disputes MUST still reverse the full associated Impact.com commission.
+
+24. The system MUST trigger the reversal on `charge.dispute.created`. The system MUST NOT automatically restore the
+    commission later if the dispute is resolved in the brand's favor.
+
+25. Automatic reversal is only guaranteed for SALE events created after rollout that persisted an Impact action mapping
+    for the disputed Stripe charge. Earlier SALE events without stored mapping are out of scope for automatic reversal
+    and require manual follow-up.
+
 ### Client-Side Tracking (UTT)
 
 22. The system MUST load the Impact.com UTT script on all pages when the UTT identifier is configured.
@@ -240,3 +253,9 @@ interventions from affiliate tracking.
 
 Added a required 5-minute gap between Impact SIGNUP delivery and dispatch of child conversion events. This gives
 Impact.com time to process the parent event before TRIAL_START, TRIAL_END, or SALE requests arrive.
+
+### 2026-04-17 -- Reverse disputed Stripe-backed sales
+
+Added rules requiring full SALE reversals for Stripe disputes on personal KiloClaw subscriptions. Clarified that
+reversals happen when `charge.dispute.created` arrives, won disputes do not auto-restore commission, and legacy sales
+without stored Impact action mapping remain manual follow-up.

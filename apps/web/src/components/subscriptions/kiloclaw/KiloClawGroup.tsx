@@ -24,7 +24,7 @@ export function KiloClawGroup({
 }) {
   const trpc = useTRPC();
   const query = useQuery(trpc.kiloclaw.listPersonalSubscriptions.queryOptions());
-  const billingQuery = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
+  const summaryQuery = useQuery(trpc.kiloclaw.getPersonalBillingSummary.queryOptions());
   const subscriptions = query.data?.subscriptions ?? [];
 
   const visibleSubscriptions = subscriptions.filter(
@@ -79,8 +79,8 @@ export function KiloClawGroup({
         </div>
       ) : nonTerminalSubscriptions.length === 0 ? (
         <KiloClawSubscribeCard
-          creditIntroEligible={billingQuery.data?.creditIntroEligible ?? false}
-          hasActiveKiloPass={billingQuery.data?.hasActiveKiloPass ?? false}
+          creditIntroEligible={summaryQuery.data?.creditIntroEligible ?? false}
+          hasActiveKiloPass={summaryQuery.data?.hasActiveKiloPass ?? false}
         />
       ) : null}
     </SubscriptionGroup>

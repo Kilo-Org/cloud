@@ -99,6 +99,10 @@ export type SecurityAdvisorRequest = z.infer<typeof SecurityAdvisorRequestSchema
 export const RecommendationPriority = z.enum(['immediate', 'high', 'medium', 'low']);
 export type RecommendationPriority = z.infer<typeof RecommendationPriority>;
 
+/** Overall letter grade for the audit, derived from finding counts + severities. */
+export const ReportGrade = z.enum(['A', 'B', 'C', 'D', 'F']);
+export type ReportGrade = z.infer<typeof ReportGrade>;
+
 export const ReportFinding = z.object({
   checkId: z.string(),
   severity: FindingSeverity,
@@ -121,6 +125,8 @@ export const SecurityAdvisorResponseSchema = z.object({
   status: z.literal('success'),
   report: z.object({
     markdown: z.string(),
+    grade: ReportGrade,
+    score: z.number().int().min(0).max(100),
     summary: z.object({
       critical: z.number(),
       warn: z.number(),

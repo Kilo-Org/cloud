@@ -2,15 +2,71 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Loader2, AlertTriangle } from 'lucide-react';
+import { useKiloClawStatus } from '@/hooks/useKiloClaw';
 import { useTRPC } from '@/lib/trpc/utils';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { Banner } from '@/components/shared/Banner';
 
+type ProfileKiloClawBannerVariant =
+  | 'loading'
+  | 'active'
+  | 'continue-setup'
+  | 'needs-attention'
+  | 'get-started';
+
+export function getProfileKiloClawBannerVariant(params: {
+  billingLoading: boolean;
+  hasBilling: boolean;
+  hasInstance: boolean;
+  activeInstanceHasAccess: boolean;
+  statusLoading: boolean;
+  statusError: boolean;
+  status: string | null | undefined;
+}): ProfileKiloClawBannerVariant {
+  if (params.billingLoading) {
+    return 'loading';
+  }
+
+  if (!params.hasBilling) {
+    return 'get-started';
+  }
+
+  if (params.hasInstance && params.activeInstanceHasAccess) {
+    if (params.statusLoading) {
+      return 'loading';
+    }
+
+    if (!params.statusError && params.status === null) {
+      return 'continue-setup';
+    }
+
+    return 'active';
+  }
+
+  if (params.hasInstance) {
+    return 'needs-attention';
+  }
+
+  return 'get-started';
+}
+
 export function ProfileKiloClawBanner() {
   const trpc = useTRPC();
-  const billingQuery = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
+  const summaryQuery = useQuery(trpc.kiloclaw.getPersonalBillingSummary.queryOptions());
+  const statusQuery = useKiloClawStatus();
 
-  if (billingQuery.isLoading) {
+  const billing = summaryQuery.data;
+  const variant = getProfileKiloClawBannerVariant({
+    billingLoading: summaryQuery.isLoading,
+    hasBilling: !!billing && !summaryQuery.isError,
+    hasInstance: billing?.hasActiveInstance ?? false,
+    activeInstanceHasAccess: billing?.activeInstanceHasAccess ?? false,
+    statusLoading: statusQuery.isLoading,
+    statusError: !!statusQuery.isError,
+    status: statusQuery.data?.status,
+  });
+
+  if (variant === 'loading') {
     return (
       <div className="flex w-full items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
         <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
@@ -18,14 +74,11 @@ export function ProfileKiloClawBanner() {
     );
   }
 
-  const billing = billingQuery.data;
-  if (billingQuery.isError || !billing) {
+  if (summaryQuery.isError || !billing) {
     return null;
   }
 
-  const hasInstance = billing.instance !== null && billing.instance.exists;
-
-  if (hasInstance && billing.hasAccess) {
+  if (variant === 'active') {
     return (
       <Banner color="emerald">
         <Banner.Icon>
@@ -45,7 +98,27 @@ export function ProfileKiloClawBanner() {
     );
   }
 
-  if (hasInstance && !billing.hasAccess) {
+  if (variant === 'continue-setup') {
+    return (
+      <Banner color="blue">
+        <Banner.Icon>
+          <KiloCrabIcon />
+        </Banner.Icon>
+        <Banner.Content>
+          <Banner.Title>Finish setting up your KiloClaw instance</Banner.Title>
+          <Banner.Description>
+            Your KiloClaw instance has not yet been set up. Continue setup now to launch your Claw.
+          </Banner.Description>
+        </Banner.Content>
+        <Banner.Button href="/claw/new">
+          Continue Setup
+          <ArrowRight />
+        </Banner.Button>
+      </Banner>
+    );
+  }
+
+  if (variant === 'needs-attention') {
     return (
       <Banner color="amber">
         <Banner.Icon>

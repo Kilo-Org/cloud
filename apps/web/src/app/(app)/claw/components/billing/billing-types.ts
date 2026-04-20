@@ -109,6 +109,7 @@ export type ClawBillingStatus = {
   } | null;
 
   instance: {
+    id: string;
     exists: boolean;
     status: 'running' | 'stopped' | 'provisioned' | 'destroying' | null;
     suspendedAt: string | null;

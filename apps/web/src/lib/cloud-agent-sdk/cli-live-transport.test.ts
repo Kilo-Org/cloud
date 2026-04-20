@@ -4,6 +4,7 @@
  */
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import { createCliLiveTransport } from './cli-live-transport';
+import { configureCloudAgentSdkRuntime, resetCloudAgentSdkRuntime } from './runtime';
 import type { KiloSessionId, SessionSnapshot } from './types';
 import { kiloId, makeSnapshot, stubUserMessage, stubTextPart } from './test-helpers';
 
@@ -35,6 +36,8 @@ beforeEach(() => {
     readyState: 1,
   };
 
+  configureCloudAgentSdkRuntime({ randomUUID: () => 'mock-uuid-1234' });
+
   webSocketConstructor = jest.fn(() => mockWs);
 
   // @ts-expect-error -- minimal WebSocket mock for testing
@@ -46,6 +49,7 @@ beforeEach(() => {
 afterEach(() => {
   // @ts-expect-error -- cleanup global mock
   delete global.WebSocket;
+  resetCloudAgentSdkRuntime();
   jest.restoreAllMocks();
 });
 
@@ -577,12 +581,6 @@ describe('CliLiveTransport lifecycle', () => {
 });
 
 describe('CliLiveTransport typed command methods', () => {
-  beforeEach(() => {
-    jest
-      .spyOn(crypto, 'randomUUID')
-      .mockReturnValue('mock-uuid-1234' as `${string}-${string}-${string}-${string}-${string}`);
-  });
-
   it('send() formats and sends command message over WebSocket', () => {
     const { transport } = createTransportWithSinks();
 

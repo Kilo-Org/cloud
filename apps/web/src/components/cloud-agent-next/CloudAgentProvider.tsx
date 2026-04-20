@@ -5,6 +5,7 @@ import { Provider as JotaiProvider, createStore } from 'jotai';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
 import {
   createSessionManager,
+  createBrowserLifecycleHooks,
   type SessionManager,
   type SessionSnapshot,
   type ResolvedSession,
@@ -12,7 +13,7 @@ import {
   type KiloSessionId,
   type CloudAgentSessionId,
 } from '@/lib/cloud-agent-sdk';
-import { SESSION_INGEST_WS_URL } from '@/lib/constants';
+import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
 import type { AgentMode } from './types';
 import { usePostHog } from 'posthog-js/react';
 
@@ -114,6 +115,10 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       },
 
       cliWebsocketUrl: SESSION_INGEST_WS_URL ? `${SESSION_INGEST_WS_URL}/api/user/web` : undefined,
+
+      websocketBaseUrl: CLOUD_AGENT_NEXT_WS_URL,
+
+      lifecycleHooks: createBrowserLifecycleHooks(),
 
       api: {
         send: async payload => {

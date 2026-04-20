@@ -92,6 +92,16 @@ describe('createJotaiStorage', () => {
       const ids = s.getParts('msg-1').map(p => p.id);
       expect(ids).toEqual(['a', 'b', 'c']);
     });
+
+    test('drops stale synthetic optimistic text part when real text part arrives', () => {
+      const syntheticPart = { ...makePart('msg-1-text', 'msg-1', 'hello'), synthetic: true };
+      s.upsertPart('msg-1', syntheticPart);
+      s.upsertPart('msg-1', makePart('prt-real', 'msg-1', 'hello'));
+
+      const parts = s.getParts('msg-1');
+      expect(parts).toHaveLength(1);
+      expect(parts[0]).toEqual(expect.objectContaining({ id: 'prt-real', text: 'hello' }));
+    });
   });
 
   describe('applyPartDelta', () => {

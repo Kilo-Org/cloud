@@ -41,6 +41,9 @@ import type {
   CleanupRecoveryPreviousVolumeResponse,
   RegionsResponse,
   UpdateRegionsResponse,
+  ProviderRolloutResponse,
+  UpdateProviderRolloutResponse,
+  ProviderRolloutConfig,
 } from './types';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
@@ -801,6 +804,19 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/regions', {
       method: 'PUT',
       body: JSON.stringify({ regions }),
+    });
+  }
+
+  async getProviderRollout(): Promise<ProviderRolloutResponse> {
+    return this.request('/api/platform/providers/rollout');
+  }
+
+  async updateProviderRollout(
+    config: ProviderRolloutConfig
+  ): Promise<UpdateProviderRolloutResponse> {
+    return this.request('/api/platform/providers/rollout', {
+      method: 'PUT',
+      body: JSON.stringify(config),
     });
   }
 }

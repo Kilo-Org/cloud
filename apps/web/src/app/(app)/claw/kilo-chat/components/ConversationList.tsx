@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
@@ -59,6 +60,7 @@ export function ConversationList({
 }: ConversationListProps) {
   const params = useParams<{ conversationId?: string }>();
   const activeId = params?.conversationId;
+  const groups = useMemo(() => groupConversations(conversations), [conversations]);
 
   return (
     <div className="flex h-full flex-col">
@@ -81,7 +83,7 @@ export function ConversationList({
             No conversations yet
           </div>
         ) : (
-          groupConversations(conversations).map(group => (
+          groups.map(group => (
             <div key={group.label}>
               <div className="text-muted-foreground px-3 pt-3 pb-1 text-[11px] font-medium uppercase">
                 {group.label}

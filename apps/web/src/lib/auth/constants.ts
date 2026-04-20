@@ -10,6 +10,8 @@ export type AuthErrorType =
   | 'SYSTEM_ERROR'
   | 'INVALID_VERIFICATION'
   | 'IP_MISMATCH'
+  | 'SIGNUP-RATE-LIMITED'
+  | 'EMAIL-ALREADY-USED'
   | 'SSO_ERROR';
 
 export const hosted_domain_specials = {

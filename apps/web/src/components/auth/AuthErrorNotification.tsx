@@ -41,6 +41,33 @@ export function AuthErrorNotification({ error }: { error: string }) {
       </div>
     );
 
+  if (error === 'SIGNUP-RATE-LIMITED')
+    return (
+      <div data-error-notification>
+        <ErrorNotificationBox title="Signup Blocked">
+          Automated account creation was detected and blocked. If this was a mistake, please{' '}
+          <a href="https://kilo.ai/support" className="underline hover:text-red-100">
+            contact support
+          </a>{' '}
+          and we&apos;ll get you sorted out.
+        </ErrorNotificationBox>
+      </div>
+    );
+
+  if (error === 'EMAIL-ALREADY-USED')
+    return (
+      <div data-error-notification>
+        <ErrorNotificationBox title="Account Already Exists">
+          An account already exists for this email address. Try signing in with the original login
+          method, or{' '}
+          <a href="https://kilo.ai/support" className="underline hover:text-red-100">
+            contact support
+          </a>{' '}
+          if you need help accessing it.
+        </ErrorNotificationBox>
+      </div>
+    );
+
   if (error === 'EMAIL-MUST-BE-LOWERCASE')
     return (
       <div data-error-notification>

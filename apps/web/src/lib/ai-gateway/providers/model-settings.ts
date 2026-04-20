@@ -1,5 +1,5 @@
 import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
-import { isGemini3Model, isGeminiModel } from '@/lib/ai-gateway/providers/google';
+import { isGemini3Model, isGeminiModel, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import { isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
@@ -89,7 +89,12 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
-  if (isMoonshotModel(model) || isZaiModel(model) || model === qwen36_plus_model.public_id) {
+  if (
+    isMoonshotModel(model) ||
+    isZaiModel(model) ||
+    model === qwen36_plus_model.public_id ||
+    isGemmaModel(model)
+  ) {
     return REASONING_VARIANTS_BINARY;
   }
   if (model === seed_20_pro_free_model.public_id) {

@@ -31,31 +31,15 @@ function generateModel(): OpenRouterModel {
 
   return {
     slug: base?.slug ?? `${randomChoice(rng, PROVIDERS)}/${modelName}`,
-    hf_slug: base?.hf_slug ?? null,
-    updated_at: base?.updated_at ?? new Date().toISOString(),
-    created_at: base?.created_at ?? new Date().toISOString(),
-    hf_updated_at: base?.hf_updated_at ?? null,
     name: modelName,
-    short_name: modelName.split('-')[0] || modelName,
     author: toDisplayName(randomChoice(rng, PROVIDERS)),
     description:
       base?.description ?? `A ${randomChoice(rng, PROVIDER_DESCRIPTION_ADJECTIVES)} AI model`,
-    model_version_group_id: base?.model_version_group_id ?? null,
     context_length: base?.context_length ?? 100000,
     input_modalities: inputModalities,
     output_modalities: outputModalities,
-    has_text_output: base?.has_text_output ?? true,
     group: base?.group ?? 'default',
-    instruct_type: base?.instruct_type ?? null,
-    default_system: base?.default_system ?? null,
-    default_stops: Array.isArray(base?.default_stops) ? base.default_stops : [],
-    hidden: base?.hidden ?? false,
-    router: base?.router ?? null,
-    warning_message: base?.warning_message ?? null,
-    permaslug: base?.permaslug ?? `${randomChoice(rng, PROVIDERS)}/${modelName}`,
-    reasoning_config: base?.reasoning_config ?? null,
-    features: base?.features ?? null,
-    default_parameters: base?.default_parameters ?? null,
+    updated_at: base?.updated_at ?? new Date().toISOString(),
     endpoint: base?.endpoint ?? null,
   };
 }

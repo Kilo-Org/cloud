@@ -30,11 +30,13 @@ describe('upsertKiloClawGoogleOAuthConnection grants_by_source merge', () => {
   let selectedRows: unknown[] = [];
   const updateSetCalls: Array<Record<string, unknown>> = [];
   const insertValuesCalls: Array<Record<string, unknown>> = [];
+  const insertOnConflictCalls: Array<{ target: unknown; set: Record<string, unknown> }> = [];
 
   beforeEach(() => {
     selectedRows = [];
     updateSetCalls.length = 0;
     insertValuesCalls.length = 0;
+    insertOnConflictCalls.length = 0;
 
     mockDb.select.mockReset();
     mockDb.select.mockImplementation(() => ({
@@ -59,7 +61,14 @@ describe('upsertKiloClawGoogleOAuthConnection grants_by_source merge', () => {
     mockDb.insert.mockImplementation(() => ({
       values: jest.fn((values: Record<string, unknown>) => {
         insertValuesCalls.push(values);
-        return Promise.resolve(undefined);
+        return {
+          onConflictDoUpdate: jest.fn(
+            (config: { target: unknown; set: Record<string, unknown> }) => {
+              insertOnConflictCalls.push(config);
+              return Promise.resolve(undefined);
+            }
+          ),
+        };
       }),
     }));
   });
@@ -146,5 +155,41 @@ describe('upsertKiloClawGoogleOAuthConnection grants_by_source merge', () => {
     );
     expect(result.capabilities).toEqual(['calendar_read', 'drive_read', 'gmail_read']);
     expect(insertValuesCalls).toHaveLength(0);
+  });
+
+  it('uses insert on conflict update for missing rows to avoid callback races', async () => {
+    selectedRows = [];
+
+    await Promise.all([
+      upsertKiloClawGoogleOAuthConnection({
+        instanceId: 'instance-race',
+        accountEmail: 'user@example.com',
+        accountSubject: 'subject-race',
+        refreshToken: 'refresh-race',
+        scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        capabilities: ['calendar_read'],
+      }),
+      upsertKiloClawGoogleOAuthConnection({
+        instanceId: 'instance-race',
+        accountEmail: 'user@example.com',
+        accountSubject: 'subject-race',
+        refreshToken: 'refresh-race',
+        scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        capabilities: ['calendar_read'],
+      }),
+    ]);
+
+    expect(insertValuesCalls.length).toBeGreaterThan(0);
+    expect(insertOnConflictCalls.length).toBeGreaterThan(0);
+    expect(insertOnConflictCalls[0]).toEqual(
+      expect.objectContaining({
+        target: expect.anything(),
+        set: expect.objectContaining({
+          credential_profile: 'kilo_owned',
+          status: 'active',
+          last_error: null,
+        }),
+      })
+    );
   });
 });

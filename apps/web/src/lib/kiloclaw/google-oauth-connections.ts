@@ -141,23 +141,44 @@ export async function upsertKiloClawGoogleOAuthConnection(
     oauth: oauthCapabilities,
   };
   const effectiveCapabilities = effectiveCapabilitiesFromGrants(grantsBySource);
-  await db.insert(kiloclaw_google_oauth_connections).values({
-    instance_id: input.instanceId,
-    provider: 'google',
-    account_email: input.accountEmail,
-    account_subject: input.accountSubject,
-    oauth_client_id: GOOGLE_WORKSPACE_OAUTH_CLIENT_ID,
-    oauth_client_secret_encrypted: null,
-    credential_profile: 'kilo_owned',
-    refresh_token_encrypted: encryptedRefreshToken,
-    scopes: nextScopes,
-    grants_by_source: grantsBySource,
-    capabilities: effectiveCapabilities,
-    status,
-    connected_at: now,
-    created_at: now,
-    updated_at: now,
-  });
+  await db
+    .insert(kiloclaw_google_oauth_connections)
+    .values({
+      instance_id: input.instanceId,
+      provider: 'google',
+      account_email: input.accountEmail,
+      account_subject: input.accountSubject,
+      oauth_client_id: GOOGLE_WORKSPACE_OAUTH_CLIENT_ID,
+      oauth_client_secret_encrypted: null,
+      credential_profile: 'kilo_owned',
+      refresh_token_encrypted: encryptedRefreshToken,
+      scopes: nextScopes,
+      grants_by_source: grantsBySource,
+      capabilities: effectiveCapabilities,
+      status,
+      connected_at: now,
+      created_at: now,
+      updated_at: now,
+    })
+    .onConflictDoUpdate({
+      target: kiloclaw_google_oauth_connections.instance_id,
+      set: {
+        account_email: input.accountEmail,
+        account_subject: input.accountSubject,
+        oauth_client_id: GOOGLE_WORKSPACE_OAUTH_CLIENT_ID,
+        oauth_client_secret_encrypted: null,
+        credential_profile: 'kilo_owned',
+        refresh_token_encrypted: encryptedRefreshToken,
+        scopes: nextScopes,
+        grants_by_source: grantsBySource,
+        capabilities: effectiveCapabilities,
+        status,
+        last_error: null,
+        last_error_at: null,
+        connected_at: now,
+        updated_at: now,
+      },
+    });
 
   return {
     status,

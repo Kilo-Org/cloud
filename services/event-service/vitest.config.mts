@@ -5,6 +5,7 @@ export default defineWorkersConfig({
     poolOptions: {
       workers: {
         wrangler: { configPath: './wrangler.jsonc' },
+        isolatedStorage: false,
         miniflare: {
           serviceBindings: {
             KILO_CHAT: 'kilo-chat-stub',

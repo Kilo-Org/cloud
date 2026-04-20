@@ -5,6 +5,7 @@ import {
 } from 'openclaw/plugin-sdk/core';
 import type { ChannelMessageActionContext, OpenClawConfig } from 'openclaw/plugin-sdk/core';
 import { createKiloChatClient } from './client';
+import { resolveControllerUrl, resolveGatewayToken } from './env';
 import { handleKiloChatReactAction } from './react-action';
 
 const CHANNEL_ID = 'kilo-chat';
@@ -16,17 +17,6 @@ function stripKiloChatPrefix(raw: string): string {
 
 function isValidUlid(raw: string): boolean {
   return ULID_RE.test(raw);
-}
-const DEFAULT_CONTROLLER_URL = 'http://127.0.0.1:18789';
-
-function resolveControllerUrl(): string {
-  return process.env.KILOCLAW_CONTROLLER_URL || DEFAULT_CONTROLLER_URL;
-}
-
-function resolveGatewayToken(): string {
-  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
-  if (!token) throw new Error('kilo-chat: OPENCLAW_GATEWAY_TOKEN is required');
-  return token;
 }
 
 // Test seam — allows tests to inject a fake fetch without mocking global fetch.

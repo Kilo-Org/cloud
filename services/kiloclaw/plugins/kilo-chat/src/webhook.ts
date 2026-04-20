@@ -6,6 +6,7 @@ import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/plugin-entry';
 import { createNormalizedOutboundDeliverer } from 'openclaw/plugin-sdk/reply-payload';
 
 import { createKiloChatClient, type KiloChatClient } from './client.js';
+import { resolveControllerUrl, resolveGatewayToken } from './env.js';
 import { createPreviewStream } from './preview-stream.js';
 
 // ---------------------------------------------------------------------------
@@ -213,13 +214,9 @@ async function dispatchInbound(
     ReplyToSender: payload.inReplyToSender,
   });
 
-  const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN;
-  if (!gatewayToken) {
-    throw new Error('kilo-chat: OPENCLAW_GATEWAY_TOKEN is required');
-  }
   const client = createKiloChatClient({
-    controllerBaseUrl: process.env.KILOCLAW_CONTROLLER_URL ?? 'http://127.0.0.1:18789',
-    gatewayToken,
+    controllerBaseUrl: resolveControllerUrl(),
+    gatewayToken: resolveGatewayToken(),
   });
 
   const wiring = buildDeliverWiring({

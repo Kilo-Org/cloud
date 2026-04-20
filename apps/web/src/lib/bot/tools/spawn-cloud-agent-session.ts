@@ -18,6 +18,12 @@ import {
 import { APP_URL } from '@/lib/constants';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
+import { resolveBotSessionProfile } from '@/lib/bot/tools/resolve-bot-session-profile';
+import {
+  resolvePlatformIntegrationOwner,
+  type OwnerRef,
+} from '@/lib/bot/tools/resolve-platform-integration-owner';
+import type { MergeProfileConfigurationResult } from '@/lib/agent/profile-session-config';
 import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
@@ -95,7 +101,6 @@ export default async function spawnCloudAgentSession(
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
 
   // Build platform-specific prepareInput and initiateInput
-  const kilocodeOrganizationId = platformIntegration.owned_by_organization_id || undefined;
   let prepareInput: PrepareSessionInput;
   let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
   const mode: AgentMode = args.mode;
@@ -119,12 +124,24 @@ export default async function spawnCloudAgentSession(
     prompt += options.prSignature;
   }
 
+  let ownerRef: OwnerRef;
+  let profileConfig: MergeProfileConfigurationResult;
+  try {
+    ownerRef = resolvePlatformIntegrationOwner(platformIntegration);
+    profileConfig = await resolveBotSessionProfile(ownerRef, ticketUserId, args);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { response: `Error resolving profile for Cloud Agent: ${message}` };
+  }
+
+  const kilocodeOrganizationId = ownerRef.kind === 'org' ? ownerRef.id : undefined;
+
   if (args.gitlabProject) {
     // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
     const gitlabToken =
-      typeof platformIntegration.owned_by_organization_id === 'string'
-        ? await getGitLabTokenForOrganization(platformIntegration.owned_by_organization_id)
-        : await getGitLabTokenForUser(platformIntegration.owned_by_user_id as string);
+      ownerRef.kind === 'org'
+        ? await getGitLabTokenForOrganization(ownerRef.id)
+        : await getGitLabTokenForUser(ownerRef.id);
 
     if (!gitlabToken) {
       return {
@@ -134,9 +151,9 @@ export default async function spawnCloudAgentSession(
     }
 
     const instanceUrl =
-      typeof platformIntegration.owned_by_organization_id === 'string'
-        ? await getGitLabInstanceUrlForOrganization(platformIntegration.owned_by_organization_id)
-        : await getGitLabInstanceUrlForUser(platformIntegration.owned_by_user_id as string);
+      ownerRef.kind === 'org'
+        ? await getGitLabInstanceUrlForOrganization(ownerRef.id)
+        : await getGitLabInstanceUrlForUser(ownerRef.id);
 
     const gitUrl = buildGitLabCloneUrl(args.gitlabProject, instanceUrl);
 
@@ -158,14 +175,17 @@ export default async function spawnCloudAgentSession(
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,
+      envVars: profileConfig.envVars,
+      encryptedSecrets: profileConfig.encryptedSecrets,
+      setupCommands: profileConfig.setupCommands,
     };
     initiateInput = { kilocodeOrganizationId };
   } else {
     // GitHub path: get token, use githubRepo/githubToken
     const githubToken =
-      typeof platformIntegration.owned_by_organization_id === 'string'
-        ? await getGitHubTokenForOrganization(platformIntegration.owned_by_organization_id)
-        : await getGitHubTokenForUser(platformIntegration.owned_by_user_id as string);
+      ownerRef.kind === 'org'
+        ? await getGitHubTokenForOrganization(ownerRef.id)
+        : await getGitHubTokenForUser(ownerRef.id);
 
     if (!githubToken) {
       return {
@@ -183,6 +203,9 @@ export default async function spawnCloudAgentSession(
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,
+      envVars: profileConfig.envVars,
+      encryptedSecrets: profileConfig.encryptedSecrets,
+      setupCommands: profileConfig.setupCommands,
     };
     initiateInput = { githubToken, kilocodeOrganizationId };
   }

@@ -72,6 +72,7 @@ import type {
   BeadFilter,
   Bead,
   BeadStatus,
+  BeadType as BeadTypeType,
   BeadPriority as BeadPriorityType,
   RegisterAgentInput,
   AgentFilter,
@@ -1139,7 +1140,7 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async deleteBeadsByStatus(
-    status: BeadStatusType,
+    status: BeadStatus,
     type?: BeadTypeType,
     rigId?: string
   ): Promise<number> {

@@ -49,7 +49,7 @@ let lastAppliedEnvVarKeys = new Set<string>();
 // Env keys managed by the control plane that custom env_vars must never override.
 // If a custom key collides with a reserved key, the infra value wins and the
 // custom value is silently ignored — matching the !(key in env) guard in buildAgentEnv.
-const RESERVED_ENV_KEYS = new Set([
+export const RESERVED_ENV_KEYS = new Set([
   'KILOCODE_TOKEN',
   'GIT_TOKEN',
   'GITHUB_TOKEN',
@@ -64,6 +64,10 @@ const RESERVED_ENV_KEYS = new Set([
   'GASTOWN_CONTAINER_TOKEN',
   'GASTOWN_SESSION_TOKEN',
   'GASTOWN_API_URL',
+  // Runtime routing vars read by pending-nudge routes and plugin clients —
+  // must never be overwritten by user-supplied env_vars.
+  'GASTOWN_TOWN_ID',
+  'GASTOWN_RIG_ID',
 ]);
 
 /** Get the latest town config delivered via X-Town-Config header. */

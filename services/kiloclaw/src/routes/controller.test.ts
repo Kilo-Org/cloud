@@ -1338,21 +1338,22 @@ describe('POST /google/migrate-legacy', () => {
     const headers = await makeAuthHeaders();
 
     mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
-    mockGetGoogleOAuthConnectionByInstanceId
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(
-        makeGoogleConnection(encryptionKey, {
-          credential_profile: 'legacy',
-          account_email: 'legacy@example.com',
-          account_subject: 'legacy-subject',
-          oauth_client_id: 'legacy-client-id',
-          oauth_client_secret_encrypted: encryptWithSymmetricKey('legacy-client-secret', encryptionKey),
-          refresh_token_encrypted: encryptWithSymmetricKey('legacy-refresh-token', encryptionKey),
-          grants_by_source: { legacy: ['calendar_read'] },
-          capabilities: ['calendar_read'],
-          status: 'active',
-        })
-      );
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValueOnce(null).mockResolvedValueOnce(
+      makeGoogleConnection(encryptionKey, {
+        credential_profile: 'legacy',
+        account_email: 'legacy@example.com',
+        account_subject: 'legacy-subject',
+        oauth_client_id: 'legacy-client-id',
+        oauth_client_secret_encrypted: encryptWithSymmetricKey(
+          'legacy-client-secret',
+          encryptionKey
+        ),
+        refresh_token_encrypted: encryptWithSymmetricKey('legacy-refresh-token', encryptionKey),
+        grants_by_source: { legacy: ['calendar_read'] },
+        capabilities: ['calendar_read'],
+        status: 'active',
+      })
+    );
 
     const response = await controller.request(
       '/google/migrate-legacy',
@@ -1394,20 +1395,18 @@ describe('POST /google/migrate-legacy', () => {
     const headers = await makeAuthHeaders();
 
     mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
-    mockGetGoogleOAuthConnectionByInstanceId
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(
-        makeGoogleConnection(encryptionKey, {
-          credential_profile: 'kilo_owned',
-          account_email: 'existing@example.com',
-          account_subject: 'existing-subject',
-          capabilities: ['calendar_read'],
-          grants_by_source: { oauth: ['calendar_read'] },
-          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
-          status: 'action_required',
-          last_error: 'invalid_grant',
-        })
-      );
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValueOnce(null).mockResolvedValueOnce(
+      makeGoogleConnection(encryptionKey, {
+        credential_profile: 'kilo_owned',
+        account_email: 'existing@example.com',
+        account_subject: 'existing-subject',
+        capabilities: ['calendar_read'],
+        grants_by_source: { oauth: ['calendar_read'] },
+        scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        status: 'action_required',
+        last_error: 'invalid_grant',
+      })
+    );
 
     const response = await controller.request(
       '/google/migrate-legacy',

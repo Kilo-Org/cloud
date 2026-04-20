@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "18fb012c-7f01-4bad-8d86-e57ec4cb9046",
+  "id": "d193cc91-5072-49e3-ae66-2fad4d942df7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "conversations": {
@@ -50,7 +50,15 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "conversations_sandbox_id_idx": {
+          "name": "conversations_sandbox_id_idx",
+          "columns": [
+            "sandbox_id"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

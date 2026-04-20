@@ -6,3 +6,5 @@ CREATE TABLE `conversations` (
 	`last_read_at` integer,
 	`joined_at` integer NOT NULL
 );
+--> statement-breakpoint
+CREATE INDEX `conversations_sandbox_id_idx` ON `conversations` (`sandbox_id`);

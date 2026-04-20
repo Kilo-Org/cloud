@@ -51,7 +51,8 @@ export const GASTOWN_URL = process.env.NEXT_PUBLIC_GASTOWN_URL ?? '';
 export const KILO_CHAT_URL = process.env.NEXT_PUBLIC_KILO_CHAT_URL ?? '';
 
 // Event Service WebSocket URL (client-side, inlined at build time)
-export const EVENT_SERVICE_URL = process.env.NEXT_PUBLIC_EVENT_SERVICE_URL ?? '';
+export const EVENT_SERVICE_URL =
+  process.env.NEXT_PUBLIC_EVENT_SERVICE_URL ?? 'wss://events.kiloapps.io';
 
 // Free model rate limits: per-IP for client-side products, per-user for server-side products
 export const FREE_MODEL_RATE_LIMIT_WINDOW_HOURS = 1;

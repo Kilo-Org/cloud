@@ -2,9 +2,9 @@ import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { db, readDb } from '@/lib/drizzle';
-import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL, modelsByProvider } from '@kilocode/db/schema';
-import { desc, eq } from 'drizzle-orm';
+import { db } from '@/lib/drizzle';
+import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
@@ -23,7 +23,6 @@ import {
   UserByokTestModels,
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { unstable_cache } from 'next/cache';
 import { StoredModelSchema } from '@/lib/ai-gateway/providers/vercel/types';
 import { createGateway, generateText } from 'ai';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
@@ -36,81 +35,77 @@ import {
   createAiSdkProvider,
   formatDirectByokModelId,
 } from '@/lib/ai-gateway/providers/direct-byok';
+import { redisGet } from '@/lib/redis';
+import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
 
-const fetchSupportedModels = unstable_cache(
-  async (): Promise<Record<string, string[]>> => {
-    const modelMetadataRaw = (
-      await readDb
-        .select({ vercel: modelsByProvider.vercel, openrouter: modelsByProvider.openrouter })
-        .from(modelsByProvider)
-        .orderBy(desc(modelsByProvider.id))
-        .limit(1)
-    ).at(0);
+async function fetchSupportedModels() {
+  const vercelModelMetadataRaw = await redisGet(GATEWAY_METADATA_REDIS_KEYS.vercelModels);
+  if (!vercelModelMetadataRaw) {
+    throw new Error(
+      'No Vercel model metadata in Redis, use the admin panel at ' + MODELS_BY_PROVIDER_ADMIN_URL
+    );
+  }
 
-    if (!modelMetadataRaw) {
-      throw new Error(
-        'No Vercel model metadata in the database, use the admin panel at ' +
-          MODELS_BY_PROVIDER_ADMIN_URL
-      );
+  const vercelModelMetadata = z
+    .record(z.string(), StoredModelSchema)
+    .safeParse(JSON.parse(vercelModelMetadataRaw));
+
+  if (!vercelModelMetadata.success) {
+    throw new Error(
+      'Failed to parse Vercel model metadata:\n' + z.prettifyError(vercelModelMetadata.error)
+    );
+  }
+
+  const openRouterModelMetadataRaw = await redisGet(GATEWAY_METADATA_REDIS_KEYS.openrouterModels);
+  if (!openRouterModelMetadataRaw) {
+    throw new Error(
+      'No OpenRouter model metadata in Redis, use the admin panel at ' +
+        MODELS_BY_PROVIDER_ADMIN_URL
+    );
+  }
+
+  const openRouterModelMetadata = z
+    .record(z.string(), StoredModelSchema)
+    .safeParse(JSON.parse(openRouterModelMetadataRaw));
+
+  if (!openRouterModelMetadata.success) {
+    throw new Error(
+      'Failed to parse OpenRouter model metadata:\n' +
+        z.prettifyError(openRouterModelMetadata.error)
+    );
+  }
+
+  const result: Record<string, string[]> = {};
+
+  result['codestral'] = ['Codestral (mistralai/codestral-2508)'];
+
+  for (const openRouterModel of Object.values(openRouterModelMetadata.data)) {
+    const vercelModel = vercelModelMetadata.data[mapModelIdToVercel(openRouterModel.id)];
+    if (!vercelModel) continue;
+    if (vercelModel.id.includes('codestral')) continue;
+    if (vercelModel.type !== 'language') continue;
+    for (const endpoint of vercelModel.endpoints) {
+      const providerParsed = VercelUserByokInferenceProviderIdSchema.safeParse(endpoint.tag);
+      if (!providerParsed.success) continue;
+      const providerId = providerParsed.data;
+      if (!result[providerId]) result[providerId] = [];
+      result[providerId].push(openRouterModel.name + ' (' + openRouterModel.id + ')');
     }
+  }
 
-    const vercelModelMetadata = z
-      .record(z.string(), StoredModelSchema)
-      .safeParse(modelMetadataRaw?.vercel);
-
-    if (!vercelModelMetadata.success) {
-      throw new Error(
-        'Failed to parse Vercel model metadata:\n' + z.prettifyError(vercelModelMetadata.error)
-      );
+  for (const provider of DIRECT_BYOK_PROVIDERS) {
+    for (const model of provider.models) {
+      if (!result[provider.id]) result[provider.id] = [];
+      result[provider.id].push(model.name + ' (' + formatDirectByokModelId(provider, model) + ')');
     }
+  }
 
-    const openRouterModelMetadata = z
-      .record(z.string(), StoredModelSchema)
-      .safeParse(modelMetadataRaw?.openrouter);
+  for (const models of Object.values(result)) {
+    models.sort();
+  }
 
-    if (!openRouterModelMetadata.success) {
-      throw new Error(
-        'Failed to parse OpenRouter model metadata:\n' +
-          z.prettifyError(openRouterModelMetadata.error)
-      );
-    }
-
-    const result: Record<string, string[]> = {};
-
-    result['codestral'] = ['Codestral (mistralai/codestral-2508)'];
-
-    for (const openRouterModel of Object.values(openRouterModelMetadata.data)) {
-      const vercelModel = vercelModelMetadata.data[mapModelIdToVercel(openRouterModel.id)];
-      if (!vercelModel) continue;
-      if (vercelModel.id.includes('codestral')) continue;
-      if (vercelModel.type !== 'language') continue;
-      for (const endpoint of vercelModel.endpoints) {
-        const providerParsed = VercelUserByokInferenceProviderIdSchema.safeParse(endpoint.tag);
-        if (!providerParsed.success) continue;
-        const providerId = providerParsed.data;
-        if (!result[providerId]) result[providerId] = [];
-        result[providerId].push(openRouterModel.name + ' (' + openRouterModel.id + ')');
-      }
-    }
-
-    for (const provider of DIRECT_BYOK_PROVIDERS) {
-      for (const model of provider.models) {
-        if (!result[provider.id]) result[provider.id] = [];
-        result[provider.id].push(
-          model.name + ' (' + formatDirectByokModelId(provider, model) + ')'
-        );
-      }
-    }
-
-    for (const models of Object.values(result)) {
-      models.sort();
-    }
-
-    return result;
-  },
-  undefined,
-  { revalidate: 300 }
-);
+  return result;
+}
 
 export const byokRouter = createTRPCRouter({
   listSupportedModels: baseProcedure

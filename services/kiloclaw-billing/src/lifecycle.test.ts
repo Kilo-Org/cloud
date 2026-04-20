@@ -17,23 +17,15 @@ import type { BillingWorkerEnv } from './types.js';
 
 let loggedValues: unknown[] = [];
 
-type SelectResult<T> = Promise<T[]> & {
-  limit: ReturnType<typeof vi.fn>;
-};
-
 type SelectBuilder = {
   from: ReturnType<typeof vi.fn>;
   innerJoin: ReturnType<typeof vi.fn>;
   leftJoin: ReturnType<typeof vi.fn>;
   where: ReturnType<typeof vi.fn>;
+  orderBy: ReturnType<typeof vi.fn>;
   limit: ReturnType<typeof vi.fn>;
+  then: Promise<unknown[]>['then'];
 };
-
-function createSelectResult<T>(rows: T[]): SelectResult<T> {
-  const result = Promise.resolve(rows) as SelectResult<T>;
-  result.limit = vi.fn(async () => rows);
-  return result;
-}
 
 function createMockDb(
   selectResults: unknown[][],
@@ -55,7 +47,7 @@ function createMockDb(
   const txInsertRowCounts = [...(options?.txInsertRowCounts ?? [])];
   const updateReturningRows = [...(options?.updateReturningRows ?? [])];
   const txUpdateReturningRows = [...(options?.txUpdateReturningRows ?? [])];
-  const nextSelectResult = () => createSelectResult(selectResults.shift() ?? []);
+  const nextSelectRows = () => selectResults.shift() ?? [];
   const createWhereResult = (returningRows: unknown[]) => {
     const promise = Promise.resolve(undefined);
     return {
@@ -64,12 +56,16 @@ function createMockDb(
     };
   };
   const createSelectBuilder = (): SelectBuilder => {
+    const rows = nextSelectRows();
+    const promise = Promise.resolve(rows);
     const builder: SelectBuilder = {
       from: vi.fn(() => builder),
       innerJoin: vi.fn(() => builder),
       leftJoin: vi.fn(() => builder),
-      where: vi.fn(() => nextSelectResult()),
-      limit: vi.fn(async () => selectResults.shift() ?? []),
+      where: vi.fn(() => builder),
+      orderBy: vi.fn(() => builder),
+      limit: vi.fn(async () => rows),
+      then: promise.then.bind(promise),
     };
     selectBuilders.push(builder);
     return builder;
@@ -103,6 +99,7 @@ function createMockDb(
       callback: (tx: {
         delete: ReturnType<typeof vi.fn>;
         insert: ReturnType<typeof vi.fn>;
+        select: ReturnType<typeof vi.fn>;
         update: ReturnType<typeof vi.fn>;
       }) => Promise<unknown>
     ) =>
@@ -123,6 +120,7 @@ function createMockDb(
             };
           }),
         })),
+        select: vi.fn(() => createSelectBuilder()),
         update: vi.fn(() => ({
           set: vi.fn((values: Record<string, unknown>) => {
             txUpdates.push(values);
@@ -565,7 +563,7 @@ describe('instance destruction sweep', () => {
 
   it('keeps DB/email cleanup unchanged when platform destroy succeeds', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
-    const { db, updates, inserts, deletes } = createMockDb([
+    const { db, updates, txUpdates, inserts, deletes } = createMockDb([
       [
         {
           id: 'sub-1',
@@ -575,6 +573,19 @@ describe('instance destruction sweep', () => {
           email: 'user-1@example.com',
         },
       ],
+      [
+        {
+          id: instanceId,
+          userId: 'user-1',
+          sandboxId: 'ki_11111111111141118111111111111111',
+          organizationId: null,
+          name: null,
+          inboundEmailEnabled: false,
+          destroyedAt: null,
+        },
+      ],
+      [],
+      [{ id: 'sub-1', user_id: 'user-1', instance_id: instanceId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
     const fetch = vi.fn(
@@ -612,16 +623,16 @@ describe('instance destruction sweep', () => {
         }),
       ])
     );
-    expect(updates).toHaveLength(2);
-    expect(updates[0].destroyed_at).toEqual(expect.any(String));
-    expect(updates[1]).toEqual({ destruction_deadline: null });
+    expect(txUpdates).toHaveLength(1);
+    expect(txUpdates[0]?.destroyed_at).toEqual(expect.any(String));
+    expect(updates).toEqual([{ destruction_deadline: null }]);
     expect(deletes).toHaveLength(1);
   });
 
   it('treats platform destroy 404 as already gone and continues with later rows', async () => {
     const firstInstanceId = '11111111-1111-4111-8111-111111111111';
     const secondInstanceId = '22222222-2222-4222-8222-222222222222';
-    const { db, updates, inserts, deletes } = createMockDb([
+    const { db, updates, txUpdates, inserts, deletes } = createMockDb([
       [
         {
           id: 'sub-1',
@@ -638,6 +649,32 @@ describe('instance destruction sweep', () => {
           email: 'user-2@example.com',
         },
       ],
+      [
+        {
+          id: firstInstanceId,
+          userId: 'user-1',
+          sandboxId: 'ki_11111111111141118111111111111111',
+          organizationId: null,
+          name: null,
+          inboundEmailEnabled: false,
+          destroyedAt: null,
+        },
+      ],
+      [],
+      [{ id: 'sub-1', user_id: 'user-1', instance_id: firstInstanceId }],
+      [
+        {
+          id: secondInstanceId,
+          userId: 'user-2',
+          sandboxId: 'ki_22222222222242228222222222222222',
+          organizationId: null,
+          name: null,
+          inboundEmailEnabled: false,
+          destroyedAt: null,
+        },
+      ],
+      [],
+      [{ id: 'sub-2', user_id: 'user-2', instance_id: secondInstanceId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
     const fetch = vi
@@ -695,17 +732,16 @@ describe('instance destruction sweep', () => {
         }),
       ])
     );
-    expect(updates).toHaveLength(4);
-    expect(updates[0].destroyed_at).toEqual(expect.any(String));
-    expect(updates[1]).toEqual({ destruction_deadline: null });
-    expect(updates[2].destroyed_at).toEqual(expect.any(String));
-    expect(updates[3]).toEqual({ destruction_deadline: null });
+    expect(txUpdates).toHaveLength(2);
+    expect(txUpdates[0]?.destroyed_at).toEqual(expect.any(String));
+    expect(txUpdates[1]?.destroyed_at).toEqual(expect.any(String));
+    expect(updates).toEqual([{ destruction_deadline: null }, { destruction_deadline: null }]);
     expect(deletes).toHaveLength(2);
   });
 
   it('logs non-404 platform destroy failures and preserves billing state transition', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
-    const { db, updates, inserts, deletes } = createMockDb([
+    const { db, updates, txUpdates, inserts, deletes } = createMockDb([
       [
         {
           id: 'sub-1',
@@ -715,6 +751,19 @@ describe('instance destruction sweep', () => {
           email: 'user-1@example.com',
         },
       ],
+      [
+        {
+          id: instanceId,
+          userId: 'user-1',
+          sandboxId: 'ki_11111111111141118111111111111111',
+          organizationId: null,
+          name: null,
+          inboundEmailEnabled: false,
+          destroyedAt: null,
+        },
+      ],
+      [],
+      [{ id: 'sub-1', user_id: 'user-1', instance_id: instanceId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
     const fetch = vi.fn(
@@ -752,9 +801,9 @@ describe('instance destruction sweep', () => {
         }),
       ])
     );
-    expect(updates).toHaveLength(2);
-    expect(updates[0].destroyed_at).toEqual(expect.any(String));
-    expect(updates[1]).toEqual({ destruction_deadline: null });
+    expect(txUpdates).toHaveLength(1);
+    expect(txUpdates[0]?.destroyed_at).toEqual(expect.any(String));
+    expect(updates).toEqual([{ destruction_deadline: null }]);
     expect(deletes).toHaveLength(1);
     expect(loggedValues).toEqual(
       expect.arrayContaining([

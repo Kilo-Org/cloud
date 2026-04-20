@@ -116,16 +116,18 @@ export async function createMessageFor(
         { messageId, senderId: callerId, content, inReplyToMessageId: inReplyToMessageId ?? null }
       );
 
-      // Implicitly stop typing for the sender
-      await pushEventToHumanMembers(
-        env,
-        conversationId,
-        sandboxId,
-        humanMemberIds,
-        callerId,
-        'typing.stop',
-        { memberId: callerId }
-      );
+      // Implicitly stop typing for human senders (bots manage their own typing lifecycle)
+      if (humanMemberIds.includes(callerId)) {
+        await pushEventToHumanMembers(
+          env,
+          conversationId,
+          sandboxId,
+          humanMemberIds,
+          callerId,
+          'typing.stop',
+          { memberId: callerId }
+        );
+      }
 
       // For each non-sender human member: if they're present in the conversation,
       // auto-mark read. Otherwise, push conversation.activity on the instance context.

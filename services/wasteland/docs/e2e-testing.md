@@ -50,10 +50,11 @@ for the explicit write+PR+merge steps.
 
 **Credentials**:
 
-- A **DoltHub token for the upstream owner** — used to merge PRs from the maintainer side.
-  Stored in environment when running tests: `WASTELAND_DOLT_TOKEN`. (This is different
-  from the token stored for the connected town's user, which goes through the
-  encrypted credential flow.)
+- A **DoltHub token for the upstream owner** — used to merge PRs from the
+  maintainer side and to perform worker-direct (Path B) writes. Available
+  in the test environment as `$WL_ADMIN_DOLT_TOKEN`. This is different
+  from the per-user token stored for a connected town (which goes through
+  the encrypted credential flow on the WastelandDO).
 
 **Known IDs** (fill in with your own values):
 
@@ -79,9 +80,9 @@ Throughout this doc:
 
 - `$WL` = wasteland worker base URL (`http://localhost:8787`)
 - `$GT` = gastown worker base URL (`http://localhost:8803`)
-- `$TOKEN` = your DoltHub API token that has write access to the upstream
-  (used for merging PRs). Example:
-  `dhat.v1.13e7aqbv90p61hh1o8e3jup3318dqg1evi97vjeh2v57r4ok3330`
+- `$TOKEN` = `$WL_ADMIN_DOLT_TOKEN` — a DoltHub API token with write
+  access to the upstream. Required for all `/debug/dolthub/*` endpoints
+  and for merging PRs from the maintainer side.
 - `$UPSTREAM_OWNER` / `$UPSTREAM_DB` = split `$UPSTREAM` on `/`
   (e.g. `jrf0110` / `wl-commons`)
 
@@ -137,7 +138,9 @@ All `dolthub` endpoints require `Authorization: token $TOKEN`.
 # Env for the rest of this doc
 WL=http://localhost:8787
 GT=http://localhost:8803
-TOKEN=dhat.v1.YOUR_TOKEN
+# $WL_ADMIN_DOLT_TOKEN is provided by the test environment — a DoltHub
+# API token with write access to $UPSTREAM_OWNER/$UPSTREAM_DB.
+TOKEN="$WL_ADMIN_DOLT_TOKEN"
 WASTELAND_ID=63bac39a-11d9-4e4e-8fdb-124d5abeb247
 UPSTREAM_OWNER=jrf0110
 UPSTREAM_DB=wl-commons

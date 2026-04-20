@@ -766,17 +766,17 @@ interfering with each other's runs, each flow should:
 
 Most failures fall into these buckets:
 
-| Symptom                                                      | Likely cause                                                                                                                     | Fix                                                                                               |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `Browse query failed: unknown certificate ...`               | Container Bun TLS broken in local dev                                                                                            | Use `/browse-direct` instead                                                                      |
-| `wl claim failed: push failed`                               | Dolt JWK missing or mismatched                                                                                                   | Reconnect via onboarding dialog with correct JWK                                                  |
-| `wl claim failed: rig not found`                             | Registration PR not merged yet                                                                                                   | Merge flow 1's PR first                                                                           |
-| `wl post failed: EOF` or all container writes fail           | workerd container HTTPS egress broken in local dev                                                                               | Use Path B (worker-direct) flows instead                                                          |
-| DoltHub write returns `Success` but nothing lands on branch  | Multi-statement SQL silently skipped, OR check constraint violation (e.g. `stamps.author != subject`)                            | Split into separate writes per statement; verify against `SHOW CREATE TABLE <t>` check constraints |
-| PR state stuck on `Open` after merge call                    | DoltHub async processing                                                                                                         | Wait 5–30s; use `wait_for_pr_merged`                                                              |
-| `cannot merge pull that is not open`                         | PR already merged or closed                                                                                                      | Check current state; pick a different PR                                                          |
-| Container not responding (`[not connected]`)                 | Wrangler dev registry missed the binding                                                                                         | Restart gastown wrangler dev; check binding shows `wasteland-dev#WastelandRPCEntrypoint`          |
-| `stamps` INSERT succeeds but doesn't commit                  | Violating `CHECK (author != subject)` constraint                                                                                 | Ensure `author` and `subject` are different rig handles                                           |
+| Symptom                                                     | Likely cause                                                                                          | Fix                                                                                                |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `Browse query failed: unknown certificate ...`              | Container Bun TLS broken in local dev                                                                 | Use `/browse-direct` instead                                                                       |
+| `wl claim failed: push failed`                              | Dolt JWK missing or mismatched                                                                        | Reconnect via onboarding dialog with correct JWK                                                   |
+| `wl claim failed: rig not found`                            | Registration PR not merged yet                                                                        | Merge flow 1's PR first                                                                            |
+| `wl post failed: EOF` or all container writes fail          | workerd container HTTPS egress broken in local dev                                                    | Use Path B (worker-direct) flows instead                                                           |
+| DoltHub write returns `Success` but nothing lands on branch | Multi-statement SQL silently skipped, OR check constraint violation (e.g. `stamps.author != subject`) | Split into separate writes per statement; verify against `SHOW CREATE TABLE <t>` check constraints |
+| PR state stuck on `Open` after merge call                   | DoltHub async processing                                                                              | Wait 5–30s; use `wait_for_pr_merged`                                                               |
+| `cannot merge pull that is not open`                        | PR already merged or closed                                                                           | Check current state; pick a different PR                                                           |
+| Container not responding (`[not connected]`)                | Wrangler dev registry missed the binding                                                              | Restart gastown wrangler dev; check binding shows `wasteland-dev#WastelandRPCEntrypoint`           |
+| `stamps` INSERT succeeds but doesn't commit                 | Violating `CHECK (author != subject)` constraint                                                      | Ensure `author` and `subject` are different rig handles                                            |
 
 ## Schema constraints
 
@@ -785,7 +785,40 @@ Discovered during E2E verification. Check `SHOW CREATE TABLE <t>` on upstream ma
 | Table         | Constraint                  | Implication for tests                                                   |
 | ------------- | --------------------------- | ----------------------------------------------------------------------- |
 | `stamps`      | `CHECK (author != subject)` | Contributor and maintainer must be different rigs                       |
-| `stamps`      | `valence` is NOT NULL JSON  | Must provide valid JSON object (can use MySQL `JSON_OBJECT(...)`)        |
+| `stamps`      | `valence` is NOT NULL JSON  | Must provide valid JSON object (can use MySQL `JSON_OBJECT(...)`)       |
 | `wanted`      | (PK: id)                    | Use unique `w-<hex>` IDs per item                                       |
 | `completions` | (PK: id)                    | Use unique `c-<hex>` IDs                                                |
 | `rigs`        | (PK: handle)                | Register each rig before it can appear as `author`/`subject` on a stamp |
+
+## Verification Results
+
+Status of each flow after initial E2E verification run.
+
+| Flow                | Status                                                   | Notes                                                                                                                                                                                                                                                      |
+| ------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — Join & register | ✅ Verified (manual)                                     | Registration PR #1 was manually merged; `jfawcett` now appears in `jrf0110/wl-commons.rigs` on main                                                                                                                                                        |
+| 2 — Browse          | ✅ Verified via sub-agent                                | `/debug/wastelands/:id/browse` fails in local dev due to container TLS egress issue; `/debug/wastelands/:id/browse-direct` returned 54 items matching `SELECT COUNT(*) FROM wanted`                                                                        |
+| 3 — Post            | ✅ Verified manually and via Flow 4 prerequisite         | Path A (`/debug/wastelands/:id/post`) fails in local dev due to `wl post` getting `EOF` from DoltHub write API via the container; Path B (worker-direct) succeeded and item `w-0e5abc1976` landed on upstream main with `posted_by=jrf0110`, `status=open` |
+| 4 — Claim           | ✅ Verified via sub-agent                                | Item `w-0e5abc1976` transitioned from `open` → `claimed` by `jrf0110` via PR #5 merge                                                                                                                                                                      |
+| 5 — Unclaim         | Not yet executed                                         | Requires fresh item + claim                                                                                                                                                                                                                                |
+| 6 — Done            | ✅ Verified via sub-agent                                | Item `w-0e5abc1976` transitioned to `in_review`, `completions` row `c-1db551a29b6ce749` inserted via PR #6 merge. Also discovered: multi-statement writes silently no-op in DoltHub's write API                                                            |
+| 7 — Accept + stamp  | ⚠️ Partial — blocked by `stamps.author != subject` check | Confirmed the constraint exists via `SHOW CREATE TABLE stamps`; fully executing flow requires a distinct maintainer rig (`jrf0110` was registered via PR #7) and a contributor rig (`jfawcett`) on a new item                                              |
+| 8 — Reject          | Not yet executed                                         | Requires fresh in_review item                                                                                                                                                                                                                              |
+| 9 — Close           | Not yet executed                                         | Requires fresh in_review item                                                                                                                                                                                                                              |
+| 10 — Disconnect     | Not yet executed                                         | Requires manually invoking the `disconnectTownFromWasteland` tRPC                                                                                                                                                                                          |
+
+### Findings that drove doc updates
+
+1. **Container HTTPS egress is broken in local wrangler dev.** Both the container's Bun `fetch` (used by `dolthubSql` for browse) and the `wl` Go binary (used for mutations) fail to establish TLS to `www.dolthub.com`. This is a workerd-container limitation; production CF Containers work normally. Path B (worker-direct) was added as a workaround for local dev verification.
+
+2. **DoltHub's write API silently drops multi-statement SQL.** Calls like `UPDATE ...; INSERT ...;` return `Success` at submission but nothing lands on the branch. Each statement must be its own write call. Subsequent writes to the same branch use `write/{branch}/{branch}` (fromBranch == toBranch) rather than `write/main/{branch}`.
+
+3. **The `stamps` table has `CHECK (author != subject)`.** This was invisible to `DESCRIBE` but visible via `SHOW CREATE TABLE stamps`. The check fails silently (no error returned; the write just doesn't commit). Any stamp INSERT must use distinct rigs for author and subject.
+
+4. **stamps.valence convention**: existing rows use numeric 1-5 scale like `{"quality":5,"reliability":5}`. The column is JSON-typed; string values like `{"quality":"good"}` are syntactically valid JSON but may not match consumer expectations.
+
+5. **DoltHub's `pulls?state=open` filter is ignored server-side** — the endpoint returns all PRs regardless of state. The worker debug endpoint filters client-side on `state` to compensate.
+
+6. **Merge is asynchronous with variable latency.** Typical merge latency observed in verification runs: 5–15s (1–3 poll iterations at 5s each). No merge exceeded 60s in any successful run. Use `wait_for_pr_merged` with a 60s timeout.
+
+7. **Rate limit / outage sensitivity**: after ~30 minutes of aggressive E2E testing (roughly 5 PRs + 20 writes + 40 reads), DoltHub began returning connection timeouts from our IP. Back off aggressively if you see consistent 000 / timeout responses — wait 5-10 minutes before resuming.

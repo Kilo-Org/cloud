@@ -75,16 +75,18 @@ export async function removeReactionFor(
     return { ok: false, code: 'internal', error: result.error };
   }
 
-  const convContext = await getConversationContext(env, params.conversationId);
-  if (convContext?.sandboxId) {
-    await pushEventToHumanMembers(
-      env,
-      params.conversationId,
-      convContext.sandboxId,
-      convContext.humanMemberIds,
-      'reaction.removed',
-      { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
-    );
+  if (result.removed) {
+    const convContext = await getConversationContext(env, params.conversationId);
+    if (convContext?.sandboxId) {
+      await pushEventToHumanMembers(
+        env,
+        params.conversationId,
+        convContext.sandboxId,
+        convContext.humanMemberIds,
+        'reaction.removed',
+        { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
+      );
+    }
   }
 
   return { ok: true };

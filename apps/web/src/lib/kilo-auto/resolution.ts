@@ -15,7 +15,6 @@ import {
   KILO_AUTO_SMALL_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   modeSchema,
-  BALANCED_CLAW_MODEL,
   BALANCED_CLAW_SETUP_MODEL,
   BALANCED_CODEX_MODEL,
   FRONTIER_MODE_TO_MODEL,
@@ -69,10 +68,6 @@ export async function resolveAutoModel(
       if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
         return BALANCED_CLAW_SETUP_MODEL;
       }
-      return BALANCED_CLAW_MODEL;
-    }
-    if (featureHeader === 'openclaw') {
-      return BALANCED_CLAW_MODEL;
     }
     return BALANCED_CODEX_MODEL;
   }

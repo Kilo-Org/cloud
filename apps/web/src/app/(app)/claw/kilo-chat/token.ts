@@ -14,6 +14,8 @@ import { z } from 'zod';
 let cachedToken: string | null = null;
 let tokenExpiresAt: number = 0;
 let inflightRequest: Promise<string> | null = null;
+let lastFailedAt: number = 0;
+const RETRY_BACKOFF_MS = 5_000;
 
 async function fetchToken(): Promise<string> {
   const res = await fetch('/api/kilo-chat/token', { method: 'POST' });
@@ -33,11 +35,23 @@ export async function getKiloChatToken(): Promise<string> {
   if (cachedToken && Date.now() < tokenExpiresAt - 5 * 60 * 1000) {
     return cachedToken;
   }
+  // Enforce minimum retry interval after failures to prevent tight retry loops
+  if (lastFailedAt && Date.now() - lastFailedAt < RETRY_BACKOFF_MS) {
+    throw new Error('Token fetch on cooldown after recent failure');
+  }
   // Deduplicate concurrent requests
   if (!inflightRequest) {
-    inflightRequest = fetchToken().finally(() => {
-      inflightRequest = null;
-    });
+    inflightRequest = fetchToken()
+      .then(token => {
+        lastFailedAt = 0;
+        inflightRequest = null;
+        return token;
+      })
+      .catch(err => {
+        lastFailedAt = Date.now();
+        inflightRequest = null;
+        throw err;
+      });
   }
   return inflightRequest;
 }

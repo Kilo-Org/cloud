@@ -741,8 +741,9 @@ async function provisionInstance(
   );
 }
 
-async function enqueueProvisionTrialStartAffiliateEvent(params: {
+async function emitProvisionTrialStartSideEffects(params: {
   userId: string;
+  userEmail: string;
   instanceId: string;
 }) {
   try {
@@ -753,6 +754,7 @@ async function enqueueProvisionTrialStartAffiliateEvent(params: {
         plan: kiloclaw_subscriptions.plan,
         status: kiloclaw_subscriptions.status,
         trialStartedAt: kiloclaw_subscriptions.trial_started_at,
+        trialEndsAt: kiloclaw_subscriptions.trial_ends_at,
         accessOrigin: kiloclaw_subscriptions.access_origin,
       })
       .from(kiloclaw_subscriptions)
@@ -768,6 +770,16 @@ async function enqueueProvisionTrialStartAffiliateEvent(params: {
     if (subscription.plan !== 'trial' || subscription.status !== 'trialing') return;
     if (subscription.accessOrigin === 'earlybird') return;
 
+    PostHogClient().capture({
+      distinctId: params.userEmail,
+      event: 'claw_trial_started',
+      properties: {
+        user_id: params.userId,
+        plan: 'trial',
+        trial_ends_at: subscription.trialEndsAt,
+      },
+    });
+
     const eventDate = new Date(subscription.trialStartedAt ?? subscription.createdAt);
     await enqueueAffiliateEventForUser({
       userId: params.userId,
@@ -782,7 +794,7 @@ async function enqueueProvisionTrialStartAffiliateEvent(params: {
       orderId: IMPACT_ORDER_ID_MACRO,
     });
   } catch (error) {
-    sentryLogger('affiliate-events', 'warning')('Affiliate trial start enqueue failed', {
+    sentryLogger('kiloclaw-billing', 'warning')('Provision trial start side effects failed', {
       user_id: params.userId,
       instance_id: params.instanceId,
       error: error instanceof Error ? error.message : String(error),
@@ -2349,8 +2361,9 @@ export const kiloclawRouter = createTRPCRouter({
           bootstrapSubscription,
         });
         if (shouldEnqueueTrialStartAffiliate) {
-          await enqueueProvisionTrialStartAffiliateEvent({
+          await emitProvisionTrialStartSideEffects({
             userId: ctx.user.id,
+            userEmail: ctx.user.google_user_email,
             instanceId: result.instanceId,
           });
         }
@@ -2378,8 +2391,9 @@ export const kiloclawRouter = createTRPCRouter({
           bootstrapSubscription,
         });
         if (shouldEnqueueTrialStartAffiliate) {
-          await enqueueProvisionTrialStartAffiliateEvent({
+          await emitProvisionTrialStartSideEffects({
             userId: ctx.user.id,
+            userEmail: ctx.user.google_user_email,
             instanceId: result.instanceId,
           });
         }

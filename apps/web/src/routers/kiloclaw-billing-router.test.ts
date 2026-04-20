@@ -636,9 +636,20 @@ describe('provision detached personal billing recovery', () => {
 
   it('bootstraps a fresh trial onto an active orphan instance with zero subscription rows', async () => {
     const activeInstance = await createKiloclawInstance(user.id);
-    kiloclawInternalClientMock.__provisionMock.mockResolvedValue({
-      sandboxId: activeInstance.sandbox_id,
-      instanceId: activeInstance.id,
+    kiloclawInternalClientMock.__provisionMock.mockImplementationOnce(async () => {
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        instance_id: activeInstance.id,
+        plan: 'trial',
+        status: 'trialing',
+        trial_started_at: '2026-04-20T10:00:00.000Z',
+        trial_ends_at: '2026-04-27T10:00:00.000Z',
+      });
+
+      return {
+        sandboxId: activeInstance.sandbox_id,
+        instanceId: activeInstance.id,
+      };
     });
 
     const caller = await createCallerForUser(user.id);

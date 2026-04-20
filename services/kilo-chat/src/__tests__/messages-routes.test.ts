@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import type { AuthContext } from '../auth';
@@ -515,5 +515,147 @@ describe('Webhook queue enqueue', () => {
     expect(res.status).toBe(201);
     const body = await res.json<{ messageId: string }>();
     expect(body.messageId).toBeTruthy();
+  });
+});
+
+describe('Webhook reply context', () => {
+  it('includes inReplyToBody and inReplyToSender when replying to an existing message', async () => {
+    const deliverChatWebhook = vi.fn().mockResolvedValue(undefined);
+    const testEnv = { ...env, KILOCLAW: { deliverChatWebhook } } as unknown as Env;
+
+    const userId = 'user-reply-context-1';
+    const sandboxId = 'sandbox-reply-context-1';
+    const userApp = makeApp(userId, 'user', [sandboxId]);
+
+    // Create conversation
+    const convRes = await userApp.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId, title: 'Reply context test' }),
+      },
+      testEnv
+    );
+    expect(convRes.status).toBe(201);
+    const { conversationId } = await convRes.json<{ conversationId: string }>();
+
+    // Create first message (the parent)
+    const parentRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Parent message text' }],
+        }),
+      },
+      testEnv
+    );
+    expect(parentRes.status).toBe(201);
+    const { messageId: parentMessageId } = await parentRes.json<{ messageId: string }>();
+
+    // Create second message as a reply to the first
+    const replyRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Reply message text' }],
+          inReplyToMessageId: parentMessageId,
+        }),
+      },
+      testEnv
+    );
+    expect(replyRes.status).toBe(201);
+
+    // deliverChatWebhook should have been called for each message (2 total)
+    // The second call (for the reply) should include reply context
+    const replyCall = deliverChatWebhook.mock.calls.find(
+      (call: [{ inReplyToMessageId?: string }]) => call[0].inReplyToMessageId === parentMessageId
+    );
+    expect(replyCall).toBeDefined();
+    expect(replyCall![0]).toMatchObject({
+      inReplyToMessageId: parentMessageId,
+      inReplyToBody: 'Parent message text',
+      inReplyToSender: userId,
+    });
+  });
+
+  it('delivers webhook without inReplyToBody or inReplyToSender when the parent message is deleted', async () => {
+    const deliverChatWebhook = vi.fn().mockResolvedValue(undefined);
+    const testEnv = { ...env, KILOCLAW: { deliverChatWebhook } } as unknown as Env;
+
+    const userId = 'user-reply-deleted-1';
+    const sandboxId = 'sandbox-reply-deleted-1';
+    const userApp = makeApp(userId, 'user', [sandboxId]);
+
+    // Create conversation
+    const convRes = await userApp.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId, title: 'Reply deleted parent test' }),
+      },
+      testEnv
+    );
+    expect(convRes.status).toBe(201);
+    const { conversationId } = await convRes.json<{ conversationId: string }>();
+
+    // Create parent message then delete it
+    const parentRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'This will be deleted' }],
+        }),
+      },
+      testEnv
+    );
+    expect(parentRes.status).toBe(201);
+    const { messageId: deletedParentId } = await parentRes.json<{ messageId: string }>();
+
+    await userApp.request(
+      `/v1/messages/${deletedParentId}`,
+      {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId }),
+      },
+      testEnv
+    );
+
+    // Reset mock so we only track the reply call
+    deliverChatWebhook.mockClear();
+
+    // Create message replying to the deleted parent
+    const res = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Reply to deleted' }],
+          inReplyToMessageId: deletedParentId,
+        }),
+      },
+      testEnv
+    );
+    expect(res.status).toBe(201);
+
+    // Webhook should have been delivered without body/sender (parent was deleted)
+    expect(deliverChatWebhook).toHaveBeenCalled();
+    const call = deliverChatWebhook.mock.calls[0]![0];
+    expect(call.inReplyToMessageId).toBe(deletedParentId);
+    expect(call.inReplyToBody).toBeUndefined();
+    expect(call.inReplyToSender).toBeUndefined();
   });
 });

@@ -65,6 +65,24 @@ export async function createMessageFor(
   const botMembers = await convStub.getBotMembersExcluding(callerId);
   if (botMembers.length > 0) {
     const now = new Date().toISOString();
+
+    // Resolve reply context for webhook delivery
+    let inReplyToBody: string | undefined;
+    let inReplyToSender: string | undefined;
+    if (inReplyToMessageId) {
+      const parent = await convStub.getMessage(inReplyToMessageId);
+      if (parent && !parent.deleted) {
+        inReplyToBody = parent.content
+          .filter(
+            (b): b is { type: 'text'; text: string } =>
+              b.type === 'text' && typeof b.text === 'string'
+          )
+          .map(b => b.text)
+          .join('');
+        inReplyToSender = parent.senderId;
+      }
+    }
+
     const deliverPromise = Promise.all(
       botMembers.map(bot =>
         deliverToBot(env, convStub, {
@@ -74,6 +92,9 @@ export async function createMessageFor(
           from: callerId,
           content,
           sentAt: now,
+          ...(inReplyToMessageId !== undefined && { inReplyToMessageId }),
+          ...(inReplyToBody !== undefined && { inReplyToBody }),
+          ...(inReplyToSender !== undefined && { inReplyToSender }),
         })
       )
     );

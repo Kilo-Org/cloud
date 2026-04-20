@@ -72,10 +72,10 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     const normalizedBlacklist = blacklistedDomains.map(d => d.toLowerCase());
 
     const blockedCountExpr = sql<number>`count(*) FILTER (WHERE ${kilocode_users.blocked_reason} IS NOT NULL)`;
-    // Hide noise: require at least 1% of users on the domain to have been
-    // blocked before surfacing it. Computed against count(*) so a one-off
-    // block on a huge domain doesn't appear here.
-    const minBlockedPercent = sql`${blockedCountExpr} * 100 >= count(*)`;
+    // Hide noise: require at least 30% of users on the domain to have been
+    // blocked before surfacing it. Keeps large legitimate providers (gmail,
+    // hotmail, etc.) from showing up.
+    const minBlockedPercent = sql`${blockedCountExpr} * 100 >= count(*) * 30`;
 
     const rows = await db
       .select({

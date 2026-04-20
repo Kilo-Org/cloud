@@ -218,27 +218,42 @@ describe('admin.blacklistDomains.suspicious', () => {
     expect(ordered.indexOf('more-blocked.com')).toBeLessThan(ordered.indexOf('fewer-blocked.com'));
   });
 
-  it('hides domains with fewer than 1% of accounts blocked', async () => {
-    // noisy.com: 99 clean users + 0 blocked → 0% → filtered out
-    for (let i = 0; i < 99; i++) {
+  it('hides domains with fewer than 30% of accounts blocked', async () => {
+    // noisy.com: 10 clean users + 0 blocked → 0% → filtered out
+    for (let i = 0; i < 10; i++) {
       await insertTestUser({
         google_user_email: `u${i}@noisy.com`,
         email_domain: 'noisy.com',
       });
     }
-    // just-under.com: 99 clean + 0 blocked → filtered out (0%)
-    // over-threshold.com: 99 clean + 1 blocked → 1% → surfaced
-    for (let i = 0; i < 99; i++) {
+    // under-threshold.com: 8 clean + 2 blocked → 20% → filtered out (below 30%)
+    for (let i = 0; i < 8; i++) {
+      await insertTestUser({
+        google_user_email: `u${i}@under-threshold.com`,
+        email_domain: 'under-threshold.com',
+      });
+    }
+    for (let i = 0; i < 2; i++) {
+      await insertTestUser({
+        google_user_email: `b${i}@under-threshold.com`,
+        email_domain: 'under-threshold.com',
+        blocked_reason: 'abuse',
+      });
+    }
+    // over-threshold.com: 7 clean + 3 blocked → 30% → surfaced
+    for (let i = 0; i < 7; i++) {
       await insertTestUser({
         google_user_email: `u${i}@over-threshold.com`,
         email_domain: 'over-threshold.com',
       });
     }
-    await insertTestUser({
-      google_user_email: 'b@over-threshold.com',
-      email_domain: 'over-threshold.com',
-      blocked_reason: 'abuse',
-    });
+    for (let i = 0; i < 3; i++) {
+      await insertTestUser({
+        google_user_email: `b${i}@over-threshold.com`,
+        email_domain: 'over-threshold.com',
+        blocked_reason: 'abuse',
+      });
+    }
 
     const caller = await createCallerForUser(admin.id);
     const { domains } = await caller.admin.blacklistDomains.suspicious();
@@ -246,6 +261,7 @@ describe('admin.blacklistDomains.suspicious', () => {
     const names = domains.map(d => d.domain);
     expect(names).toContain('over-threshold.com');
     expect(names).not.toContain('noisy.com');
+    expect(names).not.toContain('under-threshold.com');
   });
 
   it('excludes users whose email_domain is NULL', async () => {

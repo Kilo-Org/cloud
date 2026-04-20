@@ -7,13 +7,17 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { getInstanceById } from '@/lib/kiloclaw/instance-registry';
 import { exchangeGoogleOAuthCode } from '@/lib/integrations/google-service';
-import { verifyGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
+import {
+  type VerifiedGoogleOAuthState,
+  verifyGoogleOAuthState,
+} from '@/lib/integrations/google/oauth-state';
 import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 
-function buildGoogleRedirectPath(state: string | null, queryParam: string): string {
-  const verified = verifyGoogleOAuthState(state);
-  const owner = verified?.owner;
+function buildGoogleRedirectPath(
+  owner: VerifiedGoogleOAuthState['owner'] | null | undefined,
+  queryParam: string
+): string {
 
   if (owner?.type === 'org') {
     return `/organizations/${owner.id}/claw/settings?${queryParam}`;
@@ -24,6 +28,27 @@ function buildGoogleRedirectPath(state: string | null, queryParam: string): stri
   }
 
   return `/claw/settings?${queryParam}`;
+}
+
+function sanitizeOAuthProviderError(error: string | null, errorDescription: string | null): string | null {
+  const source = errorDescription ?? error;
+  if (!source) return null;
+  const normalized = source.trim();
+  if (!normalized) return null;
+
+  if (!/^[A-Za-z0-9 _.:/\-]{1,200}$/.test(normalized)) {
+    return 'oauth_error';
+  }
+
+  return encodeURIComponent(normalized);
+}
+
+function sanitizeOAuthCode(code: string | null): string | null {
+  if (!code) return null;
+  const normalized = code.trim();
+  if (!normalized || normalized.length > 2048) return null;
+  if (!/^[A-Za-z0-9._~+\-/]+$/.test(normalized)) return null;
+  return normalized;
 }
 
 function oauthSentryContext(searchParams: URLSearchParams): {
@@ -57,35 +82,10 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const code = searchParams.get('code');
     const state = searchParams.get('state');
+    const code = searchParams.get('code');
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
-
-    if (error) {
-      captureMessage('Google OAuth error', {
-        level: 'warning',
-        tags: { endpoint: 'google/callback', source: 'google_oauth' },
-        extra: oauthSentryContext(searchParams),
-      });
-
-      const errorCode = encodeURIComponent(errorDescription || error);
-      return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(state, `error=${errorCode}`), APP_URL)
-      );
-    }
-
-    if (!code) {
-      captureMessage('Google callback missing code', {
-        level: 'warning',
-        tags: { endpoint: 'google/callback', source: 'google_oauth' },
-        extra: oauthSentryContext(searchParams),
-      });
-
-      return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(state, 'error=missing_code'), APP_URL)
-      );
-    }
 
     const verifiedState = verifyGoogleOAuthState(state);
     if (!verifiedState) {
@@ -116,6 +116,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
     }
 
+    const oauthErrorCode = sanitizeOAuthProviderError(error, errorDescription);
+    if (oauthErrorCode) {
+      captureMessage('Google OAuth error', {
+        level: 'warning',
+        tags: { endpoint: 'google/callback', source: 'google_oauth' },
+        extra: oauthSentryContext(searchParams),
+      });
+
+      return NextResponse.redirect(
+        new URL(buildGoogleRedirectPath(verifiedState.owner, `error=${oauthErrorCode}`), APP_URL)
+      );
+    }
+
+    const oauthCode = sanitizeOAuthCode(code);
+    if (!oauthCode) {
+      captureMessage('Google callback missing code', {
+        level: 'warning',
+        tags: { endpoint: 'google/callback', source: 'google_oauth' },
+        extra: oauthSentryContext(searchParams),
+      });
+
+      return NextResponse.redirect(
+        new URL(buildGoogleRedirectPath(verifiedState.owner, 'error=missing_code'), APP_URL)
+      );
+    }
+
     const instance = await getInstanceById(verifiedState.instanceId);
     if (!instance) {
       captureMessage('Google callback missing target instance', {
@@ -129,7 +155,7 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(state, 'error=missing_instance'), APP_URL)
+        new URL(buildGoogleRedirectPath(verifiedState.owner, 'error=missing_instance'), APP_URL)
       );
     }
 
@@ -157,7 +183,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/claw/settings?error=unauthorized', APP_URL));
     }
 
-    const oauthData = await exchangeGoogleOAuthCode(code, verifiedState.capabilities);
+    const oauthData = await exchangeGoogleOAuthCode(oauthCode, verifiedState.capabilities);
 
     const persisted = await upsertKiloClawGoogleOAuthConnection({
       instanceId: verifiedState.instanceId,
@@ -203,7 +229,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.redirect(
-      new URL(buildGoogleRedirectPath(state, 'error=connection_failed'), APP_URL)
+      new URL(buildGoogleRedirectPath(verifyGoogleOAuthState(state)?.owner, 'error=connection_failed'), APP_URL)
     );
   }
 }

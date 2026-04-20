@@ -724,10 +724,12 @@ export function deleteBeads(sql: SqlStorage, beadIds: string[]): number {
   // Dynamic IN clauses use sql.exec directly — the type-safe query()
   // wrapper can't infer placeholder count from runtime-built strings.
   const ph = (ids: string[]) => ids.map(() => '?').join(',');
-  const childRows = [...sql.exec(
-    /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.parent_bead_id} IN (${ph(beadIds)})`,
-    ...beadIds
-  )];
+  const childRows = [
+    ...sql.exec(
+      /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.parent_bead_id} IN (${ph(beadIds)})`,
+      ...beadIds
+    ),
+  ];
   const childIds = BeadRecord.pick({ bead_id: true })
     .array()
     .parse(childRows)
@@ -760,7 +762,8 @@ export function deleteBeads(sql: SqlStorage, beadIds: string[]): number {
   // Delete dependencies referencing any of these beads
   sql.exec(
     /* sql */ `DELETE FROM ${bead_dependencies} WHERE ${bead_dependencies.bead_id} IN (${placeholders}) OR ${bead_dependencies.depends_on_bead_id} IN (${placeholders})`,
-    ...allIdsArr, ...allIdsArr
+    ...allIdsArr,
+    ...allIdsArr
   );
 
   // Delete events
@@ -813,11 +816,7 @@ function collectChildBeadIds(sql: SqlStorage, parentIds: string[]): string[] {
   return [...childIds, ...deeperIds];
 }
 
-export function deleteBeadsByStatus(
-  sql: SqlStorage,
-  status: BeadStatus,
-  type?: BeadType
-): number {
+export function deleteBeadsByStatus(sql: SqlStorage, status: BeadStatus, type?: BeadType): number {
   const conditions: string[] = [`${beads.status} = ?`];
   const values: unknown[] = [status];
 

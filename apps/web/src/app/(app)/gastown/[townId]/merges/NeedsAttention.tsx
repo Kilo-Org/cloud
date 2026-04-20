@@ -167,7 +167,9 @@ export function NeedsAttention({
       void queryClient.invalidateQueries({
         queryKey: trpc.gastown.getMergeQueueData.queryKey({ townId }),
       });
-      toast.success(`Dismissed ${failedItems.length} failed ${failedItems.length === 1 ? 'bead' : 'beads'}`);
+      toast.success(
+        `Dismissed ${failedItems.length} failed ${failedItems.length === 1 ? 'bead' : 'beads'}`
+      );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       toast.error(`Failed to dismiss all: ${message}`);

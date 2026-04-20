@@ -167,8 +167,9 @@ export function BeadsPageClient({ townId }: BeadsPageClientProps) {
     if (!deleteConfirm) return;
 
     if (deleteConfirm.kind === 'selected') {
-      const { ids, rigId } = deleteConfirm;
+      const { ids } = deleteConfirm;
       for (const id of ids) {
+        const rigId = beadRigMap.get(id) ?? '';
         deleteBeadMutation.mutate({ rigId, beadId: id, townId });
       }
     } else {
@@ -248,9 +249,7 @@ export function BeadsPageClient({ townId }: BeadsPageClientProps) {
             className="overflow-hidden"
           >
             <div className="flex items-center gap-3 border-b border-white/[0.06] bg-red-500/[0.04] px-6 py-2">
-              <span className="text-xs text-white/50">
-                {selectedIds.size} selected
-              </span>
+              <span className="text-xs text-white/50">{selectedIds.size} selected</span>
               <button
                 onClick={handleDeleteSelected}
                 className="flex items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20"
@@ -361,7 +360,12 @@ export function BeadsPageClient({ townId }: BeadsPageClientProps) {
       </div>
 
       {/* Delete confirmation dialog */}
-      <Dialog open={!!deleteConfirm} onOpenChange={open => { if (!open) setDeleteConfirm(null); }}>
+      <Dialog
+        open={!!deleteConfirm}
+        onOpenChange={open => {
+          if (!open) setDeleteConfirm(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>

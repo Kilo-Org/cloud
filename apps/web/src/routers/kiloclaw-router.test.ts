@@ -4,7 +4,7 @@ process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
 process.env.KILOCLAW_API_URL ||= 'https://claw.test';
 process.env.KILOCLAW_INTERNAL_API_SECRET ||= 'test-secret';
 
-import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { createCallerFactory } from '@/lib/trpc/init';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -98,6 +98,10 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
 
 let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) => {
   getStatus: () => Promise<unknown>;
+  validateWeatherLocation: (input: { location: string }) => Promise<{
+    location: string;
+    currentWeatherText: string;
+  }>;
   cycleInboundEmailAddress: () => Promise<{ inboundEmailAddress: string }>;
   destroy: () => Promise<{ ok: true }>;
 };
@@ -108,6 +112,195 @@ const kiloclawClientMock = jest.requireMock<KiloClawClientMock>(
 beforeAll(async () => {
   const mod = await import('@/routers/kiloclaw-router');
   createCaller = createCallerFactory(mod.kiloclawRouter);
+});
+
+function wttrResponse(params: {
+  areaName: string;
+  region?: string;
+  country?: string;
+  tempC?: string;
+  tempF?: string;
+  weatherCode?: string;
+  weatherDesc?: string;
+}): Response {
+  return new Response(
+    JSON.stringify({
+      current_condition: [
+        {
+          temp_C: params.tempC ?? '12',
+          temp_F: params.tempF ?? '54',
+          weatherCode: params.weatherCode ?? '116',
+          weatherDesc: [{ value: params.weatherDesc ?? 'Partly cloudy' }],
+        },
+      ],
+      nearest_area: [
+        {
+          areaName: [{ value: params.areaName }],
+          region: params.region ? [{ value: params.region }] : [],
+          country: params.country ? [{ value: params.country }] : [],
+        },
+      ],
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
+}
+
+describe('kiloclawRouter validateWeatherLocation', () => {
+  let fetchSpy: jest.SpiedFunction<typeof fetch>;
+
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    fetchSpy = jest.spyOn(globalThis, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('returns a normalized display location for a valid wttr response', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-test-${Math.random()}@example.com`,
+    });
+    fetchSpy.mockResolvedValueOnce(
+      wttrResponse({
+        areaName: 'Amsterdam',
+        region: 'North Holland',
+        country: 'Netherlands',
+        tempC: '12',
+        tempF: '54',
+      })
+    );
+    const caller = createCaller({ user });
+
+    const result = await caller.validateWeatherLocation({ location: ' Amsterdam ' });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      'https://wttr.in/Amsterdam?format=j1',
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'User-Agent': 'curl/8.7.1' }),
+        signal: expect.any(AbortSignal),
+      })
+    );
+    expect(result).toEqual({
+      location: 'Amsterdam, North Holland, Netherlands',
+      currentWeatherText: 'Current weather: 🌤️ 12°C',
+    });
+  });
+
+  it('deduplicates repeated location parts in the display name', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-format-test-${Math.random()}@example.com`,
+    });
+    fetchSpy.mockResolvedValueOnce(
+      wttrResponse({
+        areaName: 'Singapore',
+        region: 'Singapore',
+        country: 'Singapore',
+        tempC: '30',
+        tempF: '86',
+      })
+    );
+    const caller = createCaller({ user });
+
+    const result = await caller.validateWeatherLocation({ location: 'Singapore' });
+
+    expect(result).toEqual({
+      location: 'Singapore',
+      currentWeatherText: 'Current weather: 🌤️ 30°C',
+    });
+  });
+
+  it('uses rain emoji for rainy weather', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-rain-test-${Math.random()}@example.com`,
+    });
+    fetchSpy.mockResolvedValueOnce(
+      wttrResponse({
+        areaName: 'London',
+        region: 'Greater London',
+        country: 'United Kingdom',
+        tempC: '11',
+        tempF: '52',
+        weatherCode: '302',
+        weatherDesc: 'Moderate rain',
+      })
+    );
+    const caller = createCaller({ user });
+
+    const result = await caller.validateWeatherLocation({ location: 'London' });
+
+    expect(result).toEqual({
+      location: 'London, Greater London, United Kingdom',
+      currentWeatherText: 'Current weather: 🌧️ 11°C',
+    });
+  });
+
+  it('uses Fahrenheit for United States locations', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-us-test-${Math.random()}@example.com`,
+    });
+    fetchSpy.mockResolvedValueOnce(
+      wttrResponse({
+        areaName: 'New York',
+        region: 'New York',
+        country: 'United States of America',
+        tempC: '21',
+        tempF: '70',
+      })
+    );
+    const caller = createCaller({ user });
+
+    const result = await caller.validateWeatherLocation({ location: 'New York' });
+
+    expect(result).toEqual({
+      location: 'New York, United States of America',
+      currentWeatherText: 'Current weather: 🌤️ 70°F',
+    });
+  });
+
+  it('rejects unknown locations without returning raw input', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-invalid-test-${Math.random()}@example.com`,
+    });
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify({ nearest_area: [], message: 'unknown location' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    const caller = createCaller({ user });
+
+    await expect(caller.validateWeatherLocation({ location: 'not-a-real-place' })).rejects.toThrow(
+      'Weather location could not be found.'
+    );
+  });
+
+  it('returns a timeout error when wttr validation times out', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-timeout-test-${Math.random()}@example.com`,
+    });
+    const timeoutError = Object.assign(new Error('timeout'), { name: 'TimeoutError' });
+    fetchSpy.mockRejectedValue(timeoutError);
+    const caller = createCaller({ user });
+
+    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).rejects.toThrow(
+      'Weather location validation timed out.'
+    );
+  });
+
+  it('returns an unavailable error when wttr validation fails upstream', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-upstream-test-${Math.random()}@example.com`,
+    });
+    fetchSpy.mockRejectedValue(new Error('network down'));
+    const caller = createCaller({ user });
+
+    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).rejects.toThrow(
+      'Weather location validation is unavailable.'
+    );
+  });
 });
 
 describe('kiloclawRouter getStatus', () => {

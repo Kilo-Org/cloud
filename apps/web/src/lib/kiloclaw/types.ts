@@ -24,6 +24,7 @@ export type ProvisionInput = {
   kilocodeApiKeyExpiresAt?: string;
   kilocodeDefaultModel?: string;
   userTimezone?: string;
+  userLocation?: string;
   pinnedImageTag?: string;
 };
 

@@ -114,6 +114,8 @@ const UserTimezoneSchema = z
   .max(100)
   .refine(isValidUserTimezone, 'Must be a valid IANA timezone');
 
+const UserLocationSchema = z.string().trim().min(1).max(200);
+
 export const InstanceConfigSchema = z.object({
   envVars: z.record(envVarNameSchema, z.string()).optional(),
   encryptedSecrets: z.record(envVarNameSchema, EncryptedEnvelopeSchema).optional(),
@@ -121,6 +123,7 @@ export const InstanceConfigSchema = z.object({
   kilocodeApiKeyExpiresAt: z.string().nullable().optional(),
   kilocodeDefaultModel: z.string().nullable().optional(),
   userTimezone: UserTimezoneSchema.nullable().optional(),
+  userLocation: UserLocationSchema.nullable().optional(),
   webSearch: z
     .object({
       exaMode: KiloExaSearchModeSchema.optional(),
@@ -254,6 +257,7 @@ export const PersistedStateSchema = z.object({
   kilocodeApiKeyExpiresAt: z.string().nullable().default(null),
   kilocodeDefaultModel: z.string().nullable().default(null),
   userTimezone: UserTimezoneSchema.nullable().default(null),
+  userLocation: UserLocationSchema.nullable().default(null),
   kiloExaSearchMode: KiloExaSearchModeSchema.nullable().default(null),
   channels: z
     .object({

@@ -63,6 +63,7 @@ export type InstanceMutableState = {
   kilocodeApiKeyExpiresAt: PersistedState['kilocodeApiKeyExpiresAt'];
   kilocodeDefaultModel: PersistedState['kilocodeDefaultModel'];
   userTimezone: PersistedState['userTimezone'];
+  userLocation: PersistedState['userLocation'];
   kiloExaSearchMode: PersistedState['kiloExaSearchMode'];
   channels: PersistedState['channels'];
   googleCredentials: GoogleCredentials | null;

@@ -120,7 +120,7 @@ export function getClawOnboardingFlowState({
   const createSetupActive =
     mode === 'create-first' && (createSetupStarted || instanceStatus !== null);
   const hasPairingStep = isPairingChannel(selectedChannelId);
-  const totalSteps = hasPairingStep ? 6 : 5;
+  const totalSteps = hasPairingStep ? 5 : 4;
   const renderStepDecision = getRenderStepDecision({
     mode,
     createSetupStarted,

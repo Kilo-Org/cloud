@@ -169,17 +169,17 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('complete');
   });
 
-  test('uses six steps only when the selected channel requires pairing', () => {
+  test('uses five steps only when the selected channel requires pairing', () => {
     expect(
       getClawOnboardingFlowState(createInput({ selectedChannelId: 'telegram' })).totalSteps
-    ).toBe(6);
+    ).toBe(5);
     expect(
       getClawOnboardingFlowState(createInput({ selectedChannelId: 'discord' })).totalSteps
-    ).toBe(6);
+    ).toBe(5);
     expect(getClawOnboardingFlowState(createInput({ selectedChannelId: 'slack' })).totalSteps).toBe(
-      5
+      4
     );
-    expect(getClawOnboardingFlowState(createInput()).totalSteps).toBe(5);
+    expect(getClawOnboardingFlowState(createInput()).totalSteps).toBe(4);
   });
 
   test.each(CLAW_ONBOARDING_PROVISIONING_STATUSES)(

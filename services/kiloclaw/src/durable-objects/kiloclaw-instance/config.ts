@@ -177,6 +177,7 @@ export async function buildUserEnvVars(
       kilocodeApiKey,
       kilocodeDefaultModel: state.kilocodeDefaultModel ?? undefined,
       userTimezone: state.userTimezone ?? undefined,
+      userLocation: state.userLocation ?? undefined,
       channels: state.channels ?? undefined,
       googleCredentials: state.googleCredentials ?? undefined,
       kiloExaSearchMode: state.kiloExaSearchMode,

@@ -23,6 +23,8 @@ const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
 const TOOLS_MD_DEST = '/root/.openclaw/workspace/TOOLS.md';
+const WEATHER_SKILL_SOURCE = '/usr/local/share/kiloclaw/skills/weather/SKILL.md';
+const WEATHER_SKILL_DEST = '/root/clawd/skills/weather/SKILL.md';
 const IDENTITY_MD_DEST = '/root/.openclaw/workspace/IDENTITY.md';
 const USER_MD_DEST = '/root/.openclaw/workspace/USER.md';
 const LEGACY_BOT_IDENTITY_DESTS = ['/root/.openclaw/workspace/BOOTSTRAP.md'];
@@ -298,17 +300,32 @@ export function writeBotIdentityFile(
   }
 }
 
-export function formatUserProfileMarkdown(timezone: string): string {
+type UserProfileFields = {
+  timezone?: string;
+  location?: string;
+};
+
+function normalizeUserProfileFields(fields: string | UserProfileFields): UserProfileFields {
+  return typeof fields === 'string' ? { timezone: fields } : fields;
+}
+
+export function formatUserProfileMarkdown(fields: string | UserProfileFields): string {
+  const profile = normalizeUserProfileFields(fields);
+  const personalFields = [
+    '- Name:',
+    '- What to call them:',
+    '- Pronouns: (optional)',
+    profile.timezone ? `- Timezone: ${profile.timezone}` : null,
+    profile.location ? `- Location: ${profile.location}` : null,
+    '- Notes:',
+  ].filter((line): line is string => line !== null);
+
   return [
     '# USER.md - About Your Human',
     '',
     'Learn about the person you are helping. Update this as you go.',
     '',
-    '- Name:',
-    '- What to call them:',
-    '- Pronouns: (optional)',
-    `- Timezone: ${timezone}`,
-    '- Notes:',
+    ...personalFields,
     '',
     '## Context',
     '',
@@ -321,17 +338,21 @@ export function formatUserProfileMarkdown(timezone: string): string {
   ].join('\n');
 }
 
-export function setUserMdTimezone(content: string, timezone: string): string {
+function setUserMdProfileField(
+  content: string,
+  label: 'Timezone' | 'Location',
+  value: string
+): string {
   const lines = content.split('\n');
-  const plainTimezoneLine = /^(\s*-\s*Timezone:)\s*.*/i;
-  const boldTimezoneLine = /^(\s*-\s*\*\*Timezone:\*\*)\s*.*/i;
+  const plainFieldLine = new RegExp(`^(\\s*-\\s*${label}:)\\s*.*`, 'i');
+  const boldFieldLine = new RegExp(`^(\\s*-\\s*\\*\\*${label}:\\*\\*)\\s*.*`, 'i');
 
   const updatedLines = lines.map(line => {
-    if (plainTimezoneLine.test(line)) {
-      return line.replace(plainTimezoneLine, `$1 ${timezone}`);
+    if (plainFieldLine.test(line)) {
+      return line.replace(plainFieldLine, `$1 ${value}`);
     }
-    if (boldTimezoneLine.test(line)) {
-      return line.replace(boldTimezoneLine, `$1 ${timezone}`);
+    if (boldFieldLine.test(line)) {
+      return line.replace(boldFieldLine, `$1 ${value}`);
     }
     return line;
   });
@@ -341,7 +362,47 @@ export function setUserMdTimezone(content: string, timezone: string): string {
   }
 
   const separator = content.endsWith('\n') ? '' : '\n';
-  return `${content}${separator}\n- Timezone: ${timezone}\n`;
+  return `${content}${separator}\n- ${label}: ${value}\n`;
+}
+
+export function setUserMdTimezone(content: string, timezone: string): string {
+  return setUserMdProfileField(content, 'Timezone', timezone);
+}
+
+export function setUserMdLocation(content: string, location: string): string {
+  return setUserMdProfileField(content, 'Location', location);
+}
+
+export function writeUserProfileFile(
+  env: EnvLike,
+  deps: Pick<
+    BootstrapDeps,
+    'mkdirSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'existsSync' | 'readFileSync'
+  > = defaultDeps
+): void {
+  const timezone = env.KILOCLAW_USER_TIMEZONE;
+  const location = env.KILOCLAW_USER_LOCATION;
+  if (!timezone && !location) return;
+
+  deps.mkdirSync(path.dirname(USER_MD_DEST), { recursive: true });
+  const userMdExists = deps.existsSync(USER_MD_DEST);
+  const content = userMdExists
+    ? deps.readFileSync(USER_MD_DEST, 'utf8')
+    : formatUserProfileMarkdown({
+        ...(timezone ? { timezone } : undefined),
+        ...(location ? { location } : undefined),
+      });
+  let nextContent = content;
+  if (timezone) nextContent = setUserMdTimezone(nextContent, timezone);
+  if (location) nextContent = setUserMdLocation(nextContent, location);
+
+  if (userMdExists && nextContent === content) return;
+
+  atomicWrite(USER_MD_DEST, nextContent, {
+    writeFileSync: deps.writeFileSync,
+    renameSync: deps.renameSync,
+    unlinkSync: deps.unlinkSync,
+  });
 }
 
 export function writeUserProfileTimezoneFile(
@@ -351,23 +412,22 @@ export function writeUserProfileTimezoneFile(
     'mkdirSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'existsSync' | 'readFileSync'
   > = defaultDeps
 ): void {
-  const timezone = env.KILOCLAW_USER_TIMEZONE;
-  if (!timezone) return;
+  writeUserProfileFile(env, deps);
+}
 
-  deps.mkdirSync(path.dirname(USER_MD_DEST), { recursive: true });
-  const userMdExists = deps.existsSync(USER_MD_DEST);
-  const content = userMdExists
-    ? deps.readFileSync(USER_MD_DEST, 'utf8')
-    : formatUserProfileMarkdown(timezone);
-  const nextContent = userMdExists ? setUserMdTimezone(content, timezone) : content;
+export function ensureWeatherSkillInstalled(
+  env: EnvLike,
+  deps: Pick<BootstrapDeps, 'mkdirSync' | 'copyFileSync' | 'existsSync'> = defaultDeps
+): void {
+  if (!env.KILOCLAW_USER_LOCATION) return;
 
-  if (userMdExists && nextContent === content) return;
+  if (!deps.existsSync(WEATHER_SKILL_SOURCE)) {
+    console.warn('[controller] Weather skill source missing, skipping install');
+    return;
+  }
 
-  atomicWrite(USER_MD_DEST, nextContent, {
-    writeFileSync: deps.writeFileSync,
-    renameSync: deps.renameSync,
-    unlinkSync: deps.unlinkSync,
-  });
+  deps.mkdirSync(path.dirname(WEATHER_SKILL_DEST), { recursive: true });
+  deps.copyFileSync(WEATHER_SKILL_SOURCE, WEATHER_SKILL_DEST);
 }
 
 // ---- Step 5: GitHub config ----
@@ -524,7 +584,8 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   }
 
   writeBotIdentityFile(env, deps);
-  writeUserProfileTimezoneFile(env, deps);
+  writeUserProfileFile(env, deps);
+  ensureWeatherSkillInstalled(env, deps);
 }
 
 // ---- TOOLS.md bounded-section helper ----

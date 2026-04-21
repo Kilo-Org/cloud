@@ -12,7 +12,10 @@ import {
   writeBotIdentityFile,
   formatUserProfileMarkdown,
   setUserMdTimezone,
+  setUserMdLocation,
+  writeUserProfileFile,
   writeUserProfileTimezoneFile,
+  ensureWeatherSkillInstalled,
   updateToolsMdSection,
   GOG_SECTION_CONFIG,
   KILO_CLI_SECTION_CONFIG,
@@ -601,6 +604,17 @@ describe('formatUserProfileMarkdown', () => {
 
     expect(result).toContain('# USER.md - About Your Human');
     expect(result).toContain('- Timezone: Europe/Amsterdam');
+    expect(result).not.toContain('- Location:');
+  });
+
+  it('renders the user profile markdown with location when provided', () => {
+    const result = formatUserProfileMarkdown({
+      timezone: 'Europe/Amsterdam',
+      location: 'Amsterdam, North Holland, Netherlands',
+    });
+
+    expect(result).toContain('- Timezone: Europe/Amsterdam');
+    expect(result).toContain('- Location: Amsterdam, North Holland, Netherlands');
   });
 });
 
@@ -626,6 +640,22 @@ describe('setUserMdTimezone', () => {
 
     expect(result).toContain('- Name:');
     expect(result).toContain('- Timezone: Europe/Amsterdam');
+  });
+});
+
+describe('setUserMdLocation', () => {
+  it('updates a plain location field', () => {
+    const result = setUserMdLocation('# USER\n- Location:\n- Notes:\n', 'Amsterdam, Netherlands');
+
+    expect(result).toContain('- Location: Amsterdam, Netherlands');
+    expect(result).toContain('- Notes:');
+  });
+
+  it('appends a location field when none exists', () => {
+    const result = setUserMdLocation('# USER\n- Name:\n', 'Amsterdam, Netherlands');
+
+    expect(result).toContain('- Name:');
+    expect(result).toContain('- Location: Amsterdam, Netherlands');
   });
 });
 
@@ -664,6 +694,78 @@ describe('writeUserProfileTimezoneFile', () => {
     writeUserProfileTimezoneFile({}, harness.deps);
 
     expect(harness.writeCalls.some(call => call.path.includes('USER.md'))).toBe(false);
+  });
+});
+
+describe('writeUserProfileFile', () => {
+  it('creates workspace/USER.md with location when configured', () => {
+    const harness = fakeDeps();
+
+    writeUserProfileFile(
+      {
+        KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam',
+        KILOCLAW_USER_LOCATION: 'Amsterdam, North Holland, Netherlands',
+      },
+      harness.deps
+    );
+
+    const userWrite = harness.writeCalls.find(call => call.path.includes('USER.md'));
+    expect(userWrite?.data).toContain('- Timezone: Europe/Amsterdam');
+    expect(userWrite?.data).toContain('- Location: Amsterdam, North Holland, Netherlands');
+  });
+
+  it('updates existing workspace/USER.md with location only when configured', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === '/root/.openclaw/workspace/USER.md'
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# USER\n- Timezone: Europe/Amsterdam\n- Notes:\n'
+    );
+
+    writeUserProfileFile(
+      { KILOCLAW_USER_LOCATION: 'Amsterdam, North Holland, Netherlands' },
+      harness.deps
+    );
+
+    const userWrite = harness.writeCalls.find(call => call.path.includes('USER.md'));
+    expect(userWrite?.data).toContain('- Timezone: Europe/Amsterdam');
+    expect(userWrite?.data).toContain('- Location: Amsterdam, North Holland, Netherlands');
+  });
+
+  it('does not add location when only timezone is configured', () => {
+    const harness = fakeDeps();
+
+    writeUserProfileFile({ KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam' }, harness.deps);
+
+    const userWrite = harness.writeCalls.find(call => call.path.includes('USER.md'));
+    expect(userWrite?.data).toContain('- Timezone: Europe/Amsterdam');
+    expect(userWrite?.data).not.toContain('- Location:');
+  });
+});
+
+describe('ensureWeatherSkillInstalled', () => {
+  it('copies the staged weather skill when location is configured', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === '/usr/local/share/kiloclaw/skills/weather/SKILL.md'
+    );
+
+    ensureWeatherSkillInstalled({ KILOCLAW_USER_LOCATION: 'Amsterdam, Netherlands' }, harness.deps);
+
+    expect(harness.mkdirCalls).toContain('/root/clawd/skills/weather');
+    expect(harness.copyCalls).toContainEqual({
+      src: '/usr/local/share/kiloclaw/skills/weather/SKILL.md',
+      dest: '/root/clawd/skills/weather/SKILL.md',
+    });
+  });
+
+  it('does not install the weather skill when location is unset', () => {
+    const harness = fakeDeps();
+
+    ensureWeatherSkillInstalled({}, harness.deps);
+
+    expect(harness.copyCalls.some(call => call.dest.includes('/skills/weather/'))).toBe(false);
   });
 });
 

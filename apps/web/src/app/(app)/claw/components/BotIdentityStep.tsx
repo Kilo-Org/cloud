@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { OnboardingStepView } from './OnboardingStepView';
 import type { BotIdentity } from './claw.types';
 import { cn } from '@/lib/utils';
+import { WeatherLocationInput, type WeatherLocationSelection } from './WeatherLocationInput';
 
 const SHUFFLE_STEPS = 4;
 const SHUFFLE_INTERVAL_MS = 90;
@@ -57,16 +58,22 @@ const NATURE_PRESETS: NaturePreset[] = [
   },
 ];
 
+export type BotIdentityStepResult = {
+  identity: BotIdentity;
+  weatherLocation: WeatherLocationSelection | null;
+};
+
 export function BotIdentityStep({
   instanceRunning,
   onContinue,
 }: {
   instanceRunning: boolean;
-  onContinue: (identity: BotIdentity) => void;
+  onContinue: (result: BotIdentityStepResult) => void;
 }) {
   const [botName, setBotName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🤖');
   const [selectedNatureId, setSelectedNatureId] = useState('ai-assistant');
+  const [weatherLocation, setWeatherLocation] = useState<WeatherLocationSelection | null>(null);
   const [isShuffling, setIsShuffling] = useState(false);
   const [nameAnimKey, setNameAnimKey] = useState(0);
   const reducedMotion = useReducedMotion();
@@ -104,17 +111,20 @@ export function BotIdentityStep({
 
   function handleContinue() {
     onContinue({
-      botName: botName.trim() || 'KiloClaw',
-      botEmoji: selectedEmoji,
-      botNature: nature.label,
-      botVibe: nature.vibe,
+      identity: {
+        botName: botName.trim() || 'KiloClaw',
+        botEmoji: selectedEmoji,
+        botNature: nature.label,
+        botVibe: nature.vibe,
+      },
+      weatherLocation,
     });
   }
 
   return (
     <OnboardingStepView
-      currentStep={2}
-      totalSteps={5}
+      currentStep={1}
+      totalSteps={4}
       title="Give your bot an identity"
       description="Make it yours. You can always change this later."
       showProvisioningBanner={!instanceRunning}
@@ -293,6 +303,8 @@ export function BotIdentityStep({
               ))}
             </div>
           </section>
+
+          <WeatherLocationInput onSelectionChange={setWeatherLocation} />
         </div>
       </div>
 

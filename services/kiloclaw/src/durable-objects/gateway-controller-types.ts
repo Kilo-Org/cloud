@@ -37,6 +37,11 @@ export const BotIdentityResponseSchema = z.object({
   path: z.string(),
 });
 
+export const UserProfileResponseSchema = z.object({
+  ok: z.boolean(),
+  path: z.string(),
+});
+
 export const ConfigRestoreResponseSchema = z.object({
   ok: z.boolean(),
   signaled: z.boolean(),

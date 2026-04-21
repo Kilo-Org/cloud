@@ -1682,6 +1682,25 @@ describe('buildUserEnvVars API key refresh', () => {
     expect(payload.env).toBe('development');
   });
 
+  it('passes persisted user location to buildEnvVars', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      userTimezone: 'Europe/Amsterdam',
+      userLocation: 'Amsterdam, North Holland, Netherlands',
+      kilocodeApiKey: 'stored-key',
+      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+    });
+
+    await callBuildUserEnvVars(instance);
+
+    const options = (gatewayEnv.buildEnvVars as Mock).mock.calls[0][3] as {
+      userTimezone?: string;
+      userLocation?: string;
+    };
+    expect(options.userTimezone).toBe('Europe/Amsterdam');
+    expect(options.userLocation).toBe('Amsterdam, North Holland, Netherlands');
+  });
+
   it('falls back to the stored key when Hyperdrive is unavailable', async () => {
     const env = createFakeEnv();
     env.HYPERDRIVE = { connectionString: '' } as never;
@@ -5457,7 +5476,33 @@ describe('provision: auto-start after fresh provision', () => {
     });
   });
 
-  it('persists user timezone from provision config', async () => {
+  it('persists user timezone and location from provision config', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {
+      userTimezone: 'Europe/Amsterdam',
+      userLocation: 'Amsterdam, North Holland, Netherlands',
+    });
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('userTimezone')).toBe('Europe/Amsterdam');
+    expect(storage._store.get('userLocation')).toBe('Amsterdam, North Holland, Netherlands');
+
+    await instance.provision('user-1', { userTimezone: null, userLocation: null });
+
+    expect(storage._store.get('userTimezone')).toBeNull();
+    expect(storage._store.get('userLocation')).toBeNull();
+  });
+
+  it('leaves user location absent when weather setup is skipped', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
 
     (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
@@ -5472,10 +5517,7 @@ describe('provision: auto-start after fresh provision', () => {
     await Promise.all(waitUntilPromises);
 
     expect(storage._store.get('userTimezone')).toBe('Europe/Amsterdam');
-
-    await instance.provision('user-1', { userTimezone: null });
-
-    expect(storage._store.get('userTimezone')).toBeNull();
+    expect(storage._store.get('userLocation')).toBeNull();
   });
 
   it('creates the initial volume in the freshly ensured Fly app', async () => {

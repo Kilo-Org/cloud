@@ -640,8 +640,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
+    const previousUserTimezone = this.s.userTimezone ?? null;
+    const previousUserLocation = this.s.userLocation ?? null;
     const userTimezone =
-      config.userTimezone === undefined ? (this.s.userTimezone ?? null) : config.userTimezone;
+      config.userTimezone === undefined ? previousUserTimezone : config.userTimezone;
+    const userLocation =
+      config.userLocation === undefined ? previousUserLocation : config.userLocation;
+    const shouldWriteUserProfile =
+      !isNew &&
+      this.s.status === 'running' &&
+      (userTimezone !== previousUserTimezone || userLocation !== previousUserLocation) &&
+      (userTimezone !== null || userLocation !== null);
 
     const configFields = {
       userId,
@@ -655,6 +664,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
       kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
       userTimezone,
+      userLocation,
       kiloExaSearchMode: config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null,
       channels: config.channels ?? null,
       machineSize: config.machineSize ?? this.s.machineSize ?? null,
@@ -714,6 +724,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.kilocodeApiKeyExpiresAt = config.kilocodeApiKeyExpiresAt ?? null;
     this.s.kilocodeDefaultModel = config.kilocodeDefaultModel ?? null;
     this.s.userTimezone = userTimezone;
+    this.s.userLocation = userLocation;
     this.s.kiloExaSearchMode = config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null;
     this.s.channels = config.channels ?? null;
     this.s.machineSize = config.machineSize ?? this.s.machineSize ?? null;
@@ -728,6 +739,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.instanceReadyEmailSent = false;
     }
     this.s.loaded = true;
+
+    if (shouldWriteUserProfile) {
+      await gateway.writeUserProfile(this.s, this.env, {
+        userTimezone,
+        userLocation,
+      });
+    }
 
     // Set up the default Stream Chat channel on first provision (best-effort).
     // The bot and channel are created server-side here so the API secret never

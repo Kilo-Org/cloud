@@ -6,6 +6,7 @@ import {
   GatewayProcessStatusSchema,
   GatewayCommandResponseSchema,
   BotIdentityResponseSchema,
+  UserProfileResponseSchema,
   ConfigRestoreResponseSchema,
   ControllerVersionResponseSchema,
   GatewayReadyResponseSchema,
@@ -215,6 +216,24 @@ export function writeBotIdentity(
     'POST',
     BotIdentityResponseSchema,
     botIdentity
+  );
+}
+
+export function writeUserProfile(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  userProfile: {
+    userTimezone?: string | null;
+    userLocation?: string | null;
+  }
+): Promise<{ ok: boolean; path: string }> {
+  return callGatewayController(
+    state,
+    env,
+    '/_kilo/user-profile',
+    'POST',
+    UserProfileResponseSchema,
+    userProfile
   );
 }
 

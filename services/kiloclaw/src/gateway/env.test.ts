@@ -149,6 +149,24 @@ describe('buildEnvVars', () => {
     expect(result.env.KILOCLAW_USER_TIMEZONE).toBeUndefined();
   });
 
+  it('passes user location in sensitive bucket', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      userLocation: 'Amsterdam, North Holland, Netherlands',
+    });
+
+    expect(result.sensitive.KILOCLAW_USER_LOCATION).toBe('Amsterdam, North Holland, Netherlands');
+    expect(result.env.KILOCLAW_USER_LOCATION).toBeUndefined();
+  });
+
+  it('does not set KILOCLAW_USER_LOCATION when absent', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {});
+
+    expect(result.sensitive.KILOCLAW_USER_LOCATION).toBeUndefined();
+    expect(result.env.KILOCLAW_USER_LOCATION).toBeUndefined();
+  });
+
   it('puts decrypted secrets in sensitive bucket', async () => {
     const env = createMockEnv({
       AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey,

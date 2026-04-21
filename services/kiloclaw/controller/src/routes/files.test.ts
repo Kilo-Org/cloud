@@ -11,6 +11,7 @@ vi.mock('node:fs', () => ({
     statSync: vi.fn(),
     mkdirSync: vi.fn(),
     unlinkSync: vi.fn(),
+    copyFileSync: vi.fn(),
     realpathSync: vi.fn((p: string) => p), // identity by default (no symlinks)
   },
 }));
@@ -96,6 +97,30 @@ describe('file routes', () => {
       const body = (await res.json()) as any;
       expect(body.path).toBe('workspace/IDENTITY.md');
       expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(`${ROOT}/workspace/BOOTSTRAP.md`);
+    });
+  });
+
+  describe('POST /_kilo/user-profile', () => {
+    it('writes workspace/USER.md with location', async () => {
+      vi.mocked(fs.existsSync).mockImplementation(
+        (path: any) => typeof path === 'string' && path !== `${ROOT}/workspace/USER.md`
+      );
+
+      const res = await app.request('/_kilo/user-profile', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ userLocation: 'Amsterdam, North Holland, Netherlands' }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(atomicWrite).toHaveBeenCalledWith(
+        `${ROOT}/workspace/USER.md`,
+        expect.stringContaining('- Location: Amsterdam, North Holland, Netherlands')
+      );
+
+      const body = (await res.json()) as any;
+      expect(body.path).toBe('workspace/USER.md');
+      expect(vi.mocked(fs.copyFileSync)).toHaveBeenCalled();
     });
   });
 

@@ -3,22 +3,9 @@
 import { useEffect, useRef } from 'react';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { Brain, ChevronRight, MessageSquare, Sun, Wrench, Zap } from 'lucide-react';
-import { toast } from 'sonner';
-import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { KILO_AUTO_BALANCED_MODEL } from '@/lib/kilo-auto';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-
-type ClawMutations = ReturnType<typeof useKiloClawMutations>;
-
-function getBrowserTimeZone(): string | undefined {
-  try {
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return typeof timeZone === 'string' && timeZone.trim() ? timeZone : undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 type CreateInstanceCardViewProps = {
   isPending?: boolean;
@@ -111,13 +98,11 @@ export function CreateInstanceCardView({
 }
 
 export function CreateInstanceCard({
-  mutations,
-  onProvisionStart,
-  onProvisionFailed,
+  isPending = false,
+  onCreate,
 }: {
-  mutations: ClawMutations;
-  onProvisionStart?: () => void;
-  onProvisionFailed?: () => void;
+  isPending?: boolean;
+  onCreate: () => void;
 }) {
   // Evaluate the landing-page experiment flag so PostHog attaches
   // $feature/button-vs-card to events fired in this component.
@@ -131,35 +116,12 @@ export function CreateInstanceCard({
     posthog?.capture('claw_page_viewed');
   }, [posthog]);
 
-  const selectedModel = KILO_AUTO_BALANCED_MODEL.id;
   function handleCreate() {
     posthog?.capture('claw_create_instance_clicked', {
-      selected_model: selectedModel,
+      selected_model: KILO_AUTO_BALANCED_MODEL.id,
     });
-
-    // Enter the onboarding wizard before the mutation fires so the UI
-    // shows the wizard immediately instead of racing with status polling.
-    onProvisionStart?.();
-
-    mutations.provision.mutate(
-      {
-        kilocodeDefaultModel: `kilocode/${selectedModel}`,
-        userTimezone: getBrowserTimeZone(),
-      },
-      {
-        onError: err => {
-          posthog?.capture('claw_setup_provision_failed', {
-            selected_model: selectedModel,
-            reason: 'provision_request_failed',
-          });
-          onProvisionFailed?.();
-          toast.error(`Failed to create: ${err.message}`);
-        },
-      }
-    );
+    onCreate();
   }
 
-  return (
-    <CreateInstanceCardView isPending={mutations.provision.isPending} onCreate={handleCreate} />
-  );
+  return <CreateInstanceCardView isPending={isPending} onCreate={handleCreate} />;
 }

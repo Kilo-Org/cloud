@@ -50,6 +50,7 @@ export type WastelandCredentialResult = {
   encrypted_token: string;
   dolthub_org: string;
   rig_handle: string | null;
+  is_upstream_admin: boolean;
   connected_at: string;
 };
 
@@ -150,28 +151,36 @@ export class WastelandDO extends DurableObject<Env> {
     return memberOps.updateMember(this.sql, id, memberId, update);
   }
 
-  async storeCredential(
-    userId: string,
-    encryptedToken: string,
-    dolthubOrg: string,
-    rigHandle?: string
-  ): Promise<WastelandCredentialResult> {
+  async storeCredential(input: {
+    userId: string;
+    encryptedToken: string;
+    dolthubOrg: string;
+    rigHandle?: string;
+    isUpstreamAdmin?: boolean;
+  }): Promise<WastelandCredentialResult> {
     const id = this.wastelandId ?? (await this.getConfig())?.wasteland_id;
     if (!id) throw new Error('Wasteland not initialized');
-    return credentialOps.storeCredential(
-      this.sql,
-      id,
-      userId,
-      encryptedToken,
-      dolthubOrg,
-      rigHandle
-    );
+    return credentialOps.storeCredential(this.sql, id, input.userId, {
+      encryptedToken: input.encryptedToken,
+      dolthubOrg: input.dolthubOrg,
+      rigHandle: input.rigHandle,
+      isUpstreamAdmin: input.isUpstreamAdmin,
+    });
   }
 
   async getCredential(userId: string): Promise<WastelandCredentialResult | null> {
     const id = this.wastelandId ?? (await this.getConfig())?.wasteland_id;
     if (!id) return null;
     return credentialOps.getCredential(this.sql, id, userId);
+  }
+
+  async setIsUpstreamAdmin(
+    userId: string,
+    isUpstreamAdmin: boolean
+  ): Promise<WastelandCredentialResult | null> {
+    const id = this.wastelandId ?? (await this.getConfig())?.wasteland_id;
+    if (!id) return null;
+    return credentialOps.setIsUpstreamAdmin(this.sql, id, userId, isUpstreamAdmin);
   }
 
   async deleteCredential(userId: string): Promise<void> {

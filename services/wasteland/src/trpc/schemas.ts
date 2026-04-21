@@ -40,6 +40,7 @@ export const WastelandCredentialStatusOutput = z.object({
   user_id: z.string(),
   dolthub_org: z.string(),
   rig_handle: z.string().nullable(),
+  is_upstream_admin: z.boolean(),
   connected_at: z.string(),
 });
 

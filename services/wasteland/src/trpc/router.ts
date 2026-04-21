@@ -435,6 +435,7 @@ export const wastelandRouter = router({
         doltCredsJwk: z.string().optional(),
         doltUserName: z.string().optional(),
         doltUserEmail: z.string().email().optional(),
+        isUpstreamAdmin: z.boolean().optional(),
       })
     )
     .output(RpcWastelandCredentialStatusOutput)
@@ -454,12 +455,13 @@ export const wastelandRouter = router({
       const encryptedToken = await encryptToken(input.dolthubToken, cryptoKey);
 
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
-      const credential = await stub.storeCredential(
-        ctx.userId,
+      const credential = await stub.storeCredential({
+        userId: ctx.userId,
         encryptedToken,
-        input.dolthubOrg,
-        input.rigHandle
-      );
+        dolthubOrg: input.dolthubOrg,
+        rigHandle: input.rigHandle,
+        isUpstreamAdmin: input.isUpstreamAdmin,
+      });
 
       // Inject token and config into the container env vars (persisted
       // for next boot) and tell the running container to init immediately.
@@ -510,6 +512,7 @@ export const wastelandRouter = router({
         user_id: credential.user_id,
         dolthub_org: credential.dolthub_org,
         rig_handle: credential.rig_handle,
+        is_upstream_admin: credential.is_upstream_admin,
         connected_at: credential.connected_at,
       };
     }),
@@ -533,6 +536,32 @@ export const wastelandRouter = router({
         user_id: credential.user_id,
         dolthub_org: credential.dolthub_org,
         rig_handle: credential.rig_handle,
+        is_upstream_admin: credential.is_upstream_admin,
+        connected_at: credential.connected_at,
+      };
+    }),
+
+  // ── Credential: Set upstream-admin flag ─────────────────────────────
+  // Lets a user flip the "I own this upstream" checkbox after connect.
+
+  setUpstreamAdmin: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        isUpstreamAdmin: z.boolean(),
+      })
+    )
+    .output(RpcWastelandCredentialStatusOutput.nullable())
+    .mutation(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      const stub = getWastelandDOStub(ctx.env, input.wastelandId);
+      const credential = await stub.setIsUpstreamAdmin(ctx.userId, input.isUpstreamAdmin);
+      if (!credential) return null;
+      return {
+        user_id: credential.user_id,
+        dolthub_org: credential.dolthub_org,
+        rig_handle: credential.rig_handle,
+        is_upstream_admin: credential.is_upstream_admin,
         connected_at: credential.connected_at,
       };
     }),

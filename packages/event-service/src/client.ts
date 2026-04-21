@@ -195,7 +195,11 @@ export class EventServiceClient {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect().catch(() => {
-        // will retry again via onclose
+        // connect() may fail before a WebSocket is created (e.g. ticket fetch
+        // failure), so onclose won't fire. Schedule another reconnect manually.
+        if (!this.destroyed) {
+          this.scheduleReconnect();
+        }
       });
     }, delay);
   }

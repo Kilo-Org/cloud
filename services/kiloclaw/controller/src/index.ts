@@ -12,7 +12,8 @@ import {
 } from './proxy';
 import { createSupervisor } from './supervisor';
 import type { Supervisor } from './supervisor';
-import { registerHealthRoute } from './routes/health';
+import { registerHealthRoute, startKiloChatHealthProbe } from './routes/health';
+import type { KiloChatHealthProbe } from './routes/health';
 import { registerGatewayRoutes } from './routes/gateway';
 import { registerConfigRoutes } from './routes/config';
 import { registerPairingRoutes } from './routes/pairing';
@@ -387,17 +388,13 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   }
 
   const honoApp = new Hono();
-  registerHealthRoute(honoApp, supervisor, config.expectedToken, controllerState);
-  registerGatewayRoutes(honoApp, supervisor, config.expectedToken);
-  registerConfigRoutes(honoApp, supervisor, config.expectedToken);
-  registerPairingRoutes(honoApp, pairingCache, config.expectedToken);
-  registerEnvRoutes(honoApp, supervisor, config.expectedToken);
-  registerGoogleOAuthTokenRoutes(honoApp, config.expectedToken, googleOAuthTokenProvider);
-  registerGmailPushRoute(honoApp, gmailWatchSupervisor ?? null, config.expectedToken);
+
   // kilo-chat channel: the controller forwards its own per-sandbox gateway
   // token directly to the kilo-chat Worker. No kiloclaw Worker middleman.
+  let kiloChatHealthProbe: KiloChatHealthProbe | undefined;
   const kiloChatBaseUrl = env.KILOCHAT_BASE_URL || undefined;
   if (env.KILOCLAW_SANDBOX_ID && kiloChatBaseUrl) {
+    kiloChatHealthProbe = startKiloChatHealthProbe({ kiloChatBaseUrl });
     const kiloChatOpts = {
       expectedToken: config.expectedToken,
       sandboxId: env.KILOCLAW_SANDBOX_ID,
@@ -413,6 +410,20 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     registerKiloChatGetMembersRoute(honoApp, kiloChatOpts);
     registerKiloChatRenameRoute(honoApp, kiloChatOpts);
   }
+
+  registerHealthRoute(
+    honoApp,
+    supervisor,
+    config.expectedToken,
+    controllerState,
+    kiloChatHealthProbe
+  );
+  registerGatewayRoutes(honoApp, supervisor, config.expectedToken);
+  registerConfigRoutes(honoApp, supervisor, config.expectedToken);
+  registerPairingRoutes(honoApp, pairingCache, config.expectedToken);
+  registerEnvRoutes(honoApp, supervisor, config.expectedToken);
+  registerGoogleOAuthTokenRoutes(honoApp, config.expectedToken, googleOAuthTokenProvider);
+  registerGmailPushRoute(honoApp, gmailWatchSupervisor ?? null, config.expectedToken);
   registerInboundEmailRoute(honoApp, supervisor, config.expectedToken, config.hooksToken);
   registerFileRoutes(honoApp, config.expectedToken, '/root/.openclaw');
   registerKiloCliRunRoutes(honoApp, config.expectedToken);

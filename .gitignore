@@ -66,6 +66,8 @@ yarn-error.log*
 /prototypes/
 .plan/
 .kilo/plans
+.superpowers/
+docs/superpowers/
 
 # legacy config (migrated to .kilo/)
 .kilocode/

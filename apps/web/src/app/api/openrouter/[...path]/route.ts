@@ -207,10 +207,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
-  if (
-    requestBodyParsed.kind === 'chat_completions' ||
-    requestBodyParsed.kind === 'messages'
-  ) {
+  if (requestBodyParsed.kind === 'chat_completions' || requestBodyParsed.kind === 'messages') {
     if (!Array.isArray(requestBodyParsed.body.messages)) {
       return invalidRequestResponse();
     }

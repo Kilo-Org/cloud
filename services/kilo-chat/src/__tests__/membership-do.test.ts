@@ -95,4 +95,47 @@ describe('MembershipDO', () => {
     const result = await stub.listConversations();
     expect(result).toEqual({ conversations: [], total: 0 });
   });
+
+  it('removeConversationsBySandbox - deletes only matching sandbox rows', async () => {
+    const stub = getStub('user-sandbox-cleanup');
+    await stub.addConversation({
+      conversationId: 'conv-a',
+      conversationTitle: 'Chat A',
+      sandboxId: 'sandbox-doomed',
+      joinedAt: 1000,
+    });
+    await stub.addConversation({
+      conversationId: 'conv-b',
+      conversationTitle: 'Chat B',
+      sandboxId: 'sandbox-doomed',
+      joinedAt: 2000,
+    });
+    await stub.addConversation({
+      conversationId: 'conv-c',
+      conversationTitle: 'Chat C',
+      sandboxId: 'sandbox-keep',
+      joinedAt: 3000,
+    });
+
+    await stub.removeConversationsBySandbox('sandbox-doomed');
+
+    const result = await stub.listConversations();
+    expect(result.total).toBe(1);
+    expect(result.conversations[0].conversationId).toBe('conv-c');
+  });
+
+  it('removeConversationsBySandbox - no-op when sandbox has no conversations', async () => {
+    const stub = getStub('user-sandbox-noop');
+    await stub.addConversation({
+      conversationId: 'conv-1',
+      conversationTitle: null,
+      sandboxId: 'sandbox-other',
+      joinedAt: 1000,
+    });
+
+    await stub.removeConversationsBySandbox('sandbox-nonexistent');
+
+    const result = await stub.listConversations();
+    expect(result.total).toBe(1);
+  });
 });

@@ -16,6 +16,8 @@ export interface UserDisplayInfo {
  * - Avatar: auth provider avatar_url → google_user_image_url → null
  * - When a user has multiple auth providers, pick the row with the most recent
  *   created_at that has a non-null display_name; if none, use the most recent row.
+ * - Avatar follows the same row as display_name (the display_name winner's avatar
+ *   is used even if a more recent provider row exists without a display_name).
  */
 export async function resolveUserDisplayInfo(
   connectionString: string,
@@ -122,6 +124,10 @@ export async function resolveUserDisplayInfo(
 /**
  * Batch-queries kilocode_users to confirm which IDs exist.
  * Returns { valid: string[]; invalid: string[] }.
+ *
+ * Note: This does not handle bot IDs (prefix `bot:`). Callers should only
+ * pass human user IDs — bot IDs will be reported as invalid since they don't
+ * exist in the kilocode_users table.
  */
 export async function validateUserIds(
   connectionString: string,

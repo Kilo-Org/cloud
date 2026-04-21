@@ -119,20 +119,24 @@ describe('kilo-chat messaging adapter', () => {
 });
 
 describe('kilo-chat actions adapter', () => {
-  it('describeMessageTool returns all three actions', () => {
+  it('describeMessageTool returns all five actions', () => {
     const adapter = kiloChatPlugin.actions;
     expect(adapter).toBeDefined();
     const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
     expect(discovery?.actions).toContain('react');
     expect(discovery?.actions).toContain('read');
     expect(discovery?.actions).toContain('member-info');
+    expect(discovery?.actions).toContain('edit');
+    expect(discovery?.actions).toContain('delete');
   });
 
-  it('supportsAction returns true for react, read, member-info and false for pin', () => {
+  it('supportsAction returns true for react, read, member-info, edit, delete and false for pin', () => {
     const adapter = kiloChatPlugin.actions;
     expect(adapter?.supportsAction?.({ action: 'react' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'read' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'member-info' as never })).toBe(true);
+    expect(adapter?.supportsAction?.({ action: 'edit' as never })).toBe(true);
+    expect(adapter?.supportsAction?.({ action: 'delete' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'pin' as never })).toBe(false);
   });
 

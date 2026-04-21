@@ -6,6 +6,8 @@ import {
 import type { ChannelMessageActionContext, OpenClawConfig } from 'openclaw/plugin-sdk/core';
 import { createKiloChatClient } from './client';
 import { resolveControllerUrl, resolveGatewayToken } from './env';
+import { handleKiloChatDeleteAction } from './delete-action';
+import { handleKiloChatEditAction } from './edit-action';
 import { handleKiloChatMemberInfoAction } from './member-info-action';
 import { handleKiloChatReadAction } from './read-action';
 import { handleKiloChatReactAction } from './react-action';
@@ -101,10 +103,14 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
     },
     actions: {
       describeMessageTool: () => ({
-        actions: ['react', 'read', 'member-info'] as const,
+        actions: ['react', 'read', 'member-info', 'edit', 'delete'] as const,
       }),
       supportsAction: ({ action }: { action: string }) =>
-        action === 'react' || action === 'read' || action === 'member-info',
+        action === 'react' ||
+        action === 'read' ||
+        action === 'member-info' ||
+        action === 'edit' ||
+        action === 'delete',
       resolveExecutionMode: () => 'local' as const,
       handleAction: async (ctx: ChannelMessageActionContext) => {
         const client = makeClient();
@@ -117,6 +123,20 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         }
         if (ctx.action === 'member-info') {
           return handleKiloChatMemberInfoAction({
+            params: ctx.params,
+            toolContext: ctx.toolContext,
+            client,
+          });
+        }
+        if (ctx.action === 'edit') {
+          return handleKiloChatEditAction({
+            params: ctx.params,
+            toolContext: ctx.toolContext,
+            client,
+          });
+        }
+        if (ctx.action === 'delete') {
+          return handleKiloChatDeleteAction({
             params: ctx.params,
             toolContext: ctx.toolContext,
             client,

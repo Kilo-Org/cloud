@@ -108,7 +108,7 @@ export class KiloChatClient {
   ): Promise<{ ok: true }> {
     return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'DELETE',
-      body: { conversationId, emoji },
+      query: { conversationId, emoji },
     });
   }
 

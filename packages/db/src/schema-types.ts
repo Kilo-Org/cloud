@@ -629,13 +629,33 @@ export const OpenRouterProvider = z.object({
   name: z.string(),
   displayName: z.string(),
   slug: z.string(),
+  baseUrl: z.string().optional(),
   dataPolicy: z.object({
     training: z.boolean(),
+    trainingOpenRouter: z.boolean().optional(),
     retainsPrompts: z.boolean(),
     canPublish: z.boolean(),
+    termsOfServiceURL: z.string().optional(),
+    privacyPolicyURL: z.string().optional(),
+    requiresUserIDs: z.boolean().optional(),
+    retentionDays: z.number().optional(),
   }),
   headquarters: z.string().optional(),
   datacenters: z.array(z.string()).optional(),
+  regionOverrides: z.record(z.string(), z.unknown()).optional(),
+  hasChatCompletions: z.boolean().optional(),
+  hasCompletions: z.boolean().optional(),
+  isAbortable: z.boolean().optional(),
+  moderationRequired: z.boolean().optional(),
+  editors: z.array(z.string()).optional(),
+  owners: z.array(z.string()).optional(),
+  adapterName: z.string().optional(),
+  isMultipartSupported: z.boolean().optional(),
+  statusPageUrl: z.string().nullable().optional(),
+  byokEnabled: z.boolean().optional(),
+  sendClientIp: z.boolean().optional(),
+  pricingStrategy: z.string().optional(),
+  ignoredProviderModels: z.array(z.string()).optional(),
   icon: z
     .object({
       url: z.string(),
@@ -653,23 +673,7 @@ export const OpenRouterProvidersResponse = z.union([
 ]);
 
 export type NormalizedProvider = z.infer<typeof NormalizedProvider>;
-export const NormalizedProvider = z.object({
-  name: z.string(),
-  displayName: z.string(),
-  slug: z.string(),
-  dataPolicy: z.object({
-    training: z.boolean(),
-    retainsPrompts: z.boolean(),
-    canPublish: z.boolean(),
-  }),
-  headquarters: z.string().optional(),
-  datacenters: z.array(z.string()).optional(),
-  icon: z
-    .object({
-      url: z.string(),
-      className: z.string().optional(),
-    })
-    .optional(),
+export const NormalizedProvider = OpenRouterProvider.extend({
   models: z.array(OpenRouterModel),
 });
 

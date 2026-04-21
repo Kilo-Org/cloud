@@ -218,17 +218,7 @@ async function syncProviders(providers: OpenRouterProvider[]) {
     uniqueModels.sort((a, b) => a.name.localeCompare(b.name));
 
     return {
-      name: data.provider.name,
-      displayName: data.provider.displayName,
-      slug: data.provider.slug,
-      dataPolicy: {
-        training: data.provider.dataPolicy.training,
-        retainsPrompts: data.provider.dataPolicy.retainsPrompts,
-        canPublish: data.provider.dataPolicy.canPublish,
-      },
-      headquarters: data.provider.headquarters,
-      datacenters: data.provider.datacenters,
-      icon: data.provider.icon,
+      ...data.provider,
       models: uniqueModels, // Use deduplicated and sorted models
     };
   });

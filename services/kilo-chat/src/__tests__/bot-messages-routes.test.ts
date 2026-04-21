@@ -937,3 +937,68 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/conversations/:conversationId', () 
     expect(res.status).toBe(401);
   });
 });
+
+// ─── GET /bot/v1/sandboxes/:sandboxId/conversations ─────────────────────────
+
+describe('GET /bot/v1/sandboxes/:sandboxId/conversations', () => {
+  it('returns conversations the bot is a member of (200)', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-list-convs-1');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token}` },
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{
+      conversations: Array<{ conversationId: string; title: string | null }>;
+      total: number;
+    }>();
+    expect(body.total).toBeGreaterThanOrEqual(1);
+    expect(body.conversations.some(c => c.conversationId === conversationId)).toBe(true);
+  });
+
+  it('returns 401 without auth', async () => {
+    const { sandboxId, testEnv } = await setupData('bot-list-convs-noauth');
+    const app = makeBotApp();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      { method: 'GET' },
+      testEnv
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it('respects limit and offset query params', async () => {
+    const { sandboxId, testEnv } = await setupData('bot-list-convs-page');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations?limit=1&offset=0`,
+      {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token}` },
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{
+      conversations: unknown[];
+      limit: number;
+      offset: number;
+    }>();
+    expect(body.limit).toBe(1);
+    expect(body.offset).toBe(0);
+    expect(body.conversations.length).toBeLessThanOrEqual(1);
+  });
+});

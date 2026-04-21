@@ -265,6 +265,54 @@ export async function handleStopTyping(c: HonoCtx) {
   return new Response(null, { status: 204 });
 }
 
+// ─── listBotConversations ────────────────────────────────────────────────────
+
+export async function handleListBotConversations(c: HonoCtx) {
+  const sandboxId = c.req.param('sandboxId');
+  if (!sandboxId) {
+    return c.json({ error: 'sandboxId required' }, 400);
+  }
+
+  const botCallerId = `bot:kiloclaw:${sandboxId}`;
+  const limitParam = c.req.query('limit');
+  const rawLimit = limitParam !== undefined ? Number(limitParam) : 50;
+  const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 50));
+  const offset = Math.max(Number(c.req.query('offset')) || 0, 0);
+
+  const membershipStub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(botCallerId));
+  const { conversations, total } = await membershipStub.listConversations(sandboxId, limit, offset);
+
+  // Enrich each conversation with member info
+  const enriched = await Promise.all(
+    conversations.map(async conv => {
+      const convStub = c.env.CONVERSATION_DO.get(
+        c.env.CONVERSATION_DO.idFromName(conv.conversationId)
+      );
+      const info = await convStub.getInfo();
+      const members = info?.members ?? [];
+
+      const userIds = members.filter(m => m.kind === 'user').map(m => m.id);
+      const displayInfo =
+        userIds.length > 0
+          ? await resolveUserDisplayInfo(c.env.HYPERDRIVE.connectionString, userIds)
+          : new Map();
+
+      return {
+        conversationId: conv.conversationId,
+        title: conv.conversationTitle,
+        lastActivityAt: conv.lastActivityAt,
+        members: members.map(m => ({
+          ...m,
+          displayName: displayInfo.get(m.id)?.displayName ?? null,
+          avatarUrl: displayInfo.get(m.id)?.avatarUrl ?? null,
+        })),
+      };
+    })
+  );
+
+  return c.json({ conversations: enriched, total, limit, offset });
+}
+
 // ─── renameConversation ─────────────────────────────────────────────────────
 
 export async function handleRenameConversation(c: HonoCtx) {

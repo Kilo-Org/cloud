@@ -68,23 +68,24 @@ describe('KiloChatClient', () => {
   });
 
   describe('listMessages', () => {
-    it('parses MessageRow content from JSON string to ContentBlock[]', async () => {
+    it('returns messages with content as ContentBlock[]', async () => {
       const rawMessages = [
         {
           id: '01HXYZ00000ABCDEFGHIJK01',
           senderId: 'u1',
-          content: JSON.stringify([{ type: 'text', text: 'hello' }]),
+          content: [{ type: 'text', text: 'hello' }],
           inReplyToMessageId: null,
-          version: 1,
           updatedAt: null,
+          clientUpdatedAt: null,
           deleted: false,
+          deliveryFailed: false,
+          reactions: [],
         },
       ];
       const fetch = mockFetch(200, { messages: rawMessages });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.listMessages('conv-1');
       expect(res[0].content).toEqual([{ type: 'text', text: 'hello' }]);
-      expect(typeof res[0].content).toBe('object');
     });
 
     it('sends pagination params as query string', async () => {

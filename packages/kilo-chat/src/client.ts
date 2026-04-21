@@ -13,8 +13,6 @@ import type {
   RenameConversationRequest,
   MessageListResponse,
   Message,
-  MessageRow,
-  ContentBlock,
   MessageCreatedEvent,
   MessageUpdatedEvent,
   MessageDeletedEvent,
@@ -28,10 +26,6 @@ import type {
   ConversationReadEvent,
   ConversationActivityEvent,
 } from './types';
-
-function parseMessageRow(row: MessageRow): Message {
-  return { ...row, content: JSON.parse(row.content) as ContentBlock[] };
-}
 
 export class KiloChatClient {
   private readonly es: KiloChatClientConfig['eventService'];
@@ -135,7 +129,7 @@ export class KiloChatClient {
       `/v1/conversations/${conversationId}/messages`,
       { query: { before: opts?.before, limit: opts?.limit } }
     );
-    return res.messages.map(parseMessageRow);
+    return res.messages;
   }
 
   // ── Typed event subscriptions ─────────────────────────────────────────────

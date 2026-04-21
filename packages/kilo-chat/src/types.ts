@@ -52,7 +52,7 @@ export type Message = {
 export type MessageRow = {
   id: string;
   senderId: string;
-  content: string;
+  content: ContentBlock[];
   inReplyToMessageId: string | null;
   updatedAt: number | null;
   clientUpdatedAt: number | null;

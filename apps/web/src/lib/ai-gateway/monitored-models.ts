@@ -1,4 +1,4 @@
-import { AUTO_MODELS, isKiloAutoModel, KILO_AUTO_LEGACY_MODEL } from '@/lib/kilo-auto';
+import { AUTO_MODELS, isKiloAutoModel } from '@/lib/kilo-auto';
 import type { FeatureValue } from '@/lib/feature-detection';
 import { resolveAutoModel } from '@/lib/kilo-auto/resolution';
 import { preferredModels } from '@/lib/ai-gateway/models';
@@ -25,7 +25,7 @@ const VARIATIONS: AutoModelVariation[] = [
 export async function getMonitoredModels() {
   const set = new Set<string>();
 
-  const autoModelIds = [...AUTO_MODELS.map(m => m.id), KILO_AUTO_LEGACY_MODEL];
+  const autoModelIds = AUTO_MODELS.map(m => m.id);
 
   for (const model of autoModelIds) {
     for (const { balance, ...params } of VARIATIONS) {

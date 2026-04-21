@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "31915be2-6ab1-45ad-aef2-a8fcb463d2e3",
+  "id": "24124417-0456-4509-b245-5bf83506a86e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "conversation": {
@@ -79,6 +79,13 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "left_at": {
+          "name": "left_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -138,8 +145,23 @@
           "notNull": false,
           "autoincrement": false
         },
+        "client_updated_at": {
+          "name": "client_updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "deleted": {
           "name": "deleted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "delivery_failed": {
+          "name": "delivery_failed",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

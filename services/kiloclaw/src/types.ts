@@ -71,6 +71,9 @@ export type KiloClawEnv = {
   /** Base URL of the kilo-chat worker for bot HTTP routes. */
   KILOCHAT_BASE_URL?: string;
 
+  /** Service binding to the kilo-chat worker (RPC for destroySandboxData etc.). */
+  KILO_CHAT?: Fetcher;
+
   // PostHog product telemetry
   NEXT_PUBLIC_POSTHOG_KEY?: string;
 

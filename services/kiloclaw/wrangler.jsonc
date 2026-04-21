@@ -106,6 +106,7 @@
       "service": "kiloclaw-billing",
       "entrypoint": "KiloClawBillingService",
     },
+    { "binding": "KILO_CHAT", "service": "kilo-chat" },
   ],
   "vars": {
     "FLY_APP_NAME": "kiloclaw-machines", // Legacy fallback for existing instances

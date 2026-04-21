@@ -1888,6 +1888,22 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
+    // Best-effort: clean up kilo-chat data (conversations, messages, memberships)
+    // for this sandbox. Failure is non-fatal — orphaned data is unreachable.
+    if (this.env.KILO_CHAT && this.s.sandboxId) {
+      try {
+        await (
+          this.env.KILO_CHAT as unknown as {
+            destroySandboxData(sandboxId: string): Promise<unknown>;
+          }
+        ).destroySandboxData(this.s.sandboxId);
+      } catch (err) {
+        doWarn(this.s, 'kilo-chat sandbox cleanup failed (non-fatal)', {
+          error: toLoggable(err),
+        });
+      }
+    }
+
     const destroyRctx = createReconcileContext(this.s, this.env, 'destroy');
     if (this.s.provider === 'fly') {
       const flyConfig = getFlyConfig(this.env, this.s);

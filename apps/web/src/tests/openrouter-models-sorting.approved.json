@@ -192,7 +192,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 3,
+      "preferredIndex": 4,
       "isFree": true,
       "opencode": {
         "ai_sdk_provider": "openai-compatible",
@@ -266,7 +266,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 4,
+      "preferredIndex": 5,
       "isFree": true,
       "opencode": {
         "ai_sdk_provider": "openai"
@@ -317,7 +317,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 5,
+      "preferredIndex": 6,
       "isFree": true,
       "opencode": {}
     },

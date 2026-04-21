@@ -22,6 +22,7 @@ import {
   Network,
   KeyRound,
   Copy,
+  Megaphone,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -91,6 +92,11 @@ const financialItems: MenuItem[] = [
     title: () => 'Credit Categories',
     url: '/admin/credit-categories',
     icon: () => <DollarSign />,
+  },
+  {
+    title: () => 'Credit Campaigns',
+    url: '/admin/credit-campaigns',
+    icon: () => <Megaphone />,
   },
   {
     title: () => 'Bulk Credits & Trials',

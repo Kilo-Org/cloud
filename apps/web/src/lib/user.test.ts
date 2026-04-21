@@ -43,6 +43,7 @@ import {
   kiloclaw_admin_audit_logs,
   user_push_tokens,
   security_advisor_scans,
+  credit_campaigns,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import {
@@ -88,6 +89,7 @@ describe('User', () => {
     await db.delete(organization_audit_logs);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
+    await db.delete(credit_campaigns);
     await db.delete(kiloclaw_google_oauth_connections);
     await db.delete(kiloclaw_inbound_email_aliases);
     await db.delete(security_analysis_queue);
@@ -657,6 +659,44 @@ describe('User', () => {
       expect(logs).toHaveLength(1);
       expect(logs[0].target_user_id).toBe('deleted-user');
       expect(logs[0].actor_email).toBe(adminUser.google_user_email); // admin not anonymized
+    });
+
+    it('should anonymize credit_campaigns created_by_kilo_user_id', async () => {
+      const creator = await insertTestUser();
+      const otherAdmin = await insertTestUser();
+
+      await db.insert(credit_campaigns).values([
+        {
+          slug: 'sdu-mine',
+          credit_category: 'c-sdu-mine',
+          amount_microdollars: 1_000_000,
+          total_redemptions_allowed: 10,
+          description: 'campaign created by soft-deleted user',
+          created_by_kilo_user_id: creator.id,
+        },
+        {
+          slug: 'sdu-other',
+          credit_category: 'c-sdu-other',
+          amount_microdollars: 1_000_000,
+          total_redemptions_allowed: 10,
+          description: 'campaign created by another admin',
+          created_by_kilo_user_id: otherAdmin.id,
+        },
+      ]);
+
+      await softDeleteUser(creator.id);
+
+      const mine = await db
+        .select()
+        .from(credit_campaigns)
+        .where(eq(credit_campaigns.slug, 'sdu-mine'));
+      expect(mine[0].created_by_kilo_user_id).toBe('deleted-user');
+
+      const other = await db
+        .select()
+        .from(credit_campaigns)
+        .where(eq(credit_campaigns.slug, 'sdu-other'));
+      expect(other[0].created_by_kilo_user_id).toBe(otherAdmin.id);
     });
 
     it('should delete security_analysis_owner_state rows for the user', async () => {

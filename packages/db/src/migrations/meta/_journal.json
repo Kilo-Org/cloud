@@ -694,6 +694,27 @@
       "when": 1776724301780,
       "tag": "0098_google_oauth_kiloclaw_broker",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1776794152344,
+      "tag": "0099_credit_campaigns",
+      "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1776797574079,
+      "tag": "0100_credit_campaigns_amount_integer",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1776802028288,
+      "tag": "0101_credit_campaigns_redemptions_notnull",
+      "breakpoints": true
     }
   ]
 }

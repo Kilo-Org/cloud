@@ -1,0 +1,1 @@
+ALTER TABLE "credit_campaigns" ALTER COLUMN "total_redemptions_allowed" SET NOT NULL;

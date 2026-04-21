@@ -512,7 +512,7 @@ async function handleBrowse(req: Request): Promise<Response> {
             sandbox_required, sandbox_scope, sandbox_min_tier,
             created_at, updated_at
      FROM wanted
-     ORDER BY priority ASC, created_at DESC`,
+     ORDER BY GREATEST(COALESCE(updated_at, created_at), COALESCE(created_at, updated_at)) DESC`,
     token
   );
 

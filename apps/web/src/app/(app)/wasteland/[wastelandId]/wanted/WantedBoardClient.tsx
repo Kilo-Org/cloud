@@ -30,7 +30,34 @@ import { toast } from 'sonner';
 
 type WantedItem = WastelandOutputs['wasteland']['browseWantedBoard'][number];
 
-type SortField = 'priority' | 'date';
+type SortField = 'priority' | 'activity';
+
+/**
+ * Parse a DoltHub timestamp. DoltHub returns MySQL DATETIME strings in the
+ * form `"YYYY-MM-DD HH:MM:SS"` without a timezone suffix — the underlying
+ * data is UTC but the string is not ISO-8601, so `new Date(str)` is
+ * browser-dependent (often parsed as local time, producing values that
+ * look hours in the future or past).
+ *
+ * This helper normalizes by treating the value as UTC when no timezone
+ * marker is present.
+ */
+function parseDoltDate(value: unknown): Date | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  // Already has a timezone (Z or ±HH:MM) → trust it.
+  if (/[Zz]|[+-]\d{2}:?\d{2}$/.test(value)) return new Date(value);
+  // MySQL DATETIME `YYYY-MM-DD HH:MM:SS` → treat as UTC.
+  const normalized = value.includes('T') ? `${value}Z` : `${value.replace(' ', 'T')}Z`;
+  const d = new Date(normalized);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Most recent timestamp out of `updated_at` / `created_at`, in epoch ms. */
+function lastActivityMs(item: { created_at?: unknown; updated_at?: unknown }): number {
+  const updated = parseDoltDate(item.updated_at)?.getTime();
+  const created = parseDoltDate(item.created_at)?.getTime();
+  return Math.max(updated ?? 0, created ?? 0);
+}
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -100,7 +127,7 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<SortField>('priority');
+  const [sortField, setSortField] = useState<SortField>('activity');
   const [selectedItem, setSelectedItem] = useState<WantedItem | null>(null);
 
   // Dialog state
@@ -154,7 +181,7 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
       if (sortField === 'priority') {
         return (Number(a.priority) || 3) - (Number(b.priority) || 3);
       }
-      return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+      return lastActivityMs(b) - lastActivityMs(a);
     });
 
     return result;
@@ -165,7 +192,7 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
   }, [refreshMutation, wastelandId]);
 
   const toggleSort = useCallback(() => {
-    setSortField(prev => (prev === 'priority' ? 'date' : 'priority'));
+    setSortField(prev => (prev === 'priority' ? 'activity' : 'priority'));
   }, []);
 
   // Keep selected item in sync with fresh data
@@ -247,7 +274,7 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
             className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-white/30 transition-colors hover:bg-white/[0.04] hover:text-white/50"
           >
             <ArrowUpDown className="size-3" />
-            {sortField === 'priority' ? 'Priority' : 'Date'}
+            {sortField === 'priority' ? 'Priority' : 'Last activity'}
           </button>
         </div>
 
@@ -308,14 +335,19 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
                         <span>{String(item.posted_by)}</span>
                       </>
                     )}
-                    {item.created_at && (
-                      <>
-                        <span className="text-white/15">|</span>
-                        <span>
-                          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                        </span>
-                      </>
-                    )}
+                    {(() => {
+                      const activity = Math.max(
+                        parseDoltDate(item.updated_at)?.getTime() ?? 0,
+                        parseDoltDate(item.created_at)?.getTime() ?? 0
+                      );
+                      if (!activity) return null;
+                      return (
+                        <>
+                          <span className="text-white/15">|</span>
+                          <span>{formatDistanceToNow(activity, { addSuffix: true })}</span>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
                 <span
@@ -864,8 +896,10 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
 
 function formatTimestamp(iso: string | null): string {
   if (!iso) return '—';
+  const d = parseDoltDate(iso);
+  if (!d) return iso;
   try {
-    return formatDistanceToNow(new Date(iso), { addSuffix: true });
+    return formatDistanceToNow(d, { addSuffix: true });
   } catch {
     return iso;
   }

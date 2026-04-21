@@ -8,6 +8,7 @@ import {
   handleRemoveReaction,
   handleSetTyping,
   handleStopTyping,
+  handleListMessages,
 } from './handler';
 
 export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
@@ -21,4 +22,8 @@ export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthCont
   );
   app.post('/bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', handleAddReaction);
   app.delete('/bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', handleRemoveReaction);
+  app.get(
+    '/bot/v1/sandboxes/:sandboxId/conversations/:conversationId/messages',
+    handleListMessages
+  );
 }

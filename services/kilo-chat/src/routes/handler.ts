@@ -179,6 +179,28 @@ export async function handleRemoveReaction(c: HonoCtx) {
   return new Response(null, { status: 204 });
 }
 
+// ─── listMessages ────────────────────────────────────────────────────────────
+
+export async function handleListMessages(c: HonoCtx) {
+  const convId = parseConversationId(c);
+  if (!convId.ok) return convId.response;
+
+  const callerId = c.get('callerId');
+  const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
+
+  if (!(await convStub.isMember(callerId))) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
+
+  const beforeParam = c.req.query('before') || undefined;
+  const limitParam = c.req.query('limit');
+  const rawLimit = limitParam !== undefined ? Number(limitParam) : 50;
+  const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 50));
+
+  const result = await convStub.listMessages({ limit, before: beforeParam });
+  return c.json({ messages: result.messages });
+}
+
 // ─── setTyping ───────────────────────────────────────────────────────────────
 
 export async function handleSetTyping(c: HonoCtx) {

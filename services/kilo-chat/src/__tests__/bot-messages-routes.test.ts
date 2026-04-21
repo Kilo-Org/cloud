@@ -608,6 +608,48 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', () =
   });
 });
 
+// ─── GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/messages ──
+
+describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/messages', () => {
+  it('returns messages for a valid bot member', async () => {
+    const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-list-1');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages`,
+      {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token}` },
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{ messages: { id: string }[] }>();
+    expect(Array.isArray(body.messages)).toBe(true);
+    expect(body.messages.some(m => m.id === messageId)).toBe(true);
+  });
+
+  it('returns 403 for a non-member bot', async () => {
+    const { conversationId, testEnv } = await setupData('bot-list-forbidden');
+    const otherSandboxId = 'other-sandbox-list';
+    const app = makeBotApp();
+    const token = await tokenFor(otherSandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${otherSandboxId}/conversations/${conversationId}/messages`,
+      {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token}` },
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(403);
+  });
+});
+
 // ─── DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions ────────
 
 describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', () => {

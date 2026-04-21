@@ -23,6 +23,7 @@ import {
   ModelSettingsSchema,
   OpenClawModelSettingsSchema,
   OpenCodeSettingsSchema,
+  OpenRouterProvider as OpenRouterProviderSchema,
   VersionedSettingsSchema,
 } from '@kilocode/db/schema-types';
 
@@ -161,41 +162,9 @@ export const TimePeriodSchema = z.enum(['week', 'month', 'year', 'all']);
 export type TimePeriod = z.infer<typeof TimePeriodSchema>;
 
 // OpenRouter API Types
-const OpenRouterProviderSchema = z.object({
-  name: z.string(),
-  displayName: z.string(),
-  slug: z.string(),
-  baseUrl: z.string().optional(),
-  dataPolicy: z
-    .object({
-      training: z.boolean().optional(),
-      retainsPrompts: z.boolean().optional(),
-      canPublish: z.boolean().optional(),
-      termsOfServiceURL: z.string().optional(),
-      privacyPolicyURL: z.string().optional(),
-    })
-    .optional(),
-  headquarters: z.string().optional(),
-  datacenters: z.array(z.string()).optional(),
-  hasChatCompletions: z.boolean().optional(),
-  hasCompletions: z.boolean().optional(),
-  isAbortable: z.boolean().optional(),
-  moderationRequired: z.boolean().optional(),
-  editors: z.array(z.string()).optional(),
-  owners: z.array(z.string()).optional(),
-  adapterName: z.string().optional(),
-  isMultipartSupported: z.boolean().optional(),
-  statusPageUrl: z.string().nullable().optional(),
-  byokEnabled: z.boolean().optional(),
-  icon: z
-    .object({
-      url: z.string(),
-      className: z.string().optional(),
-    })
-    .optional(),
-  ignoredProviderModels: z.array(z.string()).optional(),
-});
-
+// OpenRouterProviderSchema is re-exported from @kilocode/db/schema-types so that
+// the frontend-facing parser stays in sync with the Zod schema used to validate
+// the payload synced into Redis by the cron job.
 export const OpenRouterProvidersResponseSchema = z.object({
   data: z.array(OpenRouterProviderSchema),
 });

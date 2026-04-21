@@ -23,6 +23,43 @@ function validateGitLfs() {
 validateGitLfs();
 
 const monorepoRoot = resolve(import.meta.dirname, '../..');
+const docsRedirectHosts = ['docs.kilo.ai', 'docs.kilocode.ai'];
+
+const docsDomainRedirects = docsRedirectHosts.flatMap(host => [
+  {
+    source: '/',
+    has: [
+      {
+        type: 'host',
+        value: host,
+      },
+    ],
+    destination: 'https://kilo.ai/docs',
+    permanent: true,
+  },
+  {
+    source: '/docs/:path*',
+    has: [
+      {
+        type: 'host',
+        value: host,
+      },
+    ],
+    destination: 'https://kilo.ai/docs/:path*',
+    permanent: true,
+  },
+  {
+    source: '/:path*',
+    has: [
+      {
+        type: 'host',
+        value: host,
+      },
+    ],
+    destination: 'https://kilo.ai/docs/:path*',
+    permanent: true,
+  },
+]);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -92,28 +129,7 @@ const nextConfig = {
 
   redirects: async () => {
     return [
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'docs.kilo.ai',
-          },
-        ],
-        destination: 'https://kilo.ai/docs/:path*',
-        permanent: true,
-      },
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'docs.kilocode.ai',
-          },
-        ],
-        destination: 'https://kilo.ai/docs/:path*',
-        permanent: true,
-      },
+      ...docsDomainRedirects,
       {
         source: '/cli/install',
         destination: 'https://raw.githubusercontent.com/Kilo-Org/kilo/refs/heads/dev/install',

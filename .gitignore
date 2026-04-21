@@ -95,6 +95,9 @@ supabase/.temp
 # husky generated hook shims
 .husky/_/
 
+# agent plans
+.opencode/plans/
+
 # misc
 TMP_CI_commit_msg.txt
 *.csv

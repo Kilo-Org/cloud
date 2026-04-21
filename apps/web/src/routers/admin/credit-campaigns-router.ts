@@ -8,7 +8,7 @@ import {
 } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq } from 'drizzle-orm';
 import {
   CREDIT_CAMPAIGN_SLUG_FORMAT,
   credit_categoryForSlug,
@@ -275,8 +275,9 @@ export const creditCampaignsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Campaign not found' });
       }
 
-      // Only expose fields the admin UI renders. No email, no full
-      // user row — minimal API responses rule.
+      // Only expose fields the admin UI renders. Email is included
+      // intentionally (admins need a way to identify who redeemed);
+      // no full user row — minimal API responses rule.
       const rows = await db
         .select({
           transaction_id: credit_transactions.id,
@@ -302,6 +303,21 @@ export const creditCampaignsRouter = createTRPCRouter({
         .limit(input.limit)
         .offset(input.offset);
 
-      return rows;
+      // Return `total` alongside `rows` so the UI can render page
+      // navigation ("showing X of Y") without a second round-trip. A
+      // separate COUNT(*) query is cleaner than a window function here:
+      // the index scan is identical and drizzle's type inference stays
+      // simple.
+      const [totalRow] = await db
+        .select({ n: count() })
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.credit_category, campaign.credit_category),
+            eq(credit_transactions.is_free, true)
+          )
+        );
+
+      return { rows, total: totalRow?.n ?? 0 };
     }),
 });

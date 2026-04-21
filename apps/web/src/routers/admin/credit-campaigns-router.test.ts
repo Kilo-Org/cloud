@@ -273,11 +273,41 @@ describe('creditCampaigns.getRedemptions', () => {
       credit_category: created.credit_category,
     });
 
-    const rows = await caller.admin.creditCampaigns.getRedemptions({ id: created.id });
-    expect(rows).toHaveLength(1);
-    expect(rows[0].kilo_user_id).toBe(redeemer.id);
-    expect(rows[0].user_email).toBe(redeemer.google_user_email);
-    expect(rows[0].amount_microdollars).toBe(5_000_000);
+    const result = await caller.admin.creditCampaigns.getRedemptions({ id: created.id });
+    expect(result.total).toBe(1);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].kilo_user_id).toBe(redeemer.id);
+    expect(result.rows[0].user_email).toBe(redeemer.google_user_email);
+    expect(result.rows[0].amount_microdollars).toBe(5_000_000);
+  });
+
+  it('returns total independent of the limit window', async () => {
+    // `total` should reflect all matching rows even when the limit
+    // returns fewer — otherwise pagination UI ("page X of Y") can't be
+    // built on top of this response.
+    const caller = await createCallerForUser(admin.id);
+    const created = await caller.admin.creditCampaigns.create(
+      makeValidInput({ slug: 'pagecount' })
+    );
+    for (let i = 0; i < 3; i++) {
+      const u = await insertTestUser({
+        google_user_email: `cc-page-${i}-${Math.random()}@example.com`,
+      });
+      await db.insert(credit_transactions).values({
+        kilo_user_id: u.id,
+        amount_microdollars: 1_000_000,
+        is_free: true,
+        credit_category: created.credit_category,
+      });
+    }
+
+    const page = await caller.admin.creditCampaigns.getRedemptions({
+      id: created.id,
+      limit: 2,
+      offset: 0,
+    });
+    expect(page.rows).toHaveLength(2);
+    expect(page.total).toBe(3);
   });
 
   it('returns NOT_FOUND when the campaign does not exist', async () => {

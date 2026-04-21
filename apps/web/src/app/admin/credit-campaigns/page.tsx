@@ -118,12 +118,18 @@ export default function CreditCampaignsPage() {
       onError: err => toast.error(err.message || 'Failed to update campaign'),
     })
   );
+  // Track which campaign id is currently being toggled so we can disable
+  // only that row's Switch. Binding `disabled` to `setActiveMutation.isPending`
+  // would disable every row in the table whenever any toggle is in flight,
+  // which is jarring on a list with many campaigns.
+  const [togglingId, setTogglingId] = useState<number | null>(null);
   const setActiveMutation = useMutation(
     trpc.admin.creditCampaigns.setActive.mutationOptions({
       onSuccess: () => {
         void invalidateList();
       },
       onError: err => toast.error(err.message || 'Failed to toggle campaign'),
+      onSettled: () => setTogglingId(null),
     })
   );
 
@@ -367,10 +373,11 @@ export default function CreditCampaignsPage() {
                             <TableCell>
                               <Switch
                                 checked={c.active}
-                                disabled={setActiveMutation.isPending}
-                                onCheckedChange={checked =>
-                                  setActiveMutation.mutate({ id: c.id, active: checked })
-                                }
+                                disabled={togglingId === c.id}
+                                onCheckedChange={checked => {
+                                  setTogglingId(c.id);
+                                  setActiveMutation.mutate({ id: c.id, active: checked });
+                                }}
                               />
                             </TableCell>
                             <TableCell>{formatDateShort(c.last_redemption_at)}</TableCell>

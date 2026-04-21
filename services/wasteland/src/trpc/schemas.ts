@@ -83,6 +83,30 @@ export const WantedItemOutput = z.object({
   updated_at: z.string(),
 });
 
+// The row shape returned by DoltHub's SQL REST API for the `wanted` table.
+// Values are strings (MySQL DATETIME as 'YYYY-MM-DD HH:MM:SS', priority as
+// stringified integer, etc.). Nulls come through as `null`. All optional
+// fields default to `null` when missing so consumers have a stable shape.
+export const WantedBoardRowOutput = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().nullable().default(null),
+  project: z.string().nullable().default(null),
+  type: z.string().nullable().default(null),
+  priority: z.union([z.string(), z.number()]).nullable().default(null),
+  tags: z.string().nullable().default(null),
+  posted_by: z.string().nullable().default(null),
+  claimed_by: z.string().nullable().default(null),
+  status: z.string(),
+  effort_level: z.string().nullable().default(null),
+  evidence_url: z.string().nullable().default(null),
+  sandbox_required: z.union([z.string(), z.number()]).nullable().default(null),
+  sandbox_scope: z.string().nullable().default(null),
+  sandbox_min_tier: z.string().nullable().default(null),
+  created_at: z.string().nullable().default(null),
+  updated_at: z.string().nullable().default(null),
+});
+
 // ── rpcSafe wrappers ────────────────────────────────────────────────────
 // tRPC's .output() forces TypeScript to check that the handler return type
 // is assignable to the schema's input type. When handlers return values from
@@ -96,3 +120,4 @@ export const RpcWastelandCredentialStatusOutput = rpcSafe(WastelandCredentialSta
 export const RpcWastelandConfigOutput = rpcSafe(WastelandConfigOutput);
 export const RpcConnectedTownOutput = rpcSafe(ConnectedTownOutput);
 export const RpcWantedItemOutput = rpcSafe(WantedItemOutput);
+export const RpcWantedBoardRowOutput = rpcSafe(WantedBoardRowOutput);

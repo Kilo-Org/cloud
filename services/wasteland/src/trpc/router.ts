@@ -22,6 +22,7 @@ import {
   RpcWastelandConfigOutput,
   RpcWastelandCredentialStatusOutput,
   RpcConnectedTownOutput,
+  RpcWantedBoardRowOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
@@ -777,6 +778,7 @@ export const wastelandRouter = router({
 
   browseWantedBoard: procedure
     .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(z.array(RpcWantedBoardRowOutput))
     .query(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {

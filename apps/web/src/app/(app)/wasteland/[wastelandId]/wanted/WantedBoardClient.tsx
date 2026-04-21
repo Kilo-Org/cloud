@@ -53,7 +53,7 @@ function parseDoltDate(value: unknown): Date | null {
 }
 
 /** Most recent timestamp out of `updated_at` / `created_at`, in epoch ms. */
-function lastActivityMs(item: { created_at?: unknown; updated_at?: unknown }): number {
+function lastActivityMs(item: Record<string, unknown>): number {
   const updated = parseDoltDate(item.updated_at)?.getTime();
   const created = parseDoltDate(item.created_at)?.getTime();
   return Math.max(updated ?? 0, created ?? 0);
@@ -314,9 +314,9 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
                     <span className="truncate text-sm text-white/80">{item.title}</span>
                     <Badge
                       variant="outline"
-                      className={`text-[9px] ${TYPE_COLORS[item.type] ?? TYPE_COLORS.other}`}
+                      className={`text-[9px] ${TYPE_COLORS[item.type ?? 'other'] ?? TYPE_COLORS.other}`}
                     >
-                      {item.type}
+                      {item.type ?? 'other'}
                     </Badge>
                     <Badge
                       variant="outline"
@@ -351,9 +351,9 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
                   </div>
                 </div>
                 <span
-                  className={`shrink-0 text-[10px] font-medium ${PRIORITY_COLORS[item.priority] ?? 'text-white/40'}`}
+                  className={`shrink-0 text-[10px] font-medium ${PRIORITY_COLORS[String(item.priority ?? 'medium')] ?? 'text-white/40'}`}
                 >
-                  {item.priority}
+                  {item.priority ?? 'medium'}
                 </span>
               </motion.div>
             ))}
@@ -440,13 +440,16 @@ function WantedDetailPanel({
             <Badge variant="outline" className={STATUS_COLORS[item.status] ?? ''}>
               {item.status}
             </Badge>
-            <Badge variant="outline" className={TYPE_COLORS[item.type] ?? TYPE_COLORS.other}>
-              {item.type}
+            <Badge
+              variant="outline"
+              className={TYPE_COLORS[item.type ?? 'other'] ?? TYPE_COLORS.other}
+            >
+              {item.type ?? 'other'}
             </Badge>
             <span
-              className={`text-xs font-medium ${PRIORITY_COLORS[item.priority] ?? 'text-white/40'}`}
+              className={`text-xs font-medium ${PRIORITY_COLORS[String(item.priority ?? 'medium')] ?? 'text-white/40'}`}
             >
-              {item.priority} priority
+              {item.priority ?? 'medium'} priority
             </span>
           </div>
 

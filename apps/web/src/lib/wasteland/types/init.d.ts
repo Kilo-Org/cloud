@@ -1,5 +1,4 @@
-import type { JwtOrgMembership } from './router';
-
+import type { JwtOrgMembership } from '../middleware/auth.middleware';
 export type TRPCContext = {
   env: Env;
   userId: string;
@@ -18,6 +17,8 @@ export declare const router: import('@trpc/server').TRPCRouterBuilder<{
  * running before tRPC). The userId is extracted from the JWT and set on the
  * Hono context by kiloAuthMiddleware, then forwarded into the tRPC context
  * by the createContext callback in wasteland.worker.ts.
+ *
+ * Also enforces per-user rate limits for operations that have them configured.
  */
 export declare const procedure: import('@trpc/server').TRPCProcedureBuilder<
   TRPCContext,

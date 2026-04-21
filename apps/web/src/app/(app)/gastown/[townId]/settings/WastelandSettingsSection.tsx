@@ -85,6 +85,27 @@ function ConnectedState({
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   const gastownTrpc = useGastownTRPC();
+  const wastelandTrpc = useWastelandTRPC();
+
+  const credentialQuery = useQuery(
+    wastelandTrpc.wasteland.getCredentialStatus.queryOptions({
+      wastelandId: connection.wasteland_id,
+    })
+  );
+  const isUpstreamAdmin = credentialQuery.data?.is_upstream_admin ?? false;
+
+  const setUpstreamAdmin = useMutation(
+    wastelandTrpc.wasteland.setUpstreamAdmin.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: wastelandTrpc.wasteland.getCredentialStatus.queryKey({
+            wastelandId: connection.wasteland_id,
+          }),
+        });
+      },
+      onError: err => toast.error(`Failed to update admin mode: ${err.message}`),
+    })
+  );
 
   const disconnect = useMutation(
     gastownTrpc.gastown.disconnectTownFromWasteland.mutationOptions({
@@ -104,9 +125,17 @@ function ConnectedState({
         <div className="flex items-center gap-3">
           <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
           <div>
-            <p className="text-sm text-white/70">
-              Connected to <span className="font-mono text-emerald-400">{connection.upstream}</span>
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-white/70">
+                Connected to{' '}
+                <span className="font-mono text-emerald-400">{connection.upstream}</span>
+              </p>
+              {isUpstreamAdmin && (
+                <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                  Admin
+                </span>
+              )}
+            </div>
             <p className="text-[11px] text-white/30">
               Rig: <span className="font-mono text-white/50">{connection.rig_handle}</span>
               {' · '}
@@ -129,6 +158,33 @@ function ConnectedState({
           {disconnect.isPending ? 'Disconnecting...' : 'Disconnect'}
         </Button>
       </div>
+
+      <label
+        className={`flex items-start gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3 ${
+          readOnly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={isUpstreamAdmin}
+          disabled={readOnly || setUpstreamAdmin.isPending || credentialQuery.isLoading}
+          onChange={e =>
+            setUpstreamAdmin.mutate({
+              wastelandId: connection.wasteland_id,
+              isUpstreamAdmin: e.target.checked,
+            })
+          }
+          className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-500"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-white/70">I own this upstream (admin mode)</p>
+          <p className="mt-0.5 text-[11px] text-white/30">
+            Enables direct writes, PR merge controls, and the ability to accept contributions.
+            Requires a DoltHub token with push access to{' '}
+            <span className="font-mono text-white/50">{connection.upstream}</span>.
+          </p>
+        </div>
+      </label>
     </div>
   );
 }
@@ -208,6 +264,9 @@ function ConnectWastelandDialog({
   const [dolthubToken, setDolthubToken] = useState('');
   const [dolthubOrg, setDolthubOrg] = useState('');
   const [doltCredsJwk, setDoltCredsJwk] = useState('');
+  // User explicitly attests they own the upstream. Unlocks admin mode
+  // (direct writes, PR merge controls) in the wasteland UI.
+  const [isUpstreamAdmin, setIsUpstreamAdmin] = useState(false);
   // Only editable in the "Create new" flow — when selecting an existing
   // wasteland, its upstream is used.
   const [upstreamInput, setUpstreamInput] = useState(DEFAULT_UPSTREAM);
@@ -246,6 +305,7 @@ function ConnectWastelandDialog({
       setDolthubToken('');
       setDolthubOrg('');
       setDoltCredsJwk('');
+      setIsUpstreamAdmin(false);
       setRigHandle('');
       setDoltUserName('');
       setDoltUserEmail('');
@@ -350,6 +410,7 @@ function ConnectWastelandDialog({
         doltCredsJwk: doltCredsJwk.trim() || undefined,
         doltUserName: doltUserName.trim() || undefined,
         doltUserEmail: doltUserEmail.trim() || undefined,
+        isUpstreamAdmin,
       });
 
       // Connect the town in the wasteland service
@@ -515,6 +576,22 @@ function ConnectWastelandDialog({
                   className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
                 />
               </FieldGroup>
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={isUpstreamAdmin}
+                  onChange={e => setIsUpstreamAdmin(e.target.checked)}
+                  className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-500"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-white/70">I own this upstream</p>
+                  <p className="mt-0.5 text-[11px] text-white/30">
+                    Unlocks admin mode — direct writes, PR merge controls, and the ability to accept
+                    contributions from others. Only check this if your DoltHub token has push access
+                    to the upstream repo. You can toggle this later in settings.
+                  </p>
+                </div>
+              </label>
             </div>
             <DialogFooter>
               <Button

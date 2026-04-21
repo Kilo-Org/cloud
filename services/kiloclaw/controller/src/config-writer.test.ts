@@ -1063,7 +1063,7 @@ describe('generateBaseConfig', () => {
     );
     expect(config.agents.defaults.memorySearch.remote.apiKey).toBe('test-api-key');
     expect(config.agents.defaults.memorySearch.remote.headers).toEqual({
-      'x-kilocode-feature': 'openclaw-embedding',
+      'x-kilocode-feature': 'kiloclaw-embedding',
     });
   });
 
@@ -1096,7 +1096,7 @@ describe('generateBaseConfig', () => {
     };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
     expect(config.agents.defaults.memorySearch.remote.headers).toEqual({
-      'x-kilocode-feature': 'openclaw-embedding',
+      'x-kilocode-feature': 'kiloclaw-embedding',
       'X-KiloCode-OrganizationId': 'org_abc123',
     });
   });

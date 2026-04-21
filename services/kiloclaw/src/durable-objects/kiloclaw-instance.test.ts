@@ -3079,7 +3079,7 @@ describe('updateKiloCodeConfig memory fields', () => {
               baseUrl: 'https://api.kilo.ai/api/gateway/',
               apiKey: 'tok-123',
               headers: {
-                'x-kilocode-feature': 'openclaw-embedding',
+                'x-kilocode-feature': 'kiloclaw-embedding',
                 'X-KiloCode-OrganizationId': 'org_abc',
               },
             },

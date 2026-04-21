@@ -81,6 +81,24 @@ export const ToolsMdSectionSyncResponseSchema = z.object({
   enabled: z.boolean(),
 });
 
+export const OpenclawWorkspaceImportFailureSchema = z.object({
+  path: z.string(),
+  operation: z.enum(['write', 'delete']),
+  error: z.string(),
+  code: z.string().optional(),
+});
+
+export const OpenclawWorkspaceImportResponseSchema = z.object({
+  ok: z.boolean(),
+  attemptedWriteCount: z.number().int().min(0),
+  writtenCount: z.number().int().min(0),
+  attemptedDeleteCount: z.number().int().min(0),
+  deletedCount: z.number().int().min(0),
+  failedCount: z.number().int().min(0),
+  totalUtf8Bytes: z.number().int().min(0),
+  failures: z.array(OpenclawWorkspaceImportFailureSchema),
+});
+
 export class GatewayControllerError extends Error {
   readonly status: number;
   readonly code: string | null;

@@ -38,7 +38,7 @@ type ResolveAutoModelParams = {
 function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
   const parsedMode = modeSchema.safeParse(modeHeader?.trim() ?? '');
   if (parsedMode.success) return parsedMode.data;
-  if (featureHeader === 'kiloclaw' || featureHeader === 'openclaw') return 'KiloClaw' as const;
+  if (featureHeader === 'kiloclaw' || featureHeader === 'openclaw') return 'claw' as const;
   return null;
 }
 

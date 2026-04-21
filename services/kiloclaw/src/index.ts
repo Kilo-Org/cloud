@@ -120,6 +120,20 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   return missing;
 }
 
+function missingGoogleBrokerEnv(env: KiloClawEnv): string[] {
+  const missing: string[] = [];
+  if (!env.GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY) {
+    missing.push('GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY');
+  }
+  if (!env.GOOGLE_WORKSPACE_OAUTH_CLIENT_ID) {
+    missing.push('GOOGLE_WORKSPACE_OAUTH_CLIENT_ID');
+  }
+  if (!env.GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET) {
+    missing.push('GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET');
+  }
+  return missing;
+}
+
 function routingTargetUrl(target: ProviderRoutingTarget, pathname: string, search = ''): string {
   return `${target.origin}${pathname}${search}`;
 }
@@ -172,6 +186,18 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
   return next();
 }
 
+async function requireControllerGoogleEnvVars(c: Context<AppEnv>, next: Next) {
+  const missing = missingGoogleBrokerEnv(c.env);
+  if (missing.length > 0) {
+    console.error('[CONFIG] Controller Google route missing bindings:', missing.join(', '));
+    return c.json(
+      { error: 'Configuration error' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
+  return next();
+}
+
 /** Authenticate user via JWT (Bearer header or cookie). Skip for platform routes. */
 async function authGuard(c: Context<AppEnv>, next: Next) {
   if (isPlatformRoute(c)) {
@@ -203,6 +229,7 @@ async function deriveSandboxId(c: Context<AppEnv>, next: Next) {
 // =============================================================================
 
 const app = new Hono<AppEnv>();
+let didLogGoogleBrokerConfig = false;
 
 // Global middleware (all routes)
 app.use('*', timingMiddleware);
@@ -211,6 +238,10 @@ app.use('*', logRequest);
 // Public routes (no auth)
 app.route('/', publicRoutes);
 app.route('/', accessGatewayRoutes);
+
+// Google OAuth broker controller routes must have full broker config.
+app.use('/api/controller/google', requireControllerGoogleEnvVars);
+app.use('/api/controller/google/*', requireControllerGoogleEnvVars);
 
 // Controller check-in routes (machine-to-worker, custom auth)
 app.route('/api/controller', controller);
@@ -1096,6 +1127,16 @@ app.all('*', async c => {
 
 export default {
   fetch(request: Request, env: KiloClawEnv, ctx: ExecutionContext) {
+    if (!didLogGoogleBrokerConfig) {
+      const missing = missingGoogleBrokerEnv(env);
+      if (missing.length > 0) {
+        console.warn('[CONFIG] Google OAuth broker env incomplete:', missing.join(', '));
+      } else {
+        console.log('[CONFIG] Google OAuth broker env ready');
+      }
+      didLogGoogleBrokerConfig = true;
+    }
+
     // Self-register the current OpenClaw version in KV on deploy.
     // Runs after the response is sent. If the very first request after deploy
     // is a provision(), the KV write races with resolveLatestVersion() —

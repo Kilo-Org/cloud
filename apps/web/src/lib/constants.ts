@@ -51,6 +51,7 @@ export const GASTOWN_URL = process.env.NEXT_PUBLIC_GASTOWN_URL ?? '';
 // Free model rate limits: per-IP for client-side products, per-user for server-side products
 export const FREE_MODEL_RATE_LIMIT_WINDOW_HOURS = 1;
 export const FREE_MODEL_MAX_REQUESTS_PER_WINDOW = 200;
+export const ADMIN_RATE_LIMIT_TEST_MODEL = 'admin-rate-limit-test';
 
 // Stripe publishable key (client-side, inlined at build time)
 export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';

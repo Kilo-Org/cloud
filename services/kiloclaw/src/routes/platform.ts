@@ -14,6 +14,7 @@ import {
   DestroyRequestSchema,
   ChannelsPatchSchema,
   GoogleCredentialsSchema,
+  GoogleOAuthConnectionSchema,
   SecretsPatchSchema,
   InstanceIdParam,
   MachineSizeSchema,
@@ -1338,6 +1339,67 @@ platform.delete('/gmail-notifications', async c => {
     return c.json(updated, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'gmail-notifications disable');
+    return jsonError(message, status);
+  }
+});
+
+const GoogleOAuthConnectionPatchSchema = z.object({
+  userId: z.string().min(1),
+  googleOAuthConnection: GoogleOAuthConnectionSchema,
+});
+
+// POST /api/platform/google-oauth-connection
+platform.post('/google-oauth-connection', async c => {
+  const result = await parseBody(c, GoogleOAuthConnectionPatchSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, googleOAuthConnection } = result.data;
+
+  try {
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub =>
+        stub.updateGoogleOAuthConnection({
+          status: googleOAuthConnection.status,
+          accountEmail: googleOAuthConnection.accountEmail,
+          accountSubject: googleOAuthConnection.accountSubject,
+          scopes: googleOAuthConnection.scopes,
+          capabilities: googleOAuthConnection.capabilities,
+          lastError: googleOAuthConnection.lastError,
+        }),
+      'updateGoogleOAuthConnection'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'google-oauth-connection');
+    return jsonError(message, status);
+  }
+});
+
+// DELETE /api/platform/google-oauth-connection?userId=...
+platform.delete('/google-oauth-connection', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) return c.json({ error: 'userId is required' }, 400);
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.clearGoogleOAuthConnection(),
+      'clearGoogleOAuthConnection'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'google-oauth-connection delete');
     return jsonError(message, status);
   }
 });

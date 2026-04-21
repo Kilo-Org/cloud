@@ -27,6 +27,7 @@ import {
   magic_link_tokens,
   stytch_fingerprints,
   kiloclaw_instances,
+  kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_version_pins,
@@ -87,6 +88,7 @@ describe('User', () => {
     await db.delete(organization_audit_logs);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
+    await db.delete(kiloclaw_google_oauth_connections);
     await db.delete(kiloclaw_inbound_email_aliases);
     await db.delete(security_analysis_queue);
     await db.delete(security_findings);
@@ -1331,6 +1333,71 @@ describe('User', () => {
           .select({ count: count() })
           .from(kiloclaw_inbound_email_reserved_aliases)
           .where(eq(kiloclaw_inbound_email_reserved_aliases.alias, alias))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete kiloclaw_google_oauth_connections for the user instances', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      const [instance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: user.id,
+          sandbox_id: `test-gdpr-oauth-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+      const [otherInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: otherUser.id,
+          sandbox_id: `test-gdpr-oauth-other-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      await db.insert(kiloclaw_google_oauth_connections).values([
+        {
+          instance_id: instance.id,
+          account_email: 'owner@example.com',
+          account_subject: 'owner-subject',
+          oauth_client_id: 'client-owner',
+          refresh_token_encrypted: 'enc-owner',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          capabilities: ['calendar_read'],
+          grants_by_source: { oauth: ['calendar_read'] },
+        },
+        {
+          instance_id: otherInstance.id,
+          account_email: 'other@example.com',
+          account_subject: 'other-subject',
+          oauth_client_id: 'client-other',
+          refresh_token_encrypted: 'enc-other',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          capabilities: ['calendar_read'],
+          grants_by_source: { oauth: ['calendar_read'] },
+        },
+      ]);
+
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, instance.id));
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_google_oauth_connections)
+          .where(eq(kiloclaw_google_oauth_connections.instance_id, instance.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_google_oauth_connections)
+          .where(eq(kiloclaw_google_oauth_connections.instance_id, otherInstance.id))
           .then(r => r[0].count)
       ).toBe(1);
     });

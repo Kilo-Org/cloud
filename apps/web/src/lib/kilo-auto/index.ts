@@ -34,7 +34,7 @@ export const GPT_53_CODEX_ID = 'openai/gpt-5.3-codex';
 export const KILO_AUTO_LEGACY_MODEL = 'kilo/auto'; // hardcoded in upstream OpenClaw
 
 export const modeSchema = z.enum([
-  'KiloClaw',
+  'claw',
   'plan',
   'general',
   'architect',
@@ -66,7 +66,7 @@ const SONNET_FRONTIER: ResolvedAutoModel = {
 export const FRONTIER_CODE_MODEL: ResolvedAutoModel = SONNET_FRONTIER;
 
 export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
-  KiloClaw: OPUS_FRONTIER,
+  claw: OPUS_FRONTIER,
   plan: OPUS_FRONTIER,
   general: OPUS_FRONTIER,
   architect: OPUS_FRONTIER,

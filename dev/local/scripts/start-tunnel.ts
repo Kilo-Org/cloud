@@ -61,6 +61,16 @@ function updateEnvValue(filePath: string, key: string, value: string): void {
   fs.writeFileSync(filePath, content);
 }
 
+function prefixAndWrite(label: string, chunk: Buffer): void {
+  const text = chunk.toString();
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.length === 0 && i === lines.length - 1) continue;
+    process.stderr.write(`[${label}] ${line}\n`);
+  }
+}
+
 if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
   console.error(
     'cloudflared not found on PATH. Install it:\n  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/\n  brew install cloudflared'
@@ -69,57 +79,110 @@ if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
 }
 
 const port = process.argv[2] ?? '3000';
+const controllerPort = process.argv[3] ?? '8795';
 const config = loadTunnelConfig();
 
-let command: string;
-let args: string[];
-let urlPattern: RegExp | null = null;
+const children: Array<{ label: string; child: ReturnType<typeof spawn> }> = [];
+
+function trackChild(label: string, child: ReturnType<typeof spawn>): void {
+  children.push({ label, child });
+}
+
+function stopAllChildren(signal: NodeJS.Signals): void {
+  for (const { child } of children) {
+    child.kill(signal);
+  }
+}
+
+let exiting = false;
+
+function exitAndStopOthers(originLabel: string, code: number | null): void {
+  if (exiting) return;
+  exiting = true;
+  for (const { label, child } of children) {
+    if (label !== originLabel) {
+      child.kill('SIGTERM');
+    }
+  }
+  process.exit(code ?? 1);
+}
+
+function startQuickTunnel(options: {
+  label: string;
+  localPort: string;
+  onUrl: (url: string) => void;
+}): void {
+  const { label, localPort, onUrl } = options;
+  const child = spawn('cloudflared', ['tunnel', '--url', `http://localhost:${localPort}`], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  trackChild(label, child);
+
+  console.log(`Starting quick tunnel (${label}) -> http://localhost:${localPort}...`);
+
+  let captured = false;
+  const urlPattern = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
+  const handleOutput = (data: Buffer) => {
+    prefixAndWrite(label, data);
+
+    if (captured) return;
+    const match = data.toString().match(urlPattern);
+    if (!match) return;
+
+    captured = true;
+    onUrl(match[0]);
+  };
+
+  child.stdout.on('data', handleOutput);
+  child.stderr.on('data', handleOutput);
+  child.on('close', code => exitAndStopOthers(label, code));
+}
 
 if (config.tunnelName) {
-  command = 'cloudflared';
-  args = ['tunnel', 'run', config.tunnelName];
+  const label = 'kiloclaw-tunnel';
+  const child = spawn('cloudflared', ['tunnel', 'run', config.tunnelName], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  trackChild(label, child);
+
   console.log(`Named tunnel: ${config.tunnelName} -> ${config.tunnelHostname}`);
 
   if (config.tunnelHostname) {
     const apiUrl = `https://${config.tunnelHostname}/api/gateway/`;
+    const checkinUrl = `https://${config.tunnelHostname}/api/controller/checkin`;
     updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
+    updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
+    console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
+    console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
   }
+
+  child.stdout.on('data', data => prefixAndWrite(label, data));
+  child.stderr.on('data', data => prefixAndWrite(label, data));
+  child.on('close', code => exitAndStopOthers(label, code));
 } else {
-  command = 'cloudflared';
-  args = ['tunnel', '--url', `http://localhost:${port}`];
-  urlPattern = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
-  console.log(`Starting quick tunnel -> http://localhost:${port}...`);
+  startQuickTunnel({
+    label: 'gateway',
+    localPort: port,
+    onUrl: url => {
+      const apiUrl = `${url}/api/gateway/`;
+      updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
+      console.log(`\nGateway tunnel URL: ${url}`);
+      console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
+    },
+  });
+
+  startQuickTunnel({
+    label: 'controller',
+    localPort: controllerPort,
+    onUrl: url => {
+      const checkinUrl = `${url}/api/controller/checkin`;
+      updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
+      console.log(`\nController tunnel URL: ${url}`);
+      console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
+    },
+  });
 }
-
-const child = spawn(command, args, {
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
-
-function handleOutput(data: Buffer) {
-  process.stderr.write(data);
-
-  if (!urlPattern) return;
-  const match = data.toString().match(urlPattern);
-  if (!match) return;
-
-  const url = match[0];
-  const apiUrl = `${url}/api/gateway/`;
-  updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
-
-  console.log(`\nTunnel URL: ${url}`);
-  console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
-
-  // Only capture once
-  urlPattern = null;
-}
-
-child.stdout.on('data', handleOutput);
-child.stderr.on('data', handleOutput);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(signal, () => child.kill(signal));
+  process.on(signal, () => stopAllChildren(signal));
 }
-
-child.on('close', code => {
-  process.exit(code ?? 1);
-});

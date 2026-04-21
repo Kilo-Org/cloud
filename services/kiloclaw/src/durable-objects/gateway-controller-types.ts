@@ -71,6 +71,11 @@ export const EnvPatchResponseSchema = z.object({
   signaled: z.boolean(),
 });
 
+export const ToolsMdSectionSyncResponseSchema = z.object({
+  ok: z.boolean(),
+  enabled: z.boolean(),
+});
+
 export class GatewayControllerError extends Error {
   readonly status: number;
   readonly code: string | null;

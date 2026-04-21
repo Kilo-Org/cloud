@@ -3,7 +3,12 @@ import {
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { kilocode_users, kiloclaw_access_codes, kiloclaw_instances } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  kiloclaw_access_codes,
+  kiloclaw_google_oauth_connections,
+  kiloclaw_instances,
+} from '@kilocode/db/schema';
 import { eq, and, isNull, gt, sql } from 'drizzle-orm';
 
 export { getWorkerDb, type WorkerDb };
@@ -190,4 +195,69 @@ export async function markInstanceDestroyed(db: WorkerDb, userId: string, sandbo
       userId,
     });
   });
+}
+
+export async function getGoogleOAuthConnectionByInstanceId(db: WorkerDb, instanceId: string) {
+  return await db
+    .select()
+    .from(kiloclaw_google_oauth_connections)
+    .where(eq(kiloclaw_google_oauth_connections.instance_id, instanceId))
+    .limit(1)
+    .then(rows => rows[0] ?? null);
+}
+
+export async function updateGoogleOAuthConnectionTokenData(
+  db: WorkerDb,
+  instanceId: string,
+  patch: {
+    refreshTokenEncrypted?: string;
+    oauthClientId?: string;
+    oauthClientSecretEncrypted?: string | null;
+    credentialProfile?: 'legacy' | 'kilo_owned';
+    scopes?: string[];
+    status?: 'active' | 'action_required' | 'disconnected';
+    lastError?: string | null;
+    lastErrorAt?: string | null;
+  }
+) {
+  const update: Record<string, unknown> = {
+    updated_at: sql`NOW()`,
+  };
+
+  if (patch.refreshTokenEncrypted !== undefined) {
+    update.refresh_token_encrypted = patch.refreshTokenEncrypted;
+  }
+
+  if (patch.oauthClientId !== undefined) {
+    update.oauth_client_id = patch.oauthClientId;
+  }
+
+  if (patch.oauthClientSecretEncrypted !== undefined) {
+    update.oauth_client_secret_encrypted = patch.oauthClientSecretEncrypted;
+  }
+
+  if (patch.credentialProfile !== undefined) {
+    update.credential_profile = patch.credentialProfile;
+  }
+
+  if (patch.scopes !== undefined) {
+    update.scopes = patch.scopes;
+  }
+
+  if (patch.status !== undefined) {
+    update.status = patch.status;
+  }
+
+  if (patch.lastError !== undefined) {
+    update.last_error = patch.lastError;
+  }
+
+  if (patch.lastErrorAt !== undefined) {
+    update.last_error_at = patch.lastErrorAt;
+  }
+
+  await db
+    .update(kiloclaw_google_oauth_connections)
+    .set(update)
+    .where(eq(kiloclaw_google_oauth_connections.instance_id, instanceId));
 }

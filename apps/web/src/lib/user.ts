@@ -44,6 +44,7 @@ import {
   bot_requests,
   cloud_agent_code_reviews,
   kiloclaw_instances,
+  kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
   user_period_cache,
@@ -566,6 +567,7 @@ export class SoftDeletePreconditionError extends Error {
  * - deployments, app_builder_projects (user assets)
  * - stytch_fingerprints (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
+ * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email, name, avatar, urls)
@@ -589,7 +591,7 @@ export class SoftDeletePreconditionError extends Error {
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
- *   kiloclaw_instances/inbound_email_aliases/access_codes, kiloclaw_subscriptions, user_period_cache,
+ *   kiloclaw_instances/inbound_email_aliases/access_codes, user_period_cache,
  *   kilo_pass_scheduled_changes)
  */
 export async function softDeleteUser(userId: string) {
@@ -750,6 +752,18 @@ export async function softDeleteUser(userId: string) {
       .set({ initiated_by_admin_id: null })
       .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
+    // Remove stored Google OAuth credentials for all instances owned by this user.
+    await tx
+      .delete(kiloclaw_google_oauth_connections)
+      .where(
+        inArray(
+          kiloclaw_google_oauth_connections.instance_id,
+          tx
+            .select({ id: kiloclaw_instances.id })
+            .from(kiloclaw_instances)
+            .where(eq(kiloclaw_instances.user_id, userId))
+        )
+      );
     await tx
       .delete(kiloclaw_inbound_email_aliases)
       .where(

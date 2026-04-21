@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
+  ADMIN_RATE_LIMIT_TEST_MODEL,
 } from '@/lib/constants';
 
 export type FreeModelUsageStatsResponse = {
@@ -37,6 +38,8 @@ export async function GET(
     return authFailedResponse;
   }
 
+  const TEST_ROW_FILTER = sql`${free_model_usage.model} != ${ADMIN_RATE_LIMIT_TEST_MODEL}`;
+
   // Get stats for the current rate limit window
   const windowResult = await db
     .select({
@@ -47,7 +50,7 @@ export async function GET(
     })
     .from(free_model_usage)
     .where(
-      sql`${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours'`
+      sql`${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours' AND ${TEST_ROW_FILTER}`
     );
 
   // Count IPs at or above the rate limit threshold using a SQL subquery
@@ -59,7 +62,7 @@ export async function GET(
       sql`(
         SELECT ${free_model_usage.ip_address}
         FROM ${free_model_usage}
-        WHERE ${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours'
+        WHERE ${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours' AND ${TEST_ROW_FILTER}
         GROUP BY ${free_model_usage.ip_address}
         HAVING COUNT(*) >= ${FREE_MODEL_MAX_REQUESTS_PER_WINDOW}
       ) sub`
@@ -74,7 +77,9 @@ export async function GET(
       authenticated_requests: sql<number>`COUNT(*) FILTER (WHERE ${free_model_usage.kilo_user_id} IS NOT NULL)`,
     })
     .from(free_model_usage)
-    .where(sql`${free_model_usage.created_at} >= NOW() - INTERVAL '24 hours'`);
+    .where(
+      sql`${free_model_usage.created_at} >= NOW() - INTERVAL '24 hours' AND ${TEST_ROW_FILTER}`
+    );
 
   const bigIntToNumber = (value: unknown): number => {
     if (value === null || value === undefined) return 0;

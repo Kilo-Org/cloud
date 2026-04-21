@@ -14,6 +14,8 @@ import {
   getGitLabInstanceUrlForOrganization,
   buildGitLabCloneUrl,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { resolveBotSessionProfile } from '@/lib/bot/tools/resolve-bot-session-profile';
+import type { MergeProfileConfigurationResult } from '@/lib/agent/profile-session-config';
 import type OpenAI from 'openai';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
@@ -286,6 +288,17 @@ async function spawnCloudAgentSession(
     ? args.prompt + buildPrSignature(requesterInfo)
     : args.prompt;
 
+  // Apply profile layering (repo-binding + owner default) so bot-spawned
+  // sessions receive env vars, encrypted secrets, and setup commands.
+  // Mirrors the new KiloBot path in apps/web/src/lib/bot/tools/spawn-cloud-agent-session.ts.
+  let profileConfig: MergeProfileConfigurationResult;
+  try {
+    profileConfig = await resolveBotSessionProfile(owner, ticketUserId, args);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { response: `Error resolving profile for Cloud Agent: ${message}` };
+  }
+
   // Build platform-specific prepareInput and initiateInput
   let prepareInput: PrepareSessionInput;
   let initiateInput: { kilocodeOrganizationId?: string };
@@ -328,6 +341,9 @@ async function spawnCloudAgentSession(
       platform: 'gitlab',
       kilocodeOrganizationId,
       createdOnPlatform: 'slack',
+      envVars: profileConfig.envVars,
+      encryptedSecrets: profileConfig.encryptedSecrets,
+      setupCommands: profileConfig.setupCommands,
     };
     initiateInput = { kilocodeOrganizationId };
   } else {
@@ -352,6 +368,9 @@ async function spawnCloudAgentSession(
       githubToken,
       kilocodeOrganizationId,
       createdOnPlatform: 'slack',
+      envVars: profileConfig.envVars,
+      encryptedSecrets: profileConfig.encryptedSecrets,
+      setupCommands: profileConfig.setupCommands,
     };
     initiateInput = { kilocodeOrganizationId };
   }

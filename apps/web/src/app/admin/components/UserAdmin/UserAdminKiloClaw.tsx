@@ -63,6 +63,43 @@ function isInactiveSubscription(subscription: {
   return subscription.status === 'canceled' || isTransferredHistoricalSubscription(subscription);
 }
 
+function getSubscriptionScope(subscription: {
+  instance: {
+    organization_id?: string | null;
+    organization_name?: string | null;
+  } | null;
+}) {
+  if (!subscription.instance?.organization_id) {
+    return {
+      type: 'personal' as const,
+      organizationId: null,
+      organizationName: null,
+    };
+  }
+
+  return {
+    type: 'organization' as const,
+    organizationId: subscription.instance.organization_id,
+    organizationName: subscription.instance.organization_name ?? null,
+  };
+}
+
+function formatSubscriptionScopeValue(subscription: {
+  instance: {
+    organization_id?: string | null;
+    organization_name?: string | null;
+  } | null;
+}) {
+  const scope = getSubscriptionScope(subscription);
+  if (scope.type === 'personal') {
+    return 'personal';
+  }
+
+  return scope.organizationName
+    ? `organization — ${scope.organizationName} (${scope.organizationId})`
+    : `organization — ${scope.organizationId}`;
+}
+
 function getSubscriptionStatusBadgeClass(status: string) {
   switch (status) {
     case 'active':
@@ -237,8 +274,187 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
     ? subscriptions.filter(s => !isInactiveSubscription(s))
     : subscriptions;
   const hiddenCount = subscriptions.length - visibleSubscriptions.length;
+  const personalSubscriptions = subscriptions.filter(
+    subscription => getSubscriptionScope(subscription).type === 'personal'
+  );
+  const organizationSubscriptions = subscriptions.filter(
+    subscription => getSubscriptionScope(subscription).type === 'organization'
+  );
+  const visiblePersonalSubscriptions = visibleSubscriptions.filter(
+    subscription => getSubscriptionScope(subscription).type === 'personal'
+  );
+  const visibleOrganizationSubscriptions = visibleSubscriptions.filter(
+    subscription => getSubscriptionScope(subscription).type === 'organization'
+  );
 
   const cancelingSubscription = subscriptions.find(s => s.id === cancelSubscriptionId);
+
+  const renderSubscriptionCards = (sectionSubscriptions: typeof visibleSubscriptions) => {
+    if (sectionSubscriptions.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-4">
+        {sectionSubscriptions.map(sub => {
+          const scope = getSubscriptionScope(sub);
+          const isTransferred = isTransferredHistoricalSubscription(sub);
+          const isEffective = !isTransferred && sub.id === data?.effectiveSubscriptionId;
+          const canEditTrialEnd =
+            !isTransferred && (sub.status === 'trialing' || sub.status === 'canceled');
+          const isTrialReset = sub.status === 'canceled';
+          const canCancel =
+            !isTransferred &&
+            (sub.status === 'active' || sub.status === 'past_due') &&
+            sub.plan !== 'trial' &&
+            !sub.cancel_at_period_end;
+          const canImmediateCancel =
+            !isTransferred &&
+            (sub.status === 'active' || sub.status === 'past_due') &&
+            sub.plan !== 'trial';
+          const canCancelTrial = !isTransferred && sub.status === 'trialing';
+
+          return (
+            <div
+              key={sub.id}
+              className={`rounded-lg border p-4 ${isEffective ? 'border-blue-500/40 bg-blue-950/10' : ''}`}
+            >
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Badge className={getSubscriptionStatusBadgeClass(sub.status)}>
+                    {sub.status}
+                  </Badge>
+                  <span className="text-sm font-semibold">{sub.plan}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {scope.type}
+                  </Badge>
+                  {scope.type === 'organization' && scope.organizationName ? (
+                    <Badge variant="outline" className="text-xs">
+                      {scope.organizationName}
+                    </Badge>
+                  ) : null}
+                  {isEffective && (
+                    <Badge variant="outline" className="text-xs">
+                      personal effective
+                    </Badge>
+                  )}
+                  {isTransferred && (
+                    <Badge variant="outline" className="text-muted-foreground text-xs">
+                      historical / ignored
+                    </Badge>
+                  )}
+                  {sub.cancel_at_period_end && (
+                    <Badge className="bg-orange-900/20 text-orange-400">
+                      cancels at period end
+                    </Badge>
+                  )}
+                  {sub.pending_conversion && (
+                    <Badge className="bg-purple-900/20 text-purple-400">pending conversion</Badge>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {sub.instance && (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/admin/kiloclaw/${sub.instance.id}`}>
+                        <ExternalLink className="mr-1 h-3 w-3" />
+                        View Instance
+                      </Link>
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => openChangeLogDialog(sub.id)}>
+                    <History className="mr-1 h-3 w-3" />
+                    Change Log
+                  </Button>
+                  {canEditTrialEnd && (
+                    <Button variant="outline" size="sm" onClick={() => openTrialDialog(sub.id)}>
+                      {isTrialReset ? 'Reset Trial' : 'Edit Trial End'}
+                    </Button>
+                  )}
+                  {canCancel && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-red-500/30 text-red-400 hover:bg-red-950/30"
+                      onClick={() => openCancelDialog(sub.id, sub.status)}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                  {!canCancel && canImmediateCancel && sub.cancel_at_period_end && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-red-500/30 text-red-400 hover:bg-red-950/30"
+                      onClick={() => openCancelDialog(sub.id, sub.status)}
+                    >
+                      Cancel Immediately
+                    </Button>
+                  )}
+                  {canCancelTrial && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-red-500/30 text-red-400 hover:bg-red-950/30"
+                      onClick={() => openCancelDialog(sub.id, sub.status)}
+                    >
+                      Cancel Trial
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                <Field label="Scope" value={formatSubscriptionScopeValue(sub)} />
+                {scope.type === 'organization' ? (
+                  <Field
+                    label="Organization"
+                    value={
+                      scope.organizationName
+                        ? `${scope.organizationName} (${scope.organizationId})`
+                        : (scope.organizationId ?? '—')
+                    }
+                  />
+                ) : null}
+                <Field label="Payment Source" value={sub.payment_source ?? '—'} />
+                <Field label="Stripe Subscription" value={sub.stripe_subscription_id ?? '—'} mono />
+                <Field
+                  label="Transferred To"
+                  value={sub.transferred_to_subscription_id ?? '—'}
+                  mono
+                />
+                <Field label="Instance ID" value={sub.instance_id ?? '—'} mono />
+                <Field
+                  label="Instance"
+                  value={
+                    sub.instance
+                      ? `${sub.instance.name ?? sub.instance.sandbox_id}${sub.instance.destroyed_at ? ' (destroyed)' : ''}`
+                      : '—'
+                  }
+                />
+                <Field label="Trial Started" value={formatDateOrDash(sub.trial_started_at)} />
+                <Field label="Trial Ends" value={formatDateOrDash(sub.trial_ends_at)} />
+                <Field label="Period Start" value={formatDateOrDash(sub.current_period_start)} />
+                <Field label="Period End" value={formatDateOrDash(sub.current_period_end)} />
+                <Field label="Commit Ends" value={formatDateOrDash(sub.commit_ends_at)} />
+                <Field label="Credit Renewal" value={formatDateOrDash(sub.credit_renewal_at)} />
+                <Field label="Scheduled Plan" value={sub.scheduled_plan ?? '—'} />
+                <Field label="Scheduled By" value={sub.scheduled_by ?? '—'} />
+                <Field label="Stripe Schedule" value={sub.stripe_schedule_id ?? '—'} mono />
+                <Field label="Suspended At" value={formatDateOrDash(sub.suspended_at)} />
+                <Field
+                  label="Destruction Deadline"
+                  value={formatDateOrDash(sub.destruction_deadline)}
+                />
+                <Field label="Past Due Since" value={formatDateOrDash(sub.past_due_since)} />
+                <Field label="Created" value={formatDate(sub.created_at)} />
+                <Field label="Updated" value={formatDate(sub.updated_at)} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -284,7 +500,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
           {/* Access & earlybird summary */}
           <div className="flex items-center gap-4">
             <div>
-              <h4 className="text-muted-foreground text-xs font-medium">Access</h4>
+              <h4 className="text-muted-foreground text-xs font-medium">Personal access</h4>
               <Badge className={getAccessBadgeClass(data?.hasAccess ?? false)}>
                 {data?.hasAccess ? 'has access' : 'no access'}
               </Badge>
@@ -329,175 +545,54 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
           )}
 
           {/* Subscription list */}
-          {visibleSubscriptions.length === 0 && subscriptions.length === 0 ? (
+          {subscriptions.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               This user does not have any KiloClaw subscription rows.
             </p>
-          ) : visibleSubscriptions.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              All subscriptions are inactive. Uncheck &quot;Hide inactive subscriptions&quot; to
-              view them.
-            </p>
           ) : (
-            <div className="space-y-4">
-              {visibleSubscriptions.map(sub => {
-                const isTransferred = isTransferredHistoricalSubscription(sub);
-                const isEffective = !isTransferred && sub.id === data?.effectiveSubscriptionId;
-                const canEditTrialEnd =
-                  !isTransferred && (sub.status === 'trialing' || sub.status === 'canceled');
-                const isTrialReset = sub.status === 'canceled';
-                const canCancel =
-                  !isTransferred &&
-                  (sub.status === 'active' || sub.status === 'past_due') &&
-                  sub.plan !== 'trial' &&
-                  !sub.cancel_at_period_end;
-                const canImmediateCancel =
-                  !isTransferred &&
-                  (sub.status === 'active' || sub.status === 'past_due') &&
-                  sub.plan !== 'trial';
-                const canCancelTrial = !isTransferred && sub.status === 'trialing';
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <div>
+                  <h4 className="text-sm font-medium">Personal subscriptions</h4>
+                  <p className="text-muted-foreground text-xs">
+                    Personal subscriptions affect the Personal access state above.
+                  </p>
+                </div>
+                {visiblePersonalSubscriptions.length > 0 ? (
+                  renderSubscriptionCards(visiblePersonalSubscriptions)
+                ) : personalSubscriptions.length > 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    All personal subscriptions are inactive. Uncheck &quot;Hide inactive
+                    subscriptions&quot; to view them.
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    This user does not have any personal KiloClaw subscription rows.
+                  </p>
+                )}
+              </div>
 
-                return (
-                  <div
-                    key={sub.id}
-                    className={`rounded-lg border p-4 ${isEffective ? 'border-blue-500/40 bg-blue-950/10' : ''}`}
-                  >
-                    {/* Header row */}
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Badge className={getSubscriptionStatusBadgeClass(sub.status)}>
-                          {sub.status}
-                        </Badge>
-                        <span className="text-sm font-semibold">{sub.plan}</span>
-                        {isEffective && (
-                          <Badge variant="outline" className="text-xs">
-                            effective
-                          </Badge>
-                        )}
-                        {isTransferred && (
-                          <Badge variant="outline" className="text-muted-foreground text-xs">
-                            historical / ignored
-                          </Badge>
-                        )}
-                        {sub.cancel_at_period_end && (
-                          <Badge className="bg-orange-900/20 text-orange-400">
-                            cancels at period end
-                          </Badge>
-                        )}
-                        {sub.pending_conversion && (
-                          <Badge className="bg-purple-900/20 text-purple-400">
-                            pending conversion
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        {sub.instance && (
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/admin/kiloclaw/${sub.instance.id}`}>
-                              <ExternalLink className="mr-1 h-3 w-3" />
-                              View Instance
-                            </Link>
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openChangeLogDialog(sub.id)}
-                        >
-                          <History className="mr-1 h-3 w-3" />
-                          Change Log
-                        </Button>
-                        {canEditTrialEnd && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openTrialDialog(sub.id)}
-                          >
-                            {isTrialReset ? 'Reset Trial' : 'Edit Trial End'}
-                          </Button>
-                        )}
-                        {canCancel && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-red-500/30 text-red-400 hover:bg-red-950/30"
-                            onClick={() => openCancelDialog(sub.id, sub.status)}
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                        {!canCancel && canImmediateCancel && sub.cancel_at_period_end && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-red-500/30 text-red-400 hover:bg-red-950/30"
-                            onClick={() => openCancelDialog(sub.id, sub.status)}
-                          >
-                            Cancel Immediately
-                          </Button>
-                        )}
-                        {canCancelTrial && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-red-500/30 text-red-400 hover:bg-red-950/30"
-                            onClick={() => openCancelDialog(sub.id, sub.status)}
-                          >
-                            Cancel Trial
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Detail grid */}
-                    <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                      <Field label="Payment Source" value={sub.payment_source ?? '—'} />
-                      <Field
-                        label="Stripe Subscription"
-                        value={sub.stripe_subscription_id ?? '—'}
-                        mono
-                      />
-                      <Field
-                        label="Transferred To"
-                        value={sub.transferred_to_subscription_id ?? '—'}
-                        mono
-                      />
-                      <Field label="Instance ID" value={sub.instance_id ?? '—'} mono />
-                      <Field
-                        label="Instance"
-                        value={
-                          sub.instance
-                            ? `${sub.instance.name ?? sub.instance.sandbox_id}${sub.instance.destroyed_at ? ' (destroyed)' : ''}`
-                            : '—'
-                        }
-                      />
-                      <Field label="Trial Started" value={formatDateOrDash(sub.trial_started_at)} />
-                      <Field label="Trial Ends" value={formatDateOrDash(sub.trial_ends_at)} />
-                      <Field
-                        label="Period Start"
-                        value={formatDateOrDash(sub.current_period_start)}
-                      />
-                      <Field label="Period End" value={formatDateOrDash(sub.current_period_end)} />
-                      <Field label="Commit Ends" value={formatDateOrDash(sub.commit_ends_at)} />
-                      <Field
-                        label="Credit Renewal"
-                        value={formatDateOrDash(sub.credit_renewal_at)}
-                      />
-                      <Field label="Scheduled Plan" value={sub.scheduled_plan ?? '—'} />
-                      <Field label="Scheduled By" value={sub.scheduled_by ?? '—'} />
-                      <Field label="Stripe Schedule" value={sub.stripe_schedule_id ?? '—'} mono />
-                      <Field label="Suspended At" value={formatDateOrDash(sub.suspended_at)} />
-                      <Field
-                        label="Destruction Deadline"
-                        value={formatDateOrDash(sub.destruction_deadline)}
-                      />
-                      <Field label="Past Due Since" value={formatDateOrDash(sub.past_due_since)} />
-                      <Field label="Created" value={formatDate(sub.created_at)} />
-                      <Field label="Updated" value={formatDate(sub.updated_at)} />
-                    </div>
-                  </div>
-                );
-              })}
+              <div className="space-y-3">
+                <div>
+                  <h4 className="text-sm font-medium">Organization subscriptions</h4>
+                  <p className="text-muted-foreground text-xs">
+                    Organization-scoped subscriptions are listed separately and do not grant
+                    personal access.
+                  </p>
+                </div>
+                {visibleOrganizationSubscriptions.length > 0 ? (
+                  renderSubscriptionCards(visibleOrganizationSubscriptions)
+                ) : organizationSubscriptions.length > 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    All organization subscriptions are inactive. Uncheck &quot;Hide inactive
+                    subscriptions&quot; to view them.
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    This user does not have any organization-scoped KiloClaw subscription rows.
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </CardContent>

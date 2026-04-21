@@ -16,6 +16,7 @@ import {
   kiloclaw_subscription_change_log,
   kiloclaw_email_log,
   kiloclaw_instances,
+  organizations,
 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
@@ -679,8 +680,11 @@ export const adminRouter = createTRPCRouter({
             name: kiloclaw_instances.name,
             sandbox_id: kiloclaw_instances.sandbox_id,
             destroyed_at: kiloclaw_instances.destroyed_at,
+            organization_id: kiloclaw_instances.organization_id,
+            organization_name: organizations.name,
           })
           .from(kiloclaw_instances)
+          .leftJoin(organizations, eq(organizations.id, kiloclaw_instances.organization_id))
           .where(eq(kiloclaw_instances.user_id, input.userId)),
       ]);
 

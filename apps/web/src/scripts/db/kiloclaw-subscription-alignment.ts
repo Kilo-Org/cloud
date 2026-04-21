@@ -11,6 +11,8 @@
  *   pnpm script db kiloclaw-subscription-alignment apply-duplicates [--confirm-sandboxes-destroyed]
  *   pnpm script db kiloclaw-subscription-alignment preview-org
  *   pnpm script db kiloclaw-subscription-alignment apply-org
+ *   pnpm script db kiloclaw-subscription-alignment preview-org-replacement
+ *   pnpm script db kiloclaw-subscription-alignment apply-org-replacement
  *   pnpm script db kiloclaw-subscription-alignment preview-changelog-baseline
  *   pnpm script db kiloclaw-subscription-alignment apply-changelog-baseline
  *   pnpm script db kiloclaw-subscription-alignment preview-multi-row-all-destroyed
@@ -86,6 +88,8 @@ type Mode =
   | 'apply-duplicates'
   | 'preview-org'
   | 'apply-org'
+  | 'preview-org-replacement'
+  | 'apply-org-replacement'
   | 'preview-changelog-baseline'
   | 'apply-changelog-baseline'
   | 'preview-multi-row-all-destroyed'
@@ -169,6 +173,41 @@ type OrgBackfillCandidate = {
   requireSeats: boolean;
   latestPurchaseStatus: OrganizationSeatsPurchase['subscription_status'] | null;
   destroyedAt: string | null;
+};
+
+type OrgReplacementJoinedRow = {
+  subscription: KiloClawSubscription;
+  instance: {
+    id: string;
+    destroyedAt: string | null;
+    organizationId: string;
+    organizationName: string;
+  };
+};
+
+type OrgReplacementDestroyedPredecessor = {
+  subscriptionId: string;
+  instanceId: string;
+  plan: string;
+  status: string;
+  destroyedAt: string;
+};
+
+type OrgReplacementTransferPlan = {
+  sourceSubscriptionId: string;
+  sourceInstanceId: string | null;
+  targetSubscriptionId: string | null;
+  targetInstanceId: string | null;
+};
+
+type OrgReplacementCandidate = {
+  organizationId: string;
+  organizationName: string;
+  userId: string;
+  liveSubscriptionId: string;
+  liveInstanceId: string;
+  destroyedPredecessors: OrgReplacementDestroyedPredecessor[];
+  plannedTransfers: OrgReplacementTransferPlan[];
 };
 
 type ActiveInstanceContextRow = {
@@ -305,6 +344,51 @@ function chunkArray<T>(rows: T[], size: number): T[][] {
 
 function describeError(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+}
+
+type SubscriptionTransferUpdate = {
+  before: KiloClawSubscription;
+  transferredToSubscriptionId: string | null;
+};
+
+function compareSubscriptionsByCreatedAtAndId(
+  left: KiloClawSubscription,
+  right: KiloClawSubscription
+): number {
+  if (left.created_at === right.created_at) {
+    return left.id.localeCompare(right.id);
+  }
+  return left.created_at.localeCompare(right.created_at);
+}
+
+function buildSubscriptionTransferUpdates(
+  subscriptions: KiloClawSubscription[]
+): SubscriptionTransferUpdate[] {
+  const orderedSubscriptions = [...subscriptions].sort(compareSubscriptionsByCreatedAtAndId);
+  const updates: SubscriptionTransferUpdate[] = [];
+
+  for (const [index, subscription] of orderedSubscriptions.entries()) {
+    const nextSubscription = orderedSubscriptions[index + 1];
+    const desiredTransferredTo = nextSubscription?.id ?? null;
+    if (subscription.transferred_to_subscription_id === desiredTransferredTo) {
+      continue;
+    }
+    updates.push({
+      before: subscription,
+      transferredToSubscriptionId: desiredTransferredTo,
+    });
+  }
+
+  return updates;
+}
+
+function transferredToUnchangedWhere(subscription: KiloClawSubscription) {
+  return subscription.transferred_to_subscription_id === null
+    ? isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+    : eq(
+        kiloclaw_subscriptions.transferred_to_subscription_id,
+        subscription.transferred_to_subscription_id
+      );
 }
 
 async function insertAlignmentChangeLog(
@@ -1265,6 +1349,284 @@ async function previewOrgBackfill() {
         trialEndsAt: row.freeTrialEndAt ?? getOrganizationTrialEndsAt(row.organizationCreatedAt),
       }))
   );
+}
+
+function buildOrgReplacementCandidateFromRows(
+  rows: OrgReplacementJoinedRow[]
+): OrgReplacementCandidate | null {
+  const currentRows = rows.filter(row => row.subscription.transferred_to_subscription_id === null);
+  const liveCurrentRows = currentRows.filter(row => row.instance.destroyedAt === null);
+  const destroyedCurrentRows = currentRows.filter(row => row.instance.destroyedAt !== null);
+
+  if (currentRows.length < 2 || liveCurrentRows.length !== 1 || destroyedCurrentRows.length === 0) {
+    return null;
+  }
+
+  if (!destroyedCurrentRows.some(row => row.subscription.status === 'active')) {
+    return null;
+  }
+
+  const liveRow = liveCurrentRows[0];
+  if (!liveRow) {
+    return null;
+  }
+
+  const orderedSubscriptions = [...rows.map(row => row.subscription)].sort(
+    compareSubscriptionsByCreatedAtAndId
+  );
+  if (orderedSubscriptions.at(-1)?.id !== liveRow.subscription.id) {
+    return null;
+  }
+
+  const rowsBySubscriptionId = new Map(rows.map(row => [row.subscription.id, row]));
+  const plannedTransfers = buildSubscriptionTransferUpdates(orderedSubscriptions).map(update => ({
+    sourceSubscriptionId: update.before.id,
+    sourceInstanceId: update.before.instance_id,
+    targetSubscriptionId: update.transferredToSubscriptionId,
+    targetInstanceId: update.transferredToSubscriptionId
+      ? (rowsBySubscriptionId.get(update.transferredToSubscriptionId)?.subscription.instance_id ??
+        null)
+      : null,
+  }));
+
+  if (plannedTransfers.length === 0) {
+    return null;
+  }
+
+  return {
+    organizationId: liveRow.instance.organizationId,
+    organizationName: liveRow.instance.organizationName,
+    userId: liveRow.subscription.user_id,
+    liveSubscriptionId: liveRow.subscription.id,
+    liveInstanceId: liveRow.instance.id,
+    destroyedPredecessors: destroyedCurrentRows.flatMap(row =>
+      row.instance.destroyedAt
+        ? [
+            {
+              subscriptionId: row.subscription.id,
+              instanceId: row.instance.id,
+              plan: row.subscription.plan,
+              status: row.subscription.status,
+              destroyedAt: row.instance.destroyedAt,
+            },
+          ]
+        : []
+    ),
+    plannedTransfers,
+  };
+}
+
+async function buildOrgReplacementCandidates(): Promise<OrgReplacementCandidate[]> {
+  const rows: OrgReplacementJoinedRow[] = await db
+    .select({
+      subscription: kiloclaw_subscriptions,
+      instance: {
+        id: kiloclaw_instances.id,
+        destroyedAt: kiloclaw_instances.destroyed_at,
+        organizationId: organizations.id,
+        organizationName: organizations.name,
+      },
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .innerJoin(organizations, eq(organizations.id, kiloclaw_instances.organization_id))
+    .orderBy(
+      asc(organizations.id),
+      asc(kiloclaw_subscriptions.user_id),
+      asc(kiloclaw_subscriptions.created_at),
+      asc(kiloclaw_subscriptions.id)
+    );
+
+  const byContext = new Map<string, OrgReplacementJoinedRow[]>();
+  for (const row of rows) {
+    const key = `${row.subscription.user_id}:${row.instance.organizationId}`;
+    const existing = byContext.get(key);
+    if (existing) {
+      existing.push(row);
+    } else {
+      byContext.set(key, [row]);
+    }
+  }
+
+  const candidates: OrgReplacementCandidate[] = [];
+  for (const groupRows of byContext.values()) {
+    const candidate = buildOrgReplacementCandidateFromRows(groupRows);
+    if (candidate) {
+      candidates.push(candidate);
+    }
+  }
+
+  return candidates;
+}
+
+async function previewOrgReplacementRepair() {
+  const rows = await buildOrgReplacementCandidates();
+  printSection(
+    'Org replacement drift candidates',
+    rows.map(row => ({
+      organizationId: row.organizationId,
+      organizationName: row.organizationName,
+      userId: row.userId,
+      liveSubscriptionId: row.liveSubscriptionId,
+      liveInstanceId: row.liveInstanceId,
+      destroyedPredecessorSubscriptions: row.destroyedPredecessors
+        .map(
+          predecessor =>
+            `${predecessor.subscriptionId} (${predecessor.status}, ${predecessor.instanceId})`
+        )
+        .join(' | '),
+      plannedTransferChain: row.plannedTransfers
+        .map(
+          transfer => `${transfer.sourceSubscriptionId}→${transfer.targetSubscriptionId ?? 'null'}`
+        )
+        .join(' | '),
+    }))
+  );
+}
+
+class OrgReplacementRaceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OrgReplacementRaceError';
+  }
+}
+
+type OrgReplacementApplyOutcome = 'succeeded' | 'skipped_no_work' | 'skipped_race';
+
+async function applyOrgReplacementCandidate(
+  candidate: OrgReplacementCandidate
+): Promise<OrgReplacementApplyOutcome> {
+  try {
+    return await db.transaction(async tx => {
+      const rows: OrgReplacementJoinedRow[] = await tx
+        .select({
+          subscription: kiloclaw_subscriptions,
+          instance: {
+            id: kiloclaw_instances.id,
+            destroyedAt: kiloclaw_instances.destroyed_at,
+            organizationId: organizations.id,
+            organizationName: organizations.name,
+          },
+        })
+        .from(kiloclaw_subscriptions)
+        .innerJoin(
+          kiloclaw_instances,
+          eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
+        )
+        .innerJoin(organizations, eq(organizations.id, kiloclaw_instances.organization_id))
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.user_id, candidate.userId),
+            eq(kiloclaw_instances.organization_id, candidate.organizationId)
+          )
+        )
+        .orderBy(asc(kiloclaw_subscriptions.created_at), asc(kiloclaw_subscriptions.id))
+        .for('update');
+
+      const currentCandidate = buildOrgReplacementCandidateFromRows(rows);
+      if (!currentCandidate) {
+        throw new OrgReplacementRaceError(
+          `Org replacement candidate changed before apply for ${candidate.userId}/${candidate.organizationId}`
+        );
+      }
+
+      const transferUpdates = buildSubscriptionTransferUpdates(rows.map(row => row.subscription));
+      if (transferUpdates.length === 0) {
+        return 'skipped_no_work';
+      }
+
+      for (const update of transferUpdates) {
+        const [after] = await tx
+          .update(kiloclaw_subscriptions)
+          .set({
+            transferred_to_subscription_id: update.transferredToSubscriptionId,
+          })
+          .where(
+            and(
+              eq(kiloclaw_subscriptions.id, update.before.id),
+              transferredToUnchangedWhere(update.before)
+            )
+          )
+          .returning();
+
+        if (!after) {
+          throw new OrgReplacementRaceError(
+            `Org replacement transfer raced for subscription ${update.before.id}`
+          );
+        }
+
+        await insertAlignmentChangeLog(tx, {
+          subscriptionId: after.id,
+          action: 'reassigned',
+          reason: 'apply_org_replacement_transfer_destroyed_predecessor',
+          before: update.before,
+          after,
+        });
+      }
+
+      return 'succeeded';
+    });
+  } catch (error) {
+    if (error instanceof OrgReplacementRaceError) {
+      return 'skipped_race';
+    }
+    throw error;
+  }
+}
+
+async function applyOrgReplacementRepair() {
+  const rows = await buildOrgReplacementCandidates();
+  let orgsSucceeded = 0;
+  let orgsSkippedNoWork = 0;
+  let orgsSkippedRace = 0;
+  const orgsError: Array<{
+    organizationId: string;
+    organizationName: string;
+    userId: string;
+    error: string;
+  }> = [];
+  const startedAt = Date.now();
+
+  for (const [index, row] of rows.entries()) {
+    try {
+      const outcome = await applyOrgReplacementCandidate(row);
+      switch (outcome) {
+        case 'succeeded':
+          orgsSucceeded += 1;
+          break;
+        case 'skipped_no_work':
+          orgsSkippedNoWork += 1;
+          break;
+        case 'skipped_race':
+          orgsSkippedRace += 1;
+          break;
+      }
+    } catch (error) {
+      orgsError.push({
+        organizationId: row.organizationId,
+        organizationName: row.organizationName,
+        userId: row.userId,
+        error: describeError(error),
+      });
+    }
+
+    logApplyProgress({
+      label: 'apply-org-replacement',
+      processed: index + 1,
+      total: rows.length,
+      startedAt,
+      every: 25,
+    });
+  }
+
+  console.log('\nOrg replacement repair results');
+  console.table([
+    { metric: 'orgs_succeeded', count: orgsSucceeded },
+    { metric: 'orgs_skipped_no_work', count: orgsSkippedNoWork },
+    { metric: 'orgs_skipped_race', count: orgsSkippedRace },
+    { metric: 'orgs_error', count: orgsError.length },
+  ]);
+  printSection('Org replacement rows that failed to repair', orgsError);
 }
 
 async function previewDuplicateActiveInstances() {
@@ -3177,6 +3539,8 @@ function parseMode(inputMode?: string): Mode {
     case 'apply-duplicates':
     case 'preview-org':
     case 'apply-org':
+    case 'preview-org-replacement':
+    case 'apply-org-replacement':
     case 'preview-changelog-baseline':
     case 'apply-changelog-baseline':
     case 'preview-multi-row-all-destroyed':
@@ -3203,6 +3567,8 @@ const singleModeHandlers: Partial<Record<Mode, ModeHandler>> = {
   'apply-duplicates': applyDuplicateActiveInstances,
   'preview-org': previewOrgBackfill,
   'apply-org': applyOrgBackfill,
+  'preview-org-replacement': previewOrgReplacementRepair,
+  'apply-org-replacement': applyOrgReplacementRepair,
   'preview-changelog-baseline': previewChangelogBaselineBackfill,
   'apply-changelog-baseline': applyChangelogBaselineBackfill,
   'preview-multi-row-all-destroyed': previewMultiRowAllDestroyedCollapse,

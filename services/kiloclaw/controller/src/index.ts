@@ -327,7 +327,9 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   // Routes are registered before the doctor/onboard path runs so the
   // controller's recovery APIs remain available if non-critical bootstrap
   // later fails.
-  const pc = createPairingCache();
+  const pc = createPairingCache({
+    autoApproveGatewayClient: env.AUTO_APPROVE_DEVICES === 'true',
+  });
   pairingCache = pc;
 
   const googleOAuthTokenProvider = new GoogleOAuthTokenProvider({

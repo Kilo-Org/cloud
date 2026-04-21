@@ -163,14 +163,34 @@ export async function handleRemoveReaction(c: HonoCtx) {
   const msgId = parseMessageId(c);
   if (!msgId.ok) return msgId.response;
 
-  const body = await parseBody(c, reactionBodySchema);
-  if (!body.ok) return body.response;
+  // Accept params from query string (preferred) or fall back to body for
+  // backwards compatibility with older callers.
+  let conversationId: string | undefined;
+  let emoji: string | undefined;
+
+  const qConv = c.req.query('conversationId');
+  const qEmoji = c.req.query('emoji');
+  if (qConv && qEmoji) {
+    conversationId = qConv;
+    emoji = qEmoji;
+  } else {
+    const body = await parseBody(c, reactionBodySchema);
+    if (!body.ok) return body.response;
+    conversationId = body.data.conversationId;
+    emoji = body.data.emoji;
+  }
+
+  // Validate the extracted values through the schema.
+  const parsed = reactionBodySchema.safeParse({ conversationId, emoji });
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400);
+  }
 
   const callerId = c.get('callerId');
   const result = await removeReactionFor(c.env, callerId, {
-    conversationId: body.data.conversationId,
+    conversationId: parsed.data.conversationId,
     messageId: msgId.data,
-    emoji: body.data.emoji,
+    emoji: parsed.data.emoji,
   });
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);

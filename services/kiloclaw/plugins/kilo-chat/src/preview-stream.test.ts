@@ -234,6 +234,60 @@ describe('createPreviewStream', () => {
     }
   });
 
+  it('two synchronous updates while idle only issue one createMessage (no double-POST race)', async () => {
+    // Regression: before the fix, both synchronous update() calls could enter
+    // the `phase === 'idle' && !inFlight` branch, each calling flushOnce()
+    // which would each see messageId === undefined and POST, producing two
+    // messages where the second orphans the first.
+    vi.useFakeTimers();
+    try {
+      let resolveCreate!: (v: { messageId: string }) => void;
+      const { client, createMessage, editMessage } = makeClientSpies();
+      // Make createMessage hang until we resolve it manually, so the inFlight
+      // guard is the only thing preventing the second call from entering.
+      createMessage.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            resolveCreate = resolve;
+          })
+      );
+
+      const stream = createPreviewStream({
+        client,
+        conversationId: 'c1',
+        throttleMs: 100,
+        onWarn: () => {},
+      });
+
+      // Two synchronous update() calls before any microtask runs.
+      stream.update('first');
+      stream.update('second');
+
+      // Only ONE createMessage should have been called.
+      expect(createMessage).toHaveBeenCalledTimes(1);
+      expect(createMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ content: [{ type: 'text', text: 'first' }] })
+      );
+
+      // Resolve the first POST so the stream can move forward.
+      resolveCreate({ messageId: 'm1' });
+      await vi.advanceTimersByTimeAsync(0);
+
+      // The second text ('second') should now flush via PATCH, not a second POST.
+      await vi.advanceTimersByTimeAsync(100);
+      expect(createMessage).toHaveBeenCalledTimes(1); // still only one POST
+      expect(editMessage).toHaveBeenCalledTimes(1);
+      expect(editMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageId: 'm1',
+          content: [{ type: 'text', text: 'second' }],
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('warns when the finalize PATCH itself is stale', async () => {
     vi.useFakeTimers();
     try {

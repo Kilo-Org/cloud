@@ -711,8 +711,55 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members
 // ─── DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions ────────
 
 describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', () => {
-  it('returns 204 after removing a reaction', async () => {
+  it('returns 204 after removing a reaction via query params', async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-1');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    // Add first
+    await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}/reactions`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ conversationId, emoji: '👍' }),
+      },
+      testEnv
+    );
+
+    const qs = new URLSearchParams({ conversationId, emoji: '👍' });
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}/reactions?${qs.toString()}`,
+      {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${token}` },
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(204);
+  });
+
+  it('returns 204 even when reaction never existed (idempotent)', async () => {
+    const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-idem');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const qs = new URLSearchParams({ conversationId, emoji: '❤️' });
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}/reactions?${qs.toString()}`,
+      {
+        method: 'DELETE',
+        headers: { authorization: `Bearer ${token}` },
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(204);
+  });
+
+  it('returns 204 when using body (backwards compat)', async () => {
+    const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-body');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
@@ -740,36 +787,18 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
     expect(res.status).toBe(204);
   });
 
-  it('returns 204 even when reaction never existed (idempotent)', async () => {
-    const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-idem');
-    const app = makeBotApp();
-    const token = await tokenFor(sandboxId);
-
-    const res = await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}/reactions`,
-      {
-        method: 'DELETE',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId, emoji: '❤️' }),
-      },
-      testEnv
-    );
-
-    expect(res.status).toBe(204);
-  });
-
   it('returns 403 for non-member bot', async () => {
     const { conversationId, messageId, testEnv } = await setupData('bot-rx-del-forbidden');
     const otherSandboxId = 'other-sandbox-rx-del';
     const app = makeBotApp();
     const token = await tokenFor(otherSandboxId);
 
+    const qs = new URLSearchParams({ conversationId, emoji: '👍' });
     const res = await app.request(
-      `/bot/v1/sandboxes/${otherSandboxId}/messages/${messageId}/reactions`,
+      `/bot/v1/sandboxes/${otherSandboxId}/messages/${messageId}/reactions?${qs.toString()}`,
       {
         method: 'DELETE',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId, emoji: '👍' }),
+        headers: { authorization: `Bearer ${token}` },
       },
       testEnv
     );

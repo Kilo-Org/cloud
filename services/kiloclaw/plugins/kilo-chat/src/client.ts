@@ -181,12 +181,15 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
   }
 
   async function removeReaction(params: RemoveReactionParams): Promise<void> {
+    const qs = new URLSearchParams({
+      conversationId: params.conversationId,
+      emoji: params.emoji,
+    });
     const response = await fetchImpl(
-      `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}/reactions`,
+      `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}/reactions?${qs}`,
       {
         method: 'DELETE',
         headers,
-        body: JSON.stringify({ conversationId: params.conversationId, emoji: params.emoji }),
       }
     );
     if (!response.ok) {

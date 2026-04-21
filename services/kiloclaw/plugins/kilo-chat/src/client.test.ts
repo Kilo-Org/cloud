@@ -338,7 +338,7 @@ describe('createKiloChatClient.addReaction', () => {
 });
 
 describe('createKiloChatClient.removeReaction', () => {
-  it('DELETEs with body; resolves void on 204', async () => {
+  it('DELETEs with query params; resolves void on 204', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
@@ -351,10 +351,12 @@ describe('createKiloChatClient.removeReaction', () => {
       fetchImpl,
     });
     await client.removeReaction({ conversationId: 'C', messageId: 'M', emoji: '👍' });
-    expect(calls[0].url).toBe('http://ctrl/_kilo/kilo-chat/messages/M/reactions');
+    const parsed = new URL(calls[0].url);
+    expect(parsed.pathname).toBe('/_kilo/kilo-chat/messages/M/reactions');
+    expect(parsed.searchParams.get('conversationId')).toBe('C');
+    expect(parsed.searchParams.get('emoji')).toBe('👍');
     expect(calls[0].init.method).toBe('DELETE');
-    const body = JSON.parse(String(calls[0].init.body));
-    expect(body).toEqual({ conversationId: 'C', emoji: '👍' });
+    expect(calls[0].init.body).toBeUndefined();
   });
 
   it('throws on non-2xx response', async () => {
@@ -369,7 +371,7 @@ describe('createKiloChatClient.removeReaction', () => {
     ).rejects.toThrow(/403/);
   });
 
-  it('URL-encodes the message id', async () => {
+  it('URL-encodes the message id and query params', async () => {
     const calls: Array<string> = [];
     const fetchImpl = (async (url: string | URL) => {
       calls.push(String(url));
@@ -381,7 +383,10 @@ describe('createKiloChatClient.removeReaction', () => {
       fetchImpl,
     });
     await client.removeReaction({ conversationId: 'C', messageId: 'M/weird?x=1', emoji: '👍' });
-    expect(calls[0]).toBe('http://ctrl/_kilo/kilo-chat/messages/M%2Fweird%3Fx%3D1/reactions');
+    const parsed = new URL(calls[0]);
+    expect(parsed.pathname).toBe('/_kilo/kilo-chat/messages/M%2Fweird%3Fx%3D1/reactions');
+    expect(parsed.searchParams.get('conversationId')).toBe('C');
+    expect(parsed.searchParams.get('emoji')).toBe('👍');
   });
 });
 

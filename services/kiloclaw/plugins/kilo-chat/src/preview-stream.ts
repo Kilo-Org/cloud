@@ -46,54 +46,48 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
   /** Once the stream is terminal (`finalize` / `abort` called), all entry points no-op. */
   const isDone = () => phase === 'finalized' || phase === 'aborted';
 
-  async function flushOnce(): Promise<void> {
+  function flushOnce(): Promise<void> {
     if (timer) {
       clearTimeout(timer);
       timer = undefined;
     }
-    if (isDone()) return;
+    if (isDone()) return Promise.resolve();
     if (inFlight) {
-      await inFlight;
-      return;
+      return inFlight.then(() => {});
     }
     const text = pendingText;
-    if (text === undefined) return;
+    if (text === undefined) return Promise.resolve();
     pendingText = undefined;
-    if (text === lastSentText) return;
+    if (text === lastSentText) return Promise.resolve();
 
-    if (messageId === undefined) {
-      // First send: POST.
-      const p = opts.client
-        .createMessage({
-          conversationId: opts.conversationId,
-          content: [{ type: 'text', text }],
-          inReplyToMessageId: opts.inReplyToMessageId,
-        })
-        .then(res => {
+    // Assign inFlight synchronously BEFORE any async work so a second
+    // synchronous `update()` call sees the guard immediately.
+    const p = (async () => {
+      if (messageId === undefined) {
+        // First send: POST.
+        try {
+          const res = await opts.client.createMessage({
+            conversationId: opts.conversationId,
+            content: [{ type: 'text', text }],
+            inReplyToMessageId: opts.inReplyToMessageId,
+          });
           messageId = res.messageId;
           lastSentText = text;
           phase = 'editing';
-        })
-        .catch(err => {
+        } catch (err) {
           warn('createMessage failed during stream', err);
-        })
-        .finally(() => {
-          if (inFlight === p) inFlight = undefined;
-        });
-      inFlight = p;
-      await p;
-      return;
-    }
+        }
+        return;
+      }
 
-    // Subsequent send: PATCH with monotonic client timestamp.
-    const p = opts.client
-      .editMessage({
-        conversationId: opts.conversationId,
-        messageId,
-        content: [{ type: 'text', text }],
-        timestamp: Date.now(),
-      })
-      .then(res => {
+      // Subsequent send: PATCH with monotonic client timestamp.
+      try {
+        const res = await opts.client.editMessage({
+          conversationId: opts.conversationId,
+          messageId,
+          content: [{ type: 'text', text }],
+          timestamp: Date.now(),
+        });
         if (res.stale) {
           // Server had a newer timestamp — don't update lastSentText so the
           // next flush or finalize re-sends.
@@ -101,15 +95,15 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
         } else {
           lastSentText = text;
         }
-      })
-      .catch(err => {
+      } catch (err) {
         warn('editMessage failed during stream', err);
-      })
-      .finally(() => {
-        if (inFlight === p) inFlight = undefined;
-      });
+      }
+    })();
     inFlight = p;
-    await p;
+    void p.finally(() => {
+      if (inFlight === p) inFlight = undefined;
+    });
+    return p;
   }
 
   function scheduleFlush(): void {

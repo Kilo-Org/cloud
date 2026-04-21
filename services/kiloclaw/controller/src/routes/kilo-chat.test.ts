@@ -7,6 +7,8 @@ import {
   registerKiloChatTypingRoute,
   registerKiloChatReactionPostRoute,
   registerKiloChatReactionDeleteRoute,
+  registerKiloChatListMessagesRoute,
+  registerKiloChatGetMembersRoute,
 } from './kilo-chat';
 
 const TOKEN = 'expected-gateway-token';
@@ -437,7 +439,7 @@ describe('POST /_kilo/kilo-chat/messages/:id/reactions', () => {
 });
 
 describe('DELETE /_kilo/kilo-chat/messages/:id/reactions', () => {
-  it('proxies DELETE with gateway bearer; forwards 204', async () => {
+  it('proxies DELETE with query params forwarded to upstream; forwards 204', async () => {
     const app = new Hono();
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
@@ -452,16 +454,19 @@ describe('DELETE /_kilo/kilo-chat/messages/:id/reactions', () => {
       fetchImpl,
     });
 
+    const qs = new URLSearchParams({ conversationId: 'C', emoji: '\u{1F44D}' });
     const res = await app.fetch(
-      new Request('http://x/_kilo/kilo-chat/messages/MID/reactions', {
+      new Request(`http://x/_kilo/kilo-chat/messages/MID/reactions?${qs}`, {
         method: 'DELETE',
-        headers: { authorization: 'Bearer gw', 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId: 'C', emoji: '\u{1F44D}' }),
+        headers: { authorization: 'Bearer gw' },
       })
     );
     expect(res.status).toBe(204);
     expect(calls[0].init.method).toBe('DELETE');
-    expect(calls[0].url).toBe('http://svc/bot/v1/sandboxes/sbx/messages/MID/reactions');
+    const upstreamUrl = new URL(calls[0].url);
+    expect(upstreamUrl.pathname).toBe('/bot/v1/sandboxes/sbx/messages/MID/reactions');
+    expect(upstreamUrl.searchParams.get('conversationId')).toBe('C');
+    expect(upstreamUrl.searchParams.get('emoji')).toBe('\u{1F44D}');
     const headers = calls[0].init.headers as Record<string, string>;
     expect(headers.authorization).toBe('Bearer gw');
   });
@@ -577,5 +582,121 @@ describe('body size limits', () => {
     );
     expect(res.status).toBe(413);
     expect(upstreamCalled).toBe(false);
+  });
+});
+
+function makeListMessagesApp(fetchImpl: typeof fetch) {
+  const app = new Hono();
+  registerKiloChatListMessagesRoute(app, {
+    expectedToken: TOKEN,
+    sandboxId: SANDBOX_ID,
+    kiloChatBaseUrl: 'https://chat.example.test',
+    fetchImpl,
+  });
+  return app;
+}
+
+describe('GET /_kilo/kilo-chat/conversations/:conversationId/messages', () => {
+  it('rejects requests without bearer token', async () => {
+    const app = makeListMessagesApp(async () => new Response('[]', { status: 200 }));
+    const res = await app.fetch(new Request('http://x/_kilo/kilo-chat/conversations/c1/messages'));
+    expect(res.status).toBe(401);
+  });
+
+  it('forwards to correct upstream URL with gateway bearer', async () => {
+    let capturedUrl = '';
+    let capturedInit: RequestInit | undefined;
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      capturedUrl = typeof url === 'string' ? url : url.toString();
+      capturedInit = init;
+      return new Response(JSON.stringify([{ id: 'm1' }]), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const app = makeListMessagesApp(fetchImpl);
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/conversations/c1/messages', {
+        headers: { authorization: `Bearer ${TOKEN}` },
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(capturedUrl).toBe(
+      'https://chat.example.test/bot/v1/sandboxes/sbx_test/conversations/c1/messages'
+    );
+    expect(capturedInit?.method).toBe('GET');
+    const headers = new Headers(capturedInit?.headers);
+    expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
+  });
+
+  it('passes query string through to upstream', async () => {
+    let capturedUrl = '';
+    const fetchImpl = (async (url: string | URL) => {
+      capturedUrl = typeof url === 'string' ? url : url.toString();
+      return new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const app = makeListMessagesApp(fetchImpl);
+    await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/conversations/c1/messages?before=msg123&limit=50', {
+        headers: { authorization: `Bearer ${TOKEN}` },
+      })
+    );
+
+    expect(capturedUrl).toBe(
+      'https://chat.example.test/bot/v1/sandboxes/sbx_test/conversations/c1/messages?before=msg123&limit=50'
+    );
+  });
+});
+
+function makeMembersApp(fetchImpl: typeof fetch) {
+  const app = new Hono();
+  registerKiloChatGetMembersRoute(app, {
+    expectedToken: TOKEN,
+    sandboxId: SANDBOX_ID,
+    kiloChatBaseUrl: 'https://chat.example.test',
+    fetchImpl,
+  });
+  return app;
+}
+
+describe('GET /_kilo/kilo-chat/conversations/:conversationId/members', () => {
+  it('rejects requests without bearer token', async () => {
+    const app = makeMembersApp(async () => new Response('[]', { status: 200 }));
+    const res = await app.fetch(new Request('http://x/_kilo/kilo-chat/conversations/c1/members'));
+    expect(res.status).toBe(401);
+  });
+
+  it('forwards to correct upstream URL with gateway bearer', async () => {
+    let capturedUrl = '';
+    let capturedInit: RequestInit | undefined;
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      capturedUrl = typeof url === 'string' ? url : url.toString();
+      capturedInit = init;
+      return new Response(JSON.stringify([{ userId: 'u1' }]), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const app = makeMembersApp(fetchImpl);
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/conversations/c1/members', {
+        headers: { authorization: `Bearer ${TOKEN}` },
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(capturedUrl).toBe(
+      'https://chat.example.test/bot/v1/sandboxes/sbx_test/conversations/c1/members'
+    );
+    expect(capturedInit?.method).toBe('GET');
+    const headers = new Headers(capturedInit?.headers);
+    expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
   });
 });

@@ -145,8 +145,39 @@ describe('POST /v1/messages/:id/reactions', () => {
 });
 
 describe('DELETE /v1/messages/:id/reactions', () => {
-  it('204 when removing a live reaction', async () => {
+  it('204 when removing a live reaction via query params', async () => {
     const { conversationId, messageId, userApp } = await setup('rx-del-1');
+    await userApp.request(
+      `/v1/messages/${messageId}/reactions`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, emoji: '👍' }),
+      },
+      env
+    );
+    const qs = new URLSearchParams({ conversationId, emoji: '👍' });
+    const res = await userApp.request(
+      `/v1/messages/${messageId}/reactions?${qs.toString()}`,
+      { method: 'DELETE' },
+      env
+    );
+    expect(res.status).toBe(204);
+  });
+
+  it('204 even when reaction never existed (idempotent)', async () => {
+    const { conversationId, messageId, userApp } = await setup('rx-del-2');
+    const qs = new URLSearchParams({ conversationId, emoji: '👍' });
+    const res = await userApp.request(
+      `/v1/messages/${messageId}/reactions?${qs.toString()}`,
+      { method: 'DELETE' },
+      env
+    );
+    expect(res.status).toBe(204);
+  });
+
+  it('204 when removing via body (backwards compat)', async () => {
+    const { conversationId, messageId, userApp } = await setup('rx-del-body');
     await userApp.request(
       `/v1/messages/${messageId}/reactions`,
       {
@@ -168,30 +199,13 @@ describe('DELETE /v1/messages/:id/reactions', () => {
     expect(res.status).toBe(204);
   });
 
-  it('204 even when reaction never existed (idempotent)', async () => {
-    const { conversationId, messageId, userApp } = await setup('rx-del-2');
-    const res = await userApp.request(
-      `/v1/messages/${messageId}/reactions`,
-      {
-        method: 'DELETE',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId, emoji: '👍' }),
-      },
-      env
-    );
-    expect(res.status).toBe(204);
-  });
-
   it('403 for non-member on DELETE', async () => {
     const { conversationId, messageId } = await setup('rx-del-3');
     const stranger = makeApp('user-stranger', 'user');
+    const qs = new URLSearchParams({ conversationId, emoji: '👍' });
     const res = await stranger.request(
-      `/v1/messages/${messageId}/reactions`,
-      {
-        method: 'DELETE',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId, emoji: '👍' }),
-      },
+      `/v1/messages/${messageId}/reactions?${qs.toString()}`,
+      { method: 'DELETE' },
       env
     );
     expect(res.status).toBe(403);

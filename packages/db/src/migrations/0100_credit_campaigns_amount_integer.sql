@@ -1,1 +1,0 @@
-ALTER TABLE "credit_campaigns" ALTER COLUMN "amount_microdollars" SET DATA TYPE integer;

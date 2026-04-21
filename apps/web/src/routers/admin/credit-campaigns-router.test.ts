@@ -138,7 +138,6 @@ describe('creditCampaigns.update', () => {
 
     const updated = await caller.admin.creditCampaigns.update({
       id: created.id,
-      slug: 'summit',
       amount_usd: 9,
       credit_expiry_hours: 72,
       campaign_ends_at: null,
@@ -154,6 +153,53 @@ describe('creditCampaigns.update', () => {
     expect(new Date(updated.updated_at).getTime()).toBeGreaterThanOrEqual(
       new Date(created.updated_at).getTime()
     );
+  });
+
+  it('does not allow changing slug or credit_category', async () => {
+    // Slug is immutable after create — changing it would orphan existing
+    // credit_transactions from the new category, resetting the cap counter
+    // and hiding real spend. The update schema omits slug entirely, so
+    // Zod silently strips it and the persisted row keeps the original.
+    const caller = await createCallerForUser(admin.id);
+    const created = await caller.admin.creditCampaigns.create(
+      makeValidInput({ slug: 'immutable' })
+    );
+    const updated = await caller.admin.creditCampaigns.update({
+      id: created.id,
+      // @ts-expect-error — slug is intentionally not in the update schema
+      slug: 'renamed',
+      amount_usd: 5,
+      credit_expiry_hours: 48,
+      campaign_ends_at: null,
+      total_redemptions_allowed: 100,
+      active: true,
+      description: 'unchanged slug',
+    });
+    expect(updated.slug).toBe('immutable');
+    expect(updated.credit_category).toBe('c-immutable');
+  });
+
+  it('accepts a campaign_ends_at in the past on update (editing an expired campaign)', async () => {
+    // Real scenario: a campaign's end date is naturally yesterday and the
+    // admin wants to edit the description or toggle active. The future-only
+    // refine on create would block this; update schema intentionally drops
+    // the refine so the stale value can pass through unchanged.
+    const caller = await createCallerForUser(admin.id);
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const created = await caller.admin.creditCampaigns.create(
+      makeValidInput({ slug: 'editexpired', campaign_ends_at: tomorrow })
+    );
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const updated = await caller.admin.creditCampaigns.update({
+      id: created.id,
+      amount_usd: 5,
+      credit_expiry_hours: 48,
+      campaign_ends_at: yesterday,
+      total_redemptions_allowed: 100,
+      active: true,
+      description: 'adjusted after expiry',
+    });
+    expect(updated.description).toBe('adjusted after expiry');
   });
 
   it('returns NOT_FOUND when the id does not exist', async () => {

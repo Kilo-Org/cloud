@@ -1,5 +1,5 @@
 {
-  "id": "2a7ffeaf-ee8e-437e-b33d-7fb658ca268a",
+  "id": "89bfc4b6-ccb0-4260-81b2-ba2559861821",
   "prevId": "33b84f22-2bd6-4a25-8f99-e8a944b8ad8f",
   "version": "7",
   "dialect": "postgresql",
@@ -5252,7 +5252,7 @@
         },
         "amount_microdollars": {
           "name": "amount_microdollars",
-          "type": "bigint",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -5272,7 +5272,7 @@
           "name": "total_redemptions_allowed",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "active": {
           "name": "active",
@@ -5285,7 +5285,7 @@
           "name": "description",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "created_by_kilo_user_id": {
           "name": "created_by_kilo_user_id",
@@ -5359,7 +5359,7 @@
         },
         "credit_campaigns_total_redemptions_allowed_positive_check": {
           "name": "credit_campaigns_total_redemptions_allowed_positive_check",
-          "value": "\"credit_campaigns\".\"total_redemptions_allowed\" IS NULL OR \"credit_campaigns\".\"total_redemptions_allowed\" > 0"
+          "value": "\"credit_campaigns\".\"total_redemptions_allowed\" > 0"
         }
       },
       "isRLSEnabled": false

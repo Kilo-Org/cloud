@@ -407,7 +407,7 @@ describe('Stytch Fingerprint Functions', () => {
           // passes its own value (typically 1).
           total_redemptions_allowed: input.total_redemptions_allowed ?? 10_000,
           active: input.active ?? true,
-          description: null,
+          description: `test campaign ${input.slug}`,
           created_by_kilo_user_id: 'test-admin',
         })
         .returning();

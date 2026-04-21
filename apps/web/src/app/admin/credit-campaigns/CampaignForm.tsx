@@ -15,7 +15,7 @@ import { CREDIT_CAMPAIGN_SLUG_FORMAT } from '@/lib/credit-campaigns-shared';
  * etc.) normalize to `null` for the server. Matching the server schema
  * close in shape keeps client + server validation from drifting.
  */
-const campaignFormValuesSchema = z.object({
+const campaignSharedFields = {
   slug: z.string().regex(CREDIT_CAMPAIGN_SLUG_FORMAT, {
     message: 'Slug must be 5-40 lowercase alphanumerics or hyphens',
   }),
@@ -29,13 +29,10 @@ const campaignFormValuesSchema = z.object({
     .positive()
     .max(87_600, 'Credit expiry capped at 87,600 hours (~10 years)')
     .nullable(),
-  campaign_ends_at: z
-    .string()
-    .datetime({ offset: true })
-    .nullable()
-    .refine(v => v === null || new Date(v).getTime() > Date.now(), {
-      message: 'Campaign end date must be in the future',
-    }),
+  // Base campaign_ends_at shape without the future-only refine. Create mode
+  // adds the refine on top; edit mode preserves existing past values so
+  // admins can touch other fields on a naturally-expired campaign.
+  campaign_ends_at: z.string().datetime({ offset: true }).nullable(),
   total_redemptions_allowed: z
     .number({ message: 'Max redemptions is required' })
     .int()
@@ -47,14 +44,30 @@ const campaignFormValuesSchema = z.object({
     .min(1, 'Notes are required')
     .max(1000)
     .refine(v => v.trim().length > 0, 'Notes cannot be whitespace-only'),
+};
+
+const createFormSchema = z.object({
+  ...campaignSharedFields,
+  campaign_ends_at: campaignSharedFields.campaign_ends_at.refine(
+    v => v === null || new Date(v).getTime() > Date.now(),
+    { message: 'Campaign end date must be in the future' }
+  ),
 });
 
-export type CampaignFormValues = z.infer<typeof campaignFormValuesSchema>;
+const updateFormSchema = z.object(campaignSharedFields);
+
+export type CampaignFormValues = z.infer<typeof createFormSchema>;
 
 type Props = {
   submitLabel: string;
   pending: boolean;
   defaultValues?: Partial<CampaignFormValues>;
+  /**
+   * When true, the slug input is disabled and a help note explains why.
+   * Used on edit because the slug is immutable after create — changing it
+   * would orphan existing `credit_transactions` rows from the new category.
+   */
+  slugReadOnly?: boolean;
   onSubmit: (values: CampaignFormValues) => void;
 };
 
@@ -96,7 +109,13 @@ function toDatetimeLocal(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function CampaignForm({ submitLabel, pending, defaultValues, onSubmit }: Props) {
+export default function CampaignForm({
+  submitLabel,
+  pending,
+  defaultValues,
+  slugReadOnly = false,
+  onSubmit,
+}: Props) {
   const [raw, setRaw] = useState<RawForm>(() => toRaw(defaultValues));
   const [errors, setErrors] = useState<Partial<Record<keyof CampaignFormValues, string>>>({});
 
@@ -109,7 +128,8 @@ export default function CampaignForm({ submitLabel, pending, defaultValues, onSu
     const total_redemptions_allowed =
       raw.totalRedemptionsAllowed === '' ? NaN : Number(raw.totalRedemptionsAllowed);
 
-    const parsed = campaignFormValuesSchema.safeParse({
+    const schema = slugReadOnly ? updateFormSchema : createFormSchema;
+    const parsed = schema.safeParse({
       slug: raw.slug.trim(),
       amount_usd,
       credit_expiry_hours,
@@ -142,11 +162,20 @@ export default function CampaignForm({ submitLabel, pending, defaultValues, onSu
             id="slug"
             value={raw.slug}
             maxLength={40}
+            disabled={slugReadOnly}
             onChange={e => setRaw(s => ({ ...s, slug: e.target.value }))}
             placeholder="e.g. summit"
           />
           <p className="text-muted-foreground mt-1 text-xs">
-            Public URL: <code>/c/{raw.slug || '<slug>'}</code>
+            {slugReadOnly ? (
+              <>
+                Slug cannot be changed after creation — existing redemptions are tied to this value.
+              </>
+            ) : (
+              <>
+                Public URL: <code>/c/{raw.slug || '<slug>'}</code>
+              </>
+            )}
           </p>
           {errors.slug && <p className="text-destructive mt-1 text-xs">{errors.slug}</p>}
         </div>
@@ -197,7 +226,10 @@ export default function CampaignForm({ submitLabel, pending, defaultValues, onSu
             id="campaign_ends_at"
             type="datetime-local"
             value={raw.campaignEndsAt}
-            min={nowDatetimeLocal()}
+            // Only nudge toward future dates on create. On edit the current
+            // value may already be in the past and the admin is touching
+            // unrelated fields — don't block that with a native min= hint.
+            min={slugReadOnly ? undefined : nowDatetimeLocal()}
             onChange={e => setRaw(s => ({ ...s, campaignEndsAt: e.target.value }))}
           />
           <p className="text-muted-foreground mt-1 text-xs">

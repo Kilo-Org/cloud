@@ -127,16 +127,29 @@ export default function CreditCampaignsPage() {
     })
   );
 
-  const editing = useMemo(() => {
-    if (mode.kind !== 'edit' || !campaigns) return null;
-    return campaigns.find(c => c.id === mode.id) ?? null;
-  }, [mode, campaigns]);
+  // Fetch the fresh campaign via `get` on edit rather than reading from the
+  // list cache. If another admin edited the row since the list was last
+  // fetched, the cached copy is stale and the form would silently overwrite
+  // their changes on save. `get` hits the DB and returns the authoritative
+  // current state. The `enabled` gate makes this a no-op outside edit mode.
+  const editingId = mode.kind === 'edit' ? mode.id : null;
+  const { data: editing, isLoading: editingLoading } = useQuery(
+    trpc.admin.creditCampaigns.get.queryOptions(
+      { id: editingId ?? 0 },
+      { enabled: editingId !== null }
+    )
+  );
 
   const handleSubmit = (values: CampaignFormValues) => {
     if (mode.kind === 'create') {
       createMutation.mutate(values);
     } else if (mode.kind === 'edit') {
-      updateMutation.mutate({ id: mode.id, ...values });
+      // slug is intentionally dropped from the update payload — the router
+      // schema doesn't accept it, and the form disables the input on edit.
+      // Historical credit_transactions rows stay pinned to the original
+      // credit_category; see updateCampaignInputSchema.
+      const { slug: _slug, ...mutableFields } = values;
+      updateMutation.mutate({ id: mode.id, ...mutableFields });
     }
   };
 
@@ -184,6 +197,14 @@ export default function CreditCampaignsPage() {
           </Card>
         )}
 
+        {mode.kind === 'edit' && editingLoading && (
+          <Card>
+            <CardContent className="py-8">
+              <p className="text-muted-foreground">Loading…</p>
+            </CardContent>
+          </Card>
+        )}
+
         {mode.kind === 'edit' && editing && (
           <Card>
             <CardHeader>
@@ -196,6 +217,7 @@ export default function CreditCampaignsPage() {
               <CampaignForm
                 submitLabel="Save"
                 pending={updateMutation.isPending}
+                slugReadOnly
                 onSubmit={handleSubmit}
                 defaultValues={{
                   slug: editing.slug,

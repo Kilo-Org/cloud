@@ -200,7 +200,7 @@ export const credit_campaigns = pgTable(
     campaign_ends_at: timestamp({ withTimezone: true, mode: 'string' }),
     total_redemptions_allowed: integer().notNull(),
     active: boolean().notNull().default(true),
-    description: text(),
+    description: text().notNull(),
     created_by_kilo_user_id: text().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -216,7 +216,7 @@ export const credit_campaigns = pgTable(
     ),
     check(
       'credit_campaigns_total_redemptions_allowed_positive_check',
-      sql`${table.total_redemptions_allowed} IS NULL OR ${table.total_redemptions_allowed} > 0`
+      sql`${table.total_redemptions_allowed} > 0`
     ),
   ]
 );

@@ -48,9 +48,37 @@ const campaignInputShape = {
 };
 
 export const createCampaignInputSchema = z.object(campaignInputShape);
+
+/**
+ * Update schema omits `slug` (and therefore `credit_category`) because a
+ * campaign's category is written into `credit_transactions` at grant time.
+ * Changing it after redemptions exist orphans those rows from the cap
+ * counter and the admin stats, which would allow over-granting and hide
+ * real spend. We make slug immutable rather than trying to migrate
+ * historical `credit_transactions` rows to a new category.
+ *
+ * Also drops the future-only refine on `campaign_ends_at` — on update the
+ * current value may already be in the past (a naturally-expired campaign)
+ * and blocking edits would force admins to clear the date before touching
+ * anything else.
+ */
+const campaignUpdateShape = {
+  amount_usd: campaignInputShape.amount_usd,
+  credit_expiry_hours: campaignInputShape.credit_expiry_hours,
+  campaign_ends_at: z
+    .string()
+    .datetime({ offset: true })
+    .nullable()
+    .optional()
+    .transform(v => v ?? null),
+  total_redemptions_allowed: campaignInputShape.total_redemptions_allowed,
+  active: campaignInputShape.active,
+  description: campaignInputShape.description,
+};
+
 export const updateCampaignInputSchema = z.object({
   id: z.number().int().positive(),
-  ...campaignInputShape,
+  ...campaignUpdateShape,
 });
 
 export type CreateCampaignInput = z.infer<typeof createCampaignInputSchema>;
@@ -183,18 +211,17 @@ export const creditCampaignsRouter = createTRPCRouter({
   update: adminProcedure
     .input(updateCampaignInputSchema)
     .mutation(async ({ input }): Promise<CreditCampaign> => {
-      const credit_category = credit_categoryForSlug(input.slug);
-
-      // Atomic guard-then-act: the WHERE clause restricts the update
-      // to the single targeted row; the RETURNING clause gives us the
-      // authoritative post-update state. A missing row here means the
-      // campaign was deleted concurrently — treat as NOT_FOUND rather
-      // than silently inserting.
+      // slug + credit_category are deliberately excluded from the SET —
+      // they're immutable after create to keep historical credit_transactions
+      // rows tied to a stable category. See updateCampaignInputSchema.
+      //
+      // Atomic guard-then-act: the WHERE clause restricts the update to the
+      // single targeted row; the RETURNING clause gives us the authoritative
+      // post-update state. A missing row means the campaign was deleted
+      // concurrently — treat as NOT_FOUND rather than silently inserting.
       const [row] = await db
         .update(credit_campaigns)
         .set({
-          slug: input.slug,
-          credit_category,
           amount_microdollars: toMicrodollars(input.amount_usd),
           credit_expiry_hours: input.credit_expiry_hours ?? null,
           campaign_ends_at: input.campaign_ends_at ?? null,

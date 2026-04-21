@@ -168,7 +168,9 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     if (captureServices.includes('kiloclaw-tunnel')) {
       const tunnelEnvPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
       oldValues.set('tunnel', readEnvValue(tunnelEnvPath, 'KILOCODE_API_BASE_URL'));
+      oldValues.set('checkin', readEnvValue(tunnelEnvPath, 'KILOCLAW_CHECKIN_URL'));
       oldMtimes.set('tunnel', readEnvMtime(tunnelEnvPath));
+      oldMtimes.set('checkin', readEnvMtime(tunnelEnvPath));
     }
     if (captureServices.includes('kiloclaw-stripe')) {
       const stripeEnvPath = path.join(repoRoot, 'apps/web/.env.development.local');
@@ -192,19 +194,36 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
 
     if (captureServices.includes('kiloclaw-tunnel')) {
       waits.push(
-        waitForEnvValueChange(
-          path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
-          'KILOCODE_API_BASE_URL',
-          oldValues.get('tunnel'),
-          CAPTURE_TIMEOUT_MS,
-          oldMtimes.get('tunnel')
-        ).then(ready => {
-          kiloclawTunnelCaptured = ready;
-          if (ready) {
-            console.log('  Tunnel URL captured');
-          } else {
+        Promise.all([
+          waitForEnvValueChange(
+            path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
+            'KILOCODE_API_BASE_URL',
+            oldValues.get('tunnel'),
+            CAPTURE_TIMEOUT_MS,
+            oldMtimes.get('tunnel')
+          ),
+          waitForEnvValueChange(
+            path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
+            'KILOCLAW_CHECKIN_URL',
+            oldValues.get('checkin'),
+            CAPTURE_TIMEOUT_MS,
+            oldMtimes.get('checkin')
+          ),
+        ]).then(([gatewayReady, checkinReady]) => {
+          kiloclawTunnelCaptured = gatewayReady && checkinReady;
+          if (kiloclawTunnelCaptured) {
+            console.log('  KiloClaw tunnel URLs captured');
+            return;
+          }
+
+          if (!gatewayReady) {
             console.warn(
-              '  Tunnel URL not captured after 30s - kiloclaw startup will wait for a retry'
+              '  KILOCODE_API_BASE_URL not captured after 30s - kiloclaw startup will wait for a retry'
+            );
+          }
+          if (!checkinReady) {
+            console.warn(
+              '  KILOCLAW_CHECKIN_URL not captured after 30s - kiloclaw startup will wait for a retry'
             );
           }
         })
@@ -268,7 +287,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
 
   if (skippedServices.length > 0) {
     console.warn(
-      `Skipped startup for ${skippedServices.join(', ')} until KILOCODE_API_BASE_URL is captured.`
+      `Skipped startup for ${skippedServices.join(', ')} until KILOCODE_API_BASE_URL and KILOCLAW_CHECKIN_URL are captured.`
     );
     console.warn('Start or restart these services after the tunnel URL is ready.');
   }

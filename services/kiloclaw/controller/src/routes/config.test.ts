@@ -17,6 +17,8 @@ vi.mock('node:fs', () => {
   return {
     default: {
       readFileSync: vi.fn(),
+      writeFileSync: vi.fn(),
+      existsSync: vi.fn(),
     },
   };
 });
@@ -26,6 +28,8 @@ import { atomicWrite } from '../atomic-write';
 import fs from 'node:fs';
 
 const readMock = vi.mocked(fs.readFileSync);
+const writeMock = vi.mocked(fs.writeFileSync);
+const existsMock = vi.mocked(fs.existsSync);
 const atomicWriteMock = vi.mocked(atomicWrite);
 const backupMock = vi.mocked(backupConfigFile);
 
@@ -158,6 +162,7 @@ describe('/_kilo/config/restore routes', () => {
 describe('/_kilo/config/patch routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    existsMock.mockReturnValue(true);
   });
 
   it('enforces bearer auth', async () => {
@@ -279,6 +284,71 @@ describe('/_kilo/config/patch routes', () => {
       headers: authHeaders(),
     });
     expect(resp.status).toBe(500);
+  });
+});
+
+describe('/_kilo/config/tools-md/google-workspace route', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    existsMock.mockReturnValue(true);
+    readMock.mockReturnValue('# TOOLS\n');
+  });
+
+  it('enforces bearer auth', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+
+    const noAuth = await app.request('/_kilo/config/tools-md/google-workspace', {
+      method: 'POST',
+      body: JSON.stringify({ enabled: true }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    expect(noAuth.status).toBe(401);
+
+    const wrongAuth = await app.request('/_kilo/config/tools-md/google-workspace', {
+      method: 'POST',
+      body: JSON.stringify({ enabled: true }),
+      headers: authHeaders('bad-token'),
+    });
+    expect(wrongAuth.status).toBe(401);
+  });
+
+  it('adds Google Workspace section when enabled=true', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+
+    const resp = await app.request('/_kilo/config/tools-md/google-workspace', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ enabled: true }),
+    });
+
+    expect(resp.status).toBe(200);
+    expect(await resp.json()).toEqual({ ok: true, enabled: true });
+    expect(writeMock).toHaveBeenCalledOnce();
+    const written = writeMock.mock.calls[0][1] as string;
+    expect(written).toContain('<!-- BEGIN:google-workspace -->');
+  });
+
+  it('removes Google Workspace section when enabled=false', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+
+    readMock.mockReturnValue(
+      `# TOOLS\n\n<!-- BEGIN:google-workspace -->\nfoo\n<!-- END:google-workspace -->\n`
+    );
+
+    const resp = await app.request('/_kilo/config/tools-md/google-workspace', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ enabled: false }),
+    });
+
+    expect(resp.status).toBe(200);
+    expect(await resp.json()).toEqual({ ok: true, enabled: false });
+    expect(writeMock).toHaveBeenCalledOnce();
+    const written = writeMock.mock.calls[0][1] as string;
+    expect(written).not.toContain('BEGIN:google-workspace');
   });
 });
 

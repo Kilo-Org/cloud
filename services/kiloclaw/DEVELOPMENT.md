@@ -226,9 +226,10 @@ values or use `latest` (if a `latest` tag exists in the registry).
 
 ### Tunnel / API
 
-| Variable                | Description                       | Source       | Auto-managed |
-| ----------------------- | --------------------------------- | ------------ | ------------ |
-| `KILOCODE_API_BASE_URL` | Your tunnel URL + `/api/gateway/` | dev-start.sh | Yes          |
+| Variable                | Description                                 | Source       | Auto-managed |
+| ----------------------- | ------------------------------------------- | ------------ | ------------ |
+| `KILOCODE_API_BASE_URL` | Your tunnel URL + `/api/gateway/`           | dev-start.sh | Yes          |
+| `KILOCLAW_CHECKIN_URL`  | Your tunnel URL + `/api/controller/checkin` | dev-start.sh | Yes          |
 
 ### R2 Persistence
 

@@ -589,13 +589,19 @@ export const GOG_SECTION_CONFIG: ToolsMdSectionConfig = {
 
 The \`gog\` CLI is configured and ready for Google Workspace operations (Gmail, Calendar, Drive, Docs, Sheets, Slides, Tasks, Forms, Chat, Classroom).
 
-- List accounts: \`gog auth list\`
+- List accounts: \`gog auth list --json\`
 - Gmail — search: \`gog gmail search --account <email> --query "from:X"\`
 - Gmail — read: \`gog gmail get --account <email> <message-id>\`
 - Gmail — send: \`gog gmail send --account <email> --to <addr> --subject "..." --body "..."\`
-- Calendar — list events: \`gog calendar events list --account <email>\`
-- Drive — list files: \`gog drive files list --account <email>\`
+- Calendar — list calendars first: \`gog calendar calendars --account <email> --json\`
+- Calendar — default retrieval path: \`gog calendar events --all --all-pages --account <email> --from <iso> --to <iso> --json\`
+- Calendar — align \`--from\` / \`--to\` to the user-requested local date window before summarizing
+- Calendar — use \`primary\` only when explicitly requested by the user
+- Calendar — if results look sparse, retry with explicit calendar IDs from \`gog calendar calendars\`:
+  \`gog calendar events <calendarId> --all-pages --account <email> --from <iso> --to <iso> --json\`
+- Drive — list files: \`gog drive ls --account <email> --json\`
 - Docs — read: \`gog docs get --account <email> <doc-id>\`
+- If a command is blocked by capabilities, first run \`gog auth list --json\` to confirm what is granted.
 - Run \`gog --help\` and \`gog <service> --help\` for all available commands.
 <!-- END:google-workspace -->`,
 };
@@ -776,8 +782,10 @@ export async function bootstrapNonCritical(
     {
       phase: 'tools-md',
       run: () => {
+        const googleWorkspaceToolsEnabled =
+          env.KILOCLAW_GOOGLE_WORKSPACE_ENABLED === 'true' || !!env.KILOCLAW_GOG_CONFIG_TARBALL;
         updateToolsMdSection(true, KILO_CLI_SECTION_CONFIG, deps);
-        updateToolsMdSection(!!env.KILOCLAW_GOG_CONFIG_TARBALL, GOG_SECTION_CONFIG, deps);
+        updateToolsMdSection(googleWorkspaceToolsEnabled, GOG_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
         // Always-on: agent context about KiloClaw-mitigated audit findings

@@ -11,6 +11,16 @@ export const WORKOS_API_KEY = getEnvVariable('WORKOS_API_KEY');
 export const WORKOS_CLIENT_ID = getEnvVariable('WORKOS_CLIENT_ID');
 export const GOOGLE_CLIENT_ID = getEnvVariable('GOOGLE_CLIENT_ID');
 export const GOOGLE_CLIENT_SECRET = getEnvVariable('GOOGLE_CLIENT_SECRET');
+export const GOOGLE_WORKSPACE_OAUTH_CLIENT_ID = getEnvVariable('GOOGLE_WORKSPACE_OAUTH_CLIENT_ID');
+export const GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET = getEnvVariable(
+  'GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET'
+);
+export const GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI = getEnvVariable(
+  'GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI'
+);
+export const GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY = getEnvVariable(
+  'GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY'
+);
 export const GITHUB_CLIENT_ID = getEnvVariable('GITHUB_CLIENT_ID');
 export const GITHUB_CLIENT_SECRET = getEnvVariable('GITHUB_CLIENT_SECRET');
 // Admin-only GitHub access (used for admin dashboards)

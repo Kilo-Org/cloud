@@ -1305,10 +1305,11 @@ export async function handleKiloClawInvoicePaid(params: {
 }): Promise<void> {
   const { eventId, invoice } = params;
 
-  // Resolve chargeId — the charge field is present at runtime in webhook payloads
-  // but removed from newer Stripe type definitions. Use a runtime guard.
+  // Stripe can emit paid $0 invoices with no charge. Use charge ID when present,
+  // otherwise fall back to invoice ID so settlement still runs idempotently.
   const chargeId =
     'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
+  const stripePaymentId = chargeId ?? invoice.id;
 
   // Resolve stripeSubscriptionId from parent subscription details
   const rawSubscription = invoice.parent?.subscription_details?.subscription;
@@ -1319,11 +1320,10 @@ export async function handleKiloClawInvoicePaid(params: {
         ? rawSubscription
         : rawSubscription.id;
 
-  if (!chargeId || !stripeSubscriptionId) {
-    logWarning('KiloClaw invoice.paid missing charge or subscription', {
+  if (!stripeSubscriptionId) {
+    logWarning('KiloClaw invoice.paid missing subscription', {
       stripe_event_id: eventId,
       stripe_invoice_id: invoice.id,
-      has_charge: !!chargeId,
       has_subscription: !!stripeSubscriptionId,
     });
     return;
@@ -1412,7 +1412,7 @@ export async function handleKiloClawInvoicePaid(params: {
     userId: metadata.kiloUserId,
     metadataInstanceId: metadata.instanceId ?? undefined,
     stripeSubscriptionId,
-    chargeId,
+    stripePaymentId,
     plan,
     amountMicrodollars,
     periodStart,
@@ -1438,40 +1438,42 @@ export async function handleKiloClawInvoicePaid(params: {
     amount_paid: invoice.amount_paid,
   });
 
-  try {
-    const eventDate =
-      invoice.status_transitions?.paid_at != null
-        ? new Date(invoice.status_transitions.paid_at * 1000)
-        : new Date();
-    await enqueueAffiliateEventForUser({
-      userId: metadata.kiloUserId,
-      provider: 'impact',
-      eventType: 'sale',
-      dedupeKey: buildAffiliateEventDedupeKey({
+  if (invoice.amount_paid > 0 && chargeId) {
+    try {
+      const eventDate =
+        invoice.status_transitions?.paid_at != null
+          ? new Date(invoice.status_transitions.paid_at * 1000)
+          : new Date();
+      await enqueueAffiliateEventForUser({
+        userId: metadata.kiloUserId,
         provider: 'impact',
         eventType: 'sale',
-        entityId: invoice.id,
-      }),
-      orderId: invoice.id,
-      amount: invoice.amount_paid / 100,
-      currencyCode: invoice.currency ?? 'usd',
-      eventDate,
-      itemCategory: getImpactItemCategory(plan),
-      itemName: getImpactItemName(plan),
-      itemSku: matchingPriceId,
-      stripeChargeId: chargeId,
-    });
-  } catch (error) {
-    logWarning('Affiliate sale enqueue failed', {
-      stripe_event_id: eventId,
-      user_id: metadata.kiloUserId,
-      stripe_charge_id: chargeId,
-      error: error instanceof Error ? error.message : String(error),
-    });
+        dedupeKey: buildAffiliateEventDedupeKey({
+          provider: 'impact',
+          eventType: 'sale',
+          entityId: invoice.id,
+        }),
+        orderId: invoice.id,
+        amount: invoice.amount_paid / 100,
+        currencyCode: invoice.currency ?? 'usd',
+        eventDate,
+        itemCategory: getImpactItemCategory(plan),
+        itemName: getImpactItemName(plan),
+        itemSku: matchingPriceId,
+        stripeChargeId: chargeId,
+      });
+    } catch (error) {
+      logWarning('Affiliate sale enqueue failed', {
+        stripe_event_id: eventId,
+        user_id: metadata.kiloUserId,
+        stripe_charge_id: chargeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   // Fire PostHog revenue tracking event in the background
-  if (!IS_IN_AUTOMATED_TEST) {
+  if (!IS_IN_AUTOMATED_TEST && invoice.amount_paid > 0) {
     await runAfterResponse(async () => {
       const [user] = await db
         .select({ email: kilocode_users.google_user_email })

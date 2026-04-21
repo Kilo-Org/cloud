@@ -233,7 +233,11 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
   if (request.body.reasoning?.enabled === true) {
     return false;
   }
-  return (request.body.reasoning?.effort ?? request.body.reasoning_effort) === 'none';
+  return (
+    (request.body.reasoning?.effort ?? request.body.reasoning_effort) === 'none' ||
+    request.body.enable_thinking === false || // Alibaba
+    request.body.thinking?.type === 'disabled' // Bytedance
+  );
 }
 
 export function enableReasoningSummaries(request: GatewayRequest) {

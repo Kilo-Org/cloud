@@ -5,16 +5,9 @@ import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
-import { unstable_cache } from 'next/cache';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { filterByFeature } from '@/lib/ai-gateway/models';
-
-const getDirectByokModels = unstable_cache(
-  (userId: string) => getDirectByokModelsForUser(userId),
-  undefined,
-  { revalidate: 60 }
-);
 
 async function tryGetUserFromAuth() {
   try {
@@ -49,7 +42,7 @@ export async function GET(
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }
-    const byokModels = auth?.user ? await getDirectByokModels(auth.user.id) : [];
+    const byokModels = auth?.user ? await getDirectByokModelsForUser(auth.user.id) : [];
     return NextResponse.json({ data: filterByFeature(data.data.concat(byokModels), feature) });
   } catch (error) {
     captureException(error, {

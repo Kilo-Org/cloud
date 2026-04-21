@@ -893,6 +893,26 @@ describe('TOOLS.md section configs', () => {
     expect(section).toContain('DO NOT create');
     expect(section).toContain('permissive mode');
   });
+
+  it('Google Workspace section uses current gog calendar guidance', () => {
+    expect(GOG_SECTION_CONFIG.section).toContain('gog auth list --json');
+    expect(GOG_SECTION_CONFIG.section).toContain('gog calendar calendars --account <email> --json');
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'gog calendar events --all --all-pages --account <email> --from <iso> --to <iso> --json'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'align `--from` / `--to` to the user-requested local date window before summarizing'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain('use `primary` only when explicitly requested');
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'if results look sparse, retry with explicit calendar IDs'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'gog calendar events <calendarId> --all-pages --account <email> --from <iso> --to <iso> --json'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain('gog drive ls --account <email> --json');
+    expect(GOG_SECTION_CONFIG.section).not.toContain('gog drive files list');
+  });
 });
 
 // ---- buildGatewayArgs ----

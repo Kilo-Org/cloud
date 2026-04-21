@@ -672,6 +672,12 @@ describe('setUserMdLocation', () => {
     );
   });
 
+  it('inserts a missing location field before lowercase notes', () => {
+    const result = setUserMdLocation('# USER\n  - name:\n  - notes: existing note\n', 'Amsterdam');
+
+    expect(result).toContain('  - Location: Amsterdam\n  - notes: existing note');
+  });
+
   it('appends a location field when no profile list anchor exists', () => {
     const result = setUserMdLocation('# USER\n- Name:\n', 'Amsterdam, Netherlands');
 

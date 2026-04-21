@@ -338,33 +338,78 @@ export function formatUserProfileMarkdown(fields: string | UserProfileFields): s
   ].join('\n');
 }
 
+type ProfileListItem = {
+  indentation: string;
+  textStartIndex: number;
+  text: string;
+};
+
+function parseProfileListItem(line: string): ProfileListItem | null {
+  let index = 0;
+  while (line[index] === ' ' || line[index] === '\t') index += 1;
+  if (line[index] !== '-') return null;
+
+  const indentation = line.slice(0, index);
+  index += 1;
+  while (line[index] === ' ' || line[index] === '\t') index += 1;
+
+  return {
+    indentation,
+    textStartIndex: index,
+    text: line.slice(index),
+  };
+}
+
+function startsWithCaseInsensitive(value: string, prefix: string): boolean {
+  return value.slice(0, prefix.length).toLowerCase() === prefix.toLowerCase();
+}
+
+function findProfileFieldPrefixEnd(
+  line: string,
+  label: 'Timezone' | 'Location' | 'Notes'
+): number | null {
+  const listItem = parseProfileListItem(line);
+  if (!listItem) return null;
+
+  const plainPrefix = `${label}:`;
+  if (startsWithCaseInsensitive(listItem.text, plainPrefix)) {
+    return listItem.textStartIndex + plainPrefix.length;
+  }
+
+  const boldPrefix = `**${label}:**`;
+  if (startsWithCaseInsensitive(listItem.text, boldPrefix)) {
+    return listItem.textStartIndex + boldPrefix.length;
+  }
+
+  return null;
+}
+
+function isBoldProfileFieldLine(line: string): boolean {
+  const listItem = parseProfileListItem(line);
+  return listItem !== null && listItem.text.startsWith('**') && listItem.text.indexOf(':**', 2) > 2;
+}
+
 function setUserMdProfileField(
   content: string,
   label: 'Timezone' | 'Location',
   value: string
 ): string {
   const lines = content.split('\n');
-  const plainFieldLine = new RegExp(`^(\\s*-\\s*${label}:)\\s*.*`, 'i');
-  const boldFieldLine = new RegExp(`^(\\s*-\\s*\\*\\*${label}:\\*\\*)\\s*.*`, 'i');
 
   const updatedLines = lines.map(line => {
-    if (plainFieldLine.test(line)) {
-      return line.replace(plainFieldLine, `$1 ${value}`);
-    }
-    if (boldFieldLine.test(line)) {
-      return line.replace(boldFieldLine, `$1 ${value}`);
-    }
-    return line;
+    const fieldPrefixEnd = findProfileFieldPrefixEnd(line, label);
+    return fieldPrefixEnd === null ? line : `${line.slice(0, fieldPrefixEnd)} ${value}`;
   });
 
   if (updatedLines.some((line, index) => line !== lines[index])) {
     return updatedLines.join('\n');
   }
 
-  const notesIndex = lines.findIndex(line => /^\s*-\s*(?:\*\*)?Notes:(?:\*\*)?\s*.*$/i.test(line));
+  const notesIndex = lines.findIndex(line => findProfileFieldPrefixEnd(line, 'Notes') !== null);
   if (notesIndex !== -1) {
-    const indentation = lines[notesIndex].match(/^(\s*)-/)?.[1] ?? '';
-    const usesBoldFields = lines.some(line => /^\s*-\s*\*\*[^*]+:\*\*/.test(line));
+    const listItem = parseProfileListItem(lines[notesIndex]);
+    const indentation = listItem?.indentation ?? '';
+    const usesBoldFields = lines.some(isBoldProfileFieldLine);
     const newFieldLine = usesBoldFields
       ? `${indentation}- **${label}:** ${value}`
       : `${indentation}- ${label}: ${value}`;

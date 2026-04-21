@@ -12,6 +12,7 @@ import {
   handleGetMembers,
   handleRenameConversation,
   handleListBotConversations,
+  handleCreateBotConversation,
 } from './handler';
 
 export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
@@ -32,4 +33,5 @@ export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthCont
   app.get('/bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members', handleGetMembers);
   app.patch('/bot/v1/sandboxes/:sandboxId/conversations/:conversationId', handleRenameConversation);
   app.get('/bot/v1/sandboxes/:sandboxId/conversations', handleListBotConversations);
+  app.post('/bot/v1/sandboxes/:sandboxId/conversations', handleCreateBotConversation);
 }

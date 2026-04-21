@@ -20,6 +20,10 @@ vi.mock('../services/sandbox-ownership', () => ({
 
 vi.mock('../services/user-lookup', () => ({
   resolveUserDisplayInfo: async () => new Map(),
+  validateUserIds: async (_conn: string, userIds: string[]) => ({
+    valid: userIds,
+    invalid: [],
+  }),
 }));
 
 function grantSandbox(userId: string, sandboxId: string) {
@@ -1004,5 +1008,118 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations', () => {
     expect(body.limit).toBe(1);
     expect(body.offset).toBe(0);
     expect(body.conversations.length).toBeLessThanOrEqual(1);
+  });
+});
+
+// ─── POST /bot/v1/sandboxes/:sandboxId/conversations ────────────────────────
+
+describe('POST /bot/v1/sandboxes/:sandboxId/conversations', () => {
+  it('creates a conversation with sandbox owner as implicit member (201)', async () => {
+    const suffix = 'bot-create-conv-ok';
+    const userId = `user-${suffix}`;
+    const sandboxId = `sandbox-${suffix}`;
+    grantSandbox(userId, sandboxId);
+
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    const testEnv = makeEnv();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: 'Bot Created Chat' }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(201);
+    const body = await res.json<{ conversationId: string }>();
+    expect(body.conversationId).toMatch(/^[0-9A-Z]{26}$/);
+  });
+
+  it('creates a conversation without title (201)', async () => {
+    const suffix = 'bot-create-conv-notitle';
+    const userId = `user-${suffix}`;
+    const sandboxId = `sandbox-${suffix}`;
+    grantSandbox(userId, sandboxId);
+
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    const testEnv = makeEnv();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(201);
+  });
+
+  it('returns 401 without auth', async () => {
+    const suffix = 'bot-create-conv-noauth';
+    const sandboxId = `sandbox-${suffix}`;
+    const app = makeBotApp();
+    const testEnv = makeEnv();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'X' }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 404 when sandbox has no owner', async () => {
+    const sandboxId = 'sandbox-no-owner';
+    // Don't call grantSandbox — no owner exists
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    const testEnv = makeEnv();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: 'Ghost' }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 400 for invalid JSON', async () => {
+    const suffix = 'bot-create-conv-badjson';
+    const sandboxId = `sandbox-${suffix}`;
+    grantSandbox(`user-${suffix}`, sandboxId);
+
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    const testEnv = makeEnv();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: 'not-json',
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
   });
 });

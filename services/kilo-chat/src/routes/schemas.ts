@@ -46,3 +46,8 @@ export const reactionBodySchema = z.object({
 export const renameConversationSchema = z.object({
   title: z.string().min(1).max(200),
 });
+
+export const createBotConversationSchema = z.object({
+  title: z.string().max(200).optional(),
+  additionalMembers: z.array(z.string().min(1)).max(20).optional(),
+});

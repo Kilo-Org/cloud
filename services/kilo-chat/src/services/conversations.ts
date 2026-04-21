@@ -5,7 +5,8 @@
 
 import { ulid } from 'ulid';
 import { extractConversationContext, extractSandboxId, pushInstanceEvent } from './event-push';
-import { userOwnsSandbox } from './sandbox-ownership';
+import { getSandboxOwner, userOwnsSandbox } from './sandbox-ownership';
+import { validateUserIds } from './user-lookup';
 
 // ─── createConversation ────────────────────────────────────────────────────
 
@@ -64,6 +65,92 @@ export async function createConversationFor(
 
   // Notify all human members on the instance context so their conversation list updates.
   await pushInstanceEvent(env, params.sandboxId, [userId], 'conversation.created', {
+    conversationId,
+  });
+
+  return { ok: true, conversationId };
+}
+
+// ─── createBotConversation ─────────────────────────────────────────────────
+
+export type CreateBotConversationParams = {
+  sandboxId: string;
+  title?: string;
+  additionalMembers?: string[];
+};
+
+export type CreateBotConversationResult =
+  | { ok: true; conversationId: string }
+  | {
+      ok: false;
+      code: 'not_found' | 'invalid_members' | 'internal';
+      error: string;
+      invalidMembers?: string[];
+    };
+
+export async function createBotConversationFor(
+  env: Env,
+  params: CreateBotConversationParams
+): Promise<CreateBotConversationResult> {
+  const ownerId = await getSandboxOwner(env.HYPERDRIVE.connectionString, params.sandboxId);
+  if (!ownerId) {
+    return { ok: false, code: 'not_found', error: 'Sandbox owner not found' };
+  }
+
+  const additionalMembers = params.additionalMembers ?? [];
+  if (additionalMembers.length > 0) {
+    const { invalid } = await validateUserIds(env.HYPERDRIVE.connectionString, additionalMembers);
+    if (invalid.length > 0) {
+      return {
+        ok: false,
+        code: 'invalid_members',
+        error: `Invalid member IDs: ${invalid.join(', ')}`,
+        invalidMembers: invalid,
+      };
+    }
+  }
+
+  const conversationId = ulid();
+  const now = Date.now();
+  const botId = `bot:kiloclaw:${params.sandboxId}`;
+
+  const members: Array<{ id: string; kind: 'user' | 'bot' }> = [
+    { id: ownerId, kind: 'user' },
+    { id: botId, kind: 'bot' },
+    ...additionalMembers
+      .filter(id => id !== ownerId) // Dedupe owner if passed in additionalMembers
+      .map(id => ({ id, kind: 'user' as const })),
+  ];
+
+  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
+  const initResult = await convStub.initialize({
+    id: conversationId,
+    title: params.title ?? null,
+    createdBy: botId,
+    createdAt: now,
+    members,
+  });
+
+  if (!initResult.ok) {
+    return { ok: false, code: 'internal', error: 'Failed to initialize conversation' };
+  }
+
+  const memberParams = {
+    conversationId,
+    conversationTitle: params.title ?? null,
+    sandboxId: params.sandboxId,
+    joinedAt: now,
+  };
+
+  await Promise.all(
+    members.map(m => {
+      const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(m.id));
+      return stub.addConversation(memberParams);
+    })
+  );
+
+  const humanMemberIds = members.filter(m => m.kind === 'user').map(m => m.id);
+  await pushInstanceEvent(env, params.sandboxId, humanMemberIds, 'conversation.created', {
     conversationId,
   });
 

@@ -10,7 +10,7 @@
 import type { Context } from 'hono';
 import type { ZodSchema } from 'zod';
 import type { AuthContext } from '../auth';
-import { renameConversationFor } from '../services/conversations';
+import { createBotConversationFor, renameConversationFor } from '../services/conversations';
 import { createMessageFor, deleteMessageFor, editMessageFor } from '../services/messages';
 import { addReactionFor, removeReactionFor } from '../services/reactions';
 import { setTypingFor, stopTypingFor } from '../services/typing';
@@ -18,6 +18,7 @@ import { resolveUserDisplayInfo } from '../services/user-lookup';
 import {
   ulidSchema,
   createMessageSchema,
+  createBotConversationSchema,
   editMessageSchema,
   reactionBodySchema,
   renameConversationSchema,
@@ -311,6 +312,34 @@ export async function handleListBotConversations(c: HonoCtx) {
   );
 
   return c.json({ conversations: enriched, total, limit, offset });
+}
+
+// ─── createBotConversation ──────────────────────────────────────────────────
+
+export async function handleCreateBotConversation(c: HonoCtx) {
+  const sandboxId = c.req.param('sandboxId');
+  if (!sandboxId) {
+    return c.json({ error: 'sandboxId required' }, 400);
+  }
+
+  const body = await parseBody(c, createBotConversationSchema);
+  if (!body.ok) return body.response;
+
+  const result = await createBotConversationFor(c.env, {
+    sandboxId,
+    title: body.data.title,
+    additionalMembers: body.data.additionalMembers,
+  });
+
+  if (!result.ok) {
+    if (result.code === 'not_found') return c.json({ error: result.error }, 404);
+    if (result.code === 'invalid_members') {
+      return c.json({ error: result.error, invalidMembers: result.invalidMembers }, 400);
+    }
+    return c.json({ error: result.error }, 500);
+  }
+
+  return c.json({ conversationId: result.conversationId }, 201);
 }
 
 // ─── renameConversation ─────────────────────────────────────────────────────

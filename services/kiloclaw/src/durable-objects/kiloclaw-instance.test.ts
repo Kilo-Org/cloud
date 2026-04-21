@@ -3078,7 +3078,10 @@ describe('updateKiloCodeConfig memory fields', () => {
             remote: {
               baseUrl: 'https://api.kilo.ai/api/gateway/',
               apiKey: 'tok-123',
-              headers: { 'X-KiloCode-OrganizationId': 'org_abc' },
+              headers: {
+                'x-kilocode-feature': 'openclaw-embedding',
+                'X-KiloCode-OrganizationId': 'org_abc',
+              },
             },
           },
         },

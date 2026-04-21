@@ -1062,7 +1062,9 @@ describe('generateBaseConfig', () => {
       'https://api.kilo.ai/api/gateway/'
     );
     expect(config.agents.defaults.memorySearch.remote.apiKey).toBe('test-api-key');
-    expect(config.agents.defaults.memorySearch.remote.headers).toEqual({});
+    expect(config.agents.defaults.memorySearch.remote.headers).toEqual({
+      'x-kilocode-feature': 'openclaw-embedding',
+    });
   });
 
   it('falls back to the default embedding model when no model env var is set', () => {
@@ -1094,6 +1096,7 @@ describe('generateBaseConfig', () => {
     };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
     expect(config.agents.defaults.memorySearch.remote.headers).toEqual({
+      'x-kilocode-feature': 'openclaw-embedding',
       'X-KiloCode-OrganizationId': 'org_abc123',
     });
   });

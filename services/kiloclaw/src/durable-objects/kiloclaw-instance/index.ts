@@ -852,7 +852,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (this.s.vectorMemoryEnabled) {
         const model = this.s.vectorMemoryModel ?? DEFAULT_VECTOR_MEMORY_MODEL;
         const baseUrl = this.env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
-        const headers: Record<string, string> = {};
+        // Feature attribution for embedding calls — matches FEATURE_HEADER /
+        // FEATURE_VALUES in apps/web/src/lib/feature-detection.ts so that
+        // microdollar_usage_metadata.feature_id records 'openclaw-embedding'.
+        const headers: Record<string, string> = {
+          'x-kilocode-feature': 'openclaw-embedding',
+        };
         if (this.s.orgId) {
           headers['X-KiloCode-OrganizationId'] = this.s.orgId;
         }

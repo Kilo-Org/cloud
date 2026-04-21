@@ -6,6 +6,8 @@ import {
 import type { ChannelMessageActionContext, OpenClawConfig } from 'openclaw/plugin-sdk/core';
 import { createKiloChatClient } from './client';
 import { resolveControllerUrl, resolveGatewayToken } from './env';
+import { handleKiloChatMemberInfoAction } from './member-info-action';
+import { handleKiloChatReadAction } from './read-action';
 import { handleKiloChatReactAction } from './react-action';
 
 const CHANNEL_ID = 'kilo-chat';
@@ -99,12 +101,27 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
     },
     actions: {
       describeMessageTool: () => ({
-        actions: ['react'] as const,
+        actions: ['react', 'read', 'member-info'] as const,
       }),
-      supportsAction: ({ action }: { action: string }) => action === 'react',
+      supportsAction: ({ action }: { action: string }) =>
+        action === 'react' || action === 'read' || action === 'member-info',
       resolveExecutionMode: () => 'local' as const,
       handleAction: async (ctx: ChannelMessageActionContext) => {
         const client = makeClient();
+        if (ctx.action === 'read') {
+          return handleKiloChatReadAction({
+            params: ctx.params,
+            toolContext: ctx.toolContext,
+            client,
+          });
+        }
+        if (ctx.action === 'member-info') {
+          return handleKiloChatMemberInfoAction({
+            params: ctx.params,
+            toolContext: ctx.toolContext,
+            client,
+          });
+        }
         return handleKiloChatReactAction({
           action: ctx.action,
           cfg: ctx.cfg,

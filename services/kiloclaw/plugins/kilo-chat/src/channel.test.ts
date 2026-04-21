@@ -119,17 +119,21 @@ describe('kilo-chat messaging adapter', () => {
 });
 
 describe('kilo-chat actions adapter', () => {
-  it('declares react in describeMessageTool', () => {
+  it('describeMessageTool returns all three actions', () => {
     const adapter = kiloChatPlugin.actions;
     expect(adapter).toBeDefined();
     const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
     expect(discovery?.actions).toContain('react');
+    expect(discovery?.actions).toContain('read');
+    expect(discovery?.actions).toContain('member-info');
   });
 
-  it('supportsAction returns true for react and false for other actions', () => {
+  it('supportsAction returns true for react, read, member-info and false for pin', () => {
     const adapter = kiloChatPlugin.actions;
     expect(adapter?.supportsAction?.({ action: 'react' as never })).toBe(true);
-    expect(adapter?.supportsAction?.({ action: 'send' as never })).toBe(false);
+    expect(adapter?.supportsAction?.({ action: 'read' as never })).toBe(true);
+    expect(adapter?.supportsAction?.({ action: 'member-info' as never })).toBe(true);
+    expect(adapter?.supportsAction?.({ action: 'pin' as never })).toBe(false);
   });
 
   it('resolveExecutionMode returns "local"', () => {

@@ -12,16 +12,6 @@ import path from 'node:path';
 
 const DEFAULT_CONFIG_PATH = '/root/.openclaw/openclaw.json';
 
-const VALID_REACTION_LEVELS = ['off', 'ack', 'minimal', 'extensive'] as const;
-type ReactionLevel = (typeof VALID_REACTION_LEVELS)[number];
-
-function resolveReactionLevel(raw: string | undefined): ReactionLevel {
-  if (raw && (VALID_REACTION_LEVELS as readonly string[]).includes(raw)) {
-    return raw as ReactionLevel;
-  }
-  return 'minimal';
-}
-
 export const MAX_CONFIG_BACKUPS = 5;
 
 // NOTE: writeBaseConfig does NOT use the shared atomicWrite utility because
@@ -473,19 +463,13 @@ export function generateBaseConfig(
   }
 
   // Kilo Chat — always enabled. The plugin's outbound path reaches
-  // kilo-chat via controller proxy → kiloclaw Worker → service binding, so
-  // nothing else needs to be provisioned per sandbox.
-  //
-  // reactionLevel has a real runtime effect AND doubles as the "meaningful
-  // channel config key" required by OpenClaw's isChannelConfigured gate —
-  // without some key other than `enabled`, hasMeaningfulChannelConfig
-  // returns false and the plugin loads in `setup-runtime` mode instead of
-  // `full`, which skips registerFull and the webhook HTTP route.
+  // kilo-chat via controller proxy → kilo-chat Worker directly.
   config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
   config.channels['kilo-chat'].enabled = true;
-  // Load-bearing: also the marker key for isChannelConfigured — do not
-  // remove without replacing with another non-`enabled` config key.
-  config.channels['kilo-chat'].reactionLevel = resolveReactionLevel(env.KILOCHAT_REACTION_LEVEL);
+  // Load-bearing: reactionLevel is the marker key for OpenClaw's
+  // hasMeaningfulChannelConfig gate — without a non-`enabled` key the
+  // plugin loads in setup-runtime mode instead of full.
+  config.channels['kilo-chat'].reactionLevel = 'minimal';
 
   config.plugins = config.plugins ?? {};
   config.plugins.load = config.plugins.load ?? {};

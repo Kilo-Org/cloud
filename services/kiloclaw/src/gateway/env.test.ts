@@ -567,20 +567,17 @@ describe('buildEnvVars', () => {
 
   // ─── kilo-chat env passthrough ──────────────────────────────────────
 
-  it('forwards KILOCHAT_BASE_URL and KILOCHAT_REACTION_LEVEL into plaintext env', async () => {
+  it('forwards KILOCHAT_BASE_URL into plaintext env', async () => {
     const env = createMockEnv({
       KILOCHAT_BASE_URL: 'https://chat.kiloapps.io',
-      KILOCHAT_REACTION_LEVEL: 'extensive',
     });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
     expect(result.env.KILOCHAT_BASE_URL).toBe('https://chat.kiloapps.io');
-    expect(result.env.KILOCHAT_REACTION_LEVEL).toBe('extensive');
   });
 
-  it('omits KILOCHAT_BASE_URL and KILOCHAT_REACTION_LEVEL when not provided', async () => {
+  it('omits KILOCHAT_BASE_URL when not provided', async () => {
     const env = createMockEnv();
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
     expect(result.env.KILOCHAT_BASE_URL).toBeUndefined();
-    expect(result.env.KILOCHAT_REACTION_LEVEL).toBeUndefined();
   });
 });

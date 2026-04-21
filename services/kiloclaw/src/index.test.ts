@@ -17,7 +17,6 @@ vi.mock('./routes', async () => {
     kiloclaw: empty,
     platform: empty,
     controller,
-    kiloChatProxy: empty,
   };
 });
 

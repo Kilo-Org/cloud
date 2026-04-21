@@ -65,12 +65,6 @@
       "id": "1f406d747ead4a5896b750c1000973e0",
     },
   ],
-
-  // Service binding for outbound kilo-chat RPC. The kilo-chat worker exposes
-  // botCreateMessage/botEditMessage/… on its default WorkerEntrypoint; those
-  // are only reachable over this binding, and kiloclaw verifies the caller's
-  // per-sandbox gateway token before invoking them.
-  "services": [{ "binding": "KILOCHAT", "service": "kilo-chat" }],
   "analytics_engine_datasets": [
     { "binding": "KILOCLAW_AE", "dataset": "kiloclaw_events" },
     {

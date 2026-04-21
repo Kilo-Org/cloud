@@ -6753,6 +6753,48 @@ describe("status guards: 'starting'", () => {
     );
   });
 
+  it('startAsync() short-circuits a duplicate call within the fresh starting window', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    const originalStartingAt = Date.now();
+    await seedProvisioned(storage, {
+      status: 'starting',
+      startingAt: originalStartingAt,
+    });
+
+    await instance.startAsync();
+
+    // No duplicate waitUntil scheduled, startingAt unchanged.
+    expect(waitUntilPromises).toHaveLength(0);
+    expect(storage._store.get('startingAt')).toBe(originalStartingAt);
+  });
+
+  it('startAsync() falls through to a fresh attempt when starting state is stale', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    const staleStartingAt = Date.now() - STARTING_TIMEOUT_MS - 1_000;
+    await seedProvisioned(storage, {
+      status: 'starting',
+      startingAt: staleStartingAt,
+    });
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.startAsync('user-1');
+
+    // Fresh attempt: startingAt is updated synchronously in startAsync before
+    // scheduling the background start(); a new waitUntil was scheduled. Check
+    // before awaiting waitUntilPromises, since the background start() will
+    // transition out of 'starting' and clear startingAt.
+    const persisted = storage._store.get('startingAt');
+    expect(typeof persisted).toBe('number');
+    expect(persisted).toBeGreaterThan(staleStartingAt);
+    expect(waitUntilPromises).toHaveLength(1);
+
+    await Promise.all(waitUntilPromises);
+  });
+
   it('background start() aborts if instance was destroyed while starting', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
 

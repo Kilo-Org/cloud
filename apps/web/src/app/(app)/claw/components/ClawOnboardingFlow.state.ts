@@ -246,6 +246,18 @@ function getRenderStepDecision({
     // enrollment created the billing records without triggering provision).
     // Show the onboarding entry point so the user can kick off provisioning.
     if (!instanceStatus) {
+      // After the user clicks "Get Started", the status poll lag (up to ~10s)
+      // would otherwise keep the create-instance step rendered, giving the
+      // button a wide window to be clicked again and produce a duplicate
+      // provision RPC. Flip to provisioning immediately so the button is
+      // unmounted before the next poll resolves.
+      if (createSetupStarted) {
+        return {
+          renderStep: 'provisioning',
+          reason:
+            'post-provisioning mode has no populated instance status yet, but setup has been started',
+        };
+      }
       return {
         renderStep: 'create-instance',
         reason: 'post-provisioning mode has no populated instance status yet',

@@ -282,6 +282,26 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('create-instance');
   });
 
+  test('flips post-provisioning from create-instance to provisioning once setup has started', () => {
+    // After the user clicks "Get Started" (createSetupStarted=true) but the
+    // status poll has not yet surfaced a populated status, the button must
+    // be unmounted immediately to prevent duplicate provisions.
+    expect(
+      getClawOnboardingFlowState(
+        createInput({ mode: 'post-provisioning', createSetupStarted: true })
+      ).renderStep
+    ).toBe('provisioning');
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          mode: 'post-provisioning',
+          createSetupStarted: true,
+          status: createStatus(null),
+        })
+      ).renderStep
+    ).toBe('provisioning');
+  });
+
   test('renders complete in post-provisioning mode once the machine is running', () => {
     const state = getClawOnboardingFlowState(
       createInput({

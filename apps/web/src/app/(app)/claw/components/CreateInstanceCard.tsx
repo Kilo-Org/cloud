@@ -110,6 +110,19 @@ export function CreateInstanceCard({
   const posthog = usePostHog();
   const hasCapturedPageView = useRef(false);
 
+  // Synchronous re-entry guard. `isPending` comes from react-query and only
+  // updates after the next render, so a rapid double-click on the button can
+  // fire two `onCreate()` invocations before the disabled={isPending} DOM
+  // attribute ever becomes true. Two provisions landing on the same owner
+  // back-to-back can race through the Worker DO's startAsync window and
+  // produce a duplicate provider.startRuntime (and a redundant Northflank
+  // deployment PATCH). Reset when the mutation settles so retries after a
+  // failure still work.
+  const inFlightRef = useRef(false);
+  useEffect(() => {
+    if (!isPending) inFlightRef.current = false;
+  }, [isPending]);
+
   useEffect(() => {
     if (hasCapturedPageView.current) return;
     hasCapturedPageView.current = true;
@@ -117,6 +130,8 @@ export function CreateInstanceCard({
   }, [posthog]);
 
   function handleCreate() {
+    if (inFlightRef.current || isPending) return;
+    inFlightRef.current = true;
     posthog?.capture('claw_create_instance_clicked', {
       selected_model: KILO_AUTO_BALANCED_MODEL.id,
     });

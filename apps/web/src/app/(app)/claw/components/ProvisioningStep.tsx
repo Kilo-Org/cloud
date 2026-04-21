@@ -50,6 +50,14 @@ export function ProvisioningStep({
   onComplete: () => void;
 }) {
   const completedRef = useRef(false);
+  // The persist-to-durable-storage sibling mutations below (patchChannels,
+  // patchExecPreset, patchBotIdentity) must fire at most once per mount.
+  // If patchOpenclawConfig fails and resets completedRef for retry, the
+  // siblings have already succeeded server-side and MUST NOT re-fire —
+  // they'd produce redundant DO writes (and in the Northflank case could
+  // churn the restricted secret, which the backend now content-hashes but
+  // still generates log noise).
+  const didPatchSiblingsRef = useRef(false);
   const [configReady, setConfigReady] = useState(false);
 
   // Keep stable references to callbacks so the effect only re-runs
@@ -71,7 +79,35 @@ export function ProvisioningStep({
   botIdentityRef.current = botIdentity;
 
   useEffect(() => {
-    if (!instanceRunning || completedRef.current) return;
+    if (!instanceRunning) return;
+
+    // Fire persist-to-durable-storage mutations exactly once. Guarded
+    // separately from `completedRef` so a patchOpenclawConfig retry does
+    // not re-trigger these already-succeeded server writes.
+    if (!didPatchSiblingsRef.current) {
+      didPatchSiblingsRef.current = true;
+
+      const tokens = channelTokensRef.current;
+      if (tokens && Object.keys(tokens).length > 0) {
+        patchChannelsRef.current(tokens);
+      }
+
+      if (preset !== 'always-ask') {
+        const { security, ask } = execPresetToConfig(preset);
+        patchExecPresetRef.current({ security, ask });
+      }
+
+      if (botIdentityRef.current) {
+        patchBotIdentityRef.current({
+          botName: botIdentityRef.current.botName,
+          botNature: botIdentityRef.current.botNature,
+          botVibe: botIdentityRef.current.botVibe,
+          botEmoji: botIdentityRef.current.botEmoji,
+        });
+      }
+    }
+
+    if (completedRef.current) return;
     completedRef.current = true;
 
     // Build the full openclaw.json patch: exec preset + channel config.
@@ -85,30 +121,6 @@ export function ProvisioningStep({
     const channelPatch = channelTokensToConfigPatch(channelTokensRef.current);
     if (channelPatch) Object.assign(configPatch, channelPatch);
 
-    // Also persist channel tokens to durable storage so they survive
-    // machine restarts. Fire-and-forget — the live config patch above
-    // is what matters for the immediate user experience.
-    const tokens = channelTokensRef.current;
-    if (tokens && Object.keys(tokens).length > 0) {
-      patchChannelsRef.current(tokens);
-    }
-
-    // Persist exec permissions preset to durable storage so it survives
-    // machine restarts/redeploys. Fire-and-forget — same pattern as channels.
-    if (preset !== 'always-ask') {
-      const { security, ask } = execPresetToConfig(preset);
-      patchExecPresetRef.current({ security, ask });
-    }
-
-    if (botIdentityRef.current) {
-      patchBotIdentityRef.current({
-        botName: botIdentityRef.current.botName,
-        botNature: botIdentityRef.current.botNature,
-        botVibe: botIdentityRef.current.botVibe,
-        botEmoji: botIdentityRef.current.botEmoji,
-      });
-    }
-
     if (Object.keys(configPatch).length === 0) {
       setConfigReady(true);
       return;
@@ -119,6 +131,7 @@ export function ProvisioningStep({
       {
         onSuccess: () => setConfigReady(true),
         onError: (err: { message: string }) => {
+          // Only reset the openclaw config guard — siblings stay fired.
           completedRef.current = false;
           toast.error(err.message);
         },

@@ -6,19 +6,5 @@
   "channels": ["kilo-chat"],
   "channelEnvVars": {
     "kilo-chat": []
-  },
-  "configSchema": {
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-      "kilo-chat": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "enabled": { "type": "boolean" },
-          "reactionLevel": { "type": "string" }
-        }
-      }
-    }
   }
 }

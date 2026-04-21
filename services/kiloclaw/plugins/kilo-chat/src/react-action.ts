@@ -73,17 +73,22 @@ function readString(params: Record<string, unknown>, key: string): string | unde
   return typeof v === 'string' && v.length > 0 ? v : undefined;
 }
 
+function stripPrefix(raw: string): string {
+  return raw.trim().replace(/^kilo-chat:/i, '');
+}
+
 export async function handleKiloChatReactAction(
   args: HandleKiloChatReactActionParams
 ): Promise<HandleKiloChatReactActionResult> {
-  const conversationId =
+  const raw =
     readString(args.params, 'to') ??
     (typeof args.toolContext?.currentChannelId === 'string'
       ? args.toolContext.currentChannelId
       : undefined);
-  if (!conversationId) {
+  if (!raw) {
     throw new Error('kilo-chat: conversationId (or `to`) is required');
   }
+  const conversationId = stripPrefix(raw);
 
   const paramMessageId = readString(args.params, 'messageId');
   const ctxMessageId =

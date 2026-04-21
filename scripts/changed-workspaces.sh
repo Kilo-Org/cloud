@@ -8,6 +8,10 @@ set -euo pipefail
 #   scripts/changed-workspaces.sh                                    # all changed workspaces with tests
 #   scripts/changed-workspaces.sh --exclude services/cloud-agent --exclude services/cloud-agent-next  # skip specific dirs
 
+# Diagnostic: print the failing command and its line number to stderr so CI
+# logs surface the root cause instead of a silent exit 1.
+trap 'echo "[changed-workspaces] ERR at line $LINENO: exit=$? cmd=${BASH_COMMAND}" >&2' ERR
+
 excludes=()
 while [[ $# -gt 0 ]]; do
   case "$1" in

@@ -30,8 +30,9 @@ export async function handleKiloChatReadAction(
 
   const limitRaw = args.params.limit;
   const limit = typeof limitRaw === 'number' ? limitRaw : undefined;
+  const before = readString(args.params, 'before');
 
-  const { messages } = await args.client.listMessages({ conversationId, limit });
+  const { messages } = await args.client.listMessages({ conversationId, limit, before });
 
   if (messages.length === 0) {
     return { content: [{ type: 'text', text: 'No messages in this conversation.' }] };
@@ -51,7 +52,10 @@ export async function handleKiloChatReadAction(
       )
       .map(b => b.text)
       .join('');
-    return `[${id}] ${sender}: ${text}`;
+    const updatedAtRaw = (msg as Record<string, unknown>).updatedAt;
+    const timestamp =
+      typeof updatedAtRaw === 'number' ? ` (${new Date(updatedAtRaw).toISOString()})` : '';
+    return `[${id}] ${sender}${timestamp}: ${text}`;
   });
 
   return { content: [{ type: 'text', text: lines.join('\n') }] };

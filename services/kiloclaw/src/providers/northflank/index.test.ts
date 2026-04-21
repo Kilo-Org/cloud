@@ -192,7 +192,10 @@ describe('northflankProviderAdapter', () => {
       },
     });
     expect(servicePayload?.createOptions?.volumesToAttach).toEqual(['kc-ki-123']);
-    expect(servicePayload?.runtimeEnvironment).toEqual(runtimeSpec.env);
+    expect(servicePayload?.runtimeEnvironment).toEqual({
+      ...runtimeSpec.env,
+      OPENCLAW_DISABLE_BONJOUR: '1',
+    });
     expect(servicePayload?.healthChecks).toEqual([
       expect.objectContaining({ type: 'startupProbe', path: '/_kilo/health', port: 18789 }),
       expect.objectContaining({ type: 'readinessProbe', path: '/_kilo/health', port: 18789 }),

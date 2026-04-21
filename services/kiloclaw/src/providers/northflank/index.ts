@@ -247,7 +247,13 @@ function buildServicePayload(
     createOptions: {
       volumesToAttach: [volumeName],
     },
-    runtimeEnvironment: runtimeSpec.env,
+    runtimeEnvironment: {
+      ...runtimeSpec.env,
+      // mDNS/Bonjour has nothing to advertise to on Kubernetes, and the pod
+      // hostname + " (OpenClaw)" suffix can exceed the 63-byte DNS label
+      // limit that @homebridge/ciao asserts on, crashing the process.
+      OPENCLAW_DISABLE_BONJOUR: '1',
+    },
     healthChecks: [
       {
         protocol: 'HTTP',

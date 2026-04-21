@@ -1,0 +1,1 @@
+CREATE INDEX "IDX_kiloclaw_email_log_type_sent_instance" ON "kiloclaw_email_log" USING btree ("email_type","sent_at","instance_id","user_id") WHERE "kiloclaw_email_log"."instance_id" is not null;

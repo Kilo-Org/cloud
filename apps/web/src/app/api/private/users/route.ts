@@ -2,10 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
-import {
-  getEffectiveKiloClawSubscriptionForUser,
-  getKiloClawEarlybirdStateForUser,
-} from '@/lib/kiloclaw/access-state';
+import { getEffectiveKiloClawSubscriptionForUser } from '@/lib/kiloclaw/access-state';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
@@ -101,8 +98,5 @@ async function checkHasKiloPass(userId: string): Promise<boolean> {
 async function checkHasKiloClaw(userId: string): Promise<boolean> {
   const now = new Date();
   const { accessReason } = await getEffectiveKiloClawSubscriptionForUser(userId, now);
-  if (accessReason) return true;
-
-  const earlybirdState = await getKiloClawEarlybirdStateForUser(userId, now);
-  return earlybirdState.hasAccess;
+  return accessReason !== null;
 }

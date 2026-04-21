@@ -1,12 +1,12 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { redisGet, redisSet } from '@/lib/redis';
 import {
-  BLACKLIST_DOMAINS_REDIS_KEY,
   BlacklistDomainsConfigSchema,
   BlacklistDomainsInputSchema,
   DEFAULT_BLACKLIST_DOMAINS_CONFIG,
   getBlacklistedDomains,
 } from '@/lib/blacklist-domains-config';
+import { BLACKLIST_DOMAINS_REDIS_KEY } from '@/lib/redis-keys';
 import type { BlacklistDomainsConfig } from '@/lib/blacklist-domains-config';
 import { TRPCError } from '@trpc/server';
 import { db } from '@/lib/drizzle';
@@ -72,10 +72,10 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     const normalizedBlacklist = blacklistedDomains.map(d => d.toLowerCase());
 
     const blockedCountExpr = sql<number>`count(*) FILTER (WHERE ${kilocode_users.blocked_reason} IS NOT NULL)`;
-    // Hide noise: require at least 1% of users on the domain to have been
-    // blocked before surfacing it. Computed against count(*) so a one-off
-    // block on a huge domain doesn't appear here.
-    const minBlockedPercent = sql`${blockedCountExpr} * 100 >= count(*)`;
+    // Hide noise: require at least 30% of users on the domain to have been
+    // blocked before surfacing it. Keeps large legitimate providers (gmail,
+    // hotmail, etc.) from showing up.
+    const minBlockedPercent = sql`${blockedCountExpr} * 100 >= count(*) * 30`;
 
     const rows = await db
       .select({

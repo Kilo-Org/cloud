@@ -89,6 +89,7 @@ import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/proce
 import { extractResponsesPromptInfo } from '@/lib/ai-gateway/processUsage.responses';
 import { extractMessagesPromptInfo } from '@/lib/ai-gateway/processUsage.messages';
 import {
+  enableReasoningSummaries,
   fixResponsesRequest,
   getMaxTokens,
   hasMiddleOutTransform,
@@ -206,6 +207,19 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
+  if (requestBodyParsed.kind === 'chat_completions' || requestBodyParsed.kind === 'messages') {
+    if (!Array.isArray(requestBodyParsed.body.messages)) {
+      return invalidRequestResponse();
+    }
+  }
+
+  if (requestBodyParsed.kind === 'responses') {
+    const { input } = requestBodyParsed.body;
+    if (input != null && typeof input !== 'string' && !Array.isArray(input)) {
+      return invalidRequestResponse();
+    }
+  }
+
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
   const isLegacyOpenRouterPath = url.pathname.includes('/openrouter');
@@ -232,6 +246,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         modeHeader,
         featureHeader: feature,
         sessionId: taskId ?? null,
+        apiKind: requestBodyParsed.kind,
       },
       requestBodyParsed,
       authPromise.then(res => res.user),
@@ -410,7 +425,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     (!autoModel && isForbiddenFreeModel(originalModelIdLowerCased))
   ) {
     console.warn(`User requested forbidden free model ${originalModelIdLowerCased}; rejecting.`);
-    return forbiddenFreeModelResponse(fraudHeaders, feature);
+    return forbiddenFreeModelResponse(fraudHeaders);
   }
 
   // Extract properties for usage context
@@ -502,6 +517,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (requestBodyParsed.kind === 'responses') {
     fixResponsesRequest(requestBodyParsed.body);
   }
+
+  enableReasoningSummaries(requestBodyParsed);
 
   const toolsAvailable = getToolsAvailable(requestBodyParsed);
   const toolsUsed = getToolsUsed(requestBodyParsed);

@@ -23,7 +23,6 @@ import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   kiloclaw_cli_runs,
-  kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
@@ -40,6 +39,7 @@ import {
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
+import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
 import {
   getOrganizationProvisionLockKey,
   withKiloclawProvisionContextLock,
@@ -152,6 +152,8 @@ const userTimezoneSchema = z
   .max(100)
   .refine(isValidUserTimezone, 'userTimezone must be a valid IANA timezone');
 
+const userLocationSchema = z.string().trim().min(1).max(200);
+
 const channelsSchema = z
   .object({
     telegramBotToken: z.string().optional(),
@@ -168,11 +170,17 @@ const updateConfigSchema = z.object({
   channels: channelsSchema,
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),
+  userLocation: userLocationSchema.nullable().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
   organizationId: z.uuid(),
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
+});
+
+const patchWebSearchConfigSchema = z.object({
+  organizationId: z.uuid(),
+  exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
 });
 
 const patchChannelsSchema = z.object({
@@ -306,6 +314,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
         trackedImageTag: null,
         trackedImageDigest: null,
         googleConnected: false,
+        googleOAuthConnected: false,
+        googleOAuthStatus: 'disconnected',
+        googleOAuthAccountEmail: null,
+        googleOAuthCapabilities: [],
         gmailNotificationsEnabled: false,
         execSecurity: null,
         execAsk: null,
@@ -417,7 +429,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
               kilocodeApiKey,
               kilocodeApiKeyExpiresAt,
               kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-              userTimezone: input.userTimezone ?? undefined,
+              userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+              userLocation: input.userLocation === undefined ? undefined : input.userLocation,
             },
             { orgId: input.organizationId }
           );
@@ -471,7 +484,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
           kilocodeApiKey,
           kilocodeApiKeyExpiresAt,
           kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-          userTimezone: input.userTimezone ?? undefined,
+          userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+          userLocation: input.userLocation === undefined ? undefined : input.userLocation,
           pinnedImageTag: pin?.image_tag,
         },
         { instanceId: instance.id, orgId: input.organizationId }
@@ -511,15 +525,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
     }
 
     try {
-      await db
-        .update(kiloclaw_subscriptions)
-        .set({ destruction_deadline: null })
-        .where(
-          and(
-            eq(kiloclaw_subscriptions.user_id, ctx.user.id),
-            eq(kiloclaw_subscriptions.instance_id, instance.id)
-          )
-        );
+      await clearSubscriptionLifecycleAfterInstanceDestroy({
+        actorUserId: ctx.user.id,
+        kiloUserId: ctx.user.id,
+        instanceId: instance.id,
+      });
     } catch (cleanupError) {
       console.error('[organization-kiloclaw] Post-destroy cleanup failed:', cleanupError);
     }
@@ -592,6 +602,18 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
       return client.patchExecPreset(ctx.user.id, input, workerInstanceId(instance));
+    }),
+
+  patchWebSearchConfig: organizationMemberMutationProcedure
+    .input(patchWebSearchConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.patchWebSearchConfig(
+        ctx.user.id,
+        { exaMode: input.exaMode },
+        workerInstanceId(instance)
+      );
     }),
 
   patchBotIdentity: organizationMemberMutationProcedure

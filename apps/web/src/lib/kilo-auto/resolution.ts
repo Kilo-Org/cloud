@@ -16,6 +16,7 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   modeSchema,
   BALANCED_CLAW_SETUP_MODEL,
+  BALANCED_CLAW_MODEL,
   BALANCED_CODEX_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
@@ -33,14 +34,22 @@ type ResolveAutoModelParams = {
   modeHeader: string | null;
   featureHeader: FeatureValue | null;
   sessionId: string | null;
+  apiKind: GatewayRequest['kind'] | null;
 };
+
+function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
+  const parsedMode = modeSchema.safeParse(modeHeader?.trim() ?? '');
+  if (parsedMode.success) return parsedMode.data;
+  if (featureHeader === 'kiloclaw' || featureHeader === 'openclaw') return 'claw' as const;
+  return null;
+}
 
 export async function resolveAutoModel(
   params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ): Promise<ResolvedAutoModel> {
-  const { model, modeHeader, featureHeader, sessionId } = params;
+  const { model, modeHeader, featureHeader, sessionId, apiKind } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
     if (
       sessionId &&
@@ -57,16 +66,17 @@ export async function resolveAutoModel(
         (await balancePromise) > 0 ? GEMMA_4_31B_IT_ID : gemma_4_26b_a4b_it_free_model.public_id,
     };
   }
-  const modeResult =
-    featureHeader === 'kiloclaw' || featureHeader === 'openclaw'
-      ? { success: true, data: 'KiloClaw' as const }
-      : modeSchema.safeParse(modeHeader?.trim() ?? '');
-  const mode = modeResult.success ? modeResult.data : null;
+  const mode = resolveMode(modeHeader, featureHeader);
   if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
-    if (featureHeader === 'kiloclaw') {
-      const user = await userPromise;
-      if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
-        return BALANCED_CLAW_SETUP_MODEL;
+    if (mode === 'claw') {
+      if (featureHeader === 'kiloclaw') {
+        const user = await userPromise;
+        if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
+          return BALANCED_CLAW_SETUP_MODEL;
+        }
+      }
+      if (apiKind !== 'messages') {
+        return BALANCED_CLAW_MODEL;
       }
     }
     return BALANCED_CODEX_MODEL;

@@ -89,9 +89,6 @@ function deduplicateToolUses(assistantMessage: OpenAI.ChatCompletionAssistantMes
 }
 
 export function repairTools(requestToMutate: OpenRouterChatCompletionRequest) {
-  if (!Array.isArray(requestToMutate.messages)) {
-    return;
-  }
   const groups = groupByAssistantMessage(requestToMutate.messages);
 
   for (const group of groups) {
@@ -178,8 +175,6 @@ function sanitizeTextPart(part: unknown): void {
 }
 
 function sanitizeChatCompletionsToolResults(body: OpenRouterChatCompletionRequest): void {
-  if (!Array.isArray(body.messages)) return;
-
   const toolNameById = new Map<string, string>();
   for (const msg of body.messages) {
     if (msg.role !== 'assistant') continue;
@@ -229,8 +224,6 @@ function sanitizeResponsesToolResults(body: GatewayResponsesRequest): void {
 }
 
 function sanitizeMessagesToolResults(body: GatewayMessagesRequest): void {
-  if (!Array.isArray(body.messages)) return;
-
   const toolNameById = new Map<string, string>();
   for (const msg of body.messages) {
     if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue;

@@ -62,6 +62,10 @@ export const ALARM_INTERVAL_RECOVERING_MS = 60 * 1000; // 1 min
 export const STARTING_TIMEOUT_MS = 5 * 60 * 1000; // 5 min
 /** Maximum time to stay in 'restarting' before surfacing a timeout */
 export const RESTARTING_TIMEOUT_MS = 5 * 60 * 1000; // 5 min
+/** Hard ceiling for 'restarting' — transient Fly states like 'replacing' (image
+ *  pull) can legitimately take 10+ min. After this, give up and transition to
+ *  'stopped' regardless of Fly state. */
+export const RESTARTING_MAX_TIMEOUT_MS = 15 * 60 * 1000; // 15 min
 /** Maximum time to stay in 'recovering' before surfacing a timeout */
 export const RECOVERING_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
 /** Destroying: retry pending deletes quickly */

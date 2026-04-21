@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { FreeModelUsageStats } from '../components/FreeModelUsageStats';
 import { PromotedModelUsageStats } from '../components/PromotedModelUsageStats';
+import { RateLimitTesting } from '../components/RateLimitTesting';
 import AdminPage from '../components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
@@ -59,6 +60,8 @@ export default function FreeModelUsagePage() {
             View sign-up conversion dashboard on Metabase →
           </a>
         </div>
+
+        <RateLimitTesting />
 
         <Suspense fallback={<div>Loading free model usage statistics...</div>}>
           <FreeModelUsageStats />

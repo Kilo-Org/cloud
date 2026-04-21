@@ -111,6 +111,7 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
     generateMimoNoLongerFreeNotification,
+    generateTrinityLargeThinkingNoLongerFreeNotification,
     generateFirstDayWelcomeNotification,
     generateKiloPassNotification,
   ];
@@ -261,6 +262,44 @@ async function generateMimoNoLongerFreeNotification(
     ];
   } catch (e) {
     console.error('[generateMiniMaxNoLongerFreeNotification]', e);
+    return [];
+  }
+}
+
+async function generateTrinityLargeThinkingNoLongerFreeNotification(
+  user: User,
+  _ctx: NotificationContext
+): Promise<KiloNotification[]> {
+  try {
+    const users = await cachedPosthogQuery(
+      z.array(z.tuple([z.string()]).transform(([userId]) => userId))
+    )(
+      'trinity-large-thinking-no-longer-free-users',
+      'select kilo_user_id from notification_trinity_large_thinking_no_longer_free_users limit 5e5'
+    );
+
+    if (!users.includes(user.id)) {
+      console.debug(
+        '[generateTrinityLargeThinkingNoLongerFreeNotification] not showing notification for user'
+      );
+      return [];
+    }
+
+    console.debug(
+      '[generateTrinityLargeThinkingNoLongerFreeNotification] showing notification for user'
+    );
+    return [
+      {
+        id: 'trinity-large-thinking-no-longer-free',
+        title: 'Trinity Large Thinking is no longer free',
+        message:
+          'The Arcee AI Trinity Large Thinking free promotion has ended. You can continue using it as a paid model, or switch to Kilo Auto Free for free inference.',
+        suggestModelId: KILO_AUTO_FREE_MODEL.id,
+        showIn: ['cli', 'extension'],
+      },
+    ];
+  } catch (e) {
+    console.error('[generateTrinityLargeThinkingNoLongerFreeNotification]', e);
     return [];
   }
 }

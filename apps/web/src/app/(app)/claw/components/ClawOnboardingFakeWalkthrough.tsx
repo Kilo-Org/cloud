@@ -57,6 +57,10 @@ const fakeStatus = {
   trackedImageTag: null,
   trackedImageDigest: null,
   googleConnected: false,
+  googleOAuthConnected: false,
+  googleOAuthStatus: 'disconnected',
+  googleOAuthAccountEmail: null,
+  googleOAuthCapabilities: [],
   gmailNotificationsEnabled: false,
   execSecurity: 'allowlist',
   execAsk: 'on-miss',
@@ -107,7 +111,7 @@ export function ClawOnboardingFakeWalkthrough({
         <TriangleAlert className="size-4" />
         <AlertDescription>
           Development-only fake KiloClaw onboarding. This walkthrough does not call billing,
-          provisioning, gateway, mutation, or pairing services.
+          provisioning, gateway, Fly, or pairing services.
         </AlertDescription>
       </Alert>
 

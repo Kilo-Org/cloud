@@ -7,13 +7,15 @@ vi.mock('cloudflare:workers', () => ({
 vi.mock('./routes', async () => {
   const { Hono } = await import('hono');
   const empty = new Hono();
+  const controller = new Hono();
+  controller.post('/google/token', c => c.json({ ok: true }, 200));
   return {
     accessGatewayRoutes: empty,
     publicRoutes: empty,
     api: empty,
     kiloclaw: empty,
     platform: empty,
-    controller: empty,
+    controller,
   };
 });
 
@@ -124,6 +126,54 @@ describe('platform route env validation', () => {
       '[CONFIG] Platform route missing bindings:',
       'NEXTAUTH_SECRET'
     );
+  });
+});
+
+describe('controller google env validation', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  it('rejects controller google routes when broker env is missing', async () => {
+    const response = await worker.fetch(
+      new Request('https://example.com/api/controller/google/token', {
+        method: 'POST',
+      }),
+      {
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('5');
+    await expect(response.json()).resolves.toEqual({ error: 'Configuration error' });
+    expect(console.error).toHaveBeenCalledWith(
+      '[CONFIG] Controller Google route missing bindings:',
+      'GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY, GOOGLE_WORKSPACE_OAUTH_CLIENT_ID, GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET'
+    );
+  });
+
+  it('allows controller google routes when broker env is configured', async () => {
+    const response = await worker.fetch(
+      new Request('https://example.com/api/controller/google/token', {
+        method: 'POST',
+      }),
+      {
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        GOOGLE_WORKSPACE_OAUTH_CLIENT_ID: 'client-id',
+        GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET: 'client-secret',
+        GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY: 'refresh-key',
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
   });
 });
 

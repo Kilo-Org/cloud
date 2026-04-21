@@ -1,8 +1,22 @@
+import {
+  markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  type KiloClawSubscriptionChangeActor,
+} from '@kilocode/db';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { kilocode_users, kiloclaw_access_codes, kiloclaw_instances } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  kiloclaw_access_codes,
+  kiloclaw_google_oauth_connections,
+  kiloclaw_instances,
+} from '@kilocode/db/schema';
 import { eq, and, isNull, gt, sql } from 'drizzle-orm';
 
 export { getWorkerDb, type WorkerDb };
+
+const KILOCLAW_WORKER_DESTROY_ACTOR = {
+  actorType: 'system',
+  actorId: 'kiloclaw-worker',
+} satisfies KiloClawSubscriptionChangeActor;
 
 export async function findPepperByUserId(db: WorkerDb, userId: string) {
   const row = await db
@@ -157,14 +171,97 @@ export async function getInstanceByIdIncludingDestroyed(
 }
 
 export async function markInstanceDestroyed(db: WorkerDb, userId: string, sandboxId: string) {
-  await db
-    .update(kiloclaw_instances)
-    .set({ destroyed_at: sql`NOW()` })
-    .where(
-      and(
-        eq(kiloclaw_instances.user_id, userId),
-        eq(kiloclaw_instances.sandbox_id, sandboxId),
-        isNull(kiloclaw_instances.destroyed_at)
+  await db.transaction(async tx => {
+    const row = await tx
+      .select({
+        id: kiloclaw_instances.id,
+      })
+      .from(kiloclaw_instances)
+      .where(
+        and(
+          eq(kiloclaw_instances.user_id, userId),
+          eq(kiloclaw_instances.sandbox_id, sandboxId),
+          isNull(kiloclaw_instances.destroyed_at)
+        )
       )
-    );
+      .limit(1)
+      .then(rows => rows[0] ?? null);
+
+    if (!row) {
+      return;
+    }
+
+    await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+      actor: KILOCLAW_WORKER_DESTROY_ACTOR,
+      executor: tx,
+      instanceId: row.id,
+      reason: 'destroy_path_inline_collapse',
+      userId,
+    });
+  });
+}
+
+export async function getGoogleOAuthConnectionByInstanceId(db: WorkerDb, instanceId: string) {
+  return await db
+    .select()
+    .from(kiloclaw_google_oauth_connections)
+    .where(eq(kiloclaw_google_oauth_connections.instance_id, instanceId))
+    .limit(1)
+    .then(rows => rows[0] ?? null);
+}
+
+export async function updateGoogleOAuthConnectionTokenData(
+  db: WorkerDb,
+  instanceId: string,
+  patch: {
+    refreshTokenEncrypted?: string;
+    oauthClientId?: string;
+    oauthClientSecretEncrypted?: string | null;
+    credentialProfile?: 'legacy' | 'kilo_owned';
+    scopes?: string[];
+    status?: 'active' | 'action_required' | 'disconnected';
+    lastError?: string | null;
+    lastErrorAt?: string | null;
+  }
+) {
+  const update: Record<string, unknown> = {
+    updated_at: sql`NOW()`,
+  };
+
+  if (patch.refreshTokenEncrypted !== undefined) {
+    update.refresh_token_encrypted = patch.refreshTokenEncrypted;
+  }
+
+  if (patch.oauthClientId !== undefined) {
+    update.oauth_client_id = patch.oauthClientId;
+  }
+
+  if (patch.oauthClientSecretEncrypted !== undefined) {
+    update.oauth_client_secret_encrypted = patch.oauthClientSecretEncrypted;
+  }
+
+  if (patch.credentialProfile !== undefined) {
+    update.credential_profile = patch.credentialProfile;
+  }
+
+  if (patch.scopes !== undefined) {
+    update.scopes = patch.scopes;
+  }
+
+  if (patch.status !== undefined) {
+    update.status = patch.status;
+  }
+
+  if (patch.lastError !== undefined) {
+    update.last_error = patch.lastError;
+  }
+
+  if (patch.lastErrorAt !== undefined) {
+    update.last_error_at = patch.lastErrorAt;
+  }
+
+  await db
+    .update(kiloclaw_google_oauth_connections)
+    .set(update)
+    .where(eq(kiloclaw_google_oauth_connections.instance_id, instanceId));
 }

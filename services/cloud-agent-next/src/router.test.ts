@@ -55,8 +55,12 @@ import type { TRPCContext, SessionId } from './types.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
 
 type MockSessionStub = {
-  deleteSession: ReturnType<typeof vi.fn>;
-  markAsInterrupted: ReturnType<typeof vi.fn>;
+  deleteSession?: ReturnType<typeof vi.fn>;
+  markAsInterrupted?: ReturnType<typeof vi.fn>;
+  getMetadata?: ReturnType<typeof vi.fn>;
+  getActiveExecutionId?: ReturnType<typeof vi.fn>;
+  getExecution?: ReturnType<typeof vi.fn>;
+  getLatestAssistantMessage?: ReturnType<typeof vi.fn>;
 };
 
 type MockCAS = {
@@ -890,6 +894,148 @@ describe('router sessionId validation', () => {
             })
           ).rejects.toThrow('Authentication required');
         });
+      });
+    });
+
+    describe('getLatestAssistantMessage procedure', () => {
+      let mockContext: TRPCContext;
+      let caller: ReturnType<typeof appRouter.createCaller>;
+      let cloudAgentSession: MockCAS;
+      let mockGetMetadata: ReturnType<typeof vi.fn>;
+      let mockGetLatestAssistantMessage: ReturnType<typeof vi.fn>;
+
+      beforeEach(() => {
+        vi.clearAllMocks();
+
+        mockGetMetadata = vi.fn();
+        mockGetLatestAssistantMessage = vi.fn();
+
+        mockContext = {
+          userId: 'test-user-123',
+          authToken: 'test-token',
+          botId: undefined,
+          request: {} as Request,
+          env: {
+            Sandbox: {} as TRPCContext['env']['Sandbox'],
+            SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
+            CLOUD_AGENT_SESSION: {
+              idFromName: vi.fn((id: string) => ({ id })),
+              get: vi.fn(() => ({
+                getMetadata: mockGetMetadata,
+                getLatestAssistantMessage: mockGetLatestAssistantMessage,
+              })),
+            } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+            SESSION_INGEST: {
+              fetch: vi.fn(),
+            } as unknown as TRPCContext['env']['SESSION_INGEST'],
+            R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+            NEXTAUTH_SECRET: 'test-secret',
+            INTERNAL_API_SECRET_PROD: {
+              get: vi.fn().mockResolvedValue('test-secret'),
+            } as unknown as TRPCContext['env']['INTERNAL_API_SECRET_PROD'],
+          },
+        };
+        cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
+        caller = appRouter.createCaller(mockContext);
+      });
+
+      it('should return the latest assistant message for the owner', async () => {
+        const sessionId: SessionId = 'agent_55555555-5555-5555-5555-555555555555';
+        mockGetMetadata.mockResolvedValue({
+          version: 123456789,
+          sessionId,
+          userId: 'test-user-123',
+          timestamp: 123456789,
+          kiloSessionId: 'ses_00000000000000000000000001',
+        } satisfies CloudAgentSessionState);
+        mockGetLatestAssistantMessage.mockResolvedValue({
+          eventId: 12,
+          timestamp: 1700000000000,
+          info: {
+            id: 'msg_00000000000000000000000001',
+            role: 'assistant',
+            sessionID: 'ses_00000000000000000000000001',
+          },
+          parts: [
+            {
+              id: 'part_00000000000000000000000001',
+              messageID: 'msg_00000000000000000000000001',
+              type: 'text',
+              text: 'Done',
+            },
+          ],
+        });
+
+        const result = await caller.getLatestAssistantMessage({ cloudAgentSessionId: sessionId });
+
+        expect(result).toEqual({
+          cloudAgentSessionId: sessionId,
+          message: {
+            eventId: 12,
+            timestamp: 1700000000000,
+            info: {
+              id: 'msg_00000000000000000000000001',
+              role: 'assistant',
+              sessionID: 'ses_00000000000000000000000001',
+            },
+            parts: [
+              {
+                id: 'part_00000000000000000000000001',
+                messageID: 'msg_00000000000000000000000001',
+                type: 'text',
+                text: 'Done',
+              },
+            ],
+          },
+        });
+        expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
+        expect(mockGetLatestAssistantMessage).toHaveBeenCalled();
+      });
+
+      it('should return null when the session has no assistant messages', async () => {
+        const sessionId: SessionId = 'agent_66666666-6666-6666-6666-666666666666';
+        mockGetMetadata.mockResolvedValue({
+          version: 123456789,
+          sessionId,
+          userId: 'test-user-123',
+          timestamp: 123456789,
+          kiloSessionId: 'ses_00000000000000000000000001',
+        } satisfies CloudAgentSessionState);
+        mockGetLatestAssistantMessage.mockResolvedValue(null);
+
+        await expect(
+          caller.getLatestAssistantMessage({ cloudAgentSessionId: sessionId })
+        ).resolves.toEqual({
+          cloudAgentSessionId: sessionId,
+          message: null,
+        });
+      });
+
+      it('should return NOT_FOUND for a missing session', async () => {
+        const sessionId: SessionId = 'agent_77777777-7777-7777-7777-777777777777';
+        mockGetMetadata.mockResolvedValue(null);
+
+        await expect(
+          caller.getLatestAssistantMessage({ cloudAgentSessionId: sessionId })
+        ).rejects.toThrow('Session not found');
+        expect(mockGetLatestAssistantMessage).not.toHaveBeenCalled();
+      });
+
+      it('should require authentication', async () => {
+        const unauthenticatedContext: TRPCContext = {
+          userId: undefined,
+          authToken: undefined,
+          botId: undefined,
+          env: mockContext.env,
+        } as unknown as TRPCContext;
+
+        const unauthenticatedCaller = appRouter.createCaller(unauthenticatedContext);
+
+        await expect(
+          unauthenticatedCaller.getLatestAssistantMessage({
+            cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+          })
+        ).rejects.toThrow('Authentication required');
       });
     });
   });

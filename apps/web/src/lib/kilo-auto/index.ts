@@ -7,6 +7,7 @@ import {
 import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
+import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 
 type AutoModel = {
   id: string;
@@ -34,7 +35,7 @@ export const GPT_53_CODEX_ID = 'openai/gpt-5.3-codex';
 export const KILO_AUTO_LEGACY_MODEL = 'kilo/auto'; // hardcoded in upstream OpenClaw
 
 export const modeSchema = z.enum([
-  'KiloClaw',
+  'claw',
   'plan',
   'general',
   'architect',
@@ -66,7 +67,7 @@ const SONNET_FRONTIER: ResolvedAutoModel = {
 export const FRONTIER_CODE_MODEL: ResolvedAutoModel = SONNET_FRONTIER;
 
 export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
-  KiloClaw: OPUS_FRONTIER,
+  claw: OPUS_FRONTIER,
   plan: OPUS_FRONTIER,
   general: OPUS_FRONTIER,
   architect: OPUS_FRONTIER,
@@ -87,6 +88,11 @@ export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   model: claude_sonnet_clawsetup_model.public_id,
   reasoning: { enabled: true, effort: 'high' },
   verbosity: 'high',
+};
+
+export const BALANCED_CLAW_MODEL: ResolvedAutoModel = {
+  model: qwen36_plus_model.public_id,
+  reasoning: { enabled: true },
 };
 
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {

@@ -35,6 +35,10 @@ function createStatus(status: KiloClawDashboardStatus['status']): KiloClawDashbo
     trackedImageTag: null,
     trackedImageDigest: null,
     googleConnected: false,
+    googleOAuthConnected: false,
+    googleOAuthStatus: 'disconnected',
+    googleOAuthAccountEmail: null,
+    googleOAuthCapabilities: [],
     gmailNotificationsEnabled: false,
     execSecurity: null,
     execAsk: null,
@@ -165,17 +169,17 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('complete');
   });
 
-  test('uses six steps only when the selected channel requires pairing', () => {
+  test('uses five steps only when the selected channel requires pairing', () => {
     expect(
       getClawOnboardingFlowState(createInput({ selectedChannelId: 'telegram' })).totalSteps
-    ).toBe(6);
+    ).toBe(5);
     expect(
       getClawOnboardingFlowState(createInput({ selectedChannelId: 'discord' })).totalSteps
-    ).toBe(6);
+    ).toBe(5);
     expect(getClawOnboardingFlowState(createInput({ selectedChannelId: 'slack' })).totalSteps).toBe(
-      5
+      4
     );
-    expect(getClawOnboardingFlowState(createInput()).totalSteps).toBe(5);
+    expect(getClawOnboardingFlowState(createInput()).totalSteps).toBe(4);
   });
 
   test.each(CLAW_ONBOARDING_PROVISIONING_STATUSES)(
@@ -192,6 +196,52 @@ describe('ClawOnboardingFlow state machine', () => {
       expect(state.postProvisioningReady).toBe(false);
     }
   );
+
+  test('renders an error when the setup request failed', () => {
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          createSetupStarted: true,
+          setupFailed: true,
+          onboardingStep: 'provisioning',
+          hasBotIdentity: true,
+          selectedPreset: 'always-ask',
+          status: undefined,
+        })
+      ).renderStep
+    ).toBe('error');
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          mode: 'post-provisioning',
+          setupFailed: true,
+          status: createStatus(null),
+        })
+      ).renderStep
+    ).toBe('error');
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          mode: 'post-provisioning',
+          setupFailed: true,
+          status: createStatus('starting'),
+        })
+      ).renderStep
+    ).toBe('error');
+  });
+
+  test('does not let an old setup failure override a running instance', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        setupFailed: true,
+        status: createStatus('running'),
+      })
+    );
+
+    expect(state.renderStep).toBe('complete');
+    expect(state.postProvisioningReady).toBe(true);
+  });
 
   test.each(CLAW_ONBOARDING_ERROR_STATUSES)(
     'renders an error when machine status is %s',

@@ -27,6 +27,32 @@ function errorMessage(status: string, fallback: string | undefined) {
   }
 }
 
+function AuthButtons({ start }: { start: (mode: 'signin' | 'signup') => Promise<void> }) {
+  return (
+    <>
+      <Button
+        size="lg"
+        onPress={() => {
+          void start('signin');
+        }}
+        accessibilityLabel="Sign in with browser"
+      >
+        <Text>Sign In</Text>
+      </Button>
+      <Button
+        variant="outline"
+        size="lg"
+        onPress={() => {
+          void start('signup');
+        }}
+        accessibilityLabel="Create a new account"
+      >
+        <Text>Create Account</Text>
+      </Button>
+    </>
+  );
+}
+
 export function LoginScreen() {
   const { signIn } = useAuth();
   const { status, token, code, error, verificationUrl, start, cancel, openBrowser } =
@@ -47,7 +73,7 @@ export function LoginScreen() {
     <View className="flex-1 items-center justify-center gap-6 bg-background px-6">
       <View className="items-center gap-2">
         <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel="Kilo logo" />
-        <Text className="text-lg">Sign in to continue</Text>
+        <Text className="text-lg">Welcome to Kilo Code</Text>
       </View>
 
       <Animated.View className="w-full max-w-sm gap-3" layout={LinearTransition}>
@@ -57,15 +83,7 @@ export function LoginScreen() {
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
           >
-            <Button
-              size="lg"
-              onPress={() => {
-                void start();
-              }}
-              accessibilityLabel="Sign in with browser"
-            >
-              <Text>Sign In</Text>
-            </Button>
+            <AuthButtons start={start} />
             <Text variant="muted" className="text-center text-xs">
               You will be redirected to your browser
             </Text>
@@ -134,22 +152,14 @@ export function LoginScreen() {
 
         {(status === 'denied' || status === 'expired' || status === 'error') && (
           <Animated.View
-            className="items-center gap-4"
+            className="gap-3"
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
           >
             <Text className="text-center text-sm text-destructive">
               {errorMessage(status, error)}
             </Text>
-            <Button
-              size="lg"
-              onPress={() => {
-                void start();
-              }}
-              accessibilityLabel="Try signing in again"
-            >
-              <Text>Try Again</Text>
-            </Button>
+            <AuthButtons start={start} />
           </Animated.View>
         )}
       </Animated.View>

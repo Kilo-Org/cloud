@@ -233,5 +233,23 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
   if (request.body.reasoning?.enabled === true) {
     return false;
   }
-  return (request.body.reasoning?.effort ?? request.body.reasoning_effort) === 'none';
+  return (
+    (request.body.reasoning?.effort ?? request.body.reasoning_effort) === 'none' ||
+    request.body.enable_thinking === false || // Alibaba
+    request.body.thinking?.type === 'disabled' // Bytedance
+  );
+}
+
+export function enableReasoningSummaries(request: GatewayRequest) {
+  if (
+    request.kind === 'messages' &&
+    request.body.thinking &&
+    (request.body.thinking.type === 'enabled' || request.body.thinking.type === 'adaptive') &&
+    !request.body.thinking.display
+  ) {
+    request.body.thinking.display = 'summarized';
+  }
+  if (request.kind === 'responses' && request.body.reasoning && !request.body.reasoning.summary) {
+    request.body.reasoning.summary = 'auto';
+  }
 }

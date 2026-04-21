@@ -5,7 +5,7 @@
  * the CloudAgentSession Durable Object's key-value storage.
  */
 
-import type { ExecutionId } from '../types/ids.js';
+import type { EventId, ExecutionId } from '../types/ids.js';
 import type { ExecutionStatus } from '../core/execution.js';
 import type { ExecutionMode, StreamingMode } from '../execution/types.js';
 
@@ -32,6 +32,27 @@ export type ExecutionMetadata = {
   lastEventAt?: number;
   /** Token for authenticating ingest WebSocket connections */
   ingestToken?: string;
+};
+
+// ---------------------------------------------------------------------------
+// Latest Assistant Message
+// ---------------------------------------------------------------------------
+
+export type AssistantMessageInfo = Record<string, unknown> & {
+  id: string;
+  role: 'assistant';
+};
+
+export type AssistantMessagePart = Record<string, unknown> & {
+  id: string;
+  messageID: string;
+};
+
+export type LatestAssistantMessage = {
+  eventId: EventId;
+  timestamp: number;
+  info: AssistantMessageInfo;
+  parts: AssistantMessagePart[];
 };
 
 // ---------------------------------------------------------------------------

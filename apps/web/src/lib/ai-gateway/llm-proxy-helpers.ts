@@ -228,15 +228,9 @@ export function modelNotAllowedResponse() {
   );
 }
 
-export function forbiddenFreeModelResponse(
-  header: FraudDetectionHeaders,
-  feature: FeatureValue | null
-) {
+export function forbiddenFreeModelResponse(header: FraudDetectionHeaders) {
   const errorType = ProxyErrorType.discontinued_free_model;
-  if (feature === 'kiloclaw' || feature === 'openclaw') {
-    const error = `The free period of this model ended. Please use ${KILO_AUTO_FREE_MODEL.name} to continue, switch using: /model kilocode/${KILO_AUTO_FREE_MODEL.id}`;
-    return NextResponse.json({ error, error_type: errorType, message: error }, { status: 404 });
-  } else if (isRooCodeBasedClient(header)) {
+  if (isRooCodeBasedClient(header)) {
     // https://github.com/Kilo-Org/kilocode/blob/50d6bd482bec6fae7d1c80b14ffb064de3761507/src/shared/kilocode/errorUtils.ts#L13
     const error = `The alpha period for this model has ended.`;
     return NextResponse.json(
@@ -494,7 +488,8 @@ function computeFimMicrodollarCost(usage: FimUsage, provider: ProviderId): numbe
 
 function parseMistralFimUsageFromString(
   response: string,
-  provider: ProviderId
+  provider: ProviderId,
+  statusCode: number
 ): MicrodollarUsageStats {
   const json: MistralFimCompletion = JSON.parse(response);
   const cost_mUsd = computeFimMicrodollarCost(json.usage, provider);
@@ -503,7 +498,7 @@ function parseMistralFimUsageFromString(
     messageId: json.id,
     model: json.model,
     responseContent: json.choices[0]?.text || '',
-    hasError: !json.model,
+    hasError: !json.model || statusCode >= 400,
     inference_provider: provider,
     inputTokens: json.usage.prompt_tokens,
     outputTokens: json.usage.completion_tokens,
@@ -524,7 +519,8 @@ function parseMistralFimUsageFromString(
 async function parseMistralFimUsageFromStream(
   stream: ReadableStream,
   requestSpan: Span | undefined,
-  provider: ProviderId
+  provider: ProviderId,
+  statusCode: number
 ): Promise<MicrodollarUsageStats> {
   requestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -539,7 +535,7 @@ async function parseMistralFimUsageFromStream(
   let messageId: string | null = null;
   let model: string | null = null;
   let responseContent = '';
-  let reportedError = false;
+  let reportedError = statusCode >= 400;
   const startedAt = performance.now();
   let firstTokenReceived = false;
   let usage: FimUsage | undefined;
@@ -627,13 +623,21 @@ export function countAndStoreFimUsage(
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedResponse, logFileExtension);
 
+  const statusCode = usageContext.status_code ?? 0;
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
     : usageContext.isStreaming
-      ? parseMistralFimUsageFromStream(clonedResponse.body, requestSpan, usageContext.provider)
+      ? parseMistralFimUsageFromStream(
+          clonedResponse.body,
+          requestSpan,
+          usageContext.provider,
+          statusCode
+        )
       : clonedResponse
           .text()
-          .then(content => parseMistralFimUsageFromString(content, usageContext.provider));
+          .then(content =>
+            parseMistralFimUsageFromString(content, usageContext.provider, statusCode)
+          );
 
   after(
     usageStatsPromise.then(usageStats => {

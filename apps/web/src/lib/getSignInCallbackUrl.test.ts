@@ -189,6 +189,19 @@ describe('getSignInCallbackUrl', () => {
 
       expect(result).toBe('/users/after-sign-in?im_ref=impact-click-id-123');
     });
+
+    test('includes signup=true when present so error bounces can preserve signup mode', () => {
+      const searchParams = { signup: 'true' };
+      const result = getSignInCallbackUrl(searchParams);
+
+      expect(result).toBe('/users/after-sign-in?signup=true');
+    });
+
+    test('ignores non-"true" signup values', () => {
+      expect(getSignInCallbackUrl({ signup: 'false' })).toBe('/users/after-sign-in');
+      expect(getSignInCallbackUrl({ signup: '' })).toBe('/users/after-sign-in');
+      expect(getSignInCallbackUrl({ signup: ['true'] })).toBe('/users/after-sign-in');
+    });
   });
 
   describe('parameter combinations', () => {

@@ -8,7 +8,15 @@ import { timingSafeTokenEqual } from '../auth';
 import { resolveSafePath, verifyCanonicalized, SafePathError } from '../safe-path';
 import { atomicWrite } from '../atomic-write';
 import { backupFile } from '../backup-file';
-import { formatBotIdentityMarkdown } from '../bootstrap';
+import {
+  ensureWeatherSkillInstalled,
+  formatBotIdentityMarkdown,
+  formatUserProfileMarkdown,
+  removeUserMdLocation,
+  removeUserMdTimezone,
+  setUserMdLocation,
+  setUserMdTimezone,
+} from '../bootstrap';
 
 function computeEtag(content: string): string {
   return crypto.createHash('md5').update(content).digest('hex');
@@ -108,8 +116,14 @@ const BotIdentityBodySchema = z.object({
   botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
 });
 
+const UserProfileBodySchema = z.object({
+  userTimezone: z.string().trim().min(1).max(100).nullable().optional(),
+  userLocation: z.string().trim().min(1).max(200).nullable().optional(),
+});
+
 const BOT_IDENTITY_RELATIVE_PATH = 'workspace/IDENTITY.md';
 const LEGACY_BOT_IDENTITY_RELATIVE_PATHS = ['workspace/BOOTSTRAP.md'];
+const USER_PROFILE_RELATIVE_PATH = 'workspace/USER.md';
 
 export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: string): void {
   app.use('/_kilo/files/*', async (c, next) => {
@@ -121,6 +135,14 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
   });
 
   app.use('/_kilo/bot-identity', async (c, next) => {
+    const token = getBearerToken(c.req.header('authorization'));
+    if (!timingSafeTokenEqual(token, expectedToken)) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    await next();
+  });
+
+  app.use('/_kilo/user-profile', async (c, next) => {
     const token = getBearerToken(c.req.header('authorization'));
     if (!timingSafeTokenEqual(token, expectedToken)) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -179,6 +201,71 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
     } catch (err) {
       console.error('[files] Failed to write bot identity:', err);
       return c.json({ error: 'Failed to write bot identity' }, 500);
+    }
+  });
+
+  app.post('/_kilo/user-profile', async c => {
+    let rawBody: unknown;
+    try {
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    const parsed = UserProfileBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return c.json({ error: 'Missing or invalid user profile fields' }, 400);
+    }
+
+    const hasUserTimezone = parsed.data.userTimezone !== undefined;
+    const hasUserLocation = parsed.data.userLocation !== undefined;
+    const userTimezone = parsed.data.userTimezone;
+    const userLocation = parsed.data.userLocation;
+    if (!hasUserTimezone && !hasUserLocation) {
+      return c.json({ error: 'Missing or invalid user profile fields' }, 400);
+    }
+
+    let targetPath: string;
+    try {
+      targetPath = resolveSafePath(USER_PROFILE_RELATIVE_PATH, rootDir);
+    } catch (err) {
+      if (err instanceof SafePathError) {
+        return c.json({ error: err.message }, 400);
+      }
+      throw err;
+    }
+
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+
+    try {
+      const userProfileExists = fs.existsSync(targetPath);
+      const hasProfileValue = Boolean(userTimezone || userLocation);
+      let content = '';
+      if (userProfileExists) {
+        content = fs.readFileSync(targetPath, 'utf8');
+      } else if (hasProfileValue) {
+        content = formatUserProfileMarkdown({
+          ...(userTimezone ? { timezone: userTimezone } : undefined),
+          ...(userLocation ? { location: userLocation } : undefined),
+        });
+      }
+      let nextContent = content;
+      if (userTimezone) nextContent = setUserMdTimezone(nextContent, userTimezone);
+      if (userTimezone === null) nextContent = removeUserMdTimezone(nextContent);
+      if (userLocation) nextContent = setUserMdLocation(nextContent, userLocation);
+      if (userLocation === null) nextContent = removeUserMdLocation(nextContent);
+
+      if ((userProfileExists || nextContent) && nextContent !== content) {
+        atomicWrite(targetPath, nextContent);
+      }
+      if (userLocation) {
+        ensureWeatherSkillInstalled({ KILOCLAW_USER_LOCATION: userLocation });
+      }
+
+      return c.json({ ok: true, path: USER_PROFILE_RELATIVE_PATH });
+    } catch (err) {
+      console.error('[files] Failed to write user profile:', err);
+      return c.json({ error: 'Failed to write user profile' }, 500);
     }
   });
 

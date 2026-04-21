@@ -38,7 +38,7 @@ export function ProvisioningStep({
   botIdentity,
   instanceRunning,
   mutations,
-  totalSteps = 5,
+  totalSteps = 4,
   onComplete,
 }: {
   preset: ExecPreset;
@@ -211,10 +211,10 @@ const PROVISIONING_PHRASES = [
 ];
 
 /** Error view shown when the gateway returns a 502 during provisioning. */
-export function ProvisioningErrorView({ totalSteps = 5 }: { totalSteps?: number }) {
+export function ProvisioningErrorView({ totalSteps = 4 }: { totalSteps?: number }) {
   return (
     <OnboardingStepView
-      currentStep={5}
+      currentStep={4}
       totalSteps={totalSteps}
       stepLabel="Provisioning failed"
       contentClassName="items-center gap-8"
@@ -246,7 +246,7 @@ export function ProvisioningErrorView({ totalSteps = 5 }: { totalSteps?: number 
 }
 
 /** Pure visual shell — extracted so Storybook can render it without wiring up mutations. */
-export function ProvisioningStepView({ totalSteps = 5 }: { totalSteps?: number }) {
+export function ProvisioningStepView({ totalSteps = 4 }: { totalSteps?: number }) {
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -269,7 +269,7 @@ export function ProvisioningStepView({ totalSteps = 5 }: { totalSteps?: number }
   }, []);
   return (
     <OnboardingStepView
-      currentStep={5}
+      currentStep={4}
       totalSteps={totalSteps}
       stepLabel="Almost there..."
       contentClassName="items-center gap-8"

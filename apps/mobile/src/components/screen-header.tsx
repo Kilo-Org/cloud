@@ -11,6 +11,8 @@ type ScreenHeaderProps = {
   headerRight?: React.ReactNode;
   modal?: boolean;
   showBackButton?: boolean;
+  onBack?: () => void;
+  onTitlePress?: () => void;
 };
 
 export function ScreenHeader({
@@ -18,6 +20,8 @@ export function ScreenHeader({
   headerRight,
   modal,
   showBackButton,
+  onBack,
+  onTitlePress,
 }: Readonly<ScreenHeaderProps>) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -34,7 +38,11 @@ export function ScreenHeader({
           {canGoBack && (
             <Pressable
               onPress={() => {
-                router.back();
+                if (onBack) {
+                  onBack();
+                } else {
+                  router.back();
+                }
               }}
               hitSlop={12}
               accessibilityLabel="Go back"
@@ -47,9 +55,22 @@ export function ScreenHeader({
               )}
             </Pressable>
           )}
-          <Text className="shrink text-lg font-semibold" numberOfLines={1}>
-            {title}
-          </Text>
+          {onTitlePress ? (
+            <Pressable
+              onPress={onTitlePress}
+              hitSlop={8}
+              className="flex-row items-center gap-1 active:opacity-70"
+            >
+              <Text className="shrink text-lg font-semibold" numberOfLines={1}>
+                {title}
+              </Text>
+              <ChevronDown size={16} color={colors.mutedForeground} />
+            </Pressable>
+          ) : (
+            <Text className="shrink text-lg font-semibold" numberOfLines={1}>
+              {title}
+            </Text>
+          )}
         </View>
         {headerRight ? <View className="ml-3 shrink-0">{headerRight}</View> : null}
       </View>

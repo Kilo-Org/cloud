@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -69,6 +69,11 @@ export function ModelCombobox({
 }: ModelComboboxProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const handleSearchChange = useCallback(() => {
+    listRef.current?.scrollTo({ top: 0 });
+  }, []);
 
   // Sort models: preferred models first (in preferredModels order), then others alphabetically
   // This must be called before any early returns to follow Rules of Hooks
@@ -200,9 +205,9 @@ export function ModelCombobox({
         </PopoverTrigger>
         <PopoverContent className="w-[min(24rem,calc(100vw-2rem))] p-0" align="start">
           <Command>
-            <CommandInput placeholder={searchPlaceholder} />
+            <CommandInput placeholder={searchPlaceholder} onValueChange={handleSearchChange} />
             <CommandEmpty>{noResultsText}</CommandEmpty>
-            <CommandList className="max-h-64 overflow-auto">
+            <CommandList ref={listRef} className="max-h-64 overflow-auto">
               {sortedModels.preferred.length > 0 && (
                 <CommandGroup heading="Recommended">
                   {sortedModels.preferred.map(model => (
@@ -313,9 +318,9 @@ export function ModelCombobox({
           style={{ width: triggerRef.current?.offsetWidth }}
         >
           <Command>
-            <CommandInput placeholder={searchPlaceholder} />
+            <CommandInput placeholder={searchPlaceholder} onValueChange={handleSearchChange} />
             <CommandEmpty>{noResultsText}</CommandEmpty>
-            <CommandList className="max-h-64 overflow-auto">
+            <CommandList ref={listRef} className="max-h-64 overflow-auto">
               {sortedModels.preferred.length > 0 && (
                 <CommandGroup heading="Recommended">
                   {sortedModels.preferred.map(model => (

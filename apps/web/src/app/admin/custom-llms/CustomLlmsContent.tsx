@@ -101,7 +101,7 @@ export function CustomLlmsContent() {
       return;
     }
 
-    const result = CustomLlmDefinitionSchema.safeParse(parsed);
+    const result = CustomLlmDefinitionSchema.strict().safeParse(parsed);
     if (!result.success) {
       const messages = result.error.issues
         .map(issue => `${issue.path.join('.')}: ${issue.message}`)

@@ -14,6 +14,7 @@ import {
   DestroyRequestSchema,
   ChannelsPatchSchema,
   GoogleCredentialsSchema,
+  GoogleOAuthConnectionSchema,
   SecretsPatchSchema,
   InstanceIdParam,
   MachineSizeSchema,
@@ -28,6 +29,10 @@ import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { flattenError, z } from 'zod';
 import { withDORetry } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
+import {
+  markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  type KiloClawSubscriptionChangeActor,
+} from '@kilocode/db';
 import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
@@ -50,7 +55,11 @@ import {
 import type { ProviderId } from '../schemas/instance-config';
 import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
 import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../db';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
+import {
+  BootstrapProvisionFallbackError,
+  bootstrapProvisionedSubscriptionWithFallback,
+} from './provision-bootstrap';
 
 const GmailHistoryIdSchema = z.object({
   userId: z.string().min(1),
@@ -75,6 +84,11 @@ const WebSearchConfigPatchSchema = z.object({
   userId: z.string().min(1),
   exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
 });
+
+const KILOCLAW_WORKER_DESTROY_ACTOR = {
+  actorType: 'system',
+  actorId: 'kiloclaw-worker',
+} satisfies KiloClawSubscriptionChangeActor;
 
 const KiloCliRunConflictSchema = z.object({
   conflict: z.object({
@@ -127,7 +141,11 @@ function logBillingPlatform(
 }
 
 type ProvisionWriteLogFields = {
-  event: 'instance_record_insert' | 'instance_record_destroy' | 'subscription_bootstrap';
+  event:
+    | 'instance_record_insert'
+    | 'instance_record_destroy'
+    | 'subscription_bootstrap'
+    | 'subscription_bootstrap_quarantine';
   outcome: 'started' | 'completed' | 'failed';
   userId?: string;
   instanceId?: string;
@@ -520,12 +538,30 @@ async function markProvisionedInstanceDestroyed(params: {
 
   const db = getWorkerDb(connectionString);
   try {
-    await db
-      .update(kiloclaw_instances)
-      .set({ destroyed_at: sql`NOW()` })
-      .where(
-        and(eq(kiloclaw_instances.id, params.instanceId), isNull(kiloclaw_instances.destroyed_at))
-      );
+    await db.transaction(async tx => {
+      const [instance] = await tx
+        .select({
+          id: kiloclaw_instances.id,
+          userId: kiloclaw_instances.user_id,
+        })
+        .from(kiloclaw_instances)
+        .where(
+          and(eq(kiloclaw_instances.id, params.instanceId), isNull(kiloclaw_instances.destroyed_at))
+        )
+        .limit(1);
+
+      if (!instance) {
+        return;
+      }
+
+      await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+        actor: KILOCLAW_WORKER_DESTROY_ACTOR,
+        executor: tx,
+        instanceId: instance.id,
+        reason: 'destroy_path_inline_collapse',
+        userId: instance.userId,
+      });
+    });
 
     logProvisionWrite('info', 'Instance record marked destroyed', {
       event: 'instance_record_destroy',
@@ -543,63 +579,6 @@ async function markProvisionedInstanceDestroyed(params: {
     });
     throw err;
   }
-}
-
-async function bootstrapProvisionedSubscription(params: {
-  env: AppEnv['Bindings'];
-  userId: string;
-  instanceId: string;
-  orgId: string | null;
-}): Promise<void> {
-  if (!params.env.KILOCLAW_BILLING) {
-    logProvisionWrite('error', 'Subscription bootstrap aborted: KILOCLAW_BILLING not configured', {
-      event: 'subscription_bootstrap',
-      outcome: 'failed',
-      userId: params.userId,
-      instanceId: params.instanceId,
-      orgId: params.orgId,
-      error: 'KILOCLAW_BILLING service binding is not configured',
-    });
-    throw new Error('KILOCLAW_BILLING service binding is not configured');
-  }
-
-  const start = performance.now();
-  logProvisionWrite('info', 'Calling billing worker to bootstrap subscription', {
-    event: 'subscription_bootstrap',
-    outcome: 'started',
-    userId: params.userId,
-    instanceId: params.instanceId,
-    orgId: params.orgId,
-  });
-
-  try {
-    await params.env.KILOCLAW_BILLING.bootstrapProvisionSubscription({
-      userId: params.userId,
-      instanceId: params.instanceId,
-      orgId: params.orgId,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    logProvisionWrite('error', 'Subscription bootstrap RPC failed', {
-      event: 'subscription_bootstrap',
-      outcome: 'failed',
-      userId: params.userId,
-      instanceId: params.instanceId,
-      orgId: params.orgId,
-      durationMs: performance.now() - start,
-      error: message.slice(0, 500),
-    });
-    throw err;
-  }
-
-  logProvisionWrite('info', 'Subscription bootstrap completed', {
-    event: 'subscription_bootstrap',
-    outcome: 'completed',
-    userId: params.userId,
-    instanceId: params.instanceId,
-    orgId: params.orgId,
-    durationMs: performance.now() - start,
-  });
 }
 
 /** Parse and validate optional ?instanceId= query param. Returns 400 on invalid format. */
@@ -684,6 +663,17 @@ function statusCodeFromError(err: unknown): number {
   return 500;
 }
 
+function describeUnknownError(error: unknown): string | null {
+  if (!error) return null;
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return null;
+  }
+}
+
 function jsonError(message: string, status: number, code?: string): Response {
   return new Response(JSON.stringify({ error: message, ...(code ? { code } : {}) }), {
     status,
@@ -736,7 +726,7 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
   const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
 
   // Log the full error for Sentry/debugging — this never reaches the caller
-  console.error(`[platform] ${operation} failed:`, raw);
+  console.error(`[platform] ${operation} failed:`, err);
 
   // Allow known-safe messages through
   if (SAFE_ERROR_PREFIXES.some(prefix => normalized.startsWith(prefix))) {
@@ -744,6 +734,15 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
   }
 
   return { message: `${operation} failed`, status };
+}
+
+function classifyProvisionFailure(err: unknown, status: number): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const flyApiMatch = raw.match(/Fly API ([A-Za-z0-9_-]+) failed \((\d{3})\)/);
+  const flyOperation = flyApiMatch?.[1];
+  const flyStatus = flyApiMatch?.[2];
+  if (flyOperation && flyStatus) return `fly_api_${flyOperation}_${flyStatus}`;
+  return `provision_${status}`;
 }
 
 /**
@@ -857,6 +856,7 @@ platform.post('/provision', async c => {
     kilocodeApiKeyExpiresAt,
     kilocodeDefaultModel,
     userTimezone,
+    userLocation,
     machineSize,
     region,
     pinnedImageTag,
@@ -866,6 +866,7 @@ platform.post('/provision', async c => {
   const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
   const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionRoute = '/api/platform/provision';
+  const provisionStartedAt = performance.now();
 
   let selectedProvider = provider;
   if (!selectedProvider && shouldInsertInstanceRecord) {
@@ -873,10 +874,12 @@ platform.post('/provision', async c => {
       kv: c.env.KV_CLAW_CACHE,
       userId,
       orgId,
+      workerEnv: c.env.WORKER_ENV,
+      defaultProvider: c.env.KILOCLAW_DEFAULT_PROVIDER,
     });
   }
 
-  let provision;
+  let provision: Awaited<ReturnType<KiloClawInstanceStub['provision']>>;
   try {
     if (selectedProvider) {
       assertAvailableProvider(c.env, selectedProvider);
@@ -896,6 +899,7 @@ platform.post('/provision', async c => {
             kilocodeApiKeyExpiresAt,
             kilocodeDefaultModel,
             userTimezone,
+            userLocation,
             machineSize,
             region,
             pinnedImageTag,
@@ -911,6 +915,18 @@ platform.post('/provision', async c => {
       return c.json({ error: 'User already has an active instance' }, 409);
     }
     const { message, status } = sanitizeError(err, 'provision');
+    writeEvent(c.env, {
+      event: 'instance.provisioning_failed',
+      delivery: 'http',
+      route: provisionRoute,
+      userId,
+      instanceId: provisionedInstanceId,
+      orgId: orgId ?? undefined,
+      error: message,
+      label: classifyProvisionFailure(err, status),
+      durationMs: performance.now() - provisionStartedAt,
+      value: status,
+    });
     return jsonError(message, status);
   }
 
@@ -976,12 +992,29 @@ platform.post('/provision', async c => {
 
   if (shouldBootstrapSubscription) {
     const bootstrapStartedAt = performance.now();
+    logProvisionWrite('info', 'Bootstrapping provisioned subscription', {
+      event: 'subscription_bootstrap',
+      outcome: 'started',
+      userId,
+      instanceId: provisionedInstanceId,
+      orgId: orgId ?? null,
+    });
     try {
-      await bootstrapProvisionedSubscription({
+      const bootstrap = await bootstrapProvisionedSubscriptionWithFallback({
         env: c.env,
+        input: {
+          userId,
+          instanceId: provisionedInstanceId,
+          orgId: orgId ?? null,
+        },
+      });
+      logProvisionWrite('info', 'Provisioned subscription bootstrapped', {
+        event: 'subscription_bootstrap',
+        outcome: 'completed',
         userId,
         instanceId: provisionedInstanceId,
         orgId: orgId ?? null,
+        durationMs: performance.now() - bootstrapStartedAt,
       });
       writeEvent(c.env, {
         event: 'instance.subscription_bootstrapped',
@@ -991,6 +1024,7 @@ platform.post('/provision', async c => {
         instanceId: provisionedInstanceId,
         sandboxId: provision.sandboxId,
         orgId: orgId ?? undefined,
+        label: bootstrap.mode,
         durationMs: performance.now() - bootstrapStartedAt,
       });
     } catch (persistErr) {
@@ -1007,38 +1041,60 @@ platform.post('/provision', async c => {
         error: message,
         durationMs: performance.now() - bootstrapStartedAt,
       });
+      const rpcError =
+        persistErr instanceof BootstrapProvisionFallbackError ? persistErr.rpcError : persistErr;
+      const fallbackError =
+        persistErr instanceof BootstrapProvisionFallbackError
+          ? persistErr.fallbackError
+          : undefined;
+      logProvisionWrite('error', 'Subscription bootstrap quarantined for remediation', {
+        event: 'subscription_bootstrap_quarantine',
+        outcome: 'failed',
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? null,
+        durationMs: performance.now() - bootstrapStartedAt,
+        error:
+          fallbackError instanceof Error
+            ? fallbackError.message.slice(0, 500)
+            : message.slice(0, 500),
+      });
+      writeEvent(c.env, {
+        event: 'instance.subscription_bootstrap_quarantined',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        error: [message, describeUnknownError(rpcError), describeUnknownError(fallbackError)]
+          .filter(part => !!part)
+          .join(' | '),
+        label: 'rpc_and_local_fallback_failed',
+        durationMs: performance.now() - bootstrapStartedAt,
+      });
       if (shouldInsertInstanceRecord) {
-        await withResolvedDORetry(
-          c.env,
-          userId,
-          provisionedInstanceId,
-          stub => stub.destroy(),
-          'destroy'
-        ).catch(destroyErr => {
-          console.error(
-            '[platform] Failed to destroy provisioned instance after bootstrap error:',
-            destroyErr
-          );
-        });
         await markProvisionedInstanceDestroyed({
           env: c.env,
           instanceId: provisionedInstanceId,
         }).catch(markErr => {
           console.error(
-            '[platform] Failed to mark instance destroyed after bootstrap error:',
+            '[platform] Failed to mark bootstrap-quarantined instance destroyed for retry:',
             markErr
           );
         });
-      } else {
-        console.error(
-          '[platform] Subscription bootstrap failed after reprovisioning existing instance; leaving Durable Object provisioned for retry/manual recovery',
-          {
-            userId,
-            instanceId: provisionedInstanceId,
-            doKey: provisionDoKey,
-          }
-        );
       }
+      console.error(
+        '[platform] Subscription bootstrap failed after local fallback; instance quarantined for remediation',
+        {
+          userId,
+          instanceId: provisionedInstanceId,
+          doKey: provisionDoKey,
+          shouldInsertInstanceRecord,
+          rpcError: describeUnknownError(rpcError) ?? undefined,
+          fallbackError: describeUnknownError(fallbackError) ?? undefined,
+        }
+      );
       return jsonError(message, status);
     }
   }
@@ -1307,6 +1363,67 @@ platform.delete('/gmail-notifications', async c => {
     return c.json(updated, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'gmail-notifications disable');
+    return jsonError(message, status);
+  }
+});
+
+const GoogleOAuthConnectionPatchSchema = z.object({
+  userId: z.string().min(1),
+  googleOAuthConnection: GoogleOAuthConnectionSchema,
+});
+
+// POST /api/platform/google-oauth-connection
+platform.post('/google-oauth-connection', async c => {
+  const result = await parseBody(c, GoogleOAuthConnectionPatchSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, googleOAuthConnection } = result.data;
+
+  try {
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub =>
+        stub.updateGoogleOAuthConnection({
+          status: googleOAuthConnection.status,
+          accountEmail: googleOAuthConnection.accountEmail,
+          accountSubject: googleOAuthConnection.accountSubject,
+          scopes: googleOAuthConnection.scopes,
+          capabilities: googleOAuthConnection.capabilities,
+          lastError: googleOAuthConnection.lastError,
+        }),
+      'updateGoogleOAuthConnection'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'google-oauth-connection');
+    return jsonError(message, status);
+  }
+});
+
+// DELETE /api/platform/google-oauth-connection?userId=...
+platform.delete('/google-oauth-connection', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) return c.json({ error: 'userId is required' }, 400);
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.clearGoogleOAuthConnection(),
+      'clearGoogleOAuthConnection'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'google-oauth-connection delete');
     return jsonError(message, status);
   }
 });

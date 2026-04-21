@@ -36,11 +36,13 @@ jest.mock('@/lib/user.server', () => ({
   getUserFromAuthOrRedirect: (...args: [string?]) => mockGetUserFromAuthOrRedirect(...args),
 }));
 
+type SignupSourceArg = 'openclaw-security-advisor' | null;
 const mockGetStytchStatus = jest.fn<Promise<boolean | null>, [User, string | null, Headers]>();
-const mockHandleSignupPromotion = jest.fn<Promise<void>, [User, boolean]>();
+const mockHandleSignupPromotion = jest.fn<Promise<void>, [User, boolean, SignupSourceArg?]>();
 jest.mock('@/lib/stytch', () => ({
   getStytchStatus: (...args: [User, string | null, Headers]) => mockGetStytchStatus(...args),
-  handleSignupPromotion: (...args: [User, boolean]) => mockHandleSignupPromotion(...args),
+  handleSignupPromotion: (...args: [User, boolean, SignupSourceArg?]) =>
+    mockHandleSignupPromotion(...args),
 }));
 
 // Mock React components that aren't relevant to redirect testing
@@ -273,6 +275,103 @@ describe('account-verification redirect logic', () => {
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
       expect(mockRedirect).toHaveBeenCalledWith('/get-started');
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // Bonus attribution: signupSource passed to handleSignupPromotion
+  // Regression coverage for kilobot findings on PR #2622:
+  //   1. `startsWith('/openclaw-advisor')` matched sibling paths like
+  //      `/openclaw-advisor-fake` — must now exact-match the pathname.
+  //   2. Already-validated users hitting /account-verification directly
+  //      could self-award the bonus once — must gate on the transition
+  //      from has_validation_stytch=null to non-null.
+  // ---------------------------------------------------------------
+  describe('openclaw-security-advisor signupSource attribution', () => {
+    it('attributes a new user with callbackPath=/openclaw-advisor', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/openclaw-advisor?code=ABCD-1234' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(
+        user,
+        true,
+        'openclaw-security-advisor'
+      );
+    });
+
+    it('does NOT attribute sibling path /openclaw-advisor-fake (exact-pathname match)', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/openclaw-advisor-fake?code=ABCD-1234' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    it('does NOT attribute already-validated user who visits with openclaw-advisor callback', async () => {
+      const user = makeUser({ has_validation_stytch: true });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/openclaw-advisor?code=ABCD-1234' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    it('does NOT attribute when callbackPath is a different product path', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/device-auth?code=ABCD-1234' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    // Defense-in-depth for the blocker called out in the post-merge review
+    // on PR #2622: even if a user manually reaches /account-verification
+    // with callbackPath=/openclaw-advisor (bypassing the page-level
+    // short-circuit in openclaw-advisor/page.tsx), bonus attribution must
+    // still refuse when no valid device-auth code accompanies the path.
+    // The code is the "real plugin flow" signal; without it any visitor
+    // could self-award the bonus by visiting the sign-in URL directly.
+    it('does NOT attribute when callbackPath=/openclaw-advisor has no code param', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/openclaw-advisor' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    it('does NOT attribute when callbackPath=/openclaw-advisor code is malformed', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      // `.` and `_` survive URL parsing but fall outside the device-auth
+      // charset `[A-Za-z0-9-]`. Must not qualify for the bonus even
+      // though the pathname exact-matches.
+      await renderPage({ callbackPath: '/openclaw-advisor?code=ab.cd' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    it('does NOT attribute when callbackPath=/openclaw-advisor code exceeds 16 chars', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      // 17 ASCII alphanumerics — within the charset but longer than the
+      // device-auth generator ever produces. Rejected by the format guard.
+      await renderPage({ callbackPath: '/openclaw-advisor?code=ABCDEFGHIJKLMNOPQ' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
     });
   });
 

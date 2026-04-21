@@ -7,6 +7,7 @@ import type {
   EncryptedEnvelope,
   EncryptedChannelTokens,
   GoogleCredentials,
+  GoogleOAuthConnection,
   KiloExaSearchMode,
 } from '../schemas/instance-config';
 import { deriveGatewayToken } from '../auth/gateway-token';
@@ -27,9 +28,11 @@ export type UserConfig = {
   kilocodeApiKey?: string | null;
   kilocodeDefaultModel?: string | null;
   userTimezone?: string | null;
+  userLocation?: string | null;
   kiloExaSearchMode?: KiloExaSearchMode | null;
   channels?: EncryptedChannelTokens;
   googleCredentials?: GoogleCredentials;
+  googleOAuthConnection?: GoogleOAuthConnection | null;
   instanceFeatures?: string[];
   execSecurity?: string | null;
   execAsk?: string | null;
@@ -173,6 +176,9 @@ export async function buildEnvVars(
     if (userConfig.userTimezone) {
       plainEnv.KILOCLAW_USER_TIMEZONE = userConfig.userTimezone;
     }
+    if (userConfig.userLocation) {
+      sensitive.KILOCLAW_USER_LOCATION = userConfig.userLocation;
+    }
 
     // Layer 4: Decrypt channel tokens and map to container env var names
     if (userConfig.channels && env.AGENT_ENV_VARS_PRIVATE_KEY) {
@@ -198,6 +204,13 @@ export async function buildEnvVars(
         console.warn('Failed to decrypt Google credentials, starting without Google access:', err);
       }
     }
+  }
+
+  if (
+    userConfig?.googleCredentials ||
+    (userConfig?.googleOAuthConnection && userConfig.googleOAuthConnection.status === 'active')
+  ) {
+    plainEnv.KILOCLAW_GOOGLE_WORKSPACE_ENABLED = 'true';
   }
 
   // Org identity (non-sensitive, plaintext)

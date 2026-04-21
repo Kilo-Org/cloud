@@ -1,6 +1,7 @@
 import type { KiloClawEnv } from '../../types';
 import type {
   GoogleCredentials,
+  GoogleOAuthConnection,
   PersistedState,
   MachineSize,
   ProviderId,
@@ -62,9 +63,15 @@ export type InstanceMutableState = {
   kilocodeApiKeyExpiresAt: PersistedState['kilocodeApiKeyExpiresAt'];
   kilocodeDefaultModel: PersistedState['kilocodeDefaultModel'];
   userTimezone: PersistedState['userTimezone'];
+  userLocation: PersistedState['userLocation'];
   kiloExaSearchMode: PersistedState['kiloExaSearchMode'];
   channels: PersistedState['channels'];
   googleCredentials: GoogleCredentials | null;
+  googleOAuthConnection: GoogleOAuthConnection | null;
+  googleWorkspaceToolsEnabled: boolean;
+  googleWorkspaceConfigSyncPending: boolean;
+  googleWorkspaceConfigSyncError: string | null;
+  googleWorkspaceConfigSyncedAt: number | null;
   provisionedAt: number | null;
   startingAt: number | null;
   restartingAt: number | null;

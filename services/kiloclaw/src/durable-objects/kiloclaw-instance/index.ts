@@ -15,6 +15,7 @@ import type {
   PersistedState,
   EncryptedEnvelope,
   GoogleCredentials,
+  GoogleOAuthConnection,
   MachineSize,
   CustomSecretMeta,
   ProviderId,
@@ -639,8 +640,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
+    const previousUserTimezone = this.s.userTimezone ?? null;
+    const previousUserLocation = this.s.userLocation ?? null;
     const userTimezone =
-      config.userTimezone === undefined ? (this.s.userTimezone ?? null) : config.userTimezone;
+      config.userTimezone === undefined ? previousUserTimezone : config.userTimezone;
+    const userLocation =
+      config.userLocation === undefined ? previousUserLocation : config.userLocation;
+    const shouldWriteUserProfile =
+      !isNew &&
+      this.s.status === 'running' &&
+      (userTimezone !== previousUserTimezone || userLocation !== previousUserLocation);
 
     const configFields = {
       userId,
@@ -654,6 +663,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
       kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
       userTimezone,
+      userLocation,
       kiloExaSearchMode: config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null,
       channels: config.channels ?? null,
       machineSize: config.machineSize ?? this.s.machineSize ?? null,
@@ -713,6 +723,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.kilocodeApiKeyExpiresAt = config.kilocodeApiKeyExpiresAt ?? null;
     this.s.kilocodeDefaultModel = config.kilocodeDefaultModel ?? null;
     this.s.userTimezone = userTimezone;
+    this.s.userLocation = userLocation;
     this.s.kiloExaSearchMode = config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null;
     this.s.channels = config.channels ?? null;
     this.s.machineSize = config.machineSize ?? this.s.machineSize ?? null;
@@ -727,6 +738,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.instanceReadyEmailSent = false;
     }
     this.s.loaded = true;
+
+    if (shouldWriteUserProfile) {
+      await gateway.writeUserProfile(this.s, this.env, {
+        userTimezone,
+        userLocation,
+      });
+    }
 
     // Set up the default Stream Chat channel on first provision (best-effort).
     // The bot and channel are created server-side here so the API secret never
@@ -828,6 +846,61 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeApiKeyExpiresAt: this.s.kilocodeApiKeyExpiresAt,
       kilocodeDefaultModel: this.s.kilocodeDefaultModel,
     };
+  }
+
+  private shouldEnableGoogleWorkspaceTools(): boolean {
+    return this.s.googleCredentials !== null || this.s.googleOAuthConnection?.status === 'active';
+  }
+
+  private async syncGoogleWorkspaceConfig(reason: string): Promise<void> {
+    const enabled = this.shouldEnableGoogleWorkspaceTools();
+    const now = Date.now();
+
+    this.s.googleWorkspaceToolsEnabled = enabled;
+
+    const running = this.s.status === 'running' && !!getRuntimeId(this.s);
+    if (!running) {
+      this.s.googleWorkspaceConfigSyncPending = true;
+      this.s.googleWorkspaceConfigSyncError = null;
+      await this.persist({
+        googleWorkspaceToolsEnabled: enabled,
+        googleWorkspaceConfigSyncPending: true,
+        googleWorkspaceConfigSyncError: null,
+      });
+      return;
+    }
+
+    try {
+      const result = await gateway.syncGoogleWorkspaceToolsSectionOnMachine(
+        this.s,
+        this.env,
+        enabled
+      );
+      if (result === null) {
+        this.s.googleWorkspaceConfigSyncPending = true;
+        this.s.googleWorkspaceConfigSyncError = 'controller_route_unavailable';
+      } else {
+        this.s.googleWorkspaceConfigSyncPending = false;
+        this.s.googleWorkspaceConfigSyncError = null;
+        this.s.googleWorkspaceConfigSyncedAt = now;
+      }
+    } catch (error) {
+      this.s.googleWorkspaceConfigSyncPending = true;
+      this.s.googleWorkspaceConfigSyncError =
+        error instanceof Error ? error.message : String(error);
+      doWarn(this.s, 'google workspace config sync failed', {
+        reason,
+        enabled,
+        error: toLoggable(error),
+      });
+    }
+
+    await this.persist({
+      googleWorkspaceToolsEnabled: enabled,
+      googleWorkspaceConfigSyncPending: this.s.googleWorkspaceConfigSyncPending,
+      googleWorkspaceConfigSyncError: this.s.googleWorkspaceConfigSyncError,
+      googleWorkspaceConfigSyncedAt: this.s.googleWorkspaceConfigSyncedAt,
+    });
   }
 
   async updateExecPreset(patch: {
@@ -1127,6 +1200,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       gmailNotificationsEnabled: true,
     });
 
+    await this.syncGoogleWorkspaceConfig('legacy_google_connected');
+
     return { googleConnected: true };
   }
 
@@ -1149,7 +1224,66 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       gmailPushOidcEmail: null,
     });
 
+    await this.syncGoogleWorkspaceConfig('legacy_google_disconnected');
+
     return { googleConnected: false };
+  }
+
+  async updateGoogleOAuthConnection(connection: {
+    status: GoogleOAuthConnection['status'];
+    accountEmail: string | null;
+    accountSubject: string | null;
+    scopes: string[];
+    capabilities: string[];
+    lastError?: string | null;
+  }): Promise<{
+    googleOAuthConnected: boolean;
+    googleOAuthStatus: GoogleOAuthConnection['status'];
+  }> {
+    await this.loadState();
+
+    const now = Date.now();
+    const previous = this.s.googleOAuthConnection;
+    const isActive = connection.status === 'active';
+
+    this.s.googleOAuthConnection = {
+      accountEmail: connection.accountEmail,
+      accountSubject: connection.accountSubject,
+      scopes: [...new Set(connection.scopes)].sort(),
+      capabilities: [...new Set(connection.capabilities)].sort(),
+      status: connection.status,
+      lastError: connection.lastError ?? null,
+      connectedAt: isActive ? (previous?.connectedAt ?? now) : (previous?.connectedAt ?? null),
+      updatedAt: now,
+    };
+
+    await this.persist({
+      googleOAuthConnection: this.s.googleOAuthConnection,
+    });
+
+    await this.syncGoogleWorkspaceConfig('oauth_google_connected');
+
+    return {
+      googleOAuthConnected: isActive,
+      googleOAuthStatus: connection.status,
+    };
+  }
+
+  async clearGoogleOAuthConnection(): Promise<{
+    googleOAuthConnected: boolean;
+    googleOAuthStatus: GoogleOAuthConnection['status'];
+  }> {
+    await this.loadState();
+
+    this.s.googleOAuthConnection = null;
+    await this.persist({ googleOAuthConnection: null });
+
+    await this.syncGoogleWorkspaceConfig('oauth_google_disconnected');
+
+    return {
+      googleOAuthConnected: false,
+      googleOAuthStatus: 'disconnected',
+    };
   }
 
   /**
@@ -1376,7 +1510,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (flyState.volumeId) {
         try {
           const volume = await fly.getVolume(flyConfig, flyState.volumeId);
-          if (volume.region !== flyState.region) {
+          if (!volume.region) {
+            doWarn(this.s, 'Volume region missing during drift check; keeping cached flyRegion', {
+              volumeId: flyState.volumeId,
+              cachedRegion: flyState.region,
+            });
+          } else if (volume.region !== flyState.region) {
             doWarn(this.s, 'flyRegion drift detected', {
               cachedRegion: flyState.region,
               actualRegion: volume.region,
@@ -1388,23 +1527,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             await this.persistProviderResult({ providerState: flyState });
           }
         } catch (err) {
-          if (fly.isFlyNotFound(err)) {
-            doWarn(this.s, 'Volume not found during region check, clearing');
-            await this.persistProviderResult({
-              providerState: {
-                ...flyState,
-                volumeId: null,
-                region: null,
-              },
-            });
-            await this.persistProviderResult(
-              await this.provider().ensureStorage({
-                env: this.env,
-                state: this.s,
-                reason: 'start',
-              })
-            );
-          }
+          if (!fly.isFlyNotFound(err)) throw err;
+
+          doWarn(this.s, 'Volume not found during region check, clearing');
+          await this.persistProviderResult({
+            providerState: {
+              ...flyState,
+              volumeId: null,
+              region: null,
+            },
+          });
+          await this.persistProviderResult(
+            await this.provider().ensureStorage({
+              env: this.env,
+              state: this.s,
+              reason: 'start',
+            })
+          );
         }
       }
 
@@ -1470,7 +1609,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       envVars,
       bootstrapEnv,
       this.s.machineSize,
-      identity
+      identity,
+      this.s.provider
     );
 
     const startResult = await this.provider().startRuntime({
@@ -1532,6 +1672,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       lastStartErrorMessage: null,
       lastStartErrorAt: null,
     });
+
+    await this.syncGoogleWorkspaceConfig('instance_started');
 
     this.emitEvent({
       event: 'instance.started',
@@ -1859,6 +2001,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     trackedImageTag: string | null;
     trackedImageDigest: string | null;
     googleConnected: boolean;
+    googleOAuthConnected: boolean;
+    googleOAuthStatus: GoogleOAuthConnection['status'];
+    googleOAuthAccountEmail: string | null;
+    googleOAuthCapabilities: string[];
+    googleWorkspaceToolsEnabled: boolean;
+    googleWorkspaceConfigSyncPending: boolean;
+    googleWorkspaceConfigSyncError: string | null;
+    googleWorkspaceConfigReady: boolean;
+    googleWorkspaceConfigSyncedAt: number | null;
     gmailNotificationsEnabled: boolean;
     execSecurity: string | null;
     execAsk: string | null;
@@ -1907,6 +2058,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       trackedImageTag: this.s.trackedImageTag,
       trackedImageDigest: this.s.trackedImageDigest,
       googleConnected: this.s.googleCredentials !== null,
+      googleOAuthConnected: this.s.googleOAuthConnection?.status === 'active',
+      googleOAuthStatus: this.s.googleOAuthConnection?.status ?? 'disconnected',
+      googleOAuthAccountEmail: this.s.googleOAuthConnection?.accountEmail ?? null,
+      googleOAuthCapabilities: this.s.googleOAuthConnection?.capabilities ?? [],
+      googleWorkspaceToolsEnabled: this.s.googleWorkspaceToolsEnabled,
+      googleWorkspaceConfigSyncPending: this.s.googleWorkspaceConfigSyncPending,
+      googleWorkspaceConfigSyncError: this.s.googleWorkspaceConfigSyncError,
+      googleWorkspaceConfigReady: !this.s.googleWorkspaceConfigSyncPending,
+      googleWorkspaceConfigSyncedAt: this.s.googleWorkspaceConfigSyncedAt,
       gmailNotificationsEnabled: this.s.gmailNotificationsEnabled,
       execSecurity: this.s.execSecurity,
       execAsk: this.s.execAsk,
@@ -1974,6 +2134,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     trackedImageTag: string | null;
     trackedImageDigest: string | null;
     googleConnected: boolean;
+    googleOAuthConnected: boolean;
+    googleOAuthStatus: GoogleOAuthConnection['status'];
+    googleOAuthAccountEmail: string | null;
+    googleOAuthCapabilities: string[];
+    googleWorkspaceToolsEnabled: boolean;
+    googleWorkspaceConfigSyncPending: boolean;
+    googleWorkspaceConfigSyncError: string | null;
+    googleWorkspaceConfigReady: boolean;
+    googleWorkspaceConfigSyncedAt: number | null;
     gmailNotificationsEnabled: boolean;
     pendingDestroyMachineId: string | null;
     pendingDestroyVolumeId: string | null;
@@ -2050,6 +2219,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       trackedImageTag: this.s.trackedImageTag,
       trackedImageDigest: this.s.trackedImageDigest,
       googleConnected: this.s.googleCredentials !== null,
+      googleOAuthConnected: this.s.googleOAuthConnection?.status === 'active',
+      googleOAuthStatus: this.s.googleOAuthConnection?.status ?? 'disconnected',
+      googleOAuthAccountEmail: this.s.googleOAuthConnection?.accountEmail ?? null,
+      googleOAuthCapabilities: this.s.googleOAuthConnection?.capabilities ?? [],
+      googleWorkspaceToolsEnabled: this.s.googleWorkspaceToolsEnabled,
+      googleWorkspaceConfigSyncPending: this.s.googleWorkspaceConfigSyncPending,
+      googleWorkspaceConfigSyncError: this.s.googleWorkspaceConfigSyncError,
+      googleWorkspaceConfigReady: !this.s.googleWorkspaceConfigSyncPending,
+      googleWorkspaceConfigSyncedAt: this.s.googleWorkspaceConfigSyncedAt,
       gmailNotificationsEnabled: this.s.gmailNotificationsEnabled,
       pendingDestroyMachineId: this.s.pendingDestroyMachineId,
       pendingDestroyVolumeId: this.s.pendingDestroyVolumeId,
@@ -2730,7 +2908,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         envVars,
         bootstrapEnv,
         this.s.machineSize,
-        identity
+        identity,
+        this.s.provider
       );
 
       const restart = await this.provider().restartRuntime({
@@ -2832,6 +3011,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
       await this.scheduleAlarm();
       return;
+    }
+
+    if (this.s.googleWorkspaceConfigSyncPending && this.s.status === 'running') {
+      await this.syncGoogleWorkspaceConfig('alarm_retry');
     }
 
     if (this.s.status !== 'recovering') {

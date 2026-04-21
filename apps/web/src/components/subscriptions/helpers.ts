@@ -10,6 +10,25 @@ export function isKiloclawTerminal(status: string): boolean {
   return status === 'canceled';
 }
 
+export function isKiloclawPendingSettlement(params: { activationState?: string | null }): boolean {
+  return params.activationState === 'pending_settlement';
+}
+
+export function getKiloclawDisplayStatus(params: {
+  status: string;
+  activationState?: string | null;
+}): string {
+  return isKiloclawPendingSettlement(params) ? 'pending_settlement' : params.status;
+}
+
+export function getKiloclawStatusNote(params: { activationState?: string | null }): string | null {
+  if (isKiloclawPendingSettlement(params)) {
+    return 'Payment processing. Hosting activates after invoice settlement.';
+  }
+
+  return null;
+}
+
 export function isSeatsTerminal(status: string): boolean {
   return status === 'ended' || status === 'canceled';
 }

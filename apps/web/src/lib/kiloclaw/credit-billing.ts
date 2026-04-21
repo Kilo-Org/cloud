@@ -49,6 +49,18 @@ const CREDIT_BILLING_ACTOR = {
   actorType: 'system',
   actorId: 'kiloclaw-credit-billing',
 } as const;
+const PAID_ACTIVATION_LIFECYCLE_CLEAR_SET = {
+  suspended_at: null,
+  destruction_deadline: null,
+  auto_resume_requested_at: null,
+  auto_resume_retry_after: null,
+  auto_resume_attempt_count: 0,
+} as const;
+const PAID_AUTO_RESUME_INITIAL_STATE = {
+  auto_resume_requested_at: null,
+  auto_resume_retry_after: null,
+  auto_resume_attempt_count: 0,
+} as const;
 
 type CreditSettlementPersonalRow = {
   subscription: typeof kiloclaw_subscriptions.$inferSelect;
@@ -397,7 +409,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   userId: string;
   metadataInstanceId?: string;
   stripeSubscriptionId: string;
-  chargeId: string;
+  stripePaymentId: string;
   plan: 'commit' | 'standard';
   amountMicrodollars: number;
   periodStart: string;
@@ -407,7 +419,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     userId,
     metadataInstanceId,
     stripeSubscriptionId,
-    chargeId,
+    stripePaymentId,
     plan,
     amountMicrodollars,
     periodStart,
@@ -427,7 +439,10 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     });
 
     if (!user) {
-      logWarning('User not found for credit settlement', { user_id: userId, chargeId });
+      logWarning('User not found for credit settlement', {
+        user_id: userId,
+        stripe_payment_id: stripePaymentId,
+      });
       return;
     }
 
@@ -514,7 +529,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     const deposited = await processTopUp(
       user,
       amountCents,
-      { type: 'stripe', stripe_payment_id: chargeId },
+      { type: 'stripe', stripe_payment_id: stripePaymentId },
       {
         skipPostTopUpFreeStuff: true,
         dbOrTx: tx,
@@ -523,7 +538,10 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     );
 
     if (!deposited) {
-      logInfo('Duplicate charge skipped', { user_id: userId, chargeId });
+      logInfo('Duplicate settlement credit skipped', {
+        user_id: userId,
+        stripe_payment_id: stripePaymentId,
+      });
       applied = true;
       return;
     }
@@ -569,6 +587,8 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       commit_ends_at: commitEndsAt,
       past_due_since: null,
       auto_top_up_triggered_for_period: null,
+      ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
+      ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
       ...(shouldClearSchedule
         ? { scheduled_plan: null, scheduled_by: null, stripe_schedule_id: null }
         : {}),
@@ -623,7 +643,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     user_id: userId,
     plan,
     stripe_subscription_id: stripeSubscriptionId,
-    chargeId,
+    stripe_payment_id: stripePaymentId,
     amountMicrodollars,
   });
 
@@ -809,7 +829,8 @@ export async function enrollWithCredits(params: {
         cancel_at_period_end: false,
         trial_started_at: null,
         trial_ends_at: null,
-        // DO NOT clear suspended_at or destruction_deadline (spec rule 5d)
+        ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
+        ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
       })
       .onConflictDoUpdate({
         target: kiloclaw_subscriptions.instance_id,
@@ -825,6 +846,8 @@ export async function enrollWithCredits(params: {
           commit_ends_at: commitEndsAt,
           past_due_since: null,
           cancel_at_period_end: false,
+          ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
+          ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
         },
       })
       .returning();

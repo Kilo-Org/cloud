@@ -26,6 +26,13 @@ type SignInFormProps = {
   storybookInitialState?: SignInFormInitialState;
 };
 
+function signInHrefFromSearchParams(searchParams: Record<string, string>): string {
+  const params = new URLSearchParams(searchParams);
+  params.delete('signup');
+  const query = params.toString();
+  return query ? `/users/sign_in?${query}` : '/users/sign_in';
+}
+
 export function SignInForm({
   searchParams,
   error: initialError,
@@ -333,7 +340,10 @@ export function SignInForm({
                 {isSignUp ? (
                   <p className="text-muted-foreground text-sm">
                     Already have an account?{' '}
-                    <Link href="/users/sign_in" className="text-primary hover:underline">
+                    <Link
+                      href={signInHrefFromSearchParams(searchParams)}
+                      className="text-primary hover:underline"
+                    >
                       Sign in
                     </Link>
                   </p>

@@ -6,10 +6,12 @@ import {
   GatewayProcessStatusSchema,
   GatewayCommandResponseSchema,
   BotIdentityResponseSchema,
+  UserProfileResponseSchema,
   ConfigRestoreResponseSchema,
   ControllerVersionResponseSchema,
   GatewayReadyResponseSchema,
   EnvPatchResponseSchema,
+  ToolsMdSectionSyncResponseSchema,
   OpenclawConfigResponseSchema,
   GatewayControllerError,
 } from '../gateway-controller-types';
@@ -214,6 +216,24 @@ export function writeBotIdentity(
     'POST',
     BotIdentityResponseSchema,
     botIdentity
+  );
+}
+
+export function writeUserProfile(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  userProfile: {
+    userTimezone?: string | null;
+    userLocation?: string | null;
+  }
+): Promise<{ ok: boolean; path: string }> {
+  return callGatewayController(
+    state,
+    env,
+    '/_kilo/user-profile',
+    'POST',
+    UserProfileResponseSchema,
+    userProfile
   );
 }
 
@@ -470,6 +490,31 @@ export async function patchConfigOnMachine(
     doWarn(state, 'patchConfigOnMachine failed (non-fatal)', {
       error: toLoggable(err),
     });
+  }
+}
+
+/**
+ * Sync the Google Workspace section in TOOLS.md on the running machine.
+ * Non-fatal: if the machine isn't running, returns null.
+ */
+export async function syncGoogleWorkspaceToolsSectionOnMachine(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  enabled: boolean
+): Promise<{ ok: boolean; enabled: boolean } | null> {
+  if (state.status !== 'running' || !getRuntimeId(state)) return null;
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/config/tools-md/google-workspace',
+      'POST',
+      ToolsMdSectionSyncResponseSchema,
+      { enabled }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
   }
 }
 

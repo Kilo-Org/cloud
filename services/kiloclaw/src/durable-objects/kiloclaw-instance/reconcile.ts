@@ -8,6 +8,7 @@ import {
   STARTUP_TIMEOUT_SECONDS,
   STARTING_TIMEOUT_MS,
   RESTARTING_TIMEOUT_MS,
+  RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   getProactiveRefreshThresholdMs,
 } from '../../config';
@@ -526,6 +527,22 @@ async function reconcileRestarting(
       return;
     }
 
+    // The update was applied but the machine is stopped — kick it.
+    // Fly sometimes finishes a 'replacing' cycle in 'stopped' instead of
+    // auto-starting. Retry on each alarm cycle until the soft timeout.
+    if (machine.state === 'stopped' && state.restartUpdateSent && !isTimedOut) {
+      rctx.log('restarting_retry_start', { machine_id: state.flyMachineId });
+      try {
+        await fly.startMachine(flyConfig, state.flyMachineId);
+      } catch (startErr) {
+        rctx.log('restarting_retry_start_failed', {
+          machine_id: state.flyMachineId,
+          error: startErr instanceof Error ? startErr.message : String(startErr),
+        });
+      }
+      return;
+    }
+
     if (!isTimedOut) {
       return;
     }
@@ -540,6 +557,32 @@ async function reconcileRestarting(
     await setRestartError(ctx, state, timeoutMessage);
 
     if (TERMINAL_STOPPED_STATES.has(machine.state)) {
+      state.status = 'stopped';
+      state.restartingAt = null;
+      state.lastStoppedAt = Date.now();
+      state.healthCheckFailCount = 0;
+      await ctx.storage.put(
+        storageUpdate({
+          status: 'stopped',
+          restartingAt: null,
+          lastStoppedAt: state.lastStoppedAt,
+          healthCheckFailCount: 0,
+        })
+      );
+      return;
+    }
+
+    // Hard ceiling for transient states (replacing, updating, etc.) that
+    // can hang indefinitely on Fly. The soft timeout above handles terminal
+    // states; this catches everything else.
+    const isMaxTimedOut =
+      restartingAt !== null && Date.now() - restartingAt > RESTARTING_MAX_TIMEOUT_MS;
+    if (isMaxTimedOut) {
+      rctx.log('restarting_max_timeout', {
+        machine_id: state.flyMachineId,
+        fly_state: machine.state,
+        elapsed_ms: Date.now() - restartingAt,
+      });
       state.status = 'stopped';
       state.restartingAt = null;
       state.lastStoppedAt = Date.now();

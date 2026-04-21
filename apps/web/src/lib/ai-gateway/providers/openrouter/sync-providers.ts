@@ -19,9 +19,17 @@ import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@/lib/ai-gateway/providers/vercel/types';
 import { EndpointsSchema, ModelsSchema } from '@/lib/ai-gateway/providers/vercel/types';
+import { redisSet } from '@/lib/redis';
+import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
+
+const ATTRIBUTION_HEADERS = {
+  'HTTP-Referer': 'https://kilocode.ai',
+  'X-Title': 'Kilo Code',
+} as const;
 
 async function fetchGatewayModels(gateway: Provider) {
   const headers = {
+    ...ATTRIBUTION_HEADERS,
     authorization: `Bearer ${gateway.apiKey}`,
   };
 
@@ -71,11 +79,7 @@ async function fetchProviders(): Promise<OpenRouterProvider[]> {
 
   const response = await fetch(`https://openrouter.ai/api/frontend/all-providers`, {
     method: 'GET',
-    headers: {
-      // NOTE: Changing HTTP-Referer; per OpenRouter docs it would identify us as a different app, but can be merged by Openrouter later
-      'HTTP-Referer': 'https://kilocode.ai',
-      'X-Title': 'Kilo Code',
-    },
+    headers: ATTRIBUTION_HEADERS,
   });
 
   if (!response.ok) {
@@ -112,11 +116,7 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
 
   const response = await fetch(`https://openrouter.ai/api/frontend/models/find?${searchParams}`, {
     method: 'GET',
-    headers: {
-      // NOTE: Changing HTTP-Referer; per OpenRouter docs it would identify us as a different app, but can be merged by Openrouter later
-      'HTTP-Referer': 'https://kilocode.ai',
-      'X-Title': 'Kilo Code',
-    },
+    headers: ATTRIBUTION_HEADERS,
   });
 
   if (!response.ok) {
@@ -134,10 +134,7 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
   return data.data.models;
 }
 
-async function syncProviders() {
-  // Fetch all providers
-  const providers = await fetchProviders();
-
+async function syncProviders(providers: OpenRouterProvider[]) {
   if (providers.length === 0) {
     throw new Error('No providers found in OpenRouter response');
   }
@@ -174,136 +171,21 @@ async function syncProviders() {
       return {
         model: {
           slug: normalizeModelId(model.id),
-          hf_slug: model.hugging_face_id || null,
-          updated_at: new Date().toISOString(),
-          created_at: new Date(model.created * 1000).toISOString(),
-          hf_updated_at: null,
           name: model.name,
-          short_name: model.name,
           author: 'Other',
           description: model.description,
-          model_version_group_id: null,
           context_length: model.context_length,
           input_modalities: model.architecture.input_modalities,
           output_modalities: model.architecture.output_modalities,
-          has_text_output: true,
           group: 'other',
-          instruct_type: model.architecture.instruct_type,
-          default_system: null,
-          default_stops: [],
-          hidden: false,
-          router: null,
-          warning_message: null,
-          permaslug: model.canonical_slug,
-          reasoning_config: null,
-          features: null,
-          default_parameters: null,
+          updated_at: new Date().toISOString(),
           endpoint: {
-            id: model.id,
-            name: model.name,
-            context_length: model.context_length,
-            model: {
-              slug: model.id,
-              hf_slug: model.hugging_face_id || null,
-              updated_at: new Date().toISOString(),
-              created_at: new Date(model.created * 1000).toISOString(),
-              hf_updated_at: null,
-              name: model.name,
-              short_name: model.name,
-              author: 'Other',
-              description: model.description,
-              model_version_group_id: null,
-              context_length: model.context_length,
-              input_modalities: model.architecture.input_modalities,
-              output_modalities: model.architecture.output_modalities,
-              has_text_output: true,
-              group: 'other',
-              instruct_type: model.architecture.instruct_type,
-              default_system: null,
-              default_stops: [],
-              hidden: false,
-              router: null,
-              warning_message: null,
-              permaslug: model.canonical_slug,
-              reasoning_config: null,
-              features: null,
-              default_parameters: null,
-            },
-            model_variant_slug: model.id,
-            model_variant_permaslug: model.canonical_slug,
-            adapter_name: 'other',
-            provider_name: 'Other',
-            provider_info: {
-              name: 'Other',
-              displayName: 'Other',
-              slug: 'other',
-              baseUrl: 'https://kilo.ai',
-              dataPolicy: {
-                training: true,
-                retainsPrompts: true,
-                canPublish: false,
-              },
-              headquarters: 'Unknown',
-              hasChatCompletions: true,
-              hasCompletions: false,
-              isAbortable: true,
-              moderationRequired: false,
-              editors: [],
-              owners: [],
-              adapterName: 'other',
-              isMultipartSupported: true,
-              statusPageUrl: null,
-              byokEnabled: false,
-              icon: {
-                url: 'https://via.placeholder.com/32x32/000000/FFFFFF?text=S',
-                className: 'rounded-sm',
-              },
-              ignoredProviderModels: [],
-            },
             provider_display_name: 'Other',
-            provider_slug: 'other',
-            provider_model_id: model.id,
-            quantization: null,
-            variant: 'default',
             is_free: !kfm.pricing,
-            can_abort: true,
-            max_prompt_tokens: model.top_provider.context_length,
-            max_completion_tokens: model.top_provider.max_completion_tokens,
-            max_prompt_images: null,
-            max_tokens_per_image: null,
-            supported_parameters: model.supported_parameters,
-            is_byok: false,
-            moderation_required: model.top_provider.is_moderated,
-            data_policy: {
-              training: true,
-              retainsPrompts: true,
-              canPublish: false,
-            },
             pricing: {
               prompt: model.pricing.prompt,
               completion: model.pricing.completion,
-              image: model.pricing.image,
-              request: model.pricing.request,
-              web_search: model.pricing.web_search,
-              internal_reasoning: model.pricing.internal_reasoning,
-              image_output: '0',
-              discount: 0,
-              input_cache_read: model.pricing.input_cache_read,
             },
-            variable_pricings: [],
-            is_hidden: false,
-            is_deranked: false,
-            is_disabled: false,
-            supports_tool_parameters: true,
-            supports_reasoning: false,
-            supports_multipart: true,
-            limit_rpm: null,
-            limit_rpd: null,
-            limit_rpm_cf: null,
-            has_completions: false,
-            has_chat_completions: true,
-            features: null,
-            provider_region: null,
           },
         },
         provider: kfm.inference_provider,
@@ -401,13 +283,37 @@ async function syncProviders() {
   return result;
 }
 
+async function mirrorToRedis(values: {
+  providers: NormalizedOpenRouterResponse;
+  openrouter: Record<string, StoredModel>;
+  vercel: Record<string, StoredModel>;
+  openrouterProviders: OpenRouterProvider[];
+}): Promise<void> {
+  const entries: [RedisKey, unknown][] = [
+    [GATEWAY_METADATA_REDIS_KEYS.allProviders, values.providers],
+    [GATEWAY_METADATA_REDIS_KEYS.openrouterModels, values.openrouter],
+    [GATEWAY_METADATA_REDIS_KEYS.vercelModels, values.vercel],
+  ];
+  if (values.openrouterProviders) {
+    entries.push([GATEWAY_METADATA_REDIS_KEYS.openrouterProviders, values.openrouterProviders]);
+  }
+  await Promise.all(entries.map(([key, value]) => redisSet(key, JSON.stringify(value))));
+}
+
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
   const openrouter_data = await fetchGatewayModels(PROVIDERS.OPENROUTER);
   const vercel_data = await fetchGatewayModels(PROVIDERS.VERCEL_AI_GATEWAY);
 
-  const providers = await syncProviders();
+  const openrouterProviders = await fetchProviders();
+  if (openrouterProviders.length < 10) {
+    throw new Error(
+      `Suspicious: total number of OpenRouter API providers is ${openrouterProviders.length} < 10`
+    );
+  }
+
+  const providers = await syncProviders(openrouterProviders);
 
   if (providers.total_providers < 10) {
     throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);
@@ -420,10 +326,21 @@ export async function syncAndStoreProviders() {
   const result = await db.transaction(async tx => {
     const results = await tx
       .insert(modelsByProvider)
-      .values({ data: providers, openrouter: openrouter_data, vercel: vercel_data })
+      .values({
+        data: providers,
+        openrouter: openrouter_data,
+        vercel: vercel_data,
+      })
       .returning();
     await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
     return results[0];
+  });
+
+  await mirrorToRedis({
+    providers,
+    openrouter: openrouter_data,
+    vercel: vercel_data,
+    openrouterProviders,
   });
 
   return {

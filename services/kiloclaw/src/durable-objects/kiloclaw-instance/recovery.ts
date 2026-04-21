@@ -407,7 +407,8 @@ export async function runUnexpectedStopRecoveryInBackground(
       envVars,
       bootstrapEnv,
       state.machineSize,
-      identity
+      identity,
+      state.provider
     );
 
     const previousRegion = state.flyRegion;

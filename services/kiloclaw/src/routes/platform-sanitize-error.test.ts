@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 /** Minimal env whose DO stub rejects with the given error (simulates RPC boundary). */
-function envWithDOError(error: Error) {
+function envWithDOError(error: Error, writeDataPoint = vi.fn()) {
   return {
     KILOCLAW_INSTANCE: {
       idFromName: (id: string) => id,
@@ -29,7 +29,7 @@ function envWithDOError(error: Error) {
           }
         ),
     },
-    KILOCLAW_AE: { writeDataPoint: vi.fn() },
+    KILOCLAW_AE: { writeDataPoint },
     KV_CLAW_CACHE: {
       get: vi.fn().mockResolvedValue(null),
       put: vi.fn().mockResolvedValue(undefined),
@@ -145,6 +145,40 @@ describe('sanitizeError: Instance-not-* status correction', () => {
     expect(resp.status).toBe(500);
     const body = await jsonBody(resp);
     expect(body.error).toBe('status failed');
+  });
+
+  it('logs the full provision error object while returning a sanitized response', async () => {
+    const err = new Error('Fly API allocateIP failed (500): <!DOCTYPE html><html>upstream</html>');
+    const writeDataPoint = vi.fn();
+    const env = envWithDOError(err, writeDataPoint);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const resp = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(500);
+    const body = await jsonBody(resp);
+    expect(body.error).toBe('provision failed');
+    expect(consoleSpy).toHaveBeenCalledWith('[platform] provision failed:', err);
+    const provisioningFailureCall = writeDataPoint.mock.calls.find(call =>
+      JSON.stringify(call[0]).includes('instance.provisioning_failed')
+    );
+    expect(provisioningFailureCall).toBeDefined();
+    expect(provisioningFailureCall?.[0]).toMatchObject({
+      indexes: ['instance.provisioning_failed'],
+    });
+    const serializedDataPoint = JSON.stringify(provisioningFailureCall?.[0]);
+    expect(serializedDataPoint).toContain('fly_api_allocateIP_500');
+    expect(serializedDataPoint).toContain('provision failed');
+    expect(serializedDataPoint).not.toContain('<!DOCTYPE html>');
+    expect(serializedDataPoint).not.toContain('upstream</html>');
   });
 });
 

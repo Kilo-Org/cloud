@@ -6,6 +6,7 @@ import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types
 import { kilologHash } from '@/lib/ai-gateway/kilologHash';
 import { createHash } from 'crypto';
 import { redisSet } from '@/lib/redis';
+import { requestLogRedisKey } from '@/lib/redis-keys';
 
 const users = [
   '992891e9fe987b8960a05ed0bc9cc456979d1d71410d467f212e6233dbc0a523', // christiaan
@@ -73,7 +74,7 @@ export async function handleRequestLogging(params: {
       try {
         const serialized = JSON.stringify(request.body);
         const hash = createHash('sha256').update(serialized).digest('hex');
-        await redisSet(`ai-gateway.request-log:${hash}`, serialized, 604800);
+        await redisSet(requestLogRedisKey(hash), serialized, 604800);
         logExceptInTest('[handleRequestLogging] request hash: ' + hash);
       } catch {
         //ignore

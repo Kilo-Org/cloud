@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, History } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,8 +41,26 @@ function localDateInputToEndOfDayIso(date: string): string {
   return new Date(year, month - 1, day, 23, 59, 59, 0).toISOString();
 }
 
+function formatJsonSummary(value: Record<string, unknown> | null | undefined): string {
+  if (!value) return '—';
+  return JSON.stringify(value, null, 2);
+}
+
 function getAccessBadgeClass(hasAccess: boolean) {
   return hasAccess ? 'bg-green-900/20 text-green-400' : 'bg-red-900/20 text-red-400';
+}
+
+function isTransferredHistoricalSubscription(subscription: {
+  transferred_to_subscription_id: string | null;
+}) {
+  return Boolean(subscription.transferred_to_subscription_id);
+}
+
+function isInactiveSubscription(subscription: {
+  status: string;
+  transferred_to_subscription_id: string | null;
+}) {
+  return subscription.status === 'canceled' || isTransferredHistoricalSubscription(subscription);
 }
 
 function getSubscriptionStatusBadgeClass(status: string) {
@@ -84,11 +102,21 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
   // Hide inactive toggle
   const [hideInactive, setHideInactive] = useState(true);
 
+  // Change log dialog
+  const [changeLogSubscriptionId, setChangeLogSubscriptionId] = useState<string | null>(null);
+
   const { data, isLoading, error } = useQuery(
     trpc.admin.users.getKiloClawState.queryOptions({ userId })
   );
 
   const trialSubscription = data?.subscriptions?.find(s => s.id === trialSubscriptionId);
+  const changeLogSubscription = data?.subscriptions?.find(s => s.id === changeLogSubscriptionId);
+  const changeLogsQuery = useQuery(
+    trpc.admin.users.getKiloClawSubscriptionChangeLogs.queryOptions(
+      { userId, subscriptionId: changeLogSubscriptionId ?? '', limit: 50 },
+      { enabled: Boolean(changeLogSubscriptionId) }
+    )
+  );
 
   useEffect(() => {
     if (!trialDialogOpen) return;
@@ -170,6 +198,14 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
     setCancelDialogOpen(true);
   };
 
+  const openChangeLogDialog = (subscriptionId: string) => {
+    setChangeLogSubscriptionId(subscriptionId);
+  };
+
+  const closeChangeLogDialog = () => {
+    setChangeLogSubscriptionId(null);
+  };
+
   if (isLoading) {
     return (
       <Card className="lg:col-span-4">
@@ -198,7 +234,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
 
   const subscriptions = data?.subscriptions ?? [];
   const visibleSubscriptions = hideInactive
-    ? subscriptions.filter(s => s.status !== 'canceled')
+    ? subscriptions.filter(s => !isInactiveSubscription(s))
     : subscriptions;
   const hiddenCount = subscriptions.length - visibleSubscriptions.length;
 
@@ -228,6 +264,23 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {data?.needsSupportReview && (
+            <div className="rounded-lg border border-yellow-500/40 bg-yellow-950/20 p-4">
+              <h4 className="text-sm font-medium text-yellow-300">
+                Billing state needs support review
+              </h4>
+              <p className="mt-1 text-sm text-yellow-100/80">
+                Current personal subscription rows could not be resolved automatically. Inspect the
+                rows below before making changes.
+              </p>
+              {data.billingStateError ? (
+                <p className="text-muted-foreground mt-2 break-words font-mono text-xs">
+                  {data.billingStateError}
+                </p>
+              ) : null}
+            </div>
+          )}
+
           {/* Access & earlybird summary */}
           <div className="flex items-center gap-4">
             <div>
@@ -258,7 +311,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
           </div>
 
           {/* Hide inactive toggle */}
-          {subscriptions.some(s => s.status === 'canceled') && (
+          {subscriptions.some(isInactiveSubscription) && (
             <div className="flex items-center gap-2">
               <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <input
@@ -288,16 +341,21 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
           ) : (
             <div className="space-y-4">
               {visibleSubscriptions.map(sub => {
-                const isEffective = sub.id === data?.effectiveSubscriptionId;
-                const canEditTrialEnd = sub.status === 'trialing' || sub.status === 'canceled';
+                const isTransferred = isTransferredHistoricalSubscription(sub);
+                const isEffective = !isTransferred && sub.id === data?.effectiveSubscriptionId;
+                const canEditTrialEnd =
+                  !isTransferred && (sub.status === 'trialing' || sub.status === 'canceled');
                 const isTrialReset = sub.status === 'canceled';
                 const canCancel =
+                  !isTransferred &&
                   (sub.status === 'active' || sub.status === 'past_due') &&
                   sub.plan !== 'trial' &&
                   !sub.cancel_at_period_end;
                 const canImmediateCancel =
-                  (sub.status === 'active' || sub.status === 'past_due') && sub.plan !== 'trial';
-                const canCancelTrial = sub.status === 'trialing';
+                  !isTransferred &&
+                  (sub.status === 'active' || sub.status === 'past_due') &&
+                  sub.plan !== 'trial';
+                const canCancelTrial = !isTransferred && sub.status === 'trialing';
 
                 return (
                   <div
@@ -314,6 +372,11 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                         {isEffective && (
                           <Badge variant="outline" className="text-xs">
                             effective
+                          </Badge>
+                        )}
+                        {isTransferred && (
+                          <Badge variant="outline" className="text-muted-foreground text-xs">
+                            historical / ignored
                           </Badge>
                         )}
                         {sub.cancel_at_period_end && (
@@ -336,6 +399,14 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                             </Link>
                           </Button>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openChangeLogDialog(sub.id)}
+                        >
+                          <History className="mr-1 h-3 w-3" />
+                          Change Log
+                        </Button>
                         {canEditTrialEnd && (
                           <Button
                             variant="outline"
@@ -543,6 +614,77 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                   : cancelMode === 'immediate'
                     ? 'Cancel Immediately'
                     : 'Cancel at Period End'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(changeLogSubscriptionId)}
+        onOpenChange={open => !open && closeChangeLogDialog()}
+      >
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>KiloClaw Subscription Change Log</DialogTitle>
+            <DialogDescription>
+              Latest 50 change log entries for subscription{' '}
+              <span className="font-mono">
+                {changeLogSubscription?.id ?? changeLogSubscriptionId}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-auto py-2">
+            {changeLogsQuery.isLoading ? (
+              <p className="text-muted-foreground text-sm">Loading change log...</p>
+            ) : changeLogsQuery.error ? (
+              <p className="text-sm text-red-400">Failed to load change log</p>
+            ) : !changeLogsQuery.data || changeLogsQuery.data.changeLogs.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                No change log entries for this subscription.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {changeLogsQuery.data.changeLogs.map(changeLog => (
+                  <div key={changeLog.id} className="rounded-md border bg-muted/20 p-3">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {changeLog.action}
+                      </Badge>
+                      <span className="text-muted-foreground text-xs">
+                        {formatDate(changeLog.created_at)}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        {changeLog.actor_type}:{' '}
+                        <span className="font-mono">{changeLog.actor_id}</span>
+                      </span>
+                      {changeLog.reason ? (
+                        <span className="text-muted-foreground text-xs">
+                          reason: <span className="font-mono">{changeLog.reason}</span>
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="grid gap-2 text-xs md:grid-cols-2">
+                      <details className="rounded border bg-background/60 p-2">
+                        <summary className="cursor-pointer font-medium">Before</summary>
+                        <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-muted-foreground">
+                          {formatJsonSummary(changeLog.before_state)}
+                        </pre>
+                      </details>
+                      <details className="rounded border bg-background/60 p-2">
+                        <summary className="cursor-pointer font-medium">After</summary>
+                        <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-muted-foreground">
+                          {formatJsonSummary(changeLog.after_state)}
+                        </pre>
+                      </details>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeChangeLogDialog}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

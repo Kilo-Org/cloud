@@ -264,6 +264,23 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {data?.needsSupportReview && (
+            <div className="rounded-lg border border-yellow-500/40 bg-yellow-950/20 p-4">
+              <h4 className="text-sm font-medium text-yellow-300">
+                Billing state needs support review
+              </h4>
+              <p className="mt-1 text-sm text-yellow-100/80">
+                Current personal subscription rows could not be resolved automatically. Inspect the
+                rows below before making changes.
+              </p>
+              {data.billingStateError ? (
+                <p className="text-muted-foreground mt-2 break-words font-mono text-xs">
+                  {data.billingStateError}
+                </p>
+              ) : null}
+            </div>
+          )}
+
           {/* Access & earlybird summary */}
           <div className="flex items-center gap-4">
             <div>

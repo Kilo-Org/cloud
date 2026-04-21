@@ -119,12 +119,27 @@ function assertKiloClawSubscriptionIsMutable(
   }
 }
 
-async function lockMutableKiloClawSubscription(params: {
+type KiloClawCancelReconciliationStatus =
+  | 'updated'
+  | 'already_desired'
+  | 'local_row_changed_after_stripe';
+
+type KiloClawCancelAuditMetadata = {
+  subscriptionId: string;
+  mode: 'period_end' | 'immediate';
+  previousStatus: string;
+  stripeMutationAttempted: boolean;
+  stripeSubscriptionId: string | null;
+  scheduleReleased: boolean;
+  scheduleIdToRelease: string | null;
+  reconciliationStatus: KiloClawCancelReconciliationStatus;
+  localStateAtReconcile?: Partial<KiloClawSubscription> | null;
+};
+
+async function findKiloClawSubscriptionForUpdate(params: {
   tx: DrizzleTransaction;
   userId: string;
   subscriptionId: string;
-  notFoundCode: 'BAD_REQUEST' | 'NOT_FOUND';
-  notFoundMessage: string;
 }) {
   const [subscription] = await params.tx
     .select()
@@ -138,6 +153,18 @@ async function lockMutableKiloClawSubscription(params: {
     .for('update')
     .limit(1);
 
+  return subscription ?? null;
+}
+
+async function lockKiloClawSubscription(params: {
+  tx: DrizzleTransaction;
+  userId: string;
+  subscriptionId: string;
+  notFoundCode: 'BAD_REQUEST' | 'NOT_FOUND';
+  notFoundMessage: string;
+}) {
+  const subscription = await findKiloClawSubscriptionForUpdate(params);
+
   if (!subscription) {
     throw new TRPCError({
       code: params.notFoundCode,
@@ -145,9 +172,49 @@ async function lockMutableKiloClawSubscription(params: {
     });
   }
 
-  assertKiloClawSubscriptionIsMutable(subscription);
-
   return subscription;
+}
+
+async function lockMutableKiloClawSubscription(
+  params: Parameters<typeof lockKiloClawSubscription>[0]
+) {
+  const subscription = await lockKiloClawSubscription(params);
+  assertKiloClawSubscriptionIsMutable(subscription);
+  return subscription;
+}
+
+function localKiloClawSubscriptionStateForAudit(subscription: KiloClawSubscription | null) {
+  if (!subscription) return null;
+  return {
+    id: subscription.id,
+    status: subscription.status,
+    plan: subscription.plan,
+    cancel_at_period_end: subscription.cancel_at_period_end,
+    transferred_to_subscription_id: subscription.transferred_to_subscription_id,
+    stripe_subscription_id: subscription.stripe_subscription_id,
+    stripe_schedule_id: subscription.stripe_schedule_id,
+    scheduled_plan: subscription.scheduled_plan,
+    scheduled_by: subscription.scheduled_by,
+    current_period_end: subscription.current_period_end,
+    credit_renewal_at: subscription.credit_renewal_at,
+    trial_ends_at: subscription.trial_ends_at,
+  };
+}
+
+function isKiloClawCancelDesiredState(params: {
+  subscription: KiloClawSubscription;
+  mode: 'period_end' | 'immediate';
+}) {
+  if (params.mode === 'period_end') {
+    return (
+      params.subscription.cancel_at_period_end &&
+      !params.subscription.stripe_schedule_id &&
+      !params.subscription.scheduled_plan &&
+      !params.subscription.scheduled_by
+    );
+  }
+
+  return params.subscription.status === 'canceled';
 }
 
 function parseJsonSafe(text: string): unknown {
@@ -998,72 +1065,144 @@ export const adminRouter = createTRPCRouter({
           }
         }
 
+        const stripeMutationAttempted = Boolean(subscription.stripe_subscription_id);
         const now = new Date().toISOString();
-        const [updatedSubscription] = await db
-          .update(kiloclaw_subscriptions)
-          .set(
-            input.mode === 'period_end'
-              ? {
-                  cancel_at_period_end: true,
-                  stripe_schedule_id: null,
-                  scheduled_plan: null,
-                  scheduled_by: null,
-                }
-              : {
-                  status: 'canceled',
-                  cancel_at_period_end: false,
-                  pending_conversion: false,
-                  stripe_schedule_id: null,
-                  scheduled_plan: null,
-                  scheduled_by: null,
-                  current_period_end: now,
-                  credit_renewal_at: now,
-                  ...(subscription.status === 'trialing' ? { trial_ends_at: now } : {}),
-                }
-          )
-          .where(
-            and(
-              eq(kiloclaw_subscriptions.id, subscription.id),
-              isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
-            )
-          )
-          .returning();
-
-        if (!updatedSubscription) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message:
-              input.mode === 'period_end'
-                ? 'Failed to update KiloClaw subscription'
-                : 'Failed to cancel KiloClaw subscription',
+        const reconciliationResult = await db.transaction(async tx => {
+          const localSubscription = await findKiloClawSubscriptionForUpdate({
+            tx,
+            userId: input.userId,
+            subscriptionId: input.subscriptionId,
           });
-        }
-
-        await insertKiloClawSubscriptionChangeLog(db, {
-          subscriptionId: subscription.id,
-          actor: adminSubscriptionActor(ctx.user),
-          action: 'canceled',
-          reason:
-            input.mode === 'period_end' ? 'admin_cancel_at_period_end' : 'admin_cancel_immediate',
-          before: subscription,
-          after: updatedSubscription,
-        });
-
-        await createKiloClawAdminAuditLog({
-          action: 'kiloclaw.subscription.admin_cancel',
-          actor_id: ctx.user.id,
-          actor_email: ctx.user.google_user_email,
-          actor_name: ctx.user.google_user_name,
-          target_user_id: input.userId,
-          message: `Admin ${input.mode === 'immediate' ? 'immediately canceled' : 'set cancel-at-period-end on'} KiloClaw subscription ${subscription.id} (status was ${previousStatus}, stripe_sub=${subscription.stripe_subscription_id ?? 'none'})`,
-          metadata: {
+          const localStateAtReconcile = localKiloClawSubscriptionStateForAudit(localSubscription);
+          const baseMetadata = {
             subscriptionId: subscription.id,
             mode: input.mode,
             previousStatus,
+            stripeMutationAttempted,
             stripeSubscriptionId: subscription.stripe_subscription_id,
             scheduleReleased,
-          },
+            scheduleIdToRelease,
+            localStateAtReconcile,
+          } satisfies Omit<KiloClawCancelAuditMetadata, 'reconciliationStatus'>;
+
+          if (!localSubscription || localSubscription.transferred_to_subscription_id) {
+            const metadata = {
+              ...baseMetadata,
+              reconciliationStatus: 'local_row_changed_after_stripe',
+            } satisfies KiloClawCancelAuditMetadata;
+            await createKiloClawAdminAuditLog({
+              action: 'kiloclaw.subscription.admin_cancel',
+              actor_id: ctx.user.id,
+              actor_email: ctx.user.google_user_email,
+              actor_name: ctx.user.google_user_name,
+              target_user_id: input.userId,
+              message: `Stripe cancel succeeded for KiloClaw subscription ${subscription.id}, but local row changed before reconciliation`,
+              metadata,
+              tx,
+            });
+            return { status: 'local_row_changed_after_stripe' as const };
+          }
+
+          if (isKiloClawCancelDesiredState({ subscription: localSubscription, mode: input.mode })) {
+            const metadata = {
+              ...baseMetadata,
+              reconciliationStatus: 'already_desired',
+            } satisfies KiloClawCancelAuditMetadata;
+            await createKiloClawAdminAuditLog({
+              action: 'kiloclaw.subscription.admin_cancel',
+              actor_id: ctx.user.id,
+              actor_email: ctx.user.google_user_email,
+              actor_name: ctx.user.google_user_name,
+              target_user_id: input.userId,
+              message: `Admin cancel reconciliation found KiloClaw subscription ${subscription.id} already in desired state`,
+              metadata,
+              tx,
+            });
+            return { status: 'already_desired' as const };
+          }
+
+          const [updatedSubscription] = await tx
+            .update(kiloclaw_subscriptions)
+            .set(
+              input.mode === 'period_end'
+                ? {
+                    cancel_at_period_end: true,
+                    stripe_schedule_id: null,
+                    scheduled_plan: null,
+                    scheduled_by: null,
+                  }
+                : {
+                    status: 'canceled',
+                    cancel_at_period_end: false,
+                    pending_conversion: false,
+                    stripe_schedule_id: null,
+                    scheduled_plan: null,
+                    scheduled_by: null,
+                    current_period_end: now,
+                    credit_renewal_at: now,
+                    ...(localSubscription.status === 'trialing' ? { trial_ends_at: now } : {}),
+                  }
+            )
+            .where(
+              and(
+                eq(kiloclaw_subscriptions.id, localSubscription.id),
+                isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+              )
+            )
+            .returning();
+
+          if (!updatedSubscription) {
+            const metadata = {
+              ...baseMetadata,
+              reconciliationStatus: 'local_row_changed_after_stripe',
+            } satisfies KiloClawCancelAuditMetadata;
+            await createKiloClawAdminAuditLog({
+              action: 'kiloclaw.subscription.admin_cancel',
+              actor_id: ctx.user.id,
+              actor_email: ctx.user.google_user_email,
+              actor_name: ctx.user.google_user_name,
+              target_user_id: input.userId,
+              message: `Stripe cancel succeeded for KiloClaw subscription ${subscription.id}, but local update failed during reconciliation`,
+              metadata,
+              tx,
+            });
+            return { status: 'local_row_changed_after_stripe' as const };
+          }
+
+          await insertKiloClawSubscriptionChangeLog(tx, {
+            subscriptionId: subscription.id,
+            actor: adminSubscriptionActor(ctx.user),
+            action: 'canceled',
+            reason:
+              input.mode === 'period_end' ? 'admin_cancel_at_period_end' : 'admin_cancel_immediate',
+            before: localSubscription,
+            after: updatedSubscription,
+          });
+
+          const metadata = {
+            ...baseMetadata,
+            reconciliationStatus: 'updated',
+          } satisfies KiloClawCancelAuditMetadata;
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.subscription.admin_cancel',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `Admin ${input.mode === 'immediate' ? 'immediately canceled' : 'set cancel-at-period-end on'} KiloClaw subscription ${subscription.id} (status was ${previousStatus}, stripe_sub=${subscription.stripe_subscription_id ?? 'none'})`,
+            metadata,
+            tx,
+          });
+          return { status: 'updated' as const };
         });
+
+        if (reconciliationResult.status === 'local_row_changed_after_stripe') {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message:
+              'Stripe cancellation was applied, but the local KiloClaw subscription changed before reconciliation. Review the admin audit log and current subscription row before retrying.',
+          });
+        }
 
         return successResult();
       }),

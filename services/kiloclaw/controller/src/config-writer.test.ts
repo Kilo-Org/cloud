@@ -804,11 +804,34 @@ describe('generateBaseConfig', () => {
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
     expect(config.channels['kilo-chat'].enabled).toBe(true);
-    // reactionLevel provides the non-`enabled` key required by OpenClaw's
+    // _configured provides the non-`enabled` key required by OpenClaw's
     // hasMeaningfulChannelConfig gate (see comment in config-writer.ts).
-    expect(config.channels['kilo-chat'].reactionLevel).toBe('minimal');
+    expect(config.channels['kilo-chat']._configured).toBe(true);
+    expect(config.channels['kilo-chat']).not.toHaveProperty('reactionLevel');
     expect(config.plugins.load.paths).toContain('/usr/local/lib/node_modules/@kiloclaw/kilo-chat');
     expect(config.plugins.entries['kilo-chat'].enabled).toBe(true);
+  });
+
+  // ─── Session ─────────────────────────────────────────────────────────────
+
+  it('defaults session.dmScope to per-channel-peer', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.session.dmScope).toBe('per-channel-peer');
+  });
+
+  it('preserves existing session.dmScope', () => {
+    const existing = JSON.stringify({
+      gateway: { port: 3001, mode: 'local' },
+      agents: { defaults: { model: { primary: 'kilocode/anthropic/claude-opus-4.6' } } },
+      session: { dmScope: 'per-peer' },
+      plugins: { entries: { telegram: { enabled: false }, discord: { enabled: false } } },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.session.dmScope).toBe('per-peer');
   });
 
   it('does not duplicate the plugin path on repeated generateBaseConfig calls', () => {

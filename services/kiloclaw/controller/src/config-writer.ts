@@ -462,14 +462,20 @@ export function generateBaseConfig(
     config.plugins.entries[scEntry].enabled = true;
   }
 
+  // Session — default DM scope to per-channel-peer so each channel+peer
+  // combination gets its own session. OpenClaw's onboard sets this for new
+  // instances, but legacy instances may not have it.
+  config.session = config.session ?? {};
+  config.session.dmScope = config.session.dmScope ?? 'per-channel-peer';
+
   // Kilo Chat — always enabled. The plugin's outbound path reaches
   // kilo-chat via controller proxy → kilo-chat Worker directly.
   config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
   config.channels['kilo-chat'].enabled = true;
-  // Load-bearing: reactionLevel is the marker key for OpenClaw's
+  // Load-bearing: _configured is the marker key for OpenClaw's
   // hasMeaningfulChannelConfig gate — without a non-`enabled` key the
   // plugin loads in setup-runtime mode instead of full.
-  config.channels['kilo-chat'].reactionLevel = 'minimal';
+  config.channels['kilo-chat']._configured = true;
 
   config.plugins = config.plugins ?? {};
   config.plugins.load = config.plugins.load ?? {};

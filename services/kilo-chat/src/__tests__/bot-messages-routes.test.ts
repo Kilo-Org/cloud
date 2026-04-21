@@ -795,3 +795,135 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
     expect(res.status).toBe(400);
   });
 });
+
+// ─── PATCH /bot/v1/sandboxes/:sandboxId/conversations/:conversationId ────────
+
+describe('PATCH /bot/v1/sandboxes/:sandboxId/conversations/:conversationId', () => {
+  it('renames a conversation as a member bot (200)', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-rename-ok');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: 'New Title From Bot' }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{ ok: boolean }>();
+    expect(body.ok).toBe(true);
+  });
+
+  it('returns 400 for invalid conversation ID', async () => {
+    const { sandboxId, testEnv } = await setupData('bot-rename-badid');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/not-a-ulid`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: 'Title' }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for missing title', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-rename-notitle');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for empty title', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-rename-empty');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: '' }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 403 for non-member bot', async () => {
+    const { conversationId, testEnv } = await setupData('bot-rename-forbidden');
+    const otherSandboxId = 'other-sandbox-rename';
+    const app = makeBotApp();
+    const token = await tokenFor(otherSandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${otherSandboxId}/conversations/${conversationId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: 'Hijack Title' }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 for invalid JSON', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-rename-badjson');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: 'not-json',
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 401 without auth token', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-rename-noauth');
+    const app = makeBotApp();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'No Auth' }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(401);
+  });
+});

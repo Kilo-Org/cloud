@@ -7,15 +7,11 @@ import {
   leaveConversationFor,
   markReadFor,
 } from '../services/conversations';
-import { ulidSchema, sandboxIdSchema } from './schemas';
+import { ulidSchema, sandboxIdSchema, renameConversationSchema } from './schemas';
 
 const createConversationSchema = z.object({
   sandboxId: sandboxIdSchema,
   title: z.string().max(200).optional(),
-});
-
-const renameConversationSchema = z.object({
-  title: z.string().min(1).max(200),
 });
 
 export function registerConversationRoutes(
@@ -85,11 +81,6 @@ export function registerConversationRoutes(
 
   // PATCH /v1/conversations/:id — rename
   app.patch('/v1/conversations/:id', async c => {
-    const callerKind = c.get('callerKind');
-    if (callerKind !== 'user') {
-      return c.json({ error: 'Only users can rename conversations' }, 403);
-    }
-
     const idParam = ulidSchema.safeParse(c.req.param('id'));
     if (!idParam.success) {
       return c.json({ error: 'Invalid conversation ID' }, 400);

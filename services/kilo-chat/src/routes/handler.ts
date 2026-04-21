@@ -10,10 +10,17 @@
 import type { Context } from 'hono';
 import type { ZodSchema } from 'zod';
 import type { AuthContext } from '../auth';
+import { renameConversationFor } from '../services/conversations';
 import { createMessageFor, deleteMessageFor, editMessageFor } from '../services/messages';
 import { addReactionFor, removeReactionFor } from '../services/reactions';
 import { setTypingFor, stopTypingFor } from '../services/typing';
-import { ulidSchema, createMessageSchema, editMessageSchema, reactionBodySchema } from './schemas';
+import {
+  ulidSchema,
+  createMessageSchema,
+  editMessageSchema,
+  reactionBodySchema,
+  renameConversationSchema,
+} from './schemas';
 
 type HonoCtx = Context<{ Bindings: Env; Variables: AuthContext }>;
 
@@ -243,4 +250,25 @@ export async function handleStopTyping(c: HonoCtx) {
     return c.json({ error: result.error }, 403);
   }
   return new Response(null, { status: 204 });
+}
+
+// ─── renameConversation ─────────────────────────────────────────────────────
+
+export async function handleRenameConversation(c: HonoCtx) {
+  const convId = parseConversationId(c);
+  if (!convId.ok) return convId.response;
+
+  const body = await parseBody(c, renameConversationSchema);
+  if (!body.ok) return body.response;
+
+  const callerId = c.get('callerId');
+  const result = await renameConversationFor(c.env, callerId, {
+    conversationId: convId.data,
+    title: body.data.title,
+  });
+  if (!result.ok) {
+    return c.json({ error: result.error }, 403);
+  }
+
+  return c.json({ ok: true });
 }

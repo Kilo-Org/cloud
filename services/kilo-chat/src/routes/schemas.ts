@@ -42,3 +42,7 @@ export const reactionBodySchema = z.object({
   conversationId: ulidSchema,
   emoji: emojiSchema,
 });
+
+export const renameConversationSchema = z.object({
+  title: z.string().min(1).max(200),
+});

@@ -10,6 +10,7 @@ import {
   handleStopTyping,
   handleListMessages,
   handleGetMembers,
+  handleRenameConversation,
 } from './handler';
 
 export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
@@ -28,4 +29,5 @@ export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthCont
     handleListMessages
   );
   app.get('/bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members', handleGetMembers);
+  app.patch('/bot/v1/sandboxes/:sandboxId/conversations/:conversationId', handleRenameConversation);
 }

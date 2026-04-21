@@ -92,7 +92,7 @@ export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
 
 export const BALANCED_CLAW_MODEL: ResolvedAutoModel = {
   model: qwen36_plus_model.public_id,
-  reasoning: { enabled: true, effort: 'medium' },
+  reasoning: { enabled: true },
 };
 
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {

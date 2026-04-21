@@ -10,13 +10,19 @@ class MockWebSocket {
   readyState = 1; // OPEN
   sent: string[] = [];
 
-  onopen: ((event: Event) => void) | null = null;
-  onmessage: ((event: MessageEvent) => void) | null = null;
-  onclose: ((event: CloseEvent) => void) | null = null;
-  onerror: ((event: Event) => void) | null = null;
+  private listeners = new Map<string, Set<(...args: unknown[]) => void>>();
 
   constructor(url: string) {
     this.url = url;
+  }
+
+  addEventListener(type: string, listener: (...args: unknown[]) => void): void {
+    let set = this.listeners.get(type);
+    if (!set) {
+      set = new Set();
+      this.listeners.set(type, set);
+    }
+    set.add(listener);
   }
 
   send(data: string): void {
@@ -28,17 +34,17 @@ class MockWebSocket {
   }
 
   triggerOpen(): void {
-    this.onopen?.(new Event('open'));
+    for (const fn of this.listeners.get('open') ?? []) fn(new Event('open'));
   }
 
   triggerMessage(data: unknown): void {
     const event = { data: JSON.stringify(data) } as MessageEvent;
-    this.onmessage?.(event);
+    for (const fn of this.listeners.get('message') ?? []) fn(event);
   }
 
   triggerClose(): void {
     this.readyState = 3;
-    this.onclose?.(new CloseEvent('close'));
+    for (const fn of this.listeners.get('close') ?? []) fn(new CloseEvent('close'));
   }
 }
 

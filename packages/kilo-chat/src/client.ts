@@ -30,7 +30,7 @@ import type {
 } from './types';
 
 function parseMessageRow(row: MessageRow): Message {
-  return { ...row, content: row.content as unknown as ContentBlock[] };
+  return { ...row, content: JSON.parse(row.content) as ContentBlock[] };
 }
 
 export class KiloChatClient {

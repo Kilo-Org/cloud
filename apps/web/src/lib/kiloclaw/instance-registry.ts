@@ -1,6 +1,10 @@
 import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
+import {
+  markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  type KiloClawSubscriptionChangeActor,
+} from '@kilocode/db';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
@@ -19,6 +23,11 @@ export type EnsureActiveInstanceResult = {
 };
 
 type InstanceRegistryExecutor = typeof db | DrizzleTransaction;
+
+const INSTANCE_REGISTRY_DESTROY_ACTOR = {
+  actorType: 'system',
+  actorId: 'web-instance-registry',
+} satisfies KiloClawSubscriptionChangeActor;
 
 /**
  * Returns true if this instance row uses the instance-keyed identity scheme
@@ -109,30 +118,40 @@ export async function markActiveInstanceDestroyed(
   userId: string,
   instanceId?: string
 ): Promise<ActiveKiloClawInstance | null> {
-  const destroyedAt = new Date().toISOString();
+  return await db.transaction(async tx => {
+    const [target] = await tx
+      .select({
+        id: kiloclaw_instances.id,
+      })
+      .from(kiloclaw_instances)
+      .where(
+        instanceId
+          ? and(
+              eq(kiloclaw_instances.id, instanceId),
+              eq(kiloclaw_instances.user_id, userId),
+              isNull(kiloclaw_instances.destroyed_at)
+            )
+          : and(
+              eq(kiloclaw_instances.user_id, userId),
+              isNull(kiloclaw_instances.organization_id),
+              isNull(kiloclaw_instances.destroyed_at)
+            )
+      )
+      .orderBy(kiloclaw_instances.created_at)
+      .limit(1);
 
-  const condition = instanceId
-    ? and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at))
-    : and(
-        eq(kiloclaw_instances.user_id, userId),
-        isNull(kiloclaw_instances.organization_id),
-        isNull(kiloclaw_instances.destroyed_at)
-      );
+    if (!target) {
+      return null;
+    }
 
-  const [row] = await db
-    .update(kiloclaw_instances)
-    .set({ destroyed_at: destroyedAt })
-    .where(condition)
-    .returning({
-      id: kiloclaw_instances.id,
-      userId: kiloclaw_instances.user_id,
-      sandboxId: kiloclaw_instances.sandbox_id,
-      organizationId: kiloclaw_instances.organization_id,
-      name: kiloclaw_instances.name,
-      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
+    return await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+      actor: INSTANCE_REGISTRY_DESTROY_ACTOR,
+      executor: tx,
+      instanceId: target.id,
+      reason: 'destroy_path_inline_collapse',
+      userId,
     });
-
-  return row ?? null;
+  });
 }
 
 /**
@@ -142,10 +161,28 @@ export async function markActiveInstanceDestroyed(
  * for rollback when the caller knows which row it created.
  */
 export async function markInstanceDestroyedById(instanceId: string): Promise<void> {
-  await db
-    .update(kiloclaw_instances)
-    .set({ destroyed_at: new Date().toISOString() })
-    .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)));
+  await db.transaction(async tx => {
+    const [instance] = await tx
+      .select({
+        id: kiloclaw_instances.id,
+        userId: kiloclaw_instances.user_id,
+      })
+      .from(kiloclaw_instances)
+      .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
+      .limit(1);
+
+    if (!instance) {
+      return;
+    }
+
+    await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+      actor: INSTANCE_REGISTRY_DESTROY_ACTOR,
+      executor: tx,
+      instanceId: instance.id,
+      reason: 'destroy_path_inline_collapse',
+      userId: instance.userId,
+    });
+  });
 }
 
 /**

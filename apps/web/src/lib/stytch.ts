@@ -3,8 +3,8 @@ import type { FraudFingerprintLookupResponse } from 'stytch';
 import { Client, envs } from 'stytch';
 import { db } from '@/lib/drizzle';
 import type { User } from '@kilocode/db/schema';
-import { stytch_fingerprints } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { kilocode_users, stytch_fingerprints } from '@kilocode/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
 import { getFraudDetectionHeaders } from './utils';
 import { captureException } from '@sentry/nextjs';
 import { updateStytchValidation } from './customerInfo';
@@ -147,6 +147,19 @@ export async function saveFingerprints(
     has_validation_stytch: kilo_free_tier_allowed,
   });
 
+  // Autoban users blocked by Stytch for smart rate limit abuse
+  if (verdict.action === 'BLOCK' && verdict.reasons.includes('SMART_RATE_LIMIT_BANNED')) {
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: 'autoban: stytch SMART_RATE_LIMIT_BANNED' })
+      .where(and(eq(kilocode_users.id, user.id), isNull(kilocode_users.blocked_reason)));
+    if (process.env.NODE_ENV !== 'test')
+      console.log('SECURITY: autobanned user for SMART_RATE_LIMIT_BANNED:', {
+        userId: user.id,
+        email: user.google_user_email,
+      });
+  }
+
   // User created event in PostHog
   try {
     const posthogClient = PostHogClient();
@@ -180,23 +193,50 @@ export async function saveFingerprints(
   return { kilo_free_tier_allowed };
 }
 
+export type SignupSource = 'openclaw-security-advisor' | null;
+
 /**
  * Handles signup promotion logic: grants credits for users who pass
- * both Turnstile and Stytch validation
+ * both Turnstile and Stytch validation. When signupSource is set, layers
+ * an additional product-specific bonus on top of the base welcome credit.
  */
-export async function handleSignupPromotion(user: User, passedValidations: boolean): Promise<void> {
-  if (passedValidations) {
-    try {
-      // Grant automatic-welcome-credits for passing both Turnstile and Stytch validation
-      await grantCreditForCategory(user, {
+export async function handleSignupPromotion(
+  user: User,
+  passedValidations: boolean,
+  signupSource: SignupSource = null
+): Promise<void> {
+  if (!passedValidations) return;
+
+  try {
+    // Grant automatic-welcome-credits for passing both Turnstile and Stytch validation
+    await grantCreditForCategory(user, {
+      credit_category: 'automatic-welcome-credits',
+      counts_as_selfservice: false,
+    });
+  } catch (error) {
+    // Don't fail the entire process if credit granting fails
+    captureException(error, {
+      tags: {
+        source: 'signup_promotion_credit_grant',
         credit_category: 'automatic-welcome-credits',
+      },
+      extra: { userId: user.id, email: user.google_user_email, signupSource },
+    });
+  }
+
+  if (signupSource === 'openclaw-security-advisor') {
+    try {
+      await grantCreditForCategory(user, {
+        credit_category: 'openclaw-security-advisor-signup-bonus',
         counts_as_selfservice: false,
       });
     } catch (error) {
-      // Don't fail the entire process if credit granting fails
       captureException(error, {
-        tags: { source: 'signup_promotion_credit_grant' },
-        extra: { userId: user.id, email: user.google_user_email },
+        tags: {
+          source: 'signup_promotion_credit_grant',
+          credit_category: 'openclaw-security-advisor-signup-bonus',
+        },
+        extra: { userId: user.id, email: user.google_user_email, signupSource },
       });
     }
   }

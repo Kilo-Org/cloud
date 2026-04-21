@@ -3,18 +3,12 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
 import { getEffectiveKiloClawSubscriptionForUser } from '@/lib/kiloclaw/access-state';
-import {
-  kilocode_users,
-  organization_memberships,
-  organizations,
-  kiloclaw_earlybird_purchases,
-} from '@kilocode/db/schema';
+import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 
 type UserLookupResponse = {
   users: {
@@ -104,13 +98,5 @@ async function checkHasKiloPass(userId: string): Promise<boolean> {
 async function checkHasKiloClaw(userId: string): Promise<boolean> {
   const now = new Date();
   const { accessReason } = await getEffectiveKiloClawSubscriptionForUser(userId, now);
-  if (accessReason) return true;
-
-  const [earlybird] = await db
-    .select({ id: kiloclaw_earlybird_purchases.id })
-    .from(kiloclaw_earlybird_purchases)
-    .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
-    .limit(1);
-
-  return !!earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > new Date();
+  return accessReason !== null;
 }

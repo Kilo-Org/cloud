@@ -1,5 +1,6 @@
 import { createClient } from 'redis';
 import { captureException } from '@sentry/nextjs';
+import type { RedisKey } from '@/lib/redis-keys';
 
 type RedisClient = ReturnType<typeof createClient>;
 
@@ -53,7 +54,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
-export async function redisGet(key: string): Promise<string | null> {
+export async function redisGet(key: RedisKey): Promise<string | null> {
   const c = getOrCreateClient();
   if (!c) return null;
   try {
@@ -66,7 +67,11 @@ export async function redisGet(key: string): Promise<string | null> {
 }
 
 /** Returns false if Redis is not configured (REDIS_URL unset). */
-export async function redisSet(key: string, value: string, ttlSeconds?: number): Promise<boolean> {
+export async function redisSet(
+  key: RedisKey,
+  value: string,
+  ttlSeconds?: number
+): Promise<boolean> {
   const c = getOrCreateClient();
   if (!c) return false;
   try {

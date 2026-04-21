@@ -28,14 +28,15 @@ vi.mock('cloudflare:workers', () => ({
 }));
 
 // -- Mock fly client --
-// Keep real isFlyNotFound, isFlyInsufficientResources + FlyApiError; mock all API functions.
+// Keep real error classifiers + FlyApiError; mock all API functions.
 vi.mock('../fly/client', async () => {
-  const { FlyApiError, isFlyNotFound, isFlyInsufficientResources } =
+  const { FlyApiError, isFlyNotFound, isFlyInsufficientResources, isFlyMissingVolume } =
     await vi.importActual('../fly/client');
   return {
     FlyApiError,
     isFlyNotFound,
     isFlyInsufficientResources,
+    isFlyMissingVolume,
     createMachine: vi.fn(),
     getMachine: vi.fn(),
     startMachine: vi.fn(),
@@ -1987,6 +1988,35 @@ describe('startExistingMachine: transient vs 404 errors', () => {
     expect(storage._store.get('flyMachineId')).toBe('machine-new');
   });
 
+  it('destroys stale machine and recreates it when updateMachine reports a missing volume', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped' });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockRejectedValue(
+      new FlyApiError(
+        'Fly API updateMachine failed (400): {"error":"invalid_argument: volume does not exist"}',
+        400,
+        '{"error":"invalid_argument: volume does not exist"}'
+      )
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'machine-new',
+      region: 'iad',
+    });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(flyClient.destroyMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1', true);
+    expect(flyClient.createMachine).toHaveBeenCalled();
+    expect(storage._store.get('flyMachineId')).toBe('machine-new');
+    expect(storage._store.get('flyVolumeId')).toBe('vol-1');
+    expect(storage._store.get('status')).toBe('running');
+  });
+
   it('clears the stale machine id before retrying replacement creation after a 404', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { status: 'stopped' });
@@ -3589,6 +3619,42 @@ describe('start: volume region validation', () => {
       expect.anything(),
       expect.anything(),
       expect.objectContaining({ region: 'cdg' })
+    );
+  });
+
+  it('keeps cached flyRegion when Fly omits the volume region', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyMachineId: null, flyRegion: 'sjc' });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'sjc' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(storage._store.get('flyRegion')).toBe('sjc');
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ region: 'sjc' })
+    );
+  });
+
+  it('does not fall back to env regions when a mounted volume has no known region', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyMachineId: null, flyRegion: null });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(storage._store.get('flyRegion')).toBeNull();
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ region: undefined })
     );
   });
 

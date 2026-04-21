@@ -4,7 +4,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
-import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
+import { requireKiloClawAccessAtInstance } from '@/lib/kiloclaw/access-gate';
 import {
   getActiveInstance,
   getActiveOrgInstance,
@@ -21,9 +21,17 @@ export async function GET() {
   // (validated by getUserFromAuth). Matches tRPC org router's
   // getStreamChatCredentials which uses organizationMemberProcedure (no billing gate).
   if (!organizationId) {
+    const instance = await getActiveInstance(user.id);
+    if (!instance) {
+      return NextResponse.json({ error: 'No active KiloClaw instance found' }, { status: 404 });
+    }
+
     try {
-      await requireKiloClawAccess(user.id);
+      await requireKiloClawAccessAtInstance(user.id, instance.id);
     } catch (err) {
+      if (err instanceof TRPCError && err.code === 'NOT_FOUND') {
+        return NextResponse.json({ error: err.message }, { status: 404 });
+      }
       if (err instanceof TRPCError && err.code === 'FORBIDDEN') {
         return NextResponse.json({ error: err.message }, { status: 403 });
       }

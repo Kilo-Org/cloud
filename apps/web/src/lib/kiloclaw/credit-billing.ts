@@ -397,7 +397,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   userId: string;
   metadataInstanceId?: string;
   stripeSubscriptionId: string;
-  chargeId: string;
+  stripePaymentId: string;
   plan: 'commit' | 'standard';
   amountMicrodollars: number;
   periodStart: string;
@@ -407,7 +407,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     userId,
     metadataInstanceId,
     stripeSubscriptionId,
-    chargeId,
+    stripePaymentId,
     plan,
     amountMicrodollars,
     periodStart,
@@ -427,7 +427,10 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     });
 
     if (!user) {
-      logWarning('User not found for credit settlement', { user_id: userId, chargeId });
+      logWarning('User not found for credit settlement', {
+        user_id: userId,
+        stripe_payment_id: stripePaymentId,
+      });
       return;
     }
 
@@ -514,7 +517,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     const deposited = await processTopUp(
       user,
       amountCents,
-      { type: 'stripe', stripe_payment_id: chargeId },
+      { type: 'stripe', stripe_payment_id: stripePaymentId },
       {
         skipPostTopUpFreeStuff: true,
         dbOrTx: tx,
@@ -523,7 +526,10 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     );
 
     if (!deposited) {
-      logInfo('Duplicate charge skipped', { user_id: userId, chargeId });
+      logInfo('Duplicate settlement credit skipped', {
+        user_id: userId,
+        stripe_payment_id: stripePaymentId,
+      });
       applied = true;
       return;
     }
@@ -623,7 +629,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     user_id: userId,
     plan,
     stripe_subscription_id: stripeSubscriptionId,
-    chargeId,
+    stripe_payment_id: stripePaymentId,
     amountMicrodollars,
   });
 

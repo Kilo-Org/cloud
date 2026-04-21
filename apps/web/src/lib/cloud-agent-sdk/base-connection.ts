@@ -1,3 +1,23 @@
+export type WebSocketHeaders = Record<string, string>;
+
+type WebSocketConstructorWithHeaders = {
+  new (
+    url: string | URL,
+    protocols?: string | string[],
+    options?: { headers?: WebSocketHeaders }
+  ): WebSocket;
+};
+
+export type ConnectionLifecycleHooks = {
+  /** Subscribe to visibility changes. `onResume` fires when the tab becomes
+   *  visible; `onHidden` fires when it becomes hidden. Returns a cleanup fn. */
+  onVisibilityChange?: (onResume: () => void, onHidden: () => void) => () => void;
+  /** Called when BFCache restore is detected (pageshow event with persisted=true) */
+  onPageshow?: (handler: (e: { persisted: boolean }) => void) => () => void;
+  /** Called when the browser comes back online */
+  onOnline?: (handler: () => void) => () => void;
+};
+
 export type BaseConnectionConfig<T = unknown> = {
   buildUrl: () => string;
   parseMessage: (
@@ -13,9 +33,15 @@ export type BaseConnectionConfig<T = unknown> = {
   refreshAuth?: () => Promise<void>;
   shouldRefreshAuthBeforeConnect?: () => boolean;
   onOpen?: (ws: WebSocket) => void;
+  websocketHeaders?: WebSocketHeaders;
   /** How long to wait for a server message (e.g. heartbeat) on tab resume before
    *  treating the connection as stale. Should exceed the server's heartbeat interval. */
   stalenessTimeoutMs?: number;
+  /** Optional lifecycle hooks for browser-specific reconnection behavior.
+   *  If not provided, no automatic reconnection on lifecycle events occurs.
+   *  For browser usage, use `createBrowserLifecycleHooks()`.
+   *  For CLI usage, omit this or provide custom hooks. */
+  lifecycleHooks?: ConnectionLifecycleHooks;
 };
 
 export type Connection = {
@@ -51,10 +77,9 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   let preconnectAuthRefreshAttempted = false;
   const stalenessTimeoutMs = config.stalenessTimeoutMs ?? DEFAULT_STALENESS_TIMEOUT_MS;
 
-  // Bound handler references for event listener cleanup
-  let boundVisibilityHandler: (() => void) | null = null;
-  let boundPageshowHandler: ((e: PageTransitionEvent) => void) | null = null;
-  let boundOnlineHandler: (() => void) | null = null;
+  // Cleanup functions returned by lifecycle hooks
+  const cleanupFns: Array<() => void> = [];
+  let lifecycleListenersRegistered = false;
 
   function clearReconnectTimer(): void {
     if (reconnectTimeoutId !== null) {
@@ -120,17 +145,11 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
 
     if (attempt >= MAX_RECONNECT_ATTEMPTS) {
-      console.log('[Connection] Max reconnection attempts exceeded');
       return;
     }
 
     const delay = calculateBackoffDelay(attempt);
     reconnectAttempt = attempt + 1;
-
-    console.log('[Connection] Scheduling reconnect', {
-      attempt: reconnectAttempt,
-      delayMs: delay,
-    });
 
     reconnectTimeoutId = setTimeout(() => {
       reconnectTimeoutId = null;
@@ -167,9 +186,11 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
     const url = config.buildUrl();
 
-    console.log('[Connection] Connecting', { attempt });
-
-    const newWs = new WebSocket(url);
+    const newWs = config.websocketHeaders
+      ? new (WebSocket as WebSocketConstructorWithHeaders)(url, undefined, {
+          headers: config.websocketHeaders,
+        })
+      : new WebSocket(url);
     ws = newWs;
 
     newWs.onopen = () => {
@@ -208,30 +229,14 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       config.onEvent(parsed.payload);
     };
 
-    newWs.onerror = (errorEvent: Event) => {
-      console.log('[Connection] WebSocket error', {
-        type: errorEvent.type,
-        authRefreshAttempted,
-        connected,
-      });
-    };
+    newWs.onerror = () => {};
 
     newWs.onclose = (event: CloseEvent) => {
       // Ignore close events from replaced sockets
       if (ws !== newWs) {
-        console.log('[Connection] Ignoring close from replaced socket');
         return;
       }
       ws = null;
-
-      console.log('[Connection] WebSocket closed', {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean,
-        intentionalDisconnect,
-        authRefreshAttempted,
-        connected,
-      });
 
       if (destroyed) return;
 
@@ -258,7 +263,6 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
       // Already tried refreshing auth and still failing - stop retrying
       if (isAuthFailure && authRefreshAttempted) {
-        console.log('[Connection] Auth failure after refresh - stopping retries');
         return;
       }
 
@@ -273,15 +277,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     };
   }
 
-  function handleVisibilityChange(): void {
+  function handleVisibilityResume(): void {
     if (destroyed || intentionalDisconnect) return;
-
-    if (typeof document === 'undefined') return;
-
-    if (document.visibilityState === 'hidden') {
-      clearStalenessTimeout();
-      return;
-    }
 
     // Tab became visible
     reconnectAttempt = 0;
@@ -303,7 +300,6 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     stalenessTimeoutId = setTimeout(() => {
       stalenessTimeoutId = null;
       if (destroyed || intentionalDisconnect || currentGeneration !== generation) return;
-      console.log('[Connection] Staleness timeout - no server message, reconnecting');
       const staleWs = ws;
       if (staleWs !== null) {
         ws = null;
@@ -317,13 +313,17 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }, stalenessTimeoutMs);
   }
 
-  function handlePageshow(event: PageTransitionEvent): void {
+  function handleVisibilityHidden(): void {
+    if (destroyed || intentionalDisconnect) return;
+    clearStalenessTimeout();
+  }
+
+  function handlePageshow(event: { persisted: boolean }): void {
     if (destroyed || intentionalDisconnect) return;
 
     if (!event.persisted) return;
 
     // BFCache restore - WebSocket is guaranteed dead
-    console.log('[Connection] BFCache restore detected, forcing reconnect');
     reconnectAttempt = 0;
     clearReconnectTimer();
     clearStalenessTimeout();
@@ -346,48 +346,36 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     // If already connected with an open socket, nothing to do
     if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
 
-    console.log('[Connection] Online event - reconnecting');
     reconnectAttempt = 0;
     clearReconnectTimer();
     void refreshAndConnect(generation);
   }
 
   function addEventListeners(): void {
-    if (typeof document !== 'undefined' && boundVisibilityHandler === null) {
-      boundVisibilityHandler = handleVisibilityChange;
-      document.addEventListener('visibilitychange', boundVisibilityHandler);
+    if (!config.lifecycleHooks || lifecycleListenersRegistered) return;
+
+    lifecycleListenersRegistered = true;
+
+    if (config.lifecycleHooks.onVisibilityChange) {
+      cleanupFns.push(
+        config.lifecycleHooks.onVisibilityChange(handleVisibilityResume, handleVisibilityHidden)
+      );
     }
-    if (typeof window !== 'undefined') {
-      if (boundPageshowHandler === null) {
-        boundPageshowHandler = handlePageshow;
-        window.addEventListener('pageshow', boundPageshowHandler);
-      }
-      if (boundOnlineHandler === null) {
-        boundOnlineHandler = handleOnline;
-        window.addEventListener('online', boundOnlineHandler);
-      }
+    if (config.lifecycleHooks.onPageshow) {
+      cleanupFns.push(config.lifecycleHooks.onPageshow(handlePageshow));
+    }
+    if (config.lifecycleHooks.onOnline) {
+      cleanupFns.push(config.lifecycleHooks.onOnline(handleOnline));
     }
   }
 
   function removeEventListeners(): void {
-    if (typeof document !== 'undefined' && boundVisibilityHandler !== null) {
-      document.removeEventListener('visibilitychange', boundVisibilityHandler);
-      boundVisibilityHandler = null;
-    }
-    if (typeof window !== 'undefined') {
-      if (boundPageshowHandler !== null) {
-        window.removeEventListener('pageshow', boundPageshowHandler);
-        boundPageshowHandler = null;
-      }
-      if (boundOnlineHandler !== null) {
-        window.removeEventListener('online', boundOnlineHandler);
-        boundOnlineHandler = null;
-      }
-    }
+    for (const cleanup of cleanupFns) cleanup();
+    cleanupFns.length = 0;
+    lifecycleListenersRegistered = false;
   }
 
   function connect() {
-    console.log('[Connection] connect() called - resetting state');
     intentionalDisconnect = false;
     destroyed = false;
     authRefreshAttempted = false;
@@ -442,4 +430,32 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   }
 
   return { connect, disconnect, destroy };
+}
+
+export function createBrowserLifecycleHooks(): ConnectionLifecycleHooks {
+  return {
+    onVisibilityChange: (onResume, onHidden) => {
+      if (typeof document === 'undefined') return () => {};
+      const handler = () => {
+        if (document.visibilityState === 'hidden') {
+          onHidden();
+        } else {
+          onResume();
+        }
+      };
+      document.addEventListener('visibilitychange', handler);
+      return () => document.removeEventListener('visibilitychange', handler);
+    },
+    onPageshow: handler => {
+      if (typeof window === 'undefined') return () => {};
+      const wrapped = (e: PageTransitionEvent) => handler({ persisted: e.persisted });
+      window.addEventListener('pageshow', wrapped);
+      return () => window.removeEventListener('pageshow', wrapped);
+    },
+    onOnline: handler => {
+      if (typeof window === 'undefined') return () => {};
+      window.addEventListener('online', handler);
+      return () => window.removeEventListener('online', handler);
+    },
+  };
 }

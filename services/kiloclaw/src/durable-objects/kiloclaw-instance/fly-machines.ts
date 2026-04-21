@@ -267,6 +267,42 @@ export async function startExistingMachine(
   if (!onProviderResult) {
     throw new Error('startExistingMachine requires a persistence callback');
   }
+  const persistProviderResult = onProviderResult;
+
+  async function recreateMachine(reason: 'not_found' | 'missing_volume') {
+    if (reason === 'not_found') {
+      console.log('[DO] Machine gone (404), creating new one');
+    } else {
+      console.log('[DO] Existing machine references a missing volume, recreating machine');
+      const machineId = providerState.machineId;
+      if (machineId) {
+        try {
+          await fly.destroyMachine(flyConfig, machineId, true);
+        } catch (destroyErr) {
+          if (!fly.isFlyNotFound(destroyErr)) {
+            throw destroyErr;
+          }
+        }
+      }
+    }
+
+    const clearedProviderState = {
+      ...providerState,
+      machineId: null,
+    } satisfies FlyProviderState;
+    await persistProviderResult({
+      providerState: clearedProviderState,
+    });
+    return createNewMachine(
+      flyConfig,
+      state,
+      clearedProviderState,
+      initialMachineConfig,
+      minSecretsVersion,
+      envFlyRegion,
+      persistProviderResult
+    );
+  }
 
   try {
     const machine = await fly.getMachine(flyConfig, providerState.machineId);
@@ -278,7 +314,7 @@ export async function startExistingMachine(
       const { cpus, memory_mb, cpu_kind } = machine.config.guest;
       machineSizePatch = { cpus, memory_mb, cpu_kind };
       machineConfig = { ...machineConfig, guest: guestFromSize(machineSizePatch) };
-      await onProviderResult({
+      await persistProviderResult({
         providerState,
         corePatch: {
           machineSize: machineSizePatch,
@@ -314,23 +350,10 @@ export async function startExistingMachine(
     };
   } catch (err) {
     if (fly.isFlyNotFound(err)) {
-      console.log('[DO] Machine gone (404), creating new one');
-      const clearedProviderState = {
-        ...providerState,
-        machineId: null,
-      } satisfies FlyProviderState;
-      await onProviderResult({
-        providerState: clearedProviderState,
-      });
-      return createNewMachine(
-        flyConfig,
-        state,
-        clearedProviderState,
-        initialMachineConfig,
-        minSecretsVersion,
-        envFlyRegion,
-        onProviderResult
-      );
+      return recreateMachine('not_found');
+    }
+    if (fly.isFlyMissingVolume(err)) {
+      return recreateMachine('missing_volume');
     } else {
       doError(state, 'Transient error starting existing machine', {
         error: toLoggable(err),
@@ -344,7 +367,7 @@ export async function startExistingMachine(
  * Create a new Fly Machine. Persists the machine ID immediately before
  * waiting for startup.
  *
- * @param envFlyRegion - The FLY_REGION env var fallback (from worker env).
+ * @param envFlyRegion - The FLY_REGION env var fallback for volume-less machines.
  */
 export async function createNewMachine(
   flyConfig: FlyClientConfig,
@@ -358,9 +381,13 @@ export async function createNewMachine(
   if (!onProviderResult) {
     throw new Error('createNewMachine requires a persistence callback');
   }
+  const machineRegion = providerState.volumeId
+    ? (providerState.region ?? undefined)
+    : (providerState.region ?? envFlyRegion ?? undefined);
+
   const machine = await fly.createMachine(flyConfig, machineConfig, {
     name: state.sandboxId ?? undefined,
-    region: providerState.region ?? envFlyRegion ?? undefined,
+    region: machineRegion,
     minSecretsVersion,
   });
   const nextProviderState = {

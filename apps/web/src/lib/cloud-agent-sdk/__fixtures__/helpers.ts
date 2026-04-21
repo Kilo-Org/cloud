@@ -40,13 +40,14 @@ const sessionInfo = (id: string, overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const userMsg = (id: string, sessionID = 'ses-1') => ({
+const userMsg = (id: string, sessionID = 'ses-1', overrides: Record<string, unknown> = {}) => ({
   id,
   sessionID,
   role: 'user',
   time: { created: 1 },
   agent: 'build',
   model: { providerID: 'a', modelID: 'b' },
+  ...overrides,
 });
 
 const assistantMsg = (

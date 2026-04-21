@@ -5,18 +5,39 @@ import { StytchClient } from '@/components/auth/StytchClient';
 import { AnimatedLogo } from '@/components/AnimatedLogo';
 import BigLoader from '@/components/BigLoader';
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
-import { getStytchStatus, handleSignupPromotion } from '@/lib/stytch';
+import { getStytchStatus, handleSignupPromotion, type SignupSource } from '@/lib/stytch';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 
+// Matches exactly the `/openclaw-advisor` pathname, optionally followed by a
+// trailing slash, query string, or fragment. Guards against sibling paths like
+// `/openclaw-advisor-fake` that would otherwise pass a naive `startsWith` check.
+const OPENCLAW_ADVISOR_PATH_RE = /^\/openclaw-advisor(?:[/?#]|$)/;
+
 export default async function AccountVerificationPage({ searchParams }: AppPageProps) {
   const user = await getUserFromAuthOrRedirect('/users/sign_in');
+  // Capture whether the user was still unvalidated when they arrived. This
+  // prevents an already-verified user from directly visiting
+  // `/account-verification?callbackPath=/openclaw-advisor?code=...` to self-award
+  // the signup bonus. The bonus must only fire on the transition from
+  // null -> true, which is the real "new-user signup" event.
+  const isFirstValidation = user.has_validation_stytch === null;
   const params = await searchParams;
   const telemetry_id = typeof params.telemetry_id === 'string' ? params.telemetry_id : null;
   const stytchStatus = await getStytchStatus(user, telemetry_id, await headers());
 
-  await handleSignupPromotion(user, stytchStatus || false);
+  const rawCallback = params.callbackPath;
+  const callbackStr = typeof rawCallback === 'string' ? rawCallback : null;
+  const signupSource: SignupSource =
+    isFirstValidation &&
+    callbackStr &&
+    isValidCallbackPath(callbackStr) &&
+    OPENCLAW_ADVISOR_PATH_RE.test(callbackStr)
+      ? 'openclaw-security-advisor'
+      : null;
+
+  await handleSignupPromotion(user, stytchStatus || false, signupSource);
 
   if (stytchStatus !== null) {
     const callbackPath = params.callbackPath;

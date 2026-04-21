@@ -18,7 +18,7 @@ import spawnCloudAgentSession, {
 import { buildSessionUrl } from '@/lib/cloud-agent-next/session-url';
 import { APP_URL } from '@/lib/constants';
 import { FEATURE_HEADER } from '@/lib/feature-detection';
-import type { Owner } from '@/lib/integrations/core/types';
+import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import {
   formatGitHubRepositoriesForPrompt,
   getGitHubRepositoryContext,
@@ -69,11 +69,6 @@ export type BotAgentMessageLike = {
   id: string;
   text: string;
 };
-
-function ownerFromIntegration(pi: PlatformIntegration): Owner {
-  if (pi.owned_by_organization_id) return { type: 'org', id: pi.owned_by_organization_id };
-  else return { type: 'user', id: pi.owned_by_user_id as string };
-}
 
 function serializeStep(step: StepResult<ToolSet>, stepNumberOffset: number): BotRequestStep {
   return {

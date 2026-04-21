@@ -234,6 +234,28 @@ env_local_val() {
   grep "^$1=" "$ENV_LOCAL" | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true
 }
 
+set_or_append_dev_var() {
+  local key="$1"
+  local value="$2"
+  local quoted="${3:-false}"
+  local escaped
+  escaped="$(printf '%s' "$value" | sed 's/[&|]/\\&/g')"
+  local rendered
+
+  if [ "$quoted" = "true" ]; then
+    rendered="${key}=\"${escaped}\""
+  else
+    rendered="${key}=${escaped}"
+  fi
+
+  if grep -q "^${key}=" "$KILOCLAW_DIR/.dev.vars"; then
+    sed "s|^${key}=.*|${rendered}|" "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
+    mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
+  else
+    printf '%s\n' "$rendered" >> "$KILOCLAW_DIR/.dev.vars"
+  fi
+}
+
 SYNC_WARNINGS=0
 
 # NEXTAUTH_SECRET → NEXTAUTH_SECRET
@@ -255,6 +277,42 @@ if [ -n "$INTERNAL_SECRET_VAL" ]; then
   mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
 else
   echo "    WARNING: KILOCLAW_INTERNAL_API_SECRET not found in .env.local — platform API auth will fail"
+  SYNC_WARNINGS=$((SYNC_WARNINGS + 1))
+fi
+
+# GOOGLE_WORKSPACE_OAUTH_CLIENT_ID → GOOGLE_WORKSPACE_OAUTH_CLIENT_ID
+GOOGLE_WORKSPACE_OAUTH_CLIENT_ID_VAL="$(env_local_val GOOGLE_WORKSPACE_OAUTH_CLIENT_ID)"
+if [ -n "$GOOGLE_WORKSPACE_OAUTH_CLIENT_ID_VAL" ]; then
+  set_or_append_dev_var GOOGLE_WORKSPACE_OAUTH_CLIENT_ID "$GOOGLE_WORKSPACE_OAUTH_CLIENT_ID_VAL"
+else
+  echo "    WARNING: GOOGLE_WORKSPACE_OAUTH_CLIENT_ID not found in .env.local — Google OAuth connect flow will fail"
+  SYNC_WARNINGS=$((SYNC_WARNINGS + 1))
+fi
+
+# GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI → GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI
+GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI_VAL="$(env_local_val GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI)"
+if [ -n "$GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI_VAL" ]; then
+  set_or_append_dev_var GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI "$GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI_VAL"
+else
+  echo "    WARNING: GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI not found in .env.local — Google OAuth callback flow will fail"
+  SYNC_WARNINGS=$((SYNC_WARNINGS + 1))
+fi
+
+# GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET → GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET
+GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET_VAL="$(env_local_val GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET)"
+if [ -n "$GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET_VAL" ]; then
+  set_or_append_dev_var GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET "$GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET_VAL" true
+else
+  echo "    WARNING: GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET not found in .env.local — Google OAuth token refresh will fail"
+  SYNC_WARNINGS=$((SYNC_WARNINGS + 1))
+fi
+
+# GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY → GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY
+GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY_VAL="$(env_local_val GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY)"
+if [ -n "$GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY_VAL" ]; then
+  set_or_append_dev_var GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY "$GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY_VAL" true
+else
+  echo "    WARNING: GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY not found in .env.local — Google OAuth broker will fail"
   SYNC_WARNINGS=$((SYNC_WARNINGS + 1))
 fi
 
@@ -297,6 +355,26 @@ if [ -z "$AGENT_KEY" ] || [ "$AGENT_KEY" = "..." ]; then
   echo "  Config: ${XDG_CONFIG_HOME:-$HOME/.config}/kiloclaw/dev-start.conf"
   echo "  Direct: $KILOCLAW_DIR/.dev.vars"
   echo "Get the dev version from 1Password (engineering vault)."
+  exit 1
+fi
+
+GOOGLE_OAUTH_CLIENT_SECRET_VAL="$(grep '^GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET=' "$KILOCLAW_DIR/.dev.vars" | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true)"
+if [ -z "$GOOGLE_OAUTH_CLIENT_SECRET_VAL" ] || [ "$GOOGLE_OAUTH_CLIENT_SECRET_VAL" = "..." ]; then
+  echo "ERROR: GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET is not configured in .dev.vars."
+  echo "Set GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET in Vercel development env,"
+  echo "then rerun this script so it syncs into .env.local and .dev.vars."
+  echo "  Vercel source: $APPS_WEB_DIR/.env.local"
+  echo "  Synced target: $KILOCLAW_DIR/.dev.vars"
+  exit 1
+fi
+
+GOOGLE_REFRESH_KEY_VAL="$(grep '^GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY=' "$KILOCLAW_DIR/.dev.vars" | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true)"
+if [ -z "$GOOGLE_REFRESH_KEY_VAL" ] || [ "$GOOGLE_REFRESH_KEY_VAL" = "..." ]; then
+  echo "ERROR: GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY is not configured in .dev.vars."
+  echo "Set GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY in Vercel development env,"
+  echo "then rerun this script so it syncs into .env.local and .dev.vars."
+  echo "  Vercel source: $APPS_WEB_DIR/.env.local"
+  echo "  Synced target: $KILOCLAW_DIR/.dev.vars"
   exit 1
 fi
 

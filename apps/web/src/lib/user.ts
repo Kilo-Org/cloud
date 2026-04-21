@@ -1,9 +1,9 @@
-import { createStripeCustomer } from '@/lib/stripe-client';
+import { createStripeCustomer, deleteStripeCustomer } from '@/lib/stripe-client';
 import { randomUUID } from 'crypto';
 import { createTimer } from '@/lib/timer';
 import PostHogClient from '@/lib/posthog';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
@@ -44,6 +44,7 @@ import {
   bot_requests,
   cloud_agent_code_reviews,
   kiloclaw_instances,
+  kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
   kiloclaw_access_codes,
   user_period_cache,
@@ -62,8 +63,8 @@ import {
   contributor_champion_memberships,
   contributor_champion_contributors,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, isNotNull, isNull, sql, or } from 'drizzle-orm';
-import { allow_fake_login } from './constants';
+import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
+import { allow_fake_login, IS_DEVELOPMENT } from './constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import { strict as assert } from 'node:assert';
@@ -116,6 +117,60 @@ export async function findUserByStripeCustomerId(
 const posthogClient = PostHogClient();
 if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
   posthogClient.debug();
+}
+
+const SIGNUP_RATE_LIMIT_MAX = 5;
+const SIGNUP_RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function getSignupIp(requestHeaders?: Headers): string | null {
+  return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
+}
+
+async function checkSignupIpRateLimit(
+  signupIp: string | null,
+  tx: DrizzleTransaction
+): Promise<Result<null, AuthErrorType>> {
+  if (IS_DEVELOPMENT) return successResult(null);
+  if (!signupIp) return successResult(null);
+
+  const windowStart = new Date(Date.now() - SIGNUP_RATE_LIMIT_WINDOW_MS).toISOString();
+  const [result] = await tx
+    .select({ count: count() })
+    .from(kilocode_users)
+    .where(
+      and(eq(kilocode_users.signup_ip, signupIp), gte(kilocode_users.created_at, windowStart))
+    );
+
+  const existingAccounts = result?.count ?? 0;
+  if (existingAccounts < SIGNUP_RATE_LIMIT_MAX) return successResult(null);
+
+  console.warn('[auth] Signup rejected due to per-IP rate limit', {
+    ip_address: signupIp,
+    existing_accounts_24h: existingAccounts,
+    max_signups: SIGNUP_RATE_LIMIT_MAX,
+  });
+
+  return failureResult('SIGNUP-RATE-LIMITED');
+}
+
+async function checkNormalizedEmailUnique(
+  normalizedEmail: string,
+  tx: DrizzleTransaction
+): Promise<Result<null, AuthErrorType>> {
+  const [existing] = await tx
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.normalized_email, normalizedEmail))
+    .limit(1);
+
+  if (!existing) return successResult(null);
+
+  console.warn('[auth] Signup rejected: normalized_email already in use', {
+    normalized_email: normalizedEmail,
+    existing_user_id: existing.id,
+  });
+
+  return failureResult('EMAIL-ALREADY-USED');
 }
 
 /**
@@ -311,9 +366,13 @@ export async function createOrUpdateUser(
   if (turnstile_guid && (await findUserById(turnstile_guid)))
     throw new Error('Abuser warning: turnstile guid reuse detected ' + turnstile_guid);
 
+  const signupIp = getSignupIp(requestHeaders);
   const newUserId = turnstile_guid ?? randomUUID();
 
-  // New user creation path
+  // New user creation path — Stripe customer is created before the DB
+  // transaction because stripe_customer_id is NOT NULL. If the transaction
+  // fails (rate limit, constraint violation, etc.) we clean up the Stripe
+  // customer to prevent orphans.
   const stripeCustomer = await createStripeCustomer({
     email: args.google_user_email,
     name: args.google_user_name,
@@ -328,39 +387,68 @@ export async function createOrUpdateUser(
     hosted_domain: args.hosted_domain,
     is_admin: shouldBeAdmin(args.google_user_email, args.hosted_domain),
     stripe_customer_id: stripeCustomer.id,
+    signup_ip: signupIp,
     openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
     vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
     normalized_email: normalizeEmail(args.google_user_email),
     email_domain: extractEmailDomain(args.google_user_email),
   } satisfies typeof kilocode_users.$inferInsert;
 
-  const savedUser = await db.transaction(async tx => {
-    const [savedUser] = await tx.insert(kilocode_users).values(newUser).returning();
-    assert(savedUser, 'Failed to save new user');
+  type TxResult = Result<{ user: User }, AuthErrorType>;
+  let txResult: TxResult;
+  let caughtError: unknown;
+  try {
+    txResult = await db.transaction(async tx => {
+      const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
+      if (!signupRateLimitResult.success) return signupRateLimitResult;
 
-    await tx.insert(user_auth_provider).values({
-      kilo_user_id: savedUser.id,
-      provider: args.provider,
-      provider_account_id: args.provider_account_id,
-      avatar_url: args.google_user_image_url,
-      email: args.google_user_email,
-      display_name: args.display_name ?? null,
-      hosted_domain: args.hosted_domain,
-    });
+      const dedupResult = await checkNormalizedEmailUnique(newUser.normalized_email, tx);
+      if (!dedupResult.success) return dedupResult;
 
-    if (affiliateTrackingId?.trim()) {
-      await recordAffiliateAttributionAndQueueParentEvent({
-        database: tx,
-        userId: savedUser.id,
-        provider: 'impact',
-        trackingId: affiliateTrackingId,
-        customerEmail: savedUser.google_user_email,
-        eventDate: new Date(savedUser.created_at),
+      const [inserted] = await tx.insert(kilocode_users).values(newUser).returning();
+      assert(inserted, 'Failed to save new user');
+
+      await tx.insert(user_auth_provider).values({
+        kilo_user_id: inserted.id,
+        provider: args.provider,
+        provider_account_id: args.provider_account_id,
+        avatar_url: args.google_user_image_url,
+        email: args.google_user_email,
+        display_name: args.display_name ?? null,
+        hosted_domain: args.hosted_domain,
       });
-    }
 
-    return savedUser;
-  });
+      if (affiliateTrackingId?.trim()) {
+        await recordAffiliateAttributionAndQueueParentEvent({
+          database: tx,
+          userId: inserted.id,
+          provider: 'impact',
+          trackingId: affiliateTrackingId,
+          customerEmail: inserted.google_user_email,
+          eventDate: new Date(inserted.created_at),
+        });
+      }
+
+      return successResult({ user: inserted });
+    });
+  } catch (error) {
+    caughtError = error;
+    txResult = failureResult('SYSTEM_ERROR');
+  }
+
+  // Clean up the Stripe customer when signup didn't succeed (thrown error
+  // or returned failure like rate-limit rejection).
+  if (!txResult.success) {
+    deleteStripeCustomer(stripeCustomer.id).catch(cleanupErr =>
+      captureException(cleanupErr, {
+        tags: { source: 'signup-stripe-cleanup' },
+        extra: { stripeCustomerId: stripeCustomer.id },
+      })
+    );
+    if (caughtError) throw caughtError;
+    return txResult;
+  }
+  const savedUser = txResult.user;
 
   fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);
 
@@ -479,6 +567,7 @@ export class SoftDeletePreconditionError extends Error {
  * - deployments, app_builder_projects (user assets)
  * - stytch_fingerprints (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
+ * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email, name, avatar, urls)
@@ -502,7 +591,7 @@ export class SoftDeletePreconditionError extends Error {
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
  *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
- *   kiloclaw_instances/inbound_email_aliases/access_codes, kiloclaw_subscriptions, user_period_cache,
+ *   kiloclaw_instances/inbound_email_aliases/access_codes, user_period_cache,
  *   kilo_pass_scheduled_changes)
  */
 export async function softDeleteUser(userId: string) {
@@ -584,6 +673,7 @@ export async function softDeleteUser(userId: string) {
         cohorts: {},
         is_admin: false,
         customer_source: null,
+        signup_ip: null,
       })
       .where(eq(kilocode_users.id, userId));
 
@@ -662,6 +752,18 @@ export async function softDeleteUser(userId: string) {
       .set({ initiated_by_admin_id: null })
       .where(eq(kiloclaw_cli_runs.initiated_by_admin_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
+    // Remove stored Google OAuth credentials for all instances owned by this user.
+    await tx
+      .delete(kiloclaw_google_oauth_connections)
+      .where(
+        inArray(
+          kiloclaw_google_oauth_connections.instance_id,
+          tx
+            .select({ id: kiloclaw_instances.id })
+            .from(kiloclaw_instances)
+            .where(eq(kiloclaw_instances.user_id, userId))
+        )
+      );
     await tx
       .delete(kiloclaw_inbound_email_aliases)
       .where(

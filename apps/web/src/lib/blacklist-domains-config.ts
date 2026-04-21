@@ -3,8 +3,7 @@ import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { createCachedFetch } from '@/lib/cached-fetch';
-
-export const BLACKLIST_DOMAINS_REDIS_KEY = 'admin:blacklisted-domains';
+import { BLACKLIST_DOMAINS_REDIS_KEY } from '@/lib/redis-keys';
 
 export const BlacklistDomainsConfigSchema = z.object({
   domains: z.array(z.string()),

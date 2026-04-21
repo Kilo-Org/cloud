@@ -40,6 +40,7 @@ import {
   KiloClawPlan,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
+  KiloClawProvider,
   KiloClawSubscriptionStatus,
   KiloClawPaymentSource,
   KiloClawSubscriptionAccessOrigin,
@@ -135,6 +136,10 @@ export type AffiliateEventPayloadJson = {
   itemName?: string | null;
   itemSku?: string | null;
   promoCode?: string | null;
+  stripeChargeId?: string | null;
+  impactActionId?: string | null;
+  impactSubmissionUri?: string | null;
+  disputeId?: string | null;
 };
 
 export const credit_transactions = pgTable(
@@ -233,6 +238,7 @@ export const kilocode_users = pgTable(
     openrouter_upstream_safety_identifier: text(),
     vercel_downstream_safety_identifier: text(),
     customer_source: text(),
+    signup_ip: text(),
     account_deletion_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
 
     normalized_email: text(),
@@ -240,6 +246,7 @@ export const kilocode_users = pgTable(
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
+    index('IDX_kilocode_users_signup_ip_created_at').on(table.signup_ip, table.created_at),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
@@ -297,6 +304,9 @@ export const user_affiliate_events = pgTable(
       .$type<AffiliateEventDeliveryState>()
       .default(AffiliateEventDeliveryState.Queued),
     payload_json: jsonb().$type<AffiliateEventPayloadJson>().notNull(),
+    stripe_charge_id: text(),
+    impact_action_id: text(),
+    impact_submission_uri: text(),
     attempt_count: integer().notNull().default(0),
     next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
     claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -318,6 +328,11 @@ export const user_affiliate_events = pgTable(
       table.id
     ),
     index('IDX_user_affiliate_events_parent_event_id').on(table.parent_event_id),
+    index('IDX_user_affiliate_events_provider_event_type_charge').on(
+      table.provider,
+      table.event_type,
+      table.stripe_charge_id
+    ),
     enumCheck('user_affiliate_events_provider_check', table.provider, AffiliateProvider),
     enumCheck('user_affiliate_events_event_type_check', table.event_type, AffiliateEventType),
     enumCheck(
@@ -333,6 +348,28 @@ export const user_affiliate_events = pgTable(
 );
 
 export type UserAffiliateEvent = typeof user_affiliate_events.$inferSelect;
+
+export const pending_impact_sale_reversals = pgTable(
+  'pending_impact_sale_reversals',
+  {
+    stripe_charge_id: text().primaryKey().notNull(),
+    dispute_id: text().notNull(),
+    amount: real().notNull(),
+    currency: text().notNull(),
+    event_date: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    attempt_count: integer().notNull().default(0),
+    last_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    check(
+      'pending_impact_sale_reversals_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type PendingImpactSaleReversal = typeof pending_impact_sale_reversals.$inferSelect;
 
 export const kilo_pass_subscriptions = pgTable(
   'kilo_pass_subscriptions',
@@ -3680,6 +3717,7 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id),
     sandbox_id: text().notNull(),
+    provider: text().$type<KiloClawProvider>().notNull().default(KiloClawProvider.Fly),
     // Null = personal instance. Non-null = org-owned instance.
     organization_id: uuid().references(() => organizations.id),
     name: text(),
@@ -3702,6 +3740,74 @@ export const kiloclaw_instances = pgTable(
 );
 
 export type KiloClawInstance = typeof kiloclaw_instances.$inferSelect;
+
+export type KiloClawGoogleOAuthStatus = 'active' | 'action_required' | 'disconnected';
+export type KiloClawGoogleOAuthCredentialProfile = 'legacy' | 'kilo_owned';
+export type KiloClawGoogleOAuthGrantsBySource = {
+  legacy?: string[];
+  oauth?: string[];
+};
+
+export const kiloclaw_google_oauth_connections = pgTable(
+  'kiloclaw_google_oauth_connections',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    instance_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_instances.id),
+    provider: text().notNull().default('google'),
+    account_email: text().notNull(),
+    account_subject: text().notNull(),
+    oauth_client_id: text().notNull(),
+    oauth_client_secret_encrypted: text(),
+    credential_profile: text()
+      .$type<KiloClawGoogleOAuthCredentialProfile>()
+      .notNull()
+      .default('kilo_owned'),
+    refresh_token_encrypted: text().notNull(),
+    scopes: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    grants_by_source: jsonb()
+      .$type<KiloClawGoogleOAuthGrantsBySource>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    capabilities: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    status: text().$type<KiloClawGoogleOAuthStatus>().notNull().default('active'),
+    last_error: text(),
+    last_error_at: timestamp({ withTimezone: true, mode: 'string' }),
+    connected_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_google_oauth_connections_instance').on(table.instance_id),
+    index('IDX_kiloclaw_google_oauth_connections_status').on(table.status),
+    index('IDX_kiloclaw_google_oauth_connections_provider').on(table.provider),
+    check(
+      'kiloclaw_google_oauth_connections_status_check',
+      sql`${table.status} IN ('active', 'action_required', 'disconnected')`
+    ),
+    check(
+      'kiloclaw_google_oauth_connections_credential_profile_check',
+      sql`${table.credential_profile} IN ('legacy', 'kilo_owned')`
+    ),
+  ]
+);
+
+export type KiloClawGoogleOAuthConnection = typeof kiloclaw_google_oauth_connections.$inferSelect;
+export type NewKiloClawGoogleOAuthConnection =
+  typeof kiloclaw_google_oauth_connections.$inferInsert;
 
 export const kiloclaw_inbound_email_reserved_aliases = pgTable(
   'kiloclaw_inbound_email_reserved_aliases',
@@ -4023,6 +4129,9 @@ export const kiloclaw_email_log = pgTable(
       .where(isNull(table.instance_id)),
     uniqueIndex('UQ_kiloclaw_email_log_user_instance_type')
       .on(table.user_id, table.instance_id, table.email_type)
+      .where(isNotNull(table.instance_id)),
+    index('IDX_kiloclaw_email_log_type_sent_instance')
+      .on(table.email_type, table.sent_at, table.instance_id, table.user_id)
       .where(isNotNull(table.instance_id)),
   ]
 );

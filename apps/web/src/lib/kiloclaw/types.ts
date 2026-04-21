@@ -142,6 +142,18 @@ export type MachineSize = {
 // Keep in sync with services/kiloclaw/src/schemas/instance-config.ts ProviderIdSchema.
 export type KiloClawProviderId = 'fly' | 'docker-local' | 'northflank';
 
+export type ProviderRolloutConfig = {
+  northflank: {
+    personalTrafficPercent: number;
+    organizationTrafficPercent: number;
+    enabledOrganizationIds: string[];
+  };
+};
+
+export type ProviderRolloutAvailability = {
+  northflank: boolean;
+};
+
 /** Response from POST /api/platform/restore-volume-snapshot */
 export type RestoreVolumeSnapshotResponse = {
   acknowledged: boolean;
@@ -182,6 +194,15 @@ export type PlatformStatusResponse = {
   trackedImageTag: string | null;
   trackedImageDigest: string | null;
   googleConnected: boolean;
+  googleOAuthConnected: boolean;
+  googleOAuthStatus: 'active' | 'action_required' | 'disconnected';
+  googleOAuthAccountEmail: string | null;
+  googleOAuthCapabilities: string[];
+  googleWorkspaceToolsEnabled?: boolean;
+  googleWorkspaceConfigSyncPending?: boolean;
+  googleWorkspaceConfigSyncError?: string | null;
+  googleWorkspaceConfigReady?: boolean;
+  googleWorkspaceConfigSyncedAt?: number | null;
   gmailNotificationsEnabled: boolean;
   execSecurity: string | null;
   execAsk: string | null;
@@ -364,6 +385,24 @@ export type GoogleCredentialsResponse = {
   googleConnected: boolean;
 };
 
+/** Input to POST /api/platform/google-oauth-connection */
+export type GoogleOAuthConnectionInput = {
+  googleOAuthConnection: {
+    accountEmail: string | null;
+    accountSubject: string | null;
+    capabilities: string[];
+    scopes: string[];
+    status: 'active' | 'action_required' | 'disconnected';
+    lastError?: string | null;
+  };
+};
+
+/** Response from POST/DELETE /api/platform/google-oauth-connection */
+export type GoogleOAuthConnectionResponse = {
+  googleOAuthConnected: boolean;
+  googleOAuthStatus: 'active' | 'action_required' | 'disconnected';
+};
+
 /** Response from POST/DELETE /api/platform/gmail-notifications */
 export type GmailNotificationsResponse = {
   gmailNotificationsEnabled: boolean;
@@ -412,6 +451,20 @@ export type UpdateRegionsResponse = {
   ok: true;
   regions: string[];
   raw: string;
+};
+
+/** Response from GET /api/platform/providers/rollout */
+export type ProviderRolloutResponse = {
+  rollout: ProviderRolloutConfig;
+  availability: ProviderRolloutAvailability;
+  source: 'kv' | 'default';
+};
+
+/** Response from PUT /api/platform/providers/rollout */
+export type UpdateProviderRolloutResponse = {
+  ok: true;
+  rollout: ProviderRolloutConfig;
+  availability: ProviderRolloutAvailability;
 };
 
 /** Stream Chat credentials for a user's KiloClaw channel */

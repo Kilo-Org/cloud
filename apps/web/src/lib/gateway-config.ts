@@ -1,6 +1,5 @@
 import * as z from 'zod';
 
-export const VERCEL_ROUTING_REDIS_KEY = 'ai-gateway:vercel-routing-percentage';
 export const DEFAULT_VERCEL_PERCENTAGE = 10;
 
 const vercelRoutingPercentage = z.number().int().min(0).max(100);

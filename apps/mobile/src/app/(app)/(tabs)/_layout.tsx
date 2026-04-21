@@ -3,7 +3,6 @@ import { Tabs } from 'expo-router';
 import { Bot, MessageSquare } from 'lucide-react-native';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { toast } from 'sonner-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -46,17 +45,10 @@ export default function TabsLayout() {
         options={{
           title: 'Agents',
           tabBarIcon: ({ color, size }) => <Bot size={size} color={color} />,
-          tabBarBadge: 'Soon',
-          tabBarBadgeStyle: {
-            backgroundColor: colors.muted,
-            color: colors.mutedForeground,
-            fontSize: 9,
-          },
         }}
         listeners={{
-          tabPress: e => {
-            e.preventDefault();
-            toast('Agents is coming soon');
+          tabPress: () => {
+            void Haptics.selectionAsync();
           },
         }}
       />

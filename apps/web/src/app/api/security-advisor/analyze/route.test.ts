@@ -260,6 +260,11 @@ describe('POST /api/security-advisor/analyze', () => {
     expect(data.report.summary.critical).toBe(1);
     expect(data.report.findings).toHaveLength(2);
     expect(data.report.recommendations.length).toBeGreaterThan(0);
+    // Grade fields are populated in both structured + markdown form.
+    expect(['A', 'B', 'C', 'D', 'F']).toContain(data.report.grade);
+    expect(data.report.score).toBeGreaterThanOrEqual(0);
+    expect(data.report.score).toBeLessThanOrEqual(100);
+    expect(data.report.markdown).toContain('## Security Grade:');
   });
 
   it('includes sales comparison for openclaw source', async () => {
@@ -288,10 +293,15 @@ describe('POST /api/security-advisor/analyze', () => {
     const response = await POST(makeRequest(kiloClawBody) as never);
     const data = await response.json();
 
-    const configFinding = data.report.findings.find(
-      (f: { checkId: string }) => f.checkId === 'fs.config.perms_world_readable'
+    // Probe summary.attack_surface rather than fs.config.perms_world_readable:
+    // the latter is in KILOCLAW_MITIGATED_CHECKS and gets filtered out of
+    // rendered findings on KiloClaw. summary.attack_surface is not mitigated
+    // and still matches gateway_exposure coverage in the test fixture, so
+    // the divergence framing should attach to it on KiloClaw.
+    const attackSurface = data.report.findings.find(
+      (f: { checkId: string }) => f.checkId === 'summary.attack_surface'
     );
-    expect(configFinding.kiloClawComparison).toContain('diverged');
+    expect(attackSurface.kiloClawComparison).toContain('diverged');
   });
 
   it('returns 429 when rate limit exceeded', async () => {

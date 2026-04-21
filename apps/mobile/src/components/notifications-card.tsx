@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, MessageSquare } from 'lucide-react-native';
 import { useCallback, useEffect, useRef } from 'react';
-import { Alert, AppState, Linking, Switch, View } from 'react-native';
+import { Alert, Linking, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import * as Notifications from 'expo-notifications';
 
@@ -99,18 +100,14 @@ export function NotificationsCard() {
   );
 
   // Re-check permission on foreground resume
-  const appState = useRef(AppState.currentState);
+  const { isActive } = useAppLifecycle();
+  const wasActiveRef = useRef(isActive);
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      if (/inactive|background/.exec(appState.current) && nextAppState === 'active') {
-        void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
-      }
-      appState.current = nextAppState;
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, [queryClient]);
+    if (!wasActiveRef.current && isActive) {
+      void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive, queryClient]);
 
   const handleToggleNotifications = useCallback(
     async (value: boolean) => {

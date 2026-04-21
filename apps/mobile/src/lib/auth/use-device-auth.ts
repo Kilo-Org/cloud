@@ -1,7 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { API_BASE_URL } from '@/lib/config';
+import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
 
 type DeviceAuthStatus = 'idle' | 'pending' | 'approved' | 'denied' | 'expired' | 'error';
 
@@ -14,7 +14,7 @@ type DeviceAuthState = {
 };
 
 type DeviceAuthResult = DeviceAuthState & {
-  start: () => Promise<void>;
+  start: (mode?: 'signin' | 'signup') => Promise<void>;
   cancel: () => void;
   openBrowser: () => Promise<void>;
 };
@@ -115,23 +115,66 @@ export function useDeviceAuth(): DeviceAuthResult {
     [cleanup]
   );
 
-  const start = useCallback(async () => {
-    cleanup();
-    setState({
-      status: 'pending',
-      code: undefined,
-      token: undefined,
-      error: undefined,
-      verificationUrl: undefined,
-    });
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/device-auth/codes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+  const start = useCallback(
+    async (mode?: 'signin' | 'signup') => {
+      cleanup();
+      setState({
+        status: 'pending',
+        code: undefined,
+        token: undefined,
+        error: undefined,
+        verificationUrl: undefined,
       });
 
-      if (!response.ok) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/device-auth/codes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+          setState({
+            status: 'error',
+            code: undefined,
+            token: undefined,
+            error: 'Failed to start sign in. Please try again.',
+            verificationUrl: undefined,
+          });
+          return;
+        }
+
+        const data = (await response.json()) as {
+          code: string;
+          verificationUrl: string;
+        };
+
+        // Sign-in uses the server-provided verificationUrl which points directly
+        // at /device-auth?code=... Sign-up instead routes through the sign-in
+        // page with signup=true so the web UI renders the create-account flow;
+        // callbackPath then forwards the user to /device-auth?code=... after
+        // account creation to complete the device-auth approval.
+        const browserUrl =
+          mode === 'signup'
+            ? `${WEB_BASE_URL}/users/sign_in?${new URLSearchParams({
+                callbackPath: `/device-auth?code=${data.code}`,
+                signup: 'true',
+              }).toString()}`
+            : data.verificationUrl;
+
+        setState({
+          status: 'pending',
+          code: data.code,
+          token: undefined,
+          error: undefined,
+          verificationUrl: browserUrl,
+        });
+
+        const abort = new AbortController();
+        abortReference.current = abort;
+        poll(data.code, abort);
+
+        await WebBrowser.openAuthSessionAsync(browserUrl);
+      } catch {
         setState({
           status: 'error',
           code: undefined,
@@ -139,37 +182,10 @@ export function useDeviceAuth(): DeviceAuthResult {
           error: 'Failed to start sign in. Please try again.',
           verificationUrl: undefined,
         });
-        return;
       }
-
-      const data = (await response.json()) as {
-        code: string;
-        verificationUrl: string;
-      };
-
-      setState({
-        status: 'pending',
-        code: data.code,
-        token: undefined,
-        error: undefined,
-        verificationUrl: data.verificationUrl,
-      });
-
-      const abort = new AbortController();
-      abortReference.current = abort;
-      poll(data.code, abort);
-
-      await WebBrowser.openAuthSessionAsync(data.verificationUrl);
-    } catch {
-      setState({
-        status: 'error',
-        code: undefined,
-        token: undefined,
-        error: 'Failed to start sign in. Please try again.',
-        verificationUrl: undefined,
-      });
-    }
-  }, [cleanup, poll]);
+    },
+    [cleanup, poll]
+  );
 
   const cancel = useCallback(() => {
     cleanup();

@@ -33,6 +33,8 @@ import type {
   OpenclawConfigResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
+  GoogleOAuthConnectionInput,
+  GoogleOAuthConnectionResponse,
   GmailNotificationsResponse,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
@@ -41,6 +43,9 @@ import type {
   CleanupRecoveryPreviousVolumeResponse,
   RegionsResponse,
   UpdateRegionsResponse,
+  ProviderRolloutResponse,
+  UpdateProviderRolloutResponse,
+  ProviderRolloutConfig,
 } from './types';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
@@ -642,6 +647,37 @@ export class KiloClawInternalClient {
     );
   }
 
+  async updateGoogleOAuthConnection(
+    userId: string,
+    input: GoogleOAuthConnectionInput,
+    instanceId?: string
+  ): Promise<GoogleOAuthConnectionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/google-oauth-connection${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...input }),
+      },
+      { userId }
+    );
+  }
+
+  async clearGoogleOAuthConnection(
+    userId: string,
+    instanceId?: string
+  ): Promise<GoogleOAuthConnectionResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(
+      `/api/platform/google-oauth-connection?${params.toString()}`,
+      {
+        method: 'DELETE',
+      },
+      { userId }
+    );
+  }
+
   async enableGmailNotifications(
     userId: string,
     instanceId?: string
@@ -801,6 +837,19 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/regions', {
       method: 'PUT',
       body: JSON.stringify({ regions }),
+    });
+  }
+
+  async getProviderRollout(): Promise<ProviderRolloutResponse> {
+    return this.request('/api/platform/providers/rollout');
+  }
+
+  async updateProviderRollout(
+    config: ProviderRolloutConfig
+  ): Promise<UpdateProviderRolloutResponse> {
+    return this.request('/api/platform/providers/rollout', {
+      method: 'PUT',
+      body: JSON.stringify(config),
     });
   }
 }

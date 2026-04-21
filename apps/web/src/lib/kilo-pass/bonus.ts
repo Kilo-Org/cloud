@@ -1,4 +1,4 @@
-import type { KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence, type KiloPassTier } from '@/lib/kilo-pass/enums';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT,
@@ -10,6 +10,18 @@ import { dayjs } from '@/lib/kilo-pass/dayjs';
 
 export const getMonthlyPriceUsd = (tier: KiloPassTier): number => {
   return KILO_PASS_TIER_CONFIG[tier].monthlyPriceUsd;
+};
+
+export const isKiloPassSelectionEligibleForKiloclawCommitUpsell = (params: {
+  tier: KiloPassTier;
+  cadence: KiloPassCadence;
+  commitCostMicrodollars: number;
+}): boolean => {
+  if (params.cadence === KiloPassCadence.Yearly) {
+    return true;
+  }
+
+  return getMonthlyPriceUsd(params.tier) * 1_000_000 >= params.commitCostMicrodollars;
 };
 
 export const computeMonthlyCadenceBonusPercent = (params: {

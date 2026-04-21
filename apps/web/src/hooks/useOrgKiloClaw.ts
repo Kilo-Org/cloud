@@ -4,12 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 
-export function useOrgKiloClawStatus(organizationId: string) {
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+
+export function useOrgKiloClawStatus(organizationId?: string) {
   const trpc = useTRPC();
+  const resolvedOrganizationId = organizationId ?? NIL_UUID;
   return useQuery(
     trpc.organizations.kiloclaw.getStatus.queryOptions(
-      { organizationId },
-      { refetchInterval: 10_000 }
+      { organizationId: resolvedOrganizationId },
+      { enabled: !!organizationId, refetchInterval: organizationId ? 10_000 : false }
     )
   );
 }
@@ -174,7 +177,9 @@ export function useOrgReadFile(organizationId: string, path: string | null, enab
  * interface as personal mutations. All other properties (isPending, data, etc.)
  * pass through from the raw mutation.
  */
-export function useOrgKiloClawMutations(organizationId: string) {
+export function useOrgKiloClawMutations(
+  organizationId: string
+): ReturnType<typeof useKiloClawMutations> {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -202,7 +207,7 @@ export function useOrgKiloClawMutations(organizationId: string) {
 
   // Helper: wrap a raw org mutation so mutate/mutateAsync inject organizationId.
   // The `any` types are unavoidable here — we're wrapping tRPC mutations generically
-  // to pre-bind organizationId. The final return is cast to the personal mutations type.
+  // to pre-bind organizationId. The final return uses `satisfies` to catch missing keys.
   /* eslint-disable @typescript-eslint/no-explicit-any */
   function bind<T extends { mutate: any; mutateAsync: any }>(raw: T): any {
     return {
@@ -366,6 +371,16 @@ export function useOrgKiloClawMutations(organizationId: string) {
   const rawPatchExecPreset = useMutation(
     trpc.organizations.kiloclaw.patchExecPreset.mutationOptions({ onSuccess: invalidateStatus })
   );
+  const rawPatchWebSearchConfig = useMutation(
+    trpc.organizations.kiloclaw.patchWebSearchConfig.mutationOptions({
+      onSuccess: async () => {
+        await invalidateStatus();
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getConfig.queryKey({ organizationId }),
+        });
+      },
+    })
+  );
   const rawPatchBotIdentity = useMutation(
     trpc.organizations.kiloclaw.patchBotIdentity.mutationOptions({ onSuccess: invalidateStatus })
   );
@@ -397,7 +412,7 @@ export function useOrgKiloClawMutations(organizationId: string) {
     trpc.organizations.kiloclaw.cancelKiloCliRun.mutationOptions({ onSuccess: invalidateStatus })
   );
 
-  return {
+  const mutations = {
     start: bindVoid(rawStart),
     stop: bindVoid(rawStop),
     destroy: bindVoid(rawDestroy),
@@ -418,6 +433,7 @@ export function useOrgKiloClawMutations(organizationId: string) {
     removeMyPin: bindVoid(rawRemoveMyPin),
     writeFile: bind(rawWriteFile),
     patchExecPreset: bind(rawPatchExecPreset),
+    patchWebSearchConfig: bind(rawPatchWebSearchConfig),
     patchBotIdentity: bind(rawPatchBotIdentity),
     patchOpenclawConfig: bind(rawPatchOpenclawConfig),
     disconnectGoogle: bindVoid(rawDisconnectGoogle),
@@ -425,5 +441,7 @@ export function useOrgKiloClawMutations(organizationId: string) {
     startKiloCliRun: bind(rawStartKiloCliRun),
     cancelKiloCliRun: bind(rawCancelKiloCliRun),
     rename: bind(rawRename),
-  } as unknown as ReturnType<typeof useKiloClawMutations>;
+  } satisfies ReturnType<typeof useKiloClawMutations>;
+
+  return mutations;
 }

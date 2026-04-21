@@ -9,6 +9,7 @@ import { VersionsTab, PinsTab } from './KiloclawVersions/KiloclawVersionsPage';
 import { RegionsTab } from './KiloclawRegions/KiloclawRegionsPage';
 import { CliRunsTab } from './KiloclawCliRuns/KiloclawCliRunsTab';
 import { KiloclawSecurityAdvisorContentTab } from './KiloclawSecurityAdvisorContent/KiloclawSecurityAdvisorContentTab';
+import { KiloclawProvidersTab } from './KiloclawProvidersTab';
 
 const VALID_TABS: readonly string[] = [
   'instances',
@@ -16,6 +17,7 @@ const VALID_TABS: readonly string[] = [
   'versions',
   'pins',
   'regions',
+  'providers',
   'cli-runs',
   'security-advisor-content',
 ];
@@ -25,6 +27,7 @@ type Tab =
   | 'versions'
   | 'pins'
   | 'regions'
+  | 'providers'
   | 'cli-runs'
   | 'security-advisor-content';
 const isValidTab = (value: string | null): value is Tab =>
@@ -74,6 +77,9 @@ export function KiloclawDashboard() {
           <TabsTrigger value="regions" className={tabTriggerClass}>
             Regions
           </TabsTrigger>
+          <TabsTrigger value="providers" className={tabTriggerClass}>
+            Providers
+          </TabsTrigger>
           <TabsTrigger value="cli-runs" className={tabTriggerClass}>
             CLI Runs
           </TabsTrigger>
@@ -95,6 +101,9 @@ export function KiloclawDashboard() {
         </TabsContent>
         <TabsContent value="regions" className="mt-4">
           <RegionsTab />
+        </TabsContent>
+        <TabsContent value="providers" className="mt-4">
+          <KiloclawProvidersTab />
         </TabsContent>
         <TabsContent value="cli-runs" className="mt-4">
           <CliRunsTab />

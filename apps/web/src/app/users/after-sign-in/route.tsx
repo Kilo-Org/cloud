@@ -26,6 +26,7 @@ function resolveSignupProduct(callbackPath: string | null, hasSource: boolean): 
   if (callbackPath.startsWith('/code-reviews')) return 'code-reviews';
   if (callbackPath.startsWith('/app-builder')) return 'app-builder';
   if (callbackPath.startsWith('/install')) return 'kilo-code';
+  if (callbackPath.startsWith('/openclaw-advisor')) return 'openclaw-security-advisor';
   return null;
 }
 

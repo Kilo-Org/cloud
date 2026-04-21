@@ -11,6 +11,7 @@ import {
   registerKiloChatGetMembersRoute,
   registerKiloChatRenameRoute,
   registerKiloChatListConversationsRoute,
+  registerKiloChatCreateConversationRoute,
 } from './kilo-chat';
 
 const TOKEN = 'expected-gateway-token';
@@ -847,5 +848,64 @@ describe('GET /_kilo/kilo-chat/conversations', () => {
     expect(capturedUrl).toBe(
       `https://chat.example.test/bot/v1/sandboxes/${SANDBOX_ID}/conversations?limit=10&offset=5`
     );
+  });
+});
+
+function makeCreateConversationApp(fetchImpl: typeof fetch) {
+  const app = new Hono();
+  registerKiloChatCreateConversationRoute(app, {
+    expectedToken: TOKEN,
+    sandboxId: SANDBOX_ID,
+    kiloChatBaseUrl: 'https://chat.example.test',
+    fetchImpl,
+  });
+  return app;
+}
+
+describe('POST /_kilo/kilo-chat/conversations', () => {
+  it('rejects requests without bearer token', async () => {
+    const app = makeCreateConversationApp(async () => new Response('', { status: 201 }));
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/conversations', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Test' }),
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('forwards authorized POST to upstream with correct URL', async () => {
+    let capturedUrl = '';
+    let capturedInit: RequestInit | undefined;
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      capturedUrl = typeof url === 'string' ? url : url.toString();
+      capturedInit = init;
+      return new Response(JSON.stringify({ conversationId: 'new-conv-1' }), {
+        status: 201,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const app = makeCreateConversationApp(fetchImpl);
+    const body = JSON.stringify({ title: 'Bot Chat' });
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/conversations', {
+        method: 'POST',
+        body,
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${TOKEN}`,
+        },
+      })
+    );
+
+    expect(res.status).toBe(201);
+    expect(capturedUrl).toBe(
+      `https://chat.example.test/bot/v1/sandboxes/${SANDBOX_ID}/conversations`
+    );
+    expect(capturedInit?.method).toBe('POST');
+    const headers = new Headers(capturedInit?.headers);
+    expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
   });
 });

@@ -317,6 +317,19 @@ export function registerKiloChatRenameRoute(app: Hono, options: KiloChatRouteOpt
   );
 }
 
+export function registerKiloChatCreateConversationRoute(
+  app: Hono,
+  options: KiloChatRouteOptions
+): void {
+  app.post('/_kilo/kilo-chat/conversations', c =>
+    relayBodyRoute(c, options, {
+      method: 'POST',
+      upstreamSuffix: () => '/conversations',
+      bodyLimit: MAX_SMALL_BODY_BYTES,
+    })
+  );
+}
+
 export function registerKiloChatListConversationsRoute(
   app: Hono,
   options: KiloChatRouteOptions

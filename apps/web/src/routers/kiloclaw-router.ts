@@ -561,6 +561,7 @@ const userTimezoneSchema = z
 const userLocationSchema = z.string().trim().min(1).max(200);
 const weatherLocationInputSchema = z.object({ location: userLocationSchema });
 const WTTR_LOCATION_TIMEOUT_MS = 4_000;
+const COORDINATE_LOCATION_PATTERN = /^-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?$/;
 
 const wttrValueSchema = z.object({ value: z.string().trim().min(1) });
 const wttrNearestAreaSchema = z.object({
@@ -568,24 +569,20 @@ const wttrNearestAreaSchema = z.object({
   region: z.array(wttrValueSchema).optional(),
   country: z.array(wttrValueSchema).optional(),
 });
-const wttrCurrentConditionSchema = z.object({
-  temp_C: z.string().trim().min(1),
-  temp_F: z.string().trim().min(1),
-  weatherCode: z.string().trim().optional(),
-  weatherDesc: z.array(wttrValueSchema).optional(),
-});
-const wttrResponseSchema = z
+const wttrLocationResponseSchema = z
   .object({
-    current_condition: z.array(wttrCurrentConditionSchema).optional(),
     nearest_area: z.array(wttrNearestAreaSchema).optional(),
   })
   .passthrough();
 
-function hasUnknownLocationMarker(data: unknown): boolean {
-  return (JSON.stringify(data) ?? '').toLowerCase().includes('unknown location');
+type WttrValue = z.infer<typeof wttrValueSchema>;
+
+function hasUnknownLocationMarker(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  return lowerText.includes('unknown location') || lowerText.includes('not found');
 }
 
-function wttrValue(values: z.infer<typeof wttrValueSchema>[] | undefined): string | null {
+function wttrValue(values: WttrValue[] | undefined): string | null {
   const value = values?.[0]?.value.trim();
   if (!value) return null;
   const lowerValue = value.toLowerCase();
@@ -593,18 +590,23 @@ function wttrValue(values: z.infer<typeof wttrValueSchema>[] | undefined): strin
   return value;
 }
 
+function formatCountryName(country: string): string {
+  return country.toLowerCase() === 'netherlands' ? 'The Netherlands' : country;
+}
+
 function normalizeWeatherLocation(data: unknown): string | null {
-  const parsed = wttrResponseSchema.safeParse(data);
-  if (!parsed.success || hasUnknownLocationMarker(data)) return null;
+  const parsed = wttrLocationResponseSchema.safeParse(data);
+  const text = JSON.stringify(data) ?? '';
+  if (!parsed.success || text.toLowerCase().includes('unknown location')) return null;
 
   const nearestArea = parsed.data.nearest_area?.[0];
   if (!nearestArea) return null;
 
-  const parts = [
-    wttrValue(nearestArea.areaName),
-    wttrValue(nearestArea.region),
-    wttrValue(nearestArea.country),
-  ];
+  const areaName = wttrValue(nearestArea.areaName);
+  const region = wttrValue(nearestArea.region);
+  const country = wttrValue(nearestArea.country);
+  const formattedCountry = country ? formatCountryName(country) : null;
+  const parts = [areaName, region, formattedCountry];
   const uniqueParts = parts.filter((part, index): part is string => {
     if (!part) return false;
     return parts.findIndex(other => other?.toLowerCase() === part.toLowerCase()) === index;
@@ -613,108 +615,23 @@ function normalizeWeatherLocation(data: unknown): string | null {
   return uniqueParts.length > 0 ? uniqueParts.join(', ') : null;
 }
 
+function parseWttrFormat3(text: string): { location: string; currentWeatherText: string } | null {
+  const trimmedText = text.trim();
+  if (!trimmedText || hasUnknownLocationMarker(trimmedText)) return null;
+
+  const separatorIndex = trimmedText.indexOf(':');
+  if (separatorIndex === -1) return null;
+
+  const location = trimmedText.slice(0, separatorIndex).trim();
+  const currentWeatherText = trimmedText.slice(separatorIndex + 1).trim();
+  if (!location || !currentWeatherText) return null;
+
+  return { location, currentWeatherText };
+}
+
 function isTimeoutError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null || !('name' in error)) return false;
   return error.name === 'TimeoutError' || error.name === 'AbortError';
-}
-
-function usesFahrenheit(country: string | null): boolean {
-  if (!country) return false;
-  const normalizedCountry = country.toLowerCase();
-  return normalizedCountry === 'united states of america' || normalizedCountry === 'united states';
-}
-
-function formatTemperature(value: string, unit: 'C' | 'F'): string | null {
-  const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) return null;
-  return `${numericValue}°${unit}`;
-}
-
-function getWeatherEmoji(condition: z.infer<typeof wttrCurrentConditionSchema>): string {
-  switch (condition.weatherCode) {
-    case '113':
-      return '☀️';
-    case '116':
-      return '🌤️';
-    case '119':
-    case '122':
-      return '☁️';
-    case '143':
-    case '248':
-    case '260':
-      return '🌫️';
-    case '176':
-    case '263':
-    case '266':
-    case '293':
-    case '296':
-    case '353':
-      return '🌦️';
-    case '179':
-    case '182':
-    case '185':
-    case '227':
-    case '230':
-    case '317':
-    case '320':
-    case '323':
-    case '326':
-    case '329':
-    case '332':
-    case '335':
-    case '338':
-    case '350':
-    case '362':
-    case '365':
-    case '368':
-    case '371':
-    case '374':
-    case '377':
-      return '🌨️';
-    case '200':
-    case '386':
-    case '389':
-    case '392':
-    case '395':
-      return '⛈️';
-    case '281':
-    case '284':
-    case '299':
-    case '302':
-    case '305':
-    case '308':
-    case '311':
-    case '314':
-    case '356':
-    case '359':
-      return '🌧️';
-  }
-
-  const description = wttrValue(condition.weatherDesc)?.toLowerCase() ?? '';
-  if (description.includes('thunder')) return '⛈️';
-  if (
-    description.includes('snow') ||
-    description.includes('sleet') ||
-    description.includes('ice')
-  ) {
-    return '🌨️';
-  }
-  if (description.includes('rain') || description.includes('drizzle')) return '🌧️';
-  if (description.includes('shower')) return '🌦️';
-  if (description.includes('fog') || description.includes('mist')) return '🌫️';
-  if (description.includes('cloud') || description.includes('overcast')) return '☁️';
-  if (description.includes('sun') || description.includes('clear')) return '☀️';
-  return '🌡️';
-}
-
-function getCurrentWeatherText(data: z.infer<typeof wttrResponseSchema>): string | null {
-  const condition = data.current_condition?.[0];
-  if (!condition) return null;
-
-  const country = wttrValue(data.nearest_area?.[0]?.country);
-  const unit = usesFahrenheit(country) ? 'F' : 'C';
-  const temperature = formatTemperature(unit === 'F' ? condition.temp_F : condition.temp_C, unit);
-  return temperature ? `Current weather: ${getWeatherEmoji(condition)} ${temperature}` : null;
 }
 
 async function fetchWttr(location: string, query: string): Promise<Response> {
@@ -741,10 +658,22 @@ async function fetchWttr(location: string, query: string): Promise<Response> {
   }
 }
 
+async function fetchCoordinateLocationName(location: string): Promise<string | null> {
+  if (!COORDINATE_LOCATION_PATTERN.test(location)) return null;
+
+  try {
+    const response = await fetchWttr(location, 'format=j1');
+    if (!response.ok) return null;
+    return normalizeWeatherLocation(await response.json());
+  } catch {
+    return null;
+  }
+}
+
 async function validateWeatherLocation(
   location: string
 ): Promise<{ location: string; currentWeatherText: string }> {
-  const response = await fetchWttr(location, 'format=j1');
+  const response = await fetchWttr(location, 'format=3');
 
   if (!response.ok) {
     throw new TRPCError({
@@ -753,41 +682,16 @@ async function validateWeatherLocation(
     });
   }
 
-  let data: unknown;
-  try {
-    data = await response.json();
-  } catch {
+  const parsed = parseWttrFormat3(await response.text());
+  if (!parsed) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Weather location could not be found.',
     });
   }
 
-  const parsed = wttrResponseSchema.safeParse(data);
-  if (!parsed.success) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Weather location could not be found.',
-    });
-  }
-
-  const normalizedLocation = normalizeWeatherLocation(data);
-  if (!normalizedLocation) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Weather location could not be found.',
-    });
-  }
-
-  const currentWeatherText = getCurrentWeatherText(parsed.data);
-  if (!currentWeatherText) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Weather preview could not be loaded.',
-    });
-  }
-
-  return { location: normalizedLocation, currentWeatherText };
+  const resolvedLocation = await fetchCoordinateLocationName(location);
+  return { ...parsed, ...(resolvedLocation ? { location: resolvedLocation } : undefined) };
 }
 
 // TODO: Replace with catalog-driven schema. This hardcoded list must be kept

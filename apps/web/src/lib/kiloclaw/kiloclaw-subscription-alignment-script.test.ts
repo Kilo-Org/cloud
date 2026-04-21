@@ -10,7 +10,7 @@ import {
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 
@@ -32,6 +32,7 @@ describe('kiloclaw-subscription-alignment script', () => {
     status: 'active' | 'trialing' | 'canceled';
     paymentSource: 'credits' | 'stripe' | null;
     organizationId?: string;
+    stripeSubscriptionId?: string | null;
     trialEndsAt?: string;
   }) {
     const user = await insertTestUser({ google_user_email: params.email });
@@ -53,6 +54,7 @@ describe('kiloclaw-subscription-alignment script', () => {
         plan: params.plan,
         status: params.status,
         payment_source: params.paymentSource,
+        stripe_subscription_id: params.stripeSubscriptionId ?? null,
         cancel_at_period_end: true,
         pending_conversion: true,
         scheduled_plan: 'standard',
@@ -229,30 +231,50 @@ describe('kiloclaw-subscription-alignment script', () => {
     );
   });
 
-  it('reports destroyed active Stripe row for manual review without mutation', async () => {
-    const { subscription } = await insertDestroyedCurrentAccessRow({
+  it('reports destroyed active Stripe and hybrid rows for manual review without mutation', async () => {
+    const stripe = await insertDestroyedCurrentAccessRow({
       email: 'destroyed-current-stripe@example.com',
       plan: 'standard',
       status: 'active',
       paymentSource: 'stripe',
+      stripeSubscriptionId: 'sub_destroyed_current_stripe',
+    });
+    const hybrid = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-hybrid@example.com',
+      plan: 'standard',
+      status: 'active',
+      paymentSource: 'credits',
+      stripeSubscriptionId: 'sub_destroyed_current_hybrid',
     });
 
     const candidates = await listPersonalDestroyedCurrentAccessCandidates();
-    expect(candidates).toEqual([
-      expect.objectContaining({
-        action: 'manual_review_stripe',
-        subscriptionId: subscription.id,
-      }),
-    ]);
+    expect(candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'manual_review_stripe',
+          subscriptionId: stripe.subscription.id,
+        }),
+        expect.objectContaining({
+          action: 'manual_review_stripe',
+          subscriptionId: hybrid.subscription.id,
+        }),
+      ])
+    );
+    expect(candidates).toHaveLength(2);
 
-    await run('apply-personal-destroyed-current-access');
+    await run('apply-personal-destroyed-current-access', '--confirm-cancel-credit-access');
 
-    const [updated] = await db
+    const updated = await db
       .select()
       .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+      .where(inArray(kiloclaw_subscriptions.id, [stripe.subscription.id, hybrid.subscription.id]));
 
-    expect(updated?.status).toBe('active');
+    expect(updated).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: stripe.subscription.id, status: 'active' }),
+        expect.objectContaining({ id: hybrid.subscription.id, status: 'active' }),
+      ])
+    );
   });
 
   it('does not touch org-scoped destroyed current row', async () => {

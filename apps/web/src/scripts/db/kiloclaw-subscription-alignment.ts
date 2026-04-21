@@ -274,6 +274,7 @@ export type PersonalDestroyedCurrentAccessCandidate = {
   plan: string;
   status: string;
   paymentSource: string | null;
+  stripeSubscriptionId: string | null;
   trialEndsAt: string | null;
   instanceDestroyedAt: string;
   subscriptionCreatedAt: string;
@@ -3438,8 +3439,9 @@ function classifyPersonalDestroyedCurrentAccessRow(row: {
   paymentSource: string | null;
   plan: string;
   status: string;
+  stripeSubscriptionId: string | null;
 }): PersonalDestroyedCurrentAccessAction {
-  if (row.paymentSource === 'stripe') {
+  if (row.paymentSource === 'stripe' || row.stripeSubscriptionId !== null) {
     return 'manual_review_stripe';
   }
   if (row.status === 'past_due') {
@@ -3469,6 +3471,7 @@ export async function listPersonalDestroyedCurrentAccessCandidates(): Promise<
     plan: string;
     status: string;
     payment_source: string | null;
+    stripe_subscription_id: string | null;
     trial_ends_at: string | null;
     instance_destroyed_at: string;
     subscription_created_at: string;
@@ -3482,6 +3485,7 @@ export async function listPersonalDestroyedCurrentAccessCandidates(): Promise<
         s.plan,
         s.status,
         s.payment_source,
+        s.stripe_subscription_id,
         s.suspended_at,
         s.trial_ends_at,
         s.created_at AS subscription_created_at,
@@ -3505,6 +3509,7 @@ export async function listPersonalDestroyedCurrentAccessCandidates(): Promise<
       plan,
       status,
       payment_source,
+      stripe_subscription_id,
       trial_ends_at,
       instance_destroyed_at,
       subscription_created_at,
@@ -3526,6 +3531,7 @@ export async function listPersonalDestroyedCurrentAccessCandidates(): Promise<
       paymentSource: row.payment_source,
       plan: row.plan,
       status: row.status,
+      stripeSubscriptionId: row.stripe_subscription_id,
     }),
     userId: row.user_id,
     subscriptionId: row.subscription_id,
@@ -3534,6 +3540,7 @@ export async function listPersonalDestroyedCurrentAccessCandidates(): Promise<
     plan: row.plan,
     status: row.status,
     paymentSource: row.payment_source,
+    stripeSubscriptionId: row.stripe_subscription_id,
     trialEndsAt: row.trial_ends_at,
     instanceDestroyedAt: row.instance_destroyed_at,
     subscriptionCreatedAt: row.subscription_created_at,
@@ -3583,6 +3590,7 @@ async function previewPersonalDestroyedCurrentAccess() {
           plan: candidate.plan,
           status: candidate.status,
           paymentSource: candidate.paymentSource,
+          stripeSubscriptionId: candidate.stripeSubscriptionId,
           trialEndsAt: candidate.trialEndsAt,
           instanceDestroyedAt: candidate.instanceDestroyedAt,
           subscriptionCreatedAt: candidate.subscriptionCreatedAt,
@@ -3685,6 +3693,7 @@ export async function applyPersonalDestroyedCurrentAccessRow(
       paymentSource: currentRow.subscription.payment_source,
       plan: currentRow.subscription.plan,
       status: currentRow.subscription.status,
+      stripeSubscriptionId: currentRow.subscription.stripe_subscription_id,
     });
     if (action === 'cancel_destroyed_credits_subscription' && !options.confirmCancelCreditAccess) {
       return 'skipped_requires_credit_confirmation' as const;

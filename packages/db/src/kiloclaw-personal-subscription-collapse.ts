@@ -95,6 +95,9 @@ function isAccessGrantingSubscription(
 }
 
 function shouldCancelSingleDestroyedCurrentAccessRow(row: KiloClawSubscription): boolean {
+  if (row.stripe_subscription_id !== null) {
+    return false;
+  }
   if (row.plan === 'trial' && row.status === 'trialing' && row.payment_source === null) {
     return true;
   }

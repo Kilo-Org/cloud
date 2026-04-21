@@ -9,7 +9,7 @@ import {
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 import { listCurrentPersonalSubscriptionRows } from '@/lib/kiloclaw/current-personal-subscription';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
@@ -42,6 +42,7 @@ async function insertPersonalSubscription(params: {
   plan: 'standard' | 'trial';
   paymentSource?: 'credits' | 'stripe' | null;
   status: 'active' | 'canceled';
+  stripeSubscriptionId?: string | null;
   transferredToSubscriptionId?: string | null;
   userId: string;
 }) {
@@ -52,6 +53,7 @@ async function insertPersonalSubscription(params: {
     plan: params.plan,
     status: params.status,
     payment_source: params.paymentSource ?? 'credits',
+    stripe_subscription_id: params.stripeSubscriptionId ?? null,
     cancel_at_period_end: false,
     transferred_to_subscription_id: params.transferredToSubscriptionId ?? null,
     created_at: params.createdAt,
@@ -450,48 +452,86 @@ describe('personal subscription destroy collapse', () => {
     expect(instance?.destroyed_at).toBeNull();
   });
 
-  it('does not auto-cancel single destroyed Stripe current row on destroy path', async () => {
-    const user = await insertTestUser({
+  it('does not auto-cancel single destroyed Stripe or hybrid current row on destroy path', async () => {
+    const stripeUser = await insertTestUser({
       google_user_email: 'destroy-cancel-single-stripe@example.com',
     });
-    const instanceId = crypto.randomUUID();
-    const subscriptionId = crypto.randomUUID();
+    const hybridUser = await insertTestUser({
+      google_user_email: 'destroy-cancel-single-hybrid@example.com',
+    });
+    const stripeInstanceId = crypto.randomUUID();
+    const hybridInstanceId = crypto.randomUUID();
+    const stripeSubscriptionId = crypto.randomUUID();
+    const hybridSubscriptionId = crypto.randomUUID();
 
     await insertPersonalInstance({
-      id: instanceId,
-      userId: user.id,
+      id: stripeInstanceId,
+      userId: stripeUser.id,
+      createdAt: '2026-04-01T00:00:00.000Z',
+    });
+    await insertPersonalInstance({
+      id: hybridInstanceId,
+      userId: hybridUser.id,
       createdAt: '2026-04-01T00:00:00.000Z',
     });
     await insertPersonalSubscription({
-      id: subscriptionId,
-      userId: user.id,
-      instanceId,
+      id: stripeSubscriptionId,
+      userId: stripeUser.id,
+      instanceId: stripeInstanceId,
       createdAt: '2026-04-01T00:00:00.000Z',
       plan: 'standard',
       status: 'active',
       paymentSource: 'stripe',
+      stripeSubscriptionId: 'sub_destroy_path_stripe',
+    });
+    await insertPersonalSubscription({
+      id: hybridSubscriptionId,
+      userId: hybridUser.id,
+      instanceId: hybridInstanceId,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      plan: 'standard',
+      status: 'active',
+      paymentSource: 'credits',
+      stripeSubscriptionId: 'sub_destroy_path_hybrid',
     });
 
     await db.transaction(async tx => {
       await markInstanceDestroyedWithPersonalSubscriptionCollapse({
         actor: TEST_ACTOR,
         executor: tx,
-        instanceId,
+        instanceId: stripeInstanceId,
         reason: 'destroy_path_inline_collapse',
-        userId: user.id,
+        userId: stripeUser.id,
+      });
+      await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+        actor: TEST_ACTOR,
+        executor: tx,
+        instanceId: hybridInstanceId,
+        reason: 'destroy_path_inline_collapse',
+        userId: hybridUser.id,
       });
     });
 
-    const [subscription] = await db
+    const subscriptions = await db
       .select()
       .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.id, subscriptionId));
+      .where(inArray(kiloclaw_subscriptions.id, [stripeSubscriptionId, hybridSubscriptionId]));
     const logs = await db
       .select()
       .from(kiloclaw_subscription_change_log)
-      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscriptionId));
+      .where(
+        inArray(kiloclaw_subscription_change_log.subscription_id, [
+          stripeSubscriptionId,
+          hybridSubscriptionId,
+        ])
+      );
 
-    expect(subscription?.status).toBe('active');
+    expect(subscriptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: stripeSubscriptionId, status: 'active' }),
+        expect.objectContaining({ id: hybridSubscriptionId, status: 'active' }),
+      ])
+    );
     expect(logs).toHaveLength(0);
   });
 

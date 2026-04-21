@@ -23,6 +23,7 @@ import type {
   DevicePairingApproveResponse,
   VolumeSnapshotsResponse,
   DoctorResponse,
+  OpenclawWorkspaceImportResponse,
   KiloCliRunStartResponse,
   KiloCliRunStatusResponse,
   GatewayProcessStatusResponse,
@@ -613,6 +614,18 @@ export class KiloClawInternalClient {
     return this.request(`/api/platform/files/write${params}`, {
       method: 'POST',
       body: JSON.stringify({ userId, path: filePath, content, etag }),
+    });
+  }
+
+  async importOpenclawWorkspace(
+    userId: string,
+    files: Array<{ path: string; content: string }>,
+    instanceId?: string
+  ): Promise<OpenclawWorkspaceImportResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(`/api/platform/files/import-openclaw-workspace${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, files }),
     });
   }
 

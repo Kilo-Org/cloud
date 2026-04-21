@@ -30,7 +30,14 @@ export type SendTypingParams = { conversationId: string };
 export type ListMessagesParams = { conversationId: string; before?: string; limit?: number };
 export type ListMessagesResult = { messages: Array<Record<string, unknown>> };
 export type GetMembersParams = { conversationId: string };
-export type GetMembersResult = { members: Array<{ id: string; kind: string }> };
+export type GetMembersResult = {
+  members: Array<{
+    id: string;
+    kind: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+  }>;
+};
 
 export type RenameConversationParams = { conversationId: string; title: string };
 

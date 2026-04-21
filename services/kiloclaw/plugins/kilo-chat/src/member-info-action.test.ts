@@ -19,12 +19,12 @@ function mockClient(overrides: Partial<KiloChatClient> = {}): KiloChatClient {
 }
 
 describe('handleKiloChatMemberInfoAction', () => {
-  it('returns formatted member list on happy path', async () => {
+  it('returns formatted member list with display names', async () => {
     const client = mockClient({
       getMembers: vi.fn().mockResolvedValue({
         members: [
-          { id: 'alice', kind: 'human' },
-          { id: 'bot-1', kind: 'bot' },
+          { id: 'alice', kind: 'user', displayName: 'Alice Smith', avatarUrl: 'https://img/a' },
+          { id: 'bot-1', kind: 'bot', displayName: null, avatarUrl: null },
         ],
       }),
     });
@@ -36,7 +36,22 @@ describe('handleKiloChatMemberInfoAction', () => {
 
     expect(client.getMembers).toHaveBeenCalledWith({ conversationId: 'CONV' });
     expect(result.content).toHaveLength(1);
-    expect(result.content[0].text).toBe('Members (2):\n- alice (human)\n- bot-1 (bot)');
+    expect(result.content[0].text).toBe('Members (2):\n- Alice Smith (alice, user)\n- bot-1 (bot)');
+  });
+
+  it('falls back to ID when displayName is null', async () => {
+    const client = mockClient({
+      getMembers: vi.fn().mockResolvedValue({
+        members: [{ id: 'user-x', kind: 'user', displayName: null, avatarUrl: null }],
+      }),
+    });
+
+    const result = await handleKiloChatMemberInfoAction({
+      params: { to: 'CONV' },
+      client,
+    });
+
+    expect(result.content[0].text).toBe('Members (1):\n- user-x (user)');
   });
 
   it('resolves conversationId from toolContext when params.to is absent', async () => {

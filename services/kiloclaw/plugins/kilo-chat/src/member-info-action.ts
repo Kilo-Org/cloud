@@ -30,7 +30,13 @@ export async function handleKiloChatMemberInfoAction(
 
   const { members } = await args.client.getMembers({ conversationId });
 
-  const lines = members.map(m => `- ${m.id} (${m.kind})`);
+  const lines = members.map(m => {
+    const display = (m as { displayName?: string | null }).displayName;
+    if (display) {
+      return `- ${display} (${m.id}, ${m.kind})`;
+    }
+    return `- ${m.id} (${m.kind})`;
+  });
   const text = `Members (${members.length}):\n${lines.join('\n')}`;
 
   return { content: [{ type: 'text', text }] };

@@ -2,7 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class FakeDurableObject {},
-  WorkerEntrypoint: class FakeWorkerEntrypoint {},
+  WorkerEntrypoint: class FakeWorkerEntrypoint {
+    env: unknown;
+    ctx: unknown;
+
+    constructor(env: unknown, ctx: unknown) {
+      this.env = env;
+      this.ctx = ctx;
+    }
+  },
 }));
 
 vi.mock('./routes', async () => {
@@ -43,7 +51,7 @@ vi.mock('./lib/image-version', async () => {
   };
 });
 
-import { app } from './index';
+import WorkerEntrypoint, { app } from './index';
 import { deriveGatewayToken } from './auth/gateway-token';
 import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
 
@@ -227,6 +235,77 @@ describe('proxy recovering state', () => {
       error: 'Instance is recovering',
       hint: 'Your instance is being recovered after an unexpected stop. Please wait.',
     });
+  });
+});
+
+describe('kilo-chat webhook delivery', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('routes service-binding webhook payloads to the target instance gateway', async () => {
+    const sandboxId = 'ki_550e8400e29b41d4a716446655440000';
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({ sandboxId }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'https://test-app.fly.dev',
+        headers: { 'fly-force-instance-id': 'machine-1' },
+      }),
+    };
+    const instanceNamespace = {
+      idFromName: vi.fn().mockReturnValue('instance-id'),
+      get: vi.fn().mockReturnValue(instanceStub),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+
+    const worker = new WorkerEntrypoint(
+      {
+        KILOCLAW_INSTANCE: instanceNamespace,
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+      } as never,
+      {} as never
+    );
+
+    await worker.deliverChatWebhook({
+      targetBotId: `bot:kiloclaw:${sandboxId}`,
+      conversationId: '01KP8R0VX4HK4ZSVQR5ZBVKHQH',
+      messageId: '01KP8R0VX4HK4ZSVQR5ZBVKHQJ',
+      from: 'user-1',
+      text: 'Hello',
+      sentAt: '2026-04-21T12:00:00.000Z',
+    });
+
+    expect(instanceNamespace.idFromName).toHaveBeenCalledWith(
+      '550e8400-e29b-41d4-a716-446655440000'
+    );
+    expect(instanceNamespace.get).toHaveBeenCalledWith('instance-id');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const { input, init } = getFetchCall(fetchMock);
+    expect(input).toBe('https://test-app.fly.dev/plugins/kilo-chat/webhook');
+    expect(init?.method).toBe('POST');
+    expect(init?.body).toBe(
+      JSON.stringify({
+        conversationId: '01KP8R0VX4HK4ZSVQR5ZBVKHQH',
+        messageId: '01KP8R0VX4HK4ZSVQR5ZBVKHQJ',
+        from: 'user-1',
+        text: 'Hello',
+        sentAt: '2026-04-21T12:00:00.000Z',
+      })
+    );
+    if (!(init?.headers instanceof Headers)) {
+      throw new Error('Expected webhook fetch headers to be a Headers instance');
+    }
+    expect(init.headers.get('x-kiloclaw-proxy-token')).toBe(
+      await deriveGatewayToken(sandboxId, 'gateway-secret')
+    );
+    expect(init.headers.get('fly-force-instance-id')).toBe('machine-1');
+    expect(init.headers.get('content-type')).toBe('application/json');
   });
 });
 

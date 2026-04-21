@@ -33,9 +33,9 @@ Subsequent reply blocks become separate messages.
 
 Outbound calls (all proxied through the controller):
 
-- `POST   /_kilo/kilo-chat/send` — create the initial preview (`version: 1`).
-- `PATCH  /_kilo/kilo-chat/messages/:id` with `{conversationId, content, version}` —
-  each edit; the server MAY reject with `409` on a stale version, which is
+- `POST   /_kilo/kilo-chat/send` — create the initial preview.
+- `PATCH  /_kilo/kilo-chat/messages/:id` with `{conversationId, content, timestamp}` —
+  each edit; the server MAY reject with `409` on a stale timestamp, which is
   treated as a benign drop (the plugin re-sends on finalize).
 - `DELETE /_kilo/kilo-chat/messages/:id` — preview cleanup on dispatch failure.
 - `POST   /_kilo/kilo-chat/typing` with `{conversationId}` — typing indicator.

@@ -5718,11 +5718,11 @@ describe('provision: auto-start after fresh provision', () => {
     });
   });
 
-  it('does not leave the hot DO on an unsupported provider after failed provision', async () => {
+  it('does not leave the hot DO on a misconfigured provider after failed provision', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
 
     await expect(instance.provision('user-1', {}, { provider: 'northflank' })).rejects.toThrow(
-      'Provider northflank is not implemented yet'
+      /^Provider northflank is not configured; missing /
     );
 
     expect(storage._store.get('userId')).toBeUndefined();

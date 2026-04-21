@@ -351,7 +351,7 @@ describe('kilo-cli-run/cancel: conflict response handling', () => {
 });
 
 describe('sanitizeError: explicit provider support errors', () => {
-  it('returns 501 for unsupported providers on provision instead of a generic 500', async () => {
+  it('returns 503 for unconfigured Northflank on provision instead of a generic 500', async () => {
     const provision = vi.fn();
     const env = {
       KILOCLAW_INSTANCE: {
@@ -381,10 +381,13 @@ describe('sanitizeError: explicit provider support errors', () => {
       env
     );
 
-    expect(resp.status).toBe(501);
-    expect(await jsonBody(resp)).toEqual({
-      error: 'Provider northflank is not implemented yet',
-    });
+    expect(resp.status).toBe(503);
+    const body = await jsonBody(resp);
+    const errorMessage = body.error;
+    if (typeof errorMessage !== 'string') {
+      throw new Error('expected string error message in response body');
+    }
+    expect(errorMessage).toMatch(/^Provider northflank is not configured; missing /);
     expect(provision).not.toHaveBeenCalled();
   });
 

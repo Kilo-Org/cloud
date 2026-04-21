@@ -67,7 +67,7 @@ export async function createMessageFor(
 
   // Deliver webhook to each bot member (other than the sender) via direct RPC.
   if (botMembers.length > 0) {
-    const now = new Date().toISOString();
+    const sentAt = new Date().toISOString();
 
     // Resolve reply context for webhook delivery
     let inReplyToBody: string | undefined;
@@ -94,7 +94,7 @@ export async function createMessageFor(
           messageId,
           from: callerId,
           content,
-          sentAt: now,
+          sentAt,
           ...(inReplyToMessageId !== undefined && { inReplyToMessageId }),
           ...(inReplyToBody !== undefined && { inReplyToBody }),
           ...(inReplyToSender !== undefined && { inReplyToSender }),

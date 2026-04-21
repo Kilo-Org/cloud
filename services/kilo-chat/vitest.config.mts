@@ -1,5 +1,9 @@
 import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
 
+// Self-referencing symbol: miniflare resolves this to the current (runner) worker,
+// letting the destroy-sandbox test call the RPC method on our own entrypoint.
+const kCurrentWorker = Symbol.for('miniflare.kCurrentWorker');
+
 export default defineWorkersConfig({
   test: {
     setupFiles: ['./src/__tests__/setup.ts'],
@@ -16,6 +20,7 @@ export default defineWorkersConfig({
           serviceBindings: {
             KILOCLAW: 'kiloclaw-stub',
             EVENT_SERVICE: 'event-service-stub',
+            KILO_CHAT_SELF: kCurrentWorker as unknown as string,
           },
           workers: [
             {

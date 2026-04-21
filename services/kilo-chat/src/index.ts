@@ -50,4 +50,49 @@ export default class extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {
     return app.fetch(request, this.env, this.ctx);
   }
+
+  async destroySandboxData(sandboxId: string): Promise<{ ok: true; conversationsDeleted: number }> {
+    const botId = `bot:kiloclaw:${sandboxId}`;
+    const botMembership = this.env.MEMBERSHIP_DO.get(this.env.MEMBERSHIP_DO.idFromName(botId));
+
+    // Discover all conversations for this sandbox, paginating through all results.
+    const allConversationIds: string[] = [];
+    const PAGE_SIZE = 100;
+    let offset = 0;
+    while (true) {
+      const page = await botMembership.listConversations(sandboxId, PAGE_SIZE, offset);
+      for (const c of page.conversations) {
+        allConversationIds.push(c.conversationId);
+      }
+      if (allConversationIds.length >= page.total) break;
+      offset += PAGE_SIZE;
+    }
+
+    // Fan out: for each conversation, clean up member MembershipDOs then destroy ConversationDO.
+    for (const conversationId of allConversationIds) {
+      const convStub = this.env.CONVERSATION_DO.get(
+        this.env.CONVERSATION_DO.idFromName(conversationId)
+      );
+      const info = await convStub.getInfo();
+
+      if (info) {
+        // Remove this conversation from every member's MembershipDO.
+        await Promise.all(
+          info.members.map(member => {
+            const memberStub = this.env.MEMBERSHIP_DO.get(
+              this.env.MEMBERSHIP_DO.idFromName(member.id)
+            );
+            return memberStub.removeConversation(conversationId);
+          })
+        );
+      }
+
+      await convStub.destroy();
+    }
+
+    // Final sweep: bulk-delete any remaining entries in the bot's MembershipDO.
+    await botMembership.removeConversationsBySandbox(sandboxId);
+
+    return { ok: true, conversationsDeleted: allConversationIds.length };
+  }
 }

@@ -25,10 +25,7 @@ import {
 import { custom_llm2, type User } from '@kilocode/db/schema';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { hasAttemptCompletionTool } from '@/lib/ai-gateway/tool-calling';
-import {
-  applyGoogleModelSettings,
-  isGeminiModel,
-} from '@/lib/ai-gateway/providers/google';
+import { applyGoogleModelSettings, isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { applyMoonshotModelSettings, isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';

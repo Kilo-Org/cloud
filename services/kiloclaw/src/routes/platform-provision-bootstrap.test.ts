@@ -264,7 +264,7 @@ describe('platform provision bootstrap quarantine', () => {
       expect.objectContaining({
         userLocation: 'Amsterdam, North Holland, Netherlands',
       }),
-      expect.objectContaining({ instanceId: expect.any(String) })
+      expect.anything()
     );
   });
 

@@ -1,37 +1,19 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { unstable_cache } from 'next/cache';
 import { captureException } from '@sentry/nextjs';
-import type { OpenRouterProvider } from '@/lib/organizations/organization-types';
+import { OpenRouterProvidersResponseSchema } from '@/lib/organizations/organization-types';
+import { createCachedFetch } from '@/lib/cached-fetch';
+import { redisGet } from '@/lib/redis';
+import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
 
-export const revalidate = 86400; // 24 hours
-
-// Cache the providers fetch for 24 hours
-const getCachedProviders = unstable_cache(
+const getProviders = createCachedFetch(
   async () => {
-    const response = await fetch('https://openrouter.ai/api/frontend/all-providers', {
-      method: 'GET',
-    });
-
-    if (!response.ok) {
-      const errorMessage = `Failed to fetch OpenRouter providers: ${response.status} ${response.statusText}`;
-      captureException(new Error(errorMessage), {
-        tags: { endpoint: 'openrouter/providers', source: 'openrouter_public_api' },
-        extra: {
-          status: response.status,
-          statusText: response.statusText,
-        },
-      });
-      throw new Error(errorMessage);
-    }
-
-    return response.json() as Promise<OpenRouterProvider[]>;
+    const raw = await redisGet(GATEWAY_METADATA_REDIS_KEYS.openrouterProviders);
+    if (raw === null) return null;
+    return OpenRouterProvidersResponseSchema.shape.data.parse(JSON.parse(raw));
   },
-  ['openrouter-providers'], // Cache key
-  {
-    revalidate: 86400, // 24 hours in seconds
-    tags: ['openrouter-providers'], // Cache tags for granular invalidation
-  }
+  60_000, // 60 seconds in-process TTL
+  null
 );
 
 /**
@@ -40,8 +22,14 @@ const getCachedProviders = unstable_cache(
  */
 export async function GET(_request: NextRequest): Promise<NextResponse> {
   try {
-    const data = await getCachedProviders();
-    return NextResponse.json(data);
+    const data = await getProviders();
+    if (data === null) {
+      return NextResponse.json(
+        { error: 'Service Unavailable', message: 'Providers data not yet available' },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ data });
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'openrouter/providers' },

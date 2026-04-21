@@ -869,6 +869,7 @@ describe('TOOLS.md section configs', () => {
     expect(section).toContain('plugins.tools_reachable_permissive_policy');
     expect(section).toContain('hooks.default_session_key_unset');
     expect(section).toContain('hooks.allowed_agent_ids_unrestricted');
+    expect(section).toContain('fs.config.perms_world_readable');
     // Does NOT redundantly list gateway.control_ui.insecure_auth as its own
     // bullet — that one is already documented in the base TOOLS.md's
     // "Security Check Context" section. In-body references to it are fine
@@ -891,6 +892,26 @@ describe('TOOLS.md section configs', () => {
     // PR #2597 for the production incident this guards against.
     expect(section).toContain('DO NOT create');
     expect(section).toContain('permissive mode');
+  });
+
+  it('Google Workspace section uses current gog calendar guidance', () => {
+    expect(GOG_SECTION_CONFIG.section).toContain('gog auth list --json');
+    expect(GOG_SECTION_CONFIG.section).toContain('gog calendar calendars --account <email> --json');
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'gog calendar events --all --all-pages --account <email> --from <iso> --to <iso> --json'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'align `--from` / `--to` to the user-requested local date window before summarizing'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain('use `primary` only when explicitly requested');
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'if results look sparse, retry with explicit calendar IDs'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'gog calendar events <calendarId> --all-pages --account <email> --from <iso> --to <iso> --json'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain('gog drive ls --account <email> --json');
+    expect(GOG_SECTION_CONFIG.section).not.toContain('gog drive files list');
   });
 });
 

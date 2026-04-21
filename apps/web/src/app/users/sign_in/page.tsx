@@ -10,6 +10,7 @@ export default async function SignInPage({
 }) {
   const { params, error } = await getAuthPageProps(searchParams);
   const ssoMode = params['sso'] === 'true' || !!params['domain'];
+  const isSignUp = params['signup'] === 'true';
 
   return (
     <AuthPageLayout>
@@ -17,13 +18,21 @@ export default async function SignInPage({
         <SignInForm
           searchParams={params}
           error={error}
-          isSignUp={false}
+          isSignUp={isSignUp}
           allowFakeLogin={allow_fake_login}
-          title={ssoMode ? 'Enterprise SSO' : 'Welcome to Kilo Code'}
+          title={
+            ssoMode
+              ? 'Enterprise SSO'
+              : isSignUp
+                ? 'Create your Kilo Code account'
+                : 'Welcome to Kilo Code'
+          }
           subtitle={
             ssoMode
               ? "Enter your work email address to sign in with your organization's Single Sign-On"
-              : 'Sign in or create an account to get started'
+              : isSignUp
+                ? 'Sign up to get started'
+                : 'Sign in or create an account to get started'
           }
           ssoMode={ssoMode}
           emailOnly={ssoMode}

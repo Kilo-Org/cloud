@@ -18,7 +18,7 @@ export default {
     id: 'alibaba',
     apiUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
     apiKey: getEnvVariable('ALIBABA_API_KEY'),
-    supportedChatApis: ['chat_completions'],
+    supportedChatApis: ['chat_completions', 'responses'],
     transformRequest(context) {
       context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
       addCacheBreakpoints(context.request);
@@ -28,7 +28,7 @@ export default {
     id: 'bytedance',
     apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/v3',
     apiKey: getEnvVariable('BYTEDANCE_API_KEY'),
-    supportedChatApis: ['chat_completions'],
+    supportedChatApis: ['chat_completions', 'responses'],
     transformRequest(context) {
       if (context.request.kind === 'chat_completions' || context.request.kind === 'responses') {
         context.request.body.thinking = { type: 'enabled' };

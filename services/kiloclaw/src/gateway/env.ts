@@ -7,6 +7,7 @@ import type {
   EncryptedEnvelope,
   EncryptedChannelTokens,
   GoogleCredentials,
+  GoogleOAuthConnection,
   KiloExaSearchMode,
 } from '../schemas/instance-config';
 import { deriveGatewayToken } from '../auth/gateway-token';
@@ -30,6 +31,7 @@ export type UserConfig = {
   kiloExaSearchMode?: KiloExaSearchMode | null;
   channels?: EncryptedChannelTokens;
   googleCredentials?: GoogleCredentials;
+  googleOAuthConnection?: GoogleOAuthConnection | null;
   instanceFeatures?: string[];
   execSecurity?: string | null;
   execAsk?: string | null;
@@ -198,6 +200,13 @@ export async function buildEnvVars(
         console.warn('Failed to decrypt Google credentials, starting without Google access:', err);
       }
     }
+  }
+
+  if (
+    userConfig?.googleCredentials ||
+    (userConfig?.googleOAuthConnection && userConfig.googleOAuthConnection.status === 'active')
+  ) {
+    plainEnv.KILOCLAW_GOOGLE_WORKSPACE_ENABLED = 'true';
   }
 
   // Org identity (non-sensitive, plaintext)

@@ -35,6 +35,13 @@ type ResolveAutoModelParams = {
   sessionId: string | null;
 };
 
+function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
+  const parsedMode = modeSchema.safeParse(modeHeader?.trim() ?? '');
+  if (parsedMode.success) return parsedMode.data;
+  if (featureHeader === 'kiloclaw' || featureHeader === 'openclaw') return 'claw' as const;
+  return null;
+}
+
 export async function resolveAutoModel(
   params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
@@ -57,13 +64,9 @@ export async function resolveAutoModel(
         (await balancePromise) > 0 ? GEMMA_4_31B_IT_ID : gemma_4_26b_a4b_it_free_model.public_id,
     };
   }
-  const modeResult =
-    featureHeader === 'kiloclaw' || featureHeader === 'openclaw'
-      ? { success: true, data: 'KiloClaw' as const }
-      : modeSchema.safeParse(modeHeader?.trim() ?? '');
-  const mode = modeResult.success ? modeResult.data : null;
+  const mode = resolveMode(modeHeader, featureHeader);
   if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
-    if (featureHeader === 'kiloclaw') {
+    if (featureHeader === 'kiloclaw' && mode === 'claw') {
       const user = await userPromise;
       if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
         return BALANCED_CLAW_SETUP_MODEL;

@@ -33,17 +33,18 @@ export const preferredModels = [
   KILO_AUTO_FRONTIER_MODEL.id,
   KILO_AUTO_BALANCED_MODEL.id,
   KILO_AUTO_FREE_MODEL.id,
+  seed_20_pro_free_model.status === 'public' ? seed_20_pro_free_model.public_id : null,
   grok_code_fast_1_optimized_free_model.status === 'public'
     ? grok_code_fast_1_optimized_free_model.public_id
     : null,
   stepfun_35_flash_free_model.status === 'public' ? stepfun_35_flash_free_model.public_id : null,
   'openrouter/elephant-alpha',
   CLAUDE_OPUS_CURRENT_MODEL_ID,
+  KIMI_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   'openai/gpt-5.4',
   'google/gemini-3.1-pro-preview',
   MINIMAX_CURRENT_MODEL_ID,
-  KIMI_CURRENT_MODEL_ID,
   'z-ai/glm-5.1',
 ].filter(m => m !== null);
 

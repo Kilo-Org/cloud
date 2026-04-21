@@ -122,6 +122,20 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   };
 });
 
+const posthogCaptureMock = jest.fn();
+
+jest.mock('@/lib/posthog', () => ({
+  __esModule: true,
+  default: () => ({
+    capture: posthogCaptureMock,
+    isFeatureEnabled: jest.fn(),
+    getFeatureFlag: jest.fn(),
+    debug: jest.fn(),
+    getFeatureFlagPayload: jest.fn(),
+    alias: jest.fn(),
+  }),
+}));
+
 // ── Dynamic imports (after mocks) ──────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -157,6 +171,10 @@ beforeEach(async () => {
   user = await insertTestUser({
     google_user_email: `kiloclaw-billing-test-${Math.random()}@example.com`,
   });
+  const defaultProvisionResult = {
+    sandboxId: `test-sandbox-${crypto.randomUUID()}`,
+    instanceId: crypto.randomUUID(),
+  };
 
   // Reset stripe mocks
   stripeMock.checkout.sessions.create.mockReset();
@@ -176,7 +194,8 @@ beforeEach(async () => {
   stripeMock.invoices.list.mockReset();
   stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
   kiloclawInternalClientMock.__provisionMock.mockReset();
-  kiloclawInternalClientMock.__provisionMock.mockResolvedValue({});
+  kiloclawInternalClientMock.__provisionMock.mockResolvedValue(defaultProvisionResult);
+  posthogCaptureMock.mockReset();
 
   // Default mock returns for live-fetch calls
   stripeMock.subscriptions.retrieve.mockResolvedValue({
@@ -555,6 +574,12 @@ describe('getBillingStatus', () => {
 
 describe('provision detached personal billing recovery', () => {
   it('allows reprovisioning when only detached access-granting row remains', async () => {
+    const provisionResult = {
+      sandboxId: `test-sandbox-${crypto.randomUUID()}`,
+      instanceId: crypto.randomUUID(),
+    };
+    kiloclawInternalClientMock.__provisionMock.mockResolvedValue(provisionResult);
+
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
       instance_id: null,
@@ -567,7 +592,7 @@ describe('provision detached personal billing recovery', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    await expect(caller.kiloclaw.provision({})).resolves.toEqual({});
+    await expect(caller.kiloclaw.provision({})).resolves.toEqual(provisionResult);
 
     expect(kiloclawInternalClientMock.__provisionMock).toHaveBeenCalledWith(
       user.id,
@@ -578,6 +603,10 @@ describe('provision detached personal billing recovery', () => {
 
   it('bootstraps detached access-granting row onto active instance when active row missing', async () => {
     const activeInstance = await createKiloclawInstance(user.id);
+    kiloclawInternalClientMock.__provisionMock.mockResolvedValue({
+      sandboxId: activeInstance.sandbox_id,
+      instanceId: activeInstance.id,
+    });
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
       instance_id: null,
@@ -590,7 +619,10 @@ describe('provision detached personal billing recovery', () => {
     });
 
     const caller = await createCallerForUser(user.id);
-    await expect(caller.kiloclaw.provision({})).resolves.toEqual({});
+    await expect(caller.kiloclaw.provision({})).resolves.toEqual({
+      sandboxId: activeInstance.sandbox_id,
+      instanceId: activeInstance.id,
+    });
 
     expect(kiloclawInternalClientMock.__provisionMock).toHaveBeenCalledWith(
       user.id,
@@ -604,9 +636,27 @@ describe('provision detached personal billing recovery', () => {
 
   it('bootstraps a fresh trial onto an active orphan instance with zero subscription rows', async () => {
     const activeInstance = await createKiloclawInstance(user.id);
+    kiloclawInternalClientMock.__provisionMock.mockImplementationOnce(async () => {
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        instance_id: activeInstance.id,
+        plan: 'trial',
+        status: 'trialing',
+        trial_started_at: '2026-04-20T10:00:00.000Z',
+        trial_ends_at: '2026-04-27T10:00:00.000Z',
+      });
+
+      return {
+        sandboxId: activeInstance.sandbox_id,
+        instanceId: activeInstance.id,
+      };
+    });
 
     const caller = await createCallerForUser(user.id);
-    await expect(caller.kiloclaw.provision({})).resolves.toEqual({});
+    await expect(caller.kiloclaw.provision({})).resolves.toEqual({
+      sandboxId: activeInstance.sandbox_id,
+      instanceId: activeInstance.id,
+    });
 
     expect(kiloclawInternalClientMock.__provisionMock).toHaveBeenCalledWith(
       user.id,
@@ -616,6 +666,33 @@ describe('provision detached personal billing recovery', () => {
         bootstrapSubscription: true,
       }
     );
+    expect(posthogCaptureMock).toHaveBeenCalledWith({
+      distinctId: user.google_user_email,
+      event: 'claw_trial_started',
+      properties: expect.objectContaining({
+        user_id: user.id,
+        plan: 'trial',
+      }),
+    });
+
+    const [trialSubscription] = await db
+      .select({
+        trialEndsAt: kiloclaw_subscriptions.trial_ends_at,
+      })
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, activeInstance.id))
+      .limit(1);
+
+    expect(trialSubscription).toBeDefined();
+    expect(posthogCaptureMock).toHaveBeenCalledWith({
+      distinctId: user.google_user_email,
+      event: 'claw_trial_started',
+      properties: {
+        user_id: user.id,
+        plan: 'trial',
+        trial_ends_at: trialSubscription?.trialEndsAt,
+      },
+    });
   });
 
   it('rejects reprovision for legacy earlybird purchase without canonical subscription row', async () => {
@@ -2916,6 +2993,99 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
       status: 'active',
       instance_id: newInstance.id,
     });
+  });
+
+  it('settles zero-dollar invoice.paid without emitting revenue events', async () => {
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      stripe_subscription_id: 'sub_zero_amount_invoice',
+      payment_source: 'stripe',
+      plan: 'standard',
+      status: 'active',
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+      cancel_at_period_end: false,
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      metadata: {
+        type: 'kiloclaw',
+        plan: 'standard',
+        kiloUserId: user.id,
+        instanceId: instance.id,
+      },
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+
+    await handleKiloClawInvoicePaid({
+      eventId: 'evt_zero_amount_invoice_paid',
+      invoice: {
+        id: 'in_zero_amount_paid',
+        amount_paid: 0,
+        currency: 'usd',
+        charge: null,
+        parent: {
+          subscription_details: {
+            subscription: 'sub_zero_amount_invoice',
+          },
+        },
+        lines: {
+          data: [
+            {
+              pricing: {
+                price_details: {
+                  price: 'price_standard',
+                },
+              },
+              period: {
+                start: Math.floor(new Date('2026-04-01T00:00:00.000Z').getTime() / 1000),
+                end: Math.floor(new Date('2026-05-01T00:00:00.000Z').getTime() / 1000),
+              },
+            },
+          ],
+        },
+        status_transitions: {
+          paid_at: Math.floor(new Date('2026-04-09T10:00:00.000Z').getTime() / 1000),
+        },
+      } as unknown as Stripe.Invoice,
+    });
+
+    const [updatedRow] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, instance.id))
+      .limit(1);
+
+    expect(updatedRow).toMatchObject({
+      stripe_subscription_id: 'sub_zero_amount_invoice',
+      payment_source: 'credits',
+      plan: 'standard',
+      status: 'active',
+    });
+    expect(updatedRow?.credit_renewal_at).toContain('2026-05-01');
+
+    const [creditTx] = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.stripe_payment_id, 'in_zero_amount_paid'))
+      .limit(1);
+    expect(creditTx).toMatchObject({
+      stripe_payment_id: 'in_zero_amount_paid',
+      amount_microdollars: 0,
+      description: 'KiloClaw standard settlement',
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+    expect(events.map(event => event.event_type)).toEqual(['signup']);
+    expect(posthogCaptureMock).not.toHaveBeenCalled();
   });
 });
 

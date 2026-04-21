@@ -470,6 +470,7 @@ function toConfigWriterDeps(deps: BootstrapDeps): ConfigWriterDeps {
     readFileSync: deps.readFileSync,
     writeFileSync: deps.writeFileSync,
     renameSync: deps.renameSync,
+    chmodSync: deps.chmodSync,
     copyFileSync: deps.copyFileSync,
     readdirSync: deps.readdirSync,
     unlinkSync: deps.unlinkSync,
@@ -506,11 +507,17 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     // Patch the config with env-var-derived fields
     const config = generateBaseConfig(env, CONFIG_PATH, cwDeps);
     const serialized = JSON.stringify(config, null, 2);
-    atomicWrite(CONFIG_PATH, serialized, {
-      writeFileSync: deps.writeFileSync,
-      renameSync: deps.renameSync,
-      unlinkSync: deps.unlinkSync,
-    });
+    atomicWrite(
+      CONFIG_PATH,
+      serialized,
+      {
+        writeFileSync: deps.writeFileSync,
+        renameSync: deps.renameSync,
+        unlinkSync: deps.unlinkSync,
+        chmodSync: deps.chmodSync,
+      },
+      { mode: 0o600 }
+    );
     console.log('Configuration patched successfully');
 
     env.KILOCLAW_FRESH_INSTALL = 'false';
@@ -582,13 +589,19 @@ export const GOG_SECTION_CONFIG: ToolsMdSectionConfig = {
 
 The \`gog\` CLI is configured and ready for Google Workspace operations (Gmail, Calendar, Drive, Docs, Sheets, Slides, Tasks, Forms, Chat, Classroom).
 
-- List accounts: \`gog auth list\`
+- List accounts: \`gog auth list --json\`
 - Gmail — search: \`gog gmail search --account <email> --query "from:X"\`
 - Gmail — read: \`gog gmail get --account <email> <message-id>\`
 - Gmail — send: \`gog gmail send --account <email> --to <addr> --subject "..." --body "..."\`
-- Calendar — list events: \`gog calendar events list --account <email>\`
-- Drive — list files: \`gog drive files list --account <email>\`
+- Calendar — list calendars first: \`gog calendar calendars --account <email> --json\`
+- Calendar — default retrieval path: \`gog calendar events --all --all-pages --account <email> --from <iso> --to <iso> --json\`
+- Calendar — align \`--from\` / \`--to\` to the user-requested local date window before summarizing
+- Calendar — use \`primary\` only when explicitly requested by the user
+- Calendar — if results look sparse, retry with explicit calendar IDs from \`gog calendar calendars\`:
+  \`gog calendar events <calendarId> --all-pages --account <email> --from <iso> --to <iso> --json\`
+- Drive — list files: \`gog drive ls --account <email> --json\`
 - Docs — read: \`gog docs get --account <email> <doc-id>\`
+- If a command is blocked by capabilities, first run \`gog auth list --json\` to confirm what is granted.
 - Run \`gog --help\` and \`gog <service> --help\` for all available commands.
 <!-- END:google-workspace -->`,
 };
@@ -667,6 +680,7 @@ When running \`openclaw doctor\` or \`openclaw security audit\`, the following f
 - **\`plugins.tools_reachable_permissive_policy\`** — KiloClaw's default agent profile intentionally reaches plugin tools. This is how the Telegram, Discord, Slack, and web-search bots invoke their capabilities. Restricting it would break the core bot workflow.
 - **\`hooks.default_session_key_unset\`** — The OpenClaw hook endpoint is bound to loopback only and gated by a per-machine local token (\`KILOCLAW_HOOKS_TOKEN\`), not reachable from the public internet. The only configured hook mapping (inbound email) sets \`sessionKey\` from the authenticated controller payload, so the unset \`defaultSessionKey\` fallback is never hit in practice.
 - **\`hooks.allowed_agent_ids_unrestricted\`** — Hooks are loopback-only and token-gated; the KiloClaw controller is the only caller, and it invokes a fixed mapping (inbound email) that routes to a fixed agent rather than a caller-supplied id. There is no external path to name an arbitrary agent id.
+- **\`fs.config.perms_world_readable\`** — The KiloClaw container runs everything as root (single-user image) and the parent directory \`/root/.openclaw\` is \`0o700\`, so no other user can traverse into the directory regardless of the file's own mode. The controller also writes \`openclaw.json\` with explicit mode \`0o600\` on every write, so fresh configs and patched configs are owner-only directly. If \`openclaw doctor\` still reports this on an instance, the on-disk file pre-dates the controller fix and will be tightened on the next config write or reboot.
 
 **When presenting security audit results that include any of these findings, ALWAYS:**
 
@@ -768,8 +782,10 @@ export async function bootstrapNonCritical(
     {
       phase: 'tools-md',
       run: () => {
+        const googleWorkspaceToolsEnabled =
+          env.KILOCLAW_GOOGLE_WORKSPACE_ENABLED === 'true' || !!env.KILOCLAW_GOG_CONFIG_TARBALL;
         updateToolsMdSection(true, KILO_CLI_SECTION_CONFIG, deps);
-        updateToolsMdSection(!!env.KILOCLAW_GOG_CONFIG_TARBALL, GOG_SECTION_CONFIG, deps);
+        updateToolsMdSection(googleWorkspaceToolsEnabled, GOG_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
         // Always-on: agent context about KiloClaw-mitigated audit findings

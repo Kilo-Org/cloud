@@ -9,7 +9,6 @@ import type {
   OpenRouterProvider,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import {
-  OpenRouterApiProvidersResponse,
   OpenRouterProvidersResponse,
   OpenRouterSearchResponse,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
@@ -21,7 +20,7 @@ import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@/lib/ai-gateway/providers/vercel/types';
 import { EndpointsSchema, ModelsSchema } from '@/lib/ai-gateway/providers/vercel/types';
 import { redisSet } from '@/lib/redis';
-import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
+import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
 
 const ATTRIBUTION_HEADERS = {
   'HTTP-Referer': 'https://kilocode.ai',
@@ -135,10 +134,7 @@ async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<Ope
   return data.data.models;
 }
 
-async function syncProviders() {
-  // Fetch all providers
-  const providers = await fetchProviders();
-
+async function syncProviders(providers: OpenRouterProvider[]) {
   if (providers.length === 0) {
     throw new Error('No providers found in OpenRouter response');
   }
@@ -287,32 +283,13 @@ async function syncProviders() {
   return result;
 }
 
-async function fetchOpenRouterApiProviders(): Promise<OpenRouterApiProvidersResponse> {
-  console.log('Fetching OpenRouter providers from public API endpoint...');
-
-  const response = await fetch('https://openrouter.ai/api/v1/providers', {
-    method: 'GET',
-    headers: ATTRIBUTION_HEADERS,
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch OpenRouter API providers: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const parsed = OpenRouterApiProvidersResponse.parse(await response.json());
-  console.log(`Found ${parsed.data.length} providers from /api/v1/providers`);
-  return parsed;
-}
-
 async function mirrorToRedis(values: {
   providers: NormalizedOpenRouterResponse;
   openrouter: Record<string, StoredModel>;
   vercel: Record<string, StoredModel>;
-  openrouterProviders: OpenRouterApiProvidersResponse | null;
+  openrouterProviders: OpenRouterProvider[];
 }): Promise<void> {
-  const entries: [string, unknown][] = [
+  const entries: [RedisKey, unknown][] = [
     [GATEWAY_METADATA_REDIS_KEYS.allProviders, values.providers],
     [GATEWAY_METADATA_REDIS_KEYS.openrouterModels, values.openrouter],
     [GATEWAY_METADATA_REDIS_KEYS.vercelModels, values.vercel],
@@ -329,14 +306,14 @@ export async function syncAndStoreProviders() {
   const openrouter_data = await fetchGatewayModels(PROVIDERS.OPENROUTER);
   const vercel_data = await fetchGatewayModels(PROVIDERS.VERCEL_AI_GATEWAY);
 
-  const openrouter_providers = await fetchOpenRouterApiProviders();
-  if (openrouter_providers.data.length < 10) {
+  const openrouterProviders = await fetchProviders();
+  if (openrouterProviders.length < 10) {
     throw new Error(
-      `Suspicious: total number of OpenRouter API providers is ${openrouter_providers.data.length} < 10`
+      `Suspicious: total number of OpenRouter API providers is ${openrouterProviders.length} < 10`
     );
   }
 
-  const providers = await syncProviders();
+  const providers = await syncProviders(openrouterProviders);
 
   if (providers.total_providers < 10) {
     throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);
@@ -363,7 +340,7 @@ export async function syncAndStoreProviders() {
     providers,
     openrouter: openrouter_data,
     vercel: vercel_data,
-    openrouterProviders: openrouter_providers,
+    openrouterProviders,
   });
 
   return {

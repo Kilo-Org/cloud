@@ -12,6 +12,7 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
+import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
@@ -73,7 +74,7 @@ export async function shouldRouteToVercel(
   }
 
   const vercelModels = await getVercelModels();
-  const vercelModelId = mapModelIdToVercel(requestedModel);
+  const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
   if (!vercelModels.includes(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
@@ -135,7 +136,10 @@ export function applyVercelSettings(
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
 ) {
-  requestToMutate.body.model = mapModelIdToVercel(requestedModel);
+  requestToMutate.body.model = mapModelIdToVercel(
+    requestedModel,
+    isReasoningExplicitlyDisabled(requestToMutate)
+  );
 
   if (userByok) {
     if (userByok.length === 0) {

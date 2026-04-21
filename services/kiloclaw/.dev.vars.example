@@ -2,9 +2,13 @@
 # The dev-start script creates .dev.vars from this file on first run.
 #
 # Most values below are working defaults. The script auto-manages:
-#   NEXTAUTH_SECRET, KILOCLAW_INTERNAL_API_SECRET  (synced from Vercel)
-#   FLY_API_TOKEN                         (auto-created once in .env.local)
-#   KILOCODE_API_BASE_URL                 (set from tunnel URL)
+#   NEXTAUTH_SECRET, KILOCLAW_INTERNAL_API_SECRET            (synced from Vercel)
+#   GOOGLE_WORKSPACE_OAUTH_CLIENT_ID, GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI,
+#   GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET,
+#   GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY            (synced from Vercel)
+#   KILOCLAW_CHECKIN_URL                                     (set from tunnel URL)
+#   FLY_API_TOKEN                                            (auto-created once in .env.local)
+#   KILOCODE_API_BASE_URL                                    (set from tunnel URL)
 #
 # Values you may need to set manually:
 #   AGENT_ENV_VARS_PRIVATE_KEY            (get from 1Password)
@@ -51,6 +55,20 @@ BACKEND_API_URL=http://localhost:3000
 # In dev, the script sets this to the Cloudflare tunnel URL pointing to your
 # local Next.js app so Fly machines route model requests through the tunnel.
 # KILOCODE_API_BASE_URL=https://<tunnel>.trycloudflare.com/api/gateway/
+# KILOCLAW_CHECKIN_URL=https://<tunnel>.trycloudflare.com/api/controller/checkin
+
+# Google OAuth (KiloClaw broker)
+# Google OAuth values are synced from .env.local.
+# @from GOOGLE_WORKSPACE_OAUTH_CLIENT_ID
+GOOGLE_WORKSPACE_OAUTH_CLIENT_ID=
+# @from GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI
+GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI=http://localhost:3000/api/integrations/google/callback
+# @from GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET
+GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET=
+# Symmetric key used to encrypt/decrypt stored Google refresh tokens.
+# Must be a base64-encoded 32-byte key (AES-256-GCM).
+# @from GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY
+GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY=
 
 # Fly.io Machines API
 # Token is auto-created once in .env.local by `pnpm dev:env` using

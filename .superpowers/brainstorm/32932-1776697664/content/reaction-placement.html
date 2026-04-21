@@ -1,0 +1,93 @@
+<h2>Reaction Display & Trigger Placement</h2>
+<p class="subtitle">Where do reactions appear on messages, and how do users add them?</p>
+
+<div class="cards">
+  <!-- Option A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 24px; background: #1a1a2e;">
+      <!-- Message bubble with reactions below -->
+      <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+        <span style="font-size: 11px; color: #888; margin-left: 4px;">KiloClaw</span>
+        <div style="background: #2a2a3e; border-radius: 16px; padding: 10px 14px; max-width: 280px;">
+          <p style="margin: 0; font-size: 13px; color: #e0e0e0;">Here's the analysis you asked for. Let me know if you need changes!</p>
+          <div style="margin-top: 4px; font-size: 10px; color: #888; text-align: right;">2:34 PM</div>
+        </div>
+        <!-- Reactions row below bubble -->
+        <div style="display: flex; gap: 4px; margin-left: 4px; flex-wrap: wrap;">
+          <div style="background: #2a2a3e; border: 1px solid #3a3a5e; border-radius: 12px; padding: 2px 8px; font-size: 13px; display: flex; align-items: center; gap: 3px; cursor: pointer;">
+            👍 <span style="font-size: 11px; color: #aaa;">2</span>
+          </div>
+          <div style="background: #1e3a5f; border: 1px solid #3a6abf; border-radius: 12px; padding: 2px 8px; font-size: 13px; display: flex; align-items: center; gap: 3px; cursor: pointer;">
+            ❤️ <span style="font-size: 11px; color: #7ab8ff;">1</span>
+          </div>
+          <div style="background: #2a2a3e; border: 1px solid #3a3a5e; border-radius: 12px; padding: 2px 8px; font-size: 12px; color: #888; cursor: pointer;">
+            +
+          </div>
+        </div>
+      </div>
+      <!-- Hover action bar -->
+      <div style="margin-top: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+        <span style="font-size: 11px; color: #888; margin-right: 4px;">You</span>
+        <div style="position: relative;">
+          <div style="position: absolute; right: 100%; top: 0; margin-right: 4px; background: #2a2a3e; border: 1px solid #3a3a5e; border-radius: 6px; padding: 2px; display: flex; gap: 2px;">
+            <div style="padding: 3px 5px; border-radius: 4px; font-size: 12px; cursor: pointer;" title="React">😊</div>
+            <div style="padding: 3px 5px; border-radius: 4px; font-size: 12px; cursor: pointer;" title="Reply">↩</div>
+          </div>
+          <div style="background: #3a6abf; border-radius: 16px; padding: 10px 14px; max-width: 280px;">
+            <p style="margin: 0; font-size: 13px; color: #fff;">Can you add more detail to section 3?</p>
+            <div style="margin-top: 4px; font-size: 10px; color: rgba(255,255,255,0.6); text-align: right;">2:35 PM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A: Below Bubble + Smiley in Action Bar</h3>
+      <p>Reaction pills sit below the message bubble. A 😊 button in the existing hover action bar opens the quick-pick row. The "+" on the reaction row opens the full picker.</p>
+      <p style="font-size: 12px; color: #888;">Slack / Discord style. Reactions are always visible. Action bar gets a smiley icon alongside edit/delete/reply.</p>
+    </div>
+  </div>
+
+  <!-- Option B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 24px; background: #1a1a2e;">
+      <!-- Message with inline reactions -->
+      <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+        <span style="font-size: 11px; color: #888; margin-left: 4px;">KiloClaw</span>
+        <div style="background: #2a2a3e; border-radius: 16px; padding: 10px 14px; max-width: 280px;">
+          <p style="margin: 0; font-size: 13px; color: #e0e0e0;">Here's the analysis you asked for. Let me know if you need changes!</p>
+          <!-- Reactions inside the bubble at bottom -->
+          <div style="display: flex; gap: 4px; margin-top: 8px; padding-top: 6px; border-top: 1px solid #3a3a5e; flex-wrap: wrap;">
+            <div style="background: #1a1a2e; border-radius: 10px; padding: 1px 6px; font-size: 12px; display: flex; align-items: center; gap: 2px;">
+              👍 <span style="font-size: 10px; color: #aaa;">2</span>
+            </div>
+            <div style="background: #1e3a5f; border-radius: 10px; padding: 1px 6px; font-size: 12px; display: flex; align-items: center; gap: 2px;">
+              ❤️ <span style="font-size: 10px; color: #7ab8ff;">1</span>
+            </div>
+          </div>
+          <div style="margin-top: 4px; font-size: 10px; color: #888; text-align: right;">2:34 PM</div>
+        </div>
+      </div>
+      <!-- Own message with action bar including smiley -->
+      <div style="margin-top: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+        <span style="font-size: 11px; color: #888; margin-right: 4px;">You</span>
+        <div style="position: relative;">
+          <div style="position: absolute; right: 100%; top: 0; margin-right: 4px; background: #2a2a3e; border: 1px solid #3a3a5e; border-radius: 6px; padding: 2px; display: flex; gap: 2px;">
+            <div style="padding: 3px 5px; border-radius: 4px; font-size: 12px; cursor: pointer;">😊</div>
+            <div style="padding: 3px 5px; border-radius: 4px; font-size: 12px; cursor: pointer;">✏️</div>
+            <div style="padding: 3px 5px; border-radius: 4px; font-size: 12px; cursor: pointer;">🗑️</div>
+            <div style="padding: 3px 5px; border-radius: 4px; font-size: 12px; cursor: pointer;">↩</div>
+          </div>
+          <div style="background: #3a6abf; border-radius: 16px; padding: 10px 14px; max-width: 280px;">
+            <p style="margin: 0; font-size: 13px; color: #fff;">Can you add more detail to section 3?</p>
+            <div style="margin-top: 4px; font-size: 10px; color: rgba(255,255,255,0.6); text-align: right;">2:35 PM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B: Inside Bubble + Smiley in Action Bar</h3>
+      <p>Reaction pills render inside the bubble above the timestamp, separated by a subtle divider. Same 😊 trigger in the action bar.</p>
+      <p style="font-size: 12px; color: #888;">iMessage style. Compact, but reactions compete with message content for space inside the bubble.</p>
+    </div>
+  </div>
+</div>

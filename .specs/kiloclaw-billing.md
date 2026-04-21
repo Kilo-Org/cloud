@@ -506,10 +506,11 @@ rows renew.
 1. The system MUST identify KiloClaw invoices by matching a line
    item's price against the configured KiloClaw price identifiers.
    Invoices with no matching line item MUST NOT be processed by
-   this flow. If required invoice data (charge identifier,
-   subscription identifier, matching line item, or period
-   boundaries) is absent, the system MUST log a warning and skip
-   the invoice.
+   this flow. If required invoice data (subscription identifier,
+   matching line item, or period boundaries) is absent, the system
+   MUST log a warning and skip the invoice. A charge identifier is
+   optional because the payment provider can emit fully paid `$0`
+   invoices without a charge object.
 2. The settled plan and billing period boundaries MUST be derived
    from the invoice, not from local subscription state or
    wall-clock time. The invoice is authoritative because local
@@ -524,7 +525,11 @@ rows renew.
    Payment-provider-side adjustments (first-month discounts,
    promotional codes, coupons, prorations) flow through as-is.
 5. Settlement MUST be idempotent. Processing the same invoice twice
-   MUST NOT produce duplicate credits or duplicate deductions.
+   MUST NOT produce duplicate credits or duplicate deductions. When a
+   charge identifier is present, the system SHOULD use it as the
+   external payment identifier for settlement. When the invoice has no
+   charge identifier, the system MUST fall back to the invoice
+   identifier so `$0` KiloClaw invoices still settle exactly once.
 6. On successful settlement the system MUST:
    a. Set payment source to `credits`, preserving the payment
    provider subscription ID (converting a legacy Stripe row to
@@ -548,6 +553,12 @@ rows renew.
 9. After the settlement transaction commits, the system MUST
    trigger a bonus credit evaluation as described in Credit
    Enrollment rule 6.
+10. `$0` KiloClaw invoices MUST still run the settlement path so
+    Stripe-created subscriptions can transition out of the
+    intermediate Stripe-funded state into the hybrid activated state.
+    Revenue side effects that require a paid amount, such as revenue
+    analytics or affiliate sale events, MUST apply their own
+    `amount_paid > 0` guard and MUST NOT block settlement.
 
 ### Commit Plan Lifecycle
 

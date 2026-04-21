@@ -5,6 +5,7 @@ import {
   parseLinkedInProfileName,
   getUserUUID,
   uuidSchema,
+  parseSignInRedirectContext,
 } from './user.server';
 import type { User } from '@kilocode/db/schema';
 import { v5 as uuidv5 } from 'uuid';
@@ -402,5 +403,58 @@ describe('uuidSchema (organization ID validation)', () => {
   test('should reject numbers', () => {
     expect(uuidSchema.safeParse(12345).success).toBe(false);
     expect(uuidSchema.safeParse(0).success).toBe(false);
+  });
+});
+
+describe('parseSignInRedirectContext', () => {
+  test('returns empty context when cookie value is undefined', () => {
+    expect(parseSignInRedirectContext(undefined)).toEqual({});
+  });
+
+  test('returns empty context when cookie value is empty string', () => {
+    expect(parseSignInRedirectContext('')).toEqual({});
+  });
+
+  test('returns empty context for malformed URL', () => {
+    expect(parseSignInRedirectContext('::::not a url::::')).toEqual({});
+  });
+
+  test('extracts callbackPath from /users/after-sign-in destination', () => {
+    const cookie = '/users/after-sign-in?callbackPath=%2Fdevice-auth%3Fcode%3Dabc123';
+    expect(parseSignInRedirectContext(cookie)).toEqual({
+      callbackPath: '/device-auth?code=abc123',
+    });
+  });
+
+  test('extracts signup=true flag', () => {
+    const cookie = '/users/after-sign-in?signup=true';
+    expect(parseSignInRedirectContext(cookie)).toEqual({
+      signup: true,
+    });
+  });
+
+  test('extracts both callbackPath and signup together', () => {
+    const cookie = '/users/after-sign-in?callbackPath=%2Fdevice-auth%3Fcode%3Dabc123&signup=true';
+    expect(parseSignInRedirectContext(cookie)).toEqual({
+      callbackPath: '/device-auth?code=abc123',
+      signup: true,
+    });
+  });
+
+  test('rejects callbackPath that fails isValidCallbackPath', () => {
+    const cookie = '/users/after-sign-in?callbackPath=https%3A%2F%2Fevil.example.com%2Fphish';
+    expect(parseSignInRedirectContext(cookie)).toEqual({});
+  });
+
+  test('treats signup values other than "true" as absent', () => {
+    const cookie = '/users/after-sign-in?signup=false';
+    expect(parseSignInRedirectContext(cookie)).toEqual({});
+  });
+
+  test('handles absolute URL cookie value', () => {
+    const cookie = 'https://kilo.ai/users/after-sign-in?callbackPath=%2Fdevice-auth%3Fcode%3Dxyz';
+    expect(parseSignInRedirectContext(cookie)).toEqual({
+      callbackPath: '/device-auth?code=xyz',
+    });
   });
 });

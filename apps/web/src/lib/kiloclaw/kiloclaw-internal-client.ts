@@ -33,6 +33,8 @@ import type {
   OpenclawConfigResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
+  GoogleOAuthConnectionInput,
+  GoogleOAuthConnectionResponse,
   GmailNotificationsResponse,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
@@ -638,6 +640,37 @@ export class KiloClawInternalClient {
     if (instanceId) params.set('instanceId', instanceId);
     return this.request(
       `/api/platform/google-credentials?${params.toString()}`,
+      {
+        method: 'DELETE',
+      },
+      { userId }
+    );
+  }
+
+  async updateGoogleOAuthConnection(
+    userId: string,
+    input: GoogleOAuthConnectionInput,
+    instanceId?: string
+  ): Promise<GoogleOAuthConnectionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/google-oauth-connection${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...input }),
+      },
+      { userId }
+    );
+  }
+
+  async clearGoogleOAuthConnection(
+    userId: string,
+    instanceId?: string
+  ): Promise<GoogleOAuthConnectionResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(
+      `/api/platform/google-oauth-connection?${params.toString()}`,
       {
         method: 'DELETE',
       },

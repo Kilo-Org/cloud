@@ -26,6 +26,9 @@ export type KiloClawEnv = {
   INTERNAL_API_SECRET?: string;
   KILOCLAW_INTERNAL_API_SECRET?: string;
   GATEWAY_TOKEN_SECRET?: string;
+  GOOGLE_WORKSPACE_OAUTH_CLIENT_ID?: string;
+  GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET?: string;
+  GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY?: string;
   WORKER_ENV?: string; // e.g. 'production' or 'development' -- for JWT env validation
   KILOCLAW_DEFAULT_PROVIDER?: string;
 

@@ -274,6 +274,9 @@ importers:
       react-native-gesture-handler:
         specifier: ~2.30.0
         version: 2.30.0(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
+      react-native-marked:
+        specifier: ^8.0.1
+        version: 8.0.1(react-native-svg@15.15.3(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
       react-native-reanimated:
         specifier: 4.2.1
         version: 4.2.1(react-native-worklets@0.7.2(@babel/core@7.29.0)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
@@ -690,6 +693,9 @@ importers:
       form-data:
         specifier: ^4.0.5
         version: 4.0.5
+      google-auth-library:
+        specifier: ^10.4.1
+        version: 10.6.2
       jotai:
         specifier: ^2.18.1
         version: 2.18.1(@babel/core@7.29.0)(@babel/template@7.28.6)(@types/react@19.2.14)(react@19.2.4)
@@ -1510,7 +1516,7 @@ importers:
         version: 7.0.0-dev.20260319.1
       jest:
         specifier: ^30.3.0
-        version: 30.3.0(@types/node@24.12.0)(esbuild-register@3.6.0(esbuild@0.27.4))
+        version: 30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4))
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -4266,6 +4272,16 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@jsamr/counter-style@2.0.2':
+    resolution: {integrity: sha512-2mXudGVtSzVxWEA7B9jZLKjoXUeUFYDDtFrQoC0IFX9/Dszz4t1vZOmafi3JSw/FxD+udMQ+4TAFR8Qs0J3URQ==}
+
+  '@jsamr/react-native-li@2.3.1':
+    resolution: {integrity: sha512-Qbo4NEj48SQ4k8FZJHFE2fgZDKTWaUGmVxcIQh3msg5JezLdTMMHuRRDYctfdHI6L0FZGObmEv3haWbIvmol8w==}
+    peerDependencies:
+      '@jsamr/counter-style': ^1.0.0 || ^2.0.0
+      react: '*'
+      react-native: '*'
 
   '@kilocode/plugin@7.1.23':
     resolution: {integrity: sha512-sFI0rlgQg3mzYP05/gg09IE1mN4QyAXyOlJjM36CFoVKi1bPYz/dqEqr6ddmMNmB577A4gDu0D07hr0pGIFrBA==}
@@ -8541,6 +8557,9 @@ packages:
   big.js@5.2.2:
     resolution: {integrity: sha512-vyL2OymJxmarO8gxMr0mhChsO9QGwhynfuu4+MHTAW6czfq9humCB7rKpUjDd9YUiDPU4mzpyupFSvOClAwbmQ==}
 
+  bignumber.js@9.3.1:
+    resolution: {integrity: sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ==}
+
   binary-extensions@2.3.0:
     resolution: {integrity: sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==}
     engines: {node: '>=8'}
@@ -9161,6 +9180,10 @@ packages:
   d3-timer@3.0.1:
     resolution: {integrity: sha512-ndfJ/JxxMd3nw31uyKoY2naivF+r29V+Lc0svZxe1JvvIRmi8hUsrMvdOwgS1o6uBHmiz91geQ0ylPP0aj1VUA==}
     engines: {node: '>=12'}
+
+  data-uri-to-buffer@4.0.1:
+    resolution: {integrity: sha512-0R9ikRb668HB7QDxT1vkpuUBtqc53YyAwMwGeUFKRojY/NWKvdZ+9UYtRfGmhqNbRkTSVpMbmyhXipFFv2cb/A==}
+    engines: {node: '>= 12'}
 
   date-fns@4.1.0:
     resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
@@ -10200,6 +10223,10 @@ packages:
       picomatch:
         optional: true
 
+  fetch-blob@3.2.0:
+    resolution: {integrity: sha512-7yAQpD2UMJzLi1Dqv7qFYnPbaPx7ZfFK6PiIxQ4PfkGPyNyl2Ugx+a/umUonmKqjhM4DnfbMvdX6otXq83soQQ==}
+    engines: {node: ^12.20 || >= 14.13}
+
   fetch-nodeshim@0.4.9:
     resolution: {integrity: sha512-XIQWlB2A4RZ7NebXWGxS0uDMdvRHkiUDTghBVJKFg9yEOd45w/PP8cZANuPf2H08W6Cor3+2n7Q6TTZgAS3Fkw==}
 
@@ -10330,6 +10357,10 @@ packages:
     engines: {node: '>=18.3.0'}
     hasBin: true
 
+  formdata-polyfill@4.0.10:
+    resolution: {integrity: sha512-buewHzMvYL29jdeQTVILecSaZKnt/RJWjoZCF5OW60Z67/GmSLBkOFM7qh1PI3zFNtJbaZL5eQu1vLfazOwj4g==}
+    engines: {node: '>=12.20.0'}
+
   forwarded-parse@2.1.2:
     resolution: {integrity: sha512-alTFZZQDKMporBH77856pXgzhEzaUVmLCDk+egLgIgHst3Tpndzz8MnKe+GzRJRfvVdn69HhpW7cmXzvtLvJAw==}
 
@@ -10389,6 +10420,14 @@ packages:
   functional-red-black-tree@1.0.1:
     resolution: {integrity: sha512-dsKNQNdj6xA3T+QlADDA7mOSlX0qiMINjn0cgr+eGHGsbSHzTabcIogz2+p/iqP1Xs6EP/sS2SbqH+brGTbq0g==}
 
+  gaxios@7.1.4:
+    resolution: {integrity: sha512-bTIgTsM2bWn3XklZISBTQX7ZSddGW+IO3bMdGaemHZ3tbqExMENHLx6kKZ/KlejgrMtj8q7wBItt51yegqalrA==}
+    engines: {node: '>=18'}
+
+  gcp-metadata@8.1.2:
+    resolution: {integrity: sha512-zV/5HKTfCeKWnxG0Dmrw51hEWFGfcF2xiXqcA3+J90WDuP0SvoiSO5ORvcBsifmx/FoIjgQN3oNOGaQ5PhLFkg==}
+    engines: {node: '>=18'}
+
   generator-function@2.0.1:
     resolution: {integrity: sha512-SFdFmIJi+ybC0vjlHN0ZGVGHc3lgE0DxPAT0djjVg+kjOnSqclqmj0KQ7ykTOLP6YxoqOvuAODGdcHJn+43q3g==}
     engines: {node: '>= 0.4'}
@@ -10439,6 +10478,9 @@ packages:
     resolution: {integrity: sha512-VilgtJj/ALgGY77fiLam5iD336eSWi96Q15JSAG1zi8NRBysm3LXKdGnHb4m5cuyxvOLQQKWpBZAT6ni4FI2iQ==}
     engines: {node: '>=6'}
 
+  github-slugger@2.0.0:
+    resolution: {integrity: sha512-IaOQ9puYtjrkq7Y0Ygl9KDZnrf/aiUJYUpVf89y8kyaxbRG7Y1SrX/jaumrv81vc61+kiMempujsM3Yw7w5qcw==}
+
   glob-parent@5.1.2:
     resolution: {integrity: sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow==}
     engines: {node: '>= 6'}
@@ -10470,6 +10512,14 @@ packages:
     resolution: {integrity: sha512-otgSPpUmdWJ43VXyiNgEYE4luzHCL2pz4wQ0OnDluC6Eg4Ko3Vexy/SrSynglw/eR+OhkzmqFCZa/OFa/RgAOQ==}
     engines: {node: '>=0.6.0'}
     hasBin: true
+
+  google-auth-library@10.6.2:
+    resolution: {integrity: sha512-e27Z6EThmVNNvtYASwQxose/G57rkRuaRbQyxM2bvYLLX/GqWZ5chWq2EBoUchJbCc57eC9ArzO5wMsEmWftCw==}
+    engines: {node: '>=18'}
+
+  google-logging-utils@1.1.3:
+    resolution: {integrity: sha512-eAmLkjDjAFCVXg7A1unxHsLf961m6y17QFqXqAXGj/gVkKFrEICfStRfwUlGNfeCEjNRa32JEWOUTlYXPyyKvA==}
+    engines: {node: '>=14'}
 
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
@@ -11335,6 +11385,9 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
+  json-bigint@1.0.0:
+    resolution: {integrity: sha512-SiPv/8VpZuWbvLSMtTDU8hEfrZWg/mH/nV/b4o0CYbSxu1UIQPLdwKOCIyLQX+VIPO5vrLX3i8qtqFyhdPSUSQ==}
+
   json-buffer@3.0.1:
     resolution: {integrity: sha512-4bV5BfR2mqfQTJm+V5tPPdf+ZpuhiIvTuAB5g8kcrXOZpTT/QwwVRWBywX1ozr6lEuPdbHxwaJlm9G6mI2sfSQ==}
 
@@ -11686,6 +11739,11 @@ packages:
   marked@14.0.0:
     resolution: {integrity: sha512-uIj4+faQ+MgHgwUW1l2PsPglZLOLOT1uErt06dAPtx2kjteLAkbsd/0FiYg/MGS+i7ZKLb7w2WClxHkzOOuryQ==}
     engines: {node: '>= 18'}
+    hasBin: true
+
+  marked@17.0.4:
+    resolution: {integrity: sha512-NOmVMM+KAokHMvjWmC5N/ZOvgmSWuqJB8FoYI019j4ogb/PeRMKoKIjReZ2w3376kkA8dSJIP8uD993Kxc0iRQ==}
+    engines: {node: '>= 20'}
     hasBin: true
 
   marky@1.3.0:
@@ -12164,6 +12222,11 @@ packages:
   node-abort-controller@3.1.1:
     resolution: {integrity: sha512-AGK2yQKIjRuqnc6VkX2Xj5d+QW8xZ87pa1UK6yA6ouUyuxfHuMP6umE5QK7UmTeOAymo+Zx1Fxiuw9rVx8taHQ==}
 
+  node-domexception@1.0.0:
+    resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
+    engines: {node: '>=10.5.0'}
+    deprecated: Use your platform's native DOMException instead
+
   node-fetch@2.7.0:
     resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
     engines: {node: 4.x || >=6.0.0}
@@ -12172,6 +12235,10 @@ packages:
     peerDependenciesMeta:
       encoding:
         optional: true
+
+  node-fetch@3.3.2:
+    resolution: {integrity: sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==}
+    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
   node-forge@1.3.3:
     resolution: {integrity: sha512-rLvcdSyRCyouf6jcOIPe/BgwG/d7hKjzMKOas33/pHEr6gbq18IK9zV7DiPvzsz0oBJPme6qr6H6kGZuI9/DZg==}
@@ -12951,6 +13018,20 @@ packages:
 
   react-native-markdown-package@1.8.2:
     resolution: {integrity: sha512-F3z/p0XfY6Nu9NlXQx1pYcPdz7Y37NRcAKTN+yb9nwRi8BW75mdc3uaBrM13PDVUlL0hbfTL7FuoAdSbsyB5vg==}
+
+  react-native-marked@8.0.1:
+    resolution: {integrity: sha512-lUAM/w9AxY54PP2BKHnDiarJ1+8s9R8HzkjnIrCkZO1fOSAdFn0XsAVMM4fGOP8QM4wIZcJhhvaW/5K7oGy5aQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      react: '>=16.8.6'
+      react-native: '>=0.76.0'
+      react-native-svg: '>=12.3.0'
+
+  react-native-reanimated-table@0.0.2:
+    resolution: {integrity: sha512-OeuqfU1AFEmHNTJlEOLWrV78JgAXnM0/ZrCm0Ab+9e5nwYJ+xab/UFXkNKz3Gyf08ZfLSNzwMQRjt3eZWPWoGA==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-native: '>=0.6.0'
 
   react-native-reanimated@4.2.1:
     resolution: {integrity: sha512-/NcHnZMyOvsD/wYXug/YqSKw90P9edN0kEPL5lP4PFf1aQ4F1V7MKe/E0tvfkXKIajy3Qocp5EiEnlcrK/+BZg==}
@@ -13951,6 +14032,9 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
 
+  svg-parser@2.0.4:
+    resolution: {integrity: sha512-e4hG1hRwoOdRb37cIMSgzNsxyzKfayW6VOflrwvR+/bzrkyxY/31WkbgnQpgtrNp1SdpJvpUAGTa/ZoiPNDuRQ==}
+
   synckit@0.11.12:
     resolution: {integrity: sha512-Bh7QjT8/SuKUIfObSXNHNSK6WHo6J1tHCqJsuaFDP7gP0fkzSfTxI8y85JrppZ0h8l0maIgc2tfuZQ6/t3GtnQ==}
     engines: {node: ^14.18.0 || >=16.0.0}
@@ -14625,6 +14709,10 @@ packages:
 
   wcwidth@1.0.1:
     resolution: {integrity: sha512-XHPEwS0q6TaxcvG85+8EYkbiCux2XtWG2mkc47Ng2A77BQu9+DqIOJldST4HgPkuea7dvKSj5VgX3P1d4rW8Tg==}
+
+  web-streams-polyfill@3.3.3:
+    resolution: {integrity: sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==}
+    engines: {node: '>= 8'}
 
   web-vitals@5.1.0:
     resolution: {integrity: sha512-ArI3kx5jI0atlTtmV0fWU3fjpLmq/nD3Zr1iFFlJLaqa5wLBkUSzINwBPySCX/8jRyjlmy1Volw1kz1g9XE4Jg==}
@@ -16429,11 +16517,11 @@ snapshots:
       '@chromaui/rrweb-snapshot': 2.0.0-alpha.18-noAbsolute
       '@playwright/test': 1.58.2
       '@segment/analytics-node': 2.1.3
-      '@storybook/addon-essentials': 8.5.8(@types/react@19.2.14)(storybook@9.1.20)
+      '@storybook/addon-essentials': 8.5.8(@types/react@19.2.14)(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))
       '@storybook/csf': 0.1.13
-      '@storybook/manager-api': 8.5.8(storybook@9.1.20)
+      '@storybook/manager-api': 8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))
       '@storybook/server-webpack5': 8.5.8(@swc/core@1.15.18)(esbuild@0.27.4)(storybook@9.1.20)(typescript@5.9.3)
-      storybook: 9.1.20
+      storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
       ts-dedent: 2.2.0
     transitivePeerDependencies:
       - '@rspack/core'
@@ -17803,6 +17891,14 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@jsamr/counter-style@2.0.2': {}
+
+  '@jsamr/react-native-li@2.3.1(@jsamr/counter-style@2.0.2)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)':
+    dependencies:
+      '@jsamr/counter-style': 2.0.2
+      react: 19.2.0
+      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
 
   '@kilocode/plugin@7.1.23':
     dependencies:
@@ -20743,16 +20839,6 @@ snapshots:
       polished: 4.3.1
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
       uuid: 9.0.1
-    optional: true
-
-  '@storybook/addon-actions@8.5.8(storybook@9.1.20)':
-    dependencies:
-      '@storybook/global': 5.0.0
-      '@types/uuid': 9.0.8
-      dequal: 2.0.3
-      polished: 4.3.1
-      storybook: 9.1.20
-      uuid: 9.0.1
 
   '@storybook/addon-backgrounds@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
@@ -20760,28 +20846,12 @@ snapshots:
       memoizerific: 1.11.3
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
       ts-dedent: 2.2.0
-    optional: true
-
-  '@storybook/addon-backgrounds@8.5.8(storybook@9.1.20)':
-    dependencies:
-      '@storybook/global': 5.0.0
-      memoizerific: 1.11.3
-      storybook: 9.1.20
-      ts-dedent: 2.2.0
 
   '@storybook/addon-controls@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
       '@storybook/global': 5.0.0
       dequal: 2.0.3
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-      ts-dedent: 2.2.0
-    optional: true
-
-  '@storybook/addon-controls@8.5.8(storybook@9.1.20)':
-    dependencies:
-      '@storybook/global': 5.0.0
-      dequal: 2.0.3
-      storybook: 9.1.20
       ts-dedent: 2.2.0
 
   '@storybook/addon-docs@8.5.8(@types/react@19.2.14)(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
@@ -20793,20 +20863,6 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-      ts-dedent: 2.2.0
-    transitivePeerDependencies:
-      - '@types/react'
-    optional: true
-
-  '@storybook/addon-docs@8.5.8(@types/react@19.2.14)(storybook@9.1.20)':
-    dependencies:
-      '@mdx-js/react': 3.1.1(@types/react@19.2.14)(react@19.2.4)
-      '@storybook/blocks': 8.5.8(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(storybook@9.1.20)
-      '@storybook/csf-plugin': 8.5.8(storybook@9.1.20)
-      '@storybook/react-dom-shim': 8.5.8(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(storybook@9.1.20)
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-      storybook: 9.1.20
       ts-dedent: 2.2.0
     transitivePeerDependencies:
       - '@types/react'
@@ -20839,34 +20895,11 @@ snapshots:
       ts-dedent: 2.2.0
     transitivePeerDependencies:
       - '@types/react'
-    optional: true
-
-  '@storybook/addon-essentials@8.5.8(@types/react@19.2.14)(storybook@9.1.20)':
-    dependencies:
-      '@storybook/addon-actions': 8.5.8(storybook@9.1.20)
-      '@storybook/addon-backgrounds': 8.5.8(storybook@9.1.20)
-      '@storybook/addon-controls': 8.5.8(storybook@9.1.20)
-      '@storybook/addon-docs': 8.5.8(@types/react@19.2.14)(storybook@9.1.20)
-      '@storybook/addon-highlight': 8.5.8(storybook@9.1.20)
-      '@storybook/addon-measure': 8.5.8(storybook@9.1.20)
-      '@storybook/addon-outline': 8.5.8(storybook@9.1.20)
-      '@storybook/addon-toolbars': 8.5.8(storybook@9.1.20)
-      '@storybook/addon-viewport': 8.5.8(storybook@9.1.20)
-      storybook: 9.1.20
-      ts-dedent: 2.2.0
-    transitivePeerDependencies:
-      - '@types/react'
 
   '@storybook/addon-highlight@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
       '@storybook/global': 5.0.0
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-    optional: true
-
-  '@storybook/addon-highlight@8.5.8(storybook@9.1.20)':
-    dependencies:
-      '@storybook/global': 5.0.0
-      storybook: 9.1.20
 
   '@storybook/addon-links@9.1.20(react@19.2.4)(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
@@ -20880,25 +20913,11 @@ snapshots:
       '@storybook/global': 5.0.0
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
       tiny-invariant: 1.3.3
-    optional: true
-
-  '@storybook/addon-measure@8.5.8(storybook@9.1.20)':
-    dependencies:
-      '@storybook/global': 5.0.0
-      storybook: 9.1.20
-      tiny-invariant: 1.3.3
 
   '@storybook/addon-outline@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
       '@storybook/global': 5.0.0
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-      ts-dedent: 2.2.0
-    optional: true
-
-  '@storybook/addon-outline@8.5.8(storybook@9.1.20)':
-    dependencies:
-      '@storybook/global': 5.0.0
-      storybook: 9.1.20
       ts-dedent: 2.2.0
 
   '@storybook/addon-themes@9.1.20(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
@@ -20909,22 +20928,11 @@ snapshots:
   '@storybook/addon-toolbars@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-    optional: true
-
-  '@storybook/addon-toolbars@8.5.8(storybook@9.1.20)':
-    dependencies:
-      storybook: 9.1.20
 
   '@storybook/addon-viewport@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
       memoizerific: 1.11.3
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-    optional: true
-
-  '@storybook/addon-viewport@8.5.8(storybook@9.1.20)':
-    dependencies:
-      memoizerific: 1.11.3
-      storybook: 9.1.20
 
   '@storybook/blocks@8.5.8(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
@@ -20935,21 +20943,10 @@ snapshots:
     optionalDependencies:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
-    optional: true
-
-  '@storybook/blocks@8.5.8(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(storybook@9.1.20)':
-    dependencies:
-      '@storybook/csf': 0.1.12
-      '@storybook/icons': 1.6.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      storybook: 9.1.20
-      ts-dedent: 2.2.0
-    optionalDependencies:
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
 
   '@storybook/builder-webpack5@8.5.8(@swc/core@1.15.18)(esbuild@0.27.4)(storybook@9.1.20)(typescript@5.9.3)':
     dependencies:
-      '@storybook/core-webpack': 8.5.8(storybook@9.1.20)
+      '@storybook/core-webpack': 8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))
       '@types/semver': 7.7.1
       browser-assert: 1.2.1
       case-sensitive-paths-webpack-plugin: 2.4.0
@@ -20963,7 +20960,7 @@ snapshots:
       path-browserify: 1.0.1
       process: 0.11.10
       semver: 7.7.4
-      storybook: 9.1.20
+      storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
       style-loader: 3.3.4(webpack@5.105.4(@swc/core@1.15.18)(esbuild@0.27.4))
       terser-webpack-plugin: 5.4.0(@swc/core@1.15.18)(esbuild@0.27.4)(webpack@5.105.4(@swc/core@1.15.18)(esbuild@0.27.4))
       ts-dedent: 2.2.0
@@ -21050,21 +21047,10 @@ snapshots:
   '@storybook/components@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-    optional: true
-
-  '@storybook/components@8.5.8(storybook@9.1.20)':
-    dependencies:
-      storybook: 9.1.20
 
   '@storybook/core-webpack@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-      ts-dedent: 2.2.0
-    optional: true
-
-  '@storybook/core-webpack@8.5.8(storybook@9.1.20)':
-    dependencies:
-      storybook: 9.1.20
       ts-dedent: 2.2.0
 
   '@storybook/core-webpack@9.1.20(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
@@ -21075,12 +21061,6 @@ snapshots:
   '@storybook/csf-plugin@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-      unplugin: 1.16.1
-    optional: true
-
-  '@storybook/csf-plugin@8.5.8(storybook@9.1.20)':
-    dependencies:
-      storybook: 9.1.20
       unplugin: 1.16.1
 
   '@storybook/csf-plugin@9.1.20(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
@@ -21106,11 +21086,6 @@ snapshots:
   '@storybook/manager-api@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-    optional: true
-
-  '@storybook/manager-api@8.5.8(storybook@9.1.20)':
-    dependencies:
-      storybook: 9.1.20
 
   '@storybook/nextjs@9.1.20(patch_hash=e1857649664eed8f87877c352d277c90d4af5a58d0ad931105f033c8c08165c1)(esbuild@0.27.4)(next@16.1.6(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))(type-fest@4.41.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1)(webpack@5.105.4(esbuild@0.27.4))':
     dependencies:
@@ -21205,26 +21180,10 @@ snapshots:
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
       ts-dedent: 2.2.0
       yaml-loader: 0.8.1
-    optional: true
-
-  '@storybook/preset-server-webpack@8.5.8(storybook@9.1.20)':
-    dependencies:
-      '@storybook/core-webpack': 8.5.8(storybook@9.1.20)
-      '@storybook/global': 5.0.0
-      '@storybook/server': 8.5.8(storybook@9.1.20)
-      safe-identifier: 0.4.2
-      storybook: 9.1.20
-      ts-dedent: 2.2.0
-      yaml-loader: 0.8.1
 
   '@storybook/preview-api@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-    optional: true
-
-  '@storybook/preview-api@8.5.8(storybook@9.1.20)':
-    dependencies:
-      storybook: 9.1.20
 
   '@storybook/react-docgen-typescript-plugin@1.0.6--canary.9.0c3f3b7.0(typescript@5.9.3)(webpack@5.105.4(esbuild@0.27.4))':
     dependencies:
@@ -21245,13 +21204,6 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-    optional: true
-
-  '@storybook/react-dom-shim@8.5.8(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(storybook@9.1.20)':
-    dependencies:
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-      storybook: 9.1.20
 
   '@storybook/react-dom-shim@9.1.20(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
@@ -21272,9 +21224,9 @@ snapshots:
   '@storybook/server-webpack5@8.5.8(@swc/core@1.15.18)(esbuild@0.27.4)(storybook@9.1.20)(typescript@5.9.3)':
     dependencies:
       '@storybook/builder-webpack5': 8.5.8(@swc/core@1.15.18)(esbuild@0.27.4)(storybook@9.1.20)(typescript@5.9.3)
-      '@storybook/preset-server-webpack': 8.5.8(storybook@9.1.20)
-      '@storybook/server': 8.5.8(storybook@9.1.20)
-      storybook: 9.1.20
+      '@storybook/preset-server-webpack': 8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))
+      '@storybook/server': 8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))
+      storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
     transitivePeerDependencies:
       - '@rspack/core'
       - '@swc/core'
@@ -21307,19 +21259,6 @@ snapshots:
       '@storybook/preview-api': 8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))
       '@storybook/theming': 8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-      ts-dedent: 2.2.0
-      yaml: 2.8.2
-    optional: true
-
-  '@storybook/server@8.5.8(storybook@9.1.20)':
-    dependencies:
-      '@storybook/components': 8.5.8(storybook@9.1.20)
-      '@storybook/csf': 0.1.12
-      '@storybook/global': 5.0.0
-      '@storybook/manager-api': 8.5.8(storybook@9.1.20)
-      '@storybook/preview-api': 8.5.8(storybook@9.1.20)
-      '@storybook/theming': 8.5.8(storybook@9.1.20)
-      storybook: 9.1.20
       ts-dedent: 2.2.0
       yaml: 2.8.2
 
@@ -21356,11 +21295,6 @@ snapshots:
   '@storybook/theming@8.5.8(storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))':
     dependencies:
       storybook: 9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-    optional: true
-
-  '@storybook/theming@8.5.8(storybook@9.1.20)':
-    dependencies:
-      storybook: 9.1.20
 
   '@stream-io/escape-string-regexp@5.0.1':
     optional: true
@@ -22731,6 +22665,8 @@ snapshots:
 
   big.js@5.2.2: {}
 
+  bignumber.js@9.3.1: {}
+
   binary-extensions@2.3.0: {}
 
   birpc@0.2.14: {}
@@ -23430,6 +23366,8 @@ snapshots:
       d3-array: 3.2.4
 
   d3-timer@3.0.1: {}
+
+  data-uri-to-buffer@4.0.1: {}
 
   date-fns@4.1.0: {}
 
@@ -24508,6 +24446,11 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.3
 
+  fetch-blob@3.2.0:
+    dependencies:
+      node-domexception: 1.0.0
+      web-streams-polyfill: 3.3.3
+
   fetch-nodeshim@0.4.9: {}
 
   fetch-to-node@2.1.0: {}
@@ -24685,6 +24628,10 @@ snapshots:
     dependencies:
       fd-package-json: 2.0.0
 
+  formdata-polyfill@4.0.10:
+    dependencies:
+      fetch-blob: 3.2.0
+
   forwarded-parse@2.1.2: {}
 
   forwarded@0.2.0: {}
@@ -24724,6 +24671,22 @@ snapshots:
   function-bind@1.1.2: {}
 
   functional-red-black-tree@1.0.1: {}
+
+  gaxios@7.1.4:
+    dependencies:
+      extend: 3.0.2
+      https-proxy-agent: 7.0.6
+      node-fetch: 3.3.2
+    transitivePeerDependencies:
+      - supports-color
+
+  gcp-metadata@8.1.2:
+    dependencies:
+      gaxios: 7.1.4
+      google-logging-utils: 1.1.3
+      json-bigint: 1.0.0
+    transitivePeerDependencies:
+      - supports-color
 
   generator-function@2.0.1: {}
 
@@ -24770,6 +24733,8 @@ snapshots:
 
   getenv@2.0.0: {}
 
+  github-slugger@2.0.0: {}
+
   glob-parent@5.1.2:
     dependencies:
       is-glob: 4.0.3
@@ -24803,6 +24768,19 @@ snapshots:
   gonzales-pe@4.3.0:
     dependencies:
       minimist: 1.2.8
+
+  google-auth-library@10.6.2:
+    dependencies:
+      base64-js: 1.5.1
+      ecdsa-sig-formatter: 1.0.11
+      gaxios: 7.1.4
+      gcp-metadata: 8.1.2
+      google-logging-utils: 1.1.3
+      jws: 4.0.1
+    transitivePeerDependencies:
+      - supports-color
+
+  google-logging-utils@1.1.3: {}
 
   gopd@1.2.0: {}
 
@@ -25482,6 +25460,25 @@ snapshots:
       - supports-color
       - ts-node
 
+  jest-cli@30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4)):
+    dependencies:
+      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.27.4))
+      '@jest/test-result': 30.3.0
+      '@jest/types': 30.3.0
+      chalk: 4.1.2
+      exit-x: 0.2.2
+      import-local: 3.2.0
+      jest-config: 30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4))
+      jest-util: 30.3.0
+      jest-validate: 30.3.0
+      yargs: 17.7.2
+    transitivePeerDependencies:
+      - '@types/node'
+      - babel-plugin-macros
+      - esbuild-register
+      - supports-color
+      - ts-node
+
   jest-config@29.7.0(@types/node@24.12.0):
     dependencies:
       '@babel/core': 7.29.0
@@ -26133,6 +26130,19 @@ snapshots:
       - supports-color
       - ts-node
 
+  jest@30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4)):
+    dependencies:
+      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.27.4))
+      '@jest/types': 30.3.0
+      import-local: 3.2.0
+      jest-cli: 30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4))
+    transitivePeerDependencies:
+      - '@types/node'
+      - babel-plugin-macros
+      - esbuild-register
+      - supports-color
+      - ts-node
+
   jimp-compact@0.16.1: {}
 
   jiti@2.6.1: {}
@@ -26191,6 +26201,10 @@ snapshots:
   jsc-safe-url@0.2.4: {}
 
   jsesc@3.1.0: {}
+
+  json-bigint@1.0.0:
+    dependencies:
+      bignumber.js: 9.3.1
 
   json-buffer@3.0.1: {}
 
@@ -26527,6 +26541,8 @@ snapshots:
   markdown-table@3.0.4: {}
 
   marked@14.0.0: {}
+
+  marked@17.0.4: {}
 
   marky@1.3.0: {}
 
@@ -27373,9 +27389,17 @@ snapshots:
 
   node-abort-controller@3.1.1: {}
 
+  node-domexception@1.0.0: {}
+
   node-fetch@2.7.0:
     dependencies:
       whatwg-url: 5.0.0
+
+  node-fetch@3.3.2:
+    dependencies:
+      data-uri-to-buffer: 4.0.1
+      fetch-blob: 3.2.0
+      formdata-polyfill: 4.0.10
 
   node-forge@1.3.3: {}
 
@@ -28355,6 +28379,24 @@ snapshots:
       react-native-lightbox: 0.7.0
       simple-markdown: 0.7.3
 
+  react-native-marked@8.0.1(react-native-svg@15.15.3(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0):
+    dependencies:
+      '@jsamr/counter-style': 2.0.2
+      '@jsamr/react-native-li': 2.3.1(@jsamr/counter-style@2.0.2)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
+      github-slugger: 2.0.0
+      html-entities: 2.6.0
+      marked: 17.0.4
+      react: 19.2.0
+      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
+      react-native-reanimated-table: 0.0.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
+      react-native-svg: 15.15.3(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
+      svg-parser: 2.0.4
+
+  react-native-reanimated-table@0.0.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0):
+    dependencies:
+      react: 19.2.0
+      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
+
   react-native-reanimated@4.2.1(react-native-worklets@0.7.2(@babel/core@7.29.0)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0):
     dependencies:
       react: 19.2.0
@@ -29323,28 +29365,6 @@ snapshots:
 
   stoppable@1.1.0: {}
 
-  storybook@9.1.20:
-    dependencies:
-      '@storybook/global': 5.0.0
-      '@testing-library/jest-dom': 6.9.1
-      '@testing-library/user-event': 14.6.1
-      '@vitest/expect': 3.2.4
-      '@vitest/mocker': 3.2.4(vite@8.0.0(@types/node@24.12.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
-      '@vitest/spy': 3.2.4
-      better-opn: 3.0.2
-      esbuild: 0.27.4
-      esbuild-register: 3.6.0(esbuild@0.27.4)
-      recast: 0.23.11
-      semver: 7.7.4
-      ws: 8.19.0
-    transitivePeerDependencies:
-      - '@testing-library/dom'
-      - bufferutil
-      - msw
-      - supports-color
-      - utf-8-validate
-      - vite
-
   storybook@9.1.20(vite@8.0.0(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)):
     dependencies:
       '@storybook/global': 5.0.0
@@ -29677,6 +29697,8 @@ snapshots:
       supports-color: 7.2.0
 
   supports-preserve-symlinks-flag@1.0.0: {}
+
+  svg-parser@2.0.4: {}
 
   synckit@0.11.12:
     dependencies:
@@ -30527,6 +30549,8 @@ snapshots:
   wcwidth@1.0.1:
     dependencies:
       defaults: 1.0.4
+
+  web-streams-polyfill@3.3.3: {}
 
   web-vitals@5.1.0: {}
 

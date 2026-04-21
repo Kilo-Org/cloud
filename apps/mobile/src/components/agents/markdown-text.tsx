@@ -147,7 +147,12 @@ class MarkdownRenderer extends Renderer {
     _rowStyle: ViewStyle | undefined,
     _cellStyle: ViewStyle | undefined
   ): ReactNode {
-    const columnCount = header.length;
+    let columnCount = header.length;
+    for (const row of rows) {
+      if (row.length > columnCount) {
+        columnCount = row.length;
+      }
+    }
 
     return (
       <ScrollView key={this.getKey()} horizontal showsHorizontalScrollIndicator={false}>
@@ -200,16 +205,15 @@ function TableRow({ palette, cells, columnCount, isLastRow, isHeader = false }: 
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant header background
       style={isHeader ? { backgroundColor: palette.codeBackground } : undefined}
     >
-      {cells.map((cell, colIdx) => (
+      {Array.from({ length: columnCount }, (_, colIdx) => (
         <TableCell
           key={colIdx}
           palette={palette}
           width={columnWidth}
           hasRightBorder={colIdx < columnCount - 1}
           hasBottomBorder={isHeader || !isLastRow}
-          isHeader={isHeader}
         >
-          {cell}
+          {cells[colIdx] ?? []}
         </TableCell>
       ))}
     </View>
@@ -221,18 +225,10 @@ type TableCellProps = {
   width: number;
   hasRightBorder: boolean;
   hasBottomBorder: boolean;
-  isHeader: boolean;
   children: ReactNode;
 };
 
-function TableCell({
-  palette,
-  width,
-  hasRightBorder,
-  hasBottomBorder,
-  isHeader,
-  children,
-}: TableCellProps) {
+function TableCell({ palette, width, hasRightBorder, hasBottomBorder, children }: TableCellProps) {
   return (
     <View
       className="p-2"
@@ -244,14 +240,7 @@ function TableCell({
         borderBottomWidth: hasBottomBorder ? 1 : 0,
       }}
     >
-      <Text
-        selectable
-        className={isHeader ? 'font-bold' : undefined}
-        // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant text color
-        style={{ color: palette.textColor }}
-      >
-        {children}
-      </Text>
+      {children}
     </View>
   );
 }

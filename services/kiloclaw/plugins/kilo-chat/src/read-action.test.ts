@@ -1,0 +1,112 @@
+import { describe, it, expect, vi } from 'vitest';
+import { handleKiloChatReadAction } from './read-action';
+import type { KiloChatClient } from './client';
+
+function mockClient(overrides: Partial<KiloChatClient> = {}): KiloChatClient {
+  return {
+    createMessage: vi.fn(),
+    editMessage: vi.fn(),
+    deleteMessage: vi.fn(),
+    sendTyping: vi.fn(),
+    sendTypingStop: vi.fn(),
+    addReaction: vi.fn(),
+    removeReaction: vi.fn(),
+    listMessages: vi.fn().mockResolvedValue({ messages: [] }),
+    getMembers: vi.fn(),
+    ...overrides,
+  } as KiloChatClient;
+}
+
+describe('handleKiloChatReadAction', () => {
+  it('returns formatted messages on happy path', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({
+        messages: [
+          { id: 'MSG1', senderId: 'alice', text: 'Hello' },
+          { id: 'MSG2', senderId: 'bob', text: 'World' },
+        ],
+      }),
+    });
+
+    const result = await handleKiloChatReadAction({
+      params: { to: 'CONV' },
+      client,
+    });
+
+    expect(client.listMessages).toHaveBeenCalledWith({ conversationId: 'CONV', limit: undefined });
+    expect(result.content).toHaveLength(1);
+    expect(result.content[0].text).toBe('[MSG1] alice: Hello\n[MSG2] bob: World');
+  });
+
+  it('returns empty message when no messages exist', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({ messages: [] }),
+    });
+
+    const result = await handleKiloChatReadAction({
+      params: { to: 'CONV' },
+      client,
+    });
+
+    expect(result.content).toHaveLength(1);
+    expect(result.content[0].text).toBe('No messages in this conversation.');
+  });
+
+  it('passes limit param to listMessages', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({
+        messages: [{ id: 'M1', senderId: 'alice', text: 'Hi' }],
+      }),
+    });
+
+    await handleKiloChatReadAction({
+      params: { to: 'CONV', limit: 5 },
+      client,
+    });
+
+    expect(client.listMessages).toHaveBeenCalledWith({ conversationId: 'CONV', limit: 5 });
+  });
+
+  it('resolves conversationId from toolContext when params.to is absent', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({ messages: [] }),
+    });
+
+    await handleKiloChatReadAction({
+      params: {},
+      toolContext: { currentChannelId: 'CTX_CONV' },
+      client,
+    });
+
+    expect(client.listMessages).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: 'CTX_CONV' })
+    );
+  });
+
+  it('prefers params.to over toolContext', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({ messages: [] }),
+    });
+
+    await handleKiloChatReadAction({
+      params: { to: 'PARAM_CONV' },
+      toolContext: { currentChannelId: 'CTX_CONV' },
+      client,
+    });
+
+    expect(client.listMessages).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: 'PARAM_CONV' })
+    );
+  });
+
+  it('throws when conversationId cannot be resolved', async () => {
+    const client = mockClient();
+
+    await expect(
+      handleKiloChatReadAction({
+        params: {},
+        client,
+      })
+    ).rejects.toThrow(/conversationId/i);
+  });
+});

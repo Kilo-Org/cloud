@@ -40,6 +40,7 @@ async function insertPersonalSubscription(params: {
   id: string;
   instanceId: string;
   plan: 'standard' | 'trial';
+  paymentSource?: 'credits' | 'stripe' | null;
   status: 'active' | 'canceled';
   transferredToSubscriptionId?: string | null;
   userId: string;
@@ -50,7 +51,7 @@ async function insertPersonalSubscription(params: {
     instance_id: params.instanceId,
     plan: params.plan,
     status: params.status,
-    payment_source: 'credits',
+    payment_source: params.paymentSource ?? 'credits',
     cancel_at_period_end: false,
     transferred_to_subscription_id: params.transferredToSubscriptionId ?? null,
     created_at: params.createdAt,
@@ -388,6 +389,161 @@ describe('personal subscription destroy collapse', () => {
       .where(eq(kiloclaw_subscription_change_log.actor_id, TEST_ACTOR.actorId));
 
     expect(logs).toHaveLength(0);
+  });
+
+  it('rolls back single-row cancellation when change-log insert fails in transaction', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'destroy-cancel-single-rollback@example.com',
+    });
+    const instanceId = crypto.randomUUID();
+    const subscriptionId = crypto.randomUUID();
+
+    await insertPersonalInstance({
+      id: instanceId,
+      userId: user.id,
+      createdAt: '2026-04-01T00:00:00.000Z',
+    });
+    await insertPersonalSubscription({
+      id: subscriptionId,
+      userId: user.id,
+      instanceId,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      plan: 'standard',
+      status: 'active',
+    });
+
+    await expect(
+      db.transaction(async tx => {
+        const executor = Object.assign(Object.create(tx), {
+          insert: ((table: typeof kiloclaw_subscription_change_log) => {
+            if (table === kiloclaw_subscription_change_log) {
+              return {
+                values: async () => {
+                  throw new Error('change-log insert failed');
+                },
+              };
+            }
+            return tx.insert(table);
+          }) as typeof tx.insert,
+        });
+
+        await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+          actor: TEST_ACTOR,
+          executor,
+          instanceId,
+          reason: 'destroy_path_inline_collapse',
+          userId: user.id,
+        });
+      })
+    ).rejects.toThrow('change-log insert failed');
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscriptionId));
+    const [instance] = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instanceId));
+
+    expect(subscription?.status).toBe('active');
+    expect(instance?.destroyed_at).toBeNull();
+  });
+
+  it('does not auto-cancel single destroyed Stripe current row on destroy path', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'destroy-cancel-single-stripe@example.com',
+    });
+    const instanceId = crypto.randomUUID();
+    const subscriptionId = crypto.randomUUID();
+
+    await insertPersonalInstance({
+      id: instanceId,
+      userId: user.id,
+      createdAt: '2026-04-01T00:00:00.000Z',
+    });
+    await insertPersonalSubscription({
+      id: subscriptionId,
+      userId: user.id,
+      instanceId,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      plan: 'standard',
+      status: 'active',
+      paymentSource: 'stripe',
+    });
+
+    await db.transaction(async tx => {
+      await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+        actor: TEST_ACTOR,
+        executor: tx,
+        instanceId,
+        reason: 'destroy_path_inline_collapse',
+        userId: user.id,
+      });
+    });
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscriptionId));
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscriptionId));
+
+    expect(subscription?.status).toBe('active');
+    expect(logs).toHaveLength(0);
+  });
+
+  it('cancels single destroyed current access row on destroy path', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'destroy-cancel-single-current@example.com',
+    });
+    const instanceId = crypto.randomUUID();
+    const subscriptionId = crypto.randomUUID();
+
+    await insertPersonalInstance({
+      id: instanceId,
+      userId: user.id,
+      createdAt: '2026-04-01T00:00:00.000Z',
+    });
+    await insertPersonalSubscription({
+      id: subscriptionId,
+      userId: user.id,
+      instanceId,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      plan: 'standard',
+      status: 'active',
+    });
+
+    await db.transaction(async tx => {
+      await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+        actor: TEST_ACTOR,
+        executor: tx,
+        instanceId,
+        reason: 'destroy_path_inline_collapse',
+        userId: user.id,
+      });
+    });
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscriptionId));
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscriptionId));
+
+    expect(subscription?.status).toBe('canceled');
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'canceled',
+          reason: 'destroy_path_cancel_single_current_access_row',
+        }),
+      ])
+    );
   });
 
   it('refuses collapse when multiple alive current personal rows exist', async () => {

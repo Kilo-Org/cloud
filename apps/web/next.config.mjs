@@ -93,6 +93,28 @@ const nextConfig = {
   redirects: async () => {
     return [
       {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'docs.kilo.ai',
+          },
+        ],
+        destination: 'https://kilo.ai/docs/:path*',
+        permanent: true,
+      },
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'docs.kilocode.ai',
+          },
+        ],
+        destination: 'https://kilo.ai/docs/:path*',
+        permanent: true,
+      },
+      {
         source: '/cli/install',
         destination: 'https://raw.githubusercontent.com/Kilo-Org/kilo/refs/heads/dev/install',
         permanent: false,

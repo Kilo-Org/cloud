@@ -28,6 +28,7 @@ export type UserConfig = {
   kilocodeApiKey?: string | null;
   kilocodeDefaultModel?: string | null;
   userTimezone?: string | null;
+  userLocation?: string | null;
   kiloExaSearchMode?: KiloExaSearchMode | null;
   channels?: EncryptedChannelTokens;
   googleCredentials?: GoogleCredentials;
@@ -174,6 +175,9 @@ export async function buildEnvVars(
     }
     if (userConfig.userTimezone) {
       plainEnv.KILOCLAW_USER_TIMEZONE = userConfig.userTimezone;
+    }
+    if (userConfig.userLocation) {
+      sensitive.KILOCLAW_USER_LOCATION = userConfig.userLocation;
     }
 
     // Layer 4: Decrypt channel tokens and map to container env var names

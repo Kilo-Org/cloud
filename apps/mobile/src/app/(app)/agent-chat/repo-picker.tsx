@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Check, Lock, Search } from 'lucide-react-native';
+import { Check, Lock, Search, Unlock } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 
@@ -116,7 +116,11 @@ export default function RepoPickerScreen() {
             accessibilityRole="button"
             accessibilityLabel={repo.fullName}
           >
-            {repo.isPrivate && <Lock size={14} color={colors.mutedForeground} />}
+            {repo.isPrivate ? (
+              <Lock size={14} color={colors.mutedForeground} />
+            ) : (
+              <Unlock size={14} color={colors.mutedForeground} />
+            )}
             <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
               {repo.fullName}
             </Text>

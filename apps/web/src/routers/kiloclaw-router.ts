@@ -558,6 +558,161 @@ const userTimezoneSchema = z
   .max(100)
   .refine(isValidUserTimezone, 'userTimezone must be a valid IANA timezone');
 
+const userLocationSchema = z.string().trim().min(1).max(200);
+const weatherLocationInputSchema = z.object({ location: userLocationSchema });
+const WTTR_LOCATION_TIMEOUT_MS = 4_000;
+const COORDINATE_LOCATION_PATTERN = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/;
+
+const wttrValueSchema = z.object({ value: z.string().trim().min(1) });
+const wttrNearestAreaSchema = z.object({
+  areaName: z.array(wttrValueSchema).optional(),
+  region: z.array(wttrValueSchema).optional(),
+  country: z.array(wttrValueSchema).optional(),
+});
+const wttrLocationResponseSchema = z
+  .object({
+    nearest_area: z.array(wttrNearestAreaSchema).optional(),
+  })
+  .passthrough();
+
+type WttrValue = z.infer<typeof wttrValueSchema>;
+
+function hasUnknownLocationMarker(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  return lowerText.includes('unknown location') || lowerText.includes('not found');
+}
+
+function wttrValue(values: WttrValue[] | undefined): string | null {
+  const value = values?.[0]?.value.trim();
+  if (!value) return null;
+  const lowerValue = value.toLowerCase();
+  if (lowerValue.includes('unknown') || lowerValue.includes('not found')) return null;
+  return value;
+}
+
+function formatCountryName(country: string): string {
+  return country.toLowerCase() === 'netherlands' ? 'The Netherlands' : country;
+}
+
+function isCoordinateLocation(location: string): boolean {
+  return COORDINATE_LOCATION_PATTERN.test(location.trim());
+}
+
+function locationIncludesCountry(location: string, country: string): boolean {
+  const normalizedCountry = country.toLowerCase().replace(/^the\s+/, '');
+  return location
+    .toLowerCase()
+    .split(',')
+    .some(part => part.trim().replace(/^the\s+/, '') === normalizedCountry);
+}
+
+function normalizeWeatherLocation(data: unknown, preferredAreaName?: string): string | null {
+  const parsed = wttrLocationResponseSchema.safeParse(data);
+  const text = JSON.stringify(data) ?? '';
+  if (!parsed.success || text.toLowerCase().includes('unknown location')) return null;
+
+  const nearestArea = parsed.data.nearest_area?.[0];
+  if (!nearestArea) return null;
+
+  const wttrAreaName = wttrValue(nearestArea.areaName);
+  const areaName =
+    preferredAreaName && !isCoordinateLocation(preferredAreaName)
+      ? preferredAreaName
+      : wttrAreaName;
+  const country = wttrValue(nearestArea.country);
+  const formattedCountry = country ? formatCountryName(country) : null;
+  const parts =
+    areaName && formattedCountry && locationIncludesCountry(areaName, formattedCountry)
+      ? [areaName]
+      : [areaName, formattedCountry];
+  const uniqueParts = parts.filter((part, index): part is string => {
+    if (!part) return false;
+    return parts.findIndex(other => other?.toLowerCase() === part.toLowerCase()) === index;
+  });
+
+  return uniqueParts.length > 0 ? uniqueParts.join(', ') : null;
+}
+
+function parseWttrFormat3(text: string): { location: string; currentWeatherText: string } | null {
+  const trimmedText = text.trim();
+  if (!trimmedText || hasUnknownLocationMarker(trimmedText)) return null;
+
+  const separatorIndex = trimmedText.indexOf(':');
+  if (separatorIndex === -1) return null;
+
+  const location = trimmedText.slice(0, separatorIndex).trim();
+  const currentWeatherText = trimmedText.slice(separatorIndex + 1).trim();
+  if (!location || !currentWeatherText) return null;
+
+  return { location, currentWeatherText };
+}
+
+function isTimeoutError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('name' in error)) return false;
+  return error.name === 'TimeoutError' || error.name === 'AbortError';
+}
+
+async function fetchWttr(location: string, query: string): Promise<Response> {
+  try {
+    return await fetch(`https://wttr.in/${encodeURIComponent(location)}?${query}`, {
+      headers: {
+        Accept: 'text/plain, application/json;q=0.9, */*;q=0.8',
+        'User-Agent': 'curl/8.7.1',
+      },
+      signal: AbortSignal.timeout(WTTR_LOCATION_TIMEOUT_MS),
+    });
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      throw new TRPCError({
+        code: 'TIMEOUT',
+        message: 'Weather location validation timed out. Please try again or skip weather setup.',
+      });
+    }
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message:
+        'Weather location validation is unavailable. Please try again or skip weather setup.',
+    });
+  }
+}
+
+async function fetchReadableLocationName(
+  location: string,
+  preferredAreaName: string
+): Promise<string | null> {
+  try {
+    const response = await fetchWttr(location, 'format=j1');
+    if (!response.ok) return null;
+    return normalizeWeatherLocation(await response.json(), preferredAreaName);
+  } catch {
+    return null;
+  }
+}
+
+async function validateWeatherLocation(
+  location: string
+): Promise<{ location: string; currentWeatherText: string }> {
+  const response = await fetchWttr(location, 'format=3');
+
+  if (!response.ok) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Weather location could not be found.',
+    });
+  }
+
+  const parsed = parseWttrFormat3(await response.text());
+  if (!parsed) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Weather location could not be found.',
+    });
+  }
+
+  const resolvedLocation = await fetchReadableLocationName(location, parsed.location);
+  return { ...parsed, ...(resolvedLocation ? { location: resolvedLocation } : undefined) };
+}
+
 // TODO: Replace with catalog-driven schema. This hardcoded list must be kept
 // in sync with @kilocode/kiloclaw-secret-catalog channel entries. Any new
 // catalog channel entry will render in the UI but be silently stripped here
@@ -577,6 +732,7 @@ const updateConfigSchema = z.object({
   channels: channelsSchema,
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),
+  userLocation: userLocationSchema.nullable().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
@@ -733,7 +889,8 @@ async function provisionInstance(
       kilocodeApiKey,
       kilocodeApiKeyExpiresAt,
       kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-      userTimezone: input.userTimezone ?? undefined,
+      userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+      userLocation: input.userLocation === undefined ? undefined : input.userLocation,
       pinnedImageTag,
     },
     params.instanceId
@@ -2026,6 +2183,10 @@ export const kiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     return client.getLatestVersion();
   }),
+
+  validateWeatherLocation: baseProcedure
+    .input(weatherLocationInputSchema)
+    .mutation(async ({ input }) => validateWeatherLocation(input.location)),
 
   /**
    * List all active KiloClaw instances for the user across all contexts

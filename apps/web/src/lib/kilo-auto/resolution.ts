@@ -16,6 +16,7 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   modeSchema,
   BALANCED_CLAW_SETUP_MODEL,
+  BALANCED_CLAW_MODEL,
   BALANCED_CODEX_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
@@ -33,6 +34,7 @@ type ResolveAutoModelParams = {
   modeHeader: string | null;
   featureHeader: FeatureValue | null;
   sessionId: string | null;
+  apiKind: GatewayRequest['kind'] | null;
 };
 
 function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
@@ -47,7 +49,7 @@ export async function resolveAutoModel(
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ): Promise<ResolvedAutoModel> {
-  const { model, modeHeader, featureHeader, sessionId } = params;
+  const { model, modeHeader, featureHeader, sessionId, apiKind } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
     if (
       sessionId &&
@@ -66,10 +68,15 @@ export async function resolveAutoModel(
   }
   const mode = resolveMode(modeHeader, featureHeader);
   if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
-    if (featureHeader === 'kiloclaw' && mode === 'claw') {
-      const user = await userPromise;
-      if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
-        return BALANCED_CLAW_SETUP_MODEL;
+    if (mode === 'claw') {
+      if (featureHeader === 'kiloclaw') {
+        const user = await userPromise;
+        if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
+          return BALANCED_CLAW_SETUP_MODEL;
+        }
+      }
+      if (apiKind !== 'messages') {
+        return BALANCED_CLAW_MODEL;
       }
     }
     return BALANCED_CODEX_MODEL;

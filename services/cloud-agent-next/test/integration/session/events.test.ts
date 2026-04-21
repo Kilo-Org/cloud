@@ -11,8 +11,17 @@
 import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
+import * as z from 'zod';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { EventId } from '../../../src/types/ids.js';
+
+const messageUpdatedPayloadSchema = z.object({
+  properties: z.object({
+    info: z.object({
+      text: z.string(),
+    }),
+  }),
+});
 
 describe('Event Storage', () => {
   beforeEach(async () => {
@@ -273,7 +282,8 @@ describe('Event Storage', () => {
     // Only one row in the table
     expect(result.allEvents).toHaveLength(1);
     // Payload should be the latest version
-    expect(JSON.parse(result.allEvents[0].payload).properties.info.text).toBe('hello world');
+    const payload: unknown = JSON.parse(result.allEvents[0].payload);
+    expect(messageUpdatedPayloadSchema.parse(payload).properties.info.text).toBe('hello world');
     // Timestamp should be updated
     expect(result.allEvents[0].stream_event_type).toBe('kilocode');
   });
@@ -332,5 +342,160 @@ describe('Event Storage', () => {
     expect(result.allEvents).toHaveLength(3);
     // entity_id should not appear in the projected results (StoredEvent type)
     expect(result.allEvents[0]).not.toHaveProperty('entity_id');
+  });
+
+  it('should return latest assistant message by sortable message ID with current parts', async () => {
+    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_7');
+    const stub = env.CLOUD_AGENT_SESSION.get(id);
+
+    const result = await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const events = createEventQueries(db, state.storage.sql);
+      const now = Date.now();
+      const latestAssistantId = 'msg_00000000000000000000000002';
+      const olderAssistantId = 'msg_00000000000000000000000001';
+      const newerUserId = 'msg_00000000000000000000000003';
+
+      events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: { info: { id: latestAssistantId, role: 'assistant', sessionID: 'ses_root' } },
+        }),
+        timestamp: now,
+        entityId: `message/${latestAssistantId}`,
+      });
+      events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.part.updated',
+          properties: {
+            part: {
+              id: 'part_00000000000000000000000002',
+              messageID: latestAssistantId,
+              sessionID: 'ses_root',
+              type: 'text',
+              text: 'latest answer',
+            },
+          },
+        }),
+        timestamp: now + 1,
+        entityId: `part/${latestAssistantId}/part_00000000000000000000000002`,
+      });
+      events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.part.updated',
+          properties: {
+            part: {
+              id: 'part_00000000000000000000000003',
+              messageID: latestAssistantId,
+              sessionID: 'ses_root',
+              type: 'text',
+              text: 'removed answer',
+            },
+          },
+        }),
+        timestamp: now + 2,
+        entityId: `part/${latestAssistantId}/part_00000000000000000000000003`,
+      });
+      events.insert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.part.removed',
+          properties: {
+            sessionID: 'ses_root',
+            messageID: latestAssistantId,
+            partID: 'part_00000000000000000000000003',
+          },
+        }),
+        timestamp: now + 3,
+      });
+      events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: { info: { id: olderAssistantId, role: 'assistant', sessionID: 'ses_root' } },
+        }),
+        timestamp: now + 2,
+        entityId: `message/${olderAssistantId}`,
+      });
+      events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: { info: { id: newerUserId, role: 'user', sessionID: 'ses_root' } },
+        }),
+        timestamp: now + 3,
+        entityId: `message/${newerUserId}`,
+      });
+
+      return events.getLatestAssistantMessage('sess_1', 'ses_root');
+    });
+
+    expect(result?.info.id).toBe('msg_00000000000000000000000002');
+    expect(result?.parts).toEqual([
+      expect.objectContaining({
+        id: 'part_00000000000000000000000002',
+        messageID: 'msg_00000000000000000000000002',
+        text: 'latest answer',
+      }),
+    ]);
+  });
+
+  it('should require root-session assistant messages', async () => {
+    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_8');
+    const stub = env.CLOUD_AGENT_SESSION.get(id);
+
+    const result = await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const events = createEventQueries(db, state.storage.sql);
+      const now = Date.now();
+      const rootMessageId = 'msg_00000000000000000000000002';
+      const childMessageId = 'msg_00000000000000000000000003';
+
+      events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: { info: { id: rootMessageId, role: 'assistant', sessionID: 'ses_root' } },
+        }),
+        timestamp: now,
+        entityId: `message/${rootMessageId}`,
+      });
+      events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: { info: { id: childMessageId, role: 'assistant', sessionID: 'ses_child' } },
+        }),
+        timestamp: now + 1,
+        entityId: `message/${childMessageId}`,
+      });
+
+      return {
+        root: events.getLatestAssistantMessage('sess_1', 'ses_root'),
+        missingRoot: events.getLatestAssistantMessage('sess_1', 'ses_missing'),
+      };
+    });
+
+    expect(result.root?.info.id).toBe('msg_00000000000000000000000002');
+    expect(result.missingRoot).toBeNull();
   });
 });

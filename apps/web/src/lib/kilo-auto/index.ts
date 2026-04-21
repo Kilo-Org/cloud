@@ -7,6 +7,7 @@ import {
 import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
+import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 
 type AutoModel = {
   id: string;
@@ -87,6 +88,11 @@ export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   model: claude_sonnet_clawsetup_model.public_id,
   reasoning: { enabled: true, effort: 'high' },
   verbosity: 'high',
+};
+
+export const BALANCED_CLAW_MODEL: ResolvedAutoModel = {
+  model: qwen36_plus_model.public_id,
+  reasoning: { enabled: true },
 };
 
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {

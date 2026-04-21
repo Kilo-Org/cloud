@@ -140,8 +140,8 @@ export function ChannelSelectionStepView({
 
   return (
     <OnboardingStepView
-      currentStep={4}
-      totalSteps={5}
+      currentStep={3}
+      totalSteps={4}
       title="Where do you want to chat?"
       description="Pick where you'd like to talk to your KiloClaw bot. You can add more channels any time from settings."
       showProvisioningBanner={instanceRunning === false}

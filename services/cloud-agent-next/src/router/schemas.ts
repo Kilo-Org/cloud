@@ -407,6 +407,38 @@ export const GetSessionOutput = z.object({
 
 export type GetSessionResponse = z.infer<typeof GetSessionOutput>;
 
+export const GetLatestAssistantMessageInput = z.object({
+  cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
+});
+
+export const AssistantMessageInfoSchema = z
+  .object({
+    id: z.string().describe('Assistant message ID'),
+    role: z.literal('assistant'),
+  })
+  .passthrough();
+
+export const AssistantMessagePartSchema = z
+  .object({
+    id: z.string().describe('Message part ID'),
+    messageID: z.string().describe('Parent message ID'),
+  })
+  .passthrough();
+
+export const LatestAssistantMessageSchema = z.object({
+  eventId: z.number().describe('Stored event ID for the message.updated event'),
+  timestamp: z.number().describe('Stored event timestamp in milliseconds'),
+  info: AssistantMessageInfoSchema,
+  parts: z.array(AssistantMessagePartSchema),
+});
+
+export const GetLatestAssistantMessageOutput = z.object({
+  cloudAgentSessionId: sessionIdSchema,
+  message: LatestAssistantMessageSchema.nullable(),
+});
+
+export type GetLatestAssistantMessageResponse = z.infer<typeof GetLatestAssistantMessageOutput>;
+
 /**
  * Response schema for V2 execution endpoints.
  * Returns acknowledgment when execution has started.

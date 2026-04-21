@@ -36,6 +36,8 @@ import type {
   ExecutionMetadata,
   AddExecutionParams,
   UpdateExecutionStatusParams,
+  LatestAssistantMessage,
+  AssistantMessagePart,
 } from '../session/types.js';
 import type { ExecutionStatus } from '../core/execution.js';
 import type { Result } from '../lib/result.js';
@@ -123,6 +125,23 @@ type DisconnectGraceState = {
   wsCloseReason: string;
 };
 
+/**
+ * Concatenate text content from assistant message parts.
+ * Parts have a loose `Record<string, unknown>` type; only include those with
+ * `type === 'text'` and a string `text` field.
+ */
+function extractAssistantTextFromParts(parts: AssistantMessagePart[]): string {
+  const pieces: string[] = [];
+  for (const part of parts) {
+    if (part.type !== 'text') continue;
+    const text = part.text;
+    if (typeof text === 'string' && text.length > 0) {
+      pieces.push(text);
+    }
+  }
+  return pieces.join('').trim();
+}
+
 export class CloudAgentSession extends DurableObject {
   private executionQueries: ExecutionQueries;
   private eventQueries: EventQueries;
@@ -162,6 +181,9 @@ export class CloudAgentSession extends DurableObject {
     const resolvedSessionId = await this.resolveSessionId(metadata.sessionId as SessionId);
     const sessionId = resolvedSessionId ?? metadata.sessionId ?? '';
 
+    const lastAssistantMessageText =
+      status === 'completed' ? await this.getLatestAssistantMessageText() : undefined;
+
     const callbackJob: CallbackJob = {
       target: metadata.callbackTarget,
       payload: {
@@ -173,6 +195,7 @@ export class CloudAgentSession extends DurableObject {
         lastSeenBranch: metadata.upstreamBranch,
         kiloSessionId: metadata.kiloSessionId,
         gateResult,
+        lastAssistantMessageText,
       },
     };
 
@@ -579,6 +602,27 @@ export class CloudAgentSession extends DurableObject {
   async getMetadata(): Promise<CloudAgentSessionState | null> {
     const metadata = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
     return metadata || null;
+  }
+
+  async getLatestAssistantMessage(): Promise<LatestAssistantMessage | null> {
+    const sessionId = await this.requireSessionId();
+    const metadata = await this.getMetadata();
+    if (!metadata?.kiloSessionId) return null;
+    return this.eventQueries.getLatestAssistantMessage(sessionId, metadata.kiloSessionId);
+  }
+
+  private async getLatestAssistantMessageText(): Promise<string | undefined> {
+    try {
+      const message = await this.getLatestAssistantMessage();
+      if (!message) return undefined;
+      const text = extractAssistantTextFromParts(message.parts);
+      return text.length > 0 ? text : undefined;
+    } catch (err) {
+      logger
+        .withFields({ error: err instanceof Error ? err.message : String(err) })
+        .warn('Failed to fetch latest assistant message for callback');
+      return undefined;
+    }
   }
 
   /**

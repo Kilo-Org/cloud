@@ -120,6 +120,7 @@ import {
   SELF_HEAL_THRESHOLD,
   STARTING_TIMEOUT_MS,
   RESTARTING_TIMEOUT_MS,
+  RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   STALE_PROVISION_THRESHOLD_MS,
 } from '../config';
@@ -384,6 +385,14 @@ beforeEach(() => {
         return Promise.resolve(
           new Response(JSON.stringify({ error: 'Not found' }), {
             status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      if (typeof url === 'string' && url.includes('/_kilo/user-profile')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, path: 'workspace/USER.md' }), {
+            status: 200,
             headers: { 'Content-Type': 'application/json' },
           })
         );
@@ -1680,6 +1689,25 @@ describe('buildUserEnvVars API key refresh', () => {
     expect(payload.kiloUserId).toBe('user-1');
     expect(payload.apiTokenPepper).toBe('pepper-1');
     expect(payload.env).toBe('development');
+  });
+
+  it('passes persisted user location to buildEnvVars', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      userTimezone: 'Europe/Amsterdam',
+      userLocation: 'Amsterdam, North Holland, Netherlands',
+      kilocodeApiKey: 'stored-key',
+      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+    });
+
+    await callBuildUserEnvVars(instance);
+
+    const options = (gatewayEnv.buildEnvVars as Mock).mock.calls[0][3] as {
+      userTimezone?: string;
+      userLocation?: string;
+    };
+    expect(options.userTimezone).toBe('Europe/Amsterdam');
+    expect(options.userLocation).toBe('Amsterdam, North Holland, Netherlands');
   });
 
   it('falls back to the stored key when Hyperdrive is unavailable', async () => {
@@ -5457,7 +5485,41 @@ describe('provision: auto-start after fresh provision', () => {
     });
   });
 
-  it('persists user timezone from provision config', async () => {
+  it('persists user timezone and location from provision config', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {
+      userTimezone: 'Europe/Amsterdam',
+      userLocation: 'Amsterdam, North Holland, Netherlands',
+    });
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('userTimezone')).toBe('Europe/Amsterdam');
+    expect(storage._store.get('userLocation')).toBe('Amsterdam, North Holland, Netherlands');
+
+    await instance.provision('user-1', { userTimezone: null, userLocation: null });
+
+    expect(storage._store.get('userTimezone')).toBeNull();
+    expect(storage._store.get('userLocation')).toBeNull();
+    const userProfileCall = vi
+      .mocked(fetch)
+      .mock.calls.find(
+        call => typeof call[0] === 'string' && call[0].includes('/_kilo/user-profile')
+      );
+    expect(userProfileCall?.[1]?.body).toBe(
+      JSON.stringify({ userTimezone: null, userLocation: null })
+    );
+  });
+
+  it('leaves user location absent when weather setup is skipped', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
 
     (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
@@ -5472,10 +5534,7 @@ describe('provision: auto-start after fresh provision', () => {
     await Promise.all(waitUntilPromises);
 
     expect(storage._store.get('userTimezone')).toBe('Europe/Amsterdam');
-
-    await instance.provision('user-1', { userTimezone: null });
-
-    expect(storage._store.get('userTimezone')).toBeNull();
+    expect(storage._store.get('userLocation')).toBeNull();
   });
 
   it('creates the initial volume in the freshly ensured Fly app', async () => {
@@ -7240,6 +7299,78 @@ describe('restartMachine restartingAt guard', () => {
     expect(storage._store.get('lastRestartErrorMessage')).toBe(
       'Restart is taking longer than expected; still reconciling while the machine remains updating'
     );
+  });
+
+  it('transitions to stopped when replacing exceeds max timeout', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, {
+      restartingAt: Date.now() - RESTARTING_MAX_TIMEOUT_MS - 1_000,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'replacing',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._store.get('restartingAt')).toBeNull();
+  });
+
+  it('retries startMachine when stopped and restartUpdateSent during restarting', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, {
+      restartUpdateSent: true,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'stopped',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+    (flyClient.startMachine as Mock).mockResolvedValue(undefined);
+
+    await instance.alarm();
+
+    expect(flyClient.startMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1');
+    expect(storage._store.get('status')).toBe('restarting');
+  });
+
+  it('does not retry startMachine when stopped but restartUpdateSent is false', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'stopped',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(flyClient.startMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('restarting');
+  });
+
+  it('does not retry startMachine after soft timeout — transitions to stopped', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, {
+      restartUpdateSent: true,
+      restartingAt: Date.now() - RESTARTING_TIMEOUT_MS - 1_000,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'stopped',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(flyClient.startMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('stopped');
   });
 
   it('transitions to stopped on terminal stopped state during restart reconcile', async () => {

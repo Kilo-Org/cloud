@@ -152,6 +152,8 @@ const userTimezoneSchema = z
   .max(100)
   .refine(isValidUserTimezone, 'userTimezone must be a valid IANA timezone');
 
+const userLocationSchema = z.string().trim().min(1).max(200);
+
 const channelsSchema = z
   .object({
     telegramBotToken: z.string().optional(),
@@ -168,6 +170,7 @@ const updateConfigSchema = z.object({
   channels: channelsSchema,
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
   userTimezone: userTimezoneSchema.nullable().optional(),
+  userLocation: userLocationSchema.nullable().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
@@ -426,7 +429,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
               kilocodeApiKey,
               kilocodeApiKeyExpiresAt,
               kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-              userTimezone: input.userTimezone ?? undefined,
+              userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+              userLocation: input.userLocation === undefined ? undefined : input.userLocation,
             },
             { orgId: input.organizationId }
           );
@@ -480,7 +484,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
           kilocodeApiKey,
           kilocodeApiKeyExpiresAt,
           kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-          userTimezone: input.userTimezone ?? undefined,
+          userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+          userLocation: input.userLocation === undefined ? undefined : input.userLocation,
           pinnedImageTag: pin?.image_tag,
         },
         { instanceId: instance.id, orgId: input.organizationId }

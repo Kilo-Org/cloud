@@ -229,6 +229,7 @@ function makeEnv() {
       },
     } as never,
     destroy,
+    provision,
   };
 }
 
@@ -237,11 +238,41 @@ describe('platform provision bootstrap quarantine', () => {
     vi.clearAllMocks();
   });
 
+  it('forwards user location to the instance provision config', async () => {
+    const { env, provision } = makeEnv();
+    const workerDb = createWorkerDb();
+    mockGetWorkerDb.mockReturnValue(workerDb);
+    mockBootstrapProvisionedSubscriptionWithFallback.mockResolvedValueOnce({ mode: 'rpc' });
+
+    const response = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          provider: 'fly',
+          userLocation: 'Amsterdam, North Holland, Netherlands',
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(201);
+    expect(provision).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({
+        userLocation: 'Amsterdam, North Holland, Netherlands',
+      }),
+      expect.anything()
+    );
+  });
+
   it('returns an error and marks fresh instance destroyed when RPC and fallback both fail', async () => {
     const { env, destroy } = makeEnv();
     const workerDb = createWorkerDb();
     mockGetWorkerDb.mockReturnValue(workerDb);
-    mockBootstrapProvisionedSubscriptionWithFallback.mockRejectedValue(
+    mockBootstrapProvisionedSubscriptionWithFallback.mockRejectedValueOnce(
       new BootstrapProvisionFallbackError({
         rpcError: new Error('rpc down'),
         fallbackError: new Error('fallback down'),

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePostHog } from 'posthog-js/react';
+import { toast } from 'sonner';
 import { Check, Sparkles, TriangleAlert, X } from 'lucide-react';
+import { KILO_AUTO_BALANCED_MODEL } from '@/lib/kilo-auto';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
@@ -48,6 +50,15 @@ function assertNever(value: never): never {
   throw new Error(`Unhandled KiloClaw onboarding render step: ${value}`);
 }
 
+function getBrowserTimeZone(): string | undefined {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return typeof timeZone === 'string' && timeZone.trim() ? timeZone : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type { ClawOnboardingMode };
 
 export function ClawOnboardingFlow({
@@ -55,6 +66,7 @@ export function ClawOnboardingFlow({
   mode,
   organizationId,
   createFlowStarted = false,
+  setupFailed = false,
   onCreateFlowStarted,
   onCreateFlowFailed,
 }: {
@@ -62,6 +74,7 @@ export function ClawOnboardingFlow({
   mode: ClawOnboardingMode;
   organizationId?: string;
   createFlowStarted?: boolean;
+  setupFailed?: boolean;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
 }) {
@@ -71,6 +84,7 @@ export function ClawOnboardingFlow({
         status={status}
         mode={mode}
         createFlowStarted={createFlowStarted}
+        setupFailed={setupFailed}
         onCreateFlowStarted={onCreateFlowStarted}
         onCreateFlowFailed={onCreateFlowFailed}
       />
@@ -82,12 +96,14 @@ function ClawOnboardingFlowInner({
   status,
   mode,
   createFlowStarted,
+  setupFailed,
   onCreateFlowStarted,
   onCreateFlowFailed,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   createFlowStarted: boolean;
+  setupFailed: boolean;
   onCreateFlowStarted?: () => void;
   onCreateFlowFailed?: () => void;
 }) {
@@ -113,6 +129,7 @@ function ClawOnboardingFlowInner({
     status,
     mode,
     createSetupStarted,
+    setupFailed,
     onboardingStep,
     selectedPreset,
     hasBotIdentity: botIdentity !== null,
@@ -182,12 +199,33 @@ function ClawOnboardingFlowInner({
 
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
 
+  function provisionInstance(userLocation?: string) {
+    handleCreateFlowStarted();
+
+    mutations.provision.mutate(
+      {
+        kilocodeDefaultModel: `kilocode/${KILO_AUTO_BALANCED_MODEL.id}`,
+        userTimezone: getBrowserTimeZone(),
+        ...(userLocation ? { userLocation } : undefined),
+      },
+      {
+        onError: err => {
+          posthog?.capture('claw_setup_provision_failed', {
+            selected_model: KILO_AUTO_BALANCED_MODEL.id,
+            reason: 'provision_request_failed',
+          });
+          handleCreateFlowFailed();
+          toast.error(`Failed to create: ${err.message}`);
+        },
+      }
+    );
+  }
+
   function renderCreateInstanceStep() {
     return (
       <CreateInstanceCard
-        mutations={mutations}
-        onProvisionStart={handleCreateFlowStarted}
-        onProvisionFailed={handleCreateFlowFailed}
+        isPending={mutations.provision.isPending}
+        onCreate={handleCreateFlowStarted}
       />
     );
   }
@@ -196,12 +234,27 @@ function ClawOnboardingFlowInner({
     return (
       <BotIdentityStep
         instanceRunning={flowState.instanceRunning}
-        onContinue={identity => {
+        onContinue={({ identity, weatherLocation }) => {
           posthog?.capture('claw_setup_identity_completed', {
             bot_name_is_custom: identity.botName !== 'KiloClaw',
             bot_nature: identity.botNature,
             bot_emoji_is_custom: identity.botEmoji !== '🤖',
           });
+          if (weatherLocation) {
+            posthog?.capture('claw_weather_location_selected', { source: weatherLocation.source });
+          } else {
+            posthog?.capture('claw_weather_location_skipped');
+          }
+          if (flowState.instanceStatus) {
+            if (weatherLocation) {
+              mutations.updateConfig.mutate(
+                { userLocation: weatherLocation.location },
+                { onError: err => toast.error(err.message) }
+              );
+            }
+          } else {
+            provisionInstance(weatherLocation?.location);
+          }
           posthog?.capture('claw_setup_permissions_viewed');
           setBotIdentity(identity);
           setOnboardingStep('permissions');
@@ -394,8 +447,8 @@ export function ClawSetupErrorStep({ basePath }: { basePath: string }) {
         <div className="flex flex-col items-center gap-2">
           <h2 className="text-2xl font-bold">Something went wrong</h2>
           <p className="text-muted-foreground max-w-md text-center">
-            Your KiloClaw instance stopped during setup. Please reach out to support for help
-            getting it back online.
+            Your KiloClaw instance stopped or failed during setup. Please reach out to support for
+            help getting it back online.
           </p>
         </div>
 

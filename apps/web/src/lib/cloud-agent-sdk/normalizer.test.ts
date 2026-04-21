@@ -756,6 +756,7 @@ describe('normalize', () => {
           },
           { label: 'Review branch', prompt: '/local-review' },
         ],
+        callId: 'call-1',
       });
     });
 
@@ -767,6 +768,7 @@ describe('normalize', () => {
         requestId: 'sug-2',
         text: 'Any follow-up?',
         actions: [],
+        callId: undefined,
       });
     });
 

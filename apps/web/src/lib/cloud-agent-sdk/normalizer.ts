@@ -84,6 +84,8 @@ export type ServiceEvent =
       requestId: string;
       text: string;
       actions: SuggestionAction[];
+      /** Tool call ID that emitted this suggestion, when available. */
+      callId?: string;
     }
   | { type: 'suggestion.accepted'; requestId: string; index: number; action?: SuggestionAction }
   | { type: 'suggestion.dismissed'; requestId: string }
@@ -287,6 +289,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         requestId: r.data.id,
         text: r.data.text,
         actions: r.data.actions,
+        callId: r.data.tool?.callID,
       };
     }
 

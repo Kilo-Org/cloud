@@ -59,6 +59,8 @@ type StandaloneSuggestion = {
   requestId: string;
   text: string;
   actions: SuggestionAction[];
+  /** Tool call ID that emitted this suggestion, when available. */
+  callId?: string;
 };
 
 type FetchedSessionData = {
@@ -578,8 +580,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         const ap = store.get(activePermissionAtom);
         if (ap?.requestId === requestId) store.set(activePermissionAtom, null);
       },
-      onSuggestionAsked: (requestId, text, actions) => {
-        store.set(activeSuggestionAtom, { requestId, text, actions });
+      onSuggestionAsked: (requestId, text, actions, callId) => {
+        store.set(activeSuggestionAtom, { requestId, text, actions, callId });
       },
       onSuggestionResolved: requestId => {
         const as = store.get(activeSuggestionAtom);

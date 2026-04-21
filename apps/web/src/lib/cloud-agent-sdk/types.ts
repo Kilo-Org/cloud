@@ -104,6 +104,8 @@ export type SuggestionState = {
   requestId: string;
   text: string;
   actions: SuggestionAction[];
+  /** Tool call ID that emitted this suggestion, when available. */
+  callId?: string;
 };
 
 /** Full service state — all non-chat state in one place. */

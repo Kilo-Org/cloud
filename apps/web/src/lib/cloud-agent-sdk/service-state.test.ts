@@ -1114,14 +1114,16 @@ describe('createServiceState', () => {
         requestId: 'sug-1',
         text: 'Review?',
         actions,
+        callId: 'call-1',
       });
 
       expect(state.getSuggestion()).toEqual({
         requestId: 'sug-1',
         text: 'Review?',
         actions,
+        callId: 'call-1',
       });
-      expect(onSuggestionAsked).toHaveBeenCalledWith('sug-1', 'Review?', actions);
+      expect(onSuggestionAsked).toHaveBeenCalledWith('sug-1', 'Review?', actions, 'call-1');
     });
   });
 

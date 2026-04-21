@@ -1267,17 +1267,18 @@ describe('createSessionManager', () => {
       expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
     });
 
-    it('onSuggestionAsked sets activeSuggestion', async () => {
+    it('onSuggestionAsked sets activeSuggestion with callId', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
 
       const actions = [{ label: 'Review', prompt: '/local-review' }];
-      mockSessionCallbacks.onSuggestionAsked?.('sug-1', 'Review?', actions);
+      mockSessionCallbacks.onSuggestionAsked?.('sug-1', 'Review?', actions, 'call-1');
       expect(atomValue(config.store, mgr.atoms.activeSuggestion)).toEqual({
         requestId: 'sug-1',
         text: 'Review?',
         actions,
+        callId: 'call-1',
       });
     });
 
@@ -1286,7 +1287,7 @@ describe('createSessionManager', () => {
       const mgr = createSessionManager(config);
       await mgr.switchSession(kiloId('ses-1'));
 
-      mockSessionCallbacks.onSuggestionAsked?.('sug-1', 'Review?', []);
+      mockSessionCallbacks.onSuggestionAsked?.('sug-1', 'Review?', [], 'call-1');
       expect(atomValue(config.store, mgr.atoms.activeSuggestion)).not.toBeNull();
 
       mockSessionCallbacks.onSuggestionResolved?.('sug-1');

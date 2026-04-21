@@ -50,7 +50,12 @@ type CloudAgentSessionConfig = {
     always?: string[]
   ) => void;
   onPermissionResolved?: (requestId: string) => void;
-  onSuggestionAsked?: (requestId: string, text: string, actions: SuggestionAction[]) => void;
+  onSuggestionAsked?: (
+    requestId: string,
+    text: string,
+    actions: SuggestionAction[],
+    callId?: string
+  ) => void;
   onSuggestionResolved?: (requestId: string) => void;
   onBranchChanged?: (branch: string) => void;
   onResolved?: (resolved: ResolvedSession) => void;

@@ -34,7 +34,12 @@ type ServiceStateConfig = {
   ) => void;
   onPermissionResolved?: (requestId: string) => void;
   /** Fired when a `suggest` tool asks the user to pick an action. */
-  onSuggestionAsked?: (requestId: string, text: string, actions: SuggestionAction[]) => void;
+  onSuggestionAsked?: (
+    requestId: string,
+    text: string,
+    actions: SuggestionAction[],
+    callId?: string
+  ) => void;
   /** Fired when a suggestion is resolved (accepted or dismissed). */
   onSuggestionResolved?: (requestId: string) => void;
   onBranchChanged?: (branch: string) => void;
@@ -213,8 +218,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       requestId: event.requestId,
       text: event.text,
       actions: event.actions,
+      callId: event.callId,
     };
-    config.onSuggestionAsked?.(event.requestId, event.text, event.actions);
+    config.onSuggestionAsked?.(event.requestId, event.text, event.actions, event.callId);
     notify();
   }
 

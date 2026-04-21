@@ -1788,6 +1788,7 @@ async function runInstanceDestructionSweep(
       instance_id: kiloclaw_subscriptions.instance_id,
       sandbox_id: kiloclaw_instances.sandbox_id,
       organization_id: kiloclaw_instances.organization_id,
+      status: kiloclaw_subscriptions.status,
       email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
@@ -1797,13 +1798,24 @@ async function runInstanceDestructionSweep(
       and(
         lt(kiloclaw_subscriptions.destruction_deadline, now),
         currentSubscriptionRowFilter(),
-        isNotNull(kiloclaw_subscriptions.suspended_at)
+        isNotNull(kiloclaw_subscriptions.suspended_at),
+        inArray(kiloclaw_subscriptions.status, ['canceled', 'past_due', 'unpaid'])
       )
     );
 
   for (const row of destructionCandidates) {
     try {
       if (isSoftDeletedUserEmail(row.email)) continue;
+      if (row.status === 'active') {
+        logSkippedSubscriptionRow(
+          'Skipping instance destruction for active subscription row',
+          row,
+          {
+            reason: 'active_subscription',
+          }
+        );
+        continue;
+      }
       if (!row.instance_id) {
         logSkippedSubscriptionRow(
           'Skipping instance destruction for detached subscription row',

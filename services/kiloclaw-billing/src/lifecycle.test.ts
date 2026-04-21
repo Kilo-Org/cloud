@@ -561,6 +561,51 @@ describe('instance destruction sweep', () => {
     );
   });
 
+  it('does not destroy active subscriptions even with stale expired destruction fields', async () => {
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    const { db, updates, txUpdates, inserts, deletes } = createMockDb([
+      [
+        {
+          id: 'sub-active',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          sandbox_id: 'ki_11111111111141118111111111111111',
+          organization_id: null,
+          status: 'active',
+          email: 'user-1@example.com',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'abababab-abab-4bab-8bab-abababababab',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping instance destruction for active subscription row',
+          reason: 'active_subscription',
+        }),
+      ])
+    );
+  });
+
   it('keeps DB/email cleanup unchanged when platform destroy succeeds', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const { db, updates, txUpdates, inserts, deletes } = createMockDb([
@@ -570,6 +615,7 @@ describe('instance destruction sweep', () => {
           user_id: 'user-1',
           instance_id: instanceId,
           sandbox_id: 'ki_11111111111141118111111111111111',
+          status: 'canceled',
           email: 'user-1@example.com',
         },
       ],
@@ -639,6 +685,7 @@ describe('instance destruction sweep', () => {
           user_id: 'user-1',
           instance_id: firstInstanceId,
           sandbox_id: 'ki_11111111111141118111111111111111',
+          status: 'canceled',
           email: 'user-1@example.com',
         },
         {
@@ -646,6 +693,7 @@ describe('instance destruction sweep', () => {
           user_id: 'user-2',
           instance_id: secondInstanceId,
           sandbox_id: 'ki_22222222222242228222222222222222',
+          status: 'canceled',
           email: 'user-2@example.com',
         },
       ],
@@ -748,6 +796,7 @@ describe('instance destruction sweep', () => {
           user_id: 'user-1',
           instance_id: instanceId,
           sandbox_id: 'ki_11111111111141118111111111111111',
+          status: 'canceled',
           email: 'user-1@example.com',
         },
       ],
@@ -827,6 +876,7 @@ describe('instance destruction sweep', () => {
           user_id: 'user-1',
           instance_id: '11111111-1111-4111-8111-111111111111',
           sandbox_id: null,
+          status: 'canceled',
           email: 'user-1@example.com',
         },
       ],

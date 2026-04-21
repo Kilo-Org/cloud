@@ -230,8 +230,10 @@ async function resolveActiveInstance(
  */
 export async function autoResumeIfSuspended(
   kiloUserId: string,
-  instanceId?: string
+  instanceId?: string,
+  options: { recordRetryState?: boolean } = {}
 ): Promise<void> {
+  const recordRetryState = options.recordRetryState ?? true;
   const targetInstance = await resolveActiveInstance(kiloUserId, { instanceId });
   if (!targetInstance) {
     await clearAutoResumeState(kiloUserId, {
@@ -265,6 +267,33 @@ export async function autoResumeIfSuspended(
     const client = new KiloClawInternalClient();
     await client.startAsync(kiloUserId, workerInstanceId(targetInstance));
   } catch (startError) {
+    if (recordRetryState) {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({
+          auto_resume_requested_at: requestedAtIso,
+          auto_resume_retry_after: retryAfterIso,
+          auto_resume_attempt_count: nextAttemptCount,
+        })
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.user_id, kiloUserId),
+            eq(kiloclaw_subscriptions.instance_id, targetInstance.id),
+            isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+          )
+        );
+    }
+    logError('Failed to request async auto-resume', {
+      user_id: kiloUserId,
+      instance_id: targetInstance.id,
+      retry_after: retryAfterIso,
+      auto_resume_attempt_count: nextAttemptCount,
+      error: startError instanceof Error ? startError.message : String(startError),
+    });
+    return;
+  }
+
+  if (recordRetryState) {
     await db
       .update(kiloclaw_subscriptions)
       .set({
@@ -279,30 +308,7 @@ export async function autoResumeIfSuspended(
           isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
         )
       );
-    logError('Failed to request async auto-resume', {
-      user_id: kiloUserId,
-      instance_id: targetInstance.id,
-      retry_after: retryAfterIso,
-      auto_resume_attempt_count: nextAttemptCount,
-      error: startError instanceof Error ? startError.message : String(startError),
-    });
-    return;
   }
-
-  await db
-    .update(kiloclaw_subscriptions)
-    .set({
-      auto_resume_requested_at: requestedAtIso,
-      auto_resume_retry_after: retryAfterIso,
-      auto_resume_attempt_count: nextAttemptCount,
-    })
-    .where(
-      and(
-        eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.instance_id, targetInstance.id),
-        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
-      )
-    );
 
   logInfo('Async auto-resume requested', {
     user_id: kiloUserId,

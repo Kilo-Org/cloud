@@ -9,10 +9,13 @@ import { registerMessageRoutes } from '../routes/messages';
 import { deriveGatewayToken } from '../lib/gateway-token';
 
 const ownershipMap = new Map<string, Set<string>>();
+const sandboxOwnerMap = new Map<string, string>();
 
 vi.mock('../services/sandbox-ownership', () => ({
   userOwnsSandbox: async (_conn: string, userId: string, sandboxId: string) =>
     ownershipMap.get(userId)?.has(sandboxId) ?? false,
+  getSandboxOwner: async (_conn: string, sandboxId: string) =>
+    sandboxOwnerMap.get(sandboxId) ?? null,
 }));
 
 vi.mock('../services/user-lookup', () => ({
@@ -22,6 +25,7 @@ vi.mock('../services/user-lookup', () => ({
 function grantSandbox(userId: string, sandboxId: string) {
   if (!ownershipMap.has(userId)) ownershipMap.set(userId, new Set());
   ownershipMap.get(userId)!.add(sandboxId);
+  sandboxOwnerMap.set(sandboxId, userId);
 }
 
 const SECRET = 'test-gateway-secret';

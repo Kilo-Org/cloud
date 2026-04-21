@@ -73,6 +73,7 @@ import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
 const EXA_SEARCH_UI_MIN_CONTROLLER_VERSION = '2026.4.14';
+const MEMORY_MIN_OPENCLAW_VERSION = '2026.4.5';
 
 // ---------------------------------------------------------------------------
 // 1Password setup guide dialog
@@ -789,6 +790,8 @@ function InboundEmailCard({
 function MemorySection({
   config,
   mutations,
+  supportsMemoryConfig,
+  onRequestUpgrade,
 }: {
   config:
     | {
@@ -798,6 +801,8 @@ function MemorySection({
       }
     | undefined;
   mutations: ClawMutations;
+  supportsMemoryConfig: boolean;
+  onRequestUpgrade?: () => void;
 }) {
   const configVectorEnabled = config?.vectorMemoryEnabled ?? false;
   const configVectorModel = config?.vectorMemoryModel ?? DEFAULT_EMBEDDING_MODEL;
@@ -860,6 +865,29 @@ function MemorySection({
     <div>
       <h2 className="text-foreground mb-3 text-base font-semibold">Memory</h2>
       <div className="rounded-lg border p-4">
+        {!supportsMemoryConfig && (
+          <div className="mb-4 flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-amber-200">Upgrade required</p>
+              <p className="text-muted-foreground text-xs">
+                Memory configuration requires OpenClaw {MEMORY_MIN_OPENCLAW_VERSION} or later.
+                Upgrade to the latest version to enable these settings.
+              </p>
+            </div>
+            {onRequestUpgrade && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300"
+                onClick={onRequestUpgrade}
+              >
+                Upgrade
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Vector Memory toggle */}
         <div className="flex items-center justify-between">
           <div className="min-w-0">
@@ -868,7 +896,11 @@ function MemorySection({
               Use semantic search across memory files via embedding vectors.
             </p>
           </div>
-          <Switch checked={vectorEnabled} onCheckedChange={handleVectorToggle} />
+          <Switch
+            checked={vectorEnabled}
+            onCheckedChange={handleVectorToggle}
+            disabled={!supportsMemoryConfig}
+          />
         </div>
 
         {vectorEnabled && (
@@ -879,7 +911,11 @@ function MemorySection({
                 Model used for generating vector embeddings.
               </p>
             </div>
-            <Select value={vectorModel} onValueChange={setVectorModel}>
+            <Select
+              value={vectorModel}
+              onValueChange={setVectorModel}
+              disabled={!supportsMemoryConfig}
+            >
               <SelectTrigger className="w-full sm:w-[300px]">
                 <SelectValue placeholder="Select model" />
               </SelectTrigger>
@@ -905,13 +941,17 @@ function MemorySection({
               long-term memory automatically.
             </p>
           </div>
-          <Switch checked={dreamingEnabled} onCheckedChange={setDreamingEnabled} />
+          <Switch
+            checked={dreamingEnabled}
+            onCheckedChange={setDreamingEnabled}
+            disabled={!supportsMemoryConfig}
+          />
         </div>
 
         <div className="mt-4 flex justify-end">
           <Button
             size="sm"
-            disabled={!dirty || saving}
+            disabled={!supportsMemoryConfig || !dirty || saving}
             variant={dirty ? 'default' : 'outline'}
             onClick={handleSave}
           >
@@ -1022,6 +1062,9 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     EXA_SEARCH_UI_MIN_CONTROLLER_VERSION
   );
+  const memoryOpenClawVersion = runningVersion ?? trackedVersion;
+  const supportsMemoryConfig =
+    !memoryOpenClawVersion || calverAtLeast(memoryOpenClawVersion, MEMORY_MIN_OPENCLAW_VERSION);
 
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
@@ -1230,7 +1273,12 @@ export function SettingsTab({
       </div>
 
       {/* ── Memory ── */}
-      <MemorySection config={config} mutations={mutations} />
+      <MemorySection
+        config={config}
+        mutations={mutations}
+        supportsMemoryConfig={supportsMemoryConfig}
+        onRequestUpgrade={onRequestUpgrade}
+      />
 
       {/* ── Default Permissions ── */}
       <PermissionPresetSection

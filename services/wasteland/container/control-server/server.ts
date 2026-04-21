@@ -98,6 +98,14 @@ const JoinBodySchema = z.object({
   upstream: z.string().min(1),
 });
 
+const CreateBodySchema = z.object({
+  upstream: z.string().min(1), // target org/db (e.g. "jfawcett/my-wasteland")
+  name: z.string().optional(), // display name for the wasteland (wl --name)
+  displayName: z.string().optional(), // rig display name (wl --display-name)
+  handle: z.string().optional(), // rig handle (wl --handle; defaults to org part)
+  email: z.string().optional(), // registration email
+});
+
 const StatusBodySchema = z.object({
   upstream: z.string().min(1),
   itemId: z.string().min(1),
@@ -911,6 +919,41 @@ async function handleJoin(req: Request): Promise<Response> {
   return jsonResponse({ success: true });
 }
 
+async function handleCreate(req: Request): Promise<Response> {
+  const token = extractToken(req);
+  if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
+
+  const body = await parseBody(req, CreateBodySchema);
+  if ('error' in body) return body.error;
+
+  // `wl create` initializes a new DoltHub repo with the commons schema,
+  // registers the creator as the first rig (trust_level 3), and pushes.
+  // We do NOT pass --local-only — in hosted mode the container pushes
+  // directly to DoltHub via the token.
+  const env = buildEnv(token, body.data.upstream);
+  const args: string[] = ['create', body.data.upstream];
+  if (body.data.name) args.push('--name', body.data.name);
+  if (body.data.displayName) args.push('--display-name', body.data.displayName);
+  if (body.data.handle) args.push('--handle', body.data.handle);
+  if (body.data.email) args.push('--email', body.data.email);
+
+  // wl create needs longer than the default for the DoltHub push.
+  const result = await execWl(args, env, 300_000);
+
+  if (result.exitCode !== 0) {
+    log.error('wl create failed', {
+      stderr: result.stderr,
+      stdout: result.stdout,
+      upstream: body.data.upstream,
+    });
+    return errorResponse(`wl create failed: ${result.stderr || result.stdout}`, 502);
+  }
+
+  lastOperationTimestamp = new Date().toISOString();
+  log.info('wl create completed', { upstream: body.data.upstream });
+  return jsonResponse({ success: true });
+}
+
 async function handleStatus(req: Request): Promise<Response> {
   const token = extractToken(req);
   if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
@@ -1033,6 +1076,7 @@ const routes: Array<{ method: string; path: string; handler: RouteHandler }> = [
   { method: 'POST', path: '/wl/post', handler: handlePost },
   { method: 'POST', path: '/wl/sync', handler: handleSync },
   { method: 'POST', path: '/wl/join', handler: handleJoin },
+  { method: 'POST', path: '/wl/create', handler: handleCreate },
   { method: 'POST', path: '/wl/status', handler: handleStatus },
   { method: 'POST', path: '/wl/accept', handler: handleAccept },
   { method: 'POST', path: '/wl/reject', handler: handleReject },

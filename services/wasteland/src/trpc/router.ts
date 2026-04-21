@@ -136,6 +136,10 @@ export const wastelandRouter = router({
         visibility: input.visibility,
       });
 
+      // Auto-register the creator as the wasteland's 'owner' member with
+      // maximum trust_level so they can manage members and configuration.
+      await stub.addMember(ctx.userId, 'owner', 3);
+
       // Register in the central wasteland registry for listing
       const registryStub = getWastelandRegistryStub(ctx.env);
       await registryStub.register({
@@ -153,6 +157,91 @@ export const wastelandRouter = router({
       });
 
       return config;
+    }),
+
+  // ── Create Upstream (invokes `wl create` on the container) ──────────
+  // Bootstraps a brand-new DoltHub commons repo with the wasteland schema
+  // and registers the caller as the first rig. Requires the caller's
+  // credential to already be stored AND marked as upstream-admin. Should
+  // only be called as part of the "create your own wasteland" flow after
+  // storeCredential has run.
+  createUpstream: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        upstream: z.string().min(1), // e.g. "myorg/my-wasteland"
+        rigHandle: z.string().optional(),
+        rigDisplayName: z.string().optional(),
+        rigEmail: z.string().email().optional(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+
+      const doStub = getWastelandDOStub(ctx.env, input.wastelandId);
+      const credential = await doStub.getCredential(ctx.userId);
+      if (!credential) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Store a DoltHub credential before creating the upstream repo',
+        });
+      }
+      if (!credential.is_upstream_admin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message:
+            'Creating a new upstream requires a credential marked as admin. Toggle "I own this upstream" on the stored credential first.',
+        });
+      }
+
+      const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
+      if (!rawKey) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Encryption key unavailable',
+        });
+      }
+      const cryptoKey = await deriveEncryptionKey(rawKey);
+      const token = await decryptToken(credential.encrypted_token, cryptoKey);
+
+      const config = await doStub.getConfig();
+      const displayName = input.rigDisplayName ?? config?.name;
+
+      const container = getWastelandContainerStub(ctx.env, input.wastelandId);
+      const res = await container.fetch(
+        new Request('http://container/wl/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', DOLTHUB_TOKEN: token },
+          body: JSON.stringify({
+            upstream: input.upstream,
+            name: config?.name,
+            displayName,
+            handle: input.rigHandle ?? credential.rig_handle ?? undefined,
+            email: input.rigEmail,
+          }),
+        })
+      );
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `wl create failed: ${body || res.statusText}`,
+        });
+      }
+
+      // Persist the upstream on the wasteland config now that the repo exists.
+      await doStub.updateConfig({ dolthub_upstream: input.upstream });
+
+      meterEvent(ctx.env, {
+        event: 'billing.api_operation',
+        userId: ctx.userId,
+        wastelandId: input.wastelandId,
+        label: 'create_upstream',
+      });
+
+      return { success: true };
     }),
 
   // ── List ────────────────────────────────────────────────────────────

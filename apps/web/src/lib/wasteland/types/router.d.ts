@@ -29,6 +29,19 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    createUpstream: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        upstream: string;
+        rigHandle?: string | undefined;
+        rigDisplayName?: string | undefined;
+        rigEmail?: string | undefined;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
     listWastelands: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         organizationId?: string | undefined;
@@ -435,6 +448,19 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             status: 'active' | 'deleted';
             created_at: string;
             updated_at: string;
+          };
+          meta: object;
+        }>;
+        createUpstream: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            upstream: string;
+            rigHandle?: string | undefined;
+            rigDisplayName?: string | undefined;
+            rigEmail?: string | undefined;
+          };
+          output: {
+            success: boolean;
           };
           meta: object;
         }>;

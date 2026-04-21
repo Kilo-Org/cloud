@@ -22,8 +22,8 @@ describe('handleKiloChatReadAction', () => {
     const client = mockClient({
       listMessages: vi.fn().mockResolvedValue({
         messages: [
-          { id: 'MSG1', senderId: 'alice', text: 'Hello' },
-          { id: 'MSG2', senderId: 'bob', text: 'World' },
+          { id: 'MSG1', senderId: 'alice', content: [{ type: 'text', text: 'Hello' }] },
+          { id: 'MSG2', senderId: 'bob', content: [{ type: 'text', text: 'World' }] },
         ],
       }),
     });
@@ -55,7 +55,7 @@ describe('handleKiloChatReadAction', () => {
   it('passes limit param to listMessages', async () => {
     const client = mockClient({
       listMessages: vi.fn().mockResolvedValue({
-        messages: [{ id: 'M1', senderId: 'alice', text: 'Hi' }],
+        messages: [{ id: 'M1', senderId: 'alice', content: [{ type: 'text', text: 'Hi' }] }],
       }),
     });
 
@@ -65,6 +65,60 @@ describe('handleKiloChatReadAction', () => {
     });
 
     expect(client.listMessages).toHaveBeenCalledWith({ conversationId: 'CONV', limit: 5 });
+  });
+
+  it('joins multiple content blocks', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({
+        messages: [
+          {
+            id: 'MSG1',
+            senderId: 'alice',
+            content: [
+              { type: 'text', text: 'Hello ' },
+              { type: 'text', text: 'World' },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const result = await handleKiloChatReadAction({
+      params: { to: 'CONV' },
+      client,
+    });
+
+    expect(result.content[0].text).toBe('[MSG1] alice: Hello World');
+  });
+
+  it('renders deleted messages with empty body', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({
+        messages: [{ id: 'MSG1', senderId: 'alice', content: [], deleted: true }],
+      }),
+    });
+
+    const result = await handleKiloChatReadAction({
+      params: { to: 'CONV' },
+      client,
+    });
+
+    expect(result.content[0].text).toBe('[MSG1] alice: ');
+  });
+
+  it('handles messages with no content field gracefully', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({
+        messages: [{ id: 'MSG1', senderId: 'alice' }],
+      }),
+    });
+
+    const result = await handleKiloChatReadAction({
+      params: { to: 'CONV' },
+      client,
+    });
+
+    expect(result.content[0].text).toBe('[MSG1] alice: ');
   });
 
   it('resolves conversationId from toolContext when params.to is absent', async () => {

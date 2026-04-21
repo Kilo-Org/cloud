@@ -68,7 +68,7 @@ jobs:
       - name: Detect changed workspaces with tests
         id: workspaces
         run: |
-          matrix=$(bash -x scripts/changed-workspaces.sh --exclude services/cloud-agent --exclude services/cloud-agent-next --exclude apps/web)
+          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent --exclude services/cloud-agent-next --exclude apps/web)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   typecheck:

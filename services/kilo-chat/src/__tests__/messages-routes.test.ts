@@ -556,7 +556,7 @@ describe('Webhook reply context', () => {
     // deliverChatWebhook should have been called for each message (2 total)
     // The second call (for the reply) should include reply context
     const replyCall = deliverChatWebhook.mock.calls.find(
-      (call: [{ inReplyToMessageId?: string }]) => call[0].inReplyToMessageId === parentMessageId
+      call => (call[0] as { inReplyToMessageId?: string }).inReplyToMessageId === parentMessageId
     );
     expect(replyCall).toBeDefined();
     expect(replyCall![0]).toMatchObject({
@@ -634,7 +634,7 @@ describe('Webhook reply context', () => {
 
     // Webhook should have been delivered without body/sender (parent was deleted)
     expect(deliverChatWebhook).toHaveBeenCalled();
-    const call = deliverChatWebhook.mock.calls[0]![0];
+    const call = deliverChatWebhook.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(call.inReplyToMessageId).toBe(deletedParentId);
     expect(call.inReplyToBody).toBeUndefined();
     expect(call.inReplyToSender).toBeUndefined();

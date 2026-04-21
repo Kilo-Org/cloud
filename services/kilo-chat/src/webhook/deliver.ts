@@ -60,7 +60,6 @@ export async function deliverToBot(
   msg: WebhookMessage
 ): Promise<void> {
   const payload = buildPayload(msg);
-  let lastErr: unknown;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -70,7 +69,6 @@ export async function deliverToBot(
       });
       return;
     } catch (err) {
-      lastErr = err;
       console.error(`Webhook delivery attempt ${attempt + 1} failed:`, err);
     }
   }

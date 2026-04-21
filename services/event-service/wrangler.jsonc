@@ -12,26 +12,26 @@
   "routes": [
     {
       "pattern": "events.kiloapps.io",
-      "custom_domain": true
-    }
+      "custom_domain": true,
+    },
   ],
 
   "durable_objects": {
     "bindings": [
       { "name": "USER_SESSION_DO", "class_name": "UserSessionDO" },
-      { "name": "TICKET_DO", "class_name": "TicketDO" }
-    ]
+      { "name": "TICKET_DO", "class_name": "TicketDO" },
+    ],
   },
   "migrations": [
     { "tag": "v1", "new_classes": ["UserSessionDO"] },
-    { "tag": "v2", "new_classes": ["TicketDO"] }
+    { "tag": "v2", "new_classes": ["TicketDO"] },
   ],
 
   "secrets_store_secrets": [
     {
       "binding": "NEXTAUTH_SECRET",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "NEXTAUTH_SECRET_PROD"
-    }
-  ]
+      "secret_name": "NEXTAUTH_SECRET_PROD",
+    },
+  ],
 }

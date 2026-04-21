@@ -25,7 +25,6 @@ export class EventServiceClient {
 
     // Close any existing socket to avoid leaking connections
     if (this.ws) {
-      this.ws.onclose = null;
       this.ws.close();
       this.ws = null;
     }
@@ -49,7 +48,7 @@ export class EventServiceClient {
       );
       this.ws = ws;
 
-      ws.onopen = () => {
+      ws.addEventListener('open', () => {
         const isReconnect = this.hasConnectedBefore;
         this.connected = true;
         this.hasConnectedBefore = true;
@@ -62,27 +61,27 @@ export class EventServiceClient {
         }
         resolve();
         this.startPing();
-      };
+      });
 
-      ws.onmessage = (event: MessageEvent) => {
+      ws.addEventListener('message', (event: MessageEvent) => {
         this.handleMessage(event.data as string);
-      };
+      });
 
-      ws.onclose = () => {
+      ws.addEventListener('close', () => {
         this.connected = false;
         this.stopPing();
         if (!this.destroyed) {
           this.scheduleReconnect();
         }
-      };
+      });
 
-      ws.onerror = () => {
-        // onerror is always followed by onclose, so we only need to reject the
+      ws.addEventListener('error', () => {
+        // error is always followed by close, so we only need to reject the
         // connect promise here if we never opened.
         if (!this.connected) {
           reject(new Error('WebSocket connection failed'));
         }
-      };
+      });
     });
   }
 

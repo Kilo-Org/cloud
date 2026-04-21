@@ -36,11 +36,12 @@ export class MembershipDO extends DurableObject<Env> {
   ): { conversations: ConversationEntry[]; total: number } {
     const where = sandboxId ? eq(conversations.sandbox_id, sandboxId) : undefined;
 
-    const total = this.db
-      .select({ count: sql<number>`count(*)` })
-      .from(conversations)
-      .where(where)
-      .get()!.count;
+    const total =
+      this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(conversations)
+        .where(where)
+        .get()?.count ?? 0;
 
     const rows = this.db
       .select()

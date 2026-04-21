@@ -110,7 +110,7 @@ describe('deliverToBot', () => {
 
     await deliverToBot(env, convStub, makeMsg());
 
-    const payload = deliverChatWebhook.mock.calls[0]![0];
+    const payload = deliverChatWebhook.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(payload.inReplyToMessageId).toBeUndefined();
     expect(payload.inReplyToBody).toBeUndefined();
     expect(payload.inReplyToSender).toBeUndefined();

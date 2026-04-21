@@ -60,7 +60,7 @@ for dir in $workspace_dirs; do
   [ -n "$has_test" ] || continue
 
   # Skip workspaces whose test script exists but has no test files
-  test_file_count=$(find "$dir" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) -not -path '*/node_modules/*' 2>/dev/null | head -1)
+  test_file_count=$(find "$dir" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) -not -path '*/node_modules/*' -print -quit 2>/dev/null)
   [ -n "$test_file_count" ] || continue
 
   # Check for file changes (if we have a merge base)

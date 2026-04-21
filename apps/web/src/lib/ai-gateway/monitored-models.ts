@@ -1,9 +1,4 @@
-import {
-  AUTO_MODELS,
-  BALANCED_CLAW_SETUP_MODEL,
-  isKiloAutoModel,
-  KILO_AUTO_LEGACY_MODEL,
-} from '@/lib/kilo-auto';
+import { AUTO_MODELS, isKiloAutoModel, KILO_AUTO_LEGACY_MODEL } from '@/lib/kilo-auto';
 import type { FeatureValue } from '@/lib/feature-detection';
 import { resolveAutoModel } from '@/lib/kilo-auto/resolution';
 import { preferredModels } from '@/lib/ai-gateway/models';
@@ -42,10 +37,6 @@ export async function getMonitoredModels() {
       set.add(resolved.model);
     }
   }
-
-  // The KiloClaw setup-promo branch requires a real user within the first-instance
-  // window, which is not reachable above. Add its target model statically.
-  set.add(BALANCED_CLAW_SETUP_MODEL.model);
 
   for (const model of preferredModels) {
     if (!isKiloAutoModel(model)) {

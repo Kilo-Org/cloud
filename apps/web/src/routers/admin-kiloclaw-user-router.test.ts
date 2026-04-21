@@ -1341,6 +1341,109 @@ describe('admin.users.cancelKiloClawSubscription', () => {
     expect(auditLog.metadata?.stripeMutationAttempted).toBe(true);
   });
 
+  it('normalizes stale canceled local state after immediate Stripe cancel succeeds', async () => {
+    const [sub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        stripe_subscription_id: 'sub_admin_immediate_normalize',
+        stripe_schedule_id: 'sched_admin_immediate_normalize',
+        scheduled_plan: 'commit',
+        scheduled_by: 'user',
+      })
+      .returning();
+
+    jest.spyOn(stripeMock.subscriptions, 'cancel').mockImplementation(async () => {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({
+          status: 'canceled',
+          cancel_at_period_end: true,
+          stripe_schedule_id: 'sched_admin_immediate_normalize',
+          scheduled_plan: 'commit',
+          scheduled_by: 'user',
+        })
+        .where(eq(kiloclaw_subscriptions.id, sub.id));
+      return {} as never;
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.users.cancelKiloClawSubscription({
+      userId: targetUser.id,
+      subscriptionId: sub.id,
+      mode: 'immediate',
+    });
+
+    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+      where: eq(kiloclaw_subscriptions.id, sub.id),
+    });
+    expect(updated?.status).toBe('canceled');
+    expect(updated?.cancel_at_period_end).toBe(false);
+    expect(updated?.stripe_schedule_id).toBeNull();
+    expect(updated?.scheduled_plan).toBeNull();
+    expect(updated?.scheduled_by).toBeNull();
+
+    const [changeLogCount] = await db
+      .select({ value: count() })
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, sub.id));
+    expect(changeLogCount?.value).toBe(1);
+  });
+
+  it('throws and audits when period-end local row becomes canceled after Stripe success', async () => {
+    const [sub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        stripe_subscription_id: 'sub_admin_period_end_canceled_race',
+      })
+      .returning();
+
+    jest.spyOn(stripeMock.subscriptions, 'update').mockImplementation(async () => {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ status: 'canceled', cancel_at_period_end: false })
+        .where(eq(kiloclaw_subscriptions.id, sub.id));
+      return {} as never;
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.users.cancelKiloClawSubscription({
+        userId: targetUser.id,
+        subscriptionId: sub.id,
+        mode: 'period_end',
+      })
+    ).rejects.toThrow('Stripe cancellation was applied');
+
+    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+      where: eq(kiloclaw_subscriptions.id, sub.id),
+    });
+    expect(updated?.status).toBe('canceled');
+    expect(updated?.cancel_at_period_end).toBe(false);
+
+    const [changeLogCount] = await db
+      .select({ value: count() })
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, sub.id));
+    expect(changeLogCount?.value).toBe(0);
+
+    const [auditLog] = await db
+      .select()
+      .from(kiloclaw_admin_audit_logs)
+      .where(eq(kiloclaw_admin_audit_logs.target_user_id, targetUser.id));
+    expect(auditLog.metadata?.reconciliationStatus).toBe('local_row_changed_after_stripe');
+    expect(auditLog.metadata?.localStateAtReconcile).toEqual(
+      expect.objectContaining({ status: 'canceled', cancel_at_period_end: false })
+    );
+  });
+
   it('period-end cancel clears scheduled plan on pure-credit row', async () => {
     const [sub] = await db
       .insert(kiloclaw_subscriptions)

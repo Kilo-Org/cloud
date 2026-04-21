@@ -214,7 +214,14 @@ function isKiloClawCancelDesiredState(params: {
     );
   }
 
-  return params.subscription.status === 'canceled';
+  return (
+    params.subscription.status === 'canceled' &&
+    !params.subscription.cancel_at_period_end &&
+    !params.subscription.pending_conversion &&
+    !params.subscription.stripe_schedule_id &&
+    !params.subscription.scheduled_plan &&
+    !params.subscription.scheduled_by
+  );
 }
 
 function parseJsonSafe(text: string): unknown {
@@ -1106,6 +1113,24 @@ export const adminRouter = createTRPCRouter({
               actor_name: ctx.user.google_user_name,
               target_user_id: input.userId,
               message: `Stripe cancel succeeded for KiloClaw subscription ${subscription.id}, but local row changed before reconciliation`,
+              metadata,
+              tx,
+            });
+            return { status: 'local_row_changed_after_stripe' as const };
+          }
+
+          if (input.mode === 'period_end' && localSubscription.status !== 'active') {
+            const metadata = {
+              ...baseMetadata,
+              reconciliationStatus: 'local_row_changed_after_stripe',
+            } satisfies KiloClawCancelAuditMetadata;
+            await createKiloClawAdminAuditLog({
+              action: 'kiloclaw.subscription.admin_cancel',
+              actor_id: ctx.user.id,
+              actor_email: ctx.user.google_user_email,
+              actor_name: ctx.user.google_user_name,
+              target_user_id: input.userId,
+              message: `Stripe period-end cancel succeeded for KiloClaw subscription ${subscription.id}, but local row was no longer active during reconciliation`,
               metadata,
               tx,
             });

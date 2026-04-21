@@ -66,7 +66,7 @@ export async function resolveAutoModel(
   }
   const mode = resolveMode(modeHeader, featureHeader);
   if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
-    if (featureHeader === 'kiloclaw') {
+    if (featureHeader === 'kiloclaw' && mode === 'claw') {
       const user = await userPromise;
       if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
         return BALANCED_CLAW_SETUP_MODEL;

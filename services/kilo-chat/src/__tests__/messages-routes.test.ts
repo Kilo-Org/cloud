@@ -367,13 +367,13 @@ describe('DELETE /v1/messages/:id', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
-    // Delete it
+    // Delete it (conversationId goes in query string, not body)
+    const delQs = new URLSearchParams({ conversationId });
     const deleteRes = await userApp.request(
-      `/v1/messages/${messageId}`,
+      `/v1/messages/${messageId}?${delQs}`,
       {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId }),
       },
       env
     );
@@ -410,12 +410,12 @@ describe('DELETE /v1/messages/:id', () => {
     const { messageId } = await createRes.json<{ messageId: string }>();
 
     // Bot tries to delete user's message
+    const delQs = new URLSearchParams({ conversationId });
     const deleteRes = await botApp.request(
-      `/v1/messages/${messageId}`,
+      `/v1/messages/${messageId}?${delQs}`,
       {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId }),
       },
       env
     );
@@ -426,12 +426,12 @@ describe('DELETE /v1/messages/:id', () => {
   it('returns 404 for non-existent message', async () => {
     const { conversationId, userApp } = await createConversation('msg-delete-notfound');
 
+    const delQs = new URLSearchParams({ conversationId });
     const deleteRes = await userApp.request(
-      '/v1/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      `/v1/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV?${delQs}`,
       {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId }),
       },
       env
     );
@@ -603,12 +603,12 @@ describe('Webhook reply context', () => {
     expect(parentRes.status).toBe(201);
     const { messageId: deletedParentId } = await parentRes.json<{ messageId: string }>();
 
+    const deleteQs = new URLSearchParams({ conversationId });
     await userApp.request(
-      `/v1/messages/${deletedParentId}`,
+      `/v1/messages/${deletedParentId}?${deleteQs}`,
       {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId }),
       },
       testEnv
     );

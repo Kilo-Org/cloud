@@ -375,12 +375,12 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     );
     const { messageId } = await createRes.json<{ messageId: string }>();
 
+    const qs = new URLSearchParams({ conversationId });
     const delRes = await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}`,
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}?${qs}`,
       {
         method: 'DELETE',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId }),
+        headers: { authorization: `Bearer ${token}` },
       },
       testEnv
     );
@@ -393,12 +393,12 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
+    const qs = new URLSearchParams({ conversationId });
     const res = await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV`,
+      `/bot/v1/sandboxes/${sandboxId}/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV?${qs}`,
       {
         method: 'DELETE',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId }),
+        headers: { authorization: `Bearer ${token}` },
       },
       testEnv
     );
@@ -411,12 +411,12 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
+    const qs = new URLSearchParams({ conversationId });
     const delRes = await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}`,
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}?${qs}`,
       {
         method: 'DELETE',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId }),
+        headers: { authorization: `Bearer ${token}` },
       },
       testEnv
     );
@@ -429,12 +429,12 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
+    const qs = new URLSearchParams({ conversationId });
     const res = await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/messages/bad-id`,
+      `/bot/v1/sandboxes/${sandboxId}/messages/bad-id?${qs}`,
       {
         method: 'DELETE',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId }),
+        headers: { authorization: `Bearer ${token}` },
       },
       testEnv
     );
@@ -442,7 +442,7 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 400 when body is missing conversationId', async () => {
+  it('returns 400 when conversationId query param is missing', async () => {
     const { sandboxId, testEnv } = await setupData('bot-del-nobody');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
@@ -451,8 +451,7 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
       `/bot/v1/sandboxes/${sandboxId}/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV`,
       {
         method: 'DELETE',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({}),
+        headers: { authorization: `Bearer ${token}` },
       },
       testEnv
     );

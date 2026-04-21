@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Undo the global mock from setup.ts so we test the real implementation
+vi.unmock('../services/user-lookup');
+
 import { resolveUserDisplayInfo, validateUserIds } from '../services/user-lookup';
 
 // Mock @kilocode/db so we don't need Hyperdrive in tests

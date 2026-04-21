@@ -6,5 +6,10 @@
   "channels": ["kilo-chat"],
   "channelEnvVars": {
     "kilo-chat": []
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
   }
 }

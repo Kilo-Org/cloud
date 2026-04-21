@@ -288,30 +288,6 @@ describe('ConversationDO', () => {
     }
   });
 
-  it('getBotMembersExcluding - returns bots except sender', async () => {
-    const stub = getStub('conv-bots-1');
-    await stub.initialize({
-      id: 'conv-test',
-      title: null,
-      createdBy: 'user-alice',
-      createdAt: 1000,
-      members: [
-        { id: 'user-alice', kind: 'user' },
-        { id: 'bot-1', kind: 'bot' },
-        { id: 'bot-2', kind: 'bot' },
-      ],
-    });
-    const bots = await stub.getBotMembersExcluding('bot-1');
-    expect(bots).toHaveLength(1);
-    expect(bots[0].id).toBe('bot-2');
-    expect(bots[0].kind).toBe('bot');
-
-    // Should not include users
-    const botsExcludingAlice = await stub.getBotMembersExcluding('user-alice');
-    expect(botsExcludingAlice).toHaveLength(2);
-    expect(botsExcludingAlice.every(b => b.kind === 'bot')).toBe(true);
-  });
-
   describe('addReaction / removeReaction', () => {
     async function seed(convId: string) {
       const stub = getStub(convId);

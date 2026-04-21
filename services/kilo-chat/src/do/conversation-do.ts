@@ -2,7 +2,7 @@ import type { ContentBlock } from '@kilocode/kilo-chat';
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { eq, lt, desc, ne, and, sql, inArray } from 'drizzle-orm';
+import { eq, lt, desc, and, sql, inArray } from 'drizzle-orm';
 import { conversation, members, messages, reactions } from '../db/conversation-schema';
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
@@ -173,17 +173,6 @@ export class ConversationDO extends DurableObject<Env> {
       .where(and(eq(members.id, memberId), sql`${members.left_at} IS NULL`))
       .get();
     return row !== undefined;
-  }
-
-  getBotMembersExcluding(senderId: string): Array<{ id: string; kind: string }> {
-    return this.db
-      .select()
-      .from(members)
-      .where(
-        and(eq(members.kind, 'bot'), ne(members.id, senderId), sql`${members.left_at} IS NULL`)
-      )
-      .all()
-      .map(m => ({ id: m.id, kind: m.kind }));
   }
 
   createMessage(params: CreateMessageParams): CreateMessageResult {

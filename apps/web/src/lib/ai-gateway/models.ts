@@ -33,6 +33,7 @@ export const preferredModels = [
   KILO_AUTO_FRONTIER_MODEL.id,
   KILO_AUTO_BALANCED_MODEL.id,
   KILO_AUTO_FREE_MODEL.id,
+  'inclusionai/ling-2.6-flash:free',
   seed_20_pro_free_model.status === 'public' ? seed_20_pro_free_model.public_id : null,
   grok_code_fast_1_optimized_free_model.status === 'public'
     ? grok_code_fast_1_optimized_free_model.public_id

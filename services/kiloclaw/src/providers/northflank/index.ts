@@ -1,6 +1,5 @@
 import type { CreateSecretRequest, CreateServiceDeploymentRequest } from '@northflank/js-client';
 import type { NorthflankProviderState } from '../../schemas/instance-config';
-import { STARTUP_TIMEOUT_SECONDS } from '../../config';
 import { getNorthflankProviderState } from '../../durable-objects/kiloclaw-instance/state';
 import type { RuntimeSpec, InstanceProviderAdapter } from '../types';
 import { getNorthflankConfig } from '../../northflank/config';
@@ -34,6 +33,8 @@ import {
 import { northflankResourceNames } from './names';
 
 const NORTHFLANK_PORT_NAME = 'p01';
+const NORTHFLANK_STARTUP_TIMEOUT_SECONDS = 240;
+const NORTHFLANK_TERMINATION_GRACE_PERIOD_SECONDS = 60;
 
 type NorthflankProvisioningNames = Awaited<ReturnType<typeof northflankResourceNames>>;
 
@@ -171,7 +172,6 @@ function northflankOrigin(host: string): string {
 }
 
 function buildPortSecurity(config: NorthflankClientConfig) {
-  const nfConfig = config;
   return {
     verificationMode: 'and' as const,
     securePathConfiguration: {
@@ -179,14 +179,20 @@ function buildPortSecurity(config: NorthflankClientConfig) {
       skipSecurityPoliciesForInternalTrafficViaPublicDns: false,
       rules: [
         {
-          paths: [],
+          paths: [
+            {
+              path: '/',
+              routingMode: 'prefix' as const,
+              priority: 0,
+            },
+          ],
           accessMode: 'protected' as const,
           securityPolicies: {
             requiredPolicies: {
               headers: [
                 {
-                  name: nfConfig.edgeHeaderName,
-                  value: nfConfig.edgeHeaderValue,
+                  name: config.edgeHeaderName,
+                  value: config.edgeHeaderValue,
                   regexMode: false,
                 },
               ],
@@ -227,9 +233,7 @@ function buildServicePayload(
           storageSize: config.ephemeralStorageMb,
         },
       },
-      strategy: {
-        type: 'recreate',
-      },
+      gracePeriodSeconds: NORTHFLANK_TERMINATION_GRACE_PERIOD_SECONDS,
     },
     ports: [
       {
@@ -245,6 +249,16 @@ function buildServicePayload(
     },
     runtimeEnvironment: runtimeSpec.env,
     healthChecks: [
+      {
+        protocol: 'HTTP',
+        type: 'startupProbe',
+        path: runtimeSpec.controllerHealthCheckPath,
+        port: runtimeSpec.controllerPort,
+        initialDelaySeconds: 5,
+        periodSeconds: 10,
+        timeoutSeconds: 5,
+        failureThreshold: 30,
+      },
       {
         protocol: 'HTTP',
         type: 'readinessProbe',
@@ -486,7 +500,7 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
 
     logNorthflank('start_runtime_patch_service', {
       description:
-        'Patching Northflank service configuration while keeping desired instances at zero before scale-up',
+        'Patching Northflank service configuration and desired instance count in one deployment update',
       apiOperation: 'PATCH /projects/{projectId}/services/deployment/{serviceId}',
       sandboxId: state.sandboxId,
       projectId,
@@ -495,29 +509,19 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       volumeName,
       imageRef: runtimeSpec.imageRef,
       ephemeralStorageMb: config.ephemeralStorageMb,
-      instances: 0,
+      instances: 1,
     });
     await patchDeploymentService(
       config,
       projectId,
       service.id,
-      buildServicePayload(config, runtimeSpec, names.serviceName, volumeName, 0)
+      buildServicePayload(config, runtimeSpec, names.serviceName, volumeName, 1)
     );
-    logNorthflank('start_runtime_scale_service', {
-      description:
-        'Scaling Northflank service to one running instance after secrets and deployment config are ready',
-      apiOperation: 'POST /projects/{projectId}/services/{serviceId}/scale',
-      sandboxId: state.sandboxId,
-      projectId,
-      serviceId: service.id,
-      instances: 1,
-    });
-    await scaleService(config, projectId, service.id, 1);
     const started = await waitForDeploymentCompleted(
       config,
       projectId,
       service.id,
-      STARTUP_TIMEOUT_SECONDS
+      NORTHFLANK_STARTUP_TIMEOUT_SECONDS
     );
 
     logNorthflank('start_runtime_deployment_completed', {
@@ -566,33 +570,6 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     const serviceId = providerState.serviceId;
 
     const volumeName = providerState.volumeName ?? names.volumeName;
-    logNorthflank('restart_runtime_patch_service', {
-      description:
-        'Patching existing Northflank service with updated image/env/runtime config before restart scale-up',
-      apiOperation: 'PATCH /projects/{projectId}/services/deployment/{serviceId}',
-      sandboxId: state.sandboxId,
-      projectId,
-      serviceId,
-      serviceName: providerState.serviceName ?? names.serviceName,
-      volumeName,
-      imageRef: runtimeSpec.imageRef,
-      ephemeralStorageMb: config.ephemeralStorageMb,
-      instances: 0,
-    });
-    await patchDeploymentService(
-      config,
-      projectId,
-      serviceId,
-      buildServicePayload(
-        config,
-        runtimeSpec,
-        providerState.serviceName ?? names.serviceName,
-        volumeName,
-        0
-      )
-    );
-    await onProviderResult?.({ providerState, corePatch: { restartUpdateSent: true } });
-
     const secret = await ensureSecret(
       config,
       projectId,
@@ -618,21 +595,37 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     });
     await onProviderResult?.({ providerState });
 
-    logNorthflank('restart_runtime_scale_service', {
+    logNorthflank('restart_runtime_patch_service', {
       description:
-        'Scaling Northflank service to one running instance after restart config and secret updates',
-      apiOperation: 'POST /projects/{projectId}/services/{serviceId}/scale',
+        'Patching existing Northflank service with updated image/env/runtime config and desired instance count in one deployment update',
+      apiOperation: 'PATCH /projects/{projectId}/services/deployment/{serviceId}',
       sandboxId: state.sandboxId,
       projectId,
       serviceId,
+      serviceName: providerState.serviceName ?? names.serviceName,
+      volumeName,
+      imageRef: runtimeSpec.imageRef,
+      ephemeralStorageMb: config.ephemeralStorageMb,
       instances: 1,
     });
-    await scaleService(config, projectId, serviceId, 1);
+    await patchDeploymentService(
+      config,
+      projectId,
+      serviceId,
+      buildServicePayload(
+        config,
+        runtimeSpec,
+        providerState.serviceName ?? names.serviceName,
+        volumeName,
+        1
+      )
+    );
+    await onProviderResult?.({ providerState, corePatch: { restartUpdateSent: true } });
     const restarted = await waitForDeploymentCompleted(
       config,
       projectId,
       serviceId,
-      STARTUP_TIMEOUT_SECONDS
+      NORTHFLANK_STARTUP_TIMEOUT_SECONDS
     );
     logNorthflank('restart_runtime_deployment_completed', {
       description: 'Northflank deployment reported COMPLETED during restart wait',

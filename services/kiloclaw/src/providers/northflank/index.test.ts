@@ -129,7 +129,7 @@ describe('northflankProviderAdapter', () => {
     );
   });
 
-  it('creates service at zero instances, writes restricted secret, then scales up', async () => {
+  it('creates service at zero instances, writes restricted secret, then patches to one instance', async () => {
     vi.mocked(findServiceByName).mockResolvedValue(null);
     vi.mocked(createDeploymentService).mockResolvedValue({
       id: 'service-1',
@@ -171,8 +171,32 @@ describe('northflankProviderAdapter', () => {
     const servicePayload = vi.mocked(createDeploymentService).mock.calls[0]?.[2];
     expect(servicePayload?.deployment.instances).toBe(0);
     expect(servicePayload?.deployment.docker).toEqual({ configType: 'default' });
+    expect(servicePayload?.deployment.gracePeriodSeconds).toBe(60);
+    expect(servicePayload?.deployment.strategy).toBeUndefined();
+    expect(servicePayload?.ports?.[0]?.security).toEqual({
+      verificationMode: 'and',
+      securePathConfiguration: {
+        enabled: true,
+        skipSecurityPoliciesForInternalTrafficViaPublicDns: false,
+        rules: [
+          {
+            paths: [{ path: '/', routingMode: 'prefix', priority: 0 }],
+            accessMode: 'protected',
+            securityPolicies: {
+              requiredPolicies: {
+                headers: [{ name: 'x-kiloclaw-edge', value: 'edge-secret', regexMode: false }],
+              },
+            },
+          },
+        ],
+      },
+    });
     expect(servicePayload?.createOptions?.volumesToAttach).toEqual(['kc-ki-123']);
     expect(servicePayload?.runtimeEnvironment).toEqual(runtimeSpec.env);
+    expect(servicePayload?.healthChecks).toEqual([
+      expect.objectContaining({ type: 'startupProbe', path: '/_kilo/health', port: 18789 }),
+      expect.objectContaining({ type: 'readinessProbe', path: '/_kilo/health', port: 18789 }),
+    ]);
     expect(createProjectSecret).toHaveBeenCalledWith(
       expect.objectContaining({ apiToken: 'nf-token' }),
       'project-1',
@@ -181,12 +205,10 @@ describe('northflankProviderAdapter', () => {
         secrets: { variables: runtimeSpec.bootstrapEnv },
       })
     );
-    expect(scaleService).toHaveBeenCalledWith(
-      expect.objectContaining({ apiToken: 'nf-token' }),
-      'project-1',
-      'service-1',
-      1
-    );
+    const patchPayload = vi.mocked(patchDeploymentService).mock.calls[0]?.[3];
+    if (!patchPayload?.deployment) throw new Error('expected deployment patch payload');
+    expect(patchPayload.deployment.instances).toBe(1);
+    expect(scaleService).not.toHaveBeenCalled();
     expect(result.providerState).toEqual(
       expect.objectContaining({
         serviceId: 'service-1',

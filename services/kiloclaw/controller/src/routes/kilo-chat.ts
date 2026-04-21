@@ -177,13 +177,26 @@ export function registerKiloChatEditRoute(app: Hono, options: KiloChatRouteOptio
 }
 
 export function registerKiloChatDeleteRoute(app: Hono, options: KiloChatRouteOptions): void {
-  app.delete('/_kilo/kilo-chat/messages/:messageId', c =>
-    relayBodyRoute(c, options, {
-      method: 'DELETE',
-      upstreamSuffix: ctx => `/messages/${encodeURIComponent(routeParam(ctx, 'messageId'))}`,
-      bodyLimit: MAX_SMALL_BODY_BYTES,
-    })
-  );
+  const fetchImpl = options.fetchImpl ?? fetch;
+
+  app.delete('/_kilo/kilo-chat/messages/:messageId', async c => {
+    const unauthorized = authorize(c, options);
+    if (unauthorized) return unauthorized;
+
+    const messageId = routeParam(c, 'messageId');
+    const { search } = new URL(c.req.url);
+
+    let upstream: Response;
+    try {
+      upstream = await fetchImpl(
+        upstreamUrl(options, `/messages/${encodeURIComponent(messageId)}${search ?? ''}`),
+        { method: 'DELETE', headers: outboundHeaders(options) }
+      );
+    } catch {
+      return c.json({ error: 'Bad Gateway' }, 502);
+    }
+    return relay(upstream);
+  });
 }
 
 export function registerKiloChatReactionPostRoute(app: Hono, options: KiloChatRouteOptions): void {

@@ -22,10 +22,6 @@ export const editMessageSchema = z.object({
   timestamp: z.number().int().positive(),
 });
 
-export const deleteMessageSchema = z.object({
-  conversationId: ulidSchema,
-});
-
 // 1-64 bytes UTF-8, no C0 (0x00-0x1F) or C1 (0x7F-0x9F) control chars.
 export const emojiSchema = z
   .string()

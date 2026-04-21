@@ -213,7 +213,7 @@ describe('editMessage', () => {
 });
 
 describe('deleteMessage', () => {
-  it('DELETEs /_kilo/kilo-chat/messages/:id with conversationId in body', async () => {
+  it('DELETEs /_kilo/kilo-chat/messages/:id with conversationId as query param', async () => {
     const fetchImpl = vi.fn(async () => new Response(null, { status: 204 }));
     const client = createKiloChatClient({
       controllerBaseUrl: 'http://127.0.0.1:18789',
@@ -222,10 +222,10 @@ describe('deleteMessage', () => {
     });
     await client.deleteMessage({ conversationId: 'c1', messageId: 'm1' });
     const [url, init] = fetchImpl.mock.calls[0]!;
-    expect(url).toBe('http://127.0.0.1:18789/_kilo/kilo-chat/messages/m1');
+    expect(url).toBe('http://127.0.0.1:18789/_kilo/kilo-chat/messages/m1?conversationId=c1');
     const init2 = init as RequestInit;
     expect(init2.method).toBe('DELETE');
-    expect(JSON.parse(init2.body as string)).toEqual({ conversationId: 'c1' });
+    expect(init2.body).toBeUndefined();
   });
 
   it('throws on non-2xx', async () => {

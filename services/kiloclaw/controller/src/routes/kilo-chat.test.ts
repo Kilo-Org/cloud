@@ -200,7 +200,7 @@ describe('DELETE /_kilo/kilo-chat/messages/:id', () => {
     expect(res.status).toBe(401);
   });
 
-  it('forwards DELETE upstream with rewritten auth', async () => {
+  it('forwards DELETE upstream with query params and rewritten auth', async () => {
     let capturedUrl = '';
     let capturedInit: RequestInit | undefined;
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
@@ -210,18 +210,19 @@ describe('DELETE /_kilo/kilo-chat/messages/:id', () => {
     }) as typeof fetch;
     const app = makeDeleteApp(fetchImpl);
     const res = await app.fetch(
-      new Request('http://x/_kilo/kilo-chat/messages/m1', {
+      new Request('http://x/_kilo/kilo-chat/messages/m1?conversationId=c1', {
         method: 'DELETE',
-        body: JSON.stringify({ conversationId: 'c1' }),
         headers: {
-          'content-type': 'application/json',
           authorization: `Bearer ${TOKEN}`,
         },
       })
     );
     expect(res.status).toBe(204);
-    expect(capturedUrl).toBe('https://chat.example.test/bot/v1/sandboxes/sbx_test/messages/m1');
+    expect(capturedUrl).toBe(
+      'https://chat.example.test/bot/v1/sandboxes/sbx_test/messages/m1?conversationId=c1'
+    );
     expect(capturedInit?.method).toBe('DELETE');
+    expect(capturedInit?.body).toBeUndefined();
     const headers = new Headers(capturedInit?.headers);
     expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
   });

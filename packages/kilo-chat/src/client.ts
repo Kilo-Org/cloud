@@ -53,7 +53,7 @@ export class KiloChatClient {
   async deleteMessage(messageId: string, req: DeleteMessageRequest): Promise<void> {
     return this.httpRequest(`/v1/messages/${messageId}`, {
       method: 'DELETE',
-      body: req,
+      query: req,
     });
   }
 

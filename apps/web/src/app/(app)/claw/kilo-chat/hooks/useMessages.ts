@@ -5,7 +5,6 @@ import type {
   ReactionSummary,
   CreateMessageRequest,
   EditMessageRequest,
-  DeleteMessageRequest,
   MessageCreatedEvent,
   MessageUpdatedEvent,
   MessageDeletedEvent,
@@ -158,8 +157,8 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
 export function useDeleteMessage(client: KiloChatClient, conversationId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ messageId, ...req }: DeleteMessageRequest & { messageId: string }) =>
-      client.deleteMessage(messageId, req),
+    mutationFn: ({ messageId, conversationId }: { messageId: string; conversationId: string }) =>
+      client.deleteMessage(messageId, { conversationId }),
     onMutate: async variables => {
       if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];

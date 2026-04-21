@@ -116,12 +116,12 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     };
   }
   async function deleteMessage(params: DeleteMessageParams): Promise<void> {
+    const qs = new URLSearchParams({ conversationId: params.conversationId });
     const response = await fetchImpl(
-      `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}`,
+      `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}?${qs}`,
       {
         method: 'DELETE',
         headers,
-        body: JSON.stringify({ conversationId: params.conversationId }),
       }
     );
     if (!response.ok) {

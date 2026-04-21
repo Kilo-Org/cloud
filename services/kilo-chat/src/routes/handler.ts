@@ -13,13 +13,7 @@ import type { AuthContext } from '../auth';
 import { createMessageFor, deleteMessageFor, editMessageFor } from '../services/messages';
 import { addReactionFor, removeReactionFor } from '../services/reactions';
 import { setTypingFor, stopTypingFor } from '../services/typing';
-import {
-  ulidSchema,
-  createMessageSchema,
-  editMessageSchema,
-  deleteMessageSchema,
-  reactionBodySchema,
-} from './schemas';
+import { ulidSchema, createMessageSchema, editMessageSchema, reactionBodySchema } from './schemas';
 
 type HonoCtx = Context<{ Bindings: Env; Variables: AuthContext }>;
 
@@ -119,12 +113,14 @@ export async function handleDeleteMessage(c: HonoCtx) {
   const msgId = parseMessageId(c);
   if (!msgId.ok) return msgId.response;
 
-  const body = await parseBody(c, deleteMessageSchema);
-  if (!body.ok) return body.response;
+  const convId = ulidSchema.safeParse(c.req.query('conversationId'));
+  if (!convId.success) {
+    return c.json({ error: 'Invalid or missing conversationId query parameter' }, 400);
+  }
 
   const callerId = c.get('callerId');
   const result = await deleteMessageFor(c.env, callerId, {
-    conversationId: body.data.conversationId,
+    conversationId: convId.data,
     messageId: msgId.data,
   });
   if (!result.ok) {

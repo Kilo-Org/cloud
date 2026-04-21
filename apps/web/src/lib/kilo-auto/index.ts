@@ -86,7 +86,7 @@ export const BALANCED_CODEX_MODEL: ResolvedAutoModel = {
 
 export const BALANCED_CLAW_MODEL: ResolvedAutoModel = {
   model: qwen36_plus_model.public_id,
-  reasoning: { enabled: true, effort: 'low' },
+  reasoning: { enabled: true },
 };
 
 export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {

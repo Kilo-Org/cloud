@@ -27,6 +27,13 @@ export function MessageInput({
     if (replyingTo) textareaRef.current?.focus();
   }, [replyingTo]);
 
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+  }, [text]);
+
   function handleSubmit() {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -49,7 +56,7 @@ export function MessageInput({
       <div className="flex items-end gap-2 p-4">
         <textarea
           ref={textareaRef}
-          className="border-input bg-background flex-1 resize-none rounded-lg border px-3 py-2 text-sm"
+          className="border-input bg-background max-h-[200px] flex-1 resize-none overflow-y-auto rounded-lg border px-3 py-2 text-sm"
           placeholder="Type a message..."
           value={text}
           onChange={e => {

@@ -44,7 +44,16 @@ export default async function AccountVerificationPage({ searchParams }: AppPageP
   // so the redirect on the post-validation pass (where `isFirstValidation` is
   // already false) still routes to `/get-started`.
   let signupSource: SignupSource = null;
-  let stripCreditCampaignCallback = false;
+  // Strip on ANY /c/ callback path, not just well-formed ones. Motivation:
+  // isValidCallbackPath only checks `.startsWith('/c/')`, so a manually
+  // crafted `/c/Summit` (uppercase) or `/c/xx` (too short) passes the
+  // callback whitelist but fails the stricter isCreditCampaignCallback
+  // slug-format guard. Without unconditional stripping, the redirect would
+  // bounce the user to the malformed URL post-signup, which then routes to
+  // `/` — a pointless extra hop. Stripping at the prefix level makes the
+  // "all /c/ callbacks resolve to /get-started post-signup" invariant
+  // hold universally.
+  let stripCreditCampaignCallback = callbackStr !== null && callbackStr.startsWith('/c/');
   if (isValidCallback) {
     if (isOpenclawAdvisorCallback(callbackStr)) {
       if (isFirstValidation) signupSource = { kind: 'openclaw-security-advisor' };

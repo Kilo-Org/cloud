@@ -448,6 +448,23 @@ describe('account-verification redirect logic', () => {
       expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
+    it('strips malformed /c/<slug> callbacks (uppercase, too short) — no bounce to the malformed URL', async () => {
+      // `isValidCallbackPath` whitelists any `/c/` prefix, but
+      // `isCreditCampaignCallback` requires the slug to match
+      // `/^[a-z0-9-]{5,40}$/`. Without the prefix-level strip, a crafted
+      // /c/Summit (uppercase) or /c/xx (short) would pass the callback
+      // whitelist but skip the strip, and the user would be redirected
+      // to the malformed URL post-signup.
+      const user = makeUser({ has_validation_stytch: null, customer_source: 'Reddit' });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c/Summit' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
+    });
+
     it('strips /c/<slug> callbacks on the post-validation pass (has_validation_stytch already set)', async () => {
       // During a real signup, account-verification renders twice: first
       // to mount the Stytch client, then after Stytch completes. By the

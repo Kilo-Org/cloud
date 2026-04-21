@@ -4,7 +4,11 @@ import { credit_campaigns, credit_transactions, type CreditCampaign } from '@kil
 import type { User } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import { count, eq, inArray, sql } from 'drizzle-orm';
-import { grantCreditForCategoryConfig } from '@/lib/promotionalCredits';
+import {
+  GRANT_MSG_ALREADY_APPLIED,
+  GRANT_MSG_CAP_REACHED,
+  grantCreditForCategoryConfig,
+} from '@/lib/promotionalCredits';
 import type { NonSelfServicePromoCreditCategoryConfig } from '@/lib/PromoCreditCategoryConfig';
 import { CREDIT_CAMPAIGN_SLUG_FORMAT, isCampaignEligible } from '@/lib/credit-campaigns-shared';
 
@@ -105,13 +109,13 @@ export async function grantCreditCampaignBonus(
       // fired inside onConflictDoNothing, meaning the user already has this
       // bonus from an earlier successful grant. Semantically they got it,
       // so report granted:true — same return as a fresh grant.
-      if (grant.message.includes('has already been applied')) {
+      if (grant.message.includes(GRANT_MSG_ALREADY_APPLIED)) {
         return { granted: true };
       }
       // Cap-race: the inner re-check ran between our eligibility check and
       // the insert, and the cap filled in the meantime. Report as 'capped'
       // to match what the render-time check would have said a moment later.
-      if (grant.message.includes('reached its redemption limit')) {
+      if (grant.message.includes(GRANT_MSG_CAP_REACHED)) {
         return { granted: false, reason: 'capped' };
       }
       // Anything else is unexpected (customer/org requirement, expiry

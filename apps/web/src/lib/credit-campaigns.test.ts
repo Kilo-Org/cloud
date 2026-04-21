@@ -124,14 +124,18 @@ describe('isCreditCampaignCallback', () => {
 });
 
 describe('isCampaignEligible', () => {
+  // Sentinel "effectively uncapped" value so tests of the active/ended
+  // branches don't accidentally trip the cap branch. The column is NOT
+  // NULL in the DB, so tests must pass a number — this matches the real
+  // runtime type of CreditCampaign.total_redemptions_allowed.
   const baseCampaign = {
     active: true,
     campaign_ends_at: null,
-    total_redemptions_allowed: null,
+    total_redemptions_allowed: 1_000_000,
   };
 
   describe('ok', () => {
-    it('is eligible when active, no end date, no cap', () => {
+    it('is eligible when active, no end date, redemptions well below cap', () => {
       expect(isCampaignEligible(baseCampaign, 0)).toEqual({ ok: true });
     });
 

@@ -42,10 +42,7 @@ export function isCampaignEligible(
   if (campaign.campaign_ends_at && new Date(campaign.campaign_ends_at) <= now) {
     return { ok: false, reason: 'ended' };
   }
-  if (
-    typeof campaign.total_redemptions_allowed === 'number' &&
-    redemptionCount >= campaign.total_redemptions_allowed
-  ) {
+  if (redemptionCount >= campaign.total_redemptions_allowed) {
     return { ok: false, reason: 'capped' };
   }
   return { ok: true };

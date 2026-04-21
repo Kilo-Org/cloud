@@ -19,6 +19,7 @@ import { atomicWrite } from './atomic-write';
 
 const CONFIG_DIR = '/root/.openclaw';
 const CONFIG_PATH = '/root/.openclaw/openclaw.json';
+const EXEC_APPROVALS_PATH = '/root/.openclaw/exec-approvals.json';
 const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
@@ -652,9 +653,52 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     env.KILOCLAW_FRESH_INSTALL = 'false';
   }
 
+  // Seed exec-approvals.json defaults to match the config's exec policy.
+  // The gateway resolves effective exec policy as maxAsk(config, approvals).
+  // If exec-approvals.json has empty defaults, the host layer inherits the
+  // config fallback — but some openclaw versions require explicit defaults
+  // in exec-approvals.json to fully suppress interactive approval prompts.
+  seedExecApprovalsDefaults(env, deps);
+
   writeBotIdentityFile(env, deps);
   writeUserProfileFile(env, deps);
   ensureWeatherSkillInstalled(env, deps);
+}
+
+// ---- exec-approvals.json seeder ----
+
+export function seedExecApprovalsDefaults(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
+  const security = env.KILOCLAW_EXEC_SECURITY || 'allowlist';
+  const ask = env.KILOCLAW_EXEC_ASK || 'on-miss';
+
+  try {
+    let file: Record<string, unknown>;
+    if (deps.existsSync(EXEC_APPROVALS_PATH)) {
+      file = JSON.parse(deps.readFileSync(EXEC_APPROVALS_PATH, 'utf8')) as Record<string, unknown>;
+    } else {
+      file = { version: 1 };
+    }
+
+    const defaults = (file.defaults ?? {}) as Record<string, unknown>;
+    defaults.security = security;
+    defaults.ask = ask;
+    defaults.askFallback = 'full';
+    file.defaults = defaults;
+
+    atomicWrite(
+      EXEC_APPROVALS_PATH,
+      JSON.stringify(file, null, 2) + '\n',
+      {
+        writeFileSync: deps.writeFileSync,
+        renameSync: deps.renameSync,
+        unlinkSync: deps.unlinkSync,
+        chmodSync: deps.chmodSync,
+      },
+      { mode: 0o600 }
+    );
+  } catch (err) {
+    console.warn('[controller] Failed to seed exec-approvals.json defaults:', err);
+  }
 }
 
 // ---- TOOLS.md bounded-section helper ----

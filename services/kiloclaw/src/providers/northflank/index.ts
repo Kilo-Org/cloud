@@ -364,6 +364,8 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       accessMode: config.storageAccessMode,
     });
     logNorthflank('provisioning_resources_ready', {
+      description: 'Northflank project and /root volume are ready for this KiloClaw instance',
+      apiOperation: 'GET/POST /projects, GET/POST /projects/{projectId}/volumes',
       sandboxId: state.sandboxId,
       projectId: project.id,
       projectName: project.name,
@@ -442,6 +444,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     }
 
     logNorthflank('start_runtime_service_ready', {
+      description:
+        'Northflank deployment service exists; service ID is available for secret restrictions',
+      apiOperation: 'GET/POST /projects/{projectId}/services/deployment',
       sandboxId: state.sandboxId,
       projectId,
       ...northflankServiceSummary(service),
@@ -468,6 +473,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       secretName: secret.name || names.secretName,
     };
     logNorthflank('start_runtime_secret_ready', {
+      description:
+        'Northflank project secret containing KILOCLAW_ENV_KEY is ready and restricted to the service',
+      apiOperation: 'POST/PATCH /projects/{projectId}/secrets',
       sandboxId: state.sandboxId,
       projectId,
       serviceId: service.id,
@@ -477,6 +485,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     await onProviderResult?.({ providerState });
 
     logNorthflank('start_runtime_patch_service', {
+      description:
+        'Patching Northflank service configuration while keeping desired instances at zero before scale-up',
+      apiOperation: 'PATCH /projects/{projectId}/services/deployment/{serviceId}',
       sandboxId: state.sandboxId,
       projectId,
       serviceId: service.id,
@@ -493,6 +504,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       buildServicePayload(config, runtimeSpec, names.serviceName, volumeName, 0)
     );
     logNorthflank('start_runtime_scale_service', {
+      description:
+        'Scaling Northflank service to one running instance after secrets and deployment config are ready',
+      apiOperation: 'POST /projects/{projectId}/services/{serviceId}/scale',
       sandboxId: state.sandboxId,
       projectId,
       serviceId: service.id,
@@ -507,6 +521,8 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     );
 
     logNorthflank('start_runtime_deployment_completed', {
+      description: 'Northflank deployment reported COMPLETED during start wait',
+      apiOperation: 'GET /projects/{projectId}/services/{serviceId}',
       sandboxId: state.sandboxId,
       projectId,
       ...northflankServiceSummary(started),
@@ -551,6 +567,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
 
     const volumeName = providerState.volumeName ?? names.volumeName;
     logNorthflank('restart_runtime_patch_service', {
+      description:
+        'Patching existing Northflank service with updated image/env/runtime config before restart scale-up',
+      apiOperation: 'PATCH /projects/{projectId}/services/deployment/{serviceId}',
       sandboxId: state.sandboxId,
       projectId,
       serviceId,
@@ -588,6 +607,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       secretName: secret.name || names.secretName,
     };
     logNorthflank('restart_runtime_secret_ready', {
+      description:
+        'Northflank project secret was updated for restart and remains restricted to the service',
+      apiOperation: 'PATCH /projects/{projectId}/secrets/{secretId}',
       sandboxId: state.sandboxId,
       projectId,
       serviceId,
@@ -597,6 +619,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     await onProviderResult?.({ providerState });
 
     logNorthflank('restart_runtime_scale_service', {
+      description:
+        'Scaling Northflank service to one running instance after restart config and secret updates',
+      apiOperation: 'POST /projects/{projectId}/services/{serviceId}/scale',
       sandboxId: state.sandboxId,
       projectId,
       serviceId,
@@ -610,6 +635,8 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       STARTUP_TIMEOUT_SECONDS
     );
     logNorthflank('restart_runtime_deployment_completed', {
+      description: 'Northflank deployment reported COMPLETED during restart wait',
+      apiOperation: 'GET /projects/{projectId}/services/{serviceId}',
       sandboxId: state.sandboxId,
       projectId,
       ...northflankServiceSummary(restarted),

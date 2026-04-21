@@ -502,6 +502,8 @@ export async function waitForDeploymentCompleted(
     if (deploymentStatus !== lastLoggedStatus) {
       lastLoggedStatus = deploymentStatus;
       console.info('[northflank] deployment_wait_status', {
+        description: 'Polling Northflank deployment status while waiting for COMPLETED',
+        apiOperation: 'GET /projects/{projectId}/services/{serviceId}',
         projectId,
         ...northflankServiceDebug(lastService),
       });
@@ -509,6 +511,8 @@ export async function waitForDeploymentCompleted(
     if (deploymentStatus === 'COMPLETED') return lastService;
     if (deploymentStatus === 'FAILED') {
       console.warn('[northflank] deployment_wait_failed', {
+        description: 'Northflank deployment reported FAILED while waiting for COMPLETED',
+        apiOperation: 'GET /projects/{projectId}/services/{serviceId}',
         projectId,
         ...northflankServiceDebug(lastService),
       });
@@ -518,6 +522,8 @@ export async function waitForDeploymentCompleted(
     lastService = await getService(config, projectId, serviceId);
   }
   console.warn('[northflank] deployment_wait_timeout', {
+    description: 'Timed out waiting for Northflank deployment to report COMPLETED',
+    apiOperation: 'GET /projects/{projectId}/services/{serviceId}',
     projectId,
     timeoutSeconds,
     ...northflankServiceDebug(lastService),

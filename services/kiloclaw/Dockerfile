@@ -163,14 +163,14 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd \
     && mkdir -p /root/clawd/skills
 
-# Copy helper scripts and staged runtime assets (used by the controller/gateway)
-# Build cache bust: 2026-04-17-v66-weather-skill
-RUN echo "12"
+# Copy helper scripts (used at runtime by the controller/gateway)
+# Build cache bust: 2026-03-17-v65-remove-startup-script
+RUN echo "11"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 
-# Stage custom skills outside /root so they survive the Fly Volume mount.
-COPY skills/ /usr/local/share/kiloclaw/skills/
+# Copy custom skills
+COPY skills/ /root/clawd/skills/
 
 # Stage TOOLS.md outside /root so it survives the Fly Volume mount.
 # The controller's bootstrap copies it to /root/.openclaw/workspace/TOOLS.md on first boot.

@@ -1,6 +1,7 @@
 import { db, cleanupDbForTest } from '@/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import {
   kiloclaw_admin_audit_logs,
   kiloclaw_subscription_change_log,
@@ -205,6 +206,78 @@ describe('admin.users.getKiloClawState', () => {
     expectSameInstant(result.subscription?.trial_ends_at, expiredTrialEnd);
     expect(result.hasAccess).toBe(false);
     expect(result.accessReason).toBeNull();
+  });
+
+  it('keeps personal access separate from organization-managed subscriptions', async () => {
+    const organization = await createTestOrganization('Org Access Test', targetUser.id, 0);
+
+    const [personalInstance, orgInstance] = await db
+      .insert(kiloclaw_instances)
+      .values([
+        {
+          user_id: targetUser.id,
+          sandbox_id: 'sandbox-admin-kiloclaw-personal-canceled',
+        },
+        {
+          user_id: targetUser.id,
+          organization_id: organization.id,
+          sandbox_id: 'sandbox-admin-kiloclaw-org-active',
+        },
+      ])
+      .returning();
+
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        user_id: targetUser.id,
+        instance_id: personalInstance.id,
+        plan: 'trial',
+        status: 'canceled',
+        cancel_at_period_end: false,
+        trial_started_at: '2026-04-01T00:00:00.000Z',
+        trial_ends_at: '2026-04-08T00:00:00.000Z',
+      },
+      {
+        user_id: targetUser.id,
+        instance_id: orgInstance.id,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        cancel_at_period_end: false,
+      },
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
+
+    expect(result.hasAccess).toBe(false);
+    expect(result.accessReason).toBeNull();
+    expect(result.subscription).toEqual(
+      expect.objectContaining({
+        instance_id: personalInstance.id,
+        plan: 'trial',
+        status: 'canceled',
+      })
+    );
+
+    const personalSubscription = result.subscriptions.find(
+      subscription => subscription.instance_id === personalInstance.id
+    );
+    const orgSubscription = result.subscriptions.find(
+      subscription => subscription.instance_id === orgInstance.id
+    );
+
+    expect(personalSubscription?.instance).toEqual(
+      expect.objectContaining({
+        organization_id: null,
+        organization_name: null,
+      })
+    );
+    expect(orgSubscription?.instance).toEqual(
+      expect.objectContaining({
+        organization_id: organization.id,
+        organization_name: organization.name,
+      })
+    );
   });
 
   it('returns earlybird access from canonical subscription row', async () => {

@@ -758,35 +758,6 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
     expect(res.status).toBe(204);
   });
 
-  it('returns 204 when using body (backwards compat)', async () => {
-    const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-body');
-    const app = makeBotApp();
-    const token = await tokenFor(sandboxId);
-
-    // Add first
-    await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}/reactions`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId, emoji: '👍' }),
-      },
-      testEnv
-    );
-
-    const res = await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}/reactions`,
-      {
-        method: 'DELETE',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId, emoji: '👍' }),
-      },
-      testEnv
-    );
-
-    expect(res.status).toBe(204);
-  });
-
   it('returns 403 for non-member bot', async () => {
     const { conversationId, messageId, testEnv } = await setupData('bot-rx-del-forbidden');
     const otherSandboxId = 'other-sandbox-rx-del';

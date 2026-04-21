@@ -163,25 +163,10 @@ export async function handleRemoveReaction(c: HonoCtx) {
   const msgId = parseMessageId(c);
   if (!msgId.ok) return msgId.response;
 
-  // Accept params from query string (preferred) or fall back to body for
-  // backwards compatibility with older callers.
-  let conversationId: string | undefined;
-  let emoji: string | undefined;
-
-  const qConv = c.req.query('conversationId');
-  const qEmoji = c.req.query('emoji');
-  if (qConv && qEmoji) {
-    conversationId = qConv;
-    emoji = qEmoji;
-  } else {
-    const body = await parseBody(c, reactionBodySchema);
-    if (!body.ok) return body.response;
-    conversationId = body.data.conversationId;
-    emoji = body.data.emoji;
-  }
-
-  // Validate the extracted values through the schema.
-  const parsed = reactionBodySchema.safeParse({ conversationId, emoji });
+  const parsed = reactionBodySchema.safeParse({
+    conversationId: c.req.query('conversationId'),
+    emoji: c.req.query('emoji'),
+  });
   if (!parsed.success) {
     return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400);
   }

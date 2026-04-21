@@ -176,29 +176,6 @@ describe('DELETE /v1/messages/:id/reactions', () => {
     expect(res.status).toBe(204);
   });
 
-  it('204 when removing via body (backwards compat)', async () => {
-    const { conversationId, messageId, userApp } = await setup('rx-del-body');
-    await userApp.request(
-      `/v1/messages/${messageId}/reactions`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId, emoji: '👍' }),
-      },
-      env
-    );
-    const res = await userApp.request(
-      `/v1/messages/${messageId}/reactions`,
-      {
-        method: 'DELETE',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId, emoji: '👍' }),
-      },
-      env
-    );
-    expect(res.status).toBe(204);
-  });
-
   it('403 for non-member on DELETE', async () => {
     const { conversationId, messageId } = await setup('rx-del-3');
     const stranger = makeApp('user-stranger', 'user');

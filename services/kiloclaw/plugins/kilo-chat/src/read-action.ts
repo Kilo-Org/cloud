@@ -32,7 +32,7 @@ export async function handleKiloChatReadAction(
     return { content: [{ type: 'text', text: 'No messages in this conversation.' }] };
   }
 
-  const lines = messages.map((msg) => {
+  const lines = messages.map(msg => {
     const id = typeof msg.id === 'string' ? msg.id : String(msg.id ?? '');
     const sender = typeof msg.senderId === 'string' ? msg.senderId : String(msg.senderId ?? '');
     const text = typeof msg.text === 'string' ? msg.text : '';

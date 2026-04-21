@@ -50,7 +50,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
   conversion time, a valid referral touch wins over an affiliate touch unless that affiliate touch is sale-attributed for
   the same SALE conversion being evaluated.
 - **First paid KiloClaw conversion**: The referee's first confirmed paid personal KiloClaw subscription payment period,
-  whether funded by Stripe settlement, hybrid settlement, or pure-credit deduction. Trial start does not qualify.
+  whether funded by Stripe settlement, hybrid settlement, or pure-credit deduction. Trial start does not qualify, nor does a purchase of inference / credits.
 - **Monetized KiloClaw payment period**: A KiloClaw billing period with positive Stripe-settled value, positive hybrid
   settled value, or positive credit deduction. Zero-dollar invoices, fully comped periods, and admin adjustments are not
   monetized payment periods.
@@ -80,7 +80,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 ## Overview
 
 The KiloClaw referral program is a double-sided program: when an eligible existing user refers an eligible new KiloClaw
-subscriber, the referrer and referee each earn one free KiloClaw month. A reward is earned only after the referee's first
+paying subscriber, the referrer and referee each earn one free KiloClaw month. A reward is earned only after the referee's first
 confirmed paid personal KiloClaw subscription payment. The reward is fulfilled by delaying the beneficiary's next
 KiloClaw renewal by one calendar month.
 

@@ -14,7 +14,7 @@ import { createBotConversationFor, renameConversationFor } from '../services/con
 import { createMessageFor, deleteMessageFor, editMessageFor } from '../services/messages';
 import { addReactionFor, removeReactionFor } from '../services/reactions';
 import { setTypingFor, stopTypingFor } from '../services/typing';
-import { resolveUserDisplayInfo } from '../services/user-lookup';
+import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
 import {
   ulidSchema,
   createMessageSchema,
@@ -229,7 +229,7 @@ export async function handleGetMembers(c: HonoCtx) {
   const displayInfo =
     userIds.length > 0
       ? await resolveUserDisplayInfo(c.env.HYPERDRIVE.connectionString, userIds)
-      : new Map();
+      : new Map<string, UserDisplayInfo>();
 
   const enrichedMembers = info.members.map(m => ({
     ...m,
@@ -296,7 +296,7 @@ export async function handleListBotConversations(c: HonoCtx) {
       const displayInfo =
         userIds.length > 0
           ? await resolveUserDisplayInfo(c.env.HYPERDRIVE.connectionString, userIds)
-          : new Map();
+          : new Map<string, UserDisplayInfo>();
 
       return {
         conversationId: conv.conversationId,

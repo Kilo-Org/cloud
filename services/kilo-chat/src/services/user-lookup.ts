@@ -80,7 +80,7 @@ export async function resolveUserDisplayInfo(
     if (!grouped.has(row.id)) {
       grouped.set(row.id, []);
     }
-    grouped.get(row.id)!.push({
+    grouped.get(row.id)?.push({
       google_user_name: row.google_user_name,
       google_user_image_url: row.google_user_image_url,
       display_name: row.display_name ?? null,

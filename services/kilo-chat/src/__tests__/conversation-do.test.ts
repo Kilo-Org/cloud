@@ -520,4 +520,37 @@ describe('ConversationDO', () => {
       }
     });
   });
+
+  it('destroy - wipes all data from the conversation', async () => {
+    const stub = getStub('conv-destroy-1');
+    await stub.initialize({
+      id: 'conv-destroy',
+      title: 'Doomed Chat',
+      createdBy: 'user-alice',
+      createdAt: 1000,
+      members: [
+        { id: 'user-alice', kind: 'user' as const },
+        { id: 'bot-1', kind: 'bot' as const },
+      ],
+    });
+    await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'hello' }],
+    });
+    await stub.createMessage({ senderId: 'bot-1', content: [{ type: 'text', text: 'hi back' }] });
+
+    await stub.destroy();
+
+    const info = await stub.getInfo();
+    expect(info).toBeNull();
+    const messages = await stub.listMessages({ limit: 50 });
+    expect(messages.messages).toHaveLength(0);
+  });
+
+  it('destroy - is idempotent on an already-empty DO', async () => {
+    const stub = getStub('conv-destroy-empty');
+    await stub.destroy();
+    const info = await stub.getInfo();
+    expect(info).toBeNull();
+  });
 });

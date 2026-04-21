@@ -784,7 +784,7 @@ function InboundEmailCard({
 }
 
 // ---------------------------------------------------------------------------
-// VectorMemorySection
+// MemorySection
 // ---------------------------------------------------------------------------
 
 function MemorySection({
@@ -1062,9 +1062,10 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     EXA_SEARCH_UI_MIN_CONTROLLER_VERSION
   );
-  const memoryOpenClawVersion = runningVersion ?? trackedVersion;
-  const supportsMemoryConfig =
-    !memoryOpenClawVersion || calverAtLeast(memoryOpenClawVersion, MEMORY_MIN_OPENCLAW_VERSION);
+  const supportsMemoryConfig = calverAtLeast(
+    runningVersion ?? trackedVersion,
+    MEMORY_MIN_OPENCLAW_VERSION
+  );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;

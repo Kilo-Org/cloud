@@ -21,7 +21,11 @@ import type {
   ProviderState,
   KiloExaSearchMode,
 } from '../../schemas/instance-config';
-import { DEFAULT_INSTANCE_FEATURES, ProviderStateSchema } from '../../schemas/instance-config';
+import {
+  DEFAULT_INSTANCE_FEATURES,
+  DEFAULT_VECTOR_MEMORY_MODEL,
+  ProviderStateSchema,
+} from '../../schemas/instance-config';
 import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
 import * as fly from '../../fly/client';
 import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '../../auth/sandbox-id';
@@ -846,7 +850,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // embedding requests through the Kilo Gateway instead of the default OpenAI endpoint.
     if (patch.vectorMemoryEnabled !== undefined || patch.vectorMemoryModel !== undefined) {
       if (this.s.vectorMemoryEnabled) {
-        const model = this.s.vectorMemoryModel ?? 'mistralai/mistral-embed-2312';
+        const model = this.s.vectorMemoryModel ?? DEFAULT_VECTOR_MEMORY_MODEL;
         const baseUrl = this.env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
         const headers: Record<string, string> = {};
         if (this.s.orgId) {
@@ -869,8 +873,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           },
         });
       } else {
+        // Send explicit nulls so deepMerge overwrites (rather than preserves)
+        // the stale remote block — the boot-time writer deletes these keys.
         await gateway.patchConfigOnMachine(this.s, this.env, {
-          agents: { defaults: { memorySearch: { enabled: false } } },
+          agents: {
+            defaults: {
+              memorySearch: {
+                enabled: false,
+                provider: null,
+                model: null,
+                remote: null,
+              },
+            },
+          },
         });
       }
     }

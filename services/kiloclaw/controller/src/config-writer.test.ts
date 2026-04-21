@@ -96,7 +96,13 @@ describe('generateBaseConfig', () => {
     expect(config.models).toBeUndefined();
 
     // No default model override when env var not set
-    expect(config.agents).toBeUndefined();
+    expect(config.agents.defaults.model).toBeUndefined();
+
+    // Vector memory defaults to disabled when no env var is set
+    expect(config.agents.defaults.memorySearch.enabled).toBe(false);
+    expect(config.agents.defaults.memorySearch.provider).toBeUndefined();
+    expect(config.agents.defaults.memorySearch.model).toBeUndefined();
+    expect(config.agents.defaults.memorySearch.remote).toBeUndefined();
 
     // Tool profile
     expect(config.tools.profile).toBe('full');
@@ -558,7 +564,7 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    expect(config.agents).toBeUndefined();
+    expect(config.agents.defaults.model).toBeUndefined();
   });
 
   it('sets agent user timezone from KILOCLAW_USER_TIMEZONE', () => {
@@ -1033,6 +1039,118 @@ describe('generateBaseConfig', () => {
       deps
     );
     expect(config).toBeDefined();
+  });
+
+  // ── Vector memory ───────────────────────────────────────────────────
+
+  it('disables memorySearch when KILOCLAW_VECTOR_MEMORY_ENABLED is not set', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+    expect(config.agents.defaults.memorySearch.enabled).toBe(false);
+    expect(config.agents.defaults.memorySearch.provider).toBeUndefined();
+    expect(config.agents.defaults.memorySearch.model).toBeUndefined();
+    expect(config.agents.defaults.memorySearch.remote).toBeUndefined();
+  });
+
+  it('enables memorySearch via Kilo Gateway when the flag is on', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_VECTOR_MEMORY_ENABLED: 'true',
+      KILOCLAW_VECTOR_MEMORY_MODEL: 'openai/text-embedding-3-small',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.agents.defaults.memorySearch.enabled).toBe(true);
+    expect(config.agents.defaults.memorySearch.provider).toBe('openai');
+    expect(config.agents.defaults.memorySearch.model).toBe('openai/text-embedding-3-small');
+    expect(config.agents.defaults.memorySearch.remote.baseUrl).toBe(
+      'https://api.kilo.ai/api/gateway/'
+    );
+    expect(config.agents.defaults.memorySearch.remote.apiKey).toBe('test-api-key');
+    expect(config.agents.defaults.memorySearch.remote.headers).toEqual({});
+  });
+
+  it('falls back to the default embedding model when no model env var is set', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILOCLAW_VECTOR_MEMORY_ENABLED: 'true' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.agents.defaults.memorySearch.model).toBe('mistralai/mistral-embed-2312');
+  });
+
+  it('honors KILOCODE_API_BASE_URL override on the memorySearch remote block', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_VECTOR_MEMORY_ENABLED: 'true',
+      KILOCODE_API_BASE_URL: 'https://example.internal/gateway/',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.agents.defaults.memorySearch.remote.baseUrl).toBe(
+      'https://example.internal/gateway/'
+    );
+  });
+
+  it('adds X-KiloCode-OrganizationId memorySearch header when org id is set', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_VECTOR_MEMORY_ENABLED: 'true',
+      KILOCODE_ORGANIZATION_ID: 'org_abc123',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.agents.defaults.memorySearch.remote.headers).toEqual({
+      'X-KiloCode-OrganizationId': 'org_abc123',
+    });
+  });
+
+  it('clears stale memorySearch.remote config when disabled on a subsequent boot', () => {
+    const existing = JSON.stringify({
+      agents: {
+        defaults: {
+          memorySearch: {
+            enabled: true,
+            provider: 'openai',
+            model: 'openai/text-embedding-3-small',
+            remote: { baseUrl: 'https://old/', apiKey: 'stale', headers: {} },
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+    expect(config.agents.defaults.memorySearch.enabled).toBe(false);
+    expect(config.agents.defaults.memorySearch.provider).toBeUndefined();
+    expect(config.agents.defaults.memorySearch.model).toBeUndefined();
+    expect(config.agents.defaults.memorySearch.remote).toBeUndefined();
+  });
+
+  // ── Dreaming ────────────────────────────────────────────────────────
+
+  it('sets dreaming disabled when KILOCLAW_DREAMING_ENABLED is not set', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+    expect(config.plugins.entries['memory-core'].config.dreaming.enabled).toBe(false);
+  });
+
+  it('enables dreaming when KILOCLAW_DREAMING_ENABLED=true', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILOCLAW_DREAMING_ENABLED: 'true' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.plugins.entries['memory-core'].config.dreaming.enabled).toBe(true);
+  });
+
+  it('flips dreaming off without deleting other memory-core plugin config', () => {
+    const existing = JSON.stringify({
+      plugins: {
+        entries: {
+          'memory-core': { config: { dreaming: { enabled: true }, extra: 'keep-me' } },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+    expect(config.plugins.entries['memory-core'].config.dreaming.enabled).toBe(false);
+    expect(config.plugins.entries['memory-core'].config.extra).toBe('keep-me');
   });
 });
 

@@ -34,7 +34,7 @@ type ResolveAutoModelParams = {
   modeHeader: string | null;
   featureHeader: FeatureValue | null;
   sessionId: string | null;
-  kind?: GatewayRequest['kind'];
+  apiKind: GatewayRequest['kind'] | null;
 };
 
 function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
@@ -49,7 +49,7 @@ export async function resolveAutoModel(
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ): Promise<ResolvedAutoModel> {
-  const { model, modeHeader, featureHeader, sessionId, kind } = params;
+  const { model, modeHeader, featureHeader, sessionId, apiKind } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
     if (
       sessionId &&
@@ -75,7 +75,7 @@ export async function resolveAutoModel(
           return BALANCED_CLAW_SETUP_MODEL;
         }
       }
-      if (kind !== 'messages') {
+      if (apiKind !== 'messages') {
         return BALANCED_CLAW_MODEL;
       }
     }

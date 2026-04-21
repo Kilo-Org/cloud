@@ -233,7 +233,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         modeHeader,
         featureHeader: feature,
         sessionId: taskId ?? null,
-        kind: requestBodyParsed.kind,
+        apiKind: requestBodyParsed.kind,
       },
       requestBodyParsed,
       authPromise.then(res => res.user),

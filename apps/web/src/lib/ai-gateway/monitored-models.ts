@@ -14,6 +14,7 @@ export async function getMonitoredModels() {
               modeHeader: null,
               featureHeader: null,
               sessionId: null,
+              apiKind: null,
             },
             Promise.resolve(null),
             Promise.resolve(0)

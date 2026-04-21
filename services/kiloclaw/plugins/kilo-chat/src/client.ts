@@ -27,6 +27,11 @@ export type DeleteMessageParams = { conversationId: string; messageId: string };
 
 export type SendTypingParams = { conversationId: string };
 
+export type ListMessagesParams = { conversationId: string; before?: string; limit?: number };
+export type ListMessagesResult = { messages: Array<Record<string, unknown>> };
+export type GetMembersParams = { conversationId: string };
+export type GetMembersResult = { members: Array<{ id: string; kind: string }> };
+
 export type AddReactionParams = { conversationId: string; messageId: string; emoji: string };
 export type AddReactionResult = { id: string };
 export type RemoveReactionParams = { conversationId: string; messageId: string; emoji: string };
@@ -39,6 +44,8 @@ export type KiloChatClient = {
   sendTypingStop(p: SendTypingParams): Promise<void>;
   addReaction(p: AddReactionParams): Promise<AddReactionResult>;
   removeReaction(p: RemoveReactionParams): Promise<void>;
+  listMessages(p: ListMessagesParams): Promise<ListMessagesResult>;
+  getMembers(p: GetMembersParams): Promise<GetMembersResult>;
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -190,6 +197,34 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     void response.body?.cancel();
   }
 
+  async function listMessages(params: ListMessagesParams): Promise<ListMessagesResult> {
+    const qs = new URLSearchParams();
+    if (params.before !== undefined) qs.set('before', params.before);
+    if (params.limit !== undefined) qs.set('limit', String(params.limit));
+    const query = qs.toString();
+    const url = `${base}/_kilo/kilo-chat/conversations/${encodeURIComponent(params.conversationId)}/messages${query ? `?${query}` : ''}`;
+    const response = await fetchImpl(url, { method: 'GET', headers });
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller GET messages responded ${response.status}: ${await response.text()}`
+      );
+    }
+    return (await response.json()) as ListMessagesResult;
+  }
+
+  async function getMembers(params: GetMembersParams): Promise<GetMembersResult> {
+    const response = await fetchImpl(
+      `${base}/_kilo/kilo-chat/conversations/${encodeURIComponent(params.conversationId)}/members`,
+      { method: 'GET', headers }
+    );
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller GET members responded ${response.status}: ${await response.text()}`
+      );
+    }
+    return (await response.json()) as GetMembersResult;
+  }
+
   return {
     createMessage,
     editMessage,
@@ -198,5 +233,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     sendTypingStop,
     addReaction,
     removeReaction,
+    listMessages,
+    getMembers,
   };
 }

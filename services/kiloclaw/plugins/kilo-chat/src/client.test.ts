@@ -384,3 +384,93 @@ describe('createKiloChatClient.removeReaction', () => {
     expect(calls[0]).toBe('http://ctrl/_kilo/kilo-chat/messages/M%2Fweird%3Fx%3D1/reactions');
   });
 });
+
+describe('listMessages', () => {
+  it('GETs the correct URL and returns messages', async () => {
+    const messages = [{ id: 'm1', text: 'hello' }];
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ messages }), { status: 200 });
+    }) as typeof fetch;
+
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+
+    const result = await client.listMessages({ conversationId: 'C1' });
+    expect(result).toEqual({ messages });
+    expect(calls[0].url).toBe('http://ctrl/_kilo/kilo-chat/conversations/C1/messages');
+    expect(calls[0].init.method).toBe('GET');
+    const headers = calls[0].init.headers as Record<string, string>;
+    expect(headers.authorization).toBe('Bearer gw');
+  });
+
+  it('passes before and limit as query params', async () => {
+    const calls: Array<string> = [];
+    const fetchImpl = (async (url: string | URL) => {
+      calls.push(String(url));
+      return new Response(JSON.stringify({ messages: [] }), { status: 200 });
+    }) as typeof fetch;
+
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+
+    await client.listMessages({ conversationId: 'C1', before: 'cursor-xyz', limit: 20 });
+    expect(calls[0]).toBe(
+      'http://ctrl/_kilo/kilo-chat/conversations/C1/messages?before=cursor-xyz&limit=20'
+    );
+  });
+
+  it('throws on non-2xx response', async () => {
+    const fetchImpl = (async () => new Response('boom', { status: 500 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+    await expect(client.listMessages({ conversationId: 'C1' })).rejects.toThrow(/500/);
+  });
+});
+
+describe('getMembers', () => {
+  it('GETs the correct URL and returns members', async () => {
+    const members = [
+      { id: 'u1', kind: 'user' },
+      { id: 'b1', kind: 'bot' },
+    ];
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ members }), { status: 200 });
+    }) as typeof fetch;
+
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+
+    const result = await client.getMembers({ conversationId: 'C1' });
+    expect(result).toEqual({ members });
+    expect(calls[0].url).toBe('http://ctrl/_kilo/kilo-chat/conversations/C1/members');
+    expect(calls[0].init.method).toBe('GET');
+    const headers = calls[0].init.headers as Record<string, string>;
+    expect(headers.authorization).toBe('Bearer gw');
+  });
+
+  it('throws on non-2xx response', async () => {
+    const fetchImpl = (async () => new Response('forbidden', { status: 403 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+    await expect(client.getMembers({ conversationId: 'C1' })).rejects.toThrow(/403/);
+  });
+});

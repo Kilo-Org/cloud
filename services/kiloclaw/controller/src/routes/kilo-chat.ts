@@ -317,6 +317,32 @@ export function registerKiloChatRenameRoute(app: Hono, options: KiloChatRouteOpt
   );
 }
 
+export function registerKiloChatListConversationsRoute(
+  app: Hono,
+  options: KiloChatRouteOptions
+): void {
+  const fetchImpl = options.fetchImpl ?? fetch;
+
+  app.get('/_kilo/kilo-chat/conversations', async c => {
+    const unauthorized = authorize(c, options);
+    if (unauthorized) return unauthorized;
+
+    const { search } = new URL(c.req.url);
+    const queryString = search ?? '';
+
+    let upstream: Response;
+    try {
+      upstream = await fetchImpl(upstreamUrl(options, `/conversations${queryString}`), {
+        method: 'GET',
+        headers: outboundHeaders(options),
+      });
+    } catch {
+      return c.json({ error: 'Bad Gateway' }, 502);
+    }
+    return relay(upstream);
+  });
+}
+
 export function registerKiloChatGetMembersRoute(app: Hono, options: KiloChatRouteOptions): void {
   const fetchImpl = options.fetchImpl ?? fetch;
 

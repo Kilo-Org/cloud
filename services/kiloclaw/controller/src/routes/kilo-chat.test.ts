@@ -10,6 +10,7 @@ import {
   registerKiloChatListMessagesRoute,
   registerKiloChatGetMembersRoute,
   registerKiloChatRenameRoute,
+  registerKiloChatListConversationsRoute,
 } from './kilo-chat';
 
 const TOKEN = 'expected-gateway-token';
@@ -777,5 +778,74 @@ describe('PATCH /_kilo/kilo-chat/conversations/:conversationId', () => {
       })
     );
     expect(res.status).toBe(502);
+  });
+});
+
+function makeListConversationsApp(fetchImpl: typeof fetch) {
+  const app = new Hono();
+  registerKiloChatListConversationsRoute(app, {
+    expectedToken: TOKEN,
+    sandboxId: SANDBOX_ID,
+    kiloChatBaseUrl: 'https://chat.example.test',
+    fetchImpl,
+  });
+  return app;
+}
+
+describe('GET /_kilo/kilo-chat/conversations', () => {
+  it('rejects requests without bearer token', async () => {
+    const app = makeListConversationsApp(async () => new Response('[]', { status: 200 }));
+    const res = await app.fetch(new Request('http://x/_kilo/kilo-chat/conversations'));
+    expect(res.status).toBe(401);
+  });
+
+  it('forwards to correct upstream URL with gateway bearer', async () => {
+    let capturedUrl = '';
+    let capturedInit: RequestInit | undefined;
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      capturedUrl = typeof url === 'string' ? url : url.toString();
+      capturedInit = init;
+      return new Response(JSON.stringify({ conversations: [], total: 0 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const app = makeListConversationsApp(fetchImpl);
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/conversations', {
+        headers: { authorization: `Bearer ${TOKEN}` },
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(capturedUrl).toBe(
+      `https://chat.example.test/bot/v1/sandboxes/${SANDBOX_ID}/conversations`
+    );
+    expect(capturedInit?.method).toBe('GET');
+    const headers = new Headers(capturedInit?.headers);
+    expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
+  });
+
+  it('passes query string through to upstream', async () => {
+    let capturedUrl = '';
+    const fetchImpl = (async (url: string | URL) => {
+      capturedUrl = typeof url === 'string' ? url : url.toString();
+      return new Response(JSON.stringify({ conversations: [], total: 0 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const app = makeListConversationsApp(fetchImpl);
+    await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/conversations?limit=10&offset=5', {
+        headers: { authorization: `Bearer ${TOKEN}` },
+      })
+    );
+
+    expect(capturedUrl).toBe(
+      `https://chat.example.test/bot/v1/sandboxes/${SANDBOX_ID}/conversations?limit=10&offset=5`
+    );
   });
 });

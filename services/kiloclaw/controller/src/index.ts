@@ -31,6 +31,7 @@ import {
   registerKiloChatListMessagesRoute,
   registerKiloChatGetMembersRoute,
   registerKiloChatRenameRoute,
+  registerKiloChatListConversationsRoute,
 } from './routes/kilo-chat';
 import { registerInboundEmailRoute } from './routes/inbound-email';
 import { registerFileRoutes } from './routes/files';
@@ -409,6 +410,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     registerKiloChatListMessagesRoute(honoApp, kiloChatOpts);
     registerKiloChatGetMembersRoute(honoApp, kiloChatOpts);
     registerKiloChatRenameRoute(honoApp, kiloChatOpts);
+    registerKiloChatListConversationsRoute(honoApp, kiloChatOpts);
   }
 
   registerHealthRoute(

@@ -95,14 +95,9 @@ describe('generateBaseConfig', () => {
     // No kilocode provider entry in production — built-in provider takes over
     expect(config.models).toBeUndefined();
 
-    // No default model override when env var not set
-    expect(config.agents.defaults.model).toBeUndefined();
-
-    // Vector memory defaults to disabled when no env var is set
-    expect(config.agents.defaults.memorySearch.enabled).toBe(false);
-    expect(config.agents.defaults.memorySearch.provider).toBeUndefined();
-    expect(config.agents.defaults.memorySearch.model).toBeUndefined();
-    expect(config.agents.defaults.memorySearch.remote).toBeUndefined();
+    // No default model override when env var not set, and no memorySearch
+    // schema introduced when the feature is off and absent from existing config.
+    expect(config.agents).toBeUndefined();
 
     // Tool profile
     expect(config.tools.profile).toBe('full');
@@ -564,7 +559,7 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    expect(config.agents.defaults.model).toBeUndefined();
+    expect(config.agents).toBeUndefined();
   });
 
   it('sets agent user timezone from KILOCLAW_USER_TIMEZONE', () => {
@@ -1043,13 +1038,13 @@ describe('generateBaseConfig', () => {
 
   // ── Vector memory ───────────────────────────────────────────────────
 
-  it('disables memorySearch when KILOCLAW_VECTOR_MEMORY_ENABLED is not set', () => {
+  it('does not introduce memorySearch schema when disabled and absent from existing config', () => {
+    // Older OpenClaw versions (< 2026.4.5) reject agents.defaults.memorySearch
+    // during `doctor` validation. When the feature is off and the config never
+    // had it, leave the config untouched so those versions keep booting.
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
-    expect(config.agents.defaults.memorySearch.enabled).toBe(false);
-    expect(config.agents.defaults.memorySearch.provider).toBeUndefined();
-    expect(config.agents.defaults.memorySearch.model).toBeUndefined();
-    expect(config.agents.defaults.memorySearch.remote).toBeUndefined();
+    expect(config.agents?.defaults?.memorySearch).toBeUndefined();
   });
 
   it('enables memorySearch via Kilo Gateway when the flag is on', () => {
@@ -1126,10 +1121,13 @@ describe('generateBaseConfig', () => {
 
   // ── Dreaming ────────────────────────────────────────────────────────
 
-  it('sets dreaming disabled when KILOCLAW_DREAMING_ENABLED is not set', () => {
+  it('does not introduce memory-core dreaming schema when disabled and absent from existing config', () => {
+    // Older OpenClaw versions (< 2026.4.5) reject
+    // plugins.entries['memory-core'].config.dreaming during `doctor` validation.
+    // When the feature is off and the config never had it, leave it untouched.
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
-    expect(config.plugins.entries['memory-core'].config.dreaming.enabled).toBe(false);
+    expect(config.plugins.entries['memory-core']).toBeUndefined();
   });
 
   it('enables dreaming when KILOCLAW_DREAMING_ENABLED=true', () => {
@@ -1150,6 +1148,22 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps(existing);
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
     expect(config.plugins.entries['memory-core'].config.dreaming.enabled).toBe(false);
+    expect(config.plugins.entries['memory-core'].config.extra).toBe('keep-me');
+  });
+
+  it('leaves memory-core plugin config untouched when dreaming is off and entry lacks dreaming', () => {
+    // If memory-core exists for another reason but has never had a dreaming key,
+    // we must not introduce one — older OpenClaw versions reject it.
+    const existing = JSON.stringify({
+      plugins: {
+        entries: {
+          'memory-core': { config: { extra: 'keep-me' } },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+    expect(config.plugins.entries['memory-core'].config.dreaming).toBeUndefined();
     expect(config.plugins.entries['memory-core'].config.extra).toBe('keep-me');
   });
 });

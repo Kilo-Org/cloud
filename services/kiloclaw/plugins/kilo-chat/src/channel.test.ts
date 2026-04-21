@@ -129,6 +129,7 @@ describe('kilo-chat actions adapter', () => {
     expect(discovery?.actions).toContain('edit');
     expect(discovery?.actions).toContain('delete');
     expect(discovery?.actions).toContain('rename');
+    expect(discovery?.actions).toContain('conversations');
   });
 
   it('supportsAction returns true for react, read, member-info, edit, delete, rename and false for pin', () => {
@@ -139,6 +140,7 @@ describe('kilo-chat actions adapter', () => {
     expect(adapter?.supportsAction?.({ action: 'edit' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'delete' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'rename' as never })).toBe(true);
+    expect(adapter?.supportsAction?.({ action: 'conversations' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'pin' as never })).toBe(false);
   });
 

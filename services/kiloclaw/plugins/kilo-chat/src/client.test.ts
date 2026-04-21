@@ -515,3 +515,59 @@ describe('getMembers', () => {
     await expect(client.getMembers({ conversationId: 'C1' })).rejects.toThrow(/403/);
   });
 });
+
+describe('listConversations', () => {
+  it('GETs the correct URL and returns conversations', async () => {
+    const conversations = [
+      { conversationId: 'c1', title: 'Chat', lastActivityAt: 123, members: [] },
+    ];
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ conversations, total: 1, limit: 50, offset: 0 }), {
+        status: 200,
+      });
+    }) as typeof fetch;
+
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+
+    const result = await client.listConversations({});
+    expect(result.conversations).toEqual(conversations);
+    expect(result.total).toBe(1);
+    expect(calls[0].url).toBe('http://ctrl/_kilo/kilo-chat/conversations');
+    expect(calls[0].init.method).toBe('GET');
+  });
+
+  it('passes limit and offset as query params', async () => {
+    const calls: Array<string> = [];
+    const fetchImpl = (async (url: string | URL) => {
+      calls.push(String(url));
+      return new Response(JSON.stringify({ conversations: [], total: 0, limit: 10, offset: 5 }), {
+        status: 200,
+      });
+    }) as typeof fetch;
+
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+
+    await client.listConversations({ limit: 10, offset: 5 });
+    expect(calls[0]).toBe('http://ctrl/_kilo/kilo-chat/conversations?limit=10&offset=5');
+  });
+
+  it('throws on non-2xx response', async () => {
+    const fetchImpl = (async () => new Response('boom', { status: 500 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+    await expect(client.listConversations({})).rejects.toThrow(/500/);
+  });
+});

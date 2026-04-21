@@ -12,6 +12,7 @@ import { handleKiloChatMemberInfoAction } from './member-info-action';
 import { handleKiloChatReadAction } from './read-action';
 import { handleKiloChatReactAction } from './react-action';
 import { handleKiloChatRenameAction } from './rename-action';
+import { handleKiloChatListConversationsAction } from './list-conversations-action';
 
 const CHANNEL_ID = 'kilo-chat';
 const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
@@ -104,7 +105,15 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
     },
     actions: {
       describeMessageTool: () => ({
-        actions: ['react', 'read', 'member-info', 'edit', 'delete', 'rename'] as const,
+        actions: [
+          'react',
+          'read',
+          'member-info',
+          'edit',
+          'delete',
+          'rename',
+          'conversations',
+        ] as const,
       }),
       supportsAction: ({ action }: { action: string }) =>
         action === 'react' ||
@@ -112,7 +121,8 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         action === 'member-info' ||
         action === 'edit' ||
         action === 'delete' ||
-        action === 'rename',
+        action === 'rename' ||
+        action === 'conversations',
       resolveExecutionMode: () => 'local' as const,
       handleAction: async (ctx: ChannelMessageActionContext) => {
         const client = makeClient();
@@ -148,6 +158,12 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
           return handleKiloChatRenameAction({
             params: ctx.params,
             toolContext: ctx.toolContext,
+            client,
+          });
+        }
+        if (ctx.action === 'conversations') {
+          return handleKiloChatListConversationsAction({
+            params: ctx.params,
             client,
           });
         }

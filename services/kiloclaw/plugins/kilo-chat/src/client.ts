@@ -41,6 +41,26 @@ export type GetMembersResult = {
 
 export type RenameConversationParams = { conversationId: string; title: string };
 
+export type ListConversationsParams = { limit?: number; offset?: number };
+export type ConversationMember = {
+  id: string;
+  kind: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+};
+export type ConversationSummary = {
+  conversationId: string;
+  title: string | null;
+  lastActivityAt: number | null;
+  members: ConversationMember[];
+};
+export type ListConversationsResult = {
+  conversations: ConversationSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type AddReactionParams = { conversationId: string; messageId: string; emoji: string };
 export type AddReactionResult = { id: string };
 export type RemoveReactionParams = { conversationId: string; messageId: string; emoji: string };
@@ -56,6 +76,7 @@ export type KiloChatClient = {
   listMessages(p: ListMessagesParams): Promise<ListMessagesResult>;
   getMembers(p: GetMembersParams): Promise<GetMembersResult>;
   renameConversation(p: RenameConversationParams): Promise<void>;
+  listConversations(p: ListConversationsParams): Promise<ListConversationsResult>;
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -255,6 +276,23 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     void response.body?.cancel();
   }
 
+  async function listConversations(
+    params: ListConversationsParams
+  ): Promise<ListConversationsResult> {
+    const qs = new URLSearchParams();
+    if (params.limit !== undefined) qs.set('limit', String(params.limit));
+    if (params.offset !== undefined) qs.set('offset', String(params.offset));
+    const query = qs.toString();
+    const url = `${base}/_kilo/kilo-chat/conversations${query ? `?${query}` : ''}`;
+    const response = await fetchImpl(url, { method: 'GET', headers });
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller GET conversations responded ${response.status}: ${await response.text()}`
+      );
+    }
+    return (await response.json()) as ListConversationsResult;
+  }
+
   return {
     createMessage,
     editMessage,
@@ -266,5 +304,6 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     listMessages,
     getMembers,
     renameConversation,
+    listConversations,
   };
 }

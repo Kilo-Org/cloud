@@ -693,17 +693,26 @@ export const adminRouter = createTRPCRouter({
       }
 
       if (!effectiveSub || !accessReason) {
-        const detachedAccessSubscription = getEffectiveKiloClawSubscription(
-          allSubscriptions.filter(subscription => subscription.instance_id === null),
-          now
-        );
-        const detachedAccessReason = getKiloClawSubscriptionAccessReason(
-          detachedAccessSubscription,
-          now
-        );
-        if (detachedAccessReason) {
-          effectiveSub = detachedAccessSubscription;
-          accessReason = detachedAccessReason;
+        const detachedAccessSubscriptions = allSubscriptions.filter(subscription => {
+          if (subscription.instance_id !== null) return false;
+          const detachedAccessReason = getKiloClawSubscriptionAccessReason(subscription, now);
+          return detachedAccessReason !== null;
+        });
+        if (detachedAccessSubscriptions.length > 1) {
+          billingStateError = 'Multiple detached access-granting KiloClaw subscription rows exist.';
+        } else {
+          const detachedAccessSubscription = getEffectiveKiloClawSubscription(
+            detachedAccessSubscriptions,
+            now
+          );
+          const detachedAccessReason = getKiloClawSubscriptionAccessReason(
+            detachedAccessSubscription,
+            now
+          );
+          if (detachedAccessReason) {
+            effectiveSub = detachedAccessSubscription;
+            accessReason = detachedAccessReason;
+          }
         }
       }
       const earlybirdDaysRemaining = earlybirdState.expiresAt

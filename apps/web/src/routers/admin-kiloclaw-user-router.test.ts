@@ -426,6 +426,38 @@ describe('admin.users.getKiloClawState', () => {
     expect(result.needsSupportReview).toBe(false);
   });
 
+  it('surfaces support review when multiple detached rows grant access', async () => {
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        user_id: targetUser.id,
+        instance_id: null,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+      },
+      {
+        user_id: targetUser.id,
+        instance_id: null,
+        plan: 'standard',
+        status: 'past_due',
+        payment_source: 'credits',
+      },
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
+
+    expect(result.subscriptions).toHaveLength(2);
+    expect(result.subscription).toBeNull();
+    expect(result.effectiveSubscriptionId).toBeNull();
+    expect(result.hasAccess).toBe(false);
+    expect(result.accessReason).toBeNull();
+    expect(result.billingStateError).toBe(
+      'Multiple detached access-granting KiloClaw subscription rows exist.'
+    );
+    expect(result.needsSupportReview).toBe(true);
+  });
+
   it('returns subscription rows without eager-loading change log history', async () => {
     const [instance] = await db
       .insert(kiloclaw_instances)

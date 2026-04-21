@@ -3,13 +3,13 @@ import {
   toInsertableDbUsageRecord,
   insertUsageRecord,
   type UsageContextInfo,
-} from '@/lib/processUsage';
+} from '@/lib/ai-gateway/processUsage';
 import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 import type {
   CoreUsageWithMetaData,
   MicrodollarUsageContext,
   MicrodollarUsageStats,
-} from '@/lib/processUsage.types';
+} from '@/lib/ai-gateway/processUsage.types';
 
 function defineDefaultUsageStats(): MicrodollarUsageStats {
   return {

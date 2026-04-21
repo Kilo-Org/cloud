@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { execFile } from 'node:child_process';
-import { Duplex, Readable } from 'node:stream';
+import { Readable } from 'node:stream';
+import type { Duplex } from 'node:stream';
 import { Hono } from 'hono';
 import {
   DEFAULT_MAX_WS_CONNS,
@@ -17,22 +18,28 @@ import { registerConfigRoutes } from './routes/config';
 import { registerPairingRoutes } from './routes/pairing';
 import { createPairingCache } from './pairing-cache';
 import { registerEnvRoutes } from './routes/env';
+import { registerGoogleOAuthTokenRoutes } from './routes/google-oauth-token';
 import { registerGmailPushRoute } from './routes/gmail-push';
+import { registerInboundEmailRoute } from './routes/inbound-email';
 import { registerFileRoutes } from './routes/files';
 import { registerKiloCliRunRoutes } from './routes/kilo-cli-run';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
 import { writeGogCredentials } from './gog-credentials';
+import { installGogShim } from './gog-shim';
+import { migrateLegacyGoogleCredentialsToBroker } from './legacy-google-migration';
 import { startWatchRenewal, stopWatchRenewal } from './gmail-watch-renewal';
 import { bootstrapCritical, bootstrapNonCritical } from './bootstrap';
 import type { ControllerStateRef, ControllerState } from './bootstrap';
 import { getOpenclawVersion } from './openclaw-version';
 import { startCheckin } from './checkin';
 import { collectProductTelemetry } from './product-telemetry';
+import { GoogleOAuthTokenProvider } from './google-oauth-token-provider';
 
 export type RuntimeConfig = {
   port: number;
   expectedToken: string;
+  hooksToken: string;
   requireProxyToken: boolean;
   gatewayArgs: string[];
   wsIdleTimeoutMs: number;
@@ -57,7 +64,7 @@ function parseGatewayArgs(value: string | undefined): string[] {
   if (!Array.isArray(parsed) || parsed.some(v => typeof v !== 'string')) {
     throw new Error('KILOCLAW_GATEWAY_ARGS must be a JSON array of strings');
   }
-  return parsed;
+  return parsed as string[];
 }
 
 function parsePositiveInt(value: string | undefined, fallback: number, label: string): number {
@@ -74,10 +81,15 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
   if (!expectedToken) {
     throw new Error('OPENCLAW_GATEWAY_TOKEN is required');
   }
+  const hooksToken = env.KILOCLAW_HOOKS_TOKEN;
+  if (!hooksToken) {
+    throw new Error('KILOCLAW_HOOKS_TOKEN is required');
+  }
 
   return {
     port: Number(env.PORT ?? 18789),
     expectedToken,
+    hooksToken,
     requireProxyToken: parseBoolean(env.REQUIRE_PROXY_TOKEN),
     gatewayArgs: parseGatewayArgs(env.KILOCLAW_GATEWAY_ARGS),
     wsIdleTimeoutMs: parsePositiveInt(
@@ -228,10 +240,17 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
 
   // Register shutdown handlers early so degraded mode can still be killed cleanly.
   let shuttingDown = false;
+  // eslint-disable-next-line prefer-const -- assigned after critical bootstrap completes
   let supervisor: Supervisor | undefined;
   let gmailWatchSupervisor: Supervisor | undefined;
+  // eslint-disable-next-line prefer-const -- assigned after pairing cache is created
   let pairingCache: ReturnType<typeof createPairingCache> | undefined;
   let stopCheckin: (() => void) | undefined;
+  const legacyGoogleMigration = {
+    attempted: false,
+    migrated: false,
+    reason: null as string | null,
+  };
 
   const onSignal = async (signal: NodeJS.Signals): Promise<void> => {
     if (shuttingDown) return;
@@ -297,6 +316,20 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   const pc = createPairingCache();
   pairingCache = pc;
 
+  const googleOAuthTokenProvider = new GoogleOAuthTokenProvider({
+    getApiKey: () => env.KILOCODE_API_KEY ?? '',
+    getGatewayToken: () => config.expectedToken,
+    getSandboxId: () => env.KILOCLAW_SANDBOX_ID ?? '',
+    getCheckinUrl: () => env.KILOCLAW_CHECKIN_URL ?? '',
+    migrateLegacy: async () =>
+      await migrateLegacyGoogleCredentialsToBroker({
+        apiKey: env.KILOCODE_API_KEY ?? '',
+        gatewayToken: config.expectedToken,
+        sandboxId: env.KILOCLAW_SANDBOX_ID ?? '',
+        checkinUrl: env.KILOCLAW_CHECKIN_URL ?? '',
+      }),
+  });
+
   supervisor = createSupervisor({
     args: ['gateway', ...config.gatewayArgs],
     onStdoutLine: line => pc.onPairingLogLine(line),
@@ -315,7 +348,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     } else {
       googleAccountEmail = email;
       gmailWatchSupervisor = createSupervisor({
-        command: 'gog',
+        command: '/usr/local/bin/gog.real',
         args: [
           'gmail',
           'watch',
@@ -348,7 +381,9 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   registerConfigRoutes(honoApp, supervisor, config.expectedToken);
   registerPairingRoutes(honoApp, pairingCache, config.expectedToken);
   registerEnvRoutes(honoApp, supervisor, config.expectedToken);
+  registerGoogleOAuthTokenRoutes(honoApp, config.expectedToken, googleOAuthTokenProvider);
   registerGmailPushRoute(honoApp, gmailWatchSupervisor ?? null, config.expectedToken);
+  registerInboundEmailRoute(honoApp, supervisor, config.expectedToken, config.hooksToken);
   registerFileRoutes(honoApp, config.expectedToken, '/root/.openclaw');
   registerKiloCliRunRoutes(honoApp, config.expectedToken);
   honoApp.all(
@@ -403,6 +438,49 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     console.error('[gog] Failed to write credentials:', err);
   }
 
+  try {
+    const migrationResult = await migrateLegacyGoogleCredentialsToBroker({
+      apiKey: env.KILOCODE_API_KEY ?? '',
+      gatewayToken: config.expectedToken,
+      sandboxId: env.KILOCLAW_SANDBOX_ID ?? '',
+      checkinUrl: env.KILOCLAW_CHECKIN_URL ?? '',
+    });
+
+    legacyGoogleMigration.attempted = migrationResult.attempted;
+    legacyGoogleMigration.migrated = migrationResult.migrated;
+    legacyGoogleMigration.reason = migrationResult.reason;
+
+    const enableLegacyFallback =
+      migrationResult.attempted &&
+      !migrationResult.migrated &&
+      migrationResult.reason !== 'no_legacy_account' &&
+      migrationResult.reason !== 'skipped';
+
+    if (enableLegacyFallback) {
+      process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED = '1';
+      process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_REASON = migrationResult.reason;
+      console.warn(
+        `[gog] Legacy Google migration did not complete; enabling gog.real fallback (reason=${migrationResult.reason})`
+      );
+    } else {
+      delete process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED;
+      delete process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_REASON;
+    }
+  } catch (err) {
+    legacyGoogleMigration.attempted = true;
+    legacyGoogleMigration.migrated = false;
+    legacyGoogleMigration.reason = 'migration_exception';
+    process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_FAILED = '1';
+    process.env.KILOCLAW_GOOGLE_LEGACY_MIGRATION_REASON = 'migration_exception';
+    console.error('[gog] Legacy Google migration failed:', err);
+  }
+
+  try {
+    installGogShim();
+  } catch (err) {
+    console.error('[gog] Failed to install shim:', err);
+  }
+
   // ── Phase 7: Start gateway ──────────────────────────────────────────
   controllerState.current = { state: 'starting' };
   console.log('[controller] Bootstrap complete, starting gateway...');
@@ -425,7 +503,16 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
       getCheckinUrl: () => env.KILOCLAW_CHECKIN_URL ?? '',
       getSupervisorStats: () => supervisor.getStats(),
       getOpenclawVersion,
-      getProductTelemetry: openclawVersion => collectProductTelemetry(openclawVersion),
+      getProductTelemetry: openclawVersion =>
+        collectProductTelemetry(openclawVersion, undefined, {
+          googleLegacyMigrationAttempted: legacyGoogleMigration.attempted,
+          googleLegacyMigrationSucceeded:
+            legacyGoogleMigration.attempted && legacyGoogleMigration.migrated,
+          googleLegacyMigrationFailureReason:
+            legacyGoogleMigration.attempted && !legacyGoogleMigration.migrated
+              ? legacyGoogleMigration.reason
+              : null,
+        }),
     });
 
     console.log(
@@ -443,9 +530,6 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     // gateway's lazy initialization, adding ~30-100s to the user's first
     // request. Once the gateway is warm and CPU has settled, the upgrade
     // runs safely in the background.
-    //
-    // TODO: Replace this timeout with a warm-up callback that fires after
-    // the gateway is confirmed ready (see gateway-warmup.ts).
     if (env.KILOCLAW_KILO_CLI === 'true') {
       const KILO_CLI_UPGRADE_DELAY_MS = 5 * 60 * 1000; // 5 minutes
       setTimeout(() => {

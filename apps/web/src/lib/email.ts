@@ -69,7 +69,7 @@ export function renderTemplate(name: string, vars: TemplateVars): string {
 export function buildCreditsSection(monthlyCreditsUsd: number): RawHtml {
   if (monthlyCreditsUsd <= 0) return new RawHtml('');
   return new RawHtml(
-    `<br />• <strong style="color: #d1d5db">$${monthlyCreditsUsd} USD in Kilo credits</strong>, which reset every 30 days`
+    `<br />• <strong style="color: #1a1a1a">$${monthlyCreditsUsd} USD in Kilo credits</strong>, which reset every 30 days`
   );
 }
 

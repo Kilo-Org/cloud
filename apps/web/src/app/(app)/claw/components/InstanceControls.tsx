@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ArrowUpCircle,
   Check,
   Cpu,
   HardDrive,
@@ -17,7 +16,6 @@ import {
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
-import { Banner } from '@/components/shared/Banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +37,7 @@ import { RunDoctorDialog } from './RunDoctorDialog';
 import { StartKiloCliRunDialog } from './StartKiloCliRunDialog';
 import { AnimatedDots } from './AnimatedDots';
 import { OpenClawButton } from './OpenClawButton';
+import { KiloClawUpdateAvailableBanner } from './KiloClawUpdateAvailableBanner';
 
 const VOLUME_SIZE_GB = 10;
 // Default machine spec fallback (matches kiloclaw DEFAULT_MACHINE_GUEST)
@@ -76,6 +75,7 @@ export function InstanceControls({
   const isStopped = status.status === 'stopped';
   const isStartable = isStopped || isProvisioned;
   const isDestroying = status.status === 'destroying';
+  const isFlyProvider = status.provider === 'fly';
   // Auto-start runs only on fresh provision (status=provisioned), not re-provision
   const isAutoStarting = isProvisioned && mutations.provision.isPending;
   const [isEditingName, setIsEditingName] = useState(false);
@@ -113,7 +113,8 @@ export function InstanceControls({
     setManuallyDismissed(true);
   }, [dismissKey]);
 
-  const showUpgradeBanner = updateAvailable && !isDismissedInStorage && !manuallyDismissed;
+  const showUpgradeBanner =
+    isFlyProvider && updateAvailable && !isDismissedInStorage && !manuallyDismissed;
 
   const handleSaveName = () => {
     const trimmed = nameValue.trim();
@@ -135,12 +136,13 @@ export function InstanceControls({
   // with "upgrade" preselected, then immediately reset via onUpgradeHandled.
   // Safe for single-click flows; won't re-fire if already true (no state change).
   useEffect(() => {
-    if (upgradeRequested) {
+    if (!upgradeRequested) return;
+    if (isFlyProvider) {
       setRedeployMode('upgrade');
       setConfirmRedeploy(true);
-      onUpgradeHandled?.();
     }
-  }, [upgradeRequested, onUpgradeHandled]);
+    onUpgradeHandled?.();
+  }, [upgradeRequested, isFlyProvider, onUpgradeHandled]);
 
   return (
     <div>
@@ -211,38 +213,15 @@ export function InstanceControls({
         </div>
       </div>
       {showUpgradeBanner && (
-        <Banner color="amber" className="mb-4">
-          <Banner.Icon>
-            <ArrowUpCircle />
-          </Banner.Icon>
-          <Banner.Content>
-            <Banner.Title>
-              {catalogNewerThanImage
-                ? `A newer OpenClaw version (${latestAvailableVersion}) is available`
-                : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available`}
-            </Banner.Title>
-            <Banner.Description>
-              Upgrade your instance to get the latest features and fixes.
-            </Banner.Description>
-          </Banner.Content>
-          <Banner.Button
-            className="text-white"
-            onClick={() => {
-              setRedeployMode('upgrade');
-              setConfirmRedeploy(true);
-            }}
-          >
-            Upgrade now
-          </Banner.Button>
-          <button
-            type="button"
-            onClick={dismissBanner}
-            className="text-amber-400/60 hover:text-amber-400 transition-colors"
-            aria-label="Dismiss upgrade banner"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </Banner>
+        <KiloClawUpdateAvailableBanner
+          className="mb-4"
+          catalogNewerThanImage={catalogNewerThanImage}
+          onUpgrade={() => {
+            setRedeployMode('upgrade');
+            setConfirmRedeploy(true);
+          }}
+          onDismiss={dismissBanner}
+        />
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <OpenClawButton
@@ -309,7 +288,7 @@ export function InstanceControls({
           className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
           disabled={
             (!isRunning && !isStopped) ||
-            !status.flyMachineId ||
+            !status.runtimeId ||
             mutations.restartMachine.isPending ||
             isDestroying ||
             isStarting ||
@@ -323,7 +302,7 @@ export function InstanceControls({
           }}
         >
           <RotateCw className="h-4 w-4" />
-          Redeploy or Upgrade
+          {isFlyProvider ? 'Redeploy or Upgrade' : 'Redeploy'}
         </Button>
         <Button
           size="sm"
@@ -395,10 +374,10 @@ export function InstanceControls({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Redeploy or Upgrade</DialogTitle>
+            <DialogTitle>{isFlyProvider ? 'Redeploy or Upgrade' : 'Redeploy'}</DialogTitle>
             <DialogDescription>
-              This will stop the machine, rebuild environment variables and secrets, and restart it.
-              The machine will be briefly offline.
+              This will stop the runtime, rebuild environment variables and secrets, and restart it.
+              The runtime will be briefly offline.
             </DialogDescription>
           </DialogHeader>
           <RadioGroup
@@ -417,16 +396,18 @@ export function InstanceControls({
                 </span>
               </Label>
             </div>
-            <div className="flex items-start gap-3">
-              <RadioGroupItem value="upgrade" id="upgrade" className="mt-0.5" />
-              <Label htmlFor="upgrade" className="block cursor-pointer leading-tight">
-                <span className="text-foreground text-sm font-medium">Upgrade to latest</span>
-                <span className="text-muted-foreground mt-0.5 block text-xs">
-                  Upgrade to the latest supported KiloClaw version, redeploy and apply pending
-                  config changes.
-                </span>
-              </Label>
-            </div>
+            {isFlyProvider && (
+              <div className="flex items-start gap-3">
+                <RadioGroupItem value="upgrade" id="upgrade" className="mt-0.5" />
+                <Label htmlFor="upgrade" className="block cursor-pointer leading-tight">
+                  <span className="text-foreground text-sm font-medium">Upgrade to latest</span>
+                  <span className="text-muted-foreground mt-0.5 block text-xs">
+                    Upgrade to the latest supported KiloClaw version, redeploy and apply pending
+                    config changes.
+                  </span>
+                </Label>
+              </div>
+            )}
           </RadioGroup>
           <DialogFooter>
             <Button
@@ -447,7 +428,7 @@ export function InstanceControls({
                 mutations.restartMachine.mutate(imageTag ? { imageTag } : undefined, {
                   onSuccess: () => {
                     toast.success(
-                      redeployMode === 'upgrade' ? 'Upgrading to latest image' : 'Redeploying'
+                      redeployMode === 'upgrade' ? 'Upgrading KiloClaw' : 'Redeploying'
                     );
                     setConfirmRedeploy(false);
                     onRedeploySuccess?.();
@@ -486,6 +467,7 @@ export function InstanceControls({
         open={kiloRunOpen}
         onOpenChange={setKiloRunOpen}
         machineStatus={status.status}
+        mutations={mutations}
       />
     </div>
   );

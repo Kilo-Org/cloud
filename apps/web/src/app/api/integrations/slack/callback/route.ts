@@ -5,6 +5,7 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import type { Owner } from '@/lib/integrations/core/types';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { exchangeSlackCode, upsertSlackInstallation } from '@/lib/integrations/slack-service';
+import { syncOldSlackInstallationToSdk } from '@/lib/bot/slack-installation-sync';
 import { APP_URL } from '@/lib/constants';
 
 const buildSlackRedirectPath = (state: string | null, queryParam: string): string => {
@@ -97,7 +98,21 @@ export async function GET(request: NextRequest) {
     // 6. Store installation in database
     await upsertSlackInstallation(owner, oauthData);
 
-    // 7. Redirect to success page
+    // 7. Best-effort seed Chat SDK state for future migration
+    try {
+      await syncOldSlackInstallationToSdk(oauthData);
+    } catch (syncError) {
+      captureException(syncError, {
+        tags: { endpoint: 'slack/callback', source: 'slack_sdk_sync' },
+        extra: {
+          teamId: oauthData.team?.id,
+          ownerType: owner.type,
+          ownerId: owner.id,
+        },
+      });
+    }
+
+    // 8. Redirect to success page
     const successPath =
       owner.type === 'org'
         ? `/organizations/${owner.id}/integrations/slack?success=installed`

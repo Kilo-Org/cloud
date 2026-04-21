@@ -10,6 +10,8 @@ import {
   formatDateLabel,
   formatKiloclawPrice,
   formatPaymentSummary,
+  getKiloclawDisplayStatus,
+  getKiloclawStatusNote,
   isInfoStatus,
   isKiloclawTerminal,
   isWarningStatus,
@@ -24,7 +26,7 @@ export function KiloClawGroup({
 }) {
   const trpc = useTRPC();
   const query = useQuery(trpc.kiloclaw.listPersonalSubscriptions.queryOptions());
-  const billingQuery = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
+  const summaryQuery = useQuery(trpc.kiloclaw.getPersonalBillingSummary.queryOptions());
   const subscriptions = query.data?.subscriptions ?? [];
 
   const visibleSubscriptions = subscriptions.filter(
@@ -53,7 +55,7 @@ export function KiloClawGroup({
               icon={<KiloCrabIcon className="h-5 w-5" />}
               title={subscription.instanceName ?? 'KiloClaw instance'}
               subtitle={subscription.instanceName || subscription.instanceId}
-              status={subscription.status}
+              status={getKiloclawDisplayStatus(subscription)}
               price={formatKiloclawPrice(subscription.plan)}
               billingDate={formatDateLabel(
                 subscription.creditRenewalAt ??
@@ -67,20 +69,23 @@ export function KiloClawGroup({
               })}
               href={`/subscriptions/kiloclaw/${subscription.instanceId}`}
               isTerminal={isKiloclawTerminal(subscription.status)}
+              statusNote={getKiloclawStatusNote(subscription)}
               warningTone={
-                isWarningStatus(subscription.status)
-                  ? 'warning'
-                  : isInfoStatus(subscription.status)
-                    ? 'info'
-                    : undefined
+                subscription.activationState === 'pending_settlement'
+                  ? 'info'
+                  : isWarningStatus(subscription.status)
+                    ? 'warning'
+                    : isInfoStatus(subscription.status)
+                      ? 'info'
+                      : undefined
               }
             />
           ))}
         </div>
       ) : nonTerminalSubscriptions.length === 0 ? (
         <KiloClawSubscribeCard
-          creditIntroEligible={billingQuery.data?.creditIntroEligible ?? false}
-          hasActiveKiloPass={billingQuery.data?.hasActiveKiloPass ?? false}
+          creditIntroEligible={summaryQuery.data?.creditIntroEligible ?? false}
+          hasActiveKiloPass={summaryQuery.data?.hasActiveKiloPass ?? false}
         />
       ) : null}
     </SubscriptionGroup>

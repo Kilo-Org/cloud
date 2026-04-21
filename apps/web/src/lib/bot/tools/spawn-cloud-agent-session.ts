@@ -17,6 +17,11 @@ import {
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { APP_URL } from '@/lib/constants';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { parseBotCallbackStep } from '@/lib/bot/step-budget';
+import { resolveBotSessionProfile } from '@/lib/bot/tools/resolve-bot-session-profile';
+import { ownerFromIntegration } from '@/lib/integrations/core/owner';
+import type { Owner } from '@/lib/integrations/core/types';
+import type { MergeProfileConfigurationResult } from '@/lib/agent/profile-session-config';
 import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
@@ -30,6 +35,12 @@ function deriveBotCallbackToken(botRequestId: string): string {
   return createHmac('sha256', INTERNAL_API_SECRET)
     .update(`bot-callback:${botRequestId}`)
     .digest('hex');
+}
+
+function buildBotCallbackUrl(botRequestId: string, currentStep: number | undefined): string {
+  const url = new URL(`/api/internal/bot-session-callback/${botRequestId}`, APP_URL);
+  url.searchParams.set('currentStep', String(parseBotCallbackStep(String(currentStep ?? 0))));
+  return url.toString();
 }
 
 /**
@@ -83,12 +94,11 @@ export default async function spawnCloudAgentSession(
   ticketUserId: string,
   botRequestId: string | undefined,
   onSessionReady?: RunSessionInput['onSessionReady'],
-  options?: { prSignature?: string; chatPlatform?: string }
+  options?: { prSignature?: string; chatPlatform?: string; currentStep?: number }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
 
   // Build platform-specific prepareInput and initiateInput
-  const kilocodeOrganizationId = platformIntegration.owned_by_organization_id || undefined;
   let prepareInput: PrepareSessionInput;
   let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
   const mode: AgentMode = args.mode;
@@ -96,7 +106,7 @@ export default async function spawnCloudAgentSession(
   const callbackTarget =
     botRequestId && INTERNAL_API_SECRET
       ? {
-          url: `${APP_URL}/api/internal/bot-session-callback/${botRequestId}`,
+          url: buildBotCallbackUrl(botRequestId, options?.currentStep),
           headers: { 'X-Bot-Callback-Token': deriveBotCallbackToken(botRequestId) },
         }
       : undefined;
@@ -112,12 +122,23 @@ export default async function spawnCloudAgentSession(
     prompt += options.prSignature;
   }
 
+  const owner: Owner = ownerFromIntegration(platformIntegration);
+  let profileConfig: MergeProfileConfigurationResult;
+  try {
+    profileConfig = await resolveBotSessionProfile(owner, ticketUserId, args);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { response: `Error resolving profile for Cloud Agent: ${message}` };
+  }
+
+  const kilocodeOrganizationId = owner.type === 'org' ? owner.id : undefined;
+
   if (args.gitlabProject) {
     // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
     const gitlabToken =
-      typeof platformIntegration.owned_by_organization_id === 'string'
-        ? await getGitLabTokenForOrganization(platformIntegration.owned_by_organization_id)
-        : await getGitLabTokenForUser(platformIntegration.owned_by_user_id as string);
+      owner.type === 'org'
+        ? await getGitLabTokenForOrganization(owner.id)
+        : await getGitLabTokenForUser(owner.id);
 
     if (!gitlabToken) {
       return {
@@ -127,9 +148,9 @@ export default async function spawnCloudAgentSession(
     }
 
     const instanceUrl =
-      typeof platformIntegration.owned_by_organization_id === 'string'
-        ? await getGitLabInstanceUrlForOrganization(platformIntegration.owned_by_organization_id)
-        : await getGitLabInstanceUrlForUser(platformIntegration.owned_by_user_id as string);
+      owner.type === 'org'
+        ? await getGitLabInstanceUrlForOrganization(owner.id)
+        : await getGitLabInstanceUrlForUser(owner.id);
 
     const gitUrl = buildGitLabCloneUrl(args.gitlabProject, instanceUrl);
 
@@ -151,14 +172,17 @@ export default async function spawnCloudAgentSession(
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,
+      envVars: profileConfig.envVars,
+      encryptedSecrets: profileConfig.encryptedSecrets,
+      setupCommands: profileConfig.setupCommands,
     };
     initiateInput = { kilocodeOrganizationId };
   } else {
     // GitHub path: get token, use githubRepo/githubToken
     const githubToken =
-      typeof platformIntegration.owned_by_organization_id === 'string'
-        ? await getGitHubTokenForOrganization(platformIntegration.owned_by_organization_id)
-        : await getGitHubTokenForUser(platformIntegration.owned_by_user_id as string);
+      owner.type === 'org'
+        ? await getGitHubTokenForOrganization(owner.id)
+        : await getGitHubTokenForUser(owner.id);
 
     if (!githubToken) {
       return {
@@ -176,6 +200,9 @@ export default async function spawnCloudAgentSession(
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,
+      envVars: profileConfig.envVars,
+      encryptedSecrets: profileConfig.encryptedSecrets,
+      setupCommands: profileConfig.setupCommands,
     };
     initiateInput = { githubToken, kilocodeOrganizationId };
   }

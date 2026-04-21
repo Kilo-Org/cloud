@@ -14,7 +14,13 @@ import {
 import { cleanupWorkspace, getSessionWorkspacePath, getSessionHomePath } from '../../workspace.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { protectedProcedure, publicProcedure, internalApiProtectedProcedure } from '../auth.js';
-import { sessionIdSchema, GetSessionInput, GetSessionOutput } from '../schemas.js';
+import {
+  sessionIdSchema,
+  GetSessionInput,
+  GetSessionOutput,
+  GetLatestAssistantMessageInput,
+  GetLatestAssistantMessageOutput,
+} from '../schemas.js';
 import { computeExecutionHealth } from '../../core/execution.js';
 
 /**
@@ -444,6 +450,43 @@ export function createSessionManagementHandlers() {
 
             timestamp: metadata.timestamp,
             version: metadata.version,
+          };
+        });
+      }),
+
+    getLatestAssistantMessage: protectedProcedure
+      .input(GetLatestAssistantMessageInput)
+      .output(GetLatestAssistantMessageOutput)
+      .query(async ({ input, ctx }) => {
+        return withLogTags({ source: 'getLatestAssistantMessage' }, async () => {
+          const sessionId = input.cloudAgentSessionId as SessionId;
+          const { userId, env } = ctx;
+
+          logger.setTags({ userId, sessionId });
+          logger.info('Fetching latest assistant message');
+
+          const doKey = `${userId}:${sessionId}`;
+          const getStub = () =>
+            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+
+          const metadata = await withDORetry(getStub, s => s.getMetadata(), 'getMetadata');
+          if (!metadata) {
+            logger.info('Session not found');
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Session not found',
+            });
+          }
+
+          const message = await withDORetry(
+            getStub,
+            s => s.getLatestAssistantMessage(),
+            'getLatestAssistantMessage'
+          );
+
+          return {
+            cloudAgentSessionId: sessionId,
+            message,
           };
         });
       }),

@@ -321,6 +321,9 @@ config --global user.name`. When `GITHUB_EMAIL` is set, the
 3. On first boot, the controller MUST seed
    `/root/.openclaw/workspace/TOOLS.md` from the image-baked copy at
    `/usr/local/share/kiloclaw/TOOLS.md`.
+4. When `KILOCLAW_USER_TIMEZONE` is set, the controller MUST create or
+   update `/root/.openclaw/workspace/USER.md` so its `Timezone` field is
+   set to that IANA timezone.
 
 ### Config Patching
 
@@ -335,24 +338,31 @@ patches to `openclaw.json`. The patches MUST include:
    URLs).
 6. KiloCode API base URL override from `KILOCODE_API_BASE_URL`.
 7. Default model from `KILOCODE_DEFAULT_MODEL`.
-8. Remove `agents.defaults.models` allowlist (KiloClaw users see all
+8. Agent default user timezone from `KILOCLAW_USER_TIMEZONE`.
+9. Remove `agents.defaults.models` allowlist (KiloClaw users see all
    models).
-9. `tools.profile`: MUST be set to `full` on fresh install or config
-   restore. MUST be preserved on subsequent boots.
-10. Exec policy: host `gateway`, security `allowlist`, ask `on-miss`.
-11. Browser: enabled, headless, noSandbox.
-12. Channel configuration from `TELEGRAM_BOT_TOKEN`,
+10. `tools.profile`: MUST be set to `full` on fresh install or config
+    restore. MUST be preserved on subsequent boots.
+11. Exec policy: host `gateway`, security `allowlist`, ask `on-miss`.
+12. Browser: enabled, headless, noSandbox.
+13. KiloClaw customizer plugin: load path and entry MUST be present;
+    when `plugins.allow` exists, it MUST include `kiloclaw-customizer`.
+14. Channel configuration from `TELEGRAM_BOT_TOKEN`,
     `DISCORD_BOT_TOKEN`, `SLACK_BOT_TOKEN`/`SLACK_APP_TOKEN`, with
     corresponding plugin enablement.
-13. Hooks configuration from `KILOCLAW_HOOKS_TOKEN` when present:
-    enabled, token, gmail preset.
+15. Hooks configuration from `KILOCLAW_HOOKS_TOKEN`: enabled,
+    token, inbound email mapping. When Gmail credentials are present, the
+    gmail preset MUST also be enabled.
 
 ### Hooks Token
 
-1. When `KILOCLAW_GOG_CONFIG_TARBALL` is set, the controller MUST
-   generate a per-boot random hooks token (32 bytes, hex-encoded) and
-   set it as `KILOCLAW_HOOKS_TOKEN`.
+1. The controller MUST generate a per-boot random hooks token (32 bytes,
+   hex-encoded) and set it as `KILOCLAW_HOOKS_TOKEN`.
 2. The hooks token MUST NOT be reused across boots.
+3. External Workers MUST NOT receive `KILOCLAW_HOOKS_TOKEN`; they
+   authenticate to controller endpoints with the gateway token, and the
+   controller forwards to local OpenClaw hook endpoints with the hooks
+   token.
 
 ### Gateway Args
 

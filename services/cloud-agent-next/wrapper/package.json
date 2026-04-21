@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "build": "bun run build.ts",
+    "test": "bun test src",
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@kilocode/sdk": "7.1.17"
+    "@kilocode/sdk": "7.1.23"
   },
   "devDependencies": {
     "@types/bun": "latest",

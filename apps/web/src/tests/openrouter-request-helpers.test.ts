@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
-import { addCacheBreakpoints } from '@/lib/providers/openrouter/request-helpers';
-import type { GatewayRequest } from '@/lib/providers/openrouter/types';
+import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
 
 describe('addCacheBreakpoints', () => {

@@ -7,6 +7,8 @@ import type {
   EncryptedEnvelope,
   EncryptedChannelTokens,
   GoogleCredentials,
+  GoogleOAuthConnection,
+  KiloExaSearchMode,
 } from '../schemas/instance-config';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import {
@@ -25,8 +27,12 @@ export type UserConfig = {
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   kilocodeApiKey?: string | null;
   kilocodeDefaultModel?: string | null;
+  userTimezone?: string | null;
+  userLocation?: string | null;
+  kiloExaSearchMode?: KiloExaSearchMode | null;
   channels?: EncryptedChannelTokens;
   googleCredentials?: GoogleCredentials;
+  googleOAuthConnection?: GoogleOAuthConnection | null;
   instanceFeatures?: string[];
   execSecurity?: string | null;
   execAsk?: string | null;
@@ -167,6 +173,12 @@ export async function buildEnvVars(
     if (userConfig.kilocodeDefaultModel) {
       plainEnv.KILOCODE_DEFAULT_MODEL = userConfig.kilocodeDefaultModel;
     }
+    if (userConfig.userTimezone) {
+      plainEnv.KILOCLAW_USER_TIMEZONE = userConfig.userTimezone;
+    }
+    if (userConfig.userLocation) {
+      sensitive.KILOCLAW_USER_LOCATION = userConfig.userLocation;
+    }
 
     // Layer 4: Decrypt channel tokens and map to container env var names
     if (userConfig.channels && env.AGENT_ENV_VARS_PRIVATE_KEY) {
@@ -194,6 +206,13 @@ export async function buildEnvVars(
     }
   }
 
+  if (
+    userConfig?.googleCredentials ||
+    (userConfig?.googleOAuthConnection && userConfig.googleOAuthConnection.status === 'active')
+  ) {
+    plainEnv.KILOCLAW_GOOGLE_WORKSPACE_ENABLED = 'true';
+  }
+
   // Org identity (non-sensitive, plaintext)
   if (userConfig?.orgId) {
     plainEnv.KILOCODE_ORGANIZATION_ID = userConfig.orgId;
@@ -211,6 +230,9 @@ export async function buildEnvVars(
   sensitive.OPENCLAW_GATEWAY_TOKEN = await deriveGatewayToken(sandboxId, gatewayTokenSecret);
   plainEnv.KILOCLAW_SANDBOX_ID = sandboxId;
   plainEnv.AUTO_APPROVE_DEVICES = 'true';
+  if (userConfig?.kiloExaSearchMode != null) {
+    plainEnv.KILO_EXA_SEARCH_MODE = userConfig.kiloExaSearchMode;
+  }
 
   // User-selected exec permissions preset (non-sensitive, survives restarts).
   if (userConfig?.execSecurity) plainEnv.KILOCLAW_EXEC_SECURITY = userConfig.execSecurity;

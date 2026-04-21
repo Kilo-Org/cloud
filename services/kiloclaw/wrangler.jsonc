@@ -100,6 +100,13 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
+  "services": [
+    {
+      "binding": "KILOCLAW_BILLING",
+      "service": "kiloclaw-billing",
+      "entrypoint": "KiloClawBillingService",
+    },
+  ],
   "vars": {
     "FLY_APP_NAME": "kiloclaw-machines", // Legacy fallback for existing instances
     "FLY_REGISTRY_APP": "kiloclaw-machines", // Shared Docker image registry

@@ -14,8 +14,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import type { PlatformStatusResponse } from '@/lib/kiloclaw/types';
+import { useClawContext } from './ClawContext';
 import { AnimatedDots } from './AnimatedDots';
 
 function isNeedsRedeployError(error: unknown): boolean {
@@ -34,14 +35,16 @@ export function StartKiloCliRunDialog({
   open,
   onOpenChange,
   machineStatus,
+  mutations,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   machineStatus: PlatformStatusResponse['status'];
+  mutations: ReturnType<typeof useKiloClawMutations>;
 }) {
   const router = useRouter();
+  const { organizationId } = useClawContext();
   const [prompt, setPrompt] = useState('');
-  const mutations = useKiloClawMutations();
   const startMutation = mutations.startKiloCliRun;
   const redeployMutation = mutations.restartMachine;
 
@@ -65,7 +68,8 @@ export function StartKiloCliRunDialog({
       {
         onSuccess: data => {
           onOpenChange(false);
-          router.push(`/claw/kilo-cli-run/${data.id}`);
+          const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
+          router.push(`${basePath}/kilo-cli-run/${data.id}`);
         },
       }
     );

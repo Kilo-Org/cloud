@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
-import PROVIDERS from '@/lib/providers/provider-definitions';
+import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { Stream } from 'openai/streaming';
 import type { ChatCompletionChunk } from 'openai/resources';
 

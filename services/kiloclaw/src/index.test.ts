@@ -7,13 +7,15 @@ vi.mock('cloudflare:workers', () => ({
 vi.mock('./routes', async () => {
   const { Hono } = await import('hono');
   const empty = new Hono();
+  const controller = new Hono();
+  controller.post('/google/token', c => c.json({ ok: true }, 200));
   return {
     accessGatewayRoutes: empty,
     publicRoutes: empty,
     api: empty,
     kiloclaw: empty,
     platform: empty,
-    controller: empty,
+    controller,
   };
 });
 
@@ -68,6 +70,35 @@ describe('platform route env validation', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
+  it('rejects platform routes when KILOCLAW_INTERNAL_API_SECRET is missing', async () => {
+    const response = await worker.fetch(
+      new Request('https://example.com/api/platform/provision', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'secret-123',
+        },
+        body: JSON.stringify({ userId: 'user-1' }),
+      }),
+      {
+        INTERNAL_API_SECRET: 'next-internal-api-secret',
+        HYPERDRIVE: { connectionString: 'postgresql://fake' },
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        FLY_API_TOKEN: 'fly-token',
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('5');
+    await expect(response.json()).resolves.toEqual({ error: 'Configuration error' });
+    expect(console.error).toHaveBeenCalledWith(
+      '[CONFIG] Platform route missing bindings:',
+      'KILOCLAW_INTERNAL_API_SECRET'
+    );
+  });
+
   it('rejects platform routes when NEXTAUTH_SECRET is missing', async () => {
     const response = await worker.fetch(
       new Request('https://example.com/api/platform/provision', {
@@ -79,7 +110,8 @@ describe('platform route env validation', () => {
         body: JSON.stringify({ userId: 'user-1' }),
       }),
       {
-        INTERNAL_API_SECRET: 'secret-123',
+        INTERNAL_API_SECRET: 'next-internal-api-secret',
+        KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
         HYPERDRIVE: { connectionString: 'postgresql://fake' },
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
         FLY_API_TOKEN: 'fly-token',
@@ -94,6 +126,54 @@ describe('platform route env validation', () => {
       '[CONFIG] Platform route missing bindings:',
       'NEXTAUTH_SECRET'
     );
+  });
+});
+
+describe('controller google env validation', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  it('rejects controller google routes when broker env is missing', async () => {
+    const response = await worker.fetch(
+      new Request('https://example.com/api/controller/google/token', {
+        method: 'POST',
+      }),
+      {
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('5');
+    await expect(response.json()).resolves.toEqual({ error: 'Configuration error' });
+    expect(console.error).toHaveBeenCalledWith(
+      '[CONFIG] Controller Google route missing bindings:',
+      'GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY, GOOGLE_WORKSPACE_OAUTH_CLIENT_ID, GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET'
+    );
+  });
+
+  it('allows controller google routes when broker env is configured', async () => {
+    const response = await worker.fetch(
+      new Request('https://example.com/api/controller/google/token', {
+        method: 'POST',
+      }),
+      {
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        GOOGLE_WORKSPACE_OAUTH_CLIENT_ID: 'client-id',
+        GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET: 'client-secret',
+        GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY: 'refresh-key',
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
   });
 });
 
@@ -115,6 +195,8 @@ describe('proxy recovering state', () => {
         userId: 'user-1',
         sandboxId: 'sandbox-1',
         status: 'recovering',
+        provider: 'fly',
+        runtimeId: 'machine-1',
         flyMachineId: 'machine-1',
         flyAppName: 'test-app',
       }),
@@ -165,6 +247,8 @@ describe('proxy routing target usage', () => {
         userId: 'user-1',
         sandboxId: 'sandbox-1',
         status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
         flyMachineId: 'machine-1',
         flyAppName: 'test-app',
       }),
@@ -224,6 +308,8 @@ describe('proxy routing target usage', () => {
         userId: 'user-1',
         sandboxId: 'sandbox-1',
         status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
         flyMachineId: 'machine-1',
         flyAppName: 'test-app',
       }),
@@ -256,6 +342,43 @@ describe('proxy routing target usage', () => {
     });
   });
 
+  it('proxies to docker-local runtimes using the generic runtime id', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'sandbox-1',
+        status: 'running',
+        provider: 'docker-local',
+        runtimeId: 'kiloclaw-sandbox-1',
+        flyMachineId: null,
+        flyAppName: null,
+      }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'http://127.0.0.1:45001',
+        headers: {},
+      }),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+    fetchMock.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    const response = await worker.fetch(
+      new Request('https://example.com/i/550e8400-e29b-41d4-a716-446655440000/api/foo'),
+      {
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(200);
+    const { input } = getFetchCall(fetchMock);
+    expect(input).toBe('http://127.0.0.1:45001/api/foo');
+  });
+
   it('rebuilds HTTP retry auth with the refreshed authoritative sandbox id after crash recovery', async () => {
     const registryStub = {
       listInstances: vi.fn().mockResolvedValue([
@@ -275,6 +398,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-old',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-old',
           flyMachineId: 'machine-old',
           flyAppName: 'test-app',
         })
@@ -282,6 +407,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-old',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-old',
           flyMachineId: 'machine-old',
           flyAppName: 'test-app',
         })
@@ -289,6 +416,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-new',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-new',
           flyMachineId: 'machine-new',
           flyAppName: 'test-app',
         })
@@ -296,6 +425,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-new',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-new',
           flyMachineId: 'machine-new',
           flyAppName: 'test-app',
         }),
@@ -372,6 +503,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-old',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-old',
           flyMachineId: 'machine-old',
           flyAppName: 'test-app',
         })
@@ -379,6 +512,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-old',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-old',
           flyMachineId: 'machine-old',
           flyAppName: 'test-app',
         })
@@ -386,6 +521,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-new',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-new',
           flyMachineId: 'machine-new',
           flyAppName: 'test-app',
         })
@@ -393,6 +530,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-new',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-new',
           flyMachineId: 'machine-new',
           flyAppName: 'test-app',
         }),

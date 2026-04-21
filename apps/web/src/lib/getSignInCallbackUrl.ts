@@ -43,5 +43,12 @@ export default function getSignInCallbackUrl(searchParams?: NextAppSearchParams)
     callbackParams.set('callbackPath', searchParams.callbackPath);
   }
 
+  // Preserve signup=true so an OAuth error bounce (see parseSignInRedirectContext
+  // in user.server.ts) can send the user back to the create-account UI instead
+  // of the plain sign-in UI.
+  if (searchParams?.signup === 'true') {
+    callbackParams.set('signup', 'true');
+  }
+
   return `/users/after-sign-in${callbackParams.size > 0 ? `?${callbackParams.toString()}` : ''}`;
 }

@@ -1,9 +1,12 @@
 import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
+import {
+  markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  type KiloClawSubscriptionChangeActor,
+} from '@kilocode/db';
 import { kiloclaw_instances } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { sandboxIdFromInstanceId } from '@/lib/kiloclaw/sandbox-id';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
 export type ActiveKiloClawInstance = {
   id: string;
@@ -11,13 +14,20 @@ export type ActiveKiloClawInstance = {
   sandboxId: string;
   organizationId: string | null;
   name: string | null;
+  inboundEmailEnabled: boolean;
 };
 
 export type EnsureActiveInstanceResult = {
   instance: ActiveKiloClawInstance;
-  /** True when this call inserted a new row (not returned an existing one). */
   created: boolean;
 };
+
+type InstanceRegistryExecutor = typeof db | DrizzleTransaction;
+
+const INSTANCE_REGISTRY_DESTROY_ACTOR = {
+  actorType: 'system',
+  actorId: 'web-instance-registry',
+} satisfies KiloClawSubscriptionChangeActor;
 
 /**
  * Returns true if this instance row uses the instance-keyed identity scheme
@@ -48,88 +58,52 @@ export function workerInstanceId(
   return sandboxId.startsWith('ki_') ? instance.id : undefined;
 }
 
+/**
+ * Resolve the worker instance ID for DO routing from a database instance row ID.
+ * Unlike {@link getInstanceById}, this includes destroyed instances — needed
+ * when routing requests for historical runs whose instance has been torn down.
+ */
+export async function resolveWorkerInstanceId(instanceId: string): Promise<string | undefined> {
+  const [row] = await db
+    .select({
+      id: kiloclaw_instances.id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+    })
+    .from(kiloclaw_instances)
+    .where(eq(kiloclaw_instances.id, instanceId))
+    .limit(1);
+  return row ? workerInstanceId(row) : undefined;
+}
+
 type EnsureActiveInstanceOpts = {
   /** Organization ID. When provided, creates an org-owned instance. */
   orgId?: string;
 };
 
 /**
- * Ensure the user has an active KiloClaw registry row before worker provisioning.
+ * Read active instance without creating one.
  *
- * The returned `id` (DB row UUID) serves as the instanceId for DO keying.
- * sandboxId is always derived from instanceId (`ki_` prefix) for consistency
- * between DB and DO identity. Legacy rows with userId-derived sandboxIds are
- * returned as-is if they already exist.
- *
- * Personal flow: returns existing active row if present, otherwise creates a
- * new instance-keyed row. Idempotent under concurrent calls (second caller
- * sees the first caller's row).
- *
- * Org flow: always creates a new row. Callers must gate on existing rows.
+ * Worker provision owns `kiloclaw_instances` inserts. This helper remains for
+ * call sites that still expect an `EnsureActiveInstanceResult` shape while
+ * migration is in progress.
  */
 export async function ensureActiveInstance(
   userId: string,
   opts?: EnsureActiveInstanceOpts
 ): Promise<EnsureActiveInstanceResult> {
-  const selectFields = {
-    id: kiloclaw_instances.id,
-    userId: kiloclaw_instances.user_id,
-    sandboxId: kiloclaw_instances.sandbox_id,
-    organizationId: kiloclaw_instances.organization_id,
-    name: kiloclaw_instances.name,
-  };
-
   if (opts?.orgId) {
-    // Org instance: generate UUID, derive sandboxId from it.
-    // Each call creates a new row (no idempotency — callers gate on existing rows).
-    const instanceId = crypto.randomUUID();
-    const sandboxId = sandboxIdFromInstanceId(instanceId);
-
-    const [row] = await db
-      .insert(kiloclaw_instances)
-      .values({
-        id: instanceId,
-        user_id: userId,
-        sandbox_id: sandboxId,
-        organization_id: opts.orgId,
-      })
-      .returning(selectFields);
-
-    if (!row) {
-      throw new Error('Failed to create org instance row');
+    const instance = await getActiveOrgInstance(userId, opts.orgId);
+    if (!instance) {
+      throw new Error('No active org instance found');
     }
-
-    return { instance: row, created: true };
+    return { instance, created: false };
   }
 
-  // Personal flow: return existing active row if present.
-  // Race note: two concurrent callers can both see no row and both insert.
-  // This is benign — getActiveInstance uses ORDER BY created_at ASC so all
-  // subsequent reads converge on the oldest row. The second row is an inert
-  // orphan (no DO created for it). The window is milliseconds on a user-
-  // initiated action already deduplicated by the frontend's useMutation.
   const existing = await getActiveInstance(userId);
-  if (existing) return { instance: existing, created: false };
-
-  // No active row — create a new instance-keyed row.
-  // sandboxId = sandboxIdFromInstanceId(uuid) ensures DB and DO identity match.
-  const instanceId = crypto.randomUUID();
-  const sandboxId = sandboxIdFromInstanceId(instanceId);
-
-  const [row] = await db
-    .insert(kiloclaw_instances)
-    .values({
-      id: instanceId,
-      user_id: userId,
-      sandbox_id: sandboxId,
-    })
-    .returning(selectFields);
-
-  if (!row) {
-    throw new Error('Failed to create personal instance row');
+  if (!existing) {
+    throw new Error('No active instance found');
   }
-
-  return { instance: row, created: true };
+  return { instance: existing, created: false };
 }
 
 /**
@@ -144,29 +118,40 @@ export async function markActiveInstanceDestroyed(
   userId: string,
   instanceId?: string
 ): Promise<ActiveKiloClawInstance | null> {
-  const destroyedAt = new Date().toISOString();
+  return await db.transaction(async tx => {
+    const [target] = await tx
+      .select({
+        id: kiloclaw_instances.id,
+      })
+      .from(kiloclaw_instances)
+      .where(
+        instanceId
+          ? and(
+              eq(kiloclaw_instances.id, instanceId),
+              eq(kiloclaw_instances.user_id, userId),
+              isNull(kiloclaw_instances.destroyed_at)
+            )
+          : and(
+              eq(kiloclaw_instances.user_id, userId),
+              isNull(kiloclaw_instances.organization_id),
+              isNull(kiloclaw_instances.destroyed_at)
+            )
+      )
+      .orderBy(kiloclaw_instances.created_at)
+      .limit(1);
 
-  const condition = instanceId
-    ? and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at))
-    : and(
-        eq(kiloclaw_instances.user_id, userId),
-        isNull(kiloclaw_instances.organization_id),
-        isNull(kiloclaw_instances.destroyed_at)
-      );
+    if (!target) {
+      return null;
+    }
 
-  const [row] = await db
-    .update(kiloclaw_instances)
-    .set({ destroyed_at: destroyedAt })
-    .where(condition)
-    .returning({
-      id: kiloclaw_instances.id,
-      userId: kiloclaw_instances.user_id,
-      sandboxId: kiloclaw_instances.sandbox_id,
-      organizationId: kiloclaw_instances.organization_id,
-      name: kiloclaw_instances.name,
+    return await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+      actor: INSTANCE_REGISTRY_DESTROY_ACTOR,
+      executor: tx,
+      instanceId: target.id,
+      reason: 'destroy_path_inline_collapse',
+      userId,
     });
-
-  return row ?? null;
+  });
 }
 
 /**
@@ -176,10 +161,28 @@ export async function markActiveInstanceDestroyed(
  * for rollback when the caller knows which row it created.
  */
 export async function markInstanceDestroyedById(instanceId: string): Promise<void> {
-  await db
-    .update(kiloclaw_instances)
-    .set({ destroyed_at: new Date().toISOString() })
-    .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)));
+  await db.transaction(async tx => {
+    const [instance] = await tx
+      .select({
+        id: kiloclaw_instances.id,
+        userId: kiloclaw_instances.user_id,
+      })
+      .from(kiloclaw_instances)
+      .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
+      .limit(1);
+
+    if (!instance) {
+      return;
+    }
+
+    await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+      actor: INSTANCE_REGISTRY_DESTROY_ACTOR,
+      executor: tx,
+      instanceId: instance.id,
+      reason: 'destroy_path_inline_collapse',
+      userId: instance.userId,
+    });
+  });
 }
 
 /**
@@ -201,14 +204,18 @@ export async function restoreDestroyedInstance(instanceId: string): Promise<void
  * by ensureActiveInstance). For multi-instance (org), use instance-specific
  * lookups instead.
  */
-export async function getActiveInstance(userId: string): Promise<ActiveKiloClawInstance | null> {
-  const [row] = await db
+export async function getActiveInstance(
+  userId: string,
+  executor: InstanceRegistryExecutor = db
+): Promise<ActiveKiloClawInstance | null> {
+  const [row] = await executor
     .select({
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
     .where(
@@ -237,6 +244,7 @@ export async function getInstanceById(instanceId: string): Promise<ActiveKiloCla
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
     .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
@@ -251,15 +259,17 @@ export async function getInstanceById(instanceId: string): Promise<ActiveKiloCla
  */
 export async function getActiveOrgInstance(
   userId: string,
-  orgId: string
+  orgId: string,
+  executor: InstanceRegistryExecutor = db
 ): Promise<ActiveKiloClawInstance | null> {
-  const [row] = await db
+  const [row] = await executor
     .select({
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
     .where(
@@ -292,14 +302,15 @@ export async function listAllActiveInstances(userId: string): Promise<ActiveKilo
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
     .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
     .orderBy(kiloclaw_instances.created_at);
 
   // Deduplicate: keep only the oldest row per context (personal = null orgId,
-  // org = specific orgId). Race conditions in ensureActiveInstance can leave
-  // orphan personal rows; getActiveInstance already handles this with LIMIT 1.
+  // org = specific orgId). Historical legacy races left duplicate active rows;
+  // getActiveInstance already handles this with LIMIT 1.
   const seen = new Set<string>();
   return rows.filter(row => {
     const key = row.organizationId ?? 'personal';
@@ -320,6 +331,7 @@ export async function listActiveOrgInstances(orgId: string): Promise<ActiveKiloC
       sandboxId: kiloclaw_instances.sandbox_id,
       organizationId: kiloclaw_instances.organization_id,
       name: kiloclaw_instances.name,
+      inboundEmailEnabled: kiloclaw_instances.inbound_email_enabled,
     })
     .from(kiloclaw_instances)
     .where(

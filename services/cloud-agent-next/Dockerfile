@@ -3,7 +3,7 @@ FROM docker.io/cloudflare/sandbox:0.8.9
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
 ARG VCS_REF=""
-ARG KILOCODE_CLI_VERSION="latest"
+ARG KILOCODE_CLI_VERSION="7.1.23"
 
 RUN mkdir -p -m 755 /etc/apt/keyrings \
 	&& out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -12,7 +12,7 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
 	&& mkdir -p -m 755 /etc/apt/sources.list.d \
 	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
 	&& apt update \
-	&& apt install gh jq -y
+	&& apt install gh git-lfs jq -y
 
 # Install GitLab CLI (glab) - download official .deb from GitLab releases
 RUN GLAB_VERSION="1.80.4" \

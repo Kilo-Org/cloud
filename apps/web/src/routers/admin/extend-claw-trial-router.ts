@@ -1,8 +1,9 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
+import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import { kilocode_users, kiloclaw_subscriptions, kiloclaw_email_log } from '@kilocode/db/schema';
 import * as z from 'zod';
-import { eq, and, inArray, sql, desc } from 'drizzle-orm';
+import { eq, and, inArray, sql, desc, isNull } from 'drizzle-orm';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 
 const MAX_USERS = 1000;
@@ -65,6 +66,38 @@ type AdminContext = {
   user: { id: string; google_user_email: string; google_user_name: string | null };
 };
 
+function adminSubscriptionActor(ctx: AdminContext) {
+  return {
+    actorType: 'user',
+    actorId: ctx.user.id,
+  } as const;
+}
+
+async function writeBestEffortSubscriptionChangeLog(
+  ctx: AdminContext,
+  params: {
+    subscriptionId: string;
+    action: 'admin_override' | 'reactivated';
+    reason: string;
+    before: typeof kiloclaw_subscriptions.$inferSelect;
+    after: typeof kiloclaw_subscriptions.$inferSelect;
+  }
+) {
+  try {
+    await insertKiloClawSubscriptionChangeLog(db, {
+      subscriptionId: params.subscriptionId,
+      actor: adminSubscriptionActor(ctx),
+      action: params.action,
+      reason: params.reason,
+      before: params.before,
+      after: params.after,
+    });
+  } catch (error) {
+    // Trial change already committed. Log failure must not trigger retry.
+    console.error('[admin-extend-claw-trial] Failed to write subscription change log:', error);
+  }
+}
+
 const EMAIL_TYPES_TO_CLEAR = [
   'claw_trial_1d',
   'claw_trial_5d',
@@ -120,7 +153,7 @@ async function processOneEmail(
           eq(kiloclaw_subscriptions.status, 'trialing')
         )
       )
-      .returning({ trial_ends_at: kiloclaw_subscriptions.trial_ends_at });
+      .returning();
 
     if (!updated) {
       // Subscription status changed between match and extend (e.g. user subscribed).
@@ -132,6 +165,14 @@ async function processOneEmail(
         error: 'Subscription status changed since match — please re-match and retry.',
       };
     }
+
+    await writeBestEffortSubscriptionChangeLog(ctx, {
+      subscriptionId: subscription.id,
+      action: 'admin_override',
+      reason: 'bulk_extend_trial',
+      before: subscription,
+      after: updated,
+    });
 
     // Audit log is best-effort — its failure does not undo the extension
     // and must not cause a false failure result that prompts a retry.
@@ -209,7 +250,7 @@ async function processOneEmail(
           eq(kiloclaw_subscriptions.status, 'canceled')
         )
       )
-      .returning({ user_id: kiloclaw_subscriptions.user_id });
+      .returning();
 
     if (!resurrected) {
       // Subscription status changed between match and extend (e.g. user reactivated).
@@ -222,6 +263,14 @@ async function processOneEmail(
       };
     }
 
+    await writeBestEffortSubscriptionChangeLog(ctx, {
+      subscriptionId: subscription.id,
+      action: 'reactivated',
+      reason: 'bulk_restart_trial',
+      before: subscription,
+      after: resurrected,
+    });
+
     // Email log clear and audit log are best-effort — their failure does
     // not undo the resurrection and must not cause a false failure result
     // that prompts a retry (which would extend rather than resurrect).
@@ -231,6 +280,9 @@ async function processOneEmail(
         .where(
           and(
             eq(kiloclaw_email_log.user_id, user.id),
+            subscription.instance_id
+              ? eq(kiloclaw_email_log.instance_id, subscription.instance_id)
+              : isNull(kiloclaw_email_log.instance_id),
             inArray(kiloclaw_email_log.email_type, [...EMAIL_TYPES_TO_CLEAR])
           )
         );

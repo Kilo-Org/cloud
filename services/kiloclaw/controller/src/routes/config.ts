@@ -6,11 +6,16 @@ import { atomicWrite } from '../atomic-write';
 import { timingSafeTokenEqual } from '../auth';
 import type { Supervisor } from '../supervisor';
 import { backupConfigFile, writeBaseConfig } from '../config-writer';
+import { GOG_SECTION_CONFIG, updateToolsMdSection } from '../bootstrap';
 import { getBearerToken } from './gateway';
 
 const ReplaceConfigBodySchema = z.object({
   config: z.record(z.string(), z.unknown()),
   etag: z.string().optional(),
+});
+
+const ToolsMdGoogleWorkspaceSchema = z.object({
+  enabled: z.boolean(),
 });
 
 function computeEtag(raw: string): string {
@@ -156,7 +161,7 @@ export function registerConfigRoutes(
       }
 
       backupConfigFile(CONFIG_PATH);
-      atomicWrite(CONFIG_PATH, JSON.stringify(config, null, 2));
+      atomicWrite(CONFIG_PATH, JSON.stringify(config, null, 2), undefined, { mode: 0o600 });
 
       console.log('[controller] Config replaced');
       return c.json({ ok: true });
@@ -192,13 +197,49 @@ export function registerConfigRoutes(
       const config = JSON.parse(raw);
       deepMerge(config, patch as Record<string, unknown>);
       const serialized = JSON.stringify(config, null, 2);
-      atomicWrite(CONFIG_PATH, serialized);
+      atomicWrite(CONFIG_PATH, serialized, undefined, { mode: 0o600 });
       console.log('[controller] Config patched:', JSON.stringify(patch));
       return c.json({ ok: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('[controller] Failed to patch config:', message);
       return c.json({ error: `Failed to patch config: ${message}` }, 500);
+    }
+  });
+
+  app.post('/_kilo/config/tools-md/google-workspace', async c => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    const parsed = ToolsMdGoogleWorkspaceSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid request body' }, 400);
+    }
+
+    try {
+      updateToolsMdSection(parsed.data.enabled, GOG_SECTION_CONFIG, {
+        mkdirSync: () => undefined,
+        chmodSync: () => undefined,
+        chdir: () => undefined,
+        existsSync: p => fs.existsSync(p),
+        copyFileSync: () => undefined,
+        writeFileSync: (p, data) => fs.writeFileSync(p, data),
+        readFileSync: (p, encoding) => fs.readFileSync(p, encoding),
+        renameSync: () => undefined,
+        unlinkSync: () => undefined,
+        readdirSync: () => [],
+        execFileSync: () => '',
+      });
+
+      return c.json({ ok: true, enabled: parsed.data.enabled }, 200);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[controller] Failed to sync Google Workspace TOOLS.md section:', message);
+      return c.json({ error: `Failed to sync TOOLS.md section: ${message}` }, 500);
     }
   });
 }

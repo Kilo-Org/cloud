@@ -4,12 +4,32 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { KiloclawInstancesPage } from './KiloclawInstances/KiloclawInstancesPage';
+import { KiloclawOrphansTab } from './KiloclawInstances/KiloclawOrphansTab';
 import { VersionsTab, PinsTab } from './KiloclawVersions/KiloclawVersionsPage';
 import { RegionsTab } from './KiloclawRegions/KiloclawRegionsPage';
 import { CliRunsTab } from './KiloclawCliRuns/KiloclawCliRunsTab';
+import { KiloclawSecurityAdvisorContentTab } from './KiloclawSecurityAdvisorContent/KiloclawSecurityAdvisorContentTab';
+import { KiloclawProvidersTab } from './KiloclawProvidersTab';
 
-const VALID_TABS: readonly string[] = ['instances', 'versions', 'pins', 'regions', 'cli-runs'];
-type Tab = 'instances' | 'versions' | 'pins' | 'regions' | 'cli-runs';
+const VALID_TABS: readonly string[] = [
+  'instances',
+  'orphans',
+  'versions',
+  'pins',
+  'regions',
+  'providers',
+  'cli-runs',
+  'security-advisor-content',
+];
+type Tab =
+  | 'instances'
+  | 'orphans'
+  | 'versions'
+  | 'pins'
+  | 'regions'
+  | 'providers'
+  | 'cli-runs'
+  | 'security-advisor-content';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -45,6 +65,9 @@ export function KiloclawDashboard() {
           <TabsTrigger value="instances" className={tabTriggerClass}>
             Instances
           </TabsTrigger>
+          <TabsTrigger value="orphans" className={tabTriggerClass}>
+            Orphans
+          </TabsTrigger>
           <TabsTrigger value="versions" className={tabTriggerClass}>
             Versions
           </TabsTrigger>
@@ -54,12 +77,21 @@ export function KiloclawDashboard() {
           <TabsTrigger value="regions" className={tabTriggerClass}>
             Regions
           </TabsTrigger>
+          <TabsTrigger value="providers" className={tabTriggerClass}>
+            Providers
+          </TabsTrigger>
           <TabsTrigger value="cli-runs" className={tabTriggerClass}>
             CLI Runs
+          </TabsTrigger>
+          <TabsTrigger value="security-advisor-content" className={tabTriggerClass}>
+            Security Advisor Content
           </TabsTrigger>
         </TabsList>
         <TabsContent value="instances" className="mt-4">
           <KiloclawInstancesPage />
+        </TabsContent>
+        <TabsContent value="orphans" className="mt-4">
+          <KiloclawOrphansTab />
         </TabsContent>
         <TabsContent value="versions" className="mt-4">
           <VersionsTab />
@@ -70,8 +102,14 @@ export function KiloclawDashboard() {
         <TabsContent value="regions" className="mt-4">
           <RegionsTab />
         </TabsContent>
+        <TabsContent value="providers" className="mt-4">
+          <KiloclawProvidersTab />
+        </TabsContent>
         <TabsContent value="cli-runs" className="mt-4">
           <CliRunsTab />
+        </TabsContent>
+        <TabsContent value="security-advisor-content" className="mt-4">
+          <KiloclawSecurityAdvisorContentTab />
         </TabsContent>
       </Tabs>
     </div>

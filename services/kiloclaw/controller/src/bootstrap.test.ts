@@ -10,11 +10,20 @@ import {
   runOnboardOrDoctor,
   formatBotIdentityMarkdown,
   writeBotIdentityFile,
+  formatUserProfileMarkdown,
+  removeUserMdLocation,
+  setUserMdTimezone,
+  setUserMdLocation,
+  writeUserProfileFile,
+  writeUserProfileTimezoneFile,
+  ensureWeatherSkillInstalled,
   updateToolsMdSection,
   GOG_SECTION_CONFIG,
   KILO_CLI_SECTION_CONFIG,
   OP_SECTION_CONFIG,
   LINEAR_SECTION_CONFIG,
+  KILOCLAW_MITIGATIONS_SECTION_CONFIG,
+  PLUGIN_INSTALL_SECTION_CONFIG,
   buildGatewayArgs,
   bootstrapCritical,
   bootstrapNonCritical,
@@ -409,10 +418,8 @@ describe('applyFeatureFlags', () => {
 // ---- generateHooksToken ----
 
 describe('generateHooksToken', () => {
-  it('generates token when KILOCLAW_GOG_CONFIG_TARBALL is set', () => {
-    const env: Record<string, string | undefined> = {
-      KILOCLAW_GOG_CONFIG_TARBALL: 'some-base64-tarball',
-    };
+  it('generates token for every boot', () => {
+    const env: Record<string, string | undefined> = {};
 
     generateHooksToken(env);
 
@@ -420,12 +427,13 @@ describe('generateHooksToken', () => {
     expect(env.KILOCLAW_HOOKS_TOKEN).toHaveLength(64); // 32 bytes = 64 hex chars
   });
 
-  it('does not generate token when tarball is absent', () => {
-    const env: Record<string, string | undefined> = {};
+  it('replaces any existing token with a fresh value', () => {
+    const env: Record<string, string | undefined> = { KILOCLAW_HOOKS_TOKEN: 'old-token' };
 
     generateHooksToken(env);
 
-    expect(env.KILOCLAW_HOOKS_TOKEN).toBeUndefined();
+    expect(env.KILOCLAW_HOOKS_TOKEN).not.toBe('old-token');
+    expect(env.KILOCLAW_HOOKS_TOKEN).toHaveLength(64);
   });
 });
 
@@ -589,6 +597,217 @@ describe('writeBotIdentityFile', () => {
   });
 });
 
+// ---- user profile file ----
+
+describe('formatUserProfileMarkdown', () => {
+  it('renders the user profile markdown with timezone', () => {
+    const result = formatUserProfileMarkdown('Europe/Amsterdam');
+
+    expect(result).toContain('# USER.md - About Your Human');
+    expect(result).toContain('- Timezone: Europe/Amsterdam');
+    expect(result).not.toContain('- Location:');
+  });
+
+  it('renders the user profile markdown with location when provided', () => {
+    const result = formatUserProfileMarkdown({
+      timezone: 'Europe/Amsterdam',
+      location: 'Amsterdam, North Holland, Netherlands',
+    });
+
+    expect(result).toContain('- Timezone: Europe/Amsterdam');
+    expect(result).toContain('- Location: Amsterdam, North Holland, Netherlands');
+  });
+});
+
+describe('setUserMdTimezone', () => {
+  it('updates a plain timezone field', () => {
+    const result = setUserMdTimezone('# USER\n- Timezone:\n- Notes:\n', 'Europe/Amsterdam');
+
+    expect(result).toContain('- Timezone: Europe/Amsterdam');
+    expect(result).toContain('- Notes:');
+  });
+
+  it('updates a bold timezone field', () => {
+    const result = setUserMdTimezone(
+      '# USER\n- **Timezone:** [America/New_York, Europe/London, etc.]\n',
+      'Europe/Amsterdam'
+    );
+
+    expect(result).toContain('- **Timezone:** Europe/Amsterdam');
+  });
+
+  it('appends a timezone field when none exists', () => {
+    const result = setUserMdTimezone('# USER\n- Name:\n', 'Europe/Amsterdam');
+
+    expect(result).toContain('- Name:');
+    expect(result).toContain('- Timezone: Europe/Amsterdam');
+  });
+});
+
+describe('setUserMdLocation', () => {
+  it('updates a plain location field', () => {
+    const result = setUserMdLocation('# USER\n- Location:\n- Notes:\n', 'Amsterdam, Netherlands');
+
+    expect(result).toContain('- Location: Amsterdam, Netherlands');
+    expect(result).toContain('- Notes:');
+  });
+
+  it('inserts a missing location field before bold notes', () => {
+    const result = setUserMdLocation(
+      [
+        '# USER.md - About Your Human',
+        '',
+        '- **Name:**',
+        '- **What to call them:**',
+        '- **Pronouns:** _(optional)_',
+        '- **Timezone:** Europe/Amsterdam',
+        '- **Notes:**',
+        '',
+        '## Context',
+      ].join('\n'),
+      'Amsterdam, Netherlands'
+    );
+
+    expect(result).toContain(
+      '- **Timezone:** Europe/Amsterdam\n- **Location:** Amsterdam, Netherlands\n- **Notes:**'
+    );
+  });
+
+  it('inserts a missing location field before lowercase notes', () => {
+    const result = setUserMdLocation('# USER\n  - name:\n  - notes: existing note\n', 'Amsterdam');
+
+    expect(result).toContain('  - Location: Amsterdam\n  - notes: existing note');
+  });
+
+  it('appends a location field when no profile list anchor exists', () => {
+    const result = setUserMdLocation('# USER\n- Name:\n', 'Amsterdam, Netherlands');
+
+    expect(result).toContain('- Name:');
+    expect(result).toContain('- Location: Amsterdam, Netherlands');
+  });
+});
+
+describe('removeUserMdLocation', () => {
+  it('removes plain and bold location fields', () => {
+    const result = removeUserMdLocation(
+      '# USER\n- Location: Amsterdam\n- **Location:** Rotterdam\n- Notes:\n'
+    );
+
+    expect(result).not.toContain('Location');
+    expect(result).toContain('- Notes:');
+  });
+});
+
+describe('writeUserProfileTimezoneFile', () => {
+  it('creates workspace/USER.md when timezone is configured', () => {
+    const harness = fakeDeps();
+
+    writeUserProfileTimezoneFile({ KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam' }, harness.deps);
+
+    const userWrite = harness.writeCalls.find(call => call.path.includes('USER.md'));
+    expect(userWrite?.data).toContain('- Timezone: Europe/Amsterdam');
+    expect(harness.renameCalls.some(call => call.to === '/root/.openclaw/workspace/USER.md')).toBe(
+      true
+    );
+  });
+
+  it('updates existing workspace/USER.md when timezone is configured', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === '/root/.openclaw/workspace/USER.md'
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# USER\n- Timezone:\n- Notes:\n'
+    );
+
+    writeUserProfileTimezoneFile({ KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam' }, harness.deps);
+
+    const userWrite = harness.writeCalls.find(call => call.path.includes('USER.md'));
+    expect(userWrite?.data).toContain('- Timezone: Europe/Amsterdam');
+    expect(userWrite?.data).toContain('- Notes:');
+  });
+
+  it('does not write workspace/USER.md when timezone is unset', () => {
+    const harness = fakeDeps();
+
+    writeUserProfileTimezoneFile({}, harness.deps);
+
+    expect(harness.writeCalls.some(call => call.path.includes('USER.md'))).toBe(false);
+  });
+});
+
+describe('writeUserProfileFile', () => {
+  it('creates workspace/USER.md with location when configured', () => {
+    const harness = fakeDeps();
+
+    writeUserProfileFile(
+      {
+        KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam',
+        KILOCLAW_USER_LOCATION: 'Amsterdam, North Holland, Netherlands',
+      },
+      harness.deps
+    );
+
+    const userWrite = harness.writeCalls.find(call => call.path.includes('USER.md'));
+    expect(userWrite?.data).toContain('- Timezone: Europe/Amsterdam');
+    expect(userWrite?.data).toContain('- Location: Amsterdam, North Holland, Netherlands');
+  });
+
+  it('updates existing workspace/USER.md with location only when configured', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === '/root/.openclaw/workspace/USER.md'
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# USER\n- Timezone: Europe/Amsterdam\n- Notes:\n'
+    );
+
+    writeUserProfileFile(
+      { KILOCLAW_USER_LOCATION: 'Amsterdam, North Holland, Netherlands' },
+      harness.deps
+    );
+
+    const userWrite = harness.writeCalls.find(call => call.path.includes('USER.md'));
+    expect(userWrite?.data).toContain('- Timezone: Europe/Amsterdam');
+    expect(userWrite?.data).toContain('- Location: Amsterdam, North Holland, Netherlands');
+  });
+
+  it('does not add location when only timezone is configured', () => {
+    const harness = fakeDeps();
+
+    writeUserProfileFile({ KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam' }, harness.deps);
+
+    const userWrite = harness.writeCalls.find(call => call.path.includes('USER.md'));
+    expect(userWrite?.data).toContain('- Timezone: Europe/Amsterdam');
+    expect(userWrite?.data).not.toContain('- Location:');
+  });
+});
+
+describe('ensureWeatherSkillInstalled', () => {
+  it('copies the staged weather skill when location is configured', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === '/usr/local/share/kiloclaw/skills/weather/SKILL.md'
+    );
+
+    ensureWeatherSkillInstalled({ KILOCLAW_USER_LOCATION: 'Amsterdam, Netherlands' }, harness.deps);
+
+    expect(harness.mkdirCalls).toContain('/root/clawd/skills/weather');
+    expect(harness.copyCalls).toContainEqual({
+      src: '/usr/local/share/kiloclaw/skills/weather/SKILL.md',
+      dest: '/root/clawd/skills/weather/SKILL.md',
+    });
+  });
+
+  it('does not install the weather skill when location is unset', () => {
+    const harness = fakeDeps();
+
+    ensureWeatherSkillInstalled({}, harness.deps);
+
+    expect(harness.copyCalls.some(call => call.dest.includes('/skills/weather/'))).toBe(false);
+  });
+});
+
 // ---- runOnboardOrDoctor ----
 
 describe('runOnboardOrDoctor', () => {
@@ -624,12 +843,13 @@ describe('runOnboardOrDoctor', () => {
     expect(onboardCalled).toBe(true);
   });
 
-  it('seeds TOOLS.md on fresh install', () => {
+  it('seeds TOOLS.md and USER.md timezone on fresh install', () => {
     const harness = fakeDeps();
     const env: Record<string, string | undefined> = {
       KILOCODE_API_KEY: 'test-key',
       OPENCLAW_GATEWAY_TOKEN: 'test-token',
       AUTO_APPROVE_DEVICES: 'true',
+      KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam',
     };
 
     (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
@@ -641,6 +861,10 @@ describe('runOnboardOrDoctor', () => {
     const toolsCopy = harness.copyCalls.find(c => c.dest.endsWith('TOOLS.md'));
     expect(toolsCopy).toBeDefined();
     expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/IDENTITY.md'))).toBe(true);
+    expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/USER.md'))).toBe(true);
+    expect(
+      harness.writeCalls.some(call => call.data.includes('- Timezone: Europe/Amsterdam'))
+    ).toBe(true);
   });
 
   it('runs doctor when config exists', () => {
@@ -765,6 +989,8 @@ describe('TOOLS.md section configs', () => {
     KILO_CLI_SECTION_CONFIG,
     OP_SECTION_CONFIG,
     LINEAR_SECTION_CONFIG,
+    KILOCLAW_MITIGATIONS_SECTION_CONFIG,
+    PLUGIN_INSTALL_SECTION_CONFIG,
   ];
 
   for (const config of configs) {
@@ -773,6 +999,61 @@ describe('TOOLS.md section configs', () => {
       expect(config.section).toContain(config.endMarker);
     });
   }
+
+  // Smoke test on the KiloClaw-specific sections we just added — pin the
+  // key directives so a drive-by edit that strips the substance (but keeps
+  // the markers) fails loudly.
+  it('KiloClaw Mitigations: names all additional mitigated checkIds', () => {
+    const section = KILOCLAW_MITIGATIONS_SECTION_CONFIG.section;
+    expect(section).toContain('gateway.trusted_proxies_missing');
+    expect(section).toContain('config.insecure_or_dangerous_flags');
+    expect(section).toContain('plugins.tools_reachable_permissive_policy');
+    expect(section).toContain('hooks.default_session_key_unset');
+    expect(section).toContain('hooks.allowed_agent_ids_unrestricted');
+    expect(section).toContain('fs.config.perms_world_readable');
+    // Does NOT redundantly list gateway.control_ui.insecure_auth as its own
+    // bullet — that one is already documented in the base TOOLS.md's
+    // "Security Check Context" section. In-body references to it are fine
+    // (the config.insecure_or_dangerous_flags explanation points back at
+    // it), but a duplicate top-level bullet would mean the agent sees it
+    // twice in workspace context.
+    expect(section).not.toContain('- **`gateway.control_ui.insecure_auth`**');
+  });
+
+  it('Plugin Install: references the CLI command and plugins.allow field', () => {
+    const section = PLUGIN_INSTALL_SECTION_CONFIG.section;
+    expect(section).toContain('openclaw plugins install');
+    expect(section).toContain('plugins.allow');
+    expect(section).toContain('ALWAYS');
+    // Safety: must explicitly tell the agent NOT to create plugins.allow
+    // from scratch on permissive instances. Creating a single-element
+    // allowlist would silently block bundled channel plugins (Telegram,
+    // Discord, Slack, Stream Chat, etc.) that are loaded under permissive
+    // mode without being enumerated. See the kilo-code-bot review on
+    // PR #2597 for the production incident this guards against.
+    expect(section).toContain('DO NOT create');
+    expect(section).toContain('permissive mode');
+  });
+
+  it('Google Workspace section uses current gog calendar guidance', () => {
+    expect(GOG_SECTION_CONFIG.section).toContain('gog auth list --json');
+    expect(GOG_SECTION_CONFIG.section).toContain('gog calendar calendars --account <email> --json');
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'gog calendar events --all --all-pages --account <email> --from <iso> --to <iso> --json'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'align `--from` / `--to` to the user-requested local date window before summarizing'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain('use `primary` only when explicitly requested');
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'if results look sparse, retry with explicit calendar IDs'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain(
+      'gog calendar events <calendarId> --all-pages --account <email> --from <iso> --to <iso> --json'
+    );
+    expect(GOG_SECTION_CONFIG.section).toContain('gog drive ls --account <email> --json');
+    expect(GOG_SECTION_CONFIG.section).not.toContain('gog drive files list');
+  });
 });
 
 // ---- buildGatewayArgs ----

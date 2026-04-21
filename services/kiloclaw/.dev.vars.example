@@ -2,9 +2,13 @@
 # The dev-start script creates .dev.vars from this file on first run.
 #
 # Most values below are working defaults. The script auto-manages:
-#   NEXTAUTH_SECRET, INTERNAL_API_SECRET  (synced from Vercel)
-#   FLY_API_TOKEN                         (auto-created once in .env.local)
-#   KILOCODE_API_BASE_URL                 (set from tunnel URL)
+#   NEXTAUTH_SECRET, KILOCLAW_INTERNAL_API_SECRET            (synced from Vercel)
+#   GOOGLE_WORKSPACE_OAUTH_CLIENT_ID, GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI,
+#   GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET,
+#   GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY            (synced from Vercel)
+#   KILOCLAW_CHECKIN_URL                                     (set from tunnel URL)
+#   FLY_API_TOKEN                                            (auto-created once in .env.local)
+#   KILOCODE_API_BASE_URL                                    (set from tunnel URL)
 #
 # Values you may need to set manually:
 #   AGENT_ENV_VARS_PRIVATE_KEY            (get from 1Password)
@@ -17,16 +21,25 @@
 # @from NEXTAUTH_SECRET
 NEXTAUTH_SECRET=dev-secret-change-me
 # Platform API authentication key (for internal service-to-service calls)
-# @from INTERNAL_API_SECRET
-INTERNAL_API_SECRET=dev-internal-secret
+# @from KILOCLAW_INTERNAL_API_SECRET
+KILOCLAW_INTERNAL_API_SECRET=dev-internal-secret
 
 # Auth (static defaults — these work as-is for local dev)
 # HMAC secret for deriving per-sandbox gateway tokens (machine authentication)
 GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw
+# Default provider for new provisions in local dev. Use "fly" or "docker-local".
+KILOCLAW_DEFAULT_PROVIDER=fly
 # Override WORKER_ENV to "development" for local development.
 # Production default is set in wrangler.jsonc. This selects the development
 # Fly app naming prefix ("dev-") for per-user app creation.
 WORKER_ENV=development
+
+# Docker-local demo provider (wrangler dev only).
+# Expose the Docker socket over loopback first:
+#   socat TCP-LISTEN:23750,bind=127.0.0.1,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock
+DOCKER_LOCAL_API_BASE=http://127.0.0.1:23750
+DOCKER_LOCAL_IMAGE=kiloclaw:local
+DOCKER_LOCAL_PORT_RANGE=45000-45999
 
 # Auto-populated by dev-start from `fly auth whoami`.
 # Tags Fly machines with developer identity for cleanup.
@@ -42,6 +55,20 @@ BACKEND_API_URL=http://localhost:3000
 # In dev, the script sets this to the Cloudflare tunnel URL pointing to your
 # local Next.js app so Fly machines route model requests through the tunnel.
 # KILOCODE_API_BASE_URL=https://<tunnel>.trycloudflare.com/api/gateway/
+# KILOCLAW_CHECKIN_URL=https://<tunnel>.trycloudflare.com/api/controller/checkin
+
+# Google OAuth (KiloClaw broker)
+# Google OAuth values are synced from .env.local.
+# @from GOOGLE_WORKSPACE_OAUTH_CLIENT_ID
+GOOGLE_WORKSPACE_OAUTH_CLIENT_ID=
+# @from GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI
+GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI=http://localhost:3000/api/integrations/google/callback
+# @from GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET
+GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET=
+# Symmetric key used to encrypt/decrypt stored Google refresh tokens.
+# Must be a base64-encoded 32-byte key (AES-256-GCM).
+# @from GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY
+GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY=
 
 # Fly.io Machines API
 # Token is auto-created once in .env.local by `pnpm dev:env` using

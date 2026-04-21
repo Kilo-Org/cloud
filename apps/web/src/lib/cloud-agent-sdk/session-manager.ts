@@ -1,3 +1,4 @@
+import type { Images } from '@/lib/images-schema';
 import { errorShapeSchema } from './schemas';
 import { atom } from 'jotai';
 import type { Atom, WritableAtom } from 'jotai';
@@ -5,7 +6,8 @@ import { createCloudAgentSession } from './session';
 import type { CloudAgentSession } from './session';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
-import type { CloudAgentApi } from './transport';
+import type { CloudAgentApi, CloudAgentStreamTicketResult } from './transport';
+import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
@@ -22,7 +24,7 @@ import type {
   TextPart,
 } from './types';
 import type { QuestionInfo } from '@/types/opencode.gen';
-import { splitByContiguousPrefix } from '@/lib/utils/splitByContiguousPrefix';
+import { splitByContiguousPrefix } from './array-utils';
 import { generateMessageId } from './message-id';
 
 // ---------------------------------------------------------------------------
@@ -87,12 +89,16 @@ type PrepareInput = {
 type SessionManagerConfig = {
   store: JotaiStore;
   resolveSession: (kiloSessionId: KiloSessionId) => Promise<ResolvedSession>;
-  getTicket: (sessionId: CloudAgentSessionId) => string | Promise<string>;
+  getTicket: (
+    sessionId: CloudAgentSessionId
+  ) => CloudAgentStreamTicketResult | Promise<CloudAgentStreamTicketResult>;
   fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   getAuthToken: () => string | Promise<string>;
   cliWebsocketUrl?: string;
   websocketBaseUrl?: string;
   api: CloudAgentApi;
+  lifecycleHooks?: ConnectionLifecycleHooks;
+  websocketHeaders?: WebSocketHeaders;
   prepare: (
     input: PrepareInput
   ) => Promise<{ cloudAgentSessionId: CloudAgentSessionId; kiloSessionId: KiloSessionId }>;
@@ -101,7 +107,7 @@ type SessionManagerConfig = {
   onKiloSessionCreated?: (kiloSessionId: KiloSessionId) => void;
   onComplete?: () => void;
   onBranchChanged?: (branch: string) => void;
-  onSendFailed?: (messageText: string) => void;
+  onSendFailed?: (messageText: string, displayMessage?: string, error?: unknown) => void;
   onRemoteSessionOpened?: (data: { kiloSessionId: KiloSessionId }) => void;
   onRemoteSessionMessageSent?: (data: { kiloSessionId: KiloSessionId }) => void;
 };
@@ -140,7 +146,13 @@ type SessionManagerAtoms = {
 
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
-  send(payload: { prompt: string; mode: string; model: string; variant?: string }): Promise<void>;
+  send(payload: {
+    prompt: string;
+    mode: string;
+    model: string;
+    variant?: string;
+    images?: Images;
+  }): Promise<boolean>;
   interrupt(): Promise<void>;
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
@@ -347,6 +359,31 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(chatUIAtom, { shouldAutoScroll: true });
   }
 
+  function upsertInitialMessageFromFetchedMetadata(
+    storage: JotaiSessionStorage,
+    kiloSessionId: KiloSessionId,
+    data: FetchedSessionData
+  ): void {
+    if (!data.prompt || !data.initialMessageId) return;
+
+    storage.upsertMessage({
+      id: data.initialMessageId,
+      sessionID: kiloSessionId,
+      role: 'user',
+      time: { created: Date.now() },
+      agent: '',
+      model: { providerID: '', modelID: '' },
+    } satisfies MessageInfo);
+    storage.upsertPart(data.initialMessageId, {
+      id: `${data.initialMessageId}-text`,
+      sessionID: kiloSessionId,
+      messageID: data.initialMessageId,
+      type: 'text',
+      text: data.prompt,
+      synthetic: true,
+    } satisfies TextPart);
+  }
+
   function subscribeToServiceState(
     session: CloudAgentSession,
     opts?: { onFirstActivity?: () => void }
@@ -355,6 +392,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     let prevAct = '';
     let prevSk = '';
     let prevCsk = '';
+    let prevCloudStatusHadIndicator = false;
     const sKey = (s: AgentStatus) => (s.type === 'autocommit' ? `${s.type}:${s.step}` : s.type);
     const csKey = (cs: CloudStatus | null) =>
       cs === null
@@ -381,7 +419,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
       // canSend factors in cloud status: preparing/finalizing blocks input
       const cloudReady = cs === null || cs.type === 'ready';
-      store.set(isReadOnlyAtom, !session.canSend);
+      // Only update read-only state after the transport has been resolved.
+      // During the 'connecting' phase the transport is null so canSend is
+      // always false, which would briefly flash a "read-only" banner.
+      if (act.type !== 'connecting') {
+        store.set(isReadOnlyAtom, !session.canSend);
+      }
       store.set(canSendAtom, session.canSend && cloudReady);
       store.set(canInterruptAtom, session.canInterrupt);
 
@@ -405,16 +448,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (cs && cs.type !== 'ready') {
         if (csk !== prevCsk) {
           const cloudInd = indicatorForCloudStatus(cs);
-          if (cloudInd) setIndicator(cloudInd);
+          if (cloudInd) {
+            setIndicator(cloudInd);
+            prevCloudStatusHadIndicator = true;
+          }
           prevCsk = csk;
         }
       } else {
+        const shouldClearCloudIndicator = prevCloudStatusHadIndicator;
         if (csk !== prevCsk) prevCsk = csk;
+        prevCloudStatusHadIndicator = false;
         // Fall through to existing agent status indicator logic
         const sk = sKey(st);
-        if (sk !== prevSk) {
+        if (sk !== prevSk || shouldClearCloudIndicator) {
           const ind = indicatorForStatus(st);
-          if (ind !== null) setIndicator(ind);
+          if (ind !== null || shouldClearCloudIndicator) setIndicator(ind);
           prevSk = sk;
         }
       }
@@ -448,10 +496,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (kiloSessionId !== activeSessionId) return;
     store.set(fetchedSessionDataAtom, data);
 
+    const jotaiStorage = createJotaiStorage(store);
+    store.set(sessionStorageAtom, jotaiStorage);
+
     // Populate session metadata and swap in the new storage eagerly.
     // The storage starts empty; snapshot replay (inside session.connect)
     // will populate it and the UI updates reactively.
-    const jotaiStorage = createJotaiStorage(store);
     store.set(sessionConfigAtom, {
       sessionId: data.cloudAgentSessionId ?? kiloSessionId,
       repository: data.repository ?? '',
@@ -460,27 +510,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       variant: data.variant ?? null,
     });
     store.set(sessionIdAtom, data.cloudAgentSessionId);
-    store.set(sessionStorageAtom, jotaiStorage);
 
-    // Insert initial message for non-initiated sessions that have prompt and initialMessageId
-    if (!data.isInitiated && data.prompt && data.initialMessageId) {
-      jotaiStorage.upsertMessage({
-        id: data.initialMessageId,
-        sessionID: kiloSessionId,
-        role: 'user',
-        time: { created: Date.now() / 1000 },
-        agent: '',
-        model: { providerID: '', modelID: '' },
-      } satisfies MessageInfo);
-      jotaiStorage.upsertPart(data.initialMessageId, {
-        id: `${data.initialMessageId}-text`,
-        sessionID: kiloSessionId,
-        messageID: data.initialMessageId,
-        type: 'text',
-        text: data.prompt,
-        synthetic: true,
-      } satisfies TextPart);
-    }
+    upsertInitialMessageFromFetchedMetadata(jotaiStorage, kiloSessionId, data);
 
     config.onKiloSessionCreated?.(kiloSessionId);
 
@@ -493,6 +524,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         fetchSnapshot: config.fetchSnapshot,
         getAuthToken: config.getAuthToken,
         cliWebsocketUrl: config.cliWebsocketUrl,
+        lifecycleHooks: config.lifecycleHooks,
+        websocketHeaders: config.websocketHeaders,
       },
       websocketBaseUrl: config.websocketBaseUrl,
       storage: jotaiStorage,
@@ -584,21 +617,25 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     mode: string;
     model: string;
     variant?: string;
-  }): Promise<void> {
+    images?: Images;
+  }): Promise<boolean> {
     store.set(errorAtom, null);
-    setIndicator(null);
+    if (store.get(agentStatusAtom).type !== 'disconnected') {
+      setIndicator(null);
+    }
 
     const storage = store.get(sessionStorageAtom);
     const kiloSessionId = activeSessionId;
     const messageId = generateMessageId();
     const shouldStoreOptimisticMessage = activeSessionType === 'cloud-agent';
+    const optimisticCreatedAt = Date.now();
 
     if (storage && kiloSessionId && shouldStoreOptimisticMessage) {
       storage.upsertMessage({
         id: messageId,
         sessionID: kiloSessionId,
         role: 'user',
-        time: { created: Date.now() / 1000 },
+        time: { created: optimisticCreatedAt },
         agent: '',
         model: { providerID: '', modelID: payload.model },
       });
@@ -622,17 +659,23 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         model: payload.model,
         variant: payload.variant,
         messageId,
+        images: payload.images,
       });
       if (sessionType === 'remote' && kiloSessionId) {
         config.onRemoteSessionMessageSent?.({ kiloSessionId });
       }
+      return true;
     } catch (err) {
       if (storage && shouldStoreOptimisticMessage) {
         storage.deleteMessage(messageId);
       }
       store.set(failedPromptAtom, payload.prompt);
-      config.onSendFailed?.(payload.prompt);
-      setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
+      const message = formatError(err);
+      config.onSendFailed?.(payload.prompt, message, err);
+      if (store.get(agentStatusAtom).type !== 'disconnected') {
+        setIndicator({ type: 'error', message, timestamp: Date.now() });
+      }
+      return false;
     }
   }
 

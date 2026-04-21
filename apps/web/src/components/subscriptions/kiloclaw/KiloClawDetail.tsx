@@ -25,6 +25,8 @@ import {
   formatDateLabel,
   formatKiloclawPrice,
   formatPaymentSummary,
+  getKiloclawDisplayStatus,
+  getKiloclawStatusNote,
   isKiloclawTerminal,
 } from '@/components/subscriptions/helpers';
 import { useCursorPagination } from '@/components/subscriptions/useCursorPagination';
@@ -109,10 +111,13 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
   }
 
   const otherPlan = subscription.plan === 'commit' ? 'standard' : 'commit';
+  const isPendingSettlement = subscription.activationState === 'pending_settlement';
+  const statusNote = getKiloclawStatusNote(subscription);
   const nextRenewalLabel = formatDateLabel(
     subscription.creditRenewalAt ?? subscription.currentPeriodEnd ?? subscription.trialEndsAt,
     'At your next renewal'
   );
+  const hasUserRequestedSwitch = subscription.scheduledBy === 'user';
   const targetPlanLabel = capitalize(otherPlan);
   const targetPlanDetails =
     otherPlan === 'commit'
@@ -269,7 +274,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
         backHref="/subscriptions"
         backLabel="Back to subscriptions"
         title={subscription.instanceName ?? 'KiloClaw'}
-        status={subscription.status}
+        status={getKiloclawDisplayStatus(subscription)}
       />
 
       <Card>
@@ -292,6 +297,12 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
               ))}
             </div>
 
+            {statusNote ? (
+              <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm text-blue-300">
+                {statusNote}
+              </div>
+            ) : null}
+
             {secondaryDetailRows.length > 0 ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 {secondaryDetailRows.map(row => (
@@ -303,10 +314,10 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
         </CardContent>
       </Card>
 
-      {isKiloclawTerminal(subscription.status) ? null : (
+      {isKiloclawTerminal(subscription.status) || isPendingSettlement ? null : (
         <div className="flex flex-wrap gap-2">
           {subscription.plan !== 'trial' ? (
-            subscription.scheduledPlan ? (
+            hasUserRequestedSwitch ? (
               <Button variant="outline" onClick={() => setConfirmationAction('cancelPlanSwitch')}>
                 Cancel Plan Switch
               </Button>

@@ -3,6 +3,7 @@ import {
   type PersistedState,
   type ProviderState,
   type FlyProviderState,
+  type DockerLocalProviderState,
 } from '../../schemas/instance-config';
 import type { InstanceMutableState } from './types';
 
@@ -74,7 +75,63 @@ export function applyProviderState(
 
   if (providerState.provider === 'fly') {
     hydrateFlyLegacyFieldsFromProviderState(s);
+    return;
   }
+
+  s.flyAppName = null;
+  s.flyMachineId = null;
+  s.flyVolumeId = null;
+  s.flyRegion = null;
+}
+
+export function getDockerLocalProviderState(
+  source: Pick<InstanceMutableState, 'providerState'>
+): DockerLocalProviderState {
+  if (source.providerState?.provider === 'docker-local') {
+    return source.providerState;
+  }
+  return {
+    provider: 'docker-local',
+    containerName: null,
+    volumeName: null,
+    hostPort: null,
+  };
+}
+
+export function getRuntimeId(
+  source: Pick<InstanceMutableState, 'providerState' | 'flyMachineId'>
+): string | null {
+  if (source.providerState?.provider === 'fly') {
+    return source.providerState.machineId;
+  }
+  if (source.providerState?.provider === 'docker-local') {
+    return source.providerState.containerName;
+  }
+  return source.flyMachineId;
+}
+
+export function getStorageId(
+  source: Pick<InstanceMutableState, 'providerState' | 'flyVolumeId'>
+): string | null {
+  if (source.providerState?.provider === 'fly') {
+    return source.providerState.volumeId;
+  }
+  if (source.providerState?.provider === 'docker-local') {
+    return source.providerState.volumeName;
+  }
+  return source.flyVolumeId;
+}
+
+export function getProviderRegion(
+  source: Pick<InstanceMutableState, 'providerState' | 'flyRegion'>
+): string | null {
+  if (source.providerState?.provider === 'fly') {
+    return source.providerState.region;
+  }
+  if (source.providerState?.provider === 'docker-local') {
+    return null;
+  }
+  return source.flyRegion;
 }
 
 export function syncProviderStateForStorage(
@@ -93,8 +150,6 @@ export function syncProviderStateForStorage(
   // `providerState`; writes to legacy Fly fields should only happen alongside a
   // follow-up `persist()` call so this helper can mirror them.
   const nextProvider = patch.provider ?? s.provider;
-  if (nextProvider !== 'fly') return patch;
-
   const explicitProviderState = patch.providerState;
   if (explicitProviderState) {
     applyProviderState(s, explicitProviderState);
@@ -110,8 +165,15 @@ export function syncProviderStateForStorage(
     }
     return {
       ...patch,
+      provider: explicitProviderState.provider,
+      flyAppName: null,
+      flyMachineId: null,
+      flyVolumeId: null,
+      flyRegion: null,
     };
   }
+
+  if (nextProvider !== 'fly') return patch;
 
   const touchesFlyLegacyFields =
     'flyAppName' in patch ||
@@ -163,8 +225,16 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.kilocodeApiKey = d.kilocodeApiKey;
     s.kilocodeApiKeyExpiresAt = d.kilocodeApiKeyExpiresAt;
     s.kilocodeDefaultModel = d.kilocodeDefaultModel;
+    s.userTimezone = d.userTimezone;
+    s.userLocation = d.userLocation;
+    s.kiloExaSearchMode = d.kiloExaSearchMode;
     s.channels = d.channels;
     s.googleCredentials = d.googleCredentials;
+    s.googleOAuthConnection = d.googleOAuthConnection;
+    s.googleWorkspaceToolsEnabled = d.googleWorkspaceToolsEnabled;
+    s.googleWorkspaceConfigSyncPending = d.googleWorkspaceConfigSyncPending;
+    s.googleWorkspaceConfigSyncError = d.googleWorkspaceConfigSyncError;
+    s.googleWorkspaceConfigSyncedAt = d.googleWorkspaceConfigSyncedAt;
     s.provisionedAt = d.provisionedAt;
     s.startingAt = d.startingAt;
     s.restartingAt = d.restartingAt;
@@ -182,6 +252,8 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
       } else {
         s.providerState = buildFlyProviderState(s);
       }
+    } else if (s.providerState) {
+      applyProviderState(s, s.providerState);
     }
     s.machineSize = d.machineSize;
     s.healthCheckFailCount = d.healthCheckFailCount;
@@ -257,8 +329,16 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.kilocodeApiKey = null;
   s.kilocodeApiKeyExpiresAt = null;
   s.kilocodeDefaultModel = null;
+  s.userTimezone = null;
+  s.userLocation = null;
+  s.kiloExaSearchMode = null;
   s.channels = null;
   s.googleCredentials = null;
+  s.googleOAuthConnection = null;
+  s.googleWorkspaceToolsEnabled = false;
+  s.googleWorkspaceConfigSyncPending = false;
+  s.googleWorkspaceConfigSyncError = null;
+  s.googleWorkspaceConfigSyncedAt = null;
   s.provisionedAt = null;
   s.startingAt = null;
   s.restartingAt = null;
@@ -335,8 +415,16 @@ export function createMutableState(): InstanceMutableState {
     kilocodeApiKey: null,
     kilocodeApiKeyExpiresAt: null,
     kilocodeDefaultModel: null,
+    userTimezone: null,
+    userLocation: null,
+    kiloExaSearchMode: null,
     channels: null,
     googleCredentials: null,
+    googleOAuthConnection: null,
+    googleWorkspaceToolsEnabled: false,
+    googleWorkspaceConfigSyncPending: false,
+    googleWorkspaceConfigSyncError: null,
+    googleWorkspaceConfigSyncedAt: null,
     provisionedAt: null,
     startingAt: null,
     restartingAt: null,

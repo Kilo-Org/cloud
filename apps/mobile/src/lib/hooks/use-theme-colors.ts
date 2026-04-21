@@ -31,7 +31,9 @@ const darkColors = {
   card: 'hsl(0, 0%, 3.9%)',
 } as const;
 
-export function useThemeColors() {
+export type ThemeColors = { readonly [K in keyof typeof lightColors]: string };
+
+export function useThemeColors(): ThemeColors {
   const colorScheme = useColorScheme();
   return colorScheme === 'dark' ? darkColors : lightColors;
 }

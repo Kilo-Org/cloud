@@ -111,6 +111,7 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
     generateMimoNoLongerFreeNotification,
+    generateTrinityLargeThinkingNoLongerFreeNotification,
     generateFirstDayWelcomeNotification,
     generateKiloPassNotification,
   ];
@@ -137,9 +138,10 @@ async function generateLowCreditNotification(
   if (balance >= 2) return [];
   const payments = await summarizeUserPayments(user.id);
 
-  const message = !payments.payments_count
-    ? `Your credit balance is low. Top up now and get $${FIRST_TOPUP_BONUS_AMOUNT()} extra on your first purchase! Add any amount of credits and we'll add $${FIRST_TOPUP_BONUS_AMOUNT()} on top instantly.`
-    : 'Your credit balance is low. Add credits to continue using the service without interruption.';
+  const message =
+    !payments.payments_count && FIRST_TOPUP_BONUS_AMOUNT > 0
+      ? `Your credit balance is low. Top up now and get $${FIRST_TOPUP_BONUS_AMOUNT} extra on your first purchase! Add any amount of credits and we'll add $${FIRST_TOPUP_BONUS_AMOUNT} on top instantly.`
+      : 'Your credit balance is low. Add credits to continue using the service without interruption.';
 
   return [
     {
@@ -147,9 +149,10 @@ async function generateLowCreditNotification(
       title: 'Low Credit Balance',
       message,
       action: {
-        actionText: !payments.payments_count
-          ? `Add Credits & Get $${FIRST_TOPUP_BONUS_AMOUNT()} Free`
-          : 'Add Credits',
+        actionText:
+          !payments.payments_count && FIRST_TOPUP_BONUS_AMOUNT > 0
+            ? `Add Credits & Get $${FIRST_TOPUP_BONUS_AMOUNT} Free`
+            : 'Add Credits',
         actionURL: `${APP_URL}/profile`,
       },
     },
@@ -175,7 +178,7 @@ async function generateAutoTopUpNotification(
       id: 'auto-top-up-dec-19',
       title: 'New: Auto Top-Ups',
       message:
-        "Set your top-up amount once—we'll automatically add credits when you drop below $5. First 200 users to trigger it get $20 bonus credits.",
+        "Set your top-up amount once—we'll automatically add credits when you drop below $5.",
       action: {
         actionText: 'Enable Auto Top-Ups',
         actionURL: 'https://app.kilo.ai/credits',
@@ -259,6 +262,44 @@ async function generateMimoNoLongerFreeNotification(
     ];
   } catch (e) {
     console.error('[generateMiniMaxNoLongerFreeNotification]', e);
+    return [];
+  }
+}
+
+async function generateTrinityLargeThinkingNoLongerFreeNotification(
+  user: User,
+  _ctx: NotificationContext
+): Promise<KiloNotification[]> {
+  try {
+    const users = await cachedPosthogQuery(
+      z.array(z.tuple([z.string()]).transform(([userId]) => userId))
+    )(
+      'trinity-large-thinking-no-longer-free-users',
+      'select kilo_user_id from notification_trinity_large_thinking_no_longer_free_users limit 5e5'
+    );
+
+    if (!users.includes(user.id)) {
+      console.debug(
+        '[generateTrinityLargeThinkingNoLongerFreeNotification] not showing notification for user'
+      );
+      return [];
+    }
+
+    console.debug(
+      '[generateTrinityLargeThinkingNoLongerFreeNotification] showing notification for user'
+    );
+    return [
+      {
+        id: 'trinity-large-thinking-no-longer-free',
+        title: 'Trinity Large Thinking is no longer free',
+        message:
+          'The Arcee AI Trinity Large Thinking free promotion has ended. You can continue using it as a paid model, or switch to Kilo Auto Free for free inference.',
+        suggestModelId: KILO_AUTO_FREE_MODEL.id,
+        showIn: ['cli', 'extension'],
+      },
+    ];
+  } catch (e) {
+    console.error('[generateTrinityLargeThinkingNoLongerFreeNotification]', e);
     return [];
   }
 }

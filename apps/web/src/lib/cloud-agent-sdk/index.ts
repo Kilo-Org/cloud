@@ -32,14 +32,21 @@ export { reduce } from './reducer';
 export { createChatProcessor } from './chat-processor';
 export type { ChatProcessor } from './chat-processor';
 
+export { configureCloudAgentSdkRuntime } from './runtime';
+export type { CloudAgentSdkRuntimeOverrides } from './runtime';
+
 export { createServiceState } from './service-state';
 export type { ServiceState, ServiceStateConfig } from './service-state';
 
 export { createCloudAgentTransport } from './cloud-agent-transport';
 export type { CloudAgentTransportConfig } from './cloud-agent-transport';
 
-export { createBaseConnection } from './base-connection';
-export type { BaseConnectionConfig } from './base-connection';
+export { createBaseConnection, createBrowserLifecycleHooks } from './base-connection';
+export type {
+  BaseConnectionConfig,
+  ConnectionLifecycleHooks,
+  WebSocketHeaders,
+} from './base-connection';
 
 export { createCliHistoricalTransport } from './cli-historical-transport';
 export type { CliHistoricalTransportConfig } from './cli-historical-transport';
@@ -47,7 +54,14 @@ export type { CliHistoricalTransportConfig } from './cli-historical-transport';
 export { createCliLiveTransport } from './cli-live-transport';
 export type { CliLiveTransportConfig } from './cli-live-transport';
 
-export type { TransportSink, Transport, TransportFactory, CloudAgentApi } from './transport';
+export type {
+  CloudAgentApi,
+  CloudAgentStreamTicket,
+  CloudAgentStreamTicketResult,
+  TransportFactory,
+  TransportSink,
+  Transport,
+} from './transport';
 
 export { createConnection } from './cloud-agent-connection';
 export type { Connection, ConnectionConfig } from './cloud-agent-connection';
@@ -56,6 +70,9 @@ export { createMemoryStorage } from './storage/memory';
 export { createJotaiStorage } from './storage/jotai';
 export type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
 export type { SessionStorage, StorageMutation } from './storage/types';
+
+export { stripPartContentIfFile } from './part-utils';
+export { splitByContiguousPrefix } from './array-utils';
 
 export type {
   MessageInfo,

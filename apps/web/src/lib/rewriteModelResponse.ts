@@ -1,5 +1,5 @@
-import { getOutputHeaders } from '@/lib/llm-proxy-helpers';
-import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/processUsage.types';
+import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
+import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { NextResponse } from 'next/server';

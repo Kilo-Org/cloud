@@ -1,10 +1,13 @@
 import type { FeatureValue } from '@/lib/feature-detection';
-import { minimax_m25_free_model } from '@/lib/providers/minimax';
-import { gpt_oss_20b_free_model, GPT_5_NANO_ID } from '@/lib/providers/openai';
+import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
+import {
+  gemma_4_26b_a4b_it_free_model,
+  GEMMA_4_31B_IT_ID,
+} from '@/lib/ai-gateway/providers/google';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
-} from '@/lib/providers/openrouter/types';
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
 import type { User } from '@kilocode/db';
 import {
@@ -13,40 +16,67 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   modeSchema,
   BALANCED_CLAW_SETUP_MODEL,
+  BALANCED_CLAW_MODEL,
   BALANCED_CODEX_MODEL,
-  BALANCED_QWEN_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
+  KILO_AUTO_LEGACY_MODEL,
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
+import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
+import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
 
-const ENABLE_QWEN_KILOCLAW_MODEL = false;
+const STEP_FLASH_ROUTING_PERCENTAGE = 20;
+
+type ResolveAutoModelParams = {
+  model: string;
+  modeHeader: string | null;
+  featureHeader: FeatureValue | null;
+  sessionId: string | null;
+  apiKind: GatewayRequest['kind'] | null;
+};
+
+function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
+  const parsedMode = modeSchema.safeParse(modeHeader?.trim() ?? '');
+  if (parsedMode.success) return parsedMode.data;
+  if (featureHeader === 'kiloclaw' || featureHeader === 'openclaw') return 'claw' as const;
+  return null;
+}
 
 export async function resolveAutoModel(
-  model: string,
-  modeHeader: string | null,
+  params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ): Promise<ResolvedAutoModel> {
+  const { model, modeHeader, featureHeader, sessionId, apiKind } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
+    if (
+      sessionId &&
+      stepfun_35_flash_free_model.status === 'public' &&
+      getRandomNumberLessThan100('step_routing_' + sessionId) < STEP_FLASH_ROUTING_PERCENTAGE
+    ) {
+      return { model: stepfun_35_flash_free_model.public_id };
+    }
     return { model: minimax_m25_free_model.public_id };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {
-      model: (await balancePromise) > 0 ? GPT_5_NANO_ID : gpt_oss_20b_free_model.public_id,
+      model:
+        (await balancePromise) > 0 ? GEMMA_4_31B_IT_ID : gemma_4_26b_a4b_it_free_model.public_id,
     };
   }
-  const modeResult = modeSchema.safeParse(modeHeader?.trim() ?? '');
-  const mode = modeResult.success ? modeResult.data : null;
-  if (model === KILO_AUTO_BALANCED_MODEL.id) {
-    if (mode === modeSchema.enum.KiloClaw) {
-      const user = await userPromise;
-      if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
-        return BALANCED_CLAW_SETUP_MODEL;
+  const mode = resolveMode(modeHeader, featureHeader);
+  if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
+    if (mode === 'claw') {
+      if (featureHeader === 'kiloclaw') {
+        const user = await userPromise;
+        if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
+          return BALANCED_CLAW_SETUP_MODEL;
+        }
       }
-      if (ENABLE_QWEN_KILOCLAW_MODEL) {
-        return BALANCED_QWEN_MODEL;
+      if (apiKind !== 'messages') {
+        return BALANCED_CLAW_MODEL;
       }
     }
     return BALANCED_CODEX_MODEL;
@@ -55,25 +85,18 @@ export async function resolveAutoModel(
 }
 
 export async function applyResolvedAutoModel(
-  model: string,
+  params: ResolveAutoModelParams,
   request: GatewayRequest,
-  modeHeader: string | null,
-  featureHeader: FeatureValue | null,
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ) {
-  const resolved = await resolveAutoModel(
-    model,
-    featureHeader === 'kiloclaw' || featureHeader === 'openclaw' ? 'KiloClaw' : modeHeader,
-    userPromise,
-    balancePromise
-  );
+  const resolved = await resolveAutoModel(params, userPromise, balancePromise);
   request.body.model = resolved.model;
   if (resolved.reasoning) {
     if (request.kind === 'messages') {
       request.body.thinking = { type: resolved.reasoning.enabled ? 'adaptive' : 'disabled' };
     } else {
-      request.body.reasoning = resolved.reasoning;
+      request.body.reasoning = { ...resolved.reasoning };
     }
   }
   if (resolved.verbosity) {

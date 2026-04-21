@@ -1,9 +1,9 @@
 /**
- * KiloClaw - Multi-tenant OpenClaw on Fly.io Machines
+ * KiloClaw - Multi-tenant OpenClaw runtimes
  *
- * Each authenticated user gets their own Fly Machine, managed by the
- * KiloClawInstance Durable Object. The catch-all proxy resolves the user's
- * flyMachineId from the DO and forwards HTTP/WebSocket traffic via Fly Proxy.
+ * Each authenticated user gets their own provider-backed runtime, managed by the
+ * KiloClawInstance Durable Object. The catch-all proxy resolves routing from the
+ * DO and forwards HTTP/WebSocket traffic through the active provider target.
  *
  * Auth model:
  * - User routes + catch-all proxy: JWT via authMiddleware (Bearer header or cookie)
@@ -117,7 +117,20 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   const missing: string[] = [];
   if (!env.NEXTAUTH_SECRET) missing.push('NEXTAUTH_SECRET');
   if (!env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
-  if (!env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
+  return missing;
+}
+
+function missingGoogleBrokerEnv(env: KiloClawEnv): string[] {
+  const missing: string[] = [];
+  if (!env.GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY) {
+    missing.push('GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY');
+  }
+  if (!env.GOOGLE_WORKSPACE_OAUTH_CLIENT_ID) {
+    missing.push('GOOGLE_WORKSPACE_OAUTH_CLIENT_ID');
+  }
+  if (!env.GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET) {
+    missing.push('GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET');
+  }
   return missing;
 }
 
@@ -147,11 +160,10 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
   // Platform routes need infra bindings but not AI provider keys
   if (isPlatformRoute(c)) {
     const missing: string[] = [];
-    if (!c.env.INTERNAL_API_SECRET) missing.push('INTERNAL_API_SECRET');
+    if (!c.env.KILOCLAW_INTERNAL_API_SECRET) missing.push('KILOCLAW_INTERNAL_API_SECRET');
     if (!c.env.HYPERDRIVE?.connectionString) missing.push('HYPERDRIVE');
     if (!c.env.NEXTAUTH_SECRET) missing.push('NEXTAUTH_SECRET');
     if (!c.env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
-    if (!c.env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
     if (missing.length > 0) {
       console.error('[CONFIG] Platform route missing bindings:', missing.join(', '));
       return c.json(
@@ -171,6 +183,18 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
     );
   }
 
+  return next();
+}
+
+async function requireControllerGoogleEnvVars(c: Context<AppEnv>, next: Next) {
+  const missing = missingGoogleBrokerEnv(c.env);
+  if (missing.length > 0) {
+    console.error('[CONFIG] Controller Google route missing bindings:', missing.join(', '));
+    return c.json(
+      { error: 'Configuration error' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
   return next();
 }
 
@@ -205,6 +229,7 @@ async function deriveSandboxId(c: Context<AppEnv>, next: Next) {
 // =============================================================================
 
 const app = new Hono<AppEnv>();
+let didLogGoogleBrokerConfig = false;
 
 // Global middleware (all routes)
 app.use('*', timingMiddleware);
@@ -213,6 +238,10 @@ app.use('*', logRequest);
 // Public routes (no auth)
 app.route('/', publicRoutes);
 app.route('/', accessGatewayRoutes);
+
+// Google OAuth broker controller routes must have full broker config.
+app.use('/api/controller/google', requireControllerGoogleEnvVars);
+app.use('/api/controller/google/*', requireControllerGoogleEnvVars);
 
 // Controller check-in routes (machine-to-worker, custom auth)
 app.route('/api/controller', controller);
@@ -288,7 +317,7 @@ app.all('/i/:instanceId/*', async c => {
   if (status.status === 'recovering') {
     return c.json({ error: 'Instance is recovering from an unexpected stop' }, 409);
   }
-  if (!status.flyMachineId) {
+  if (!status.runtimeId) {
     return c.json({ error: 'Instance not provisioned' }, 404);
   }
   if (!status.sandboxId) {
@@ -317,8 +346,8 @@ app.all('/i/:instanceId/*', async c => {
     strippedPath,
     'instance:',
     instanceId,
-    'machine:',
-    status.flyMachineId
+    'runtime:',
+    status.runtimeId
   );
 
   const isWebSocketRequest = c.req.raw.headers.get('Upgrade')?.toLowerCase() === 'websocket';
@@ -538,8 +567,8 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
 }
 
 /**
- * Resolve the flyMachineId, flyAppName, sandboxId, and status for the current user from their DO.
- * Returns null machineId if the instance is destroying (blocks proxy during teardown).
+ * Resolve the active provider runtime id, sandboxId, and status for the current user from their DO.
+ * Returns null runtimeId if the instance is destroying (blocks proxy during teardown).
  * Routes through the user registry, which triggers lazy migration on first access.
  *
  * The returned sandboxId is the DO's authoritative value — it may differ from the
@@ -548,25 +577,25 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
  */
 async function resolveInstance(c: Context<AppEnv>): Promise<{
   stub: ReturnType<KiloClawEnv['KILOCLAW_INSTANCE']['get']> | null;
-  machineId: string | null;
+  runtimeId: string | null;
   sandboxId: string | null;
   status: string | null;
 }> {
   const resolved = await resolveRegistryEntry(c);
-  if (!resolved) return { stub: null, machineId: null, sandboxId: null, status: null };
+  if (!resolved) return { stub: null, runtimeId: null, sandboxId: null, status: null };
 
   const s = await resolved.stub.getStatus();
 
   if (s.status === 'destroying')
-    return { stub: resolved.stub, machineId: null, sandboxId: null, status: 'destroying' };
+    return { stub: resolved.stub, runtimeId: null, sandboxId: null, status: 'destroying' };
   if (s.status === 'restoring')
-    return { stub: resolved.stub, machineId: null, sandboxId: null, status: 'restoring' };
+    return { stub: resolved.stub, runtimeId: null, sandboxId: null, status: 'restoring' };
   if (s.status === 'recovering')
-    return { stub: resolved.stub, machineId: null, sandboxId: null, status: 'recovering' };
+    return { stub: resolved.stub, runtimeId: null, sandboxId: null, status: 'recovering' };
 
   return {
     stub: resolved.stub,
-    machineId: s.flyMachineId,
+    runtimeId: s.runtimeId,
     sandboxId: s.sandboxId,
     status: s.status,
   };
@@ -627,7 +656,7 @@ app.all('*', async c => {
             409
           );
         }
-        if (!instanceStatus.flyMachineId) {
+        if (!instanceStatus.runtimeId) {
           return c.json(
             { error: 'Instance not provisioned', hint: 'The instance has no running machine.' },
             404
@@ -645,8 +674,8 @@ app.all('*', async c => {
           console.log(
             '[PROXY] Cookie-routed to instance:',
             activeInstanceId,
-            'machine:',
-            instanceStatus.flyMachineId
+            'runtime:',
+            instanceStatus.runtimeId
           );
           const request = c.req.raw;
           const url = new URL(request.url);
@@ -783,7 +812,7 @@ app.all('*', async c => {
     // Cookie invalid/stale — fall through to default personal resolution
   }
 
-  const { stub, machineId, sandboxId, status } = await resolveInstance(c);
+  const { stub, runtimeId, sandboxId, status } = await resolveInstance(c);
   if (status === 'destroying') {
     return c.json(
       { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
@@ -808,7 +837,7 @@ app.all('*', async c => {
       409
     );
   }
-  if (!machineId) {
+  if (!runtimeId) {
     return c.json(
       {
         error: 'Instance not provisioned',
@@ -836,7 +865,7 @@ app.all('*', async c => {
   }
   let targetUrl = routingTargetUrl(routingTarget, url.pathname, url.search);
 
-  console.log('[PROXY] Handling request:', url.pathname, 'machine:', machineId);
+  console.log('[PROXY] Handling request:', url.pathname, 'runtime:', runtimeId);
 
   const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
 
@@ -876,7 +905,7 @@ app.all('*', async c => {
         // Machine may have been recreated — refresh the instance routing header
         const refreshedInstance = await resolveInstance(c);
         if (
-          !refreshedInstance.machineId ||
+          !refreshedInstance.runtimeId ||
           !refreshedInstance.stub ||
           !refreshedInstance.sandboxId
         ) {
@@ -1042,7 +1071,7 @@ app.all('*', async c => {
     if (recovered) {
       // Machine may have been recreated — refresh the instance routing header
       const refreshedInstance = await resolveInstance(c);
-      if (!refreshedInstance.machineId || !refreshedInstance.stub || !refreshedInstance.sandboxId) {
+      if (!refreshedInstance.runtimeId || !refreshedInstance.stub || !refreshedInstance.sandboxId) {
         return c.json(
           { error: 'Instance not reachable after restart' },
           { status: 503, headers: { 'Retry-After': '5' } }
@@ -1098,6 +1127,16 @@ app.all('*', async c => {
 
 export default {
   fetch(request: Request, env: KiloClawEnv, ctx: ExecutionContext) {
+    if (!didLogGoogleBrokerConfig) {
+      const missing = missingGoogleBrokerEnv(env);
+      if (missing.length > 0) {
+        console.warn('[CONFIG] Google OAuth broker env incomplete:', missing.join(', '));
+      } else {
+        console.log('[CONFIG] Google OAuth broker env ready');
+      }
+      didLogGoogleBrokerConfig = true;
+    }
+
     // Self-register the current OpenClaw version in KV on deploy.
     // Runs after the response is sent. If the very first request after deploy
     // is a provision(), the KV write races with resolveLatestVersion() —

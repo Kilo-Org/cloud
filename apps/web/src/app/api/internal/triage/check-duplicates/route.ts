@@ -22,7 +22,7 @@ import { getTriageTicketById, updateTriageTicketStatus } from '@/lib/auto-triage
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
-import { createEmbeddingService } from '@/lib/embeddings/embedding-providers';
+import { createEmbeddingService } from '@/lib/ai-gateway/embeddings/embedding-providers';
 import { getMilvusClient } from '@/lib/code-indexing/milvus';
 import { createHash } from 'crypto';
 

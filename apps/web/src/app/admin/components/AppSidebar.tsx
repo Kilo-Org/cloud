@@ -5,14 +5,12 @@ import {
   Users,
   DollarSign,
   Building2,
-  ShieldAlert,
   Shield,
   Ban,
   Database,
   BarChart,
   Rocket,
   Blocks,
-  MessageSquare,
   Bot,
   Sparkles,
   MailCheck,
@@ -22,8 +20,8 @@ import {
   Upload,
   Bell,
   Network,
-  RefreshCw,
   KeyRound,
+  Copy,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -67,11 +65,6 @@ const userManagementItems: MenuItem[] = [
     icon: () => <Building2 />,
   },
   {
-    title: () => 'Abuse',
-    url: '/admin/abuse',
-    icon: () => <ShieldAlert />,
-  },
-  {
     title: () => 'Bulk Block',
     url: '/admin/bulk-block',
     icon: () => <Ban />,
@@ -82,9 +75,14 @@ const userManagementItems: MenuItem[] = [
     icon: () => <Shield />,
   },
   {
-    title: () => 'Safety Identifiers',
-    url: '/admin/safety-identifiers',
+    title: () => 'Backfills',
+    url: '/admin/backfills',
     icon: () => <KeyRound />,
+  },
+  {
+    title: () => 'Account Deduplication',
+    url: '/admin/account-deduplication',
+    icon: () => <Copy />,
   },
 ];
 
@@ -123,13 +121,8 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <GitPullRequest />,
   },
   {
-    title: () => 'Slack Bot',
-    url: '/admin/slack-bot',
-    icon: () => <MessageSquare />,
-  },
-  {
     title: () => 'Kilo Bot',
-    url: '/admin/bot-requests',
+    url: '/admin/bots',
     icon: () => <Bot />,
   },
   {
@@ -158,14 +151,9 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <Network />,
   },
   {
-    title: () => 'Sync Providers',
-    url: '/admin/sync-providers',
-    icon: () => <RefreshCw />,
-  },
-  {
-    title: () => 'Custom LLMs',
-    url: '/admin/custom-llms',
-    icon: () => <Bot />,
+    title: () => 'Gateway',
+    url: '/admin/gateway',
+    icon: () => <Network />,
   },
 ];
 
@@ -193,11 +181,6 @@ const analyticsObservabilityItems: MenuItem[] = [
   {
     title: () => 'Alerting',
     url: '/admin/alerting',
-    icon: () => <Bell />,
-  },
-  {
-    title: () => 'Alerting (TTFB)',
-    url: '/admin/alerting-ttfb',
     icon: () => <Bell />,
   },
   {

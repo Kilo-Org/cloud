@@ -2,6 +2,10 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getEnvVariable } from '@/lib/dotenvx';
+import {
+  isInstanceKeyedSandboxId,
+  instanceIdFromSandboxId,
+} from '@kilocode/worker-utils/instance-id';
 
 type QueryType = 'instance-events' | 'all-events';
 
@@ -24,7 +28,7 @@ function isSafeIdentifier(value: string): boolean {
 
 type AllEventsParams = {
   sandboxId: string;
-  userId: string;
+  instanceId: string | null;
   flyAppName: string | null;
   flyMachineId: string | null;
   offset: number;
@@ -60,7 +64,14 @@ FORMAT JSON`;
     case 'all-events': {
       // All identifiers are validated before reaching here
       const p = params as AllEventsParams;
-      const orClauses = [`blob2 = '${p.userId}'`, `blob8 = '${p.sandboxId}'`];
+      // Use instance-scoped identifiers to avoid cross-instance bleed.
+      // userId (blob2) is intentionally excluded — it's shared across personal + org instances.
+      // NOTE: HTTP-layer analytics middleware currently writes the legacy userId-derived
+      // sandboxId (not the ki_* instance-scoped one) and empty flyAppName/flyMachineId,
+      // so HTTP events for instance-keyed sandboxes won't appear here until the HTTP
+      // instrumentation is updated to emit instance-scoped identifiers.
+      const orClauses = [`blob8 = '${p.sandboxId}'`];
+      if (p.instanceId) orClauses.push(`blob15 = '${p.instanceId}'`);
       if (p.flyMachineId) orClauses.push(`blob7 = '${p.flyMachineId}'`);
       if (p.flyAppName) orClauses.push(`blob6 = '${p.flyAppName}'`);
       return `SELECT
@@ -78,6 +89,8 @@ FORMAT JSON`;
   blob11 AS image_tag,
   blob12 AS fly_region,
   blob13 AS label,
+  blob14 AS org_id,
+  blob15 AS instance_id,
   double1 AS duration_ms,
   double2 AS value
 FROM kiloclaw_events
@@ -135,15 +148,11 @@ export async function GET(
   let sqlQuery: string;
 
   if (queryType === 'all-events') {
-    const userId = searchParams.get('userId');
     const flyAppName = searchParams.get('flyAppName');
     const flyMachineId = searchParams.get('flyMachineId');
     const offsetParam = searchParams.get('offset');
     const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
 
-    if (!userId || !isSafeIdentifier(userId)) {
-      return NextResponse.json({ error: 'Invalid or missing userId' }, { status: 400 });
-    }
     if (flyAppName && !isSafeIdentifier(flyAppName)) {
       return NextResponse.json({ error: 'Invalid flyAppName' }, { status: 400 });
     }
@@ -154,9 +163,13 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid offset' }, { status: 400 });
     }
 
+    const instanceId = isInstanceKeyedSandboxId(sandboxId)
+      ? instanceIdFromSandboxId(sandboxId)
+      : null;
+
     sqlQuery = buildQuery('all-events', sandboxId, {
       sandboxId,
-      userId,
+      instanceId,
       flyAppName: flyAppName ?? null,
       flyMachineId: flyMachineId ?? null,
       offset,

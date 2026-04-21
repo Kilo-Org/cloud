@@ -13,6 +13,11 @@ export type ExecutionCallbackPayload = {
   kiloSessionId?: string;
   /** Gate result reported by the agent when gate_threshold is active */
   gateResult?: 'pass' | 'fail';
+  /**
+   * Concatenated text of the latest assistant message at the time of callback.
+   * Undefined when no assistant message has been recorded yet.
+   */
+  lastAssistantMessageText?: string;
 };
 
 export type CallbackJob = {

@@ -23,6 +23,15 @@ export type ProductTelemetry = {
   toolsProfile: string | null;
   execSecurity: string | null;
   browserEnabled: boolean;
+  googleLegacyMigrationAttempted?: boolean;
+  googleLegacyMigrationSucceeded?: boolean;
+  googleLegacyMigrationFailureReason?: string | null;
+};
+
+export type ProductTelemetryExtras = {
+  googleLegacyMigrationAttempted?: boolean;
+  googleLegacyMigrationSucceeded?: boolean;
+  googleLegacyMigrationFailureReason?: string | null;
 };
 
 // Per-section schemas — each is parsed independently so one bad section
@@ -52,7 +61,8 @@ const defaultDeps: ProductTelemetryDeps = {
 
 export function collectProductTelemetry(
   openclawVersion: string | null,
-  deps: ProductTelemetryDeps = defaultDeps
+  deps: ProductTelemetryDeps = defaultDeps,
+  extras?: ProductTelemetryExtras
 ): ProductTelemetry {
   const empty: ProductTelemetry = {
     openclawVersion,
@@ -62,6 +72,7 @@ export function collectProductTelemetry(
     toolsProfile: null,
     execSecurity: null,
     browserEnabled: false,
+    ...extras,
   };
 
   let raw: unknown;
@@ -87,5 +98,6 @@ export function collectProductTelemetry(
     toolsProfile: (tools.success && tools.data.profile) || null,
     execSecurity: (tools.success && tools.data.exec?.security) || null,
     browserEnabled: browser.success ? browser.data.enabled : false,
+    ...extras,
   };
 }

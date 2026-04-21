@@ -603,6 +603,97 @@
       "when": 1775999621732,
       "tag": "0085_mixed_pestilence",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1776244339941,
+      "tag": "0086_puzzling_crystal",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1776258588925,
+      "tag": "0087_lively_skin",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1776267352667,
+      "tag": "0088_melted_sentinels",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1776284246585,
+      "tag": "0089_secret_molten_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1776340276295,
+      "tag": "0090_silly_alice",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1776345680886,
+      "tag": "0091_living_vulture",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1776424147392,
+      "tag": "0092_sudden_alice",
+      "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1776433446928,
+      "tag": "0093_living_living_lightning",
+      "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1776438967235,
+      "tag": "0094_loud_wrecker",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1776444828897,
+      "tag": "0095_left_unicorn",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1776448720072,
+      "tag": "0096_grey_nick_fury",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1776670788432,
+      "tag": "0097_fast_tempest",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1776724301780,
+      "tag": "0098_google_oauth_kiloclaw_broker",
+      "breakpoints": true
     }
   ]
 }

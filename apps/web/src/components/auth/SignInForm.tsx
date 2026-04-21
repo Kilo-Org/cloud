@@ -12,7 +12,7 @@ import { AuthErrorNotification } from '@/components/auth/AuthErrorNotification';
 import Link from 'next/link';
 import { Mail, SquareUserRound } from 'lucide-react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
-import { OAuthProviderIds, ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
+import { OAuthProviderIds } from '@/lib/auth/provider-metadata';
 
 type SignInFormProps = {
   searchParams: Record<string, string>;
@@ -25,6 +25,13 @@ type SignInFormProps = {
   ssoMode?: boolean; // If true, triggers SSO-specific messaging and email input view
   storybookInitialState?: SignInFormInitialState;
 };
+
+function signInHrefFromSearchParams(searchParams: Record<string, string>): string {
+  const params = new URLSearchParams(searchParams);
+  params.delete('signup');
+  const query = params.toString();
+  return query ? `/users/sign_in?${query}` : '/users/sign_in';
+}
 
 export function SignInForm({
   searchParams,
@@ -188,21 +195,12 @@ export function SignInForm({
                       customLabels={emailCustomLabel}
                     />
 
-                    {/* Expandable other methods section */}
-                    {flow.showOtherMethods ? (
-                      <AuthProviderButtons
-                        providers={ProdNonSSOAuthProviders.filter(p => p !== lastAuthMethod)}
-                        onProviderClick={flow.handleOAuthClick}
-                      />
-                    ) : (
-                      // Show "see other methods" button
-                      <button
-                        onClick={flow.handleToggleOtherMethods}
-                        className="text-muted-foreground text-sm hover:underline"
-                      >
-                        or see other sign-in methods
-                      </button>
-                    )}
+                    <button
+                      onClick={flow.handleClearHint}
+                      className="text-muted-foreground text-sm hover:underline"
+                    >
+                      or see other sign-in methods
+                    </button>
                   </div>
                 );
               })()}
@@ -342,7 +340,10 @@ export function SignInForm({
                 {isSignUp ? (
                   <p className="text-muted-foreground text-sm">
                     Already have an account?{' '}
-                    <Link href="/users/sign_in" className="text-primary hover:underline">
+                    <Link
+                      href={signInHrefFromSearchParams(searchParams)}
+                      className="text-primary hover:underline"
+                    >
                       Sign in
                     </Link>
                   </p>

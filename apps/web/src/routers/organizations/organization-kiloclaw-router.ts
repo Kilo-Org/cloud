@@ -17,6 +17,7 @@ import {
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
 import { KILOCLAW_API_URL } from '@/lib/config.server';
+import { sentryLogger } from '@/lib/utils.server';
 import { db } from '@/lib/drizzle';
 import {
   kiloclaw_version_pins,
@@ -25,15 +26,24 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
+import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
+import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
 import {
-  ensureActiveInstance,
+  cycleInboundEmailAddressForInstance,
+  getInboundEmailAddressForInstance,
+} from '@/lib/kiloclaw/inbound-email-alias';
+import {
   getActiveOrgInstance,
   markActiveInstanceDestroyed,
-  markInstanceDestroyedById,
   renameOrgInstance,
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
+import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
+import {
+  getOrganizationProvisionLockKey,
+  withKiloclawProvisionContextLock,
+} from '@/lib/kiloclaw/provision-lock';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -126,6 +136,24 @@ const kilocodeDefaultModelSchema = z
     'kilocodeDefaultModel must start with kilocode/ and include a provider'
   );
 
+function isValidUserTimezone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date(0));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const userTimezoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(100)
+  .refine(isValidUserTimezone, 'userTimezone must be a valid IANA timezone');
+
+const userLocationSchema = z.string().trim().min(1).max(200);
+
 const channelsSchema = z
   .object({
     telegramBotToken: z.string().optional(),
@@ -141,11 +169,18 @@ const updateConfigSchema = z.object({
   secrets: z.record(z.string(), z.string()).optional(),
   channels: channelsSchema,
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
+  userTimezone: userTimezoneSchema.nullable().optional(),
+  userLocation: userLocationSchema.nullable().optional(),
 });
 
 const updateKiloCodeConfigSchema = z.object({
   organizationId: z.uuid(),
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
+});
+
+const patchWebSearchConfigSchema = z.object({
+  organizationId: z.uuid(),
+  exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
 });
 
 const patchChannelsSchema = z.object({
@@ -209,6 +244,8 @@ function sanitizeKiloCodeConfigResponse(
   };
 }
 
+const logDiskUsageError = sentryLogger('organization-kiloclaw-disk-usage', 'error');
+
 // ── Router ─────────────────────────────────────────────────────────
 
 export const organizationKiloclawRouter = createTRPCRouter({
@@ -256,6 +293,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
       return {
         userId: ctx.user.id,
         sandboxId: null,
+        provider: null,
+        runtimeId: null,
+        storageId: null,
+        region: null,
         status: null,
         provisionedAt: null,
         lastStartedAt: null,
@@ -273,6 +314,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
         trackedImageTag: null,
         trackedImageDigest: null,
         googleConnected: false,
+        googleOAuthConnected: false,
+        googleOAuthStatus: 'disconnected',
+        googleOAuthAccountEmail: null,
+        googleOAuthCapabilities: [],
         gmailNotificationsEnabled: false,
         execSecurity: null,
         execAsk: null,
@@ -283,18 +328,43 @@ export const organizationKiloclawRouter = createTRPCRouter({
         workerUrl,
         name: null,
         instanceId: null,
+        inboundEmailAddress: null,
+        inboundEmailEnabled: false,
       } satisfies KiloClawDashboardStatus;
     }
 
     const client = new KiloClawInternalClient();
-    const status = await client.getStatus(ctx.user.id, workerInstanceId(instance));
+    const [status, inboundEmailAddress] = await Promise.all([
+      client.getStatus(ctx.user.id, workerInstanceId(instance)),
+      getInboundEmailAddressForInstance(instance.id),
+    ]);
 
     return {
       ...status,
       name: instance.name ?? null,
       workerUrl,
       instanceId: instance.id,
+      inboundEmailAddress,
+      inboundEmailEnabled: instance.inboundEmailEnabled,
     } satisfies KiloClawDashboardStatus;
+  }),
+
+  getDiskUsage: organizationMemberProcedure.query(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+    try {
+      return await queryDiskUsage(instance.sandboxId);
+    } catch (error) {
+      logDiskUsageError('Failed to fetch organization disk usage', {
+        error,
+        organizationId: input.organizationId,
+        sandboxId: instance.sandboxId,
+      });
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch disk usage',
+        cause: error,
+      });
+    }
   }),
 
   renameInstance: organizationMemberMutationProcedure
@@ -310,83 +380,74 @@ export const organizationKiloclawRouter = createTRPCRouter({
       }
     }),
 
+  cycleInboundEmailAddress: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+    return {
+      inboundEmailAddress: await cycleInboundEmailAddressForInstance(instance.id),
+    };
+  }),
+
   // ── Lifecycle ─────────────────────────────────────────────────
 
   provision: organizationMemberMutationProcedure
     .input(updateConfigSchema)
     .mutation(async ({ ctx, input }) => {
-      // TODO: org-specific kiloclaw billing gate — currently gated by
-      // organizationMemberMutationProcedure (requireActiveSubscriptionOrTrial for org)
+      return await withKiloclawProvisionContextLock(
+        getOrganizationProvisionLockKey(ctx.user.id, input.organizationId),
+        async () => {
+          // TODO: org-specific kiloclaw billing gate — currently gated by
+          // organizationMemberMutationProcedure (requireActiveSubscriptionOrTrial for org)
+          const existing = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+          if (existing) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'You already have an active KiloClaw instance in this organization',
+            });
+          }
 
-      // Cardinality check: 1 instance per (org, user) in Phase 1
-      const existing = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-      if (existing) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'You already have an active KiloClaw instance in this organization',
-        });
-      }
+          const encryptedSecrets = input.secrets
+            ? Object.fromEntries(
+                Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
+              )
+            : undefined;
 
-      const { instance: instanceRow } = await ensureActiveInstance(ctx.user.id, {
-        orgId: input.organizationId,
-      });
+          const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
+          const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
+            expiresIn: expiresInSeconds,
+          });
+          const kilocodeApiKeyExpiresAt = new Date(
+            Date.now() + expiresInSeconds * 1000
+          ).toISOString();
 
-      const encryptedSecrets = input.secrets
-        ? Object.fromEntries(
-            Object.entries(input.secrets).map(([k, v]) => [k, encryptKiloClawSecret(v)])
-          )
-        : undefined;
-
-      const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
-      const kilocodeApiKey = generateApiToken(ctx.user, undefined, {
-        expiresIn: expiresInSeconds,
-      });
-      const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
-
-      // Check if the user has a version pin
-      const [pin] = await db
-        .select({ image_tag: kiloclaw_version_pins.image_tag })
-        .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.instance_id, instanceRow.id))
-        .limit(1);
-
-      const client = new KiloClawInternalClient();
-      try {
-        const result = await client.provision(
-          ctx.user.id,
-          {
-            envVars: input.envVars,
-            encryptedSecrets,
-            channels: buildWorkerChannels(input.channels),
-            kilocodeApiKey,
-            kilocodeApiKeyExpiresAt,
-            kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-            pinnedImageTag: pin?.image_tag,
-          },
-          { instanceId: instanceRow.id, orgId: input.organizationId }
-        );
-
-        PostHogClient().capture({
-          distinctId: ctx.user.google_user_email,
-          event: 'claw_org_instance_provisioned',
-          properties: {
-            user_id: ctx.user.id,
-            organization_id: input.organizationId,
-            instance_id: instanceRow.id,
-          },
-        });
-
-        return result;
-      } catch (error) {
-        // Org provision always creates a new row, so always clean up on failure.
-        await markInstanceDestroyedById(instanceRow.id).catch(cleanupErr => {
-          console.error(
-            '[kiloclaw-org] Failed to clean up instance row after provision error:',
-            cleanupErr
+          const client = new KiloClawInternalClient();
+          const result = await client.provision(
+            ctx.user.id,
+            {
+              envVars: input.envVars,
+              encryptedSecrets,
+              channels: buildWorkerChannels(input.channels),
+              kilocodeApiKey,
+              kilocodeApiKeyExpiresAt,
+              kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+              userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+              userLocation: input.userLocation === undefined ? undefined : input.userLocation,
+            },
+            { orgId: input.organizationId }
           );
-        });
-        throw error;
-      }
+
+          PostHogClient().capture({
+            distinctId: ctx.user.google_user_email,
+            event: 'claw_org_instance_provisioned',
+            properties: {
+              user_id: ctx.user.id,
+              organization_id: input.organizationId,
+              instance_id: result.instanceId,
+            },
+          });
+
+          return result;
+        }
+      );
     }),
 
   updateConfig: organizationMemberMutationProcedure
@@ -423,6 +484,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
           kilocodeApiKey,
           kilocodeApiKeyExpiresAt,
           kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+          userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+          userLocation: input.userLocation === undefined ? undefined : input.userLocation,
           pinnedImageTag: pin?.image_tag,
         },
         { instanceId: instance.id, orgId: input.organizationId }
@@ -451,14 +514,27 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const destroyedRow = await markActiveInstanceDestroyed(ctx.user.id, instance.id);
     const client = new KiloClawInternalClient();
+    let result: Awaited<ReturnType<KiloClawInternalClient['destroy']>>;
     try {
-      return await client.destroy(ctx.user.id, workerInstanceId(instance));
+      result = await client.destroy(ctx.user.id, workerInstanceId(instance));
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);
       }
       throw error;
     }
+
+    try {
+      await clearSubscriptionLifecycleAfterInstanceDestroy({
+        actorUserId: ctx.user.id,
+        kiloUserId: ctx.user.id,
+        instanceId: instance.id,
+      });
+    } catch (cleanupError) {
+      console.error('[organization-kiloclaw] Post-destroy cleanup failed:', cleanupError);
+    }
+
+    return result;
   }),
 
   // ── Config ────────────────────────────────────────────────────
@@ -526,6 +602,18 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
       return client.patchExecPreset(ctx.user.id, input, workerInstanceId(instance));
+    }),
+
+  patchWebSearchConfig: organizationMemberMutationProcedure
+    .input(patchWebSearchConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.patchWebSearchConfig(
+        ctx.user.id,
+        { exaMode: input.exaMode },
+        workerInstanceId(instance)
+      );
     }),
 
   patchBotIdentity: organizationMemberMutationProcedure
@@ -1103,126 +1191,77 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
-      const result = await client.startKiloCliRun(
-        ctx.user.id,
-        input.prompt,
-        workerInstanceId(instance)
-      );
 
-      const [row] = await db
-        .insert(kiloclaw_cli_runs)
-        .values({
-          user_id: ctx.user.id,
-          instance_id: instance.id,
-          prompt: input.prompt,
-          status: 'running',
-          started_at: result.startedAt,
-        })
-        .returning({ id: kiloclaw_cli_runs.id });
+      let result: Awaited<ReturnType<KiloClawInternalClient['startKiloCliRun']>>;
+      try {
+        result = await client.startKiloCliRun(
+          ctx.user.id,
+          input.prompt,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        if (err instanceof KiloClawApiError) {
+          const { code, message } = getKiloClawApiErrorPayload(err);
+          if (code === 'controller_route_unavailable') {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'Instance needs redeploy to support recovery',
+              cause: new UpstreamApiError('controller_route_unavailable'),
+            });
+          }
+          if (err.statusCode === 409) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: message ?? 'Instance is busy',
+              cause: code ? new UpstreamApiError(code) : undefined,
+            });
+          }
+        }
+        throw err;
+      }
 
-      return { ...result, id: row.id };
+      const runId = await createCliRun({
+        userId: ctx.user.id,
+        instanceId: instance.id,
+        prompt: input.prompt,
+        startedAt: result.startedAt,
+        initiatedByAdminId: null,
+      });
+
+      return { ...result, id: runId };
     }),
 
   getKiloCliRunStatus: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid(), runId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
-      const [row] = await db
-        .select()
-        .from(kiloclaw_cli_runs)
-        .where(
-          and(
-            eq(kiloclaw_cli_runs.id, input.runId),
-            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
-            eq(kiloclaw_cli_runs.instance_id, instance.id)
-          )
-        )
-        .limit(1);
-
-      if (!row) {
-        return {
-          hasRun: false,
-          status: null,
-          output: null,
-          exitCode: null,
-          startedAt: null,
-          completedAt: null,
-          prompt: null,
-        };
-      }
-
-      if (row.status !== 'running') {
-        return {
-          hasRun: true,
-          status: row.status as 'completed' | 'failed' | 'cancelled',
-          output: row.output,
-          exitCode: row.exit_code,
-          startedAt: row.started_at,
-          completedAt: row.completed_at ?? null,
-          prompt: row.prompt,
-        };
-      }
-
-      const client = new KiloClawInternalClient();
-      const controllerStatus = await client.getKiloCliRunStatus(
-        ctx.user.id,
-        workerInstanceId(instance)
-      );
-
-      if (
-        controllerStatus.hasRun &&
-        controllerStatus.status !== 'running' &&
-        controllerStatus.startedAt
-      ) {
-        await db
-          .update(kiloclaw_cli_runs)
-          .set({
-            status: controllerStatus.status ?? 'failed',
-            exit_code: controllerStatus.exitCode,
-            output: controllerStatus.output,
-            completed_at: controllerStatus.completedAt ?? new Date().toISOString(),
-          })
-          .where(
-            and(
-              eq(kiloclaw_cli_runs.id, input.runId),
-              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
-              eq(kiloclaw_cli_runs.instance_id, instance.id),
-              eq(kiloclaw_cli_runs.status, 'running')
-            )
-          );
-      }
-
-      return {
-        ...controllerStatus,
-        prompt: row.prompt,
-      };
+      return getCliRunStatus({
+        runId: input.runId,
+        userId: ctx.user.id,
+        instanceId: instance.id,
+        workerInstanceId: workerInstanceId(instance),
+      });
     }),
 
   cancelKiloCliRun: organizationMemberMutationProcedure
     .input(z.object({ organizationId: z.uuid(), runId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
-      const client = new KiloClawInternalClient();
-      const result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
+      const result = await cancelCliRun({
+        runId: input.runId,
+        userId: ctx.user.id,
+        instanceId: instance.id,
+        workerInstanceId: workerInstanceId(instance),
+      });
 
-      if (result.ok) {
-        await db
-          .update(kiloclaw_cli_runs)
-          .set({
-            status: 'cancelled',
-            completed_at: new Date().toISOString(),
-          })
-          .where(
-            and(
-              eq(kiloclaw_cli_runs.id, input.runId),
-              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
-              eq(kiloclaw_cli_runs.instance_id, instance.id),
-              eq(kiloclaw_cli_runs.status, 'running')
-            )
-          );
+      if (!result.runFound) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Kilo CLI run not found',
+        });
       }
 
-      return result;
+      return { ok: result.ok };
     }),
 
   listKiloCliRuns: organizationMemberProcedure

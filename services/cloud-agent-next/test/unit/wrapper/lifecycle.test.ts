@@ -17,6 +17,14 @@ import {
 } from '../../../wrapper/src/lifecycle.js';
 import { WrapperState, type JobContext } from '../../../wrapper/src/state.js';
 import type { WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
+
+vi.mock('../../../wrapper/src/auto-commit.js', () => ({
+  runAutoCommit: vi.fn(),
+}));
+
+import { runAutoCommit } from '../../../wrapper/src/auto-commit.js';
+
+const mockRunAutoCommit = vi.mocked(runAutoCommit);
 // ---------------------------------------------------------------------------
 // Test Helpers
 // ---------------------------------------------------------------------------
@@ -84,6 +92,7 @@ describe('createLifecycleManager', () => {
     kiloClient = createMockKiloClient();
     connectionFns = createMockConnectionFns();
     config = createDefaultConfig();
+    mockRunAutoCommit.mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
@@ -409,10 +418,70 @@ describe('createLifecycleManager', () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
 
-    it('sends error event if auto-commit fails', async () => {
-      // This would require mocking runAutoCommit which is imported
-      // For unit tests, we verify the error handling path exists
-      // Full integration testing would mock the auto-commit module
+    it('aborts auto-commit when the lifecycle timeout fires', async () => {
+      const sendToIngestSpy = vi.fn();
+      state.setSendToIngestFn(sendToIngestSpy);
+      mockRunAutoCommit.mockImplementation(
+        ({ signal }) =>
+          new Promise(resolve => {
+            signal?.addEventListener(
+              'abort',
+              () => resolve({ success: false, error: 'exec aborted' }),
+              {
+                once: true,
+              }
+            );
+          })
+      );
+
+      const mgr = createManager({}, { autoCommit: true });
+      state.startJob(createJobContext());
+
+      mgr.triggerDrainAndClose();
+      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(300);
+
+      const autoCommitCall = mockRunAutoCommit.mock.calls[0]?.[0];
+      expect(autoCommitCall?.signal?.aborted).toBe(true);
+      expect(sendToIngestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          streamEventType: 'error',
+          data: { error: 'Auto-commit timed out', fatal: false },
+        })
+      );
+      expect(sendToIngestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ streamEventType: 'complete' })
+      );
+    });
+
+    it('does not report lifecycle timeout when auto-commit wins the timeout race', async () => {
+      const sendToIngestSpy = vi.fn();
+      state.setSendToIngestFn(sendToIngestSpy);
+      mockRunAutoCommit.mockImplementation(
+        ({ signal }) =>
+          new Promise(resolve => {
+            signal?.addEventListener('abort', () => resolve({ success: true }), {
+              once: true,
+            });
+          })
+      );
+
+      const mgr = createManager({}, { autoCommit: true });
+      state.startJob(createJobContext());
+
+      mgr.triggerDrainAndClose();
+      await vi.advanceTimersByTimeAsync(120_000);
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(sendToIngestSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          streamEventType: 'error',
+          data: { error: 'Auto-commit timed out', fatal: false },
+        })
+      );
+      expect(sendToIngestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ streamEventType: 'complete' })
+      );
     });
   });
 

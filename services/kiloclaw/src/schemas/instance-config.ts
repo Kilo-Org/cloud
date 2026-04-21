@@ -42,6 +42,19 @@ export const GoogleCredentialsSchema = z.object({
 
 export type GoogleCredentials = z.infer<typeof GoogleCredentialsSchema>;
 
+export const GoogleOAuthConnectionSchema = z.object({
+  accountEmail: z.string().nullable().default(null),
+  accountSubject: z.string().nullable().default(null),
+  capabilities: z.array(z.string()).default([]),
+  scopes: z.array(z.string()).default([]),
+  status: z.enum(['active', 'action_required', 'disconnected']).default('active'),
+  lastError: z.string().nullable().default(null),
+  connectedAt: z.number().nullable().default(null),
+  updatedAt: z.number().nullable().default(null),
+});
+
+export type GoogleOAuthConnection = z.infer<typeof GoogleOAuthConnectionSchema>;
+
 /** Metadata for a custom secret (e.g. config path for openclaw.json patching). */
 export const CustomSecretMetaSchema = z.object({
   configPath: z
@@ -55,7 +68,8 @@ export const CustomSecretMetaSchema = z.object({
 
 export type CustomSecretMeta = z.infer<typeof CustomSecretMetaSchema>;
 
-export const ProviderIdSchema = z.enum(['fly', 'northflank', 'aws', 'k8s']);
+// Keep in sync with apps/web/src/lib/kiloclaw/types.ts KiloClawProviderId.
+export const ProviderIdSchema = z.enum(['fly', 'docker-local', 'northflank']);
 export type ProviderId = z.infer<typeof ProviderIdSchema>;
 
 export const FlyProviderStateSchema = z.object({
@@ -66,9 +80,41 @@ export const FlyProviderStateSchema = z.object({
   region: z.string().nullable().default(null),
 });
 
-export const ProviderStateSchema = FlyProviderStateSchema;
+export const DockerLocalProviderStateSchema = z.object({
+  provider: z.literal('docker-local'),
+  containerName: z.string().nullable().default(null),
+  volumeName: z.string().nullable().default(null),
+  hostPort: z.number().int().nullable().default(null),
+});
+
+export const ProviderStateSchema = z.discriminatedUnion('provider', [
+  FlyProviderStateSchema,
+  DockerLocalProviderStateSchema,
+]);
 export type FlyProviderState = z.infer<typeof FlyProviderStateSchema>;
+export type DockerLocalProviderState = z.infer<typeof DockerLocalProviderStateSchema>;
 export type ProviderState = z.infer<typeof ProviderStateSchema>;
+
+export const KiloExaSearchModeSchema = z.enum(['kilo-proxy', 'disabled']);
+export type KiloExaSearchMode = z.infer<typeof KiloExaSearchModeSchema>;
+
+function isValidUserTimezone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date(0));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const UserTimezoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(100)
+  .refine(isValidUserTimezone, 'Must be a valid IANA timezone');
+
+const UserLocationSchema = z.string().trim().min(1).max(200);
 
 export const InstanceConfigSchema = z.object({
   envVars: z.record(envVarNameSchema, z.string()).optional(),
@@ -76,6 +122,13 @@ export const InstanceConfigSchema = z.object({
   kilocodeApiKey: z.string().nullable().optional(),
   kilocodeApiKeyExpiresAt: z.string().nullable().optional(),
   kilocodeDefaultModel: z.string().nullable().optional(),
+  userTimezone: UserTimezoneSchema.nullable().optional(),
+  userLocation: UserLocationSchema.nullable().optional(),
+  webSearch: z
+    .object({
+      exaMode: KiloExaSearchModeSchema.optional(),
+    })
+    .optional(),
   // TODO: Legacy hardcoded channel storage. Kept for backward compat with
   // existing DO state and the decryptChannelTokens/buildEnvVars startup path.
   // Migrate to read from encryptedSecrets via catalog, then remove.
@@ -88,6 +141,11 @@ export const InstanceConfigSchema = z.object({
     })
     .optional(),
   googleCredentials: GoogleCredentialsSchema.optional(),
+  googleOAuthConnection: GoogleOAuthConnectionSchema.optional(),
+  googleWorkspaceToolsEnabled: z.boolean().optional(),
+  googleWorkspaceConfigSyncPending: z.boolean().optional(),
+  googleWorkspaceConfigSyncError: z.string().nullable().optional(),
+  googleWorkspaceConfigSyncedAt: z.number().nullable().optional(),
   machineSize: MachineSizeSchema.optional(),
   // Region for Fly Volume/Machine. Comma-separated priority list of region codes or aliases.
   // Examples: "us,eu" (try US first, then Europe), "lhr" (London only).
@@ -143,8 +201,17 @@ export const ProvisionRequestSchema = z.object({
   instanceId: z.string().uuid().optional(),
   /** Optional org ID — null/absent means personal instance. */
   orgId: z.string().uuid().nullable().optional(),
+  /** Bootstrap subscription against an existing instance row during migration cleanup. */
+  bootstrapSubscription: z.boolean().optional(),
   provider: ProviderIdSchema.optional(),
-  ...InstanceConfigSchema.omit({ googleCredentials: true }).shape,
+  ...InstanceConfigSchema.omit({
+    googleCredentials: true,
+    googleOAuthConnection: true,
+    googleWorkspaceToolsEnabled: true,
+    googleWorkspaceConfigSyncPending: true,
+    googleWorkspaceConfigSyncError: true,
+    googleWorkspaceConfigSyncedAt: true,
+  }).shape,
 });
 
 export type ProvisionRequest = z.infer<typeof ProvisionRequestSchema>;
@@ -189,6 +256,9 @@ export const PersistedStateSchema = z.object({
   kilocodeApiKey: z.string().nullable().default(null),
   kilocodeApiKeyExpiresAt: z.string().nullable().default(null),
   kilocodeDefaultModel: z.string().nullable().default(null),
+  userTimezone: UserTimezoneSchema.nullable().default(null),
+  userLocation: UserLocationSchema.nullable().default(null),
+  kiloExaSearchMode: KiloExaSearchModeSchema.nullable().default(null),
   channels: z
     .object({
       telegramBotToken: EncryptedEnvelopeSchema.optional(),
@@ -199,6 +269,11 @@ export const PersistedStateSchema = z.object({
     .nullable()
     .default(null),
   googleCredentials: GoogleCredentialsSchema.nullable().default(null),
+  googleOAuthConnection: GoogleOAuthConnectionSchema.nullable().default(null),
+  googleWorkspaceToolsEnabled: z.boolean().default(false),
+  googleWorkspaceConfigSyncPending: z.boolean().default(false),
+  googleWorkspaceConfigSyncError: z.string().nullable().default(null),
+  googleWorkspaceConfigSyncedAt: z.number().nullable().default(null),
   provisionedAt: z.number().nullable().default(null),
   startingAt: z.number().nullable().default(null),
   restartingAt: z.number().nullable().default(null),

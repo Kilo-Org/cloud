@@ -1,5 +1,6 @@
 import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
+import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
@@ -8,20 +9,25 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
+import {
+  cycleInboundEmailAddressForInstance,
+  getInboundEmailAddressForInstance,
+} from '@/lib/kiloclaw/inbound-email-alias';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import {
   getActiveInstance,
   getInstanceById,
   markActiveInstanceDestroyed,
+  markInstanceDestroyedById,
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
-import { flyAppNameFromUserId } from '@/lib/kiloclaw/fly-app-name';
 import {
   createKiloClawAdminAuditLog,
   listKiloClawAdminAuditLogs,
 } from '@/lib/kiloclaw/admin-audit-log';
+import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
 import type {
   PlatformDebugStatusResponse,
   VolumeSnapshot,
@@ -33,6 +39,7 @@ import type {
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import { alias } from 'drizzle-orm/pg-core';
 import {
   eq,
   and,
@@ -45,8 +52,11 @@ import {
   inArray,
   sql,
   gte,
+  lte,
   type SQL,
 } from 'drizzle-orm';
+
+const initiatingAdminUsers = alias(kilocode_users, 'initiating_admin_users');
 
 const ListInstancesSchema = z.object({
   offset: z.number().min(0).default(0),
@@ -57,12 +67,24 @@ const ListInstancesSchema = z.object({
   status: z.enum(['all', 'active', 'suspended', 'destroyed']).default('all'),
 });
 
+const DetectOrphansSchema = z.object({
+  /** ISO date string — only check instances created on or after this date. */
+  createdAfter: z.string().datetime(),
+  /** ISO date string — only check instances created on or before this date. */
+  createdBefore: z.string().datetime(),
+});
+
 const GetInstanceSchema = z.object({
   id: z.string().uuid(),
 });
 
 const DestroyInstanceSchema = z.object({
   id: z.string().uuid(),
+});
+
+const SetInboundEmailEnabledSchema = z.object({
+  id: z.string().uuid(),
+  enabled: z.boolean(),
 });
 
 const VolumeSnapshotsSchema = z.object({
@@ -84,6 +106,7 @@ type KiloclawTrpcCode =
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'TOO_MANY_REQUESTS'
+  | 'PRECONDITION_FAILED'
   | 'INTERNAL_SERVER_ERROR';
 
 function kiloclawStatusToTrpcCode(statusCode: number): KiloclawTrpcCode {
@@ -94,6 +117,8 @@ function kiloclawStatusToTrpcCode(statusCode: number): KiloclawTrpcCode {
       return 'NOT_FOUND';
     case 409:
       return 'CONFLICT';
+    case 412:
+      return 'PRECONDITION_FAILED';
     case 429:
       return 'TOO_MANY_REQUESTS';
     default:
@@ -101,21 +126,27 @@ function kiloclawStatusToTrpcCode(statusCode: number): KiloclawTrpcCode {
   }
 }
 
-function getKiloclawApiErrorMessage(err: KiloClawApiError, fallbackMessage: string): string {
-  if (!err.responseBody) return fallbackMessage;
+function getKiloclawApiErrorPayload(
+  err: KiloClawApiError,
+  fallbackMessage: string
+): { code?: string; message: string } {
+  if (!err.responseBody) return { message: fallbackMessage };
 
   try {
     const parsed: unknown = JSON.parse(err.responseBody);
     if (typeof parsed === 'object' && parsed !== null) {
-      const record = parsed as { error?: unknown; message?: unknown };
-      if (typeof record.error === 'string') return record.error;
-      if (typeof record.message === 'string') return record.message;
+      const code = 'code' in parsed && typeof parsed.code === 'string' ? parsed.code : undefined;
+      const error = 'error' in parsed ? parsed.error : undefined;
+      const message = 'message' in parsed ? parsed.message : undefined;
+      if (typeof error === 'string') return { code, message: error };
+      if (typeof message === 'string') return { code, message };
+      return { code, message: fallbackMessage };
     }
   } catch {
     // Fall back to the raw response body when the controller did not return JSON.
   }
 
-  return err.responseBody.trim() || fallbackMessage;
+  return { message: err.responseBody.trim() || fallbackMessage };
 }
 
 function throwKiloclawAdminError(
@@ -126,14 +157,27 @@ function throwKiloclawAdminError(
     messageOverrides?: Partial<Record<number, string>>;
   }
 ): never {
+  if (err instanceof TRPCError) {
+    throw err;
+  }
+
   if (err instanceof KiloClawApiError) {
+    const payload = getKiloclawApiErrorPayload(err, fallbackMessage);
+    if (payload.code === 'controller_route_unavailable') {
+      throw new TRPCError({
+        code: options?.statusCodeOverrides?.[err.statusCode] ?? 'PRECONDITION_FAILED',
+        message:
+          options?.messageOverrides?.[err.statusCode] ??
+          'Instance needs redeploy to support recovery',
+        cause: new UpstreamApiError('controller_route_unavailable'),
+      });
+    }
+
     throw new TRPCError({
       code:
         options?.statusCodeOverrides?.[err.statusCode] ?? kiloclawStatusToTrpcCode(err.statusCode),
-      message:
-        options?.messageOverrides?.[err.statusCode] ??
-        getKiloclawApiErrorMessage(err, fallbackMessage),
-      cause: err,
+      message: options?.messageOverrides?.[err.statusCode] ?? payload.message,
+      cause: payload.code ? new UpstreamApiError(payload.code) : err,
     });
   }
 
@@ -142,6 +186,61 @@ function throwKiloclawAdminError(
     message: err instanceof Error ? `${fallbackMessage}: ${err.message}` : fallbackMessage,
     cause: err instanceof Error ? err : undefined,
   });
+}
+
+type KiloclawSubscriptionRow = typeof kiloclaw_subscriptions.$inferSelect;
+
+async function clearAdminInstanceDestructionDeadlineWithChangeLog(params: {
+  actorUserId: string;
+  userId: string;
+  instanceId: string;
+  reason: string;
+}) {
+  const [before] = await db
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId)
+      )
+    )
+    .limit(1);
+
+  if (!before) {
+    return;
+  }
+
+  const [after] = await db
+    .update(kiloclaw_subscriptions)
+    .set({ destruction_deadline: null })
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId)
+      )
+    )
+    .returning();
+
+  if (!after) {
+    return;
+  }
+
+  try {
+    await insertKiloClawSubscriptionChangeLog(db, {
+      subscriptionId: after.id,
+      actor: {
+        actorType: 'user',
+        actorId: params.actorUserId,
+      },
+      action: 'admin_override',
+      reason: params.reason,
+      before: before satisfies KiloclawSubscriptionRow,
+      after: after satisfies KiloclawSubscriptionRow,
+    });
+  } catch (error) {
+    console.error('[admin-kiloclaw] Failed to write subscription change log:', error);
+  }
 }
 
 /**
@@ -156,11 +255,26 @@ async function resolveInstance(userId: string, instanceId?: string) {
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: `Instance ${instanceId} not found`,
+        cause: new UpstreamApiError('instance_not_found'),
       });
     }
     return instance;
   }
+
   return getActiveInstance(userId);
+}
+
+function assertInstanceBelongsToUser(
+  instance: Awaited<ReturnType<typeof resolveInstance>>,
+  userId: string
+): asserts instance is NonNullable<Awaited<ReturnType<typeof resolveInstance>>> {
+  if (!instance || instance.userId !== userId) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Instance not found',
+      cause: new UpstreamApiError('instance_not_found'),
+    });
+  }
 }
 
 export type AdminKiloclawInstance = {
@@ -170,6 +284,7 @@ export type AdminKiloclawInstance = {
   organization_id: string | null;
   created_at: string;
   destroyed_at: string | null;
+  inbound_email_enabled: boolean;
   suspended_at: string | null;
   user_email: string | null;
   subscription_id: string | null;
@@ -177,7 +292,7 @@ export type AdminKiloclawInstance = {
 };
 
 export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
-  derived_fly_app_name: string;
+  inbound_email_address: string | null;
   workerStatus: PlatformDebugStatusResponse | null;
   workerStatusError: string | null;
 };
@@ -212,13 +327,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       organization_id: result.instance.organization_id,
       created_at: result.instance.created_at,
       destroyed_at: result.instance.destroyed_at,
+      inbound_email_enabled: result.instance.inbound_email_enabled,
       suspended_at: result.suspended_at ?? null,
       user_email: result.user_email,
       subscription_id: result.subscription_id ?? null,
       subscription_status: result.subscription_status ?? null,
     };
 
-    const derivedFlyAppName = flyAppNameFromUserId(instance.user_id);
+    const inboundEmailAddress = await getInboundEmailAddressForInstance(instance.id);
 
     // Fetch live worker status for all instances.
     // DB may be marked destroyed while DO is still retrying destroy.
@@ -231,7 +347,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     } catch (err) {
       workerStatusError =
         err instanceof KiloClawApiError
-          ? getKiloclawApiErrorMessage(err, 'Failed to fetch worker status')
+          ? getKiloclawApiErrorPayload(err, 'Failed to fetch worker status').message
           : err instanceof Error
             ? err.message
             : 'Failed to fetch worker status';
@@ -239,11 +355,60 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
     return {
       ...instance,
-      derived_fly_app_name: derivedFlyAppName,
+      inbound_email_address: inboundEmailAddress,
       workerStatus,
       workerStatusError,
     } satisfies AdminKiloclawInstanceDetail;
   }),
+
+  cycleInboundEmailAddress: adminProcedure
+    .input(GetInstanceSchema)
+    .mutation(async ({ input, ctx }) => {
+      const [instance] = await db
+        .select({ id: kiloclaw_instances.id, user_id: kiloclaw_instances.user_id })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, input.id))
+        .limit(1);
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      }
+
+      const inboundEmailAddress = await cycleInboundEmailAddressForInstance(instance.id);
+      await createKiloClawAdminAuditLog({
+        action: 'kiloclaw.inbound_email.cycle',
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        target_user_id: instance.user_id,
+        message: `Inbound email address cycled for instance ${instance.id}`,
+        metadata: { instanceId: instance.id },
+      });
+      return { inboundEmailAddress };
+    }),
+
+  setInboundEmailEnabled: adminProcedure
+    .input(SetInboundEmailEnabledSchema)
+    .mutation(async ({ input, ctx }) => {
+      const [instance] = await db
+        .update(kiloclaw_instances)
+        .set({ inbound_email_enabled: input.enabled })
+        .where(eq(kiloclaw_instances.id, input.id))
+        .returning({ id: kiloclaw_instances.id, user_id: kiloclaw_instances.user_id });
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      }
+
+      await createKiloClawAdminAuditLog({
+        action: 'kiloclaw.inbound_email.update_enabled',
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        target_user_id: instance.user_id,
+        message: `Inbound email ${input.enabled ? 'enabled' : 'disabled'} for instance ${instance.id}`,
+        metadata: { instanceId: instance.id, enabled: input.enabled },
+      });
+      return { ok: true };
+    }),
 
   registryEntries: adminProcedure
     .input(z.object({ userId: z.string().min(1), orgId: z.string().optional() }))
@@ -332,6 +497,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       organization_id: row.instance.organization_id,
       created_at: row.instance.created_at,
       destroyed_at: row.instance.destroyed_at,
+      inbound_email_enabled: row.instance.inbound_email_enabled,
       suspended_at: row.suspended_at ?? null,
       user_email: row.user_email,
       subscription_id: row.subscription_id ?? null,
@@ -556,37 +722,156 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         prompt: z.string().min(1).max(10_000),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const fallbackMessage = 'Failed to start kilo CLI run';
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
         const client = new KiloClawInternalClient();
-        return await client.startKiloCliRun(input.userId, input.prompt, workerInstanceId(instance));
+        const result = await client.startKiloCliRun(
+          input.userId,
+          input.prompt,
+          workerInstanceId(instance)
+        );
+
+        const runId = await createCliRun({
+          userId: input.userId,
+          instanceId: instance.id,
+          prompt: input.prompt,
+          startedAt: result.startedAt,
+          initiatedByAdminId: ctx.user.id,
+        });
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.cli_run.start',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `CLI run started on instance ${instance.id}`,
+            metadata: {
+              runId,
+              instanceId: instance.id,
+              promptLength: input.prompt.length,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for startKiloCliRun:', auditErr);
+        }
+
+        return { ...result, id: runId };
       } catch (err) {
         console.error('Failed to start kilo CLI run for user:', input.userId, err);
         throwKiloclawAdminError(err, fallbackMessage);
       }
     }),
 
-  getKiloCliRunStatus: adminProcedure.input(GatewayProcessSchema).query(async ({ input }) => {
-    const fallbackMessage = 'Failed to get kilo CLI run status';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      return await client.getKiloCliRunStatus(input.userId, workerInstanceId(instance));
-    } catch (err) {
-      console.error('Failed to get kilo CLI run status for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
+  getKiloCliRunStatus: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.uuid().optional(),
+        runId: z.uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      const fallbackMessage = 'Failed to get kilo CLI run status';
+      try {
+        const instance = input.instanceId
+          ? await getInstanceById(input.instanceId)
+          : await getActiveInstance(input.userId);
+        if (instance) {
+          assertInstanceBelongsToUser(instance, input.userId);
+        }
+
+        return getCliRunStatus({
+          runId: input.runId,
+          userId: input.userId,
+          instanceId: instance?.id ?? null,
+          workerInstanceId: workerInstanceId(instance),
+        });
+      } catch (err) {
+        console.error('Failed to get kilo CLI run status for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
+  cancelKiloCliRun: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.uuid().optional(),
+        runId: z.uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const fallbackMessage = 'Failed to cancel kilo CLI run';
+      try {
+        const instance = input.instanceId
+          ? await getInstanceById(input.instanceId)
+          : await getActiveInstance(input.userId);
+        if (instance) {
+          assertInstanceBelongsToUser(instance, input.userId);
+        }
+        const result = await cancelCliRun({
+          runId: input.runId,
+          userId: input.userId,
+          instanceId: instance?.id ?? null,
+          workerInstanceId: workerInstanceId(instance),
+        });
+
+        if (!result.runFound) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'CLI run not found' });
+        }
+
+        if (result.cancelled) {
+          try {
+            await createKiloClawAdminAuditLog({
+              action: 'kiloclaw.cli_run.cancel',
+              actor_id: ctx.user.id,
+              actor_email: ctx.user.google_user_email,
+              actor_name: ctx.user.google_user_name,
+              target_user_id: input.userId,
+              message: 'CLI run cancelled',
+              metadata: {
+                instanceId: result.instanceId,
+                requestedInstanceId: input.instanceId ?? null,
+                usedFallback: !instance,
+                runId: input.runId,
+              },
+            });
+          } catch (auditErr) {
+            console.error('Failed to write audit log for cancelKiloCliRun:', auditErr);
+          }
+        }
+
+        return { ok: result.ok };
+      } catch (err) {
+        console.error('Failed to cancel kilo CLI run for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
 
   listKiloCliRuns: adminProcedure
-    .input(z.object({ userId: z.string().min(1), limit: z.number().min(1).max(50).default(20) }))
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.uuid().optional(),
+        limit: z.number().min(1).max(50).default(20),
+      })
+    )
     .query(async ({ input }) => {
+      const conditions: SQL[] = [eq(kiloclaw_cli_runs.user_id, input.userId)];
+
+      if (input.instanceId) {
+        conditions.push(eq(kiloclaw_cli_runs.instance_id, input.instanceId));
+      }
+
       const runs = await db
         .select()
         .from(kiloclaw_cli_runs)
-        .where(eq(kiloclaw_cli_runs.user_id, input.userId))
+        .where(and(...conditions))
         .orderBy(desc(kiloclaw_cli_runs.started_at))
         .limit(input.limit);
 
@@ -600,14 +885,23 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         limit: z.number().min(1).max(100).default(25),
         search: z.string().optional(),
         status: z.enum(['all', 'running', 'completed', 'failed', 'cancelled']).default('all'),
+        initiatedBy: z.enum(['all', 'admin', 'user']).default('all'),
       })
     )
     .query(async ({ input }) => {
-      const { offset, limit, search, status } = input;
+      const { offset, limit, search, status, initiatedBy } = input;
       const conditions: SQL[] = [];
 
       if (status !== 'all') {
         conditions.push(eq(kiloclaw_cli_runs.status, status));
+      }
+
+      if (initiatedBy !== 'all') {
+        conditions.push(
+          initiatedBy === 'admin'
+            ? isNotNull(kiloclaw_cli_runs.initiated_by_admin_id)
+            : isNull(kiloclaw_cli_runs.initiated_by_admin_id)
+        );
       }
 
       const searchTerm = search?.trim();
@@ -616,7 +910,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         const pattern = `%${escaped}%`;
         const searchCond = or(
           ilike(kilocode_users.google_user_email, pattern),
-          ilike(kiloclaw_cli_runs.prompt, pattern)
+          ilike(kiloclaw_cli_runs.prompt, pattern),
+          ilike(sql`${kiloclaw_cli_runs.instance_id}::text`, pattern)
         );
         if (searchCond) conditions.push(searchCond);
       }
@@ -629,6 +924,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             id: kiloclaw_cli_runs.id,
             user_id: kiloclaw_cli_runs.user_id,
             user_email: kilocode_users.google_user_email,
+            instance_id: kiloclaw_cli_runs.instance_id,
+            initiated_by_admin_id: kiloclaw_cli_runs.initiated_by_admin_id,
+            initiated_by_admin_email: initiatingAdminUsers.google_user_email,
             prompt: kiloclaw_cli_runs.prompt,
             status: kiloclaw_cli_runs.status,
             exit_code: kiloclaw_cli_runs.exit_code,
@@ -637,6 +935,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           })
           .from(kiloclaw_cli_runs)
           .leftJoin(kilocode_users, eq(kiloclaw_cli_runs.user_id, kilocode_users.id))
+          .leftJoin(
+            initiatingAdminUsers,
+            eq(kiloclaw_cli_runs.initiated_by_admin_id, initiatingAdminUsers.id)
+          )
           .where(where)
           .orderBy(desc(kiloclaw_cli_runs.started_at))
           .limit(limit)
@@ -657,12 +959,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   getCliRunOutput: adminProcedure
-    .input(z.object({ runId: z.string().min(1) }))
+    .input(z.object({ userId: z.string().min(1), runId: z.uuid() }))
     .query(async ({ input }) => {
       const [row] = await db
         .select({ output: kiloclaw_cli_runs.output })
         .from(kiloclaw_cli_runs)
-        .where(eq(kiloclaw_cli_runs.id, input.runId))
+        .where(
+          and(eq(kiloclaw_cli_runs.id, input.runId), eq(kiloclaw_cli_runs.user_id, input.userId))
+        )
         .limit(1);
 
       return { output: row?.output ?? null };
@@ -897,6 +1201,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       } catch (err) {
         throwKiloclawAdminError(err, 'Failed to verify machine state before destroy');
       }
+      if (status.provider !== 'fly') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Direct Fly machine destroy is not supported for provider ${status.provider}`,
+        });
+      }
       if (status.flyAppName !== input.appName || status.flyMachineId !== input.machineId) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -1059,6 +1369,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     // Post-destroy cleanup: best-effort DB tidying that must not report
     // failure after a successful destroy.
     try {
+      await clearAdminInstanceDestructionDeadlineWithChangeLog({
+        actorUserId: ctx.user.id,
+        userId: instance.user_id,
+        instanceId: instance.id,
+        reason: 'admin_destroy_clear_lifecycle_state',
+      });
+
       // Clear lifecycle emails so they can fire again if the user re-provisions.
       const resettableEmailTypes = [
         'claw_suspended_trial',
@@ -1072,6 +1389,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         .where(
           and(
             eq(kiloclaw_email_log.user_id, instance.user_id),
+            eq(kiloclaw_email_log.instance_id, instance.id),
             inArray(kiloclaw_email_log.email_type, resettableEmailTypes)
           )
         );
@@ -1081,7 +1399,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         .where(
           and(
             eq(kiloclaw_email_log.user_id, instance.user_id),
-            sql`${kiloclaw_email_log.email_type} LIKE 'claw_instance_ready:%'`
+            or(
+              and(
+                eq(kiloclaw_email_log.instance_id, instance.id),
+                eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
+              ),
+              and(
+                isNull(kiloclaw_email_log.instance_id),
+                eq(kiloclaw_email_log.email_type, `claw_instance_ready:${instance.sandbox_id}`)
+              )
+            )
           )
         );
     } catch (cleanupError) {
@@ -1308,5 +1635,179 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         console.error('Failed to restore snapshot for user:', input.userId, err);
         throwKiloclawAdminError(err, 'Failed to restore from snapshot');
       }
+    }),
+
+  // ── Orphan detection ──────────────────────────────────────────────────
+
+  detectOrphans: adminProcedure.input(DetectOrphansSchema).mutation(async ({ input }) => {
+    // 1. Fetch all active (non-destroyed) instances created within the date range.
+    //    Cap at 1000 to avoid excessively long fan-outs; the UI shows when capped.
+    const MAX_SCAN = 1000;
+    const instances = await db
+      .select({
+        id: kiloclaw_instances.id,
+        user_id: kiloclaw_instances.user_id,
+        sandbox_id: kiloclaw_instances.sandbox_id,
+        organization_id: kiloclaw_instances.organization_id,
+        created_at: kiloclaw_instances.created_at,
+        user_email: kilocode_users.google_user_email,
+        subscription_id: kiloclaw_subscriptions.id,
+        subscription_status: kiloclaw_subscriptions.status,
+      })
+      .from(kiloclaw_instances)
+      .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+      .leftJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
+      )
+      .where(
+        and(
+          isNull(kiloclaw_instances.destroyed_at),
+          gte(kiloclaw_instances.created_at, input.createdAfter),
+          lte(kiloclaw_instances.created_at, input.createdBefore)
+        )
+      )
+      .orderBy(desc(kiloclaw_instances.created_at))
+      .limit(MAX_SCAN + 1);
+
+    const capped = instances.length > MAX_SCAN;
+    const toScan = capped ? instances.slice(0, MAX_SCAN) : instances;
+
+    if (toScan.length === 0) {
+      return { orphans: [], scanned: 0, capped: false };
+    }
+
+    // 2. Fan out getDebugStatus calls with concurrency limit.
+    const CONCURRENCY = 10;
+    const client = new KiloClawInternalClient();
+
+    type OrphanResult = {
+      id: string;
+      user_id: string;
+      sandbox_id: string;
+      organization_id: string | null;
+      created_at: string;
+      user_email: string | null;
+      subscription_id: string | null;
+      subscription_status: string | null;
+      workerStatusError: string | null;
+    };
+
+    const orphans: OrphanResult[] = [];
+
+    for (let i = 0; i < toScan.length; i += CONCURRENCY) {
+      const batch = toScan.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        batch.map(async instance => {
+          const instId = instance.sandbox_id.startsWith('ki_') ? instance.id : undefined;
+          const status = await client.getDebugStatus(instance.user_id, instId);
+          return { instance, status };
+        })
+      );
+
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
+        if (result.status === 'fulfilled') {
+          const { instance, status } = result.value;
+          // A null/undefined status means the DO has never been provisioned.
+          if (!status?.status) {
+            orphans.push({
+              id: instance.id,
+              user_id: instance.user_id,
+              sandbox_id: instance.sandbox_id,
+              organization_id: instance.organization_id,
+              created_at: instance.created_at,
+              user_email: instance.user_email,
+              subscription_id: instance.subscription_id,
+              subscription_status: instance.subscription_status,
+              workerStatusError: null,
+            });
+          }
+        } else {
+          // If the status call itself failed, flag it as a potential orphan
+          // with the error — the admin can investigate.
+          const instance = batch[j];
+          if (instance) {
+            orphans.push({
+              id: instance.id,
+              user_id: instance.user_id,
+              sandbox_id: instance.sandbox_id,
+              organization_id: instance.organization_id,
+              created_at: instance.created_at,
+              user_email: instance.user_email,
+              subscription_id: instance.subscription_id,
+              subscription_status: instance.subscription_status,
+              workerStatusError:
+                result.reason instanceof Error ? result.reason.message : 'Status check failed',
+            });
+          }
+        }
+      }
+    }
+
+    return { orphans, scanned: toScan.length, capped };
+  }),
+
+  destroyOrphan: adminProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      // Verify the instance exists and is not already destroyed.
+      const [instance] = await db
+        .select({
+          id: kiloclaw_instances.id,
+          user_id: kiloclaw_instances.user_id,
+          sandbox_id: kiloclaw_instances.sandbox_id,
+          destroyed_at: kiloclaw_instances.destroyed_at,
+        })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, input.id))
+        .limit(1);
+
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      }
+      if (instance.destroyed_at !== null) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Instance is already destroyed' });
+      }
+
+      // Verify the instance is actually an orphan — the DO should have no state.
+      // If it does, the admin should use the standard destroy flow instead.
+      const client = new KiloClawInternalClient();
+      const instId = instance.sandbox_id.startsWith('ki_') ? instance.id : undefined;
+      const workerStatus = await client.getDebugStatus(instance.user_id, instId);
+      if (workerStatus?.status) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Instance has active DO state (status: ${workerStatus.status}) — use the standard destroy flow instead`,
+        });
+      }
+
+      console.log(
+        `[admin-kiloclaw] Orphan cleanup by admin ${ctx.user.id} (${ctx.user.google_user_email}) for instance ${instance.id} (user: ${instance.user_id})`
+      );
+
+      // Soft-delete the DB row. No DO destroy needed — the DO was never
+      // provisioned (that's what makes it an orphan).
+      await markInstanceDestroyedById(instance.id);
+
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.orphan.destroy',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: instance.user_id,
+          message: `Orphaned instance destroyed: ${instance.sandbox_id}`,
+          metadata: {
+            reason: 'Orphaned instance — active DB row with no backing Durable Object',
+            instance_id: instance.id,
+            sandbox_id: instance.sandbox_id,
+          },
+        });
+      } catch (auditErr) {
+        console.error('[admin-kiloclaw] Failed to write audit log for orphan destroy:', auditErr);
+      }
+
+      return { success: true };
     }),
 });

@@ -27,6 +27,9 @@ import {
   magic_link_tokens,
   stytch_fingerprints,
   kiloclaw_instances,
+  kiloclaw_google_oauth_connections,
+  kiloclaw_inbound_email_aliases,
+  kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   security_findings,
@@ -34,6 +37,7 @@ import {
   security_analysis_owner_state,
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
+  kiloclaw_email_log,
   kiloclaw_cli_runs,
   bot_requests,
   kiloclaw_admin_audit_logs,
@@ -41,7 +45,13 @@ import {
   security_advisor_scans,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
-import { softDeleteUser, SoftDeletePreconditionError, findUserById, findUsersByIds } from './user';
+import {
+  softDeleteUser,
+  SoftDeletePreconditionError,
+  findUserById,
+  findUsersByIds,
+  createOrUpdateUser,
+} from './user';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
@@ -53,6 +63,13 @@ import {
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
+
+jest.mock('@/lib/stripe-client', () => ({
+  createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
+    id: `cus_${metadata.kiloUserId}`,
+  })),
+  deleteStripeCustomer: jest.fn(async () => {}),
+}));
 
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
@@ -71,6 +88,8 @@ describe('User', () => {
     await db.delete(organization_audit_logs);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
+    await db.delete(kiloclaw_google_oauth_connections);
+    await db.delete(kiloclaw_inbound_email_aliases);
     await db.delete(security_analysis_queue);
     await db.delete(security_findings);
     await db.delete(security_analysis_owner_state);
@@ -85,14 +104,99 @@ describe('User', () => {
     await db.delete(magic_link_tokens);
     await db.delete(bot_requests);
     await db.delete(stytch_fingerprints);
+    await db.delete(kiloclaw_cli_runs);
+    await db.delete(kiloclaw_email_log);
+    await db.delete(kiloclaw_version_pins);
+    await db.delete(kiloclaw_image_catalog);
+    await db.delete(kiloclaw_subscriptions);
+    await db.delete(kiloclaw_earlybird_purchases);
+    await db.delete(kiloclaw_instances);
     await db.delete(organizations);
     await db.delete(kilocode_users);
+  });
+
+  describe('createOrUpdateUser', () => {
+    it('stores the signup IP for new users', async () => {
+      const headers = new Headers({ 'x-forwarded-for': '203.0.113.25, 10.0.0.1' });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'signup-ip@example.com',
+          google_user_name: 'Signup IP',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-signup-ip',
+        },
+        undefined,
+        false,
+        headers
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.signup_ip).toBe('203.0.113.25');
+    });
+
+    it('rejects new signups after the per-IP threshold (5)', async () => {
+      const signupIp = '203.0.113.50';
+      for (let i = 1; i <= 5; i++) {
+        await insertTestUser({ id: `ip-limit-${i}`, signup_ip: signupIp });
+      }
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'limited@example.com',
+          google_user_name: 'Limited User',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-limited',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': signupIp })
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('SIGNUP-RATE-LIMITED');
+    });
+
+    it('rejects new signups whose normalized_email is already in use', async () => {
+      await insertTestUser({
+        id: 'existing-normalized',
+        google_user_email: 'dedup.user@gmail.com',
+        normalized_email: 'dedupuser@gmail.com',
+      });
+
+      // New signup with a different raw email but same normalized form
+      // (Gmail dots + plus-alias both collapse to dedupuser@gmail.com).
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'dedup.user+alias@gmail.com',
+          google_user_name: 'Dedup User',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'github',
+          provider_account_id: 'github-dedup',
+        },
+        undefined,
+        false
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('EMAIL-ALREADY-USED');
+    });
   });
 
   describe('softDeleteUser', () => {
     it('should anonymize the user row and preserve it', async () => {
       const user = await insertTestUser({
         google_user_email: 'real-email@example.com',
+        normalized_email: 'real-email@example.com',
+        email_domain: 'example.com',
         google_user_name: 'Real Name',
         google_user_image_url: 'https://example.com/avatar.png',
         linkedin_url: 'https://linkedin.com/in/testuser',
@@ -100,6 +204,7 @@ describe('User', () => {
         openrouter_upstream_safety_identifier: 'openrouter_upstream_safety_identifier',
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
+        signup_ip: '203.0.113.10',
         is_admin: true,
       });
 
@@ -108,6 +213,8 @@ describe('User', () => {
       const softDeleted = await findUserById(user.id);
       expect(softDeleted).toBeDefined();
       expect(softDeleted!.google_user_email).toBe(`deleted+${user.id}@deleted.invalid`);
+      expect(softDeleted!.normalized_email).toBeNull();
+      expect(softDeleted!.email_domain).toBeNull();
       expect(softDeleted!.google_user_name).toBe('Deleted User');
       expect(softDeleted!.google_user_image_url).toBe('');
       expect(softDeleted!.hosted_domain).toBeNull();
@@ -121,6 +228,7 @@ describe('User', () => {
         'vercel_downstream_safety_identifier'
       );
       expect(softDeleted!.customer_source).toBeNull();
+      expect(softDeleted!.signup_ip).toBeNull();
       expect(softDeleted!.api_token_pepper).toBeNull();
       expect(softDeleted!.default_model).toBeNull();
       expect(softDeleted!.blocked_reason).toMatch(/^soft-deleted at \d{4}-\d{2}-\d{2}T/);
@@ -985,7 +1093,7 @@ describe('User', () => {
       expect((await db.select({ count: count() }).from(magic_link_tokens))[0].count).toBe(0);
     });
 
-    it('should delete kiloclaw_version_pins for the user', async () => {
+    it('should retain kiloclaw_version_pins for the user', async () => {
       const user = await insertTestUser();
       const adminUser = await insertTestUser({ is_admin: true });
 
@@ -1014,6 +1122,11 @@ describe('User', () => {
         reason: 'test pin',
       });
 
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, instance.id));
+
       await softDeleteUser(user.id);
 
       expect(
@@ -1022,13 +1135,10 @@ describe('User', () => {
           .from(kiloclaw_version_pins)
           .where(eq(kiloclaw_version_pins.instance_id, instance.id))
           .then(r => r[0].count)
-      ).toBe(0);
-
-      // Cleanup catalog entry
-      await db.delete(kiloclaw_image_catalog).where(eq(kiloclaw_image_catalog.image_tag, testTag));
+      ).toBe(1);
     });
 
-    it('should delete kiloclaw_earlybird_purchases for the user', async () => {
+    it('should retain kiloclaw_earlybird_purchases for the user', async () => {
       const user = await insertTestUser();
 
       await db.insert(kiloclaw_earlybird_purchases).values({
@@ -1045,7 +1155,7 @@ describe('User', () => {
           .from(kiloclaw_earlybird_purchases)
           .where(eq(kiloclaw_earlybird_purchases.user_id, user.id))
           .then(r => r[0].count)
-      ).toBe(0);
+      ).toBe(1);
     });
 
     it('should delete kiloclaw_cli_runs for the user', async () => {
@@ -1068,7 +1178,32 @@ describe('User', () => {
       ).toBe(0);
     });
 
-    it('should delete kiloclaw_subscriptions for the user', async () => {
+    it('should clear kiloclaw_cli_runs initiated by the deleted admin', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const user = await insertTestUser();
+
+      const [run] = await db
+        .insert(kiloclaw_cli_runs)
+        .values({
+          user_id: user.id,
+          initiated_by_admin_id: admin.id,
+          prompt: 'admin run',
+          status: 'completed',
+        })
+        .returning({ id: kiloclaw_cli_runs.id });
+
+      await softDeleteUser(admin.id);
+
+      expect(
+        await db
+          .select({ initiated_by_admin_id: kiloclaw_cli_runs.initiated_by_admin_id })
+          .from(kiloclaw_cli_runs)
+          .where(eq(kiloclaw_cli_runs.id, run.id))
+          .then(r => r[0].initiated_by_admin_id)
+      ).toBeNull();
+    });
+
+    it('should retain kiloclaw_subscriptions for the user', async () => {
       const user = await insertTestUser();
 
       await db.insert(kiloclaw_subscriptions).values({
@@ -1085,10 +1220,10 @@ describe('User', () => {
           .from(kiloclaw_subscriptions)
           .where(eq(kiloclaw_subscriptions.user_id, user.id))
           .then(r => r[0].count)
-      ).toBe(0);
+      ).toBe(1);
     });
 
-    it('should delete kiloclaw_subscriptions and kiloclaw_cli_runs linked to a kiloclaw_instance for the user', async () => {
+    it('should retain instance-linked subscriptions and delete kiloclaw_cli_runs for the user', async () => {
       const user = await insertTestUser();
 
       const [instance] = await db
@@ -1113,6 +1248,11 @@ describe('User', () => {
         instance_id: instance.id,
       });
 
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, instance.id));
+
       await softDeleteUser(user.id);
 
       expect(
@@ -1121,14 +1261,14 @@ describe('User', () => {
           .from(kiloclaw_instances)
           .where(eq(kiloclaw_instances.user_id, user.id))
           .then(r => r[0].count)
-      ).toBe(0);
+      ).toBe(1);
       expect(
         await db
           .select({ count: count() })
           .from(kiloclaw_subscriptions)
           .where(eq(kiloclaw_subscriptions.user_id, user.id))
           .then(r => r[0].count)
-      ).toBe(0);
+      ).toBe(1);
       expect(
         await db
           .select({ count: count() })
@@ -1136,6 +1276,149 @@ describe('User', () => {
           .where(eq(kiloclaw_cli_runs.user_id, user.id))
           .then(r => r[0].count)
       ).toBe(0);
+    });
+
+    it('should delete kiloclaw_inbound_email_aliases for the user instances', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      const [instance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: user.id,
+          sandbox_id: `test-gdpr-alias-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+      const [otherInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: otherUser.id,
+          sandbox_id: `test-gdpr-alias-other-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      const alias = `soft-delete-${Date.now()}`;
+      const otherAlias = `soft-delete-other-${Date.now()}`;
+      await db
+        .insert(kiloclaw_inbound_email_reserved_aliases)
+        .values([{ alias }, { alias: otherAlias }]);
+      await db.insert(kiloclaw_inbound_email_aliases).values([
+        { alias, instance_id: instance.id },
+        { alias: otherAlias, instance_id: otherInstance.id },
+      ]);
+
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, instance.id));
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_inbound_email_aliases)
+          .where(eq(kiloclaw_inbound_email_aliases.instance_id, instance.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_inbound_email_aliases)
+          .where(eq(kiloclaw_inbound_email_aliases.instance_id, otherInstance.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_inbound_email_reserved_aliases)
+          .where(eq(kiloclaw_inbound_email_reserved_aliases.alias, alias))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete kiloclaw_google_oauth_connections for the user instances', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      const [instance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: user.id,
+          sandbox_id: `test-gdpr-oauth-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+      const [otherInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: otherUser.id,
+          sandbox_id: `test-gdpr-oauth-other-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      await db.insert(kiloclaw_google_oauth_connections).values([
+        {
+          instance_id: instance.id,
+          account_email: 'owner@example.com',
+          account_subject: 'owner-subject',
+          oauth_client_id: 'client-owner',
+          refresh_token_encrypted: 'enc-owner',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          capabilities: ['calendar_read'],
+          grants_by_source: { oauth: ['calendar_read'] },
+        },
+        {
+          instance_id: otherInstance.id,
+          account_email: 'other@example.com',
+          account_subject: 'other-subject',
+          oauth_client_id: 'client-other',
+          refresh_token_encrypted: 'enc-other',
+          scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+          capabilities: ['calendar_read'],
+          grants_by_source: { oauth: ['calendar_read'] },
+        },
+      ]);
+
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, instance.id));
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_google_oauth_connections)
+          .where(eq(kiloclaw_google_oauth_connections.instance_id, instance.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_google_oauth_connections)
+          .where(eq(kiloclaw_google_oauth_connections.instance_id, otherInstance.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should retain kiloclaw_email_log rows for the user', async () => {
+      const user = await insertTestUser();
+
+      await db.insert(kiloclaw_email_log).values({
+        user_id: user.id,
+        email_type: 'claw_trial_1d',
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_email_log)
+          .where(eq(kiloclaw_email_log.user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(1);
     });
 
     it('should throw SoftDeletePreconditionError for active KiloClaw subscription', async () => {
@@ -1176,6 +1459,19 @@ describe('User', () => {
         plan: 'trial',
         status: 'trialing',
         trial_ends_at: new Date(Date.now() + 86_400_000).toISOString(),
+      });
+
+      await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
+      const userAfter = await findUserById(user.id);
+      expect(userAfter!.google_user_email).toBe(user.google_user_email);
+    });
+
+    it('should throw SoftDeletePreconditionError for active KiloClaw instance even without live subscription', async () => {
+      const user = await insertTestUser();
+
+      await db.insert(kiloclaw_instances).values({
+        user_id: user.id,
+        sandbox_id: `test-active-instance-${Date.now()}`,
       });
 
       await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);

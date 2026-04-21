@@ -1,5 +1,5 @@
 import { test, expect, describe } from '@jest/globals';
-import { preferredModels } from '@/lib/models';
+import { preferredModels } from '@/lib/ai-gateway/models';
 
 describe('OpenRouter Models Config', () => {
   test('preferred models should contain expected models', () => {

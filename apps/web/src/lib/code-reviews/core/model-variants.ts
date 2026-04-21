@@ -1,4 +1,4 @@
-import { getModelVariants } from '@/lib/providers/model-settings';
+import { getModelVariants } from '@/lib/ai-gateway/providers/model-settings';
 
 /** Returns the ordered list of thinking-effort variant names available for a model, or [] if the model has no variants. */
 export function getAvailableThinkingEfforts(modelSlug: string): string[] {

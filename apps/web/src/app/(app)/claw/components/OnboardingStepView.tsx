@@ -20,7 +20,10 @@ export function OnboardingStepIndicator({
         {Array.from({ length: totalSteps }, (_, i) => (
           <span
             key={i}
-            className={cn('h-1.5 w-6 rounded-full', i < currentStep ? 'bg-blue-500' : 'bg-muted')}
+            className={cn(
+              'h-1.5 w-6 rounded-full',
+              i < currentStep ? 'bg-brand-primary' : 'bg-muted'
+            )}
           />
         ))}
       </div>
@@ -79,8 +82,12 @@ export function OnboardingStepView({
         {title || description ? (
           <div className="flex flex-col gap-3">
             {indicator}
-            {title && <h2 className="text-foreground text-2xl font-bold">{title}</h2>}
-            {description && <p className="text-muted-foreground text-sm">{description}</p>}
+            {(title || description) && (
+              <div className="flex flex-col gap-1">
+                {title && <h2 className="text-foreground text-2xl font-bold">{title}</h2>}
+                {description && <p className="text-muted-foreground text-sm">{description}</p>}
+              </div>
+            )}
           </div>
         ) : (
           <div className="self-start">{indicator}</div>

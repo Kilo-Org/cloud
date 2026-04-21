@@ -18,10 +18,30 @@ import type { ExecutionPlan, ExecutionResult } from './types.js';
 import { ExecutionError } from './errors.js';
 import { SessionService, type PreparedSession } from '../session-service.js';
 import { logger } from '../logger.js';
+import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
 import { updateGitRemoteToken } from '../workspace.js';
-import { WrapperClient } from '../kilo/wrapper-client.js';
+import { WrapperClient, type WrapperPromptOptions } from '../kilo/wrapper-client.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { normalizeAgentMode } from '../schema.js';
+import { buildImagePromptParts, downloadImagePromptParts } from './image-prompt-parts.js';
+import { withTimeout } from '@kilocode/worker-utils';
+
+/** Maximum time allowed for workspace preparation (resume, init, fast path). */
+const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
+
+function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string): Promise<T> {
+  return withTimeout(
+    operation,
+    PREPARE_WORKSPACE_TIMEOUT_MS,
+    `Workspace preparation timed out during ${step} after ${PREPARE_WORKSPACE_TIMEOUT_MS / 1000}s`,
+    () =>
+      logSandboxOperationTimeout({
+        operation: `workspace.prepare:${step}`,
+        timeoutMs: PREPARE_WORKSPACE_TIMEOUT_MS,
+        timeoutLayer: 'outer',
+      })
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -135,7 +155,16 @@ export class ExecutionOrchestrator {
       logger.warn('Failed to record kilo server activity');
     }
 
-    // 6. Send prompt with execution binding (async - returns messageId immediately)
+    // 6. Download images from R2 to sandbox if provided
+    const fileParts = await downloadImagePromptParts({
+      env: this.deps.env,
+      session: prepared.session,
+      userId: plan.userId,
+      images: plan.images,
+      createdOnPlatform: this.getCreatedOnPlatform(plan),
+    });
+
+    // 7. Send prompt with execution binding (async - returns messageId immediately)
     const ingestUrl = this.deps.getIngestUrl(sessionId, userId);
     const ingestToken = executionId;
     const kilocodeToken = this.getKilocodeToken(plan);
@@ -150,17 +179,26 @@ export class ExecutionOrchestrator {
 
     // Normalize mode to internal mode (e.g., 'architect' -> 'plan', 'orchestrator' -> 'code')
     const normalizedMode = normalizeAgentMode(mode);
+
+    // Build prompt options, using parts when images are attached
+    const promptOptions: WrapperPromptOptions = {
+      messageId: plan.messageId,
+      model: wrapper.model,
+      variant: wrapper.variant,
+      agent: normalizedMode,
+      autoCommit: wrapper.autoCommit,
+      condenseOnComplete: wrapper.condenseOnComplete,
+      execution,
+    };
+
+    if (fileParts.length > 0) {
+      promptOptions.parts = buildImagePromptParts(prompt, fileParts);
+    } else {
+      promptOptions.prompt = prompt;
+    }
+
     try {
-      const result = await wrapperClient.prompt({
-        prompt,
-        messageId: plan.messageId,
-        model: wrapper.model,
-        variant: wrapper.variant,
-        agent: normalizedMode,
-        autoCommit: wrapper.autoCommit,
-        condenseOnComplete: wrapper.condenseOnComplete,
-        execution,
-      });
+      const result = await wrapperClient.prompt(promptOptions);
       if (result.messageId) {
         logger.withFields({ messageId: result.messageId }).info('Prompt sent to wrapper');
       } else {
@@ -201,19 +239,22 @@ export class ExecutionOrchestrator {
           throw new Error('Missing kilocodeToken in resume context');
         }
 
-        return await this.sessionService.resume({
-          sandbox,
-          sandboxId: workspace.sandboxId as ServiceSandboxId,
-          orgId,
-          userId,
-          sessionId: sessionId as ServiceSessionId,
-          kilocodeToken: resumeContext.kilocodeToken,
-          kilocodeModel: resumeContext.kilocodeModel ?? 'default',
-          env: this.deps.env,
-          githubToken: resumeContext.githubToken,
-          gitToken: resumeContext.gitToken,
-          onProgress,
-        });
+        return await withWorkspacePreparationTimeout(
+          this.sessionService.resume({
+            sandbox,
+            sandboxId: workspace.sandboxId as ServiceSandboxId,
+            orgId,
+            userId,
+            sessionId: sessionId as ServiceSessionId,
+            kilocodeToken: resumeContext.kilocodeToken,
+            kilocodeModel: resumeContext.kilocodeModel ?? 'default',
+            env: this.deps.env,
+            githubToken: resumeContext.githubToken,
+            gitToken: resumeContext.gitToken,
+            onProgress,
+          }),
+          'resume'
+        );
       }
 
       const initContext = workspace.initContext;
@@ -252,16 +293,19 @@ export class ExecutionOrchestrator {
           envVars: initContext.envVars,
         };
 
-        const session = await this.sessionService.getOrCreateSession(
-          sandbox,
-          context,
-          this.deps.env,
-          initContext.kilocodeToken,
-          initContext.kilocodeModel ?? 'default',
-          orgId,
-          initContext.encryptedSecrets,
-          initContext.createdOnPlatform,
-          existingMetadata.appendSystemPrompt
+        const session = await withWorkspacePreparationTimeout(
+          this.sessionService.getOrCreateSession(
+            sandbox,
+            context,
+            this.deps.env,
+            initContext.kilocodeToken,
+            initContext.kilocodeModel ?? 'default',
+            orgId,
+            initContext.encryptedSecrets,
+            initContext.createdOnPlatform,
+            existingMetadata.appendSystemPrompt
+          ),
+          'prepared session creation'
         );
 
         return {
@@ -288,7 +332,35 @@ export class ExecutionOrchestrator {
           throw new Error('Prepared session is missing kiloSessionId');
         }
 
-        return await this.sessionService.initiateFromKiloSessionWithRetry({
+        return await withWorkspacePreparationTimeout(
+          this.sessionService.initiateFromKiloSessionWithRetry({
+            getSandbox: () => this.deps.getSandbox(workspace.sandboxId ?? ''),
+            sandboxId: (workspace.sandboxId ?? '') as ServiceSandboxId,
+            orgId,
+            userId,
+            sessionId: sessionId as ServiceSessionId,
+            kilocodeToken: initContext.kilocodeToken,
+            kilocodeModel: initContext.kilocodeModel ?? 'default',
+            kiloSessionId: initContext.kiloSessionId,
+            env: this.deps.env,
+            envVars: initContext.envVars,
+            encryptedSecrets: initContext.encryptedSecrets,
+            setupCommands: initContext.setupCommands,
+            mcpServers: initContext.mcpServers,
+            botId: initContext.botId,
+            githubAppType: initContext.githubAppType,
+            createdOnPlatform: initContext.createdOnPlatform,
+            // Note: existingMetadata requires CloudAgentSessionState, not our simplified type
+            ...gitSource,
+          }),
+          'legacy prepared session initialization'
+        );
+      }
+
+      // Brand new session
+      logger.info('Initializing new session');
+      return await withWorkspacePreparationTimeout(
+        this.sessionService.initiateWithRetry({
           getSandbox: () => this.deps.getSandbox(workspace.sandboxId ?? ''),
           sandboxId: (workspace.sandboxId ?? '') as ServiceSandboxId,
           orgId,
@@ -296,45 +368,23 @@ export class ExecutionOrchestrator {
           sessionId: sessionId as ServiceSessionId,
           kilocodeToken: initContext.kilocodeToken,
           kilocodeModel: initContext.kilocodeModel ?? 'default',
-          kiloSessionId: initContext.kiloSessionId,
+          githubRepo: initContext.githubRepo,
+          githubToken: initContext.githubToken,
+          gitUrl: initContext.gitUrl,
+          gitToken: initContext.gitToken,
           env: this.deps.env,
           envVars: initContext.envVars,
           encryptedSecrets: initContext.encryptedSecrets,
           setupCommands: initContext.setupCommands,
           mcpServers: initContext.mcpServers,
+          upstreamBranch: initContext.upstreamBranch,
           botId: initContext.botId,
           githubAppType: initContext.githubAppType,
+          platform: initContext.platform,
           createdOnPlatform: initContext.createdOnPlatform,
-          // Note: existingMetadata requires CloudAgentSessionState, not our simplified type
-          ...gitSource,
-        });
-      }
-
-      // Brand new session
-      logger.info('Initializing new session');
-      return await this.sessionService.initiateWithRetry({
-        getSandbox: () => this.deps.getSandbox(workspace.sandboxId ?? ''),
-        sandboxId: (workspace.sandboxId ?? '') as ServiceSandboxId,
-        orgId,
-        userId,
-        sessionId: sessionId as ServiceSessionId,
-        kilocodeToken: initContext.kilocodeToken,
-        kilocodeModel: initContext.kilocodeModel ?? 'default',
-        githubRepo: initContext.githubRepo,
-        githubToken: initContext.githubToken,
-        gitUrl: initContext.gitUrl,
-        gitToken: initContext.gitToken,
-        env: this.deps.env,
-        envVars: initContext.envVars,
-        encryptedSecrets: initContext.encryptedSecrets,
-        setupCommands: initContext.setupCommands,
-        mcpServers: initContext.mcpServers,
-        upstreamBranch: initContext.upstreamBranch,
-        botId: initContext.botId,
-        githubAppType: initContext.githubAppType,
-        platform: initContext.platform,
-        createdOnPlatform: initContext.createdOnPlatform,
-      });
+        }),
+        'new session initialization'
+      );
     } catch (error) {
       if (error instanceof ExecutionError) throw error;
       throw ExecutionError.workspaceSetupFailed(
@@ -387,6 +437,20 @@ export class ExecutionOrchestrator {
         error
       );
     }
+  }
+
+  private getCreatedOnPlatform(plan: ExecutionPlan): string | undefined {
+    if (plan.workspace.shouldPrepare) {
+      return (
+        plan.workspace.initContext.createdOnPlatform ??
+        plan.workspace.existingMetadata?.createdOnPlatform
+      );
+    }
+
+    return (
+      plan.workspace.resumeContext.createdOnPlatform ??
+      plan.workspace.existingMetadata?.createdOnPlatform
+    );
   }
 
   /**

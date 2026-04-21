@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createMutableState } from './state';
-import { applyProviderState, getFlyProviderState, syncProviderStateForStorage } from './state';
+import {
+  applyProviderState,
+  getFlyProviderState,
+  getRuntimeId,
+  getStorageId,
+  syncProviderStateForStorage,
+} from './state';
 
 describe('provider state helpers', () => {
   it('hydrates legacy Fly fields from canonical providerState', () => {
@@ -108,6 +114,60 @@ describe('provider state helpers', () => {
       machineId: 'machine-1',
       volumeId: 'vol-1',
       region: 'ord',
+    });
+  });
+
+  it('clears legacy Fly fields when applying a non-Fly provider state', () => {
+    const state = createMutableState();
+    state.flyAppName = 'acct-old';
+    state.flyMachineId = 'machine-old';
+    state.flyVolumeId = 'vol-old';
+    state.flyRegion = 'ord';
+
+    applyProviderState(state, {
+      provider: 'docker-local',
+      containerName: 'kiloclaw-sandbox-1',
+      volumeName: 'kiloclaw-root-sandbox-1',
+      hostPort: 45001,
+    });
+
+    expect(state.flyAppName).toBeNull();
+    expect(state.flyMachineId).toBeNull();
+    expect(state.flyVolumeId).toBeNull();
+    expect(state.flyRegion).toBeNull();
+    expect(getRuntimeId(state)).toBe('kiloclaw-sandbox-1');
+    expect(getStorageId(state)).toBe('kiloclaw-root-sandbox-1');
+  });
+
+  it('clears legacy Fly fields in storage when writing non-Fly providerState', () => {
+    const state = createMutableState();
+    state.flyAppName = 'acct-old';
+    state.flyMachineId = 'machine-old';
+    state.flyVolumeId = 'vol-old';
+    state.flyRegion = 'ord';
+
+    const patch = syncProviderStateForStorage(state, {
+      provider: 'docker-local',
+      providerState: {
+        provider: 'docker-local',
+        containerName: 'kiloclaw-sandbox-1',
+        volumeName: 'kiloclaw-root-sandbox-1',
+        hostPort: 45001,
+      },
+    });
+
+    expect(patch).toEqual({
+      provider: 'docker-local',
+      providerState: {
+        provider: 'docker-local',
+        containerName: 'kiloclaw-sandbox-1',
+        volumeName: 'kiloclaw-root-sandbox-1',
+        hostPort: 45001,
+      },
+      flyAppName: null,
+      flyMachineId: null,
+      flyVolumeId: null,
+      flyRegion: null,
     });
   });
 });

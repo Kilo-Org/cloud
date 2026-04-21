@@ -8,6 +8,7 @@ import {
   recordSecurityAdvisorScan,
 } from '@/lib/security-advisor/rate-limiter';
 import { trackSecurityAdvisorScanCompleted } from '@/lib/security-advisor/posthog-tracking';
+import { getSecurityAdvisorContent } from '@/lib/security-advisor/content-loader';
 import { RATE_LIMIT_PER_DAY } from '@/lib/security-advisor/schemas';
 
 // Capture after() callbacks so we can flush them in tests
@@ -29,10 +30,78 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
+// The real content-loader queries the DB. In CI, workerSetup.ts runs
+// `cleanupDbForTest()` after migrations, which truncates every table —
+// including our seeded content. Mock the loader here so the route tests
+// exercise deterministic content that mirrors the migration seed, without
+// depending on whether the cleanup happened to preserve the seed rows.
+// Fixture is installed per-test in beforeEach (resetAllMocks wipes it).
+jest.mock('@/lib/security-advisor/content-loader', () => {
+  const actual = jest.requireActual('@/lib/security-advisor/content-loader');
+  return {
+    ...actual,
+    getSecurityAdvisorContent: jest.fn(),
+  };
+});
+
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedCheckRateLimit = jest.mocked(checkSecurityAdvisorRateLimit);
 const mockedRecordScan = jest.mocked(recordSecurityAdvisorScan);
 const mockedTrackScan = jest.mocked(trackSecurityAdvisorScanCompleted);
+const mockedGetContent = jest.mocked(getSecurityAdvisorContent);
+
+// Seed-equivalent content used by the route-level tests. `jest.resetAllMocks`
+// in beforeEach clears mock return values; setSecurityAdvisorContentFixture()
+// re-installs this value before each test.
+const TEST_CONTENT = {
+  checkCatalog: new Map([
+    [
+      'fs.config.perms_world_readable',
+      {
+        severity: 'critical' as const,
+        explanation: 'The OpenClaw configuration file is readable by all users.',
+        risk: 'Any process can read your secrets.',
+      },
+    ],
+    [
+      'summary.attack_surface',
+      {
+        severity: 'info' as const,
+        explanation: 'Summary of the attack surface.',
+        risk: 'More entry points mean more risk.',
+      },
+    ],
+  ]),
+  kiloclawCoverage: [
+    {
+      area: 'config_permissions',
+      summary: 'Config files are restricted to owner only access',
+      detail: 'KiloClaw provisions strict file permissions.',
+      matchCheckIds: ['fs.config.perms_world_readable', 'fs.config.perms_group_readable'],
+    },
+    {
+      area: 'gateway_exposure',
+      summary: 'Gateway bound to localhost only',
+      detail: 'Reverse proxy handles external access.',
+      matchCheckIds: ['summary.attack_surface'],
+    },
+  ],
+  content: new Map([
+    ['framing.openclaw', '**How KiloClaw handles this:** {summary}. {detail}'],
+    [
+      'framing.kiloclaw',
+      '**KiloClaw default:** {summary}. Your instance has diverged from this default configuration.',
+    ],
+    ['fallback.risk', 'Review this finding: {detail}'],
+    ['fallback.recommendation_action', 'Address finding: {title} ({checkId})'],
+    ['section.next_step', '## Next step: try KiloClaw free'],
+    ['cta.body', '**Start a free trial at [kilo.ai/kiloclaw](https://kilo.ai/kiloclaw).**'],
+  ]),
+};
+
+function setSecurityAdvisorContentFixture() {
+  mockedGetContent.mockResolvedValue(TEST_CONTENT);
+}
 
 function setUserAuth(id = 'user-123') {
   mockedGetUserFromAuth.mockResolvedValue({
@@ -98,6 +167,7 @@ describe('POST /api/security-advisor/analyze', () => {
     jest.resetAllMocks();
     afterCallbacks = [];
     mockedRecordScan.mockResolvedValue(undefined);
+    setSecurityAdvisorContentFixture();
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -153,6 +223,28 @@ describe('POST /api/security-advisor/analyze', () => {
     expect(data.error.code).toBe('invalid_payload');
   });
 
+  it('returns a readable zod error in the invalid_payload message, not [object Object]', async () => {
+    // Regression guard: the error formatter uses
+    //   JSON.stringify(z.treeifyError(parseResult.error))
+    // inside a template literal. Before this fix it was
+    //   ${z.treeifyError(parseResult.error)}
+    // which produced "Invalid request body: [object Object]" — genuinely
+    // unusable for debugging. If someone drops the JSON.stringify() call,
+    // this test fails.
+    setUserAuth();
+    const { POST } = await import('./route');
+
+    const response = await POST(
+      makeRequest({ apiVersion: '2026-04-01', source: { platform: 'bad' } }) as never
+    );
+    const data = await response.json();
+    expect(data.error.code).toBe('invalid_payload');
+    expect(typeof data.error.message).toBe('string');
+    expect(data.error.message).not.toContain('[object Object]');
+    // Should surface some field-level info from the zod tree output.
+    expect(data.error.message.length).toBeGreaterThan(30);
+  });
+
   it('returns 200 with structured report for valid request', async () => {
     setUserAuth();
     setRateLimitAllowed();
@@ -168,6 +260,11 @@ describe('POST /api/security-advisor/analyze', () => {
     expect(data.report.summary.critical).toBe(1);
     expect(data.report.findings).toHaveLength(2);
     expect(data.report.recommendations.length).toBeGreaterThan(0);
+    // Grade fields are populated in both structured + markdown form.
+    expect(['A', 'B', 'C', 'D', 'F']).toContain(data.report.grade);
+    expect(data.report.score).toBeGreaterThanOrEqual(0);
+    expect(data.report.score).toBeLessThanOrEqual(100);
+    expect(data.report.markdown).toContain('## Security Grade:');
   });
 
   it('includes sales comparison for openclaw source', async () => {
@@ -191,15 +288,20 @@ describe('POST /api/security-advisor/analyze', () => {
 
     const kiloClawBody = {
       ...VALID_BODY,
-      source: { platform: 'kiloclaw', method: 'plugin' },
+      source: { platform: 'kiloclaw', method: 'plugin', pluginVersion: '1.0.0' },
     };
     const response = await POST(makeRequest(kiloClawBody) as never);
     const data = await response.json();
 
-    const configFinding = data.report.findings.find(
-      (f: { checkId: string }) => f.checkId === 'fs.config.perms_world_readable'
+    // Probe summary.attack_surface rather than fs.config.perms_world_readable:
+    // the latter is in KILOCLAW_MITIGATED_CHECKS and gets filtered out of
+    // rendered findings on KiloClaw. summary.attack_surface is not mitigated
+    // and still matches gateway_exposure coverage in the test fixture, so
+    // the divergence framing should attach to it on KiloClaw.
+    const attackSurface = data.report.findings.find(
+      (f: { checkId: string }) => f.checkId === 'summary.attack_surface'
     );
-    expect(configFinding.kiloClawComparison).toContain('diverged');
+    expect(attackSurface.kiloClawComparison).toContain('diverged');
   });
 
   it('returns 429 when rate limit exceeded', async () => {

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePostHog } from 'posthog-js/react';
+import { toast } from 'sonner';
 import { Check, Sparkles, TriangleAlert, X } from 'lucide-react';
+import { KILO_AUTO_BALANCED_MODEL } from '@/lib/kilo-auto';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
@@ -23,16 +25,13 @@ import { CreateInstanceCard } from './CreateInstanceCard';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep, ProvisioningStepView } from './ProvisioningStep';
 import type { BotIdentity, ExecPreset } from './claw.types';
-
-type PopulatedClawStatus = KiloClawDashboardStatus & {
-  status: NonNullable<KiloClawDashboardStatus['status']>;
-};
-
-function hasPopulatedStatus(
-  candidate: KiloClawDashboardStatus | undefined
-): candidate is PopulatedClawStatus {
-  return candidate !== undefined && candidate.status !== null;
-}
+import {
+  getClawOnboardingFlowState,
+  isPairingChannel,
+  type ClawOnboardingMode,
+  type OnboardingStep,
+  type PopulatedClawStatus,
+} from './ClawOnboardingFlow.state';
 
 function MaybeBillingWrapper({
   skip,
@@ -47,27 +46,47 @@ function MaybeBillingWrapper({
   return <BillingWrapper hideBanners={hideBanners}>{children}</BillingWrapper>;
 }
 
-export type ClawOnboardingMode = 'create-first' | 'post-provisioning';
+function assertNever(value: never): never {
+  throw new Error(`Unhandled KiloClaw onboarding render step: ${value}`);
+}
 
-type OnboardingStep = 'identity' | 'permissions' | 'channels' | 'provisioning' | 'pairing' | 'done';
+function getBrowserTimeZone(): string | undefined {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return typeof timeZone === 'string' && timeZone.trim() ? timeZone : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export type { ClawOnboardingMode };
 
 export function ClawOnboardingFlow({
   status,
   mode,
   organizationId,
+  createFlowStarted = false,
+  setupFailed = false,
   onCreateFlowStarted,
+  onCreateFlowFailed,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   organizationId?: string;
+  createFlowStarted?: boolean;
+  setupFailed?: boolean;
   onCreateFlowStarted?: () => void;
+  onCreateFlowFailed?: () => void;
 }) {
   return (
     <ClawContextProvider organizationId={organizationId}>
       <ClawOnboardingFlowInner
         status={status}
         mode={mode}
+        createFlowStarted={createFlowStarted}
+        setupFailed={setupFailed}
         onCreateFlowStarted={onCreateFlowStarted}
+        onCreateFlowFailed={onCreateFlowFailed}
       />
     </ClawContextProvider>
   );
@@ -76,11 +95,17 @@ export function ClawOnboardingFlow({
 function ClawOnboardingFlowInner({
   status,
   mode,
+  createFlowStarted,
+  setupFailed,
   onCreateFlowStarted,
+  onCreateFlowFailed,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
+  createFlowStarted: boolean;
+  setupFailed: boolean;
   onCreateFlowStarted?: () => void;
+  onCreateFlowFailed?: () => void;
 }) {
   const { organizationId } = useClawContext();
 
@@ -89,59 +114,285 @@ function ClawOnboardingFlowInner({
   const mutations = organizationId ? orgMutations : personalMutations;
 
   const gatewayUrl = useGatewayUrl(status);
-  const instanceStatus = hasPopulatedStatus(status) ? status : null;
-  const isRunning = instanceStatus?.status === 'running';
-  const postProvisioningReady = isRunning;
-
-  const personalGateway = useKiloClawGatewayStatus(!organizationId && isRunning);
-  const orgGateway = useOrgKiloClawGatewayStatus(
-    organizationId ?? '',
-    !!organizationId && isRunning
-  );
-  const { data: gatewayStatus } = organizationId ? orgGateway : personalGateway;
-
-  const { data: isServiceDegraded } = useClawServiceDegraded();
-  const posthog = usePostHog();
 
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('identity');
   const [selectedPreset, setSelectedPreset] = useState<ExecPreset | null>(null);
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
-  const [createProvisioningStarted, setCreateProvisioningStarted] = useState(false);
-  const hasPairingStep = selectedChannelId === 'telegram' || selectedChannelId === 'discord';
+  const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
   const hasCapturedIdentityView = useRef(false);
   const hasCapturedDoneView = useRef(false);
+  const createSetupStarted = createFlowStarted || localCreateSetupStarted;
+
+  const stateInput = {
+    status,
+    mode,
+    createSetupStarted,
+    setupFailed,
+    onboardingStep,
+    selectedPreset,
+    hasBotIdentity: botIdentity !== null,
+    selectedChannelId,
+  };
+  const preGatewayFlowState = getClawOnboardingFlowState({
+    ...stateInput,
+    gatewayState: null,
+    debugLogSource: 'pre-gateway',
+  });
+
+  const personalGateway = useKiloClawGatewayStatus(
+    !organizationId && preGatewayFlowState.isRunning
+  );
+  const orgGateway = useOrgKiloClawGatewayStatus(
+    organizationId ?? '',
+    !!organizationId && preGatewayFlowState.isRunning
+  );
+  const { data: gatewayStatus } = organizationId ? orgGateway : personalGateway;
+  const flowState = getClawOnboardingFlowState({
+    ...stateInput,
+    gatewayState: gatewayStatus?.state ?? null,
+    debugLogSource: 'gateway',
+  });
+
+  const { data: isServiceDegraded } = useClawServiceDegraded();
+  const posthog = usePostHog();
 
   useEffect(() => {
-    if (mode !== 'create-first' || !instanceStatus || hasCapturedIdentityView.current) return;
+    if (!flowState.createSetupActive || hasCapturedIdentityView.current) return;
     hasCapturedIdentityView.current = true;
     posthog?.capture('claw_setup_identity_viewed');
-  }, [instanceStatus, mode, posthog]);
+  }, [flowState.createSetupActive, posthog]);
 
   useEffect(() => {
-    if (mode !== 'post-provisioning' || !postProvisioningReady || hasCapturedDoneView.current) {
+    if (
+      mode !== 'post-provisioning' ||
+      !flowState.postProvisioningReady ||
+      hasCapturedDoneView.current
+    ) {
       return;
     }
     hasCapturedDoneView.current = true;
     posthog?.capture('claw_setup_done_viewed');
-  }, [mode, postProvisioningReady, posthog]);
+  }, [mode, flowState.postProvisioningReady, posthog]);
 
-  const handleCreateFlowStarted = useCallback(() => {
-    setCreateProvisioningStarted(true);
+  const resetWizardSelections = useCallback(() => {
     setOnboardingStep('identity');
     setSelectedPreset(null);
     setBotIdentity(null);
     setChannelTokens(null);
     setSelectedChannelId(null);
-    onCreateFlowStarted?.();
-  }, [onCreateFlowStarted]);
-
-  const handleCreateFlowFailed = useCallback(() => {
-    setCreateProvisioningStarted(false);
   }, []);
 
+  const handleCreateFlowStarted = useCallback(() => {
+    setLocalCreateSetupStarted(true);
+    resetWizardSelections();
+    onCreateFlowStarted?.();
+  }, [onCreateFlowStarted, resetWizardSelections]);
+
+  const handleCreateFlowFailed = useCallback(() => {
+    setLocalCreateSetupStarted(false);
+    hasCapturedIdentityView.current = false;
+    resetWizardSelections();
+    onCreateFlowFailed?.();
+  }, [onCreateFlowFailed, resetWizardSelections]);
+
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
+
+  function provisionInstance(userLocation?: string) {
+    handleCreateFlowStarted();
+
+    mutations.provision.mutate(
+      {
+        kilocodeDefaultModel: `kilocode/${KILO_AUTO_BALANCED_MODEL.id}`,
+        userTimezone: getBrowserTimeZone(),
+        ...(userLocation ? { userLocation } : undefined),
+      },
+      {
+        onError: err => {
+          posthog?.capture('claw_setup_provision_failed', {
+            selected_model: KILO_AUTO_BALANCED_MODEL.id,
+            reason: 'provision_request_failed',
+          });
+          handleCreateFlowFailed();
+          toast.error(`Failed to create: ${err.message}`);
+        },
+      }
+    );
+  }
+
+  function renderCreateInstanceStep() {
+    return (
+      <CreateInstanceCard
+        isPending={mutations.provision.isPending}
+        onCreate={handleCreateFlowStarted}
+      />
+    );
+  }
+
+  function renderIdentityStep() {
+    return (
+      <BotIdentityStep
+        instanceRunning={flowState.instanceRunning}
+        onContinue={({ identity, weatherLocation }) => {
+          posthog?.capture('claw_setup_identity_completed', {
+            bot_name_is_custom: identity.botName !== 'KiloClaw',
+            bot_nature: identity.botNature,
+            bot_emoji_is_custom: identity.botEmoji !== '🤖',
+          });
+          if (weatherLocation) {
+            posthog?.capture('claw_weather_location_selected', { source: weatherLocation.source });
+          } else {
+            posthog?.capture('claw_weather_location_skipped');
+          }
+          if (flowState.instanceStatus) {
+            if (weatherLocation) {
+              mutations.updateConfig.mutate(
+                { userLocation: weatherLocation.location },
+                { onError: err => toast.error(err.message) }
+              );
+            }
+          } else {
+            provisionInstance(weatherLocation?.location);
+          }
+          posthog?.capture('claw_setup_permissions_viewed');
+          setBotIdentity(identity);
+          setOnboardingStep('permissions');
+        }}
+      />
+    );
+  }
+
+  function renderPermissionsStep() {
+    return (
+      <PermissionStep
+        instanceRunning={flowState.instanceRunning}
+        onSelect={preset => {
+          posthog?.capture('claw_setup_permissions_completed', { preset });
+          posthog?.capture('claw_setup_channels_viewed');
+          setSelectedPreset(preset);
+          setOnboardingStep('channels');
+        }}
+      />
+    );
+  }
+
+  function renderChannelsStep() {
+    return (
+      <ChannelSelectionStepView
+        instanceRunning={flowState.instanceRunning}
+        onSelect={(channelId, tokens) => {
+          posthog?.capture('claw_setup_channels_completed', {
+            channel: channelId,
+            skipped: false,
+          });
+          posthog?.capture('claw_setup_provisioning_viewed');
+          setSelectedChannelId(channelId);
+          setChannelTokens(tokens);
+          setOnboardingStep('provisioning');
+        }}
+        onSkip={() => {
+          posthog?.capture('claw_setup_channels_completed', {
+            channel: null,
+            skipped: true,
+          });
+          posthog?.capture('claw_setup_provisioning_viewed');
+          setSelectedChannelId(null);
+          setChannelTokens(null);
+          setOnboardingStep('provisioning');
+        }}
+      />
+    );
+  }
+
+  function renderProvisioningStep() {
+    if (mode === 'post-provisioning') return <ProvisioningStepView />;
+    if (selectedPreset === null) return renderPermissionsStep();
+
+    return (
+      <ProvisioningStep
+        preset={selectedPreset}
+        channelTokens={channelTokens}
+        botIdentity={botIdentity}
+        instanceRunning={flowState.instanceRunning}
+        mutations={mutations}
+        totalSteps={flowState.totalSteps}
+        onComplete={() => {
+          posthog?.capture('claw_setup_provisioned');
+          posthog?.capture(
+            flowState.hasPairingStep ? 'claw_setup_pairing_viewed' : 'claw_setup_done_viewed'
+          );
+          setOnboardingStep(flowState.hasPairingStep ? 'pairing' : 'done');
+        }}
+      />
+    );
+  }
+
+  function renderPairingStep() {
+    if (!isPairingChannel(selectedChannelId)) return renderCompleteStep();
+
+    return (
+      <ChannelPairingStep
+        channelId={selectedChannelId}
+        mutations={mutations}
+        onComplete={() => {
+          posthog?.capture('claw_setup_pairing_completed', {
+            channel: selectedChannelId,
+            skipped: false,
+          });
+          posthog?.capture('claw_setup_done_viewed');
+          setOnboardingStep('done');
+        }}
+        onSkip={() => {
+          posthog?.capture('claw_setup_pairing_completed', {
+            channel: selectedChannelId,
+            skipped: true,
+          });
+          posthog?.capture('claw_setup_done_viewed');
+          setOnboardingStep('done');
+        }}
+      />
+    );
+  }
+
+  function renderCompleteStep() {
+    return (
+      <ClawSetupCompleteStep
+        status={flowState.instanceStatus}
+        gatewayReady={flowState.gatewayReady}
+        basePath={basePath}
+      />
+    );
+  }
+
+  function renderErrorStep() {
+    return <ClawSetupErrorStep basePath={basePath} />;
+  }
+
+  function renderStepContent() {
+    const renderStep = flowState.renderStep;
+
+    switch (renderStep) {
+      case 'create-instance':
+        return renderCreateInstanceStep();
+      case 'identity':
+        return renderIdentityStep();
+      case 'permissions':
+        return renderPermissionsStep();
+      case 'channels':
+        return renderChannelsStep();
+      case 'provisioning':
+        return renderProvisioningStep();
+      case 'pairing':
+        return renderPairingStep();
+      case 'complete':
+        return renderCompleteStep();
+      case 'error':
+        return renderErrorStep();
+      default:
+        return assertNever(renderStep);
+    }
+  }
 
   return (
     <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -150,7 +401,7 @@ function ClawOnboardingFlowInner({
         sandboxId={status?.sandboxId || null}
         region={status?.flyRegion || null}
         gatewayUrl={gatewayUrl}
-        gatewayReady={gatewayStatus?.state === 'running'}
+        gatewayReady={flowState.gatewayReady}
         isSetupWizard
       />
 
@@ -177,117 +428,45 @@ function ClawOnboardingFlowInner({
       <ClawConfigServiceBanner status={status} />
 
       <MaybeBillingWrapper skip={!!organizationId} hideBanners>
-        {mode === 'post-provisioning' ? (
-          postProvisioningReady ? (
-            <ClawSetupCompleteStep
-              status={instanceStatus}
-              gatewayReady={gatewayStatus?.state === 'running'}
-              basePath={basePath}
-            />
-          ) : (
-            <ProvisioningStepView />
-          )
-        ) : !instanceStatus && !createProvisioningStarted ? (
-          <CreateInstanceCard
-            mutations={mutations}
-            onProvisionStart={handleCreateFlowStarted}
-            onProvisionFailed={handleCreateFlowFailed}
-          />
-        ) : onboardingStep === 'identity' ? (
-          <BotIdentityStep
-            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
-            onContinue={identity => {
-              posthog?.capture('claw_setup_identity_completed', {
-                bot_name_is_custom: identity.botName !== 'KiloClaw',
-                bot_nature: identity.botNature,
-                bot_emoji_is_custom: identity.botEmoji !== '🤖',
-              });
-              posthog?.capture('claw_setup_permissions_viewed');
-              setBotIdentity(identity);
-              setOnboardingStep('permissions');
-            }}
-          />
-        ) : onboardingStep === 'permissions' ? (
-          <PermissionStep
-            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
-            onSelect={preset => {
-              posthog?.capture('claw_setup_permissions_completed', { preset });
-              posthog?.capture('claw_setup_channels_viewed');
-              setSelectedPreset(preset);
-              setOnboardingStep('channels');
-            }}
-          />
-        ) : onboardingStep === 'channels' ? (
-          <ChannelSelectionStepView
-            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
-            onSelect={(channelId, tokens) => {
-              posthog?.capture('claw_setup_channels_completed', {
-                channel: channelId,
-                skipped: false,
-              });
-              posthog?.capture('claw_setup_provisioning_viewed');
-              setSelectedChannelId(channelId);
-              setChannelTokens(tokens);
-              setOnboardingStep('provisioning');
-            }}
-            onSkip={() => {
-              posthog?.capture('claw_setup_channels_completed', {
-                channel: null,
-                skipped: true,
-              });
-              posthog?.capture('claw_setup_provisioning_viewed');
-              setSelectedChannelId(null);
-              setChannelTokens(null);
-              setOnboardingStep('provisioning');
-            }}
-          />
-        ) : onboardingStep === 'provisioning' && selectedPreset ? (
-          <ProvisioningStep
-            preset={selectedPreset}
-            channelTokens={channelTokens}
-            botIdentity={botIdentity}
-            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
-            mutations={mutations}
-            totalSteps={hasPairingStep ? 6 : 5}
-            onComplete={() => {
-              posthog?.capture('claw_setup_provisioned');
-              posthog?.capture(
-                hasPairingStep ? 'claw_setup_pairing_viewed' : 'claw_setup_done_viewed'
-              );
-              setOnboardingStep(hasPairingStep ? 'pairing' : 'done');
-            }}
-          />
-        ) : onboardingStep === 'pairing' &&
-          (selectedChannelId === 'telegram' || selectedChannelId === 'discord') ? (
-          <ChannelPairingStep
-            channelId={selectedChannelId}
-            mutations={mutations}
-            onComplete={() => {
-              posthog?.capture('claw_setup_pairing_completed', {
-                channel: selectedChannelId,
-                skipped: false,
-              });
-              posthog?.capture('claw_setup_done_viewed');
-              setOnboardingStep('done');
-            }}
-            onSkip={() => {
-              posthog?.capture('claw_setup_pairing_completed', {
-                channel: selectedChannelId,
-                skipped: true,
-              });
-              posthog?.capture('claw_setup_done_viewed');
-              setOnboardingStep('done');
-            }}
-          />
-        ) : (
-          <ClawSetupCompleteStep
-            status={instanceStatus}
-            gatewayReady={gatewayStatus?.state === 'running'}
-            basePath={basePath}
-          />
-        )}
+        {renderStepContent()}
       </MaybeBillingWrapper>
     </div>
+  );
+}
+
+export function ClawSetupErrorStep({ basePath }: { basePath: string }) {
+  return (
+    <Card className="mt-6 overflow-hidden">
+      <CardContent className="flex flex-col items-center justify-center gap-6 pt-12">
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-destructive/30 bg-destructive/10">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-destructive">
+            <TriangleAlert className="h-6 w-6 text-destructive" />
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center gap-2">
+          <h2 className="text-2xl font-bold">Something went wrong</h2>
+          <p className="text-muted-foreground max-w-md text-center">
+            Your KiloClaw instance stopped or failed during setup. Please reach out to support for
+            help getting it back online.
+          </p>
+        </div>
+
+        <div className="flex w-full flex-col gap-3">
+          <Button asChild variant="primary" className="w-full min-w-[180px] py-6 text-base">
+            <a href="https://kilo.ai/support" target="_blank" rel="noopener noreferrer">
+              Contact Support
+            </a>
+          </Button>
+          <Button asChild className="w-full py-6 text-base" variant="outline">
+            <Link href={basePath}>
+              <X className="mr-2 h-4 w-4" />
+              Close Wizard
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

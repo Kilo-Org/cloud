@@ -36,6 +36,8 @@ import type {
   ExecutionMetadata,
   AddExecutionParams,
   UpdateExecutionStatusParams,
+  LatestAssistantMessage,
+  AssistantMessagePart,
 } from '../session/types.js';
 import type { ExecutionStatus } from '../core/execution.js';
 import type { Result } from '../lib/result.js';
@@ -88,7 +90,7 @@ const REAPER_INTERVAL_MS_DEFAULT = 5 * 60 * 1000;
 const REAPER_ACTIVE_INTERVAL_MS = 2 * 60 * 1000;
 /** Longer reaper interval when idle (no active execution): 1 hour */
 const REAPER_IDLE_INTERVAL_MS = 60 * 60 * 1000;
-const PENDING_START_TIMEOUT_MS_DEFAULT = 5 * 60 * 1000;
+const PENDING_START_TIMEOUT_MS_DEFAULT = 3 * 60 * 1000;
 
 /** Event retention period: 90 days (aligns with session TTL) */
 const EVENT_RETENTION_MS = Limits.SESSION_TTL_MS;
@@ -122,6 +124,23 @@ type DisconnectGraceState = {
   wsCloseCode: number;
   wsCloseReason: string;
 };
+
+/**
+ * Concatenate text content from assistant message parts.
+ * Parts have a loose `Record<string, unknown>` type; only include those with
+ * `type === 'text'` and a string `text` field.
+ */
+function extractAssistantTextFromParts(parts: AssistantMessagePart[]): string {
+  const pieces: string[] = [];
+  for (const part of parts) {
+    if (part.type !== 'text') continue;
+    const text = part.text;
+    if (typeof text === 'string' && text.length > 0) {
+      pieces.push(text);
+    }
+  }
+  return pieces.join('').trim();
+}
 
 export class CloudAgentSession extends DurableObject {
   private executionQueries: ExecutionQueries;
@@ -162,6 +181,9 @@ export class CloudAgentSession extends DurableObject {
     const resolvedSessionId = await this.resolveSessionId(metadata.sessionId as SessionId);
     const sessionId = resolvedSessionId ?? metadata.sessionId ?? '';
 
+    const lastAssistantMessageText =
+      status === 'completed' ? await this.getLatestAssistantMessageText() : undefined;
+
     const callbackJob: CallbackJob = {
       target: metadata.callbackTarget,
       payload: {
@@ -173,6 +195,7 @@ export class CloudAgentSession extends DurableObject {
         lastSeenBranch: metadata.upstreamBranch,
         kiloSessionId: metadata.kiloSessionId,
         gateResult,
+        lastAssistantMessageText,
       },
     };
 
@@ -579,6 +602,27 @@ export class CloudAgentSession extends DurableObject {
   async getMetadata(): Promise<CloudAgentSessionState | null> {
     const metadata = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
     return metadata || null;
+  }
+
+  async getLatestAssistantMessage(): Promise<LatestAssistantMessage | null> {
+    const sessionId = await this.requireSessionId();
+    const metadata = await this.getMetadata();
+    if (!metadata?.kiloSessionId) return null;
+    return this.eventQueries.getLatestAssistantMessage(sessionId, metadata.kiloSessionId);
+  }
+
+  private async getLatestAssistantMessageText(): Promise<string | undefined> {
+    try {
+      const message = await this.getLatestAssistantMessage();
+      if (!message) return undefined;
+      const text = extractAssistantTextFromParts(message.parts);
+      return text.length > 0 ? text : undefined;
+    } catch (err) {
+      logger
+        .withFields({ error: err instanceof Error ? err.message : String(err) })
+        .warn('Failed to fetch latest assistant message for callback');
+      return undefined;
+    }
   }
 
   /**
@@ -2101,6 +2145,7 @@ export class CloudAgentSession extends DurableObject {
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
     messageId?: string;
+    images?: Images;
     initContext?: InitializeContext;
     resumeContext?: TokenResumeContext;
     existingMetadata?: CloudAgentSessionState;
@@ -2122,6 +2167,7 @@ export class CloudAgentSession extends DurableObject {
                 appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
                 githubRepo: params.existingMetadata.githubRepo,
                 gitUrl: params.existingMetadata.gitUrl,
+                createdOnPlatform: params.existingMetadata.createdOnPlatform,
               }
             : undefined,
         }
@@ -2136,6 +2182,7 @@ export class CloudAgentSession extends DurableObject {
             branchName: params.existingMetadata?.branchName ?? '',
             githubToken: params.resumeContext?.githubToken,
             gitToken: params.resumeContext?.gitToken,
+            createdOnPlatform: params.existingMetadata?.createdOnPlatform,
           },
           existingMetadata: params.existingMetadata
             ? {
@@ -2148,6 +2195,7 @@ export class CloudAgentSession extends DurableObject {
                 appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
                 githubRepo: params.existingMetadata.githubRepo,
                 gitUrl: params.existingMetadata.gitUrl,
+                createdOnPlatform: params.existingMetadata.createdOnPlatform,
               }
             : undefined,
         };
@@ -2167,6 +2215,7 @@ export class CloudAgentSession extends DurableObject {
         autoCommit: params.autoCommit,
         condenseOnComplete: params.condenseOnComplete,
       },
+      images: params.images,
       messageId: params.messageId,
     };
   }
@@ -2456,6 +2505,7 @@ export class CloudAgentSession extends DurableObject {
           autoCommit: metadata.autoCommit,
           condenseOnComplete: metadata.condenseOnComplete,
           messageId: metadata.initialMessageId,
+          images: metadata.images,
           initContext,
           existingMetadata: metadata,
           kiloSessionId: metadata.kiloSessionId,
@@ -2536,6 +2586,7 @@ export class CloudAgentSession extends DurableObject {
         autoCommit: request.autoCommit ?? metadata.autoCommit,
         condenseOnComplete: request.condenseOnComplete ?? metadata.condenseOnComplete,
         messageId: request.messageId,
+        images: request.images,
         resumeContext,
         existingMetadata: metadata,
         kiloSessionId: metadata.kiloSessionId,
@@ -2667,21 +2718,40 @@ export class CloudAgentSession extends DurableObject {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      this.broadcastVolatileEvent({
-        executionId,
-        sessionId,
-        streamEventType: 'cloud.status',
-        payload: JSON.stringify({ cloudStatus: { type: 'error', message: errorMessage } }),
-        timestamp: Date.now(),
-      });
+      try {
+        this.broadcastVolatileEvent({
+          executionId,
+          sessionId,
+          streamEventType: 'cloud.status',
+          payload: JSON.stringify({ cloudStatus: { type: 'error', message: errorMessage } }),
+          timestamp: Date.now(),
+        });
+      } catch {
+        // Best-effort — must not prevent failExecution from running.
+      }
 
-      await this.failExecution({
-        executionId,
-        status: 'failed',
-        error: errorMessage,
-        streamEventType: 'error',
-        suppressCallback: opts?.suppressCallbackOnError,
-      });
+      try {
+        await this.failExecution({
+          executionId,
+          status: 'failed',
+          error: errorMessage,
+          streamEventType: 'error',
+          suppressCallback: opts?.suppressCallbackOnError,
+        });
+      } catch (failError) {
+        // failExecution itself threw — force-clear the active execution as a
+        // last-resort safety net so the session is not permanently locked.
+        logger
+          .withFields({ sessionId, executionId, error: String(failError) })
+          .error(
+            'failExecution threw during executeDirectly cleanup — force-clearing active execution'
+          );
+        try {
+          await this.executionQueries.clearActiveExecution();
+        } catch {
+          // Storage write failed — the reaper alarm will catch this.
+        }
+      }
 
       throw error;
     }

@@ -14,6 +14,7 @@ import {
   DestroyRequestSchema,
   ChannelsPatchSchema,
   GoogleCredentialsSchema,
+  GoogleOAuthConnectionSchema,
   SecretsPatchSchema,
   InstanceIdParam,
   MachineSizeSchema,
@@ -28,14 +29,37 @@ import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { flattenError, z } from 'zod';
 import { withDORetry } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
+import {
+  markInstanceDestroyedWithPersonalSubscriptionCollapse,
+  type KiloClawSubscriptionChangeActor,
+} from '@kilocode/db';
+import {
+  kiloclaw_inbound_email_aliases,
+  kiloclaw_inbound_email_reserved_aliases,
+  kiloclaw_instances,
+} from '@kilocode/db/schema';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
-import { assertImplementedProvider } from '../providers';
+import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
-import { resolveDoKeyForUser } from '../lib/instance-routing';
+import {
+  providerRolloutAvailability,
+  ProviderRolloutConfigSchema,
+  readProviderRolloutConfig,
+  selectProviderForProvision,
+  writeProviderRolloutConfig,
+} from '../providers/rollout';
+import type { ProviderId } from '../schemas/instance-config';
+import { doKeyFromActiveInstance, resolveDoKeyForUser } from '../lib/instance-routing';
+import { getInstanceById, getInstanceByIdIncludingDestroyed, getWorkerDb } from '../db';
+import { and, eq, isNull } from 'drizzle-orm';
+import {
+  BootstrapProvisionFallbackError,
+  bootstrapProvisionedSubscriptionWithFallback,
+} from './provision-bootstrap';
 
 const GmailHistoryIdSchema = z.object({
   userId: z.string().min(1),
@@ -54,6 +78,27 @@ const KiloCodeConfigPatchSchema = z.object({
     )
     .nullable()
     .optional(),
+});
+
+const WebSearchConfigPatchSchema = z.object({
+  userId: z.string().min(1),
+  exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
+});
+
+const KILOCLAW_WORKER_DESTROY_ACTOR = {
+  actorType: 'system',
+  actorId: 'kiloclaw-worker',
+} satisfies KiloClawSubscriptionChangeActor;
+
+const KiloCliRunConflictSchema = z.object({
+  conflict: z.object({
+    code: z.enum([
+      'kilo_cli_run_instance_not_running',
+      'kilo_cli_run_already_active',
+      'kilo_cli_run_no_active_run',
+    ]),
+    error: z.string().min(1),
+  }),
 });
 
 const platform = new Hono<AppEnv>();
@@ -85,6 +130,42 @@ function logBillingPlatform(
   const record = JSON.stringify({
     level,
     message,
+    ...fields,
+  });
+
+  if (level === 'error') {
+    console.error(record);
+    return;
+  }
+  console.log(record);
+}
+
+type ProvisionWriteLogFields = {
+  event:
+    | 'instance_record_insert'
+    | 'instance_record_destroy'
+    | 'subscription_bootstrap'
+    | 'subscription_bootstrap_quarantine';
+  outcome: 'started' | 'completed' | 'failed';
+  userId?: string;
+  instanceId?: string;
+  orgId?: string | null;
+  sandboxId?: string;
+  durationMs?: number;
+  statusCode?: number;
+  inserted?: boolean;
+  error?: string;
+};
+
+function logProvisionWrite(
+  level: 'info' | 'error',
+  message: string,
+  fields: ProvisionWriteLogFields
+) {
+  const record = JSON.stringify({
+    level,
+    message,
+    billingComponent: 'kiloclaw_platform',
     ...fields,
   });
 
@@ -197,16 +278,56 @@ function setValidatedQueryUserId(c: Context<AppEnv>): string | null {
 /**
  * Resolve the DO key for a platform request.
  *
- * When instanceId is provided, it is always authoritative. Otherwise the
- * active Postgres row is the source of truth so legacy sandboxes continue to
- * route to the original userId-keyed DO after kilocode_users.id migrations.
+ * When instanceId is provided, it is authoritative. Postgres is only a
+ * best-effort bridge so legacy rows still route to their original userId-keyed
+ * DO and destroyed rows keep resolving after soft-delete. Missing rows fall
+ * back to the explicit instanceId so fresh provisioning can reach its DO
+ * before the instance record is inserted.
+ *
+ * Otherwise the active Postgres row is the source of truth so legacy sandboxes
+ * continue to route to the original userId-keyed DO after kilocode_users.id
+ * migrations.
  */
 export async function resolveInstanceDoKey(
   env: AppEnv['Bindings'],
   userId: string,
   instanceId?: string
 ): Promise<string> {
-  if (instanceId) return instanceId;
+  if (instanceId) {
+    const connectionString = env.HYPERDRIVE?.connectionString;
+    if (!connectionString) {
+      console.warn(
+        '[platform] Missing database connection for explicit instance DO-key resolution, using instanceId',
+        { userId, instanceId }
+      );
+      return instanceId;
+    }
+
+    try {
+      const instance = await getInstanceByIdIncludingDestroyed(
+        getWorkerDb(connectionString),
+        instanceId,
+        {
+          includeDestroyed: true,
+        }
+      );
+      if (!instance) {
+        console.warn(
+          '[platform] Instance not found during explicit DO-key resolution, using instanceId',
+          { userId, instanceId }
+        );
+        return instanceId;
+      }
+      return doKeyFromActiveInstance(instance);
+    } catch (err) {
+      console.warn('[platform] Failed to resolve DO key for explicit instance, using instanceId', {
+        userId,
+        instanceId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return instanceId;
+    }
+  }
 
   try {
     return (await resolveDoKeyForUser(env.HYPERDRIVE?.connectionString, userId)) ?? userId;
@@ -240,6 +361,224 @@ async function withResolvedDORetry<TResult>(
   operationName: string
 ): Promise<TResult> {
   return withDORetry(await instanceStubFactory(env, userId, instanceId), operation, operationName);
+}
+
+type ProvisionedInstanceRecord = {
+  id: string;
+  sandboxId: string;
+};
+
+function buildDefaultInboundEmailAlias(instanceId: string): string {
+  return `claw-${instanceId.replaceAll('-', '')}`;
+}
+
+async function insertProvisionedInstanceRecord(params: {
+  env: AppEnv['Bindings'];
+  userId: string;
+  instanceId: string;
+  sandboxId: string;
+  orgId: string | null;
+  provider: ProviderId;
+}): Promise<ProvisionedInstanceRecord> {
+  const connectionString = params.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    logProvisionWrite('error', 'Instance record insert aborted: HYPERDRIVE not configured', {
+      event: 'instance_record_insert',
+      outcome: 'failed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      error: 'HYPERDRIVE is not configured',
+    });
+    throw new Error('HYPERDRIVE is not configured');
+  }
+
+  const start = performance.now();
+  logProvisionWrite('info', 'Inserting provisioned instance record', {
+    event: 'instance_record_insert',
+    outcome: 'started',
+    userId: params.userId,
+    instanceId: params.instanceId,
+    orgId: params.orgId,
+    sandboxId: params.sandboxId,
+  });
+
+  const db = getWorkerDb(connectionString);
+  const alias = buildDefaultInboundEmailAlias(params.instanceId);
+  try {
+    const created = await db.transaction(async tx => {
+      const [createdInstance] = await tx
+        .insert(kiloclaw_instances)
+        .values({
+          id: params.instanceId,
+          user_id: params.userId,
+          sandbox_id: params.sandboxId,
+          provider: params.provider,
+          organization_id: params.orgId,
+        })
+        .onConflictDoNothing({ target: kiloclaw_instances.id })
+        .returning({
+          id: kiloclaw_instances.id,
+          sandboxId: kiloclaw_instances.sandbox_id,
+        });
+
+      const [existingAlias] = await tx
+        .select({ alias: kiloclaw_inbound_email_aliases.alias })
+        .from(kiloclaw_inbound_email_aliases)
+        .where(
+          and(
+            eq(kiloclaw_inbound_email_aliases.instance_id, params.instanceId),
+            isNull(kiloclaw_inbound_email_aliases.retired_at)
+          )
+        )
+        .limit(1);
+
+      if (!existingAlias) {
+        await tx
+          .insert(kiloclaw_inbound_email_reserved_aliases)
+          .values({ alias })
+          .onConflictDoNothing();
+
+        await tx
+          .insert(kiloclaw_inbound_email_aliases)
+          .values({
+            alias,
+            instance_id: params.instanceId,
+          })
+          .onConflictDoNothing({
+            target: kiloclaw_inbound_email_aliases.alias,
+          });
+      }
+
+      return createdInstance ?? null;
+    });
+
+    if (created) {
+      logProvisionWrite('info', 'Instance record inserted', {
+        event: 'instance_record_insert',
+        outcome: 'completed',
+        userId: params.userId,
+        instanceId: params.instanceId,
+        orgId: params.orgId,
+        sandboxId: params.sandboxId,
+        durationMs: performance.now() - start,
+        inserted: true,
+      });
+      return created;
+    }
+
+    const [existing] = await db
+      .select({
+        id: kiloclaw_instances.id,
+        sandboxId: kiloclaw_instances.sandbox_id,
+      })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, params.instanceId))
+      .limit(1);
+
+    if (!existing) {
+      logProvisionWrite('error', 'Instance record insert reported conflict but row not found', {
+        event: 'instance_record_insert',
+        outcome: 'failed',
+        userId: params.userId,
+        instanceId: params.instanceId,
+        orgId: params.orgId,
+        durationMs: performance.now() - start,
+        error: 'row_missing_after_conflict',
+      });
+      throw new Error('Failed to insert provisioned instance record');
+    }
+
+    logProvisionWrite('info', 'Instance record already existed (onConflictDoNothing hit)', {
+      event: 'instance_record_insert',
+      outcome: 'completed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      sandboxId: existing.sandboxId,
+      durationMs: performance.now() - start,
+      inserted: false,
+    });
+    return existing;
+  } catch (err) {
+    logProvisionWrite('error', 'Instance record insert failed', {
+      event: 'instance_record_insert',
+      outcome: 'failed',
+      userId: params.userId,
+      instanceId: params.instanceId,
+      orgId: params.orgId,
+      durationMs: performance.now() - start,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
+async function markProvisionedInstanceDestroyed(params: {
+  env: AppEnv['Bindings'];
+  instanceId: string;
+}): Promise<void> {
+  const connectionString = params.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    logProvisionWrite('error', 'Instance destroy compensation aborted: HYPERDRIVE not configured', {
+      event: 'instance_record_destroy',
+      outcome: 'failed',
+      instanceId: params.instanceId,
+      error: 'HYPERDRIVE is not configured',
+    });
+    throw new Error('HYPERDRIVE is not configured during instance destroy compensation');
+  }
+
+  const start = performance.now();
+  logProvisionWrite('info', 'Marking provisioned instance destroyed', {
+    event: 'instance_record_destroy',
+    outcome: 'started',
+    instanceId: params.instanceId,
+  });
+
+  const db = getWorkerDb(connectionString);
+  try {
+    await db.transaction(async tx => {
+      const [instance] = await tx
+        .select({
+          id: kiloclaw_instances.id,
+          userId: kiloclaw_instances.user_id,
+        })
+        .from(kiloclaw_instances)
+        .where(
+          and(eq(kiloclaw_instances.id, params.instanceId), isNull(kiloclaw_instances.destroyed_at))
+        )
+        .limit(1);
+
+      if (!instance) {
+        return;
+      }
+
+      await markInstanceDestroyedWithPersonalSubscriptionCollapse({
+        actor: KILOCLAW_WORKER_DESTROY_ACTOR,
+        executor: tx,
+        instanceId: instance.id,
+        reason: 'destroy_path_inline_collapse',
+        userId: instance.userId,
+      });
+    });
+
+    logProvisionWrite('info', 'Instance record marked destroyed', {
+      event: 'instance_record_destroy',
+      outcome: 'completed',
+      instanceId: params.instanceId,
+      durationMs: performance.now() - start,
+    });
+  } catch (err) {
+    logProvisionWrite('error', 'Instance destroy compensation failed', {
+      event: 'instance_record_destroy',
+      outcome: 'failed',
+      instanceId: params.instanceId,
+      durationMs: performance.now() - start,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 /** Parse and validate optional ?instanceId= query param. Returns 400 on invalid format. */
@@ -295,17 +634,44 @@ async function requireProviderCapability(
   return jsonError(`${operation} is not supported for provider ${metadata.provider}`, 400);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isHttpStatus(value: unknown): value is { status: number } {
+  return isRecord(value) && typeof value.status === 'number';
+}
+
+function hasStringCode(value: unknown): value is { code: string } {
+  return isRecord(value) && typeof value.code === 'string';
+}
+
+/** Extract a string `code` from an error or its `.cause`, if present. */
+function getErrorCode(err: unknown): string | undefined {
+  if (hasStringCode(err)) return err.code;
+  if (err instanceof Error && hasStringCode(err.cause)) return err.cause.code;
+  return undefined;
+}
+
 function statusCodeFromError(err: unknown): number {
-  if (
-    typeof err === 'object' &&
-    err !== null &&
-    'status' in err &&
-    typeof (err as { status: unknown }).status === 'number'
-  ) {
-    const status = (err as { status: number }).status;
-    if (status >= 400 && status < 600) return status;
+  // Extract a valid HTTP status from the error or its cause, defaulting to 500.
+  for (const candidate of [err, err instanceof Error ? err.cause : undefined]) {
+    if (isHttpStatus(candidate) && candidate.status >= 400 && candidate.status < 600) {
+      return candidate.status;
+    }
   }
   return 500;
+}
+
+function describeUnknownError(error: unknown): string | null {
+  if (!error) return null;
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return null;
+  }
 }
 
 function jsonError(message: string, status: number, code?: string): Response {
@@ -313,6 +679,20 @@ function jsonError(message: string, status: number, code?: string): Response {
     status,
     headers: { 'content-type': 'application/json' },
   });
+}
+
+function kiloCliRunConflictResponse(response: unknown): Response | undefined {
+  const result = KiloCliRunConflictSchema.safeParse(response);
+  if (result.success) {
+    const { code, error } = result.data.conflict;
+    return jsonError(error, 409, code);
+  }
+
+  if (isRecord(response) && 'conflict' in response) {
+    return jsonError('Invalid Kilo CLI conflict response', 502, 'upstream_invalid_response');
+  }
+
+  return undefined;
 }
 
 /**
@@ -346,7 +726,7 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
   const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
 
   // Log the full error for Sentry/debugging — this never reaches the caller
-  console.error(`[platform] ${operation} failed:`, raw);
+  console.error(`[platform] ${operation} failed:`, err);
 
   // Allow known-safe messages through
   if (SAFE_ERROR_PREFIXES.some(prefix => normalized.startsWith(prefix))) {
@@ -354,6 +734,15 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
   }
 
   return { message: `${operation} failed`, status };
+}
+
+function classifyProvisionFailure(err: unknown, status: number): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const flyApiMatch = raw.match(/Fly API ([A-Za-z0-9_-]+) failed \((\d{3})\)/);
+  const flyOperation = flyApiMatch?.[1];
+  const flyStatus = flyApiMatch?.[2];
+  if (flyOperation && flyStatus) return `fly_api_${flyOperation}_${flyStatus}`;
+  return `provision_${status}`;
 }
 
 /**
@@ -392,13 +781,7 @@ function sanitizeOpenclawConfigError(
   const raw = err instanceof Error ? err.message : 'Unknown error';
   const status = statusCodeFromError(err);
   const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
-  const code =
-    typeof err === 'object' &&
-    err !== null &&
-    'code' in err &&
-    typeof (err as { code?: unknown }).code === 'string'
-      ? (err as { code: string }).code
-      : undefined;
+  const code = getErrorCode(err);
 
   console.error(`[platform] ${operation} failed:`, raw);
 
@@ -464,6 +847,7 @@ platform.post('/provision', async c => {
     userId,
     instanceId,
     orgId,
+    bootstrapSubscription,
     provider,
     envVars,
     encryptedSecrets,
@@ -471,20 +855,39 @@ platform.post('/provision', async c => {
     kilocodeApiKey,
     kilocodeApiKeyExpiresAt,
     kilocodeDefaultModel,
+    userTimezone,
+    userLocation,
     machineSize,
     region,
     pinnedImageTag,
   } = result.data;
+  const provisionedInstanceId = instanceId ?? crypto.randomUUID();
+  const shouldInsertInstanceRecord = !instanceId;
+  const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
+  const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
+  const provisionRoute = '/api/platform/provision';
+  const provisionStartedAt = performance.now();
 
-  let provision;
+  let selectedProvider = provider;
+  if (!selectedProvider && shouldInsertInstanceRecord) {
+    selectedProvider = await selectProviderForProvision({
+      kv: c.env.KV_CLAW_CACHE,
+      userId,
+      orgId,
+      workerEnv: c.env.WORKER_ENV,
+      defaultProvider: c.env.KILOCLAW_DEFAULT_PROVIDER,
+    });
+  }
+
+  let provision: Awaited<ReturnType<KiloClawInstanceStub['provision']>>;
   try {
-    if (provider) {
-      assertImplementedProvider(provider);
+    if (selectedProvider) {
+      assertAvailableProvider(c.env, selectedProvider);
     }
     provision = await withResolvedDORetry(
       c.env,
       userId,
-      instanceId,
+      provisionedInstanceId,
       stub =>
         stub.provision(
           userId,
@@ -495,11 +898,13 @@ platform.post('/provision', async c => {
             kilocodeApiKey,
             kilocodeApiKeyExpiresAt,
             kilocodeDefaultModel,
+            userTimezone,
+            userLocation,
             machineSize,
             region,
             pinnedImageTag,
           },
-          instanceId || orgId || provider ? { instanceId, orgId, provider } : undefined
+          { instanceId: provisionedInstanceId, orgId, provider: selectedProvider }
         ),
       'provision'
     );
@@ -510,31 +915,212 @@ platform.post('/provision', async c => {
       return c.json({ error: 'User already has an active instance' }, 409);
     }
     const { message, status } = sanitizeError(err, 'provision');
+    writeEvent(c.env, {
+      event: 'instance.provisioning_failed',
+      delivery: 'http',
+      route: provisionRoute,
+      userId,
+      instanceId: provisionedInstanceId,
+      orgId: orgId ?? undefined,
+      error: message,
+      label: classifyProvisionFailure(err, status),
+      durationMs: performance.now() - provisionStartedAt,
+      value: status,
+    });
     return jsonError(message, status);
   }
 
-  // Record the instance in the appropriate registry (best-effort).
-  // instanceId is always provided by Next.js (the Postgres row UUID).
-  if (instanceId) {
+  if (shouldInsertInstanceRecord) {
+    const insertStartedAt = performance.now();
     try {
-      const registryKey = orgId ? `org:${orgId}` : `user:${userId}`;
-      const registryStub = c.env.KILOCLAW_REGISTRY.get(
-        c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
-      );
-      // doKey = instanceId: all new provisions create DOs keyed by instanceId.
-      // For lazy-migrated legacy instances, doKey = userId (set in lazyMigrate).
-      await registryStub.createInstance(registryKey, userId, instanceId, instanceId);
-      console.log('[platform] Registry entry created:', {
-        registryKey,
-        instanceId,
-        doKey: instanceId,
+      await insertProvisionedInstanceRecord({
+        env: c.env,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? null,
+        provider: selectedProvider ?? 'fly',
       });
-    } catch (registryErr) {
-      console.error('[platform] Registry create failed (non-fatal):', registryErr);
+      writeEvent(c.env, {
+        event: 'instance.record_inserted',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        durationMs: performance.now() - insertStartedAt,
+      });
+    } catch (persistErr) {
+      console.error('[platform] Provision post-processing failed:', persistErr);
+      const { message, status } = sanitizeError(persistErr, 'post-provision bootstrap');
+      writeEvent(c.env, {
+        event: 'instance.record_insert_failed',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        error: message,
+        durationMs: performance.now() - insertStartedAt,
+      });
+      await withResolvedDORetry(
+        c.env,
+        userId,
+        provisionedInstanceId,
+        stub => stub.destroy(),
+        'destroy'
+      ).catch(destroyErr => {
+        console.error(
+          '[platform] Failed to destroy provisioned instance after bootstrap error:',
+          destroyErr
+        );
+      });
+      await markProvisionedInstanceDestroyed({
+        env: c.env,
+        instanceId: provisionedInstanceId,
+      }).catch(markErr => {
+        console.error(
+          '[platform] Failed to mark instance destroyed after bootstrap error:',
+          markErr
+        );
+      });
+      return jsonError(message, status);
     }
   }
 
-  return c.json(provision, 201);
+  if (shouldBootstrapSubscription) {
+    const bootstrapStartedAt = performance.now();
+    logProvisionWrite('info', 'Bootstrapping provisioned subscription', {
+      event: 'subscription_bootstrap',
+      outcome: 'started',
+      userId,
+      instanceId: provisionedInstanceId,
+      orgId: orgId ?? null,
+    });
+    try {
+      const bootstrap = await bootstrapProvisionedSubscriptionWithFallback({
+        env: c.env,
+        input: {
+          userId,
+          instanceId: provisionedInstanceId,
+          orgId: orgId ?? null,
+        },
+      });
+      logProvisionWrite('info', 'Provisioned subscription bootstrapped', {
+        event: 'subscription_bootstrap',
+        outcome: 'completed',
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? null,
+        durationMs: performance.now() - bootstrapStartedAt,
+      });
+      writeEvent(c.env, {
+        event: 'instance.subscription_bootstrapped',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        label: bootstrap.mode,
+        durationMs: performance.now() - bootstrapStartedAt,
+      });
+    } catch (persistErr) {
+      console.error('[platform] Provision post-processing failed:', persistErr);
+      const { message, status } = sanitizeError(persistErr, 'post-provision bootstrap');
+      writeEvent(c.env, {
+        event: 'instance.subscription_bootstrap_failed',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        error: message,
+        durationMs: performance.now() - bootstrapStartedAt,
+      });
+      const rpcError =
+        persistErr instanceof BootstrapProvisionFallbackError ? persistErr.rpcError : persistErr;
+      const fallbackError =
+        persistErr instanceof BootstrapProvisionFallbackError
+          ? persistErr.fallbackError
+          : undefined;
+      logProvisionWrite('error', 'Subscription bootstrap quarantined for remediation', {
+        event: 'subscription_bootstrap_quarantine',
+        outcome: 'failed',
+        userId,
+        instanceId: provisionedInstanceId,
+        orgId: orgId ?? null,
+        durationMs: performance.now() - bootstrapStartedAt,
+        error:
+          fallbackError instanceof Error
+            ? fallbackError.message.slice(0, 500)
+            : message.slice(0, 500),
+      });
+      writeEvent(c.env, {
+        event: 'instance.subscription_bootstrap_quarantined',
+        delivery: 'http',
+        route: provisionRoute,
+        userId,
+        instanceId: provisionedInstanceId,
+        sandboxId: provision.sandboxId,
+        orgId: orgId ?? undefined,
+        error: [message, describeUnknownError(rpcError), describeUnknownError(fallbackError)]
+          .filter(part => !!part)
+          .join(' | '),
+        label: 'rpc_and_local_fallback_failed',
+        durationMs: performance.now() - bootstrapStartedAt,
+      });
+      if (shouldInsertInstanceRecord) {
+        await markProvisionedInstanceDestroyed({
+          env: c.env,
+          instanceId: provisionedInstanceId,
+        }).catch(markErr => {
+          console.error(
+            '[platform] Failed to mark bootstrap-quarantined instance destroyed for retry:',
+            markErr
+          );
+        });
+      }
+      console.error(
+        '[platform] Subscription bootstrap failed after local fallback; instance quarantined for remediation',
+        {
+          userId,
+          instanceId: provisionedInstanceId,
+          doKey: provisionDoKey,
+          shouldInsertInstanceRecord,
+          rpcError: describeUnknownError(rpcError) ?? undefined,
+          fallbackError: describeUnknownError(fallbackError) ?? undefined,
+        }
+      );
+      return jsonError(message, status);
+    }
+  }
+
+  try {
+    const registryKey = orgId ? `org:${orgId}` : `user:${userId}`;
+    const registryStub = c.env.KILOCLAW_REGISTRY.get(
+      c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+    );
+    await registryStub.createInstance(registryKey, userId, provisionedInstanceId, provisionDoKey);
+    console.log('[platform] Registry entry created:', {
+      registryKey,
+      instanceId: provisionedInstanceId,
+      doKey: provisionDoKey,
+    });
+  } catch (registryErr) {
+    console.error('[platform] Registry create failed (non-fatal):', registryErr);
+  }
+
+  return c.json(
+    {
+      ...provision,
+      instanceId: provisionedInstanceId,
+    },
+    201
+  );
 });
 
 // PATCH /api/platform/kilocode-config
@@ -563,6 +1149,31 @@ platform.patch('/kilocode-config', async c => {
     return c.json(updated, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'kilocode-config patch');
+    return jsonError(message, status);
+  }
+});
+
+// PATCH /api/platform/web-search-config
+platform.patch('/web-search-config', async c => {
+  const result = await parseBody(c, WebSearchConfigPatchSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, exaMode } = result.data;
+
+  try {
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateWebSearchConfig({ exaMode }),
+      'updateWebSearchConfig'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'web-search-config patch');
     return jsonError(message, status);
   }
 });
@@ -752,6 +1363,67 @@ platform.delete('/gmail-notifications', async c => {
     return c.json(updated, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'gmail-notifications disable');
+    return jsonError(message, status);
+  }
+});
+
+const GoogleOAuthConnectionPatchSchema = z.object({
+  userId: z.string().min(1),
+  googleOAuthConnection: GoogleOAuthConnectionSchema,
+});
+
+// POST /api/platform/google-oauth-connection
+platform.post('/google-oauth-connection', async c => {
+  const result = await parseBody(c, GoogleOAuthConnectionPatchSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, googleOAuthConnection } = result.data;
+
+  try {
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub =>
+        stub.updateGoogleOAuthConnection({
+          status: googleOAuthConnection.status,
+          accountEmail: googleOAuthConnection.accountEmail,
+          accountSubject: googleOAuthConnection.accountSubject,
+          scopes: googleOAuthConnection.scopes,
+          capabilities: googleOAuthConnection.capabilities,
+          lastError: googleOAuthConnection.lastError,
+        }),
+      'updateGoogleOAuthConnection'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'google-oauth-connection');
+    return jsonError(message, status);
+  }
+});
+
+// DELETE /api/platform/google-oauth-connection?userId=...
+platform.delete('/google-oauth-connection', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) return c.json({ error: 'userId is required' }, 400);
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.clearGoogleOAuthConnection(),
+      'clearGoogleOAuthConnection'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'google-oauth-connection delete');
     return jsonError(message, status);
   }
 });
@@ -1361,11 +2033,15 @@ platform.post('/kilo-cli-run/start', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    // The DO returns a discriminated union: success | { conflict } | null.
+    // CF Workers' RPC type wrapping turns this into `Promise<A> | Promise<B>`
+    // instead of `Promise<A | B>`, which breaks narrowing. The `.then(r => r)`
+    // collapses the RPC wrapper back to a plain Promise union.
     const response = await withResolvedDORetry(
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.startKiloCliRun(result.data.prompt),
+      stub => stub.startKiloCliRun(result.data.prompt).then(r => r),
       'startKiloCliRun'
     );
     if (!response) {
@@ -1375,6 +2051,8 @@ platform.post('/kilo-cli-run/start', async c => {
         'controller_route_unavailable'
       );
     }
+    const conflictResponse = kiloCliRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'kilo-cli-run start');
@@ -1412,13 +2090,17 @@ platform.post('/kilo-cli-run/cancel', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
+    // The DO returns a discriminated union: success | { conflict }.
+    // See startKiloCliRun for the same pattern and the reason for .then(r => r).
     const response = await withResolvedDORetry(
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.cancelKiloCliRun(),
+      stub => stub.cancelKiloCliRun().then(r => r),
       'cancelKiloCliRun'
     );
+    const conflictResponse = kiloCliRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
     return c.json(response, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'kilo-cli-run cancel');
@@ -1706,6 +2388,285 @@ platform.get('/stream-chat-credentials', async c => {
     return c.json(creds);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'stream-chat-credentials');
+    return jsonError(message, status);
+  }
+});
+
+const MAX_INBOUND_EMAIL_TITLE_SLUG_LENGTH = 80;
+
+const InboundEmailSchema = z.object({
+  instanceId: z.string().uuid(),
+  messageId: z.string().trim().min(1).max(512),
+  from: z.string().trim().min(1).max(512),
+  to: z.string().trim().min(1).max(512),
+  recipientAlias: z.string().trim().min(1).max(512).optional(),
+  subject: z.string().max(1_000),
+  text: z.string().min(1).max(32_000),
+  receivedAt: z.string().datetime(),
+});
+
+type InboundEmailDelivery = z.infer<typeof InboundEmailSchema>;
+
+function inboundEmailTitleSlug(subject: string): string {
+  const slug = subject
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_INBOUND_EMAIL_TITLE_SLUG_LENGTH)
+    .replace(/-+$/g, '');
+
+  return slug || 'no-subject';
+}
+
+function inboundEmailSessionKey(subject: string, receivedAt: string): string {
+  return `inbound-email:${receivedAt.slice(0, 10)}-${inboundEmailTitleSlug(subject)}`;
+}
+
+function inboundEmailAddressParts(address: string): {
+  localPart: string;
+  domain: string;
+  validSingleAddress: boolean;
+} {
+  const [localPart, domain, ...extra] = address.trim().toLowerCase().split('@');
+  return {
+    localPart: localPart ?? '',
+    domain: domain ?? '',
+    validSingleAddress: Boolean(localPart && domain && extra.length === 0),
+  };
+}
+
+function inboundEmailLogContext(delivery: InboundEmailDelivery) {
+  const recipient = inboundEmailAddressParts(delivery.to);
+  const sender = inboundEmailAddressParts(delivery.from);
+
+  return {
+    instanceId: delivery.instanceId,
+    messageIdLength: delivery.messageId.length,
+    fromDomain: sender.domain,
+    toLocalPart: recipient.localPart,
+    toDomain: recipient.domain,
+    toAddressValid: recipient.validSingleAddress,
+    recipientAlias: delivery.recipientAlias ?? null,
+    subjectLength: delivery.subject.length,
+    textLength: delivery.text.length,
+    receivedAt: delivery.receivedAt,
+  };
+}
+
+async function resolveInboundEmailDoKey(
+  env: AppEnv['Bindings'],
+  instance: { id: string; userId: string; sandboxId: string; orgId: string | null }
+): Promise<string> {
+  const ownerKey = instance.orgId ? `org:${instance.orgId}` : `user:${instance.userId}`;
+  try {
+    const registryStub = env.KILOCLAW_REGISTRY.get(env.KILOCLAW_REGISTRY.idFromName(ownerKey));
+    const doKey = await registryStub.resolveDoKey(ownerKey, instance.id);
+    if (doKey) return doKey;
+  } catch (err) {
+    console.warn(
+      '[platform] inbound-email registry lookup failed, falling back to instance identity',
+      {
+        instanceId: instance.id,
+        error: err instanceof Error ? err.message : String(err),
+      }
+    );
+  }
+  return doKeyFromActiveInstance(instance);
+}
+
+// POST /api/platform/inbound-email
+// Deliver a Cloudflare Email Routing message to an instance's OpenClaw hook endpoint.
+platform.post('/inbound-email', async c => {
+  const startedAt = performance.now();
+  const result = await parseBody(c, InboundEmailSchema);
+  if ('error' in result) return result.error;
+
+  const delivery = result.data;
+  const logContext = inboundEmailLogContext(delivery);
+  const recipientAlias = delivery.recipientAlias?.toLowerCase();
+  console.log('[platform] inbound email received', logContext);
+  if (!recipientAlias) {
+    console.warn('[platform] inbound email missing alias metadata', logContext);
+    return jsonError('Inbound email address is no longer available', 410);
+  }
+
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    console.error('[platform] inbound email database unavailable', logContext);
+    return jsonError('Database is not configured', 503);
+  }
+  if (!c.env.GATEWAY_TOKEN_SECRET) {
+    console.error('[platform] inbound email gateway token secret unavailable', logContext);
+    return jsonError('GATEWAY_TOKEN_SECRET is not configured', 503);
+  }
+
+  try {
+    const db = getWorkerDb(connectionString);
+    const instance = await getInstanceById(db, delivery.instanceId);
+    if (!instance) {
+      console.warn('[platform] inbound email instance not found', logContext);
+      return jsonError('Instance not found', 404);
+    }
+    if (!instance.inboundEmailEnabled) {
+      console.warn('[platform] inbound email disabled for instance', logContext);
+      return jsonError('Inbound email is disabled for this instance', 410);
+    }
+
+    const [activeAlias] = await db
+      .select({ alias: kiloclaw_inbound_email_aliases.alias })
+      .from(kiloclaw_inbound_email_aliases)
+      .where(
+        and(
+          eq(kiloclaw_inbound_email_aliases.instance_id, instance.id),
+          eq(kiloclaw_inbound_email_aliases.alias, recipientAlias),
+          isNull(kiloclaw_inbound_email_aliases.retired_at)
+        )
+      )
+      .limit(1);
+    if (!activeAlias) {
+      console.warn('[platform] inbound email alias is not active', logContext);
+      return jsonError('Inbound email address is no longer available', 410);
+    }
+
+    c.set('userId', instance.userId);
+    console.log('[platform] inbound email instance resolved', {
+      ...logContext,
+      userId: instance.userId,
+      sandboxId: instance.sandboxId,
+      orgId: instance.orgId,
+    });
+
+    const doKey = await resolveInboundEmailDoKey(c.env, instance);
+    console.log('[platform] inbound email DO resolved', {
+      ...logContext,
+      userId: instance.userId,
+      orgId: instance.orgId,
+      doKey,
+      doKeyMatchesInstanceId: doKey === instance.id,
+    });
+
+    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+    const status = await stub.getStatus();
+    console.log('[platform] inbound email status resolved', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      instanceStatus: status.status,
+      statusUserId: status.userId,
+      statusSandboxId: status.sandboxId,
+      hasSandboxId: Boolean(status.sandboxId),
+    });
+
+    if (status.status !== 'running') {
+      console.warn('[platform] inbound email instance is not running', {
+        ...logContext,
+        userId: instance.userId,
+        doKey,
+        instanceStatus: status.status,
+      });
+      return jsonError('Instance is not running', 503);
+    }
+    if (!status.sandboxId) {
+      console.error('[platform] inbound email instance has no sandboxId', {
+        ...logContext,
+        userId: instance.userId,
+        doKey,
+        instanceStatus: status.status,
+      });
+      return jsonError('Instance has no sandboxId', 500);
+    }
+
+    const routingTarget = await stub.getRoutingTarget();
+    if (!routingTarget) {
+      console.warn('[platform] inbound email instance not routable', {
+        ...logContext,
+        userId: instance.userId,
+        doKey,
+        instanceStatus: status.status,
+      });
+      return jsonError('Instance not routable', 503);
+    }
+    console.log('[platform] inbound email routing target resolved', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      targetOrigin: routingTarget.origin,
+      hasFlyForceInstanceId: 'fly-force-instance-id' in routingTarget.headers,
+    });
+
+    const gatewayToken = await deriveGatewayToken(status.sandboxId, c.env.GATEWAY_TOKEN_SECRET);
+    const sessionKey = inboundEmailSessionKey(delivery.subject, delivery.receivedAt);
+    console.log('[platform] inbound email forwarding to controller', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      targetOrigin: routingTarget.origin,
+      sessionKeyPrefix: sessionKey.split(':')[0] ?? '',
+      sessionKeyLength: sessionKey.length,
+    });
+    const response = await fetch(`${routingTarget.origin}/_kilo/hooks/email`, {
+      method: 'POST',
+      headers: {
+        ...routingTarget.headers,
+        authorization: `Bearer ${gatewayToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sessionKey,
+        messageId: delivery.messageId,
+        from: delivery.from,
+        to: delivery.to,
+        subject: delivery.subject,
+        text: delivery.text,
+        receivedAt: delivery.receivedAt,
+      }),
+    });
+
+    console.log('[platform] inbound email controller response', {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      status: response.status,
+      ok: response.ok,
+      durationMs: performance.now() - startedAt,
+    });
+
+    if (response.ok) {
+      writeEvent(c.env, {
+        event: 'instance.webhook_chat_message_sent',
+        delivery: 'http',
+        route: '/api/platform/inbound-email',
+        userId: instance.userId,
+        instanceId: instance.id,
+      });
+      return c.json({ success: true }, 202);
+    }
+
+    const error = await response.text().catch(() => '');
+    const controllerFailure = {
+      ...logContext,
+      userId: instance.userId,
+      doKey,
+      status: response.status,
+      error: error.slice(0, 500),
+      durationMs: performance.now() - startedAt,
+    };
+    if (response.status >= 500) {
+      console.error('[platform] inbound email controller delivery failed', controllerFailure);
+    } else {
+      console.warn('[platform] inbound email controller rejected delivery', controllerFailure);
+    }
+
+    const responseStatus = response.status >= 400 && response.status < 600 ? response.status : 502;
+    return jsonError('Inbound email delivery failed', responseStatus);
+  } catch (err) {
+    console.error('[platform] inbound email delivery threw', {
+      ...logContext,
+      error: err instanceof Error ? err.message : String(err),
+      durationMs: performance.now() - startedAt,
+    });
+    const { message, status } = sanitizeError(err, 'inbound-email');
     return jsonError(message, status);
   }
 });
@@ -2214,6 +3175,33 @@ platform.put('/regions', async c => {
 
   console.log('[platform] Regions updated:', raw);
   return c.json({ ok: true, regions: result.data.regions, raw });
+});
+
+// GET /api/platform/providers/rollout
+// Returns runtime provider rollout configuration from KV.
+platform.get('/providers/rollout', async c => {
+  try {
+    const { config, source } = await readProviderRolloutConfig(c.env.KV_CLAW_CACHE);
+    return c.json({ rollout: config, availability: providerRolloutAvailability(), source });
+  } catch (err) {
+    console.error('[platform] Failed to read provider rollout config:', err);
+    return c.json({ error: 'Failed to read provider rollout config' }, 500);
+  }
+});
+
+// PUT /api/platform/providers/rollout
+// Updates runtime provider rollout configuration in KV.
+platform.put('/providers/rollout', async c => {
+  const result = await parseBody(c, ProviderRolloutConfigSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    await writeProviderRolloutConfig(c.env.KV_CLAW_CACHE, result.data);
+    return c.json({ ok: true, rollout: result.data, availability: providerRolloutAvailability() });
+  } catch (err) {
+    console.error('[platform] Failed to write provider rollout config:', err);
+    return c.json({ error: 'Failed to write provider rollout config' }, 500);
+  }
 });
 
 // POST /api/platform/destroy-fly-machine

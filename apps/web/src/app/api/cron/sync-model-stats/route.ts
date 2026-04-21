@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { getRawOpenRouterModels, getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
+import {
+  getRawOpenRouterModels,
+  getEnhancedOpenRouterModels,
+} from '@/lib/ai-gateway/providers/openrouter';
 import { syncArtificialAnalysisBenchmarks } from '@/lib/model-stats/sync-artificial-analysis';
 import { syncOpenRouterModels } from '@/lib/model-stats/sync-openrouter';
 import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
 import { CRON_SECRET } from '@/lib/config.server';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { getMonitoredModels } from '@/lib/monitored-models';
+import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
 
 const BETTERSTACK_HEARTBEAT_URL =
   'https://uptime.betterstack.com/api/v1/heartbeat/1zuL4cAH8Ui6JF9j8M3L8oAD';

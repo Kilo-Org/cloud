@@ -2,7 +2,7 @@ import { db } from '@/lib/drizzle';
 import { modelStats } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import type { OpenRouterModel as OpenRouterApiModel } from '@/lib/providers/openrouter/openrouter-types';
+import type { OpenRouterModel as OpenRouterApiModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 /**
  * Convert per-token price to per-million-tokens price

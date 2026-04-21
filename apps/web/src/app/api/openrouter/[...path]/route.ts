@@ -1,8 +1,8 @@
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { isOpenCodeBasedClient, isRooCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
-import { applyTrackingIds } from '@/lib/providerHash';
-import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/processUsage';
+import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
+import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/ai-gateway/processUsage';
 import {
   validateFeatureHeader,
   FEATURE_HEADER,
@@ -14,8 +14,12 @@ import type {
   GatewayResponsesRequest,
   GatewayMessagesRequest,
   GatewayRequest,
-} from '@/lib/providers/openrouter/types';
-import { applyProviderSpecificLogic, getProvider, openRouterRequest } from '@/lib/providers';
+} from '@/lib/ai-gateway/providers/openrouter/types';
+import {
+  applyProviderSpecificLogic,
+  getProvider,
+  openRouterRequest,
+} from '@/lib/ai-gateway/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
@@ -23,15 +27,17 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
   isFreeModel,
   isDeadFreeModel,
+  isExcludedForFeature,
   isKiloExclusiveFreeModel,
   isKiloStealthModel,
-} from '@/lib/models';
+} from '@/lib/ai-gateway/models';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
   checkOrganizationModelRestrictions,
   dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
+  featureExclusiveModelResponse,
   invalidPathResponse,
   invalidRequestResponse,
   makeErrorReadable,
@@ -43,10 +49,11 @@ import {
   forbiddenFreeModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
-} from '@/lib/llm-proxy-helpers';
+} from '@/lib/ai-gateway/llm-proxy-helpers';
+import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
-import { isFreePromptTrainingAllowed } from '@/lib/providers/openrouter/types';
+import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
+import { isFreePromptTrainingAllowed } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   rewriteFreeModelResponse_ChatCompletions,
   rewriteFreeModelResponse_Messages,
@@ -64,28 +71,29 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { handleRequestLogging } from '@/lib/handleRequestLogging';
-import { classifyAbuse } from '@/lib/abuse-service';
+import { handleRequestLogging } from '@/lib/ai-gateway/handleRequestLogging';
+import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
 import {
   emitApiMetricsForResponse,
   getToolsAvailable,
   getToolsUsed,
-} from '@/lib/o11y/api-metrics.server';
-import { grokCodeFastOptimizedRequest } from '@/lib/custom-llm/customLlmRequest';
-import { normalizeModelId } from '@/lib/model-utils';
-import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
+} from '@/lib/ai-gateway/o11y/api-metrics.server';
+import { grokCodeFastOptimizedRequest } from '@/lib/ai-gateway/custom-llm/customLlmRequest';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { isKiloAutoModel } from '@/lib/kilo-auto';
 import { applyResolvedAutoModel } from '@/lib/kilo-auto/resolution';
-import { fixOpenCodeDuplicateReasoning } from '@/lib/providers/fixOpenCodeDuplicateReasoning';
-import type { MicrodollarUsageContext, PromptInfo } from '@/lib/processUsage.types';
-import { extractResponsesPromptInfo } from '@/lib/processUsage.responses';
-import { extractMessagesPromptInfo } from '@/lib/processUsage.messages';
+import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
+import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/processUsage.types';
+import { extractResponsesPromptInfo } from '@/lib/ai-gateway/processUsage.responses';
+import { extractMessagesPromptInfo } from '@/lib/ai-gateway/processUsage.messages';
 import {
+  enableReasoningSummaries,
   fixResponsesRequest,
   getMaxTokens,
   hasMiddleOutTransform,
-} from '@/lib/providers/openrouter/request-helpers';
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 
 export const maxDuration = 800;
 
@@ -137,7 +145,10 @@ async function resolveRateLimit(
     const { user } = await authPromise;
     if (!user) {
       return NextResponse.json(
-        { error: 'Authentication required for this feature' },
+        {
+          error: 'Authentication required for this feature',
+          error_type: ProxyErrorType.authentication_required,
+        },
         { status: 401 }
       );
     }
@@ -196,6 +207,19 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
+  if (requestBodyParsed.kind === 'chat_completions' || requestBodyParsed.kind === 'messages') {
+    if (!Array.isArray(requestBodyParsed.body.messages)) {
+      return invalidRequestResponse();
+    }
+  }
+
+  if (requestBodyParsed.kind === 'responses') {
+    const { input } = requestBodyParsed.body;
+    if (input != null && typeof input !== 'string' && !Array.isArray(input)) {
+      return invalidRequestResponse();
+    }
+  }
+
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
   const isLegacyOpenRouterPath = url.pathname.includes('/openrouter');
@@ -212,14 +236,19 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
+  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
     await applyResolvedAutoModel(
-      requestedModelLowerCased,
+      {
+        model: requestedModelLowerCased,
+        modeHeader,
+        featureHeader: feature,
+        sessionId: taskId ?? null,
+        apiKind: requestBodyParsed.kind,
+      },
       requestBodyParsed,
-      modeHeader,
-      feature,
       authPromise.then(res => res.user),
       balanceAndSettingsPromise.then(res => res.balance)
     );
@@ -227,10 +256,24 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
 
+  // Reject early (before rate limiting) if the model is exclusive to other features.
+  if (isExcludedForFeature(originalModelIdLowerCased, feature)) {
+    console.warn(
+      `Model ${originalModelIdLowerCased} is not available for feature ${feature}; rejecting.`
+    );
+    return featureExclusiveModelResponse(originalModelIdLowerCased);
+  }
+
   // Extract IP for all requests (needed for free model rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   if (!ipAddress) {
-    return NextResponse.json({ error: 'Unable to determine client IP' }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: 'Unable to determine client IP',
+        error_type: ProxyErrorType.missing_client_ip,
+      },
+      { status: 400 }
+    );
   }
 
   // For FREE models: check rate limit, log at start.
@@ -248,6 +291,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       return NextResponse.json(
         {
           error: 'Rate limit exceeded',
+          error_type: ProxyErrorType.rate_limit_exceeded,
           message:
             'Free model usage limit reached. Please try again later or upgrade to a paid model.',
         },
@@ -282,6 +326,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
             code: PAID_MODEL_AUTH_REQUIRED,
             message: 'You need to sign in to use this model.',
           },
+          error_type: ProxyErrorType.paid_model_auth_required,
         },
         { status: 401 }
       );
@@ -305,6 +350,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
               'Sign up for free to continue and explore 500 other models. ' +
               'Takes 2 minutes, no credit card required. Or come back later.',
           },
+          error_type: ProxyErrorType.promotion_limit_reached,
         },
         { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
       );
@@ -337,7 +383,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
-  const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   const { provider, userByok, bypassAccessCheck } = await getProvider(
     originalModelIdLowerCased,
     requestBodyParsed,
@@ -380,7 +425,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     (!autoModel && isForbiddenFreeModel(originalModelIdLowerCased))
   ) {
     console.warn(`User requested forbidden free model ${originalModelIdLowerCased}; rejecting.`);
-    return forbiddenFreeModelResponse(fraudHeaders, feature);
+    return forbiddenFreeModelResponse(fraudHeaders);
   }
 
   // Extract properties for usage context
@@ -457,11 +502,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   applyTrackingIds(requestBodyParsed, provider, user.id, taskId ?? null);
 
+  sanitizeBinaryToolResults(requestBodyParsed);
+
   if (requestBodyParsed.kind === 'chat_completions') {
-    if (ENABLE_TOOL_REPAIR) {
-      // Mostly a workaround for bugs in the old extension.
-      repairTools(requestBodyParsed.body);
-    }
+    // Mostly a workaround for bugs in the old extension.
+    repairTools(requestBodyParsed.body);
 
     if (isOpenCodeBasedClient(fraudHeaders)) {
       // Workaround for bugs in the chat completions client.
@@ -472,6 +517,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (requestBodyParsed.kind === 'responses') {
     fixResponsesRequest(requestBodyParsed.body);
   }
+
+  enableReasoningSummaries(requestBodyParsed);
 
   const toolsAvailable = getToolsAvailable(requestBodyParsed);
   const toolsUsed = getToolsUsed(requestBodyParsed);
@@ -580,7 +627,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  handleRequestLogging({
+  await handleRequestLogging({
     clonedResponse: response.clone(),
     user: maybeUser,
     organization_id: organizationId || null,
@@ -595,8 +642,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed,
       response,
       isUserByok: !!userByok,
-      feature,
-      balance: (await balanceAndSettingsPromise).balance,
     });
     if (errorResponse) {
       return errorResponse;

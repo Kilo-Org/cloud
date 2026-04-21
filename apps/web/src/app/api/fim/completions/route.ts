@@ -3,9 +3,9 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
-import type { MicrodollarUsageContext } from '@/lib/processUsage.types';
+import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { isFreeModel } from '@/lib/models';
+import { isFreeModel } from '@/lib/ai-gateway/models';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user.server';
 import {
@@ -18,12 +18,13 @@ import {
   wrapInSafeNextResponse,
   captureProxyError,
   extractHeaderAndLimitLength,
-} from '@/lib/llm-proxy-helpers';
+} from '@/lib/ai-gateway/llm-proxy-helpers';
+import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { readDb } from '@/lib/drizzle';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { sentryLogger } from '@/lib/utils.server';
-import { getBYOKforOrganization, getBYOKforUser } from '@/lib/byok';
+import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 
 const MISTRAL_FIM_URL = 'https://api.mistral.ai/v1/fim/completions';
 const INCEPTION_FIM_URL = 'https://api.inceptionlabs.ai/v1/fim/completions';
@@ -119,7 +120,10 @@ export async function POST(request: NextRequest) {
   const resolved = resolveFimProvider(requestBody.model);
   if (!resolved) {
     return NextResponse.json(
-      { error: requestBody.model + ' is not a supported FIM model' },
+      {
+        error: requestBody.model + ' is not a supported FIM model',
+        error_type: ProxyErrorType.unsupported_fim_model,
+      },
       { status: 400 }
     );
   }
@@ -177,7 +181,13 @@ export async function POST(request: NextRequest) {
   const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
-    return NextResponse.json({ error: { message: 'Insufficient credits' } }, { status: 402 });
+    return NextResponse.json(
+      {
+        error: { message: 'Insufficient credits' },
+        error_type: ProxyErrorType.insufficient_credits,
+      },
+      { status: 402 }
+    );
   }
 
   // Use shared helper for organization model restrictions
@@ -195,6 +205,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Provider not allowed for your team.',
+        error_type: ProxyErrorType.provider_not_allowed,
         message: `The provider "${fimProvider}" is not allowed for your team.`,
       },
       { status: 403 }
@@ -208,6 +219,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'This model requires a BYOK API key. Please configure your API key in settings.',
+        error_type: ProxyErrorType.byok_key_required,
       },
       { status: 400 }
     );
@@ -237,7 +249,13 @@ export async function POST(request: NextRequest) {
   usageContext.status_code = proxyRes.status;
 
   if (!proxyRes.body) {
-    return NextResponse.json({ error: 'No body returned from upstream' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'No body returned from upstream',
+        error_type: ProxyErrorType.upstream_error,
+      },
+      { status: 500 }
+    );
   }
 
   // Handle errors

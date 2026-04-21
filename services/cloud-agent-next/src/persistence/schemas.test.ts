@@ -1,6 +1,64 @@
 import { describe, it, expect } from 'vitest';
-import { MCPServerConfigSchema, MetadataSchema } from './schemas.js';
+import { ImagesSchema, MCPServerConfigSchema, MetadataSchema } from './schemas.js';
 import type { MCPServerConfig } from './types.js';
+
+describe('ImagesSchema', () => {
+  it('accepts a bare message UUID and up to five UUID image filenames', () => {
+    const images = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: [
+        '123e4567-e89b-12d3-a456-426614174001.png',
+        '123e4567-e89b-12d3-a456-426614174002.jpg',
+        '123e4567-e89b-12d3-a456-426614174003.webp',
+        '123e4567-e89b-12d3-a456-426614174004.gif',
+        '123e4567-e89b-12d3-a456-426614174005.jpeg',
+      ],
+    };
+
+    expect(ImagesSchema.parse(images)).toEqual(images);
+  });
+
+  it('rejects client-provided R2 service prefixes', () => {
+    const result = ImagesSchema.safeParse({
+      path: 'app-builder/123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects hyphen-only image filenames without UUID segments', () => {
+    const result = ImagesSchema.safeParse({
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['------------------------------------.png'],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects more than five files and unsafe filenames', () => {
+    expect(
+      ImagesSchema.safeParse({
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: [
+          '123e4567-e89b-12d3-a456-426614174001.png',
+          '123e4567-e89b-12d3-a456-426614174002.png',
+          '123e4567-e89b-12d3-a456-426614174003.png',
+          '123e4567-e89b-12d3-a456-426614174004.png',
+          '123e4567-e89b-12d3-a456-426614174005.png',
+          '123e4567-e89b-12d3-a456-426614174006.png',
+        ],
+      }).success
+    ).toBe(false);
+
+    expect(
+      ImagesSchema.safeParse({
+        path: '123e4567-e89b-12d3-a456-426614174000',
+        files: ['../123e4567-e89b-12d3-a456-426614174001.svg'],
+      }).success
+    ).toBe(false);
+  });
+});
 
 describe('MCPServerConfigSchema', () => {
   describe('valid local configuration', () => {

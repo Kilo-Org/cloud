@@ -73,12 +73,20 @@ const AUTH_FAILURE_KEYWORDS = ['unauthorized', '401', 'auth', 'ticket'] as const
  * - Close code 4001 (custom) - explicit auth failure code
  * - Close reason containing auth-related keywords
  */
+function isAuthFailureCode(code: number): boolean {
+  return AUTH_FAILURE_CLOSE_CODES.some(authFailureCode => authFailureCode === code);
+}
+
 function isAuthFailureClose(event: CloseEvent): boolean {
-  if (AUTH_FAILURE_CLOSE_CODES.includes(event.code as (typeof AUTH_FAILURE_CLOSE_CODES)[number])) {
+  if (isAuthFailureCode(event.code)) {
     return true;
   }
   const reason = event.reason?.toLowerCase() ?? '';
   return AUTH_FAILURE_KEYWORDS.some(keyword => reason.includes(keyword));
+}
+
+function isAmbiguousAbnormalClose(event: CloseEvent): boolean {
+  return event.code === 1006 && event.reason === '';
 }
 
 export function createWebSocketManager(config: WebSocketManagerConfig): {
@@ -245,25 +253,28 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
       }
 
       const isAuthFailure = isAuthFailureClose(event);
+      const isAmbiguousAbnormal = isAmbiguousAbnormalClose(event);
+      const shouldRefreshTicket = isAuthFailure || isAmbiguousAbnormal;
 
       console.log('[WebSocketManager] Auth failure check', {
         isAuthFailure,
+        isAmbiguousAbnormalClose: isAmbiguousAbnormal,
         ticketRefreshAttempted,
         hasRefreshHandler: !!config.onRefreshTicket,
-        willRefresh: isAuthFailure && !ticketRefreshAttempted && !!config.onRefreshTicket,
+        willRefresh: shouldRefreshTicket && !ticketRefreshAttempted && !!config.onRefreshTicket,
       });
 
-      if (isAuthFailure && !ticketRefreshAttempted && config.onRefreshTicket) {
+      if (shouldRefreshTicket && !ticketRefreshAttempted && config.onRefreshTicket) {
         console.log('[WebSocketManager] Auth failure detected, attempting ticket refresh');
         void refreshTicketAndReconnect();
         return;
       }
 
-      // If we already tried refreshing the ticket and still getting auth failures,
-      // don't keep retrying - the issue is likely not the ticket
+      // If we already tried refreshing the ticket and still get an explicit auth close,
+      // don't keep retrying - the issue is likely not the ticket.
       if (isAuthFailure && ticketRefreshAttempted) {
         console.log(
-          '[WebSocketManager] Auth failure after ticket refresh - stopping retries (likely origin/config issue)'
+          '[WebSocketManager] Explicit auth failure after ticket refresh - stopping retries (likely origin/config issue)'
         );
         setState({
           status: 'error',

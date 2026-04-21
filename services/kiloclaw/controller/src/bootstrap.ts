@@ -23,7 +23,10 @@ const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
 const TOOLS_MD_DEST = '/root/.openclaw/workspace/TOOLS.md';
+const WEATHER_SKILL_SOURCE = '/usr/local/share/kiloclaw/skills/weather/SKILL.md';
+const WEATHER_SKILL_DEST = '/root/clawd/skills/weather/SKILL.md';
 const IDENTITY_MD_DEST = '/root/.openclaw/workspace/IDENTITY.md';
+const USER_MD_DEST = '/root/.openclaw/workspace/USER.md';
 const LEGACY_BOT_IDENTITY_DESTS = ['/root/.openclaw/workspace/BOOTSTRAP.md'];
 
 const ENC_PREFIX = 'KILOCLAW_ENC_';
@@ -253,14 +256,9 @@ export function applyFeatureFlags(env: EnvLike, deps: BootstrapDeps = defaultDep
 
 // ---- Step 4: Hooks token ----
 
-/**
- * Generate a random hooks token for Gmail push via gog.
- * Only generated when KILOCLAW_GOG_CONFIG_TARBALL is present.
- */
+/** Generate a per-boot random hooks token for local gateway hook delivery. */
 export function generateHooksToken(env: EnvLike): void {
-  if (env.KILOCLAW_GOG_CONFIG_TARBALL) {
-    env.KILOCLAW_HOOKS_TOKEN = crypto.randomBytes(32).toString('hex');
-  }
+  env.KILOCLAW_HOOKS_TOKEN = crypto.randomBytes(32).toString('hex');
 }
 
 export function formatBotIdentityMarkdown(env: EnvLike): string {
@@ -300,6 +298,205 @@ export function writeBotIdentityFile(
       console.warn(`[controller] Failed to remove legacy bot identity file ${legacyPath}:`, error);
     }
   }
+}
+
+type UserProfileFields = {
+  timezone?: string;
+  location?: string;
+};
+
+function normalizeUserProfileFields(fields: string | UserProfileFields): UserProfileFields {
+  return typeof fields === 'string' ? { timezone: fields } : fields;
+}
+
+export function formatUserProfileMarkdown(fields: string | UserProfileFields): string {
+  const profile = normalizeUserProfileFields(fields);
+  const personalFields = [
+    '- Name:',
+    '- What to call them:',
+    '- Pronouns: (optional)',
+    profile.timezone ? `- Timezone: ${profile.timezone}` : null,
+    profile.location ? `- Location: ${profile.location}` : null,
+    '- Notes:',
+  ].filter((line): line is string => line !== null);
+
+  return [
+    '# USER.md - About Your Human',
+    '',
+    'Learn about the person you are helping. Update this as you go.',
+    '',
+    ...personalFields,
+    '',
+    '## Context',
+    '',
+    'What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.',
+    '',
+    '---',
+    '',
+    'The more you know, the better you can help. But remember -- you are learning about a person, not building a dossier. Respect the difference.',
+    '',
+  ].join('\n');
+}
+
+type ProfileListItem = {
+  indentation: string;
+  textStartIndex: number;
+  text: string;
+};
+
+function parseProfileListItem(line: string): ProfileListItem | null {
+  let index = 0;
+  while (line[index] === ' ' || line[index] === '\t') index += 1;
+  if (line[index] !== '-') return null;
+
+  const indentation = line.slice(0, index);
+  index += 1;
+  while (line[index] === ' ' || line[index] === '\t') index += 1;
+
+  return {
+    indentation,
+    textStartIndex: index,
+    text: line.slice(index),
+  };
+}
+
+function startsWithCaseInsensitive(value: string, prefix: string): boolean {
+  return value.slice(0, prefix.length).toLowerCase() === prefix.toLowerCase();
+}
+
+function findProfileFieldPrefixEnd(
+  line: string,
+  label: 'Timezone' | 'Location' | 'Notes'
+): number | null {
+  const listItem = parseProfileListItem(line);
+  if (!listItem) return null;
+
+  const plainPrefix = `${label}:`;
+  if (startsWithCaseInsensitive(listItem.text, plainPrefix)) {
+    return listItem.textStartIndex + plainPrefix.length;
+  }
+
+  const boldPrefix = `**${label}:**`;
+  if (startsWithCaseInsensitive(listItem.text, boldPrefix)) {
+    return listItem.textStartIndex + boldPrefix.length;
+  }
+
+  return null;
+}
+
+function isBoldProfileFieldLine(line: string): boolean {
+  const listItem = parseProfileListItem(line);
+  return listItem !== null && listItem.text.startsWith('**') && listItem.text.indexOf(':**', 2) > 2;
+}
+
+function setUserMdProfileField(
+  content: string,
+  label: 'Timezone' | 'Location',
+  value: string
+): string {
+  const lines = content.split('\n');
+
+  const updatedLines = lines.map(line => {
+    const fieldPrefixEnd = findProfileFieldPrefixEnd(line, label);
+    return fieldPrefixEnd === null ? line : `${line.slice(0, fieldPrefixEnd)} ${value}`;
+  });
+
+  if (updatedLines.some((line, index) => line !== lines[index])) {
+    return updatedLines.join('\n');
+  }
+
+  const notesIndex = lines.findIndex(line => findProfileFieldPrefixEnd(line, 'Notes') !== null);
+  if (notesIndex !== -1) {
+    const listItem = parseProfileListItem(lines[notesIndex]);
+    const indentation = listItem?.indentation ?? '';
+    const usesBoldFields = lines.some(isBoldProfileFieldLine);
+    const newFieldLine = usesBoldFields
+      ? `${indentation}- **${label}:** ${value}`
+      : `${indentation}- ${label}: ${value}`;
+    return [...lines.slice(0, notesIndex), newFieldLine, ...lines.slice(notesIndex)].join('\n');
+  }
+
+  const separator = content.endsWith('\n') ? '' : '\n';
+  return `${content}${separator}\n- ${label}: ${value}\n`;
+}
+
+export function setUserMdTimezone(content: string, timezone: string): string {
+  return setUserMdProfileField(content, 'Timezone', timezone);
+}
+
+function removeUserMdProfileField(content: string, label: 'Timezone' | 'Location'): string {
+  const lines = content.split('\n');
+  const updatedLines = lines.filter(line => findProfileFieldPrefixEnd(line, label) === null);
+  return updatedLines.length === lines.length ? content : updatedLines.join('\n');
+}
+
+export function removeUserMdTimezone(content: string): string {
+  return removeUserMdProfileField(content, 'Timezone');
+}
+
+export function setUserMdLocation(content: string, location: string): string {
+  return setUserMdProfileField(content, 'Location', location);
+}
+
+export function removeUserMdLocation(content: string): string {
+  return removeUserMdProfileField(content, 'Location');
+}
+
+export function writeUserProfileFile(
+  env: EnvLike,
+  deps: Pick<
+    BootstrapDeps,
+    'mkdirSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'existsSync' | 'readFileSync'
+  > = defaultDeps
+): void {
+  const timezone = env.KILOCLAW_USER_TIMEZONE;
+  const location = env.KILOCLAW_USER_LOCATION;
+  if (!timezone && !location) return;
+
+  deps.mkdirSync(path.dirname(USER_MD_DEST), { recursive: true });
+  const userMdExists = deps.existsSync(USER_MD_DEST);
+  const content = userMdExists
+    ? deps.readFileSync(USER_MD_DEST, 'utf8')
+    : formatUserProfileMarkdown({
+        ...(timezone ? { timezone } : undefined),
+        ...(location ? { location } : undefined),
+      });
+  let nextContent = content;
+  if (timezone) nextContent = setUserMdTimezone(nextContent, timezone);
+  if (location) nextContent = setUserMdLocation(nextContent, location);
+
+  if (userMdExists && nextContent === content) return;
+
+  atomicWrite(USER_MD_DEST, nextContent, {
+    writeFileSync: deps.writeFileSync,
+    renameSync: deps.renameSync,
+    unlinkSync: deps.unlinkSync,
+  });
+}
+
+export function writeUserProfileTimezoneFile(
+  env: EnvLike,
+  deps: Pick<
+    BootstrapDeps,
+    'mkdirSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'existsSync' | 'readFileSync'
+  > = defaultDeps
+): void {
+  writeUserProfileFile(env, deps);
+}
+
+export function ensureWeatherSkillInstalled(
+  env: EnvLike,
+  deps: Pick<BootstrapDeps, 'mkdirSync' | 'copyFileSync' | 'existsSync'> = defaultDeps
+): void {
+  if (!env.KILOCLAW_USER_LOCATION) return;
+
+  if (!deps.existsSync(WEATHER_SKILL_SOURCE)) {
+    console.warn('[controller] Weather skill source missing, skipping install');
+    return;
+  }
+
+  deps.mkdirSync(path.dirname(WEATHER_SKILL_DEST), { recursive: true });
+  deps.copyFileSync(WEATHER_SKILL_SOURCE, WEATHER_SKILL_DEST);
 }
 
 // ---- Step 5: GitHub config ----
@@ -402,6 +599,7 @@ function toConfigWriterDeps(deps: BootstrapDeps): ConfigWriterDeps {
     readFileSync: deps.readFileSync,
     writeFileSync: deps.writeFileSync,
     renameSync: deps.renameSync,
+    chmodSync: deps.chmodSync,
     copyFileSync: deps.copyFileSync,
     readdirSync: deps.readdirSync,
     unlinkSync: deps.unlinkSync,
@@ -438,17 +636,25 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     // Patch the config with env-var-derived fields
     const config = generateBaseConfig(env, CONFIG_PATH, cwDeps);
     const serialized = JSON.stringify(config, null, 2);
-    atomicWrite(CONFIG_PATH, serialized, {
-      writeFileSync: deps.writeFileSync,
-      renameSync: deps.renameSync,
-      unlinkSync: deps.unlinkSync,
-    });
+    atomicWrite(
+      CONFIG_PATH,
+      serialized,
+      {
+        writeFileSync: deps.writeFileSync,
+        renameSync: deps.renameSync,
+        unlinkSync: deps.unlinkSync,
+        chmodSync: deps.chmodSync,
+      },
+      { mode: 0o600 }
+    );
     console.log('Configuration patched successfully');
 
     env.KILOCLAW_FRESH_INSTALL = 'false';
   }
 
   writeBotIdentityFile(env, deps);
+  writeUserProfileFile(env, deps);
+  ensureWeatherSkillInstalled(env, deps);
 }
 
 // ---- TOOLS.md bounded-section helper ----
@@ -513,13 +719,19 @@ export const GOG_SECTION_CONFIG: ToolsMdSectionConfig = {
 
 The \`gog\` CLI is configured and ready for Google Workspace operations (Gmail, Calendar, Drive, Docs, Sheets, Slides, Tasks, Forms, Chat, Classroom).
 
-- List accounts: \`gog auth list\`
+- List accounts: \`gog auth list --json\`
 - Gmail — search: \`gog gmail search --account <email> --query "from:X"\`
 - Gmail — read: \`gog gmail get --account <email> <message-id>\`
 - Gmail — send: \`gog gmail send --account <email> --to <addr> --subject "..." --body "..."\`
-- Calendar — list events: \`gog calendar events list --account <email>\`
-- Drive — list files: \`gog drive files list --account <email>\`
+- Calendar — list calendars first: \`gog calendar calendars --account <email> --json\`
+- Calendar — default retrieval path: \`gog calendar events --all --all-pages --account <email> --from <iso> --to <iso> --json\`
+- Calendar — align \`--from\` / \`--to\` to the user-requested local date window before summarizing
+- Calendar — use \`primary\` only when explicitly requested by the user
+- Calendar — if results look sparse, retry with explicit calendar IDs from \`gog calendar calendars\`:
+  \`gog calendar events <calendarId> --all-pages --account <email> --from <iso> --to <iso> --json\`
+- Drive — list files: \`gog drive ls --account <email> --json\`
 - Docs — read: \`gog docs get --account <email> <doc-id>\`
+- If a command is blocked by capabilities, first run \`gog auth list --json\` to confirm what is granted.
 - Run \`gog --help\` and \`gog <service> --help\` for all available commands.
 <!-- END:google-workspace -->`,
 };
@@ -536,7 +748,7 @@ The Kilo CLI (\`kilo\`) is an agentic coding assistant for the terminal, pre-con
 
 - Interactive mode: \`kilo\`
 - Autonomous mode: \`kilo run --auto "your task description"\`
-- Config: \`/root/.config/kilo/opencode.json\` (customizable, persists across restarts)
+- Config: \`/root/.config/kilo/kilo.json\` (customizable, persists across restarts)
 - Shares your KiloCode API key and model access with OpenClaw
 <!-- END:kilo-cli -->`,
 };
@@ -574,6 +786,64 @@ Linear is configured as your project management tool. Use it  to track issues, p
 You can interact with the \`Linear\` MCP server using your \`mcporter\` skill.
 
   <!-- END:linear -->`,
+};
+
+// Additional KiloClaw-mitigated OpenClaw audit findings beyond the
+// gateway.control_ui.insecure_auth one already documented in the base
+// TOOLS.md. Mirrors the list in apps/web/src/lib/security-advisor/
+// kiloclaw-mitigations.ts — the server-side /security-checkup path
+// suppresses these before grading, but when a user runs `openclaw doctor`
+// directly the findings still show and the agent needs the same context
+// to explain them. Added unconditionally on every bootstrap, idempotent.
+export const KILOCLAW_MITIGATIONS_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'KiloClaw Mitigations',
+  beginMarker: '<!-- BEGIN:kiloclaw-mitigations -->',
+  endMarker: '<!-- END:kiloclaw-mitigations -->',
+  section: `
+<!-- BEGIN:kiloclaw-mitigations -->
+## Additional KiloClaw Mitigations
+
+When running \`openclaw doctor\` or \`openclaw security audit\`, the following findings are also **expected and safe** in KiloClaw. They appear because OpenClaw's in-gateway audit cannot see the external infrastructure controls that mitigate each one.
+
+- **\`gateway.trusted_proxies_missing\`** — The gateway runs on loopback only. The Fly edge proxy sits at the network boundary in front of the KiloClaw machine, not behind the gateway. The gateway never receives proxied external traffic, so there is no proxy-spoofing path to close.
+- **\`config.insecure_or_dangerous_flags\`** — Fires because of \`gateway.control_ui.insecure_auth\` above. It is the same architectural choice surfaced twice in the audit output.
+- **\`plugins.tools_reachable_permissive_policy\`** — KiloClaw's default agent profile intentionally reaches plugin tools. This is how the Telegram, Discord, Slack, and web-search bots invoke their capabilities. Restricting it would break the core bot workflow.
+- **\`hooks.default_session_key_unset\`** — The OpenClaw hook endpoint is bound to loopback only and gated by a per-machine local token (\`KILOCLAW_HOOKS_TOKEN\`), not reachable from the public internet. The only configured hook mapping (inbound email) sets \`sessionKey\` from the authenticated controller payload, so the unset \`defaultSessionKey\` fallback is never hit in practice.
+- **\`hooks.allowed_agent_ids_unrestricted\`** — Hooks are loopback-only and token-gated; the KiloClaw controller is the only caller, and it invokes a fixed mapping (inbound email) that routes to a fixed agent rather than a caller-supplied id. There is no external path to name an arbitrary agent id.
+- **\`fs.config.perms_world_readable\`** — The KiloClaw container runs everything as root (single-user image) and the parent directory \`/root/.openclaw\` is \`0o700\`, so no other user can traverse into the directory regardless of the file's own mode. The controller also writes \`openclaw.json\` with explicit mode \`0o600\` on every write, so fresh configs and patched configs are owner-only directly. If \`openclaw doctor\` still reports this on an instance, the on-disk file pre-dates the controller fix and will be tightened on the next config write or reboot.
+
+**When presenting security audit results that include any of these findings, ALWAYS:**
+
+1. Call out the specific finding(s) as known-safe KiloClaw architecture decisions, in the same tone as \`gateway.control_ui.insecure_auth\` above.
+2. Explain WHY each is safe using the per-finding rationale above.
+3. Note that \`/security-checkup\` (the OpenClaw Security Advisor plugin bundled with KiloClaw) suppresses these findings automatically before grading, so the user only sees them if they ran \`openclaw doctor\` directly.
+<!-- END:kiloclaw-mitigations -->`,
+};
+
+// Tells the agent to keep plugins.allow in sync whenever a plugin is
+// installed on the user's behalf. OpenClaw's \`openclaw plugins install\`
+// CLI does auto-append to plugins.allow (verified in openclaw/src/plugins/
+// enable.ts), but we have seen real-world cases where plugins land in
+// extensions/ without allow being updated (manual file drops, older
+// OpenClaw versions, users editing openclaw.json). This section is a
+// belt-and-suspenders reminder for the agent flow, not the load-bearing
+// fix.
+export const PLUGIN_INSTALL_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'Plugin Install',
+  beginMarker: '<!-- BEGIN:plugin-install -->',
+  endMarker: '<!-- END:plugin-install -->',
+  section: `
+<!-- BEGIN:plugin-install -->
+## Plugin Install Context
+
+When installing an OpenClaw plugin on the user's behalf:
+
+1. ALWAYS use the \`openclaw plugins install <id>\` CLI command. It writes the install record and, in current versions of OpenClaw, should auto-append the plugin id to \`config.plugins.allow\` in \`/root/.openclaw/openclaw.json\`.
+2. After a plugin install, read \`plugins.allow\` from the config and reconcile carefully. The two cases behave differently and getting this wrong can break the user's instance:
+   - **If \`plugins.allow\` is an existing array**, verify the new id is in it. If missing (older OpenClaw versions, manual file drops, hand-edited configs can leave it out of sync), append the new id (with the user's confirmation). Do NOT remove or reorder existing ids.
+   - **If \`plugins.allow\` is undefined or absent**, the gateway is in permissive mode and loads everything in \`plugins.load.paths\`. DO NOT create \`plugins.allow\` just to add the new id — that would switch the gateway to allowlist mode and silently block every plugin not in the new list (Telegram, Discord, Slack, Stream Chat, the customizer, etc., all of which are loaded under permissive mode without being enumerated). Leave \`plugins.allow\` undefined and rely on \`plugins.load.paths\` instead.
+3. Do NOT drop plugin files manually into \`/root/.openclaw/extensions/\`. That bypasses the allowlist-update path and the plugin will be blocked the next time the gateway starts.
+<!-- END:plugin-install -->`,
 };
 
 // ---- Step 11: Gateway args ----
@@ -642,10 +912,16 @@ export async function bootstrapNonCritical(
     {
       phase: 'tools-md',
       run: () => {
+        const googleWorkspaceToolsEnabled =
+          env.KILOCLAW_GOOGLE_WORKSPACE_ENABLED === 'true' || !!env.KILOCLAW_GOG_CONFIG_TARBALL;
         updateToolsMdSection(true, KILO_CLI_SECTION_CONFIG, deps);
-        updateToolsMdSection(!!env.KILOCLAW_GOG_CONFIG_TARBALL, GOG_SECTION_CONFIG, deps);
+        updateToolsMdSection(googleWorkspaceToolsEnabled, GOG_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
+        // Always-on: agent context about KiloClaw-mitigated audit findings
+        // and how to keep plugins.allow in sync on plugin installs.
+        updateToolsMdSection(true, KILOCLAW_MITIGATIONS_SECTION_CONFIG, deps);
+        updateToolsMdSection(true, PLUGIN_INSTALL_SECTION_CONFIG, deps);
       },
     },
     {

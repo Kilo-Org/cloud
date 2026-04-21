@@ -12,14 +12,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { stripAnsi } from '@/lib/stripAnsi';
 
 type DoctorMutation = ReturnType<typeof useKiloClawMutations>['runDoctor'];
-
-/** Strip ANSI escape codes so raw terminal output can render in a browser &lt;pre&gt;. */
-function stripAnsi(raw: string): string {
-  // eslint-disable-next-line no-control-regex
-  return raw.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
-}
 
 export function RunDoctorDialog({
   open,
@@ -82,7 +77,7 @@ export function RunDoctorDialog({
         )}
 
         {result && !isPending && (
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <div className="flex items-center gap-2">
               {result.success ? (
                 <CheckCircle2 className="h-4 w-4 text-emerald-400" />
@@ -93,7 +88,7 @@ export function RunDoctorDialog({
                 {result.success ? 'Executed successfully' : 'Issues detected'}
               </span>
             </div>
-            <div className="border-border bg-background max-h-[400px] overflow-auto rounded-md border">
+            <div className="border-border bg-background max-h-[400px] min-w-0 overflow-auto rounded-md border">
               {/* prettier-ignore */}
               <pre
                 className="p-3 text-xs leading-relaxed whitespace-pre"

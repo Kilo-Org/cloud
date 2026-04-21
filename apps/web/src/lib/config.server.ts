@@ -11,6 +11,16 @@ export const WORKOS_API_KEY = getEnvVariable('WORKOS_API_KEY');
 export const WORKOS_CLIENT_ID = getEnvVariable('WORKOS_CLIENT_ID');
 export const GOOGLE_CLIENT_ID = getEnvVariable('GOOGLE_CLIENT_ID');
 export const GOOGLE_CLIENT_SECRET = getEnvVariable('GOOGLE_CLIENT_SECRET');
+export const GOOGLE_WORKSPACE_OAUTH_CLIENT_ID = getEnvVariable('GOOGLE_WORKSPACE_OAUTH_CLIENT_ID');
+export const GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET = getEnvVariable(
+  'GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET'
+);
+export const GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI = getEnvVariable(
+  'GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI'
+);
+export const GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY = getEnvVariable(
+  'GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY'
+);
 export const GITHUB_CLIENT_ID = getEnvVariable('GITHUB_CLIENT_ID');
 export const GITHUB_CLIENT_SECRET = getEnvVariable('GITHUB_CLIENT_SECRET');
 // Admin-only GitHub access (used for admin dashboards)
@@ -196,6 +206,8 @@ export const CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID = getEnvVariable(
 // KiloClaw Worker
 export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';
 export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_API_SECRET') || '';
+export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
+  getEnvVariable('KILOCLAW_INBOUND_EMAIL_DOMAIN') || 'kiloclaw.ai';
 
 // KiloClaw Early Bird Checkout
 export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(
@@ -228,6 +240,11 @@ export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY
 export const SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL = getEnvVariable(
   'SECURITY_CLEANUP_BETTERSTACK_HEARTBEAT_URL'
 );
+
+// Pylon chat widget (support chat on KiloClaw pages).
+// PYLON_IDENTITY_SECRET is the shared secret from the Pylon dashboard used to HMAC-sign
+// the user's email so the widget can verify the end user's identity.
+export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || '';
 
 // Pipe-delimited list of TLDs to block from new signups, each with a leading dot (e.g. ".shop|.top|.co.uk")
 const blacklistTldsEnv = getEnvVariable('BLACKLIST_TLDS');

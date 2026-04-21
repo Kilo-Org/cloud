@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 function BotStatusIndicator({ online }: { online: boolean }) {
@@ -26,11 +27,22 @@ export function ChatHeader({
 }) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { data: instances } = useAllKiloClawInstances();
+
+  const hasMultipleInstances = (instances?.length ?? 0) > 1;
+
+  const handleTitlePress = () => {
+    const href: Href = {
+      pathname: '/(app)/chat/instance-picker',
+      params: { currentId: instanceId },
+    };
+    router.push(href);
+  };
 
   const settingsButton = (
     <Pressable
       onPress={() => {
-        router.push(`/(app)/(tabs)/(1_kiloclaw)/${instanceId}/dashboard` as Href);
+        router.push(`/(app)/kiloclaw/${instanceId}/dashboard` as Href);
       }}
       hitSlop={12}
       accessibilityLabel="Settings"
@@ -43,6 +55,7 @@ export function ChatHeader({
   return (
     <ScreenHeader
       title={title}
+      onTitlePress={hasMultipleInstances ? handleTitlePress : undefined}
       headerRight={
         <View className="flex-row items-center gap-3">
           {botOnline !== undefined && <BotStatusIndicator online={botOnline} />}

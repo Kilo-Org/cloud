@@ -8,7 +8,7 @@
 
 ## Verification
 
-<!-- List the checks you ran and what passed. Add command output notes when useful. -->
+<!-- Only list manually tested paths, not automated tests. If you didn't run any manual tests, point that out, and explain why. -->
 
 - [ ]
 

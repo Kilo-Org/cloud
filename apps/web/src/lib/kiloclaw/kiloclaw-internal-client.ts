@@ -9,6 +9,8 @@ import type {
   RegistryEntriesResponse,
   KiloCodeConfigPatchInput,
   KiloCodeConfigResponse,
+  WebSearchConfigPatchInput,
+  WebSearchConfigPatchResponse,
   BotIdentityPatchInput,
   BotIdentityPatchResponse,
   ChannelsPatchInput,
@@ -31,6 +33,8 @@ import type {
   OpenclawConfigResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
+  GoogleOAuthConnectionInput,
+  GoogleOAuthConnectionResponse,
   GmailNotificationsResponse,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
@@ -39,6 +43,9 @@ import type {
   CleanupRecoveryPreviousVolumeResponse,
   RegionsResponse,
   UpdateRegionsResponse,
+  ProviderRolloutResponse,
+  UpdateProviderRolloutResponse,
+  ProviderRolloutConfig,
 } from './types';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
@@ -130,8 +137,8 @@ export class KiloClawInternalClient {
   async provision(
     userId: string,
     config: ProvisionInput,
-    opts?: { instanceId?: string; orgId?: string }
-  ): Promise<{ sandboxId: string }> {
+    opts?: { instanceId?: string; orgId?: string; bootstrapSubscription?: boolean }
+  ): Promise<{ sandboxId: string; instanceId: string }> {
     return this.request(
       '/api/platform/provision',
       {
@@ -255,6 +262,22 @@ export class KiloClawInternalClient {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/kilocode-config${params}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ userId, ...patch }),
+      },
+      { userId }
+    );
+  }
+
+  async patchWebSearchConfig(
+    userId: string,
+    patch: WebSearchConfigPatchInput,
+    instanceId?: string
+  ): Promise<WebSearchConfigPatchResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/web-search-config${params}`,
       {
         method: 'PATCH',
         body: JSON.stringify({ userId, ...patch }),
@@ -624,6 +647,37 @@ export class KiloClawInternalClient {
     );
   }
 
+  async updateGoogleOAuthConnection(
+    userId: string,
+    input: GoogleOAuthConnectionInput,
+    instanceId?: string
+  ): Promise<GoogleOAuthConnectionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/google-oauth-connection${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...input }),
+      },
+      { userId }
+    );
+  }
+
+  async clearGoogleOAuthConnection(
+    userId: string,
+    instanceId?: string
+  ): Promise<GoogleOAuthConnectionResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(
+      `/api/platform/google-oauth-connection?${params.toString()}`,
+      {
+        method: 'DELETE',
+      },
+      { userId }
+    );
+  }
+
   async enableGmailNotifications(
     userId: string,
     instanceId?: string
@@ -783,6 +837,19 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/regions', {
       method: 'PUT',
       body: JSON.stringify({ regions }),
+    });
+  }
+
+  async getProviderRollout(): Promise<ProviderRolloutResponse> {
+    return this.request('/api/platform/providers/rollout');
+  }
+
+  async updateProviderRollout(
+    config: ProviderRolloutConfig
+  ): Promise<UpdateProviderRolloutResponse> {
+    return this.request('/api/platform/providers/rollout', {
+      method: 'PUT',
+      body: JSON.stringify(config),
     });
   }
 }

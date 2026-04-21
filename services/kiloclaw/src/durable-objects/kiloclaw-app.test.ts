@@ -371,6 +371,20 @@ describe('alarm retry', () => {
 });
 
 describe('ensureEnvKey', () => {
+  it('creates and persists a provider-neutral key before any Fly app exists', async () => {
+    const storage = createFakeStorage();
+    const { appDO } = createAppDO(storage);
+
+    const { key, secretsVersion } = await appDO.ensureEnvKey('user-1');
+
+    expect(key).toBeTruthy();
+    expect(secretsVersion).toBe(0);
+    expect(secretsClient.setAppSecret).not.toHaveBeenCalled();
+    expect(storage._store.get('userId')).toBe('user-1');
+    expect(storage._store.get('envKey')).toBe(key);
+    expect(storage._store.get('envKeySet')).toBe(true);
+  });
+
   it('always re-sets Fly secret (self-healing) even when key exists', async () => {
     const { appDO } = createAppDO();
     await appDO.ensureApp('user-1');
@@ -426,6 +440,57 @@ describe('ensureEnvKey', () => {
     await appDO.ensureApp('user-1');
 
     await expect(appDO.ensureEnvKey('user-2')).rejects.toThrow('ownerKey mismatch');
+  });
+
+  it('adopts flyAppName from caller when App DO has none', async () => {
+    const storage = createFakeStorage();
+    const { appDO } = createAppDO(storage);
+
+    // First call without flyAppName — no Fly secret sync
+    const result1 = await appDO.ensureEnvKey('user-1');
+    expect(result1.secretsVersion).toBe(0);
+    expect(secretsClient.setAppSecret).not.toHaveBeenCalled();
+    expect(storage._store.get('flyAppName')).toBeUndefined();
+
+    vi.clearAllMocks();
+
+    // Second call passes flyAppName — App DO adopts it and syncs the Fly secret
+    const result2 = await appDO.ensureEnvKey('user-1', 'acct-adopted');
+    expect(result2.key).toBe(result1.key);
+    expect(result2.secretsVersion).toBe(1);
+    expect(storage._store.get('flyAppName')).toBe('acct-adopted');
+    expect(secretsClient.setAppSecret).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'acct-adopted' },
+      'KILOCLAW_ENV_KEY',
+      result2.key
+    );
+  });
+
+  it('does not overwrite existing flyAppName with caller value', async () => {
+    const { appDO, storage } = createAppDO();
+    await appDO.ensureApp('user-1');
+    const existingAppName = storage._store.get('flyAppName');
+    vi.clearAllMocks();
+
+    const result = await appDO.ensureEnvKey('user-1', 'acct-different');
+
+    // flyAppName unchanged — the App DO already had one
+    expect(storage._store.get('flyAppName')).toBe(existingAppName);
+    expect(secretsClient.setAppSecret).toHaveBeenCalledWith(
+      expect.objectContaining({ appName: existingAppName }),
+      'KILOCLAW_ENV_KEY',
+      result.key
+    );
+  });
+
+  it('ignores undefined flyAppName param', async () => {
+    const storage = createFakeStorage();
+    const { appDO } = createAppDO(storage);
+
+    await appDO.ensureEnvKey('user-1', undefined);
+
+    expect(storage._store.get('flyAppName')).toBeUndefined();
+    expect(secretsClient.setAppSecret).not.toHaveBeenCalled();
   });
 });
 

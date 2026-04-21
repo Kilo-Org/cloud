@@ -7,6 +7,7 @@ import {
   EncryptedSecretEnvelopeSchema,
   EncryptedSecretsSchema,
   CallbackTargetSchema,
+  ImagesSchema,
 } from '../persistence/schemas.js';
 import { AgentModeSchema, Limits } from '../schema.js';
 
@@ -14,25 +15,16 @@ import { AgentModeSchema, Limits } from '../schema.js';
 export { sessionIdSchema, githubRepoSchema, gitUrlSchema, envVarsSchema };
 export { MCPServerConfigSchema, branchNameSchema, modelIdSchema };
 export { AgentModeSchema, Limits };
-export { EncryptedSecretEnvelopeSchema, EncryptedSecretsSchema, CallbackTargetSchema };
+export {
+  EncryptedSecretEnvelopeSchema,
+  EncryptedSecretsSchema,
+  CallbackTargetSchema,
+  ImagesSchema,
+};
 
 // Re-export types
 export type { EncryptedSecretEnvelope, EncryptedSecrets } from '../persistence/schemas.js';
 
-/**
- * Schema for image attachments that will be downloaded from R2 to the sandbox.
- * Images are stored in R2 at path: {bucket}/{userId}/{path}/{filename}
- */
-export const ImagesSchema = z.object({
-  path: z
-    .string()
-    .min(1)
-    .describe('R2 path prefix under the user ID (e.g., "app-builder/msg-uuid")'),
-  files: z
-    .array(z.string().min(1))
-    .min(1)
-    .describe('Ordered array of specific filenames to download'),
-});
 export type Images = z.infer<typeof ImagesSchema>;
 
 /**
@@ -414,6 +406,38 @@ export const GetSessionOutput = z.object({
 });
 
 export type GetSessionResponse = z.infer<typeof GetSessionOutput>;
+
+export const GetLatestAssistantMessageInput = z.object({
+  cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to inspect'),
+});
+
+export const AssistantMessageInfoSchema = z
+  .object({
+    id: z.string().describe('Assistant message ID'),
+    role: z.literal('assistant'),
+  })
+  .passthrough();
+
+export const AssistantMessagePartSchema = z
+  .object({
+    id: z.string().describe('Message part ID'),
+    messageID: z.string().describe('Parent message ID'),
+  })
+  .passthrough();
+
+export const LatestAssistantMessageSchema = z.object({
+  eventId: z.number().describe('Stored event ID for the message.updated event'),
+  timestamp: z.number().describe('Stored event timestamp in milliseconds'),
+  info: AssistantMessageInfoSchema,
+  parts: z.array(AssistantMessagePartSchema),
+});
+
+export const GetLatestAssistantMessageOutput = z.object({
+  cloudAgentSessionId: sessionIdSchema,
+  message: LatestAssistantMessageSchema.nullable(),
+});
+
+export type GetLatestAssistantMessageResponse = z.infer<typeof GetLatestAssistantMessageOutput>;
 
 /**
  * Response schema for V2 execution endpoints.

@@ -11,12 +11,18 @@ import type { ExecResult } from '../../../wrapper/src/utils.js';
 // Mock the utils module (spawns git processes + writes log files)
 // ---------------------------------------------------------------------------
 
-vi.mock('../../../wrapper/src/utils.js', () => ({
-  git: vi.fn(),
-  getCurrentBranch: vi.fn(),
-  hasGitUpstream: vi.fn(),
-  logToFile: vi.fn(),
-}));
+vi.mock('../../../wrapper/src/utils.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../wrapper/src/utils.js')>(
+    '../../../wrapper/src/utils.js'
+  );
+  return {
+    ...actual,
+    git: vi.fn(),
+    getCurrentBranch: vi.fn(),
+    hasGitUpstream: vi.fn(),
+    logToFile: vi.fn(),
+  };
+});
 
 // Import mocked functions so we can configure per-test return values
 import { git, getCurrentBranch, hasGitUpstream } from '../../../wrapper/src/utils.js';
@@ -104,6 +110,26 @@ describe('runAutoCommit', () => {
         data: expect.objectContaining({ skipped: true, message: 'Skipped: detached HEAD state' }),
       })
     );
+  });
+
+  it('does not report aborted branch detection as detached HEAD', async () => {
+    mockGetCurrentBranch.mockRejectedValue(new Error('git branch aborted'));
+
+    const { opts, events } = createOpts();
+    const result = await runAutoCommit(opts);
+
+    expect(result).toEqual({ success: false, error: 'git branch aborted' });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(
+      expect.objectContaining({
+        streamEventType: 'autocommit_completed',
+        data: expect.objectContaining({
+          success: false,
+          message: 'Auto-commit failed: git branch aborted',
+        }),
+      })
+    );
+    expect(mockGit).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
@@ -247,5 +273,92 @@ describe('runAutoCommit', () => {
         commitMessage: 'test commit',
       })
     );
+  });
+
+  it('uses fallback commit message and still pushes when generation times out', async () => {
+    vi.useFakeTimers();
+    try {
+      mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
+      mockGit
+        .mockResolvedValueOnce(ok(' M file.ts'))
+        .mockResolvedValueOnce(ok())
+        .mockResolvedValueOnce(ok('[feature/cool-stuff abc1234] wip'))
+        .mockResolvedValueOnce(ok('abc1234'))
+        .mockResolvedValueOnce(ok());
+      const kiloClient = createMockKiloClient();
+      vi.mocked(kiloClient.generateCommitMessage).mockReturnValue(new Promise(() => {}));
+      const { opts, events } = createOpts({ kiloClient });
+
+      const resultPromise = runAutoCommit(opts);
+      await vi.advanceTimersByTimeAsync(30_000);
+      const result = await resultPromise;
+
+      expect(result).toEqual({ success: true });
+      expect(mockGit).toHaveBeenNthCalledWith(
+        3,
+        ['commit', '-m', 'wip'],
+        expect.objectContaining({ cwd: '/workspace', timeoutMs: 30_000 })
+      );
+      expect(mockGit).toHaveBeenLastCalledWith(
+        ['push'],
+        expect.objectContaining({ cwd: '/workspace', timeoutMs: 60_000 })
+      );
+      const completed = events.find(e => e.streamEventType === 'autocommit_completed');
+      expect(completed?.data).toEqual(
+        expect.objectContaining({
+          success: true,
+          message: 'Changes committed and pushed',
+          commitHash: 'abc1234',
+          commitMessage: 'wip',
+        })
+      );
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports aborted git status distinctly from timeout', async () => {
+    mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
+    mockGit.mockResolvedValueOnce({
+      stdout: '',
+      stderr: 'exec aborted',
+      exitCode: 124,
+      terminationReason: 'abort',
+    });
+
+    const { opts, events } = createOpts();
+    const result = await runAutoCommit(opts);
+
+    expect(result).toEqual({ success: false, error: 'git status aborted' });
+    expect(events[0]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({ message: 'git status aborted' }),
+      })
+    );
+  });
+
+  it('clears commit message timeout when lifecycle signal aborts generation', async () => {
+    vi.useFakeTimers();
+    try {
+      mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
+      mockGit.mockResolvedValue(ok());
+      mockGit.mockResolvedValueOnce(ok(' M file.ts'));
+      const controller = new AbortController();
+      const kiloClient = createMockKiloClient();
+      vi.mocked(kiloClient.generateCommitMessage).mockReturnValue(new Promise(() => {}));
+      const { opts } = createOpts({ kiloClient, signal: controller.signal });
+
+      const resultPromise = runAutoCommit(opts);
+      await vi.advanceTimersByTimeAsync(1);
+      controller.abort();
+      const result = await resultPromise;
+
+      expect(result).toEqual({ success: true });
+      expect(kiloClient.generateCommitMessage).toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

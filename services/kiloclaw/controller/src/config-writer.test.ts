@@ -19,6 +19,7 @@ function fakeDeps(existingConfig?: string) {
   const written: { path: string; data: string }[] = [];
   const copied: { src: string; dest: string }[] = [];
   const renamed: { from: string; to: string }[] = [];
+  const chmodded: { path: string; mode: number }[] = [];
   const unlinked: string[] = [];
   const execCalls: { cmd: string; args: string[]; env?: Record<string, string | undefined> }[] = [];
   let dirEntries: string[] = [];
@@ -37,6 +38,9 @@ function fakeDeps(existingConfig?: string) {
       }),
       renameSync: vi.fn((from: string, to: string) => {
         renamed.push({ from, to });
+      }),
+      chmodSync: vi.fn((filePath: string, mode: number) => {
+        chmodded.push({ path: filePath, mode });
       }),
       copyFileSync: vi.fn((src: string, dest: string) => {
         copied.push({ src, dest });
@@ -59,6 +63,7 @@ function fakeDeps(existingConfig?: string) {
     written,
     copied,
     renamed,
+    chmodded,
     unlinked,
     execCalls,
     setDirEntries(entries: string[]) {
@@ -151,6 +156,127 @@ describe('generateBaseConfig', () => {
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
     expect(config.tools.web.search.provider).toBe('brave');
+  });
+
+  it('auto-assigns kilo-exa when provider is missing and mode is unset', () => {
+    const existing = JSON.stringify({ tools: { web: { search: {} } } });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
+  it('auto-assigns kilo-exa even when web search was explicitly disabled but provider is missing', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            enabled: false,
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
+  it('preserves explicit kilo-exa provider when mode is unset', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'kilo-exa',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
+  it('selects kilo-exa provider when KILO_EXA_SEARCH_MODE=kilo-proxy', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILO_EXA_SEARCH_MODE: 'kilo-proxy' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
+  it('switches to brave when Exa is disabled and BRAVE_API_KEY is configured', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'kilo-exa',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      KILO_EXA_SEARCH_MODE: 'disabled',
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('brave');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(false);
+  });
+
+  it('preserves explicit non-Exa provider when Exa is disabled and BRAVE_API_KEY is configured', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'perplexity',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      KILO_EXA_SEARCH_MODE: 'disabled',
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('perplexity');
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(false);
+  });
+
+  it('clears kilo-exa provider when Exa is disabled and Brave is not configured', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'kilo-exa',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      KILO_EXA_SEARCH_MODE: 'disabled',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBeUndefined();
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(false);
   });
 
   it('defaults tool profile to full when not previously set', () => {
@@ -435,6 +561,24 @@ describe('generateBaseConfig', () => {
     expect(config.agents).toBeUndefined();
   });
 
+  it('sets agent user timezone from KILOCLAW_USER_TIMEZONE', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILOCLAW_USER_TIMEZONE: 'Europe/Amsterdam' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.agents.defaults.userTimezone).toBe('Europe/Amsterdam');
+  });
+
+  it('preserves existing agent user timezone when KILOCLAW_USER_TIMEZONE is not set', () => {
+    const existing = JSON.stringify({
+      agents: { defaults: { userTimezone: 'Asia/Tokyo' } },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.agents.defaults.userTimezone).toBe('Asia/Tokyo');
+  });
+
   it('configures allowed origins from env', () => {
     const { deps } = fakeDeps();
     const env = {
@@ -474,6 +618,18 @@ describe('generateBaseConfig', () => {
     const pluginPath = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
     const paths = config.plugins.load.paths as string[];
     expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
+  });
+
+  it('adds KiloClaw customizer to an existing plugin allowlist', () => {
+    const existing = JSON.stringify({
+      plugins: {
+        allow: ['openclaw-channel-streamchat', 'telegram', 'kilocode', 'browser'],
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.plugins.allow).toContain('kiloclaw-customizer');
   });
 
   it('configures Telegram channel', () => {
@@ -704,13 +860,88 @@ describe('generateBaseConfig', () => {
     expect(config.channels.telegram.dmPolicy).toBe('pairing');
   });
 
-  it('configures hooks when KILOCLAW_HOOKS_TOKEN is set', () => {
+  it('configures inbound email hooks when KILOCLAW_HOOKS_TOKEN is set', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'test-hooks-token' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
     expect(config.hooks.enabled).toBe(true);
     expect(config.hooks.token).toBe('test-hooks-token');
+    expect(config.hooks.path).toBe('/hooks');
+    expect(config.hooks.presets).toBeUndefined();
+    expect(config.hooks.mappings).toContainEqual({
+      id: 'cloudflare-email-inbound',
+      match: { path: 'email' },
+      action: 'agent',
+      wakeMode: 'now',
+      name: 'Inbound Email',
+      sessionKey: '{{payload.sessionKey}}',
+      messageTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+      deliver: false,
+    });
+  });
+
+  it('migrates existing inbound email wake hook to agent mapping', () => {
+    const existing = JSON.stringify({
+      hooks: {
+        mappings: [
+          {
+            id: 'cloudflare-email-inbound',
+            match: { path: 'email' },
+            action: 'wake',
+            wakeMode: 'now',
+            name: 'Inbound Email',
+            sessionKey: '{{payload.sessionKey}}',
+            textTemplate: 'old template',
+            deliver: false,
+          },
+          {
+            id: 'custom-wake',
+            action: 'wake',
+            messageTemplate: 'custom template',
+          },
+        ],
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'test-hooks-token' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.hooks.mappings).toContainEqual({
+      id: 'cloudflare-email-inbound',
+      match: { path: 'email' },
+      action: 'agent',
+      wakeMode: 'now',
+      name: 'Inbound Email',
+      sessionKey: '{{payload.sessionKey}}',
+      messageTemplate: 'From: {{payload.from}}\nSubject: {{payload.subject}}\n\n{{payload.text}}',
+      deliver: false,
+    });
+    expect(config.hooks.mappings).toContainEqual({
+      id: 'custom-wake',
+      action: 'wake',
+      textTemplate: 'custom template',
+    });
+    expect(config.hooks.mappings).not.toContainEqual(
+      expect.objectContaining({ id: 'cloudflare-email-inbound', action: 'wake' })
+    );
+    expect(config.hooks.mappings).not.toContainEqual(
+      expect.objectContaining({ id: 'cloudflare-email-inbound', textTemplate: expect.any(String) })
+    );
+    expect(config.hooks.mappings).toContainEqual(
+      expect.objectContaining({ id: 'cloudflare-email-inbound', wakeMode: 'now' })
+    );
+  });
+
+  it('adds gmail preset when Gog credentials are configured', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_HOOKS_TOKEN: 'test-hooks-token',
+      KILOCLAW_GOG_CONFIG_TARBALL: 'tarball',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
     expect(config.hooks.presets).toContain('gmail');
   });
 
@@ -726,7 +957,11 @@ describe('generateBaseConfig', () => {
       hooks: { enabled: true, token: 'old-token', presets: ['gmail'] },
     });
     const { deps } = fakeDeps(existing);
-    const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'new-token' };
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_HOOKS_TOKEN: 'new-token',
+      KILOCLAW_GOG_CONFIG_TARBALL: 'tarball',
+    };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
     expect(config.hooks.presets).toEqual(['gmail']);
@@ -926,6 +1161,42 @@ describe('writeBaseConfig', () => {
     expect(config.tools.exec.host).toBe('gateway');
   });
 
+  it('chmods the temp file to 0o600 before rename (owner-only commit)', () => {
+    const { deps, written, renamed, chmodded } = fakeDeps();
+    writeBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    // Exactly one chmod and it targets the same temp path that was written,
+    // not the final path. Chmod-before-rename keeps the commit atomic: if
+    // chmod fails, rename never happens and the target file is untouched.
+    expect(chmodded).toHaveLength(1);
+    expect(chmodded[0]).toEqual({ path: written[0].path, mode: 0o600 });
+
+    // Rename happens after chmod (asserted by ordering of mock calls: write
+    // at index 0, chmod at index 0, rename at index 0 — they each fired
+    // exactly once but from different mocks, so arrays remain length-1
+    // with the temp path as the subject).
+    expect(renamed[0].from).toBe(written[0].path);
+    expect(renamed[0].to).toBe('/tmp/openclaw.json');
+  });
+
+  it('propagates chmod failure and leaves target config file untouched', () => {
+    const { deps } = fakeDeps();
+    const chmodError = new Error('chmod failed');
+    (deps.chmodSync as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+      throw chmodError;
+    });
+
+    expect(() => writeBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps)).toThrow(chmodError);
+
+    // Rename must NOT have happened — the target openclaw.json is untouched
+    // by this failed write rather than committed with whatever default-umask
+    // mode the temp file ended up with.
+    expect(deps.renameSync).not.toHaveBeenCalled();
+
+    // Cleanup was attempted against the temp path
+    expect(deps.unlinkSync).toHaveBeenCalled();
+  });
+
   it('passes all required onboard flags for non-interactive setup', () => {
     const { deps, execCalls } = fakeDeps();
     writeBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
@@ -957,7 +1228,7 @@ describe('writeBaseConfig', () => {
     expect(config.tools.profile).toBe('full');
   });
 
-  it('does not steer web search provider on config restore path', () => {
+  it('auto-assigns Exa web search provider on restore path when provider is missing', () => {
     const { deps, written } = fakeDeps();
     const env = minimalEnv();
     delete env.KILOCLAW_FRESH_INSTALL;
@@ -965,7 +1236,8 @@ describe('writeBaseConfig', () => {
     writeBaseConfig(env, '/tmp/openclaw.json', deps);
 
     const config = JSON.parse(written[0].data);
-    expect(config.tools?.web?.search?.provider).toBeUndefined();
+    expect(config.tools?.web?.search?.provider).toBe('kilo-exa');
+    expect(config.tools?.web?.search?.enabled).toBe(true);
   });
 
   it('throws if KILOCODE_API_KEY is missing', () => {
@@ -1104,6 +1376,7 @@ function mcporterFakeDeps(existingMcporterConfig?: string) {
         written.push({ path: filePath, data });
       }),
       renameSync: vi.fn(),
+      chmodSync: vi.fn(),
       copyFileSync: vi.fn(),
       readdirSync: vi.fn(() => []),
       unlinkSync: vi.fn(),

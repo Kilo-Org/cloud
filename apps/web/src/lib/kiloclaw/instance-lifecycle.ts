@@ -3,6 +3,7 @@ import 'server-only';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
+import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
   kiloclaw_subscriptions,
   kiloclaw_instances,
@@ -16,6 +17,11 @@ const logInfo = sentryLogger('kiloclaw-instance-lifecycle', 'info');
 const logError = sentryLogger('kiloclaw-instance-lifecycle', 'error');
 const AUTO_RESUME_INITIAL_BACKOFF_MS = 2 * 60 * 60 * 1000;
 const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
+const INSTANCE_LIFECYCLE_ACTOR = {
+  actorType: 'system',
+  actorId: 'web-instance-lifecycle',
+} as const;
+const INSTANCE_DESTROYED_REASON = 'instance_destroyed';
 
 type ActiveInstance = {
   id: string;
@@ -38,13 +44,83 @@ function getResettableAutoResumeEmailTypes() {
   ] as const;
 }
 
+function emailLogTypeFilter(
+  kiloUserId: string,
+  emailTypes: readonly string[],
+  instanceId?: string
+) {
+  return and(
+    eq(kiloclaw_email_log.user_id, kiloUserId),
+    inArray(kiloclaw_email_log.email_type, [...emailTypes]),
+    instanceId
+      ? eq(kiloclaw_email_log.instance_id, instanceId)
+      : isNull(kiloclaw_email_log.instance_id)
+  );
+}
+
 function subscriptionFilterForUser(kiloUserId: string, instanceId?: string) {
   return instanceId
     ? and(
         eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.instance_id, instanceId)
+        eq(kiloclaw_subscriptions.instance_id, instanceId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
-    : eq(kiloclaw_subscriptions.user_id, kiloUserId);
+    : and(
+        eq(kiloclaw_subscriptions.user_id, kiloUserId),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+      );
+}
+
+export async function clearSubscriptionLifecycleAfterInstanceDestroy(params: {
+  actorUserId: string;
+  kiloUserId: string;
+  instanceId: string;
+}): Promise<void> {
+  await db.transaction(async tx => {
+    const [subscription] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(subscriptionFilterForUser(params.kiloUserId, params.instanceId))
+      .limit(1);
+
+    if (!subscription) {
+      return;
+    }
+
+    const clearFields: { destruction_deadline: null; suspended_at?: null } = {
+      destruction_deadline: null,
+    };
+
+    if (subscription.status !== 'past_due') {
+      clearFields.suspended_at = null;
+    }
+
+    const [updatedSubscription] = await tx
+      .update(kiloclaw_subscriptions)
+      .set(clearFields)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id))
+      .returning();
+
+    const clearedSuspension =
+      subscription.destruction_deadline !== null ||
+      (subscription.status !== 'past_due' && subscription.suspended_at !== null);
+
+    if (!updatedSubscription || !clearedSuspension) {
+      return;
+    }
+
+    await insertKiloClawSubscriptionChangeLog(tx, {
+      subscriptionId: subscription.id,
+      actor: {
+        actorType: 'user',
+        actorId: params.actorUserId,
+      },
+      action: 'status_changed',
+      reason: INSTANCE_DESTROYED_REASON,
+      before: subscription,
+      after: updatedSubscription,
+    });
+  });
 }
 
 async function clearAutoResumeState(
@@ -53,19 +129,19 @@ async function clearAutoResumeState(
     instanceId?: string;
     sandboxId?: string;
     logMessage: string;
+    changeLogReason: string;
     logFields?: Record<string, unknown>;
   }
 ): Promise<void> {
   const subscriptionFilter = subscriptionFilterForUser(kiloUserId, options.instanceId);
 
   await db.transaction(async tx => {
+    const subscriptions = await tx.select().from(kiloclaw_subscriptions).where(subscriptionFilter);
+
     await tx
       .delete(kiloclaw_email_log)
       .where(
-        and(
-          eq(kiloclaw_email_log.user_id, kiloUserId),
-          inArray(kiloclaw_email_log.email_type, [...getResettableAutoResumeEmailTypes()])
-        )
+        emailLogTypeFilter(kiloUserId, getResettableAutoResumeEmailTypes(), options.instanceId)
       );
 
     await tx
@@ -78,6 +154,30 @@ async function clearAutoResumeState(
         auto_resume_attempt_count: 0,
       })
       .where(subscriptionFilter);
+
+    for (const subscription of subscriptions) {
+      const clearedSuspension =
+        subscription.suspended_at !== null || subscription.destruction_deadline !== null;
+      if (!clearedSuspension) {
+        continue;
+      }
+
+      await insertKiloClawSubscriptionChangeLog(tx, {
+        subscriptionId: subscription.id,
+        actor: INSTANCE_LIFECYCLE_ACTOR,
+        action: 'reactivated',
+        reason: options.changeLogReason,
+        before: subscription,
+        after: {
+          ...subscription,
+          suspended_at: null,
+          destruction_deadline: null,
+          auto_resume_requested_at: null,
+          auto_resume_retry_after: null,
+          auto_resume_attempt_count: 0,
+        },
+      });
+    }
   });
 
   logInfo(options.logMessage, {
@@ -96,15 +196,21 @@ async function resolveActiveInstance(
     ? and(
         eq(kiloclaw_instances.id, options.instanceId),
         eq(kiloclaw_instances.user_id, kiloUserId),
+        isNull(kiloclaw_instances.organization_id),
         isNull(kiloclaw_instances.destroyed_at)
       )
     : options.sandboxId
       ? and(
           eq(kiloclaw_instances.user_id, kiloUserId),
           eq(kiloclaw_instances.sandbox_id, options.sandboxId),
+          isNull(kiloclaw_instances.organization_id),
           isNull(kiloclaw_instances.destroyed_at)
         )
-      : and(eq(kiloclaw_instances.user_id, kiloUserId), isNull(kiloclaw_instances.destroyed_at));
+      : and(
+          eq(kiloclaw_instances.user_id, kiloUserId),
+          isNull(kiloclaw_instances.organization_id),
+          isNull(kiloclaw_instances.destroyed_at)
+        );
 
   const [targetInstance] = await db
     .select({ id: kiloclaw_instances.id, sandbox_id: kiloclaw_instances.sandbox_id })
@@ -124,13 +230,16 @@ async function resolveActiveInstance(
  */
 export async function autoResumeIfSuspended(
   kiloUserId: string,
-  instanceId?: string
+  instanceId?: string,
+  options: { recordRetryState?: boolean } = {}
 ): Promise<void> {
+  const recordRetryState = options.recordRetryState ?? true;
   const targetInstance = await resolveActiveInstance(kiloUserId, { instanceId });
   if (!targetInstance) {
     await clearAutoResumeState(kiloUserId, {
       instanceId,
       logMessage: 'Cleared auto-resume state because no active instance remains',
+      changeLogReason: 'auto_resume_aborted_no_active_instance',
       logFields: { recovery_reason: 'no_active_instance' },
     });
     return;
@@ -142,7 +251,8 @@ export async function autoResumeIfSuspended(
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.instance_id, targetInstance.id)
+        eq(kiloclaw_subscriptions.instance_id, targetInstance.id),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
     )
     .limit(1);
@@ -157,19 +267,22 @@ export async function autoResumeIfSuspended(
     const client = new KiloClawInternalClient();
     await client.startAsync(kiloUserId, workerInstanceId(targetInstance));
   } catch (startError) {
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({
-        auto_resume_requested_at: requestedAtIso,
-        auto_resume_retry_after: retryAfterIso,
-        auto_resume_attempt_count: nextAttemptCount,
-      })
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.user_id, kiloUserId),
-          eq(kiloclaw_subscriptions.instance_id, targetInstance.id)
-        )
-      );
+    if (recordRetryState) {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({
+          auto_resume_requested_at: requestedAtIso,
+          auto_resume_retry_after: retryAfterIso,
+          auto_resume_attempt_count: nextAttemptCount,
+        })
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.user_id, kiloUserId),
+            eq(kiloclaw_subscriptions.instance_id, targetInstance.id),
+            isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+          )
+        );
+    }
     logError('Failed to request async auto-resume', {
       user_id: kiloUserId,
       instance_id: targetInstance.id,
@@ -180,19 +293,22 @@ export async function autoResumeIfSuspended(
     return;
   }
 
-  await db
-    .update(kiloclaw_subscriptions)
-    .set({
-      auto_resume_requested_at: requestedAtIso,
-      auto_resume_retry_after: retryAfterIso,
-      auto_resume_attempt_count: nextAttemptCount,
-    })
-    .where(
-      and(
-        eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.instance_id, targetInstance.id)
-      )
-    );
+  if (recordRetryState) {
+    await db
+      .update(kiloclaw_subscriptions)
+      .set({
+        auto_resume_requested_at: requestedAtIso,
+        auto_resume_retry_after: retryAfterIso,
+        auto_resume_attempt_count: nextAttemptCount,
+      })
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, kiloUserId),
+          eq(kiloclaw_subscriptions.instance_id, targetInstance.id),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+        )
+      );
+  }
 
   logInfo('Async auto-resume requested', {
     user_id: kiloUserId,
@@ -213,6 +329,7 @@ export async function completeAutoResumeIfReady(
       instanceId,
       sandboxId,
       logMessage: 'Cleared auto-resume state because readiness callback found no active instance',
+      changeLogReason: 'auto_resume_ready_without_active_instance',
       logFields: { recovery_reason: 'ready_without_active_instance' },
     });
     return { instanceId: instanceId ?? null, resumeCompleted: true };
@@ -229,7 +346,8 @@ export async function completeAutoResumeIfReady(
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.instance_id, targetInstance.id)
+        eq(kiloclaw_subscriptions.instance_id, targetInstance.id),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
     )
     .limit(1);
@@ -254,6 +372,7 @@ export async function completeAutoResumeIfReady(
     instanceId: targetInstance.id,
     sandboxId,
     logMessage: 'Async auto-resume completed',
+    changeLogReason: 'auto_resume_completed',
   });
   return { instanceId: targetInstance.id, resumeCompleted: true };
 }

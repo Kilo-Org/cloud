@@ -28,14 +28,15 @@ vi.mock('cloudflare:workers', () => ({
 }));
 
 // -- Mock fly client --
-// Keep real isFlyNotFound, isFlyInsufficientResources + FlyApiError; mock all API functions.
+// Keep real error classifiers + FlyApiError; mock all API functions.
 vi.mock('../fly/client', async () => {
-  const { FlyApiError, isFlyNotFound, isFlyInsufficientResources } =
+  const { FlyApiError, isFlyNotFound, isFlyInsufficientResources, isFlyMissingVolume } =
     await vi.importActual('../fly/client');
   return {
     FlyApiError,
     isFlyNotFound,
     isFlyInsufficientResources,
+    isFlyMissingVolume,
     createMachine: vi.fn(),
     getMachine: vi.fn(),
     startMachine: vi.fn(),
@@ -119,6 +120,7 @@ import {
   SELF_HEAL_THRESHOLD,
   STARTING_TIMEOUT_MS,
   RESTARTING_TIMEOUT_MS,
+  RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   STALE_PROVISION_THRESHOLD_MS,
 } from '../config';
@@ -235,6 +237,12 @@ function analyticsEventsByName(
   });
 }
 
+function fetchInputUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
+
 function createInstance(
   storage = createFakeStorage(),
   env = createFakeEnv()
@@ -326,6 +334,30 @@ async function seedRecovering(
   });
 }
 
+function dockerProviderState(overrides: Record<string, unknown> = {}) {
+  return {
+    provider: 'docker-local',
+    containerName: 'kiloclaw-sandbox-1',
+    volumeName: 'kiloclaw-root-sandbox-1',
+    hostPort: 45001,
+    ...overrides,
+  };
+}
+
+async function seedDockerInstance(
+  storage: ReturnType<typeof createFakeStorage>,
+  overrides: Record<string, unknown> = {}
+) {
+  await seedProvisioned(storage, {
+    provider: 'docker-local',
+    flyMachineId: null,
+    flyVolumeId: null,
+    flyRegion: null,
+    providerState: dockerProviderState(),
+    ...overrides,
+  });
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -353,6 +385,14 @@ beforeEach(() => {
         return Promise.resolve(
           new Response(JSON.stringify({ error: 'Not found' }), {
             status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      if (typeof url === 'string' && url.includes('/_kilo/user-profile')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, path: 'workspace/USER.md' }), {
+            status: 200,
             headers: { 'Content-Type': 'application/json' },
           })
         );
@@ -487,6 +527,102 @@ describe('two-phase destroy', () => {
     await inst2.alarm();
 
     // Now fully cleaned up
+    expect(storage._store.size).toBe(0);
+    expect(storage._getAlarm()).toBeNull();
+  });
+
+  it('fully destroys docker-local instances when container and volume deletes succeed', async () => {
+    const env = {
+      ...createFakeEnv(),
+      DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750',
+    };
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      provider: 'docker-local',
+      flyMachineId: null,
+      flyVolumeId: null,
+      flyRegion: null,
+      providerState: {
+        provider: 'docker-local',
+        containerName: 'kiloclaw-sandbox-1',
+        volumeName: 'kiloclaw-root-sandbox-1',
+        hostPort: 45001,
+      },
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/containers/kiloclaw-sandbox-1?force=true')) {
+        return new Response(null, { status: 204 });
+      }
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    await instance.destroy();
+
+    expect(storage._store.size).toBe(0);
+    expect(storage._getAlarm()).toBeNull();
+  });
+
+  it('retries docker-local destroy over multiple alarms when storage deletion fails', async () => {
+    const env = {
+      ...createFakeEnv(),
+      DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750',
+    };
+    const { storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, {
+      provider: 'docker-local',
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: null,
+      flyRegion: null,
+      providerState: {
+        provider: 'docker-local',
+        containerName: 'kiloclaw-sandbox-1',
+        volumeName: 'kiloclaw-root-sandbox-1',
+        hostPort: 45001,
+      },
+      pendingDestroyMachineId: 'kiloclaw-sandbox-1',
+      pendingDestroyVolumeId: 'kiloclaw-root-sandbox-1',
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/containers/kiloclaw-sandbox-1?force=true')) {
+        return new Response(null, { status: 204 });
+      }
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response('volume busy', { status: 409 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    expect(storage._store.get('pendingDestroyMachineId')).toBeNull();
+    expect(storage._store.get('pendingDestroyVolumeId')).toBe('kiloclaw-root-sandbox-1');
+    expect(storage._store.get('providerState')).toEqual({
+      provider: 'docker-local',
+      containerName: null,
+      volumeName: 'kiloclaw-root-sandbox-1',
+      hostPort: null,
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    const { instance: retryInstance } = createInstance(storage, env);
+    await retryInstance.alarm();
+
     expect(storage._store.size).toBe(0);
     expect(storage._getAlarm()).toBeNull();
   });
@@ -1510,6 +1646,7 @@ describe('buildUserEnvVars API key refresh', () => {
       instance as unknown as {
         buildUserEnvVars: () => Promise<{
           envVars: Record<string, string>;
+          bootstrapEnv: Record<string, string>;
           minSecretsVersion: number;
         }>;
       }
@@ -1552,6 +1689,25 @@ describe('buildUserEnvVars API key refresh', () => {
     expect(payload.kiloUserId).toBe('user-1');
     expect(payload.apiTokenPepper).toBe('pepper-1');
     expect(payload.env).toBe('development');
+  });
+
+  it('passes persisted user location to buildEnvVars', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      userTimezone: 'Europe/Amsterdam',
+      userLocation: 'Amsterdam, North Holland, Netherlands',
+      kilocodeApiKey: 'stored-key',
+      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+    });
+
+    await callBuildUserEnvVars(instance);
+
+    const options = (gatewayEnv.buildEnvVars as Mock).mock.calls[0][3] as {
+      userTimezone?: string;
+      userLocation?: string;
+    };
+    expect(options.userTimezone).toBe('Europe/Amsterdam');
+    expect(options.userLocation).toBe('Amsterdam, North Holland, Netherlands');
   });
 
   it('falls back to the stored key when Hyperdrive is unavailable', async () => {
@@ -1858,6 +2014,35 @@ describe('startExistingMachine: transient vs 404 errors', () => {
 
     expect(flyClient.createMachine).toHaveBeenCalled();
     expect(storage._store.get('flyMachineId')).toBe('machine-new');
+  });
+
+  it('destroys stale machine and recreates it when updateMachine reports a missing volume', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped' });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockRejectedValue(
+      new FlyApiError(
+        'Fly API updateMachine failed (400): {"error":"invalid_argument: volume does not exist"}',
+        400,
+        '{"error":"invalid_argument: volume does not exist"}'
+      )
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'machine-new',
+      region: 'iad',
+    });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(flyClient.destroyMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1', true);
+    expect(flyClient.createMachine).toHaveBeenCalled();
+    expect(storage._store.get('flyMachineId')).toBe('machine-new');
+    expect(storage._store.get('flyVolumeId')).toBe('vol-1');
+    expect(storage._store.get('status')).toBe('running');
   });
 
   it('clears the stale machine id before retrying replacement creation after a 404', async () => {
@@ -2550,6 +2735,17 @@ describe('updateSecrets', () => {
     const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
     expect(secrets.TELEGRAM_BOT_TOKEN).toEqual(fakeEnvelope);
     expect(secrets.DISCORD_BOT_TOKEN).toEqual(discordEnvelope);
+  });
+
+  it('saving Brave API key disables Exa mode', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      kiloExaSearchMode: 'kilo-proxy',
+    });
+
+    await instance.updateSecrets({ braveSearchApiKey: fakeEnvelope });
+
+    expect(storage._store.get('kiloExaSearchMode')).toBe('disabled');
   });
 
   it('reads from legacy channels field when encryptedSecrets is empty', async () => {
@@ -3454,6 +3650,42 @@ describe('start: volume region validation', () => {
     );
   });
 
+  it('keeps cached flyRegion when Fly omits the volume region', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyMachineId: null, flyRegion: 'sjc' });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'sjc' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(storage._store.get('flyRegion')).toBe('sjc');
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ region: 'sjc' })
+    );
+  });
+
+  it('does not fall back to env regions when a mounted volume has no known region', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyMachineId: null, flyRegion: null });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(storage._store.get('flyRegion')).toBeNull();
+    expect(flyClient.createMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ region: undefined })
+    );
+  });
+
   it('handles volume gone (404) during region check by creating a new volume', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { flyMachineId: null });
@@ -4252,6 +4484,32 @@ describe('controller-first pairing', () => {
     fetchSpy.mockRestore();
   });
 
+  it('channel list via controller works for docker-local without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          requests: [{ code: 'DOCKER1', id: 'r-docker', channel: 'telegram' }],
+          lastUpdated: '2026-04-13T00:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const result = await instance.listPairingRequests(true);
+
+    expect(result).toEqual({
+      requests: [{ code: 'DOCKER1', id: 'r-docker', channel: 'telegram' }],
+    });
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'http://127.0.0.1:45001/_kilo/pairing/channels?refresh=true'
+    );
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
   it('channel list fallback on 404 — runs fly exec', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { flyAppName: 'acct-test' });
@@ -4419,6 +4677,48 @@ describe('controller-first pairing', () => {
     fetchSpy.mockRestore();
   });
 
+  it('channel approve via controller works for docker-local without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, message: 'Pairing approved' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.approvePairingRequest('telegram', 'ABC123');
+
+    expect(result).toEqual({ success: true, message: 'Pairing approved' });
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'http://127.0.0.1:45001/_kilo/pairing/channels/approve'
+    );
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel approve returns redeploy-required when non-Fly controller route is unavailable', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.approvePairingRequest('telegram', 'ABC123');
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
   it('channel approve 400 with { error } body — returns failure without throwing', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { flyAppName: 'acct-test' });
@@ -4496,6 +4796,32 @@ describe('controller-first pairing', () => {
     );
 
     expect(result).toEqual({ success: true, message: 'Device pairing approved' });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device list via controller works for docker-local without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          requests: [{ requestId: 'req-docker', deviceId: 'dev-docker', role: 'operator' }],
+          lastUpdated: '2026-04-13T00:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const result = await instance.listDevicePairingRequests(true);
+
+    expect(result).toEqual({
+      requests: [{ requestId: 'req-docker', deviceId: 'dev-docker', role: 'operator' }],
+    });
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'http://127.0.0.1:45001/_kilo/pairing/devices?refresh=true'
+    );
     expect(flyClient.execCommand).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
@@ -4926,6 +5252,206 @@ describe('controller-first pairing', () => {
 });
 
 // ============================================================================
+// Kilo CLI run controller routing
+// ============================================================================
+
+describe('kilo CLI run routing', () => {
+  it('starts a Kilo CLI run for docker-local via controller without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true, startedAt: '2026-04-13T18:45:00.000Z' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.startKiloCliRun('fix the thing');
+
+    expect(result).toEqual({ ok: true, startedAt: '2026-04-13T18:45:00.000Z' });
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://127.0.0.1:45001/_kilo/cli-run/start');
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('gets Kilo CLI run status for docker-local via controller without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const controllerStatus = {
+      hasRun: true,
+      status: 'running',
+      output: 'working',
+      exitCode: null,
+      startedAt: '2026-04-13T18:45:00.000Z',
+      completedAt: null,
+      prompt: 'fix the thing',
+    };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(controllerStatus), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.getKiloCliRunStatus();
+
+    expect(result).toEqual(controllerStatus);
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://127.0.0.1:45001/_kilo/cli-run/status');
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('returns { conflict } from startKiloCliRun when instance is not running', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage); // status: 'provisioned', not 'running'
+
+    const result = await instance.startKiloCliRun('fix something');
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_instance_not_running',
+        error: 'Instance is not running',
+      },
+    });
+  });
+
+  it('returns { conflict } from startKiloCliRun when controller returns 409', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'kilo_cli_run_already_active',
+          error: 'A Kilo CLI run is already in progress',
+        }),
+        {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    const result = await instance.startKiloCliRun('fix something');
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_already_active',
+        error: 'A Kilo CLI run is already in progress',
+      },
+    });
+    fetchSpy.mockRestore();
+  });
+
+  it('uses the start-specific code when controller start returns an unstructured 409', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'A Kilo CLI run is already in progress' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.startKiloCliRun('fix something');
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_already_active',
+        error: 'A Kilo CLI run is already in progress',
+      },
+    });
+    fetchSpy.mockRestore();
+  });
+
+  it('returns { conflict } from cancelKiloCliRun when instance is not running', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage); // status: 'provisioned', not 'running'
+
+    const result = await instance.cancelKiloCliRun();
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_instance_not_running',
+        error: 'Instance is not running',
+      },
+    });
+  });
+
+  it('returns { conflict } from cancelKiloCliRun when controller returns 409', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'kilo_cli_run_no_active_run',
+          error: 'No active run to cancel',
+        }),
+        {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    const result = await instance.cancelKiloCliRun();
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_no_active_run',
+        error: 'No active run to cancel',
+      },
+    });
+    fetchSpy.mockRestore();
+  });
+
+  it('uses the cancel-specific code when controller cancel returns an unrecognized 409', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'No active run to cancel' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.cancelKiloCliRun();
+
+    expect(result).toEqual({
+      conflict: {
+        code: 'kilo_cli_run_no_active_run',
+        error: 'No active run to cancel',
+      },
+    });
+    fetchSpy.mockRestore();
+  });
+
+  it('cancels a Kilo CLI run for docker-local via controller without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.cancelKiloCliRun();
+
+    expect(result).toEqual({ ok: true });
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://127.0.0.1:45001/_kilo/cli-run/cancel');
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+});
+
+// ============================================================================
 // provision: auto-start
 // ============================================================================
 
@@ -4957,6 +5483,58 @@ describe('provision: auto-start after fresh provision', () => {
       volumeId: 'vol-1',
       region: 'iad',
     });
+  });
+
+  it('persists user timezone and location from provision config', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {
+      userTimezone: 'Europe/Amsterdam',
+      userLocation: 'Amsterdam, North Holland, Netherlands',
+    });
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('userTimezone')).toBe('Europe/Amsterdam');
+    expect(storage._store.get('userLocation')).toBe('Amsterdam, North Holland, Netherlands');
+
+    await instance.provision('user-1', { userTimezone: null, userLocation: null });
+
+    expect(storage._store.get('userTimezone')).toBeNull();
+    expect(storage._store.get('userLocation')).toBeNull();
+    const userProfileCall = vi
+      .mocked(fetch)
+      .mock.calls.find(
+        call => typeof call[0] === 'string' && call[0].includes('/_kilo/user-profile')
+      );
+    expect(userProfileCall?.[1]?.body).toBe(
+      JSON.stringify({ userTimezone: null, userLocation: null })
+    );
+  });
+
+  it('leaves user location absent when weather setup is skipped', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', { userTimezone: 'Europe/Amsterdam' });
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('userTimezone')).toBe('Europe/Amsterdam');
+    expect(storage._store.get('userLocation')).toBeNull();
   });
 
   it('creates the initial volume in the freshly ensured Fly app', async () => {
@@ -5143,8 +5721,8 @@ describe('provision: auto-start after fresh provision', () => {
   it('does not leave the hot DO on an unsupported provider after failed provision', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
 
-    await expect(instance.provision('user-1', {}, { provider: 'k8s' })).rejects.toThrow(
-      'Provider k8s is not implemented yet'
+    await expect(instance.provision('user-1', {}, { provider: 'northflank' })).rejects.toThrow(
+      'Provider northflank is not implemented yet'
     );
 
     expect(storage._store.get('userId')).toBeUndefined();
@@ -5208,6 +5786,7 @@ describe('startAsync: catch handler writes stopped state on pre-machine failure'
     (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
     // Machine is created (ID will be persisted) but waitForState throws
     (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'created' });
     (flyClient.waitForState as Mock).mockRejectedValue(new Error('timeout waiting for started'));
 
     await instance.provision('user-1', {});
@@ -5219,6 +5798,159 @@ describe('startAsync: catch handler writes stopped state on pre-machine failure'
     expect(storage._store.get('status')).toBe('starting');
     // Error fields should NOT be populated for post-machine failures
     expect(storage._store.get('lastStartErrorMessage')).toBeFalsy();
+    expect(flyClient.getMachine).not.toHaveBeenCalled();
+  });
+
+  it('does NOT overwrite Fly state when start() fails after machine ID is persisted and inspect would fail', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.getMachine as Mock).mockRejectedValue(new Error('transient Fly API failure'));
+    (flyClient.waitForState as Mock).mockRejectedValue(new Error('timeout waiting for started'));
+
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('flyMachineId')).toBe('machine-1');
+    expect(storage._store.get('status')).toBe('starting');
+    expect(storage._store.get('lastStartErrorMessage')).toBeFalsy();
+    expect(flyClient.getMachine).not.toHaveBeenCalled();
+  });
+
+  it('transitions docker-local to stopped when start fails after deterministic names are seeded', async () => {
+    const env = {
+      ...createFakeEnv(),
+      DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750',
+      DOCKER_LOCAL_PORT_RANGE: '45000-45010',
+    };
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedDockerInstance(storage, {
+      status: 'provisioned',
+      providerState: dockerProviderState({ hostPort: null }),
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response(JSON.stringify({ Name: 'kiloclaw-root-sandbox-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/containers/json?all=1')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/containers/kiloclaw-sandbox-1/json')) {
+        return new Response('', { status: 404 });
+      }
+      if (url.includes('/containers/create?name=kiloclaw-sandbox-1')) {
+        return new Response('create failed', { status: 500 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    await instance.startAsync();
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._store.get('startingAt')).toBeNull();
+    expect(storage._store.get('lastStartErrorMessage')).toContain('create failed');
+    expect(storage._store.get('providerState')).toEqual(dockerProviderState({ hostPort: 45000 }));
+  });
+});
+
+describe('non-Fly runtime reconciliation via alarm', () => {
+  it("transitions a docker-local starting runtime to 'running' when inspect reports running", async () => {
+    const env = { ...createFakeEnv(), DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750' };
+    const { instance, storage } = createInstance(undefined, env);
+    await seedDockerInstance(storage, {
+      status: 'starting',
+      startingAt: Date.now(),
+      lastStartedAt: null,
+    });
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          Id: 'container-1',
+          Name: '/kiloclaw-sandbox-1',
+          State: { Running: true, Status: 'running' },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('startingAt')).toBeNull();
+    expect(storage._store.get('lastStartedAt')).toBeGreaterThan(0);
+  });
+
+  it("transitions a docker-local restarting runtime to 'running' when inspect reports running", async () => {
+    const env = { ...createFakeEnv(), DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750' };
+    const { instance, storage } = createInstance(undefined, env);
+    await seedDockerInstance(storage, {
+      status: 'restarting',
+      restartingAt: Date.now(),
+      lastRestartErrorMessage: 'previous failure',
+      lastRestartErrorAt: Date.now() - 1_000,
+    });
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          Id: 'container-1',
+          Name: '/kiloclaw-sandbox-1',
+          State: { Running: true, Status: 'running' },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('restartingAt')).toBeNull();
+    expect(storage._store.get('lastRestartErrorMessage')).toBeNull();
+    expect(storage._store.get('lastRestartErrorAt')).toBeNull();
+  });
+
+  it("transitions a docker-local running runtime to 'stopped' when inspect reports missing", async () => {
+    const env = { ...createFakeEnv(), DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750' };
+    const { instance, storage } = createInstance(undefined, env);
+    await seedDockerInstance(storage, {
+      status: 'running',
+      lastStoppedAt: null,
+    });
+    vi.mocked(fetch).mockResolvedValue(new Response('', { status: 404 }));
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._store.get('lastStoppedAt')).toBeGreaterThan(0);
+    expect(storage._getAlarm()).not.toBeNull();
+  });
+
+  it('keeps the alarm chain alive for idle docker-local statuses', async () => {
+    const env = { ...createFakeEnv(), DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750' };
+    const { instance, storage } = createInstance(undefined, env);
+    await seedDockerInstance(storage, {
+      status: 'stopped',
+      lastStoppedAt: Date.now(),
+    });
+
+    await instance.alarm();
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._getAlarm()).not.toBeNull();
   });
 });
 
@@ -6567,6 +7299,78 @@ describe('restartMachine restartingAt guard', () => {
     expect(storage._store.get('lastRestartErrorMessage')).toBe(
       'Restart is taking longer than expected; still reconciling while the machine remains updating'
     );
+  });
+
+  it('transitions to stopped when replacing exceeds max timeout', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, {
+      restartingAt: Date.now() - RESTARTING_MAX_TIMEOUT_MS - 1_000,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'replacing',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._store.get('restartingAt')).toBeNull();
+  });
+
+  it('retries startMachine when stopped and restartUpdateSent during restarting', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, {
+      restartUpdateSent: true,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'stopped',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+    (flyClient.startMachine as Mock).mockResolvedValue(undefined);
+
+    await instance.alarm();
+
+    expect(flyClient.startMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1');
+    expect(storage._store.get('status')).toBe('restarting');
+  });
+
+  it('does not retry startMachine when stopped but restartUpdateSent is false', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'stopped',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(flyClient.startMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('restarting');
+  });
+
+  it('does not retry startMachine after soft timeout — transitions to stopped', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, {
+      restartUpdateSent: true,
+      restartingAt: Date.now() - RESTARTING_TIMEOUT_MS - 1_000,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'stopped',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(flyClient.startMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('stopped');
   });
 
   it('transitions to stopped on terminal stopped state during restart reconcile', async () => {

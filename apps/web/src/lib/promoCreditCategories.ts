@@ -9,9 +9,11 @@ import {
   REFERRAL_BONUS_AMOUNT,
   PROMO_CREDIT_EXPIRY_HRS,
   WELCOME_CREDIT_EXPIRY_HRS,
+  OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS,
 } from '@/lib/constants';
 import { promoCategoriesOld } from '@/lib/promoCreditCategoriesOld';
 import {
+  created_before,
   has_githubAuth,
   has_githubAuthAndWelcomeCredits,
   has_holdOrPayment,
@@ -178,6 +180,13 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     expiry_hours: WELCOME_CREDIT_EXPIRY_HRS,
   },
   {
+    credit_category: 'openclaw-security-advisor-signup-bonus',
+    description: 'Bonus for new users signing up via the OpenClaw Security Advisor plugin',
+    amount_usd: 7.13,
+    is_idempotent: true,
+    expiry_hours: OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS,
+  },
+  {
     credit_category: 'autocomplete-rollout-2025-11',
     description: 'Autocomplete feature rollout - $1 credit with 30 day expiry',
     amount_usd: 1,
@@ -238,7 +247,7 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
   },
   {
     credit_category: '20-usd-after-first-top-up',
-    amount_usd: 20,
+    amount_usd: 0,
     description: 'Bonus for users who top up for the first time',
     expiry_hours: PROMO_CREDIT_EXPIRY_HRS,
     is_idempotent: true,
@@ -258,8 +267,8 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
   },
   {
     credit_category: 'first-topup-bonus',
-    description: `First top-up bonus - $${FIRST_TOPUP_BONUS_AMOUNT()} credit`,
-    amount_usd: FIRST_TOPUP_BONUS_AMOUNT(),
+    description: `First top-up bonus - $${FIRST_TOPUP_BONUS_AMOUNT} credit`,
+    amount_usd: FIRST_TOPUP_BONUS_AMOUNT,
     expiry_hours: PROMO_CREDIT_EXPIRY_HRS,
     is_idempotent: true,
   },
@@ -718,6 +727,18 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     amount_usd: 9,
     promotion_ends_at: new Date('2026-04-30'),
     total_redemptions_allowed: 563,
+  },
+  {
+    encrypted_credit_category:
+      'uUuur9I2iZOBVuFT12Qesw==:nzwZRYrw5yNyIceuzIlFIA==:2gJR8oVMRq6ka1mEQ0U=',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 10,
+    description: 'Free AI Inference KiloClaw email',
+    promotion_ends_at: new Date('2026-04-22'),
+    total_redemptions_allowed: 4175,
+    expiry_hours: 7 * 24,
+    customer_requirement: created_before(new Date('2026-04-11')),
   },
 ];
 

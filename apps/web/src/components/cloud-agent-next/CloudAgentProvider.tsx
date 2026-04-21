@@ -5,6 +5,7 @@ import { Provider as JotaiProvider, createStore } from 'jotai';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
 import {
   createSessionManager,
+  createBrowserLifecycleHooks,
   type SessionManager,
   type SessionSnapshot,
   type ResolvedSession,
@@ -12,10 +13,22 @@ import {
   type KiloSessionId,
   type CloudAgentSessionId,
 } from '@/lib/cloud-agent-sdk';
-import { SESSION_INGEST_WS_URL } from '@/lib/constants';
+import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
+import type { AgentMode } from './types';
 import { usePostHog } from 'posthog-js/react';
 
 const ManagerContext = createContext<SessionManager | null>(null);
+const CLOUD_AGENT_NEXT_MODES = [
+  'code',
+  'plan',
+  'debug',
+  'orchestrator',
+  'ask',
+] satisfies AgentMode[];
+
+function isCloudAgentNextMode(mode: string | undefined): mode is AgentMode {
+  return CLOUD_AGENT_NEXT_MODES.some(validMode => validMode === mode);
+}
 
 type CloudAgentProviderProps = {
   children: ReactNode;
@@ -65,7 +78,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
         return { type: 'read-only', kiloSessionId };
       },
 
-      getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {
+      getTicket: async (sessionId: CloudAgentSessionId) => {
         const body: Record<string, string> = { cloudAgentSessionId: sessionId };
         if (organizationId) body.organizationId = organizationId;
         const response = await fetch('/api/cloud-agent-next/sessions/stream-ticket', {
@@ -77,8 +90,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           const errorData = (await response.json()) as { error?: string };
           throw new Error(errorData.error ?? 'Failed to get stream ticket');
         }
-        const result = (await response.json()) as { ticket: string };
-        return result.ticket;
+        return (await response.json()) as { ticket: string; expiresAt: number };
       },
 
       fetchSnapshot: async (id: KiloSessionId) => {
@@ -104,38 +116,42 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
 
       cliWebsocketUrl: SESSION_INGEST_WS_URL ? `${SESSION_INGEST_WS_URL}/api/user/web` : undefined,
 
+      websocketBaseUrl: CLOUD_AGENT_NEXT_WS_URL,
+
+      lifecycleHooks: createBrowserLifecycleHooks(),
+
       api: {
         send: async payload => {
-          const castSessionId = payload.sessionId as string;
-          const prompt = payload.prompt as string;
-          const mode = payload.mode as 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
-          const model = payload.model as string;
-          const variant = payload.variant as string | undefined;
-          const messageId = payload.messageId as string | undefined;
+          const mode = isCloudAgentNextMode(payload.mode) ? payload.mode : 'code';
+          if (payload.model === undefined) {
+            throw new Error('Cloud Agent model is required');
+          }
           if (organizationId) {
             return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
               {
-                cloudAgentSessionId: castSessionId,
-                prompt,
+                cloudAgentSessionId: payload.sessionId,
+                prompt: payload.prompt,
                 mode,
-                model,
-                variant,
+                model: payload.model,
+                variant: payload.variant,
                 autoCommit: true,
                 organizationId,
-                messageId,
+                messageId: payload.messageId,
+                images: payload.images,
               },
               { context: { skipBatch: true } }
             );
           }
           return trpcClient.cloudAgentNext.sendMessage.mutate(
             {
-              cloudAgentSessionId: castSessionId,
-              prompt,
+              cloudAgentSessionId: payload.sessionId,
+              prompt: payload.prompt,
               mode,
-              model,
-              variant,
+              model: payload.model,
+              variant: payload.variant,
               autoCommit: true,
-              messageId,
+              messageId: payload.messageId,
+              images: payload.images,
             },
             { context: { skipBatch: true } }
           );

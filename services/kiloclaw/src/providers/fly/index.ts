@@ -255,4 +255,78 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
       },
     };
   },
+
+  async inspectRuntime({ env, state }) {
+    const providerState = getFlyProviderState(state);
+    if (!providerState.machineId) {
+      return {
+        providerState,
+        observation: {
+          runtimeState: 'missing',
+        },
+      };
+    }
+
+    const flyConfig = getFlyConfig(env, state);
+    try {
+      const machine = await fly.getMachine(flyConfig, providerState.machineId);
+      const runtimeState =
+        machine.state === 'started'
+          ? 'running'
+          : machine.state === 'starting'
+            ? 'starting'
+            : machine.state === 'stopped' || machine.state === 'suspended'
+              ? 'stopped'
+              : 'failed';
+      return {
+        providerState,
+        observation: {
+          runtimeState,
+        },
+      };
+    } catch (err) {
+      if (fly.isFlyNotFound(err)) {
+        return {
+          providerState,
+          observation: {
+            runtimeState: 'missing',
+          },
+        };
+      }
+      throw err;
+    }
+  },
+
+  async destroyRuntime({ env, state }) {
+    const providerState = getFlyProviderState(state);
+    if (!providerState.machineId) {
+      return { providerState };
+    }
+
+    const flyConfig = getFlyConfig(env, state);
+    await fly.destroyMachine(flyConfig, providerState.machineId);
+    return {
+      providerState: {
+        ...providerState,
+        machineId: null,
+      },
+    };
+  },
+
+  async destroyStorage({ env, state }) {
+    const providerState = getFlyProviderState(state);
+    if (!providerState.volumeId) {
+      return { providerState };
+    }
+
+    const flyConfig = getFlyConfig(env, state);
+    await fly.deleteVolume(flyConfig, providerState.volumeId);
+    return {
+      providerState: {
+        ...providerState,
+        volumeId: null,
+        region: null,
+      },
+    };
+  },
 };

@@ -1,4 +1,4 @@
-import type { MachineSize } from '../schemas/instance-config';
+import type { MachineSize, ProviderId } from '../schemas/instance-config';
 import { OPENCLAW_PORT, DEFAULT_MACHINE_GUEST } from '../config';
 import type { RuntimeSpec } from '../providers/types';
 import type { FlyMachineConfig } from '../fly/types';
@@ -31,12 +31,19 @@ export type MachineIdentity = {
 export function buildRuntimeSpec(
   imageRef: string,
   envVars: Record<string, string>,
+  bootstrapEnv: Record<string, string>,
   machineSize: MachineSize | null,
-  identity: MachineIdentity
+  identity: MachineIdentity,
+  provider: ProviderId
 ): RuntimeSpec {
   return {
     imageRef,
-    env: envVars,
+    env: {
+      ...envVars,
+      KILOCLAW_RUNTIME_PROVIDER: provider,
+      KILOCLAW_MACHINE_CPU_KIND: machineSize?.cpu_kind ?? DEFAULT_MACHINE_GUEST.cpu_kind,
+    },
+    bootstrapEnv,
     machineSize,
     rootMountPath: '/root',
     controllerPort: OPENCLAW_PORT,

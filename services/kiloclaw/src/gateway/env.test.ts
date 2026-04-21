@@ -60,6 +60,22 @@ describe('buildEnvVars', () => {
     expect(result.env.AUTO_APPROVE_DEVICES).toBe('true');
   });
 
+  it('omits KILO_EXA_SEARCH_MODE when user has not selected a mode', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+
+    expect(result.env.KILO_EXA_SEARCH_MODE).toBeUndefined();
+  });
+
+  it('sets KILO_EXA_SEARCH_MODE from user config', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      kiloExaSearchMode: 'kilo-proxy',
+    });
+
+    expect(result.env.KILO_EXA_SEARCH_MODE).toBe('kilo-proxy');
+  });
+
   it('passes KILOCODE_API_BASE_URL override in env bucket', async () => {
     const env = createMockEnv({
       KILOCODE_API_BASE_URL: 'https://example.internal/openrouter/',
@@ -114,6 +130,41 @@ describe('buildEnvVars', () => {
       kilocodeApiKey: 'kc-key',
     });
     expect(result.env.KILOCODE_DEFAULT_MODEL).toBeUndefined();
+  });
+
+  it('passes user timezone in env bucket', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      userTimezone: 'Europe/Amsterdam',
+    });
+
+    expect(result.env.KILOCLAW_USER_TIMEZONE).toBe('Europe/Amsterdam');
+    expect(result.sensitive.KILOCLAW_USER_TIMEZONE).toBeUndefined();
+  });
+
+  it('does not set KILOCLAW_USER_TIMEZONE when absent', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {});
+
+    expect(result.env.KILOCLAW_USER_TIMEZONE).toBeUndefined();
+  });
+
+  it('passes user location in sensitive bucket', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      userLocation: 'Amsterdam, North Holland, Netherlands',
+    });
+
+    expect(result.sensitive.KILOCLAW_USER_LOCATION).toBe('Amsterdam, North Holland, Netherlands');
+    expect(result.env.KILOCLAW_USER_LOCATION).toBeUndefined();
+  });
+
+  it('does not set KILOCLAW_USER_LOCATION when absent', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {});
+
+    expect(result.sensitive.KILOCLAW_USER_LOCATION).toBeUndefined();
+    expect(result.env.KILOCLAW_USER_LOCATION).toBeUndefined();
   });
 
   it('puts decrypted secrets in sensitive bucket', async () => {

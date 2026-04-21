@@ -10,6 +10,7 @@ import { storageUpdate } from './state';
 import { doWarn, toLoggable } from './log';
 
 const MINT_TIMEOUT_MS = 5_000;
+const DOCKER_HOST_INTERNAL = 'host.docker.internal';
 
 /**
  * Resolve the Docker image tag for this instance.
@@ -31,6 +32,34 @@ export function getRegistryApp(env: KiloClawEnv): string {
 
 export function resolveImageRef(state: InstanceMutableState, env: KiloClawEnv): string {
   return `registry.fly.io/${getRegistryApp(env)}:${resolveImageTag(state, env)}`;
+}
+
+export function resolveRuntimeImageRef(state: InstanceMutableState, env: KiloClawEnv): string {
+  if (state.provider === 'docker-local') {
+    return env.DOCKER_LOCAL_IMAGE ?? 'kiloclaw:local';
+  }
+  return resolveImageRef(state, env);
+}
+
+export function resolveDockerLocalKiloCodeApiBaseUrl(
+  backendApiUrl: string | undefined
+): string | null {
+  if (!backendApiUrl) return null;
+
+  let url: URL;
+  try {
+    url = new URL(backendApiUrl);
+  } catch {
+    return null;
+  }
+
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]') {
+    url.hostname = DOCKER_HOST_INTERNAL;
+  }
+  url.pathname = '/api/gateway/';
+  url.search = '';
+  url.hash = '';
+  return url.toString();
 }
 
 /**
@@ -92,6 +121,7 @@ export async function buildUserEnvVars(
   state: InstanceMutableState
 ): Promise<{
   envVars: Record<string, string>;
+  bootstrapEnv: Record<string, string>;
   minSecretsVersion: number;
 }> {
   if (!state.sandboxId || !env.GATEWAY_TOKEN_SECRET) {
@@ -146,8 +176,11 @@ export async function buildUserEnvVars(
       encryptedSecrets: state.encryptedSecrets ?? undefined,
       kilocodeApiKey,
       kilocodeDefaultModel: state.kilocodeDefaultModel ?? undefined,
+      userTimezone: state.userTimezone ?? undefined,
+      userLocation: state.userLocation ?? undefined,
       channels: state.channels ?? undefined,
       googleCredentials: state.googleCredentials ?? undefined,
+      kiloExaSearchMode: state.kiloExaSearchMode,
       instanceFeatures: state.instanceFeatures,
       execSecurity: state.execSecurity ?? undefined,
       execAsk: state.execAsk ?? undefined,
@@ -159,6 +192,13 @@ export async function buildUserEnvVars(
       customSecretMeta: state.customSecretMeta ?? undefined,
     }
   );
+
+  if (state.provider === 'docker-local') {
+    const dockerLocalBaseUrl = resolveDockerLocalKiloCodeApiBaseUrl(env.BACKEND_API_URL);
+    if (dockerLocalBaseUrl) {
+      plainEnv.KILOCODE_API_BASE_URL = dockerLocalBaseUrl;
+    }
+  }
 
   // Inject latest Gmail historyId for controller to patch gog state on startup.
   if (state.gmailLastHistoryId) {
@@ -178,9 +218,15 @@ export async function buildUserEnvVars(
 
   // Get the env encryption key from the App DO, creating it if needed.
   // Instance-keyed DOs get per-instance apps, legacy DOs get per-user apps.
+  // Pass the Instance DO's known flyAppName so the App DO can adopt it if needed
+  // (self-heals instances provisioned before per-instance Fly apps existed).
   const appKey = getAppKey({ userId: state.userId, sandboxId: state.sandboxId });
   const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
-  const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(appKey);
+  const knownFlyAppName =
+    (state.providerState?.provider === 'fly' ? state.providerState.appName : null) ??
+    state.flyAppName ??
+    undefined;
+  const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(appKey, knownFlyAppName);
 
   // Encrypt sensitive values and prefix their names with KILOCLAW_ENC_
   const result: Record<string, string> = { ...plainEnv };
@@ -188,5 +234,11 @@ export async function buildUserEnvVars(
     result[`${ENCRYPTED_ENV_PREFIX}${name}`] = encryptEnvValue(envKey, value);
   }
 
-  return { envVars: result, minSecretsVersion: secretsVersion };
+  return {
+    envVars: result,
+    bootstrapEnv: {
+      KILOCLAW_ENV_KEY: envKey,
+    },
+    minSecretsVersion: secretsVersion,
+  };
 }

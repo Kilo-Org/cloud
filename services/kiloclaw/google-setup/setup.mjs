@@ -48,6 +48,8 @@ const projectIdArg = args.find(a => a.startsWith('--project-id='));
 const projectIdFlag = projectIdArg?.substring(projectIdArg.indexOf('=') + 1);
 
 const isMemberMode = !!(clientIdFlag && clientSecretFlag && projectIdFlag);
+const LEGACY_GOOGLE_SETUP_SERVICES =
+  'gmail,chat,classroom,drive,docs,slides,contacts,tasks,people,sheets,forms,appscript,groups,keep';
 
 if (!isMemberMode && (clientIdFlag || clientSecretFlag || projectIdFlag)) {
   console.error(
@@ -410,7 +412,14 @@ console.log('━━━━━━━━━━━━━━━━━━━━━━�
 try {
   await runCommand(
     'gog',
-    ['auth', 'add', userEmail, '--services=all', '--force-consent', '--manual'],
+    [
+      'auth',
+      'add',
+      userEmail,
+      `--services=${LEGACY_GOOGLE_SETUP_SERVICES}`,
+      '--force-consent',
+      '--manual',
+    ],
     {
       env: gogEnv,
     }

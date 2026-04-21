@@ -1,3 +1,4 @@
+import { WorkerEntrypoint } from 'cloudflare:workers';
 import { z } from 'zod';
 import { BILLING_FLOW } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
@@ -9,6 +10,13 @@ import {
 } from './types.js';
 import { runSweep } from './lifecycle.js';
 import { logger, withLogTags, type BillingLogFields } from './logger.js';
+import { bootstrapProvisionSubscription } from './bootstrap.js';
+
+const BootstrapProvisionSubscriptionSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().uuid(),
+  orgId: z.string().uuid().nullable().optional(),
+});
 
 const BillingSweepMessageSchema = z.object({
   runId: z.string().uuid(),
@@ -33,6 +41,71 @@ function log(level: 'info' | 'warn' | 'error', message: string, fields: BillingL
     return;
   }
   logger.withFields(fields).info(message);
+}
+
+/**
+ * RPC entrypoint invoked by other Workers over a service binding.
+ *
+ * Callers authenticate implicitly via the binding topology — only Workers
+ * explicitly bound to `kiloclaw-billing` with `entrypoint: "KiloClawBillingService"`
+ * can reach these methods. No shared secret is needed across the boundary.
+ */
+export class KiloClawBillingService extends WorkerEntrypoint<BillingWorkerEnv> {
+  async bootstrapProvisionSubscription(params: {
+    userId: string;
+    instanceId: string;
+    orgId?: string | null;
+  }): Promise<{ subscriptionId: string }> {
+    const parsed = BootstrapProvisionSubscriptionSchema.parse(params);
+    const orgId = parsed.orgId ?? null;
+
+    return await withLogTags(
+      {
+        source: 'rpc',
+        tags: {
+          billingFlow: BILLING_FLOW,
+          billingComponent: 'worker',
+          userId: parsed.userId,
+          instanceId: parsed.instanceId,
+        },
+      },
+      async () => {
+        const start = Date.now();
+        log('info', 'bootstrap-subscription started', {
+          event: 'bootstrap_subscription',
+          outcome: 'started',
+          orgId,
+        });
+        try {
+          const subscription = await bootstrapProvisionSubscription(this.env, {
+            userId: parsed.userId,
+            instanceId: parsed.instanceId,
+            orgId,
+          });
+
+          log('info', 'bootstrap-subscription completed', {
+            event: 'bootstrap_subscription',
+            outcome: 'completed',
+            orgId,
+            durationMs: Date.now() - start,
+            kiloclawSubscriptionId: subscription.id,
+          });
+
+          return { subscriptionId: subscription.id };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          log('error', 'bootstrap-subscription failed', {
+            event: 'bootstrap_subscription',
+            outcome: 'failed',
+            orgId,
+            durationMs: Date.now() - start,
+            error: errorMessage,
+          });
+          throw error;
+        }
+      }
+    );
+  }
 }
 
 export const handler: ExportedHandler<BillingWorkerEnv, BillingSweepMessage> = {

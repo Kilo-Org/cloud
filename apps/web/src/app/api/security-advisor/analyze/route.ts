@@ -12,6 +12,7 @@ import {
   type SecurityAdvisorResponse,
 } from '@/lib/security-advisor/schemas';
 import { generateSecurityReport } from '@/lib/security-advisor/report-generator';
+import { getSecurityAdvisorContent } from '@/lib/security-advisor/content-loader';
 import {
   checkSecurityAdvisorRateLimit,
   recordSecurityAdvisorScan,
@@ -65,12 +66,24 @@ export async function POST(request: NextRequest) {
   if (!parseResult.success) {
     return errorResponse(
       'invalid_payload',
-      `Invalid request body: ${z.treeifyError(parseResult.error)}`,
+      `Invalid request body: ${JSON.stringify(z.treeifyError(parseResult.error))}`,
       400
     );
   }
 
   const payload = parseResult.data;
+
+  // Log the incoming version fingerprint so we have day-1 observability of
+  // what plugin and OpenClaw versions are calling us. We don't branch on
+  // this yet, but future schema changes will use these values to decide
+  // how to interpret a given payload.
+  console.log('[SecurityAdvisor] scan', {
+    userId: user.id,
+    pluginVersion: payload.source.pluginVersion,
+    openclawVersion: payload.source.openclawVersion,
+    sourcePlatform: payload.source.platform,
+    sourceMethod: payload.source.method,
+  });
 
   // 5. Rate limit (DB-backed, survives restarts, shared across replicas)
   const rateLimit = await checkSecurityAdvisorRateLimit(user.id);
@@ -84,10 +97,12 @@ export async function POST(request: NextRequest) {
 
   // 6. Generate report
   const isKiloClaw = payload.source.platform === 'kiloclaw';
+  const content = await getSecurityAdvisorContent();
   const report = generateSecurityReport({
     audit: payload.audit,
     publicIp: payload.publicIp,
     isKiloClaw,
+    content,
   });
 
   // 7. Record scan in DB (synchronous — must complete before response
@@ -108,6 +123,8 @@ export async function POST(request: NextRequest) {
         findingsCritical: report.summary.critical,
         findingsWarn: report.summary.warn,
         findingsInfo: report.summary.info,
+        grade: report.grade,
+        score: report.score,
         publicIp: payload.publicIp,
       });
     } catch (err) {
@@ -121,6 +138,8 @@ export async function POST(request: NextRequest) {
     status: 'success',
     report: {
       markdown: report.markdown,
+      grade: report.grade,
+      score: report.score,
       summary: report.summary,
       findings: report.findings,
       recommendations: report.recommendations,

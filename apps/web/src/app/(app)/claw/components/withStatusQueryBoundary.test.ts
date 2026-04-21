@@ -7,6 +7,10 @@ import { withStatusQueryBoundary } from '@/app/(app)/claw/components';
 const baseStatus: KiloClawDashboardStatus = {
   userId: 'user-1',
   sandboxId: 'sandbox-1',
+  provider: 'fly',
+  runtimeId: 'machine-1',
+  storageId: 'vol-1',
+  region: 'iad',
   name: null,
   status: 'running',
   provisionedAt: 1,
@@ -25,6 +29,10 @@ const baseStatus: KiloClawDashboardStatus = {
   trackedImageTag: null,
   trackedImageDigest: null,
   googleConnected: false,
+  googleOAuthConnected: false,
+  googleOAuthStatus: 'disconnected',
+  googleOAuthAccountEmail: null,
+  googleOAuthCapabilities: [],
   gmailNotificationsEnabled: false,
   execSecurity: null,
   execAsk: null,
@@ -34,6 +42,8 @@ const baseStatus: KiloClawDashboardStatus = {
   botEmoji: null,
   workerUrl: 'https://claw.kilo.ai',
   instanceId: null,
+  inboundEmailAddress: 'amber-river-quiet-maple@kiloclaw.ai',
+  inboundEmailEnabled: true,
 };
 
 describe('withStatusQueryBoundary', () => {

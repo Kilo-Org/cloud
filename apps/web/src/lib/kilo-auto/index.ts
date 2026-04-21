@@ -3,11 +3,11 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/providers/anthropic.constants';
-import { minimax_m25_free_model } from '@/lib/providers/minimax';
-import { qwen36_plus_model } from '@/lib/providers/qwen';
-import type { OpenRouterReasoningConfig } from '@/lib/providers/openrouter/types';
+} from '@/lib/ai-gateway/providers/anthropic.constants';
+import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
+import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
+import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 
 type AutoModel = {
   id: string;
@@ -32,8 +32,10 @@ export type ResolvedAutoModel = {
 
 export const GPT_53_CODEX_ID = 'openai/gpt-5.3-codex';
 
+export const KILO_AUTO_LEGACY_MODEL = 'kilo/auto'; // hardcoded in upstream OpenClaw
+
 export const modeSchema = z.enum([
-  'KiloClaw',
+  'claw',
   'plan',
   'general',
   'architect',
@@ -47,59 +49,34 @@ export const modeSchema = z.enum([
 
 type Mode = z.infer<typeof modeSchema>;
 
-export const FRONTIER_CODE_MODEL: ResolvedAutoModel = {
-  model: CLAUDE_SONNET_CURRENT_MODEL_ID,
-  reasoning: { enabled: true },
-  verbosity: 'low',
+const FRONTIER_REASONING = { enabled: true, effort: 'medium' } as const;
+const FRONTIER_VERBOSITY = 'medium' as const;
+
+const OPUS_FRONTIER: ResolvedAutoModel = {
+  model: CLAUDE_OPUS_CURRENT_MODEL_ID,
+  reasoning: FRONTIER_REASONING,
+  verbosity: FRONTIER_VERBOSITY,
 };
 
+const SONNET_FRONTIER: ResolvedAutoModel = {
+  model: CLAUDE_SONNET_CURRENT_MODEL_ID,
+  reasoning: FRONTIER_REASONING,
+  verbosity: FRONTIER_VERBOSITY,
+};
+
+export const FRONTIER_CODE_MODEL: ResolvedAutoModel = SONNET_FRONTIER;
+
 export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
-  KiloClaw: {
-    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
-    reasoning: { enabled: true },
-    verbosity: 'high',
-  },
-  plan: {
-    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
-    reasoning: { enabled: true },
-    verbosity: 'high',
-  },
-  general: {
-    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
-    reasoning: { enabled: true },
-    verbosity: 'medium',
-  },
-  architect: {
-    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
-    reasoning: { enabled: true },
-    verbosity: 'high',
-  },
-  orchestrator: {
-    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
-    reasoning: { enabled: true },
-    verbosity: 'high',
-  },
-  ask: {
-    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
-    reasoning: { enabled: true },
-    verbosity: 'high',
-  },
-  debug: {
-    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
-    reasoning: { enabled: true },
-    verbosity: 'high',
-  },
-  build: {
-    model: CLAUDE_SONNET_CURRENT_MODEL_ID,
-    reasoning: { enabled: true },
-    verbosity: 'medium',
-  },
-  explore: {
-    model: CLAUDE_SONNET_CURRENT_MODEL_ID,
-    reasoning: { enabled: true },
-    verbosity: 'medium',
-  },
-  code: FRONTIER_CODE_MODEL,
+  claw: OPUS_FRONTIER,
+  plan: OPUS_FRONTIER,
+  general: OPUS_FRONTIER,
+  architect: OPUS_FRONTIER,
+  orchestrator: OPUS_FRONTIER,
+  ask: OPUS_FRONTIER,
+  debug: OPUS_FRONTIER,
+  build: SONNET_FRONTIER,
+  explore: SONNET_FRONTIER,
+  code: SONNET_FRONTIER,
 };
 
 export const BALANCED_CODEX_MODEL: ResolvedAutoModel = {
@@ -107,15 +84,15 @@ export const BALANCED_CODEX_MODEL: ResolvedAutoModel = {
   reasoning: { enabled: true, effort: 'low' },
 };
 
-export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
-  model: qwen36_plus_model.public_id,
-  reasoning: { enabled: true },
-};
-
 export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   model: claude_sonnet_clawsetup_model.public_id,
   reasoning: { enabled: true, effort: 'high' },
   verbosity: 'high',
+};
+
+export const BALANCED_CLAW_MODEL: ResolvedAutoModel = {
+  model: qwen36_plus_model.public_id,
+  reasoning: { enabled: true },
 };
 
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
@@ -180,17 +157,15 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   id: 'kilo-auto/small',
   name: 'Kilo Auto Small',
   description: 'Automatically routes your request to a small model.',
-  context_length: 131072,
+  context_length: 262144,
   max_completion_tokens: 32768,
   prompt_price: '0.00000005',
   completion_price: '0.0000004',
   input_cache_read_price: '0.000000005',
   input_cache_write_price: undefined,
-  supports_images: false,
+  supports_images: true,
   roocode_settings: undefined,
-  opencode_settings: {
-    ai_sdk_provider: 'openai',
-  },
+  opencode_settings: undefined,
 };
 
 export const AUTO_MODELS = [
@@ -201,5 +176,5 @@ export const AUTO_MODELS = [
 ];
 
 export function isKiloAutoModel(model: string) {
-  return AUTO_MODELS.some(m => m.id === model);
+  return AUTO_MODELS.some(m => m.id === model) || model === KILO_AUTO_LEGACY_MODEL;
 }

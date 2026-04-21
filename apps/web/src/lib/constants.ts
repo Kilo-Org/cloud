@@ -1,15 +1,10 @@
-export const deadline_XL_first_topup_bonus = new Date('2025-10-14T08:01Z');
-const XL_first_topup_amount = 24;
-
-export const is_XL_first_topup_bonus_active = (now?: Date) =>
-  (now ?? new Date()) < deadline_XL_first_topup_bonus;
-export const FIRST_TOPUP_BONUS_AMOUNT = (now?: Date) =>
-  is_XL_first_topup_bonus_active(now) ? XL_first_topup_amount : 20;
+export const FIRST_TOPUP_BONUS_AMOUNT: number = 0;
 
 export const REFERRAL_BONUS_AMOUNT = 10;
 
 export const PROMO_CREDIT_EXPIRY_HRS = 60 * 24; // 60 days in hours
 export const WELCOME_CREDIT_EXPIRY_HRS = 30 * 24; // 30 days in hours
+export const OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS = 48; // 2 days in hours
 
 export const allow_fake_login =
   !!process.env.DEBUG_SHOW_DEV_UI &&
@@ -56,6 +51,7 @@ export const GASTOWN_URL = process.env.NEXT_PUBLIC_GASTOWN_URL ?? '';
 // Free model rate limits: per-IP for client-side products, per-user for server-side products
 export const FREE_MODEL_RATE_LIMIT_WINDOW_HOURS = 1;
 export const FREE_MODEL_MAX_REQUESTS_PER_WINDOW = 200;
+export const ADMIN_RATE_LIMIT_TEST_MODEL = 'admin-rate-limit-test';
 
 // Stripe publishable key (client-side, inlined at build time)
 export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';

@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
@@ -51,6 +52,7 @@ import { DetailTile } from './DetailTile';
 
 import { getEntriesByCategory } from '@kilocode/kiloclaw-secret-catalog';
 import { SecretEntrySection } from './SecretEntrySection';
+import { ExaSearchEntrySection } from './ExaSearchEntrySection';
 import { AnimatedDots } from './AnimatedDots';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PairingSection } from './PairingSection';
@@ -61,6 +63,8 @@ import { CustomSecretsSection } from './CustomSecretsSection';
 import { WebhookIntegrationSection } from './WebhookIntegrationSection';
 import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.types';
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
+
+const EXA_SEARCH_UI_MIN_CONTROLLER_VERSION = '2026.4.14';
 
 // ---------------------------------------------------------------------------
 // 1Password setup guide dialog
@@ -233,6 +237,29 @@ function AgentCardSetupGuide() {
   );
 }
 
+function GoogleGIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+      <path
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        fill="#34A853"
+      />
+      <path
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Google Account (collapsible card, matches SecretEntrySection card style)
 // ---------------------------------------------------------------------------
@@ -262,28 +289,6 @@ function GoogleAccountCard({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // Google "G" icon as inline SVG
-  const GoogleIcon = ({ className }: { className?: string }) => (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
-      <path
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-        fill="#4285F4"
-      />
-      <path
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-        fill="#34A853"
-      />
-      <path
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-        fill="#EA4335"
-      />
-    </svg>
-  );
-
   return (
     <>
       <Collapsible open={open} onOpenChange={setOpen}>
@@ -293,7 +298,7 @@ function GoogleAccountCard({
               type="button"
               className="hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-colors"
             >
-              <GoogleIcon className="h-5 w-5 shrink-0" />
+              <GoogleGIcon className="h-5 w-5 shrink-0" />
               <div className="flex min-w-0 flex-1 flex-col items-start">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium">Google Account</span>
@@ -562,6 +567,7 @@ function DestroyInstanceDialog({
   onConfirm: () => void;
 }) {
   const [confirmation, setConfirmation] = useState('');
+  const [copied, setCopied] = useState(false);
   const { displayName, sandboxId, instanceKind, confirmationOptions, primaryConfirmation } =
     useMemo(
       () => getDestroyConfirmationContext({ status, organizationName }),
@@ -570,11 +576,22 @@ function DestroyInstanceDialog({
   const confirmationMatches =
     confirmationOptions.length > 0 && confirmationOptions.includes(confirmation.trim());
 
+  function handleCopyConfirmation() {
+    if (!primaryConfirmation) return;
+    void navigator.clipboard.writeText(primaryConfirmation);
+    setCopied(true);
+  }
+
   useEffect(() => {
     if (!open) {
       setConfirmation('');
+      setCopied(false);
+      return;
     }
-  }, [open]);
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [open, copied]);
 
   return (
     <Dialog open={open} onOpenChange={isPending ? () => {} : onOpenChange}>
@@ -624,10 +641,25 @@ function DestroyInstanceDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="destroy-instance-confirmation">
-              Type <code className="bg-muted rounded px-1 py-0.5">{primaryConfirmation}</code> to
-              confirm
-            </Label>
+            <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+              <Label htmlFor="destroy-instance-confirmation">Type</Label>
+              <span className="bg-muted inline-flex min-w-0 max-w-full items-center gap-1.5 rounded border border-border/50 py-0.5 pr-1 pl-2 select-text">
+                <code className="break-all">{primaryConfirmation}</code>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground inline-flex cursor-pointer items-center rounded p-0.5 transition-colors"
+                  onClick={handleCopyConfirmation}
+                  aria-label="Copy confirmation string"
+                >
+                  {copied ? (
+                    <Check className="h-3.5 w-3.5 text-green-500" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </span>
+              <Label htmlFor="destroy-instance-confirmation">to confirm</Label>
+            </div>
             <Input
               id="destroy-instance-confirmation"
               value={confirmation}
@@ -663,6 +695,86 @@ function DestroyInstanceDialog({
   );
 }
 
+function InboundEmailCard({
+  address,
+  enabled,
+  isCycling,
+  onCycle,
+}: {
+  address: string | null;
+  enabled: boolean;
+  isCycling: boolean;
+  onCycle: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [confirmCycle, setConfirmCycle] = useState(false);
+
+  function handleCopy() {
+    if (!address) return;
+    void navigator.clipboard
+      .writeText(address)
+      .then(() => toast.success('Inbound email address copied'))
+      .catch(() => toast.error('Failed to copy inbound email address'));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="rounded-lg border px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <Hash className="text-muted-foreground h-5 w-5 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Inbound Email</p>
+            <p className="text-muted-foreground text-xs">
+              {enabled
+                ? 'Send email to this address to message your agent.'
+                : 'Inbound email is disabled for this instance.'}
+            </p>
+          </div>
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          {address && enabled ? (
+            <code className="bg-muted text-foreground min-w-0 truncate rounded px-2 py-1 text-xs">
+              {address}
+            </code>
+          ) : (
+            <span className="text-muted-foreground text-xs">Unavailable</span>
+          )}
+          <Button variant="outline" size="sm" onClick={handleCopy} disabled={!address || !enabled}>
+            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+            Copy
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setConfirmCycle(true)}
+            disabled={!enabled || isCycling}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Cycle
+          </Button>
+        </div>
+      </div>
+      <ConfirmActionDialog
+        open={confirmCycle}
+        onOpenChange={setConfirmCycle}
+        title="Cycle inbound email address?"
+        description="This cannot be undone. The current address will stop working immediately and cannot be reassigned later."
+        confirmLabel="Cycle Address"
+        confirmIcon={<RotateCcw className="h-4 w-4" />}
+        isPending={isCycling}
+        pendingLabel="Cycling"
+        onConfirm={() => {
+          onCycle();
+          setConfirmCycle(false);
+        }}
+        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+      />
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // SettingsTab
 // ---------------------------------------------------------------------------
@@ -690,6 +802,7 @@ export function SettingsTab({
   organizationName?: string;
 }) {
   const posthog = usePostHog();
+  const { data: user } = useUser();
   const { data: config } = useClawConfig();
   const { organizationId } = useClawContext();
   const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
@@ -703,7 +816,6 @@ export function SettingsTab({
     variantsMatch,
     trackedVersion,
     runningVersion,
-    latestAvailableVersion,
     latestVersion,
     controllerVersion,
     isLoadingControllerVersion,
@@ -758,9 +870,47 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     '2026.2.26'
   );
+  const supportsExaSearchUi = calverAtLeast(
+    cleanVersion(controllerVersion?.version),
+    EXA_SEARCH_UI_MIN_CONTROLLER_VERSION
+  );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
+  const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
+  const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
+  const exaSearchConfigured =
+    supportsExaSearchUi && (kiloExaSearchMode === 'kilo-proxy' || kiloExaSearchMode === null);
+  const exaSearchDisplayMode =
+    supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
+  const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
+  const googleCalendarConnectHref = useMemo(() => {
+    const params = new URLSearchParams({ capabilities: 'calendar_read' });
+    if (organizationId) {
+      params.set('organizationId', organizationId);
+    }
+
+    return `/api/integrations/google/connect?${params.toString()}`;
+  }, [organizationId]);
+  const googleCalendarDisconnectHref = useMemo(() => {
+    const params = new URLSearchParams();
+    if (organizationId) {
+      params.set('organizationId', organizationId);
+    }
+
+    const qs = params.toString();
+    return qs.length > 0
+      ? `/api/integrations/google/disconnect?${qs}`
+      : '/api/integrations/google/disconnect';
+  }, [organizationId]);
+  const canSeeGoogleCalendar = !!user?.is_admin;
+
+  function handleCycleInboundEmailAddress() {
+    mutations.cycleInboundEmailAddress.mutate(undefined, {
+      onSuccess: data => toast.success(`New inbound email address: ${data.inboundEmailAddress}`),
+      onError: err => toast.error(`Failed to cycle inbound email address: ${err.message}`),
+    });
+  }
 
   function handleSave() {
     if (hasModelSelectionError) {
@@ -811,6 +961,15 @@ export function SettingsTab({
         />
       </div>
 
+      {status.status !== null && (
+        <InboundEmailCard
+          address={status.inboundEmailAddress}
+          enabled={status.inboundEmailEnabled}
+          isCycling={mutations.cycleInboundEmailAddress.isPending}
+          onCycle={handleCycleInboundEmailAddress}
+        />
+      )}
+
       {/* ── Pairing Requests ── */}
       {isRunning && <PairingSection mutations={mutations} />}
 
@@ -856,8 +1015,8 @@ export function SettingsTab({
                       <TooltipContent>
                         <p>
                           {catalogNewerThanImage
-                            ? `A newer OpenClaw version (${latestAvailableVersion}) is available — click to upgrade`
-                            : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available — click to upgrade`}
+                            ? 'A new version of KiloClaw is available. This update includes a new OpenClaw version. Click to upgrade.'
+                            : 'A new version of KiloClaw is available — click to upgrade.'}
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -953,6 +1112,35 @@ export function SettingsTab({
       {/* ── Webhook Integration ── */}
       <WebhookIntegrationSection />
 
+      {canSeeGoogleCalendar && (
+        <div className="rounded-lg border px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <GoogleGIcon className="h-5 w-5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium">Google Calendar</p>
+                <div className="text-muted-foreground text-xs">
+                  {status.googleOAuthConnected
+                    ? `Connected${status.googleOAuthAccountEmail ? ` as ${status.googleOAuthAccountEmail}` : ''}`
+                    : 'Not connected'}
+                </div>
+              </div>
+            </div>
+            {status.googleOAuthConnected ? (
+              <form action={googleCalendarDisconnectHref} method="POST">
+                <Button type="submit" variant="outline" size="sm">
+                  Disconnect
+                </Button>
+              </form>
+            ) : (
+              <Button asChild variant="outline" size="sm">
+                <a href={googleCalendarConnectHref}>Connect</a>
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Messaging Channels ── */}
       <div>
         <h2 className="text-foreground mb-3 text-base font-semibold">Messaging Channels</h2>
@@ -982,12 +1170,60 @@ export function SettingsTab({
                 <SecretEntrySection
                   key={entry.id}
                   entry={entry}
-                  configured={configuredSecrets[entry.id] ?? false}
+                  configured={braveSearchEnabled}
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
+                  actionRowInlineExtra={
+                    supportsExaSearchUi && braveSearchConfigured && exaSearchConfigured ? (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-8 px-1 text-xs"
+                        disabled={mutations.patchWebSearchConfig.isPending}
+                        onClick={() => {
+                          mutations.patchWebSearchConfig.mutate(
+                            { exaMode: 'disabled' },
+                            {
+                              onSuccess: () => {
+                                toast.success('Brave Search re-enabled. Redeploy to apply.', {
+                                  duration: 8000,
+                                });
+                                onSecretsChanged?.('brave-search');
+                              },
+                              onError: err => {
+                                toast.error(`Failed to re-enable Brave Search: ${err.message}`);
+                              },
+                            }
+                          );
+                        }}
+                      >
+                        Re-enable Brave Search
+                      </Button>
+                    ) : undefined
+                  }
+                  saveConfirmation={
+                    supportsExaSearchUi && exaSearchConfigured
+                      ? {
+                          title: 'Enable Brave Search?',
+                          description:
+                            'Exa Search is currently configured. Enabling Brave will disable Exa on the next redeploy.',
+                          confirmLabel: 'Enable Brave and disable Exa',
+                        }
+                      : undefined
+                  }
                 />
               ))}
+            {supportsExaSearchUi && (
+              <ExaSearchEntrySection
+                mode={exaSearchDisplayMode}
+                configured={exaSearchConfigured}
+                braveConfigured={braveSearchConfigured}
+                mutations={mutations}
+                onSecretsChanged={onSecretsChanged}
+                isDirty={dirtySecrets.has('kilo-exa-search')}
+              />
+            )}
           </div>
         </div>
       )}

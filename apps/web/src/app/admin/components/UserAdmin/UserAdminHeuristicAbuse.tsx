@@ -495,15 +495,6 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
       <h2 className="text-xl font-semibold">
         Analysis of usage patterns for potential abuse detection
       </h2>
-      <div className="italic">
-        Note: abuse after 2025-08-21 12:30Z{' '}
-        <a
-          href="https://github.com/Kilo-Org/kilocode-backend/pull/2084"
-          className="text-blue-600 underline hover:text-blue-300"
-        >
-          must have intentionally added the X-KiloCode-Version header!
-        </a>
-      </div>
       <div className="flex gap-4">
         <Button
           variant={showRawData ? 'default' : 'outline'}

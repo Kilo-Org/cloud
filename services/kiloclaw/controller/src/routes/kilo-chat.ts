@@ -306,6 +306,17 @@ export function registerKiloChatListMessagesRoute(app: Hono, options: KiloChatRo
   });
 }
 
+export function registerKiloChatRenameRoute(app: Hono, options: KiloChatRouteOptions): void {
+  app.patch('/_kilo/kilo-chat/conversations/:conversationId', c =>
+    relayBodyRoute(c, options, {
+      method: 'PATCH',
+      upstreamSuffix: ctx =>
+        `/conversations/${encodeURIComponent(routeParam(ctx, 'conversationId'))}`,
+      bodyLimit: MAX_SMALL_BODY_BYTES,
+    })
+  );
+}
+
 export function registerKiloChatGetMembersRoute(app: Hono, options: KiloChatRouteOptions): void {
   const fetchImpl = options.fetchImpl ?? fetch;
 

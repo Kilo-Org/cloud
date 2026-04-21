@@ -29,6 +29,7 @@ import {
   registerKiloChatReactionDeleteRoute,
   registerKiloChatListMessagesRoute,
   registerKiloChatGetMembersRoute,
+  registerKiloChatRenameRoute,
 } from './routes/kilo-chat';
 import { registerInboundEmailRoute } from './routes/inbound-email';
 import { registerFileRoutes } from './routes/files';
@@ -410,6 +411,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     registerKiloChatReactionDeleteRoute(honoApp, kiloChatOpts);
     registerKiloChatListMessagesRoute(honoApp, kiloChatOpts);
     registerKiloChatGetMembersRoute(honoApp, kiloChatOpts);
+    registerKiloChatRenameRoute(honoApp, kiloChatOpts);
   }
   registerInboundEmailRoute(honoApp, supervisor, config.expectedToken, config.hooksToken);
   registerFileRoutes(honoApp, config.expectedToken, '/root/.openclaw');

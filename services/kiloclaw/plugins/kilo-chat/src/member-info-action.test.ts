@@ -13,6 +13,7 @@ function mockClient(overrides: Partial<KiloChatClient> = {}): KiloChatClient {
     removeReaction: vi.fn(),
     listMessages: vi.fn(),
     getMembers: vi.fn().mockResolvedValue({ members: [] }),
+    renameConversation: vi.fn(),
     ...overrides,
   } as KiloChatClient;
 }

@@ -119,7 +119,7 @@ describe('kilo-chat messaging adapter', () => {
 });
 
 describe('kilo-chat actions adapter', () => {
-  it('describeMessageTool returns all five actions', () => {
+  it('describeMessageTool returns all six actions', () => {
     const adapter = kiloChatPlugin.actions;
     expect(adapter).toBeDefined();
     const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
@@ -128,15 +128,17 @@ describe('kilo-chat actions adapter', () => {
     expect(discovery?.actions).toContain('member-info');
     expect(discovery?.actions).toContain('edit');
     expect(discovery?.actions).toContain('delete');
+    expect(discovery?.actions).toContain('rename');
   });
 
-  it('supportsAction returns true for react, read, member-info, edit, delete and false for pin', () => {
+  it('supportsAction returns true for react, read, member-info, edit, delete, rename and false for pin', () => {
     const adapter = kiloChatPlugin.actions;
     expect(adapter?.supportsAction?.({ action: 'react' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'read' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'member-info' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'edit' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'delete' as never })).toBe(true);
+    expect(adapter?.supportsAction?.({ action: 'rename' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'pin' as never })).toBe(false);
   });
 

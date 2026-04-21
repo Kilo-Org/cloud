@@ -9,6 +9,7 @@ import {
   registerKiloChatReactionDeleteRoute,
   registerKiloChatListMessagesRoute,
   registerKiloChatGetMembersRoute,
+  registerKiloChatRenameRoute,
 } from './kilo-chat';
 
 const TOKEN = 'expected-gateway-token';
@@ -699,5 +700,82 @@ describe('GET /_kilo/kilo-chat/conversations/:conversationId/members', () => {
     expect(capturedInit?.method).toBe('GET');
     const headers = new Headers(capturedInit?.headers);
     expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
+  });
+});
+
+function makeRenameApp(fetchImpl: typeof fetch) {
+  const app = new Hono();
+  registerKiloChatRenameRoute(app, {
+    expectedToken: TOKEN,
+    sandboxId: SANDBOX_ID,
+    kiloChatBaseUrl: 'https://chat.example.test',
+    fetchImpl,
+  });
+  return app;
+}
+
+describe('PATCH /_kilo/kilo-chat/conversations/:conversationId', () => {
+  it('rejects requests without bearer token', async () => {
+    const app = makeRenameApp(async () => new Response('', { status: 200 }));
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/conversations/c1', {
+        method: 'PATCH',
+        body: JSON.stringify({ title: 'New name' }),
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('forwards authorized PATCH to the kilo-chat worker with correct URL and body', async () => {
+    let capturedUrl = '';
+    let capturedInit: RequestInit | undefined;
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      capturedUrl = typeof url === 'string' ? url : url.toString();
+      capturedInit = init;
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const app = makeRenameApp(fetchImpl);
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/conversations/c1', {
+        method: 'PATCH',
+        body: JSON.stringify({ title: 'New name' }),
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${TOKEN}`,
+        },
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(capturedUrl).toBe(
+      'https://chat.example.test/bot/v1/sandboxes/sbx_test/conversations/c1'
+    );
+    expect(capturedInit?.method).toBe('PATCH');
+    const headers = new Headers(capturedInit?.headers);
+    expect(headers.get('authorization')).toBe('Bearer ' + TOKEN);
+    expect(JSON.parse((capturedInit?.body as string) ?? '{}')).toEqual({ title: 'New name' });
+  });
+
+  it('returns 502 when upstream fetch throws', async () => {
+    const fetchImpl = (async () => {
+      throw new Error('ECONNREFUSED');
+    }) as typeof fetch;
+    const app = makeRenameApp(fetchImpl);
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/conversations/c1', {
+        method: 'PATCH',
+        body: JSON.stringify({ title: 'New name' }),
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${TOKEN}`,
+        },
+      })
+    );
+    expect(res.status).toBe(502);
   });
 });

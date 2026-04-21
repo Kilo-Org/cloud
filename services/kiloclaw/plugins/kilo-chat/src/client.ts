@@ -32,6 +32,8 @@ export type ListMessagesResult = { messages: Array<Record<string, unknown>> };
 export type GetMembersParams = { conversationId: string };
 export type GetMembersResult = { members: Array<{ id: string; kind: string }> };
 
+export type RenameConversationParams = { conversationId: string; title: string };
+
 export type AddReactionParams = { conversationId: string; messageId: string; emoji: string };
 export type AddReactionResult = { id: string };
 export type RemoveReactionParams = { conversationId: string; messageId: string; emoji: string };
@@ -46,6 +48,7 @@ export type KiloChatClient = {
   removeReaction(p: RemoveReactionParams): Promise<void>;
   listMessages(p: ListMessagesParams): Promise<ListMessagesResult>;
   getMembers(p: GetMembersParams): Promise<GetMembersResult>;
+  renameConversation(p: RenameConversationParams): Promise<void>;
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -228,6 +231,23 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     return (await response.json()) as GetMembersResult;
   }
 
+  async function renameConversation(params: RenameConversationParams): Promise<void> {
+    const response = await fetchImpl(
+      `${base}/_kilo/kilo-chat/conversations/${encodeURIComponent(params.conversationId)}`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ title: params.title }),
+      }
+    );
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller PATCH conversations responded ${response.status}: ${await response.text()}`
+      );
+    }
+    void response.body?.cancel();
+  }
+
   return {
     createMessage,
     editMessage,
@@ -238,5 +258,6 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     removeReaction,
     listMessages,
     getMembers,
+    renameConversation,
   };
 }

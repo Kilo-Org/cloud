@@ -257,6 +257,52 @@ export function registerKiloChatTypingRoute(app: Hono, options: KiloChatRouteOpt
   });
 }
 
+export function registerKiloChatListMessagesRoute(app: Hono, options: KiloChatRouteOptions): void {
+  const fetchImpl = options.fetchImpl ?? fetch;
+
+  app.get('/_kilo/kilo-chat/conversations/:conversationId/messages', async c => {
+    const unauthorized = authorize(c, options);
+    if (unauthorized) return unauthorized;
+
+    const convId = routeParam(c, 'conversationId');
+    const { search } = new URL(c.req.url);
+    const queryString = search ?? '';
+
+    let upstream: Response;
+    try {
+      upstream = await fetchImpl(
+        upstreamUrl(options, `/conversations/${encodeURIComponent(convId)}/messages${queryString}`),
+        { method: 'GET', headers: outboundHeaders(options) }
+      );
+    } catch {
+      return c.json({ error: 'Bad Gateway' }, 502);
+    }
+    return relay(upstream);
+  });
+}
+
+export function registerKiloChatGetMembersRoute(app: Hono, options: KiloChatRouteOptions): void {
+  const fetchImpl = options.fetchImpl ?? fetch;
+
+  app.get('/_kilo/kilo-chat/conversations/:conversationId/members', async c => {
+    const unauthorized = authorize(c, options);
+    if (unauthorized) return unauthorized;
+
+    const convId = routeParam(c, 'conversationId');
+
+    let upstream: Response;
+    try {
+      upstream = await fetchImpl(
+        upstreamUrl(options, `/conversations/${encodeURIComponent(convId)}/members`),
+        { method: 'GET', headers: outboundHeaders(options) }
+      );
+    } catch {
+      return c.json({ error: 'Bad Gateway' }, 502);
+    }
+    return relay(upstream);
+  });
+}
+
 async function parseConversationId(c: import('hono').Context): Promise<string | Response> {
   const read = await readBodyWithLimit(c, MAX_SMALL_BODY_BYTES);
   if (!read.ok) return read.response;

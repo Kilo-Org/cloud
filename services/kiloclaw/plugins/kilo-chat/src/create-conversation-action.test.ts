@@ -33,9 +33,7 @@ describe('handleKiloChatCreateConversationAction', () => {
       title: 'Project Discussion',
       additionalMembers: undefined,
     });
-    expect(result.content[0].text).toBe(
-      'Created conversation "Project Discussion" (01NEWCONV)'
-    );
+    expect(result.content[0].text).toBe('Created conversation "Project Discussion" (01NEWCONV)');
   });
 
   it('creates conversation without title', async () => {

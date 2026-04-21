@@ -41,9 +41,8 @@ export function registerConversationRoutes(
     }
 
     const callerId = c.get('callerId');
-    const allowedSandboxIds = c.get('allowedSandboxIds');
 
-    const result = await createConversationFor(c.env, callerId, body.data, allowedSandboxIds);
+    const result = await createConversationFor(c.env, callerId, body.data);
     if (!result.ok) {
       if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
       return c.json({ error: result.error }, 500);

@@ -1,8 +1,21 @@
 import { env } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { ConversationDO } from '../do/conversation-do';
 import type { MembershipDO } from '../do/membership-do';
 import { makeApp } from './helpers';
+
+/** Map of userId → set of sandbox IDs they own. */
+const ownershipMap = new Map<string, Set<string>>();
+
+vi.mock('../services/sandbox-ownership', () => ({
+  userOwnsSandbox: async (_conn: string, userId: string, sandboxId: string) =>
+    ownershipMap.get(userId)?.has(sandboxId) ?? false,
+}));
+
+function grantSandbox(userId: string, sandboxId: string) {
+  if (!ownershipMap.has(userId)) ownershipMap.set(userId, new Set());
+  ownershipMap.get(userId)!.add(sandboxId);
+}
 
 function getConvStub(convId: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(convId));
@@ -14,7 +27,8 @@ function getMemberStub(memberId: string): DurableObjectStub<MembershipDO> {
 
 describe('POST /v1/conversations', () => {
   it('creates a conversation and returns conversationId', async () => {
-    const app = makeApp('user-alice', 'user', ['sandbox-123']);
+    grantSandbox('user-alice', 'sandbox-123');
+    const app = makeApp('user-alice', 'user');
     const res = await app.request(
       '/v1/conversations',
       {
@@ -33,7 +47,8 @@ describe('POST /v1/conversations', () => {
   });
 
   it('initializes ConversationDO and MembershipDOs on creation', async () => {
-    const app = makeApp('user-bob', 'user', ['sandbox-456']);
+    grantSandbox('user-bob', 'sandbox-456');
+    const app = makeApp('user-bob', 'user');
     const res = await app.request(
       '/v1/conversations',
       {
@@ -88,7 +103,8 @@ describe('POST /v1/conversations', () => {
   });
 
   it('returns 403 when user does not own the sandbox', async () => {
-    const app = makeApp('user-unauthorized', 'user', ['sandbox-mine']);
+    grantSandbox('user-unauthorized', 'sandbox-mine');
+    const app = makeApp('user-unauthorized', 'user');
     const res = await app.request(
       '/v1/conversations',
       {
@@ -158,7 +174,9 @@ describe('POST /v1/conversations', () => {
 describe('GET /v1/conversations', () => {
   it('lists conversations for the caller', async () => {
     // First create a couple of conversations via a user app
-    const app = makeApp('user-eve', 'user', ['sandbox-eve-1', 'sandbox-eve-2']);
+    grantSandbox('user-eve', 'sandbox-eve-1');
+    grantSandbox('user-eve', 'sandbox-eve-2');
+    const app = makeApp('user-eve', 'user');
 
     await app.request(
       '/v1/conversations',
@@ -209,7 +227,8 @@ describe('GET /v1/conversations', () => {
 describe('GET /v1/conversations/:id', () => {
   it('returns conversation info for a member', async () => {
     // Create a conversation first
-    const app = makeApp('user-frank', 'user', ['sandbox-frank']);
+    grantSandbox('user-frank', 'sandbox-frank');
+    const app = makeApp('user-frank', 'user');
     const createRes = await app.request(
       '/v1/conversations',
       {
@@ -231,7 +250,8 @@ describe('GET /v1/conversations/:id', () => {
 
   it('returns 403 for non-member', async () => {
     // Create conversation as user-grace
-    const gracesApp = makeApp('user-grace', 'user', ['sandbox-grace']);
+    grantSandbox('user-grace', 'sandbox-grace');
+    const gracesApp = makeApp('user-grace', 'user');
     const createRes = await gracesApp.request(
       '/v1/conversations',
       {

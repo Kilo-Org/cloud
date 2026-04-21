@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { AuthContext } from '../auth';
 import { botAuthMiddleware } from '../auth-bot';
@@ -7,6 +7,18 @@ import { registerBotRoutes } from '../routes/bot-messages';
 import { registerConversationRoutes } from '../routes/conversations';
 import { registerMessageRoutes } from '../routes/messages';
 import { deriveGatewayToken } from '../lib/gateway-token';
+
+const ownershipMap = new Map<string, Set<string>>();
+
+vi.mock('../services/sandbox-ownership', () => ({
+  userOwnsSandbox: async (_conn: string, userId: string, sandboxId: string) =>
+    ownershipMap.get(userId)?.has(sandboxId) ?? false,
+}));
+
+function grantSandbox(userId: string, sandboxId: string) {
+  if (!ownershipMap.has(userId)) ownershipMap.set(userId, new Set());
+  ownershipMap.get(userId)!.add(sandboxId);
+}
 
 const SECRET = 'test-gateway-secret';
 
@@ -37,12 +49,13 @@ async function setupData(suffix: string) {
   const userId = `user-${suffix}`;
   const sandboxId = `sandbox-${suffix}`;
 
+  grantSandbox(userId, sandboxId);
+
   // Minimal app with mock auth for setup
   const setupApp = new Hono<{ Bindings: Env; Variables: AuthContext }>();
   setupApp.use('*', async (c, next) => {
     c.set('callerId', userId);
     c.set('callerKind', 'user');
-    c.set('allowedSandboxIds', [sandboxId]);
     await next();
   });
   registerConversationRoutes(setupApp);

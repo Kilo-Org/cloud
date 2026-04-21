@@ -9,6 +9,7 @@ declare namespace Cloudflare {
 	interface Env {
 		NEXTAUTH_SECRET: SecretsStoreSecret;
 		GATEWAY_TOKEN_SECRET: SecretsStoreSecret;
+		HYPERDRIVE: Hyperdrive;
 		CONVERSATION_DO: DurableObjectNamespace<import("./src/index").ConversationDO>;
 		MEMBERSHIP_DO: DurableObjectNamespace<import("./src/index").MembershipDO>;
 		KILOCLAW: Fetcher /* kiloclaw */;

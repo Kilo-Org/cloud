@@ -6,7 +6,7 @@ async function setup(suffix: string) {
   const userId = `user-${suffix}`;
   const sandboxId = `sandbox-${suffix}`;
   const botId = `bot:kiloclaw:${sandboxId}`;
-  const userApp = makeApp(userId, 'user', [sandboxId]);
+  const userApp = makeApp(userId, 'user');
 
   const convRes = await userApp.request(
     '/v1/conversations',

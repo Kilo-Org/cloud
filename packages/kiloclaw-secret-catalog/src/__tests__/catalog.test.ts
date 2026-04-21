@@ -530,9 +530,6 @@ describe('Secret Catalog', () => {
       expect(isValidCustomSecretKey('NEXTAUTH_SECRET')).toBe(false);
       expect(isValidCustomSecretKey('NODE_OPTIONS')).toBe(false);
       expect(isValidCustomSecretKey('STREAM_CHAT_API_KEY')).toBe(false);
-      // KILOCHAT_ prefix is still reserved (DENIED_ENV_VAR_PREFIXES) even
-      // though no specific variable is set internally anymore.
-      expect(isValidCustomSecretKey('KILOCHAT_ANYTHING')).toBe(false);
     });
 
     it('rejects denied exact env var names', () => {

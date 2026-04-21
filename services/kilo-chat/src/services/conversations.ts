@@ -5,6 +5,7 @@
 
 import { ulid } from 'ulid';
 import { extractConversationContext, extractSandboxId, pushInstanceEvent } from './event-push';
+import { userOwnsSandbox } from './sandbox-ownership';
 
 // ─── createConversation ────────────────────────────────────────────────────
 
@@ -20,11 +21,10 @@ export type CreateConversationResult =
 export async function createConversationFor(
   env: Env,
   userId: string,
-  params: CreateConversationParams,
-  allowedSandboxIds?: string[]
+  params: CreateConversationParams
 ): Promise<CreateConversationResult> {
-  // HTTP path supplies allowedSandboxIds from JWT; RPC path omits it (trusted).
-  if (allowedSandboxIds && !allowedSandboxIds.includes(params.sandboxId)) {
+  const owns = await userOwnsSandbox(env.HYPERDRIVE.connectionString, userId, params.sandboxId);
+  if (!owns) {
     return { ok: false, code: 'forbidden', error: 'You do not have access to this sandbox' };
   }
 

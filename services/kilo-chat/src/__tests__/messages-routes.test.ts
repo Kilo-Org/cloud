@@ -16,7 +16,7 @@ async function createConversation(userSuffix: string) {
   const sandboxId = `sandbox-${userSuffix}`;
   const botId = `bot:kiloclaw:${sandboxId}`;
 
-  const userApp = makeApp(userId, 'user', [sandboxId]);
+  const userApp = makeApp(userId, 'user');
   const botApp = makeApp(botId, 'bot');
 
   const res = await userApp.request(
@@ -506,7 +506,7 @@ describe('Webhook reply context', () => {
 
     const userId = 'user-reply-context-1';
     const sandboxId = 'sandbox-reply-context-1';
-    const userApp = makeApp(userId, 'user', [sandboxId]);
+    const userApp = makeApp(userId, 'user');
 
     // Create conversation
     const convRes = await userApp.request(
@@ -572,7 +572,7 @@ describe('Webhook reply context', () => {
 
     const userId = 'user-reply-deleted-1';
     const sandboxId = 'sandbox-reply-deleted-1';
-    const userApp = makeApp(userId, 'user', [sandboxId]);
+    const userApp = makeApp(userId, 'user');
 
     // Create conversation
     const convRes = await userApp.request(
@@ -681,7 +681,7 @@ describe('auto-title on first message', () => {
   it('auto-titles an untitled conversation from first message text', async () => {
     const userId = 'user-autotitle';
     const sandboxId = 'sandbox-autotitle';
-    const userApp = makeApp(userId, 'user', [sandboxId]);
+    const userApp = makeApp(userId, 'user');
 
     // Create conversation WITHOUT a title
     const convRes = await userApp.request(

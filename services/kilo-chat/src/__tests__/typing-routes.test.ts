@@ -7,7 +7,7 @@ async function createConversation(userSuffix: string) {
   const sandboxId = `sandbox-${userSuffix}`;
   const botId = `bot:kiloclaw:${sandboxId}`;
 
-  const userApp = makeApp(userId, 'user', [sandboxId]);
+  const userApp = makeApp(userId, 'user');
   const botApp = makeApp(botId, 'bot');
 
   const res = await userApp.request(

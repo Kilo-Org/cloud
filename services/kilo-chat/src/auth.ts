@@ -4,8 +4,6 @@ import { extractBearerToken, verifyKiloToken } from '@kilocode/worker-utils';
 export type AuthContext = {
   callerId: string;
   callerKind: 'user' | 'bot';
-  /** Sandbox IDs the user is allowed to create conversations for (from JWT). */
-  allowedSandboxIds: string[];
 };
 
 /**
@@ -33,7 +31,6 @@ export const authMiddleware = createMiddleware<{
     const payload = await verifyKiloToken(token, jwtSecret);
     c.set('callerId', payload.kiloUserId);
     c.set('callerKind', 'user');
-    c.set('allowedSandboxIds', payload.kiloChatSandboxIds ?? []);
     return next();
   } catch {
     return c.json({ error: 'Unauthorized' }, 401);

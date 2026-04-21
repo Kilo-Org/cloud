@@ -325,7 +325,6 @@ const DENIED_ENV_VAR_PREFIXES: readonly string[] = [
   'NEXTAUTH_',
   'NODE_',
   'STREAM_CHAT_',
-  'KILOCHAT_',
 ];
 
 /**

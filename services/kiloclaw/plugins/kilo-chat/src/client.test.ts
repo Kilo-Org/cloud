@@ -571,3 +571,70 @@ describe('listConversations', () => {
     await expect(client.listConversations({})).rejects.toThrow(/500/);
   });
 });
+
+describe('createConversation', () => {
+  it('POSTs to /_kilo/kilo-chat/conversations and returns conversationId', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ conversationId: 'conv-new' }), {
+        status: 201,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+
+    const result = await client.createConversation({ title: 'My Chat' });
+    expect(result).toEqual({ conversationId: 'conv-new' });
+    expect(calls[0].url).toBe('http://ctrl/_kilo/kilo-chat/conversations');
+    expect(calls[0].init.method).toBe('POST');
+    const body = JSON.parse(String(calls[0].init.body));
+    expect(body).toEqual({ title: 'My Chat' });
+  });
+
+  it('includes additionalMembers in body when provided', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ conversationId: 'conv-new' }), { status: 201 });
+    }) as typeof fetch;
+
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+
+    await client.createConversation({
+      title: 'Group',
+      additionalMembers: ['user_1', 'user_2'],
+    });
+    const body = JSON.parse(String(calls[0].init.body));
+    expect(body.additionalMembers).toEqual(['user_1', 'user_2']);
+  });
+
+  it('throws on non-2xx response', async () => {
+    const fetchImpl = (async () => new Response('not found', { status: 404 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+    await expect(client.createConversation({ title: 'X' })).rejects.toThrow(/404/);
+  });
+
+  it('throws when response is missing conversationId', async () => {
+    const fetchImpl = (async () => new Response('{}', { status: 201 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://ctrl',
+      gatewayToken: 'gw',
+      fetchImpl,
+    });
+    await expect(client.createConversation({})).rejects.toThrow(/missing conversationId/);
+  });
+});

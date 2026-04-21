@@ -65,6 +65,9 @@ export type AddReactionParams = { conversationId: string; messageId: string; emo
 export type AddReactionResult = { id: string };
 export type RemoveReactionParams = { conversationId: string; messageId: string; emoji: string };
 
+export type CreateConversationParams = { title?: string; additionalMembers?: string[] };
+export type CreateConversationResult = { conversationId: string };
+
 export type KiloChatClient = {
   createMessage(p: CreateMessageParams): Promise<CreateMessageResult>;
   editMessage(p: EditMessageParams): Promise<EditMessageResult>;
@@ -77,6 +80,7 @@ export type KiloChatClient = {
   getMembers(p: GetMembersParams): Promise<GetMembersResult>;
   renameConversation(p: RenameConversationParams): Promise<void>;
   listConversations(p: ListConversationsParams): Promise<ListConversationsResult>;
+  createConversation(p: CreateConversationParams): Promise<CreateConversationResult>;
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -293,6 +297,31 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     return (await response.json()) as ListConversationsResult;
   }
 
+  async function createConversation(
+    params: CreateConversationParams
+  ): Promise<CreateConversationResult> {
+    const response = await fetchImpl(`${base}/_kilo/kilo-chat/conversations`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        ...(params.title !== undefined && { title: params.title }),
+        ...(params.additionalMembers !== undefined && {
+          additionalMembers: params.additionalMembers,
+        }),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller POST conversations responded ${response.status}: ${await response.text()}`
+      );
+    }
+    const data = (await response.json()) as { conversationId?: unknown };
+    if (typeof data.conversationId !== 'string' || data.conversationId.length === 0) {
+      throw new Error('kilo-chat: response missing conversationId');
+    }
+    return { conversationId: data.conversationId };
+  }
+
   return {
     createMessage,
     editMessage,
@@ -305,5 +334,6 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     getMembers,
     renameConversation,
     listConversations,
+    createConversation,
   };
 }

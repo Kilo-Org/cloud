@@ -185,6 +185,7 @@ describe('provider state helpers', () => {
       volumeName: null,
       secretId: null,
       secretName: null,
+      secretContentHash: null,
       ingressHost: null,
       region: null,
     });
@@ -203,6 +204,7 @@ describe('provider state helpers', () => {
       volumeName: null,
       secretId: null,
       secretName: null,
+      secretContentHash: null,
       ingressHost: null,
       region: null,
     });
@@ -221,6 +223,7 @@ describe('provider state helpers', () => {
       volumeName: 'kc-ki-test',
       secretId: 'secret-1',
       secretName: 'kc-ki-test',
+      secretContentHash: null,
       ingressHost: 'kc-ki-test.code.run',
       region: 'us-central',
     });
@@ -247,6 +250,7 @@ describe('provider state helpers', () => {
       volumeName: 'kc-ki-test',
       secretId: null,
       secretName: 'kc-ki-test',
+      secretContentHash: null,
       ingressHost: null,
       region: null,
     });

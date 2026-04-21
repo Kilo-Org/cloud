@@ -464,21 +464,6 @@ export async function patchDeploymentService(
   return response.data;
 }
 
-export async function scaleService(
-  config: NorthflankClientConfig,
-  projectId: string,
-  serviceId: string,
-  instances: number
-): Promise<void> {
-  await requestVoid(
-    config,
-    `/projects/${encodeURIComponent(projectId)}/services/${encodeURIComponent(serviceId)}/scale`,
-    jsonInit('POST', { instances }),
-    [200, 202, 204],
-    'scaleService'
-  );
-}
-
 export async function listServices(
   config: NorthflankClientConfig,
   projectId: string

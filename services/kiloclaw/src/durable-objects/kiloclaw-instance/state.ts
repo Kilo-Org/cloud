@@ -115,6 +115,7 @@ export function getNorthflankProviderState(
     volumeName: null,
     secretId: null,
     secretName: null,
+    secretContentHash: null,
     ingressHost: null,
     region: null,
   };

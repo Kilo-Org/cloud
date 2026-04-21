@@ -23,7 +23,6 @@ import {
   isNorthflankNotFound,
   patchDeploymentService,
   putProjectSecret,
-  scaleService,
   waitForDeploymentCompleted,
   type NorthflankClientConfig,
   type NorthflankProject,
@@ -300,6 +299,21 @@ function buildSecretPayload(
   };
 }
 
+async function hashBootstrapEnv(bootstrapEnv: Record<string, string>): Promise<string> {
+  const canonical = JSON.stringify(bootstrapEnv, Object.keys(bootstrapEnv).sort());
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+type EnsureSecretResult = {
+  secretId: string;
+  secretName: string;
+  contentHash: string;
+  skipped: boolean;
+};
+
 async function ensureSecret(
   config: NorthflankClientConfig,
   projectId: string,
@@ -307,25 +321,66 @@ async function ensureSecret(
   providerState: NorthflankProviderState,
   names: NorthflankProvisioningNames,
   runtimeSpec: RuntimeSpec
-) {
+): Promise<EnsureSecretResult> {
+  const contentHash = await hashBootstrapEnv(runtimeSpec.bootstrapEnv);
+
+  if (
+    providerState.secretId &&
+    providerState.secretContentHash &&
+    providerState.secretContentHash === contentHash
+  ) {
+    logNorthflank('ensure_secret_unchanged', {
+      description:
+        'Restricted secret contents match persisted hash; skipping write to avoid Northflank redeploy',
+      apiOperation: 'PATCH /projects/{projectId}/secrets/{secretId}',
+      projectId,
+      serviceId,
+      secretId: providerState.secretId,
+      secretName: providerState.secretName ?? names.secretName,
+    });
+    return {
+      secretId: providerState.secretId,
+      secretName: providerState.secretName ?? names.secretName,
+      contentHash,
+      skipped: true,
+    };
+  }
+
   const payload = buildSecretPayload(serviceId, names.secretName, runtimeSpec.bootstrapEnv);
 
   if (providerState.secretId) {
     try {
       const secret = await putProjectSecret(config, projectId, providerState.secretId, payload);
-      return secret;
+      return {
+        secretId: secret.id,
+        secretName: secret.name || names.secretName,
+        contentHash,
+        skipped: false,
+      };
     } catch (err) {
       if (!isNorthflankNotFound(err)) throw err;
     }
   }
 
   try {
-    return await createProjectSecret(config, projectId, payload);
+    const created = await createProjectSecret(config, projectId, payload);
+    return {
+      secretId: created.id,
+      secretName: created.name || names.secretName,
+      contentHash,
+      skipped: false,
+    };
   } catch (err) {
     if (!isNorthflankConflict(err)) throw err;
     const recovered = await findProjectSecretByName(config, projectId, names.secretName);
     if (recovered) {
-      return await putProjectSecret(config, projectId, recovered.id, payload);
+      const updated = await putProjectSecret(config, projectId, recovered.id, payload);
+      return {
+        secretId: updated.id,
+        secretName: updated.name || names.secretName,
+        contentHash,
+        skipped: false,
+      };
     }
     throw err;
   }
@@ -489,8 +544,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     );
     providerState = {
       ...providerState,
-      secretId: secret.id,
-      secretName: secret.name || names.secretName,
+      secretId: secret.secretId,
+      secretName: secret.secretName,
+      secretContentHash: secret.contentHash,
     };
     logNorthflank('start_runtime_secret_ready', {
       description:
@@ -499,8 +555,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       sandboxId: state.sandboxId,
       projectId,
       serviceId: service.id,
-      secretId: secret.id,
-      secretName: secret.name,
+      secretId: secret.secretId,
+      secretName: secret.secretName,
+      secretWriteSkipped: secret.skipped,
     });
     await onProviderResult?.({ providerState });
 
@@ -556,7 +613,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       return { providerState };
     }
 
-    await scaleService(config, providerState.projectId, providerState.serviceId, 0);
+    await patchDeploymentService(config, providerState.projectId, providerState.serviceId, {
+      deployment: { instances: 0 },
+    });
     return {
       providerState,
       observation: {
@@ -586,8 +645,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     );
     providerState = {
       ...providerState,
-      secretId: secret.id,
-      secretName: secret.name || names.secretName,
+      secretId: secret.secretId,
+      secretName: secret.secretName,
+      secretContentHash: secret.contentHash,
     };
     logNorthflank('restart_runtime_secret_ready', {
       description:
@@ -596,8 +656,9 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       sandboxId: state.sandboxId,
       projectId,
       serviceId,
-      secretId: secret.id,
-      secretName: secret.name,
+      secretId: secret.secretId,
+      secretName: secret.secretName,
+      secretWriteSkipped: secret.skipped,
     });
     await onProviderResult?.({ providerState });
 

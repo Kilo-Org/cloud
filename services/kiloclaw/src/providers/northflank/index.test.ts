@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { northflankProviderAdapter } from './index';
 import type { RuntimeSpec } from '../types';
+import type { ProviderState } from '../../schemas/instance-config';
 import {
   createDeploymentService,
   createProject,
@@ -13,9 +14,23 @@ import {
   getService,
   getVolume,
   patchDeploymentService,
-  scaleService,
+  putProjectSecret,
   waitForDeploymentCompleted,
 } from '../../northflank/client';
+
+type OnProviderResultArg = {
+  providerState?: ProviderState;
+  corePatch?: Record<string, unknown>;
+};
+type OnProviderResultFn = (arg: OnProviderResultArg) => Promise<void>;
+
+async function computeBootstrapEnvHash(bootstrapEnv: Record<string, string>): Promise<string> {
+  const canonical = JSON.stringify(bootstrapEnv, Object.keys(bootstrapEnv).sort());
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 vi.mock('../../northflank/client', () => ({
   createDeploymentService: vi.fn(),
@@ -37,7 +52,6 @@ vi.mock('../../northflank/client', () => ({
   isNorthflankNotFound: vi.fn(() => false),
   patchDeploymentService: vi.fn(),
   putProjectSecret: vi.fn(),
-  scaleService: vi.fn(),
   waitForDeploymentCompleted: vi.fn(),
 }));
 
@@ -138,7 +152,6 @@ describe('northflankProviderAdapter', () => {
     });
     vi.mocked(createProjectSecret).mockResolvedValue({ id: 'secret-1', name: 'kc-ki-123' });
     vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
-    vi.mocked(scaleService).mockResolvedValue(undefined);
     vi.mocked(waitForDeploymentCompleted).mockResolvedValue({
       id: 'service-1',
       name: 'kc-ki-123',
@@ -211,7 +224,6 @@ describe('northflankProviderAdapter', () => {
     const patchPayload = vi.mocked(patchDeploymentService).mock.calls[0]?.[3];
     if (!patchPayload?.deployment) throw new Error('expected deployment patch payload');
     expect(patchPayload.deployment.instances).toBe(1);
-    expect(scaleService).not.toHaveBeenCalled();
     expect(result.providerState).toEqual(
       expect.objectContaining({
         serviceId: 'service-1',
@@ -230,6 +242,108 @@ describe('northflankProviderAdapter', () => {
 
     expect(getService).not.toHaveBeenCalled();
     expect(result.observation?.runtimeState).toBe('missing');
+  });
+
+  it('stops by PATCHing deployment.instances to 0 rather than calling the deprecated scale endpoint', async () => {
+    vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+
+    const result = await northflankProviderAdapter.stopRuntime({
+      env: env as never,
+      state: {
+        providerState: {
+          provider: 'northflank',
+          projectId: 'project-1',
+          serviceId: 'service-1',
+        },
+      } as never,
+    });
+
+    expect(patchDeploymentService).toHaveBeenCalledWith(
+      expect.objectContaining({ apiToken: 'nf-token' }),
+      'project-1',
+      'service-1',
+      { deployment: { instances: 0 } }
+    );
+    expect(result.observation?.runtimeState).toBe('stopped');
+  });
+
+  it('skips writing the restricted secret on restart when bootstrap env is unchanged', async () => {
+    const matchingHash = await computeBootstrapEnvHash(runtimeSpec.bootstrapEnv);
+    vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+    vi.mocked(waitForDeploymentCompleted).mockResolvedValue({
+      id: 'service-1',
+      name: 'kc-ki-123',
+      ports: [{ name: 'p01', dns: 'kc-ki-123.code.run' }],
+    });
+    const onProviderResult = vi.fn<OnProviderResultFn>();
+
+    await northflankProviderAdapter.restartRuntime({
+      env: env as never,
+      state: {
+        sandboxId: 'ki_123',
+        providerState: {
+          provider: 'northflank',
+          projectId: 'project-1',
+          projectName: 'kc-ki-123',
+          serviceId: 'service-1',
+          serviceName: 'kc-ki-123',
+          volumeId: 'volume-1',
+          volumeName: 'kc-ki-123',
+          secretId: 'secret-1',
+          secretName: 'kc-ki-123',
+          secretContentHash: matchingHash,
+          ingressHost: 'kc-ki-123.code.run',
+          region: 'us-central',
+        },
+      } as never,
+      runtimeSpec,
+      onProviderResult,
+    });
+
+    expect(putProjectSecret).not.toHaveBeenCalled();
+    expect(createProjectSecret).not.toHaveBeenCalled();
+    expect(patchDeploymentService).toHaveBeenCalled();
+  });
+
+  it('writes the restricted secret on restart when bootstrap env hash changed', async () => {
+    vi.mocked(putProjectSecret).mockResolvedValue({ id: 'secret-1', name: 'kc-ki-123' });
+    vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+    vi.mocked(waitForDeploymentCompleted).mockResolvedValue({
+      id: 'service-1',
+      name: 'kc-ki-123',
+      ports: [{ name: 'p01', dns: 'kc-ki-123.code.run' }],
+    });
+    const onProviderResult = vi.fn<OnProviderResultFn>();
+
+    await northflankProviderAdapter.restartRuntime({
+      env: env as never,
+      state: {
+        sandboxId: 'ki_123',
+        providerState: {
+          provider: 'northflank',
+          projectId: 'project-1',
+          projectName: 'kc-ki-123',
+          serviceId: 'service-1',
+          serviceName: 'kc-ki-123',
+          volumeId: 'volume-1',
+          volumeName: 'kc-ki-123',
+          secretId: 'secret-1',
+          secretName: 'kc-ki-123',
+          secretContentHash: 'sha256-of-a-previous-bootstrap-env',
+          ingressHost: 'kc-ki-123.code.run',
+          region: 'us-central',
+        },
+      } as never,
+      runtimeSpec,
+      onProviderResult,
+    });
+
+    expect(putProjectSecret).toHaveBeenCalledTimes(1);
+    const expectedHash = await computeBootstrapEnvHash(runtimeSpec.bootstrapEnv);
+    const persistedHashes = onProviderResult.mock.calls
+      .map(call => call[0]?.providerState)
+      .map(state => (state?.provider === 'northflank' ? state.secretContentHash : undefined));
+    expect(persistedHashes).toContain(expectedHash);
   });
 
   it('verifies persisted volumes without recreating active missing storage', async () => {

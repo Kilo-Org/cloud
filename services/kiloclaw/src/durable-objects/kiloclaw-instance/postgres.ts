@@ -82,6 +82,10 @@ async function recoverNorthflankProviderState(
     volumeName: volume?.name ?? names.volumeName,
     secretId: secret?.id ?? null,
     secretName: secret?.name ?? names.secretName,
+    // Recovery path: we can't derive the content hash from Northflank (secret
+    // values aren't returned on find), so leave it null. The next ensureSecret
+    // call will write and persist a fresh hash, treating it as a cold start.
+    secretContentHash: null,
     ingressHost: service ? firstNorthflankIngressHost(service) : null,
     region: config.region,
   };

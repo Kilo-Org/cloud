@@ -120,6 +120,7 @@ import {
   SELF_HEAL_THRESHOLD,
   STARTING_TIMEOUT_MS,
   RESTARTING_TIMEOUT_MS,
+  RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   STALE_PROVISION_THRESHOLD_MS,
 } from '../config';
@@ -7240,6 +7241,78 @@ describe('restartMachine restartingAt guard', () => {
     expect(storage._store.get('lastRestartErrorMessage')).toBe(
       'Restart is taking longer than expected; still reconciling while the machine remains updating'
     );
+  });
+
+  it('transitions to stopped when replacing exceeds max timeout', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, {
+      restartingAt: Date.now() - RESTARTING_MAX_TIMEOUT_MS - 1_000,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'replacing',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._store.get('restartingAt')).toBeNull();
+  });
+
+  it('retries startMachine when stopped and restartUpdateSent during restarting', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, {
+      restartUpdateSent: true,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'stopped',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+    (flyClient.startMachine as Mock).mockResolvedValue(undefined);
+
+    await instance.alarm();
+
+    expect(flyClient.startMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1');
+    expect(storage._store.get('status')).toBe('restarting');
+  });
+
+  it('does not retry startMachine when stopped but restartUpdateSent is false', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'stopped',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(flyClient.startMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('restarting');
+  });
+
+  it('does not retry startMachine after soft timeout — transitions to stopped', async () => {
+    const { instance, storage } = createInstance();
+    await seedRestarting(storage, {
+      restartUpdateSent: true,
+      restartingAt: Date.now() - RESTARTING_TIMEOUT_MS - 1_000,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'stopped',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(flyClient.startMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('stopped');
   });
 
   it('transitions to stopped on terminal stopped state during restart reconcile', async () => {

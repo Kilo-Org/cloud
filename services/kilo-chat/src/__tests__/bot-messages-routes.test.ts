@@ -650,6 +650,51 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/message
   });
 });
 
+// ─── GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members ───
+
+describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members', () => {
+  it('returns members for a valid bot member (200)', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-members-1');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/members`,
+      {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token}` },
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{ members: { id: string; kind: string }[] }>();
+    expect(Array.isArray(body.members)).toBe(true);
+    // Should contain the user (created the conversation) and the bot (sandboxId)
+    const ids = body.members.map(m => m.id);
+    expect(ids).toContain(`user-bot-members-1`);
+    expect(ids).toContain(`bot:kiloclaw:${sandboxId}`);
+  });
+
+  it('returns 403 for a non-member bot', async () => {
+    const { conversationId, testEnv } = await setupData('bot-members-forbidden');
+    const otherSandboxId = 'other-sandbox-members';
+    const app = makeBotApp();
+    const token = await tokenFor(otherSandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${otherSandboxId}/conversations/${conversationId}/members`,
+      {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token}` },
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(403);
+  });
+});
+
 // ─── DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions ────────
 
 describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', () => {

@@ -201,6 +201,23 @@ export async function handleListMessages(c: HonoCtx) {
   return c.json({ messages: result.messages });
 }
 
+// ─── getMembers ──────────────────────────────────────────────────────────────
+
+export async function handleGetMembers(c: HonoCtx) {
+  const convId = parseConversationId(c);
+  if (!convId.ok) return convId.response;
+
+  const callerId = c.get('callerId');
+  const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
+
+  const info = await convStub.getInfo();
+  if (!info || !info.members.some(m => m.id === callerId)) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
+
+  return c.json({ members: info.members });
+}
+
 // ─── setTyping ───────────────────────────────────────────────────────────────
 
 export async function handleSetTyping(c: HonoCtx) {

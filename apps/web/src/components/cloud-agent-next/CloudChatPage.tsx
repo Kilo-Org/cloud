@@ -19,7 +19,7 @@ import { WorkingIndicator } from './WorkingIndicator';
 import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
 import { PermissionCard, PermissionContextProvider } from './PermissionCard';
-import { SuggestionCard, SuggestionContextProvider } from './SuggestionCard';
+import { SuggestionContextProvider } from './SuggestionCard';
 import { SessionContinuationPanel } from './SessionContinuationPanel';
 import { isMessageStreaming } from './types';
 import { useOrganizationModels } from './hooks/useOrganizationModels';
@@ -435,26 +435,12 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                         />
                       </div>
                     )}
-                    {activeSuggestion && (
-                      <div className="flex items-center border-t p-4">
-                        <SuggestionCard
-                          key={activeSuggestion.requestId}
-                          requestId={activeSuggestion.requestId}
-                          text={activeSuggestion.text}
-                          actions={activeSuggestion.actions}
-                        />
-                      </div>
-                    )}
-                    <div
-                      className={
-                        activeQuestion || activePermission || activeSuggestion ? 'hidden' : ''
-                      }
-                    >
+                    <div className={activeQuestion || activePermission ? 'hidden' : ''}>
                       <ChatInput
                         onSend={handleSendMessage}
                         onStop={handleStopExecution}
-                        disabled={isStreaming || !canSend}
-                        isStreaming={isStreaming}
+                        disabled={(isStreaming && !activeSuggestion) || !canSend}
+                        isStreaming={isStreaming && !activeSuggestion}
                         placeholder={placeholder}
                         slashCommands={availableCommands}
                         mode={sessionConfig?.mode as AgentMode | undefined}

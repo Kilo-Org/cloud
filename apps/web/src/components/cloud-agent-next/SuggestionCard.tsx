@@ -99,7 +99,7 @@ export function SuggestionCard({ requestId, text, actions }: SuggestionCardProps
   }, [pending, dismissSuggestion, requestId]);
 
   return (
-    <div className="bg-muted/30 w-full max-w-lg rounded-md border border-l-4 border-blue-500/40">
+    <div className="bg-muted/30 w-full rounded-md border border-l-4 border-blue-500/40">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2">
         <Sparkles className="h-4 w-4 shrink-0 text-blue-500" />

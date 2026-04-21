@@ -290,6 +290,15 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           requestID: payload.requestId,
           reply: payload.response,
         }),
+      acceptSuggestion: (payload: { requestId: string; index: number }) =>
+        rawSendCommand('suggestion_accept', {
+          requestID: payload.requestId,
+          index: payload.index,
+        }),
+      dismissSuggestion: (payload: { requestId: string }) =>
+        rawSendCommand('suggestion_dismiss', {
+          requestID: payload.requestId,
+        }),
 
       disconnect() {
         generation += 1;

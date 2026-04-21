@@ -236,6 +236,37 @@ export const permissionRepliedDataSchema = z.object({
 });
 export type PermissionRepliedData = z.infer<typeof permissionRepliedDataSchema>;
 
+// `suggest` tool payloads — requires Kilo CLI >= v7.2.7 (recommended >= v7.2.14).
+// Older CLIs never emit these events, so no explicit version gate is needed here.
+
+export const suggestionActionSchema = z.object({
+  label: z.string(),
+  description: z.string().optional(),
+  prompt: z.string(),
+});
+export type SuggestionActionData = z.infer<typeof suggestionActionSchema>;
+
+export const suggestionShownDataSchema = z.object({
+  id: z.string(),
+  sessionID: z.string().optional(),
+  text: z.string(),
+  actions: z.array(suggestionActionSchema).catch([]),
+  tool: z.object({ messageID: z.string(), callID: z.string() }).optional(),
+});
+export type SuggestionShownData = z.infer<typeof suggestionShownDataSchema>;
+
+export const suggestionAcceptedDataSchema = z.object({
+  requestID: z.string(),
+  index: z.number(),
+  action: suggestionActionSchema.optional(),
+});
+export type SuggestionAcceptedData = z.infer<typeof suggestionAcceptedDataSchema>;
+
+export const suggestionDismissedDataSchema = z.object({
+  requestID: z.string(),
+});
+export type SuggestionDismissedData = z.infer<typeof suggestionDismissedDataSchema>;
+
 export const completeDataSchema = z
   .object({
     currentBranch: z.string().optional().catch(undefined),

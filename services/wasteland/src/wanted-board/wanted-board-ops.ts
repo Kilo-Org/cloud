@@ -31,11 +31,22 @@ export class WantedBoardOpError extends Error {
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
+type LoadContextResult = {
+  doStub: ReturnType<typeof getWastelandDOStub>;
+  upstream: string;
+  token: string;
+  isUpstreamAdmin: boolean;
+};
+
 /**
  * Load the wasteland config + credential for the user, decrypt the token,
  * and return everything needed to dispatch a container request.
  */
-async function loadContext(env: Env, wastelandId: string, userId: string) {
+async function loadContext(
+  env: Env,
+  wastelandId: string,
+  userId: string
+): Promise<LoadContextResult> {
   const doStub = getWastelandDOStub(env, wastelandId);
 
   const config = await doStub.getConfig();
@@ -61,14 +72,40 @@ async function loadContext(env: Env, wastelandId: string, userId: string) {
   const cryptoKey = await deriveEncryptionKey(rawKey);
   const token = await decryptToken(credential.encrypted_token, cryptoKey);
 
-  return { doStub, upstream: config.dolthub_upstream, token };
+  return {
+    doStub,
+    upstream: config.dolthub_upstream,
+    token,
+    isUpstreamAdmin: credential.is_upstream_admin,
+  };
 }
+
+/**
+ * Resolve whether to pass `--direct` to the wl CLI. The caller can request
+ * direct mode, but it's only honored when the user has admin rights on the
+ * upstream (stored as `is_upstream_admin` on the credential). If a caller
+ * without admin asks for direct mode, we silently downgrade to PR mode —
+ * the admin flag is a safety check, not an authorization failure mode.
+ */
+function resolveDirect(requested: boolean | undefined, isUpstreamAdmin: boolean): boolean {
+  return requested === true && isUpstreamAdmin;
+}
+
+type ContainerPath =
+  | '/wl/browse'
+  | '/wl/claim'
+  | '/wl/unclaim'
+  | '/wl/post'
+  | '/wl/done'
+  | '/wl/accept'
+  | '/wl/reject'
+  | '/wl/close';
 
 /** Dispatch a request to the wasteland container and throw on non-ok responses. */
 async function callContainer(
   env: Env,
   wastelandId: string,
-  path: '/wl/browse' | '/wl/claim' | '/wl/post' | '/wl/done',
+  path: ContainerPath,
   token: string,
   body: Record<string, unknown>,
   errorLabel: string
@@ -124,11 +161,20 @@ export async function claimWantedItem(
   env: Env,
   wastelandId: string,
   userId: string,
-  itemId: string
+  itemId: string,
+  options?: { direct?: boolean }
 ): Promise<{ success: true }> {
-  const { doStub, token, upstream } = await loadContext(env, wastelandId, userId);
+  const { doStub, token, upstream, isUpstreamAdmin } = await loadContext(env, wastelandId, userId);
+  const direct = resolveDirect(options?.direct, isUpstreamAdmin);
 
-  await callContainer(env, wastelandId, '/wl/claim', token, { upstream, itemId, userId }, 'Claim');
+  await callContainer(
+    env,
+    wastelandId,
+    '/wl/claim',
+    token,
+    { upstream, itemId, userId, direct },
+    'Claim'
+  );
 
   await doStub.refreshWantedBoard();
 
@@ -137,6 +183,132 @@ export async function claimWantedItem(
     userId,
     wastelandId,
     label: 'claim',
+  });
+
+  return { success: true };
+}
+
+export async function unclaimWantedItem(
+  env: Env,
+  wastelandId: string,
+  userId: string,
+  itemId: string,
+  options?: { direct?: boolean }
+): Promise<{ success: true }> {
+  const { doStub, token, upstream, isUpstreamAdmin } = await loadContext(env, wastelandId, userId);
+  const direct = resolveDirect(options?.direct, isUpstreamAdmin);
+
+  await callContainer(
+    env,
+    wastelandId,
+    '/wl/unclaim',
+    token,
+    { upstream, itemId, direct },
+    'Unclaim'
+  );
+
+  await doStub.refreshWantedBoard();
+
+  meterEvent(env, {
+    event: 'billing.api_operation',
+    userId,
+    wastelandId,
+    label: 'unclaim',
+  });
+
+  return { success: true };
+}
+
+export async function acceptWantedItem(
+  env: Env,
+  wastelandId: string,
+  userId: string,
+  input: {
+    itemId: string;
+    quality: 'excellent' | 'good' | 'fair' | 'poor';
+    comment?: string;
+    direct?: boolean;
+  }
+): Promise<{ success: true }> {
+  const { doStub, token, upstream, isUpstreamAdmin } = await loadContext(env, wastelandId, userId);
+  const direct = resolveDirect(input.direct, isUpstreamAdmin);
+
+  await callContainer(
+    env,
+    wastelandId,
+    '/wl/accept',
+    token,
+    {
+      upstream,
+      itemId: input.itemId,
+      quality: input.quality,
+      ...(input.comment ? { comment: input.comment } : {}),
+      direct,
+    },
+    'Accept'
+  );
+
+  await doStub.refreshWantedBoard();
+
+  meterEvent(env, {
+    event: 'billing.api_operation',
+    userId,
+    wastelandId,
+    label: 'accept',
+  });
+
+  return { success: true };
+}
+
+export async function rejectWantedItem(
+  env: Env,
+  wastelandId: string,
+  userId: string,
+  input: { itemId: string; comment: string; direct?: boolean }
+): Promise<{ success: true }> {
+  const { doStub, token, upstream, isUpstreamAdmin } = await loadContext(env, wastelandId, userId);
+  const direct = resolveDirect(input.direct, isUpstreamAdmin);
+
+  await callContainer(
+    env,
+    wastelandId,
+    '/wl/reject',
+    token,
+    { upstream, itemId: input.itemId, comment: input.comment, direct },
+    'Reject'
+  );
+
+  await doStub.refreshWantedBoard();
+
+  meterEvent(env, {
+    event: 'billing.api_operation',
+    userId,
+    wastelandId,
+    label: 'reject',
+  });
+
+  return { success: true };
+}
+
+export async function closeWantedItem(
+  env: Env,
+  wastelandId: string,
+  userId: string,
+  itemId: string,
+  options?: { direct?: boolean }
+): Promise<{ success: true }> {
+  const { doStub, token, upstream, isUpstreamAdmin } = await loadContext(env, wastelandId, userId);
+  const direct = resolveDirect(options?.direct, isUpstreamAdmin);
+
+  await callContainer(env, wastelandId, '/wl/close', token, { upstream, itemId, direct }, 'Close');
+
+  await doStub.refreshWantedBoard();
+
+  meterEvent(env, {
+    event: 'billing.api_operation',
+    userId,
+    wastelandId,
+    label: 'close',
   });
 
   return { success: true };
@@ -151,9 +323,11 @@ export async function postWantedItem(
     description: string;
     priority?: z.infer<typeof PriorityEnum>;
     type?: z.infer<typeof TypeEnum>;
+    direct?: boolean;
   }
 ): Promise<{ success: true }> {
-  const { doStub, token, upstream } = await loadContext(env, wastelandId, userId);
+  const { doStub, token, upstream, isUpstreamAdmin } = await loadContext(env, wastelandId, userId);
+  const direct = resolveDirect(input.direct, isUpstreamAdmin);
 
   await callContainer(
     env,
@@ -166,6 +340,7 @@ export async function postWantedItem(
       description: input.description,
       ...(input.priority !== undefined ? { priority: PRIORITY_TO_NUMBER[input.priority] } : {}),
       ...(input.type !== undefined ? { type: input.type } : {}),
+      direct,
     },
     'Post'
   );
@@ -186,16 +361,17 @@ export async function markWantedItemDone(
   env: Env,
   wastelandId: string,
   userId: string,
-  input: { itemId: string; evidence: string }
+  input: { itemId: string; evidence: string; direct?: boolean }
 ): Promise<{ success: true }> {
-  const { doStub, token, upstream } = await loadContext(env, wastelandId, userId);
+  const { doStub, token, upstream, isUpstreamAdmin } = await loadContext(env, wastelandId, userId);
+  const direct = resolveDirect(input.direct, isUpstreamAdmin);
 
   await callContainer(
     env,
     wastelandId,
     '/wl/done',
     token,
-    { upstream, itemId: input.itemId, evidence: input.evidence },
+    { upstream, itemId: input.itemId, evidence: input.evidence, direct },
     'Mark done'
   );
 

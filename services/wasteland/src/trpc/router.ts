@@ -799,6 +799,7 @@ export const wastelandRouter = router({
       z.object({
         wastelandId: z.string().uuid(),
         itemId: z.string().min(1),
+        direct: z.boolean().optional(),
       })
     )
     .output(z.object({ success: z.boolean() }))
@@ -809,7 +810,32 @@ export const wastelandRouter = router({
           ctx.env,
           input.wastelandId,
           ctx.userId,
-          input.itemId
+          input.itemId,
+          { direct: input.direct }
+        );
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
+  unclaimWantedItem: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        itemId: z.string().min(1),
+        direct: z.boolean().optional(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await wantedBoard.unclaimWantedItem(
+          ctx.env,
+          input.wastelandId,
+          ctx.userId,
+          input.itemId,
+          { direct: input.direct }
         );
       } catch (err) {
         return wantedBoardErrorToTRPC(err);
@@ -824,6 +850,7 @@ export const wastelandRouter = router({
         description: z.string().min(1).max(4096),
         priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
         type: z.enum(['feature', 'bug', 'docs', 'other']).optional(),
+        direct: z.boolean().optional(),
       })
     )
     .output(z.object({ success: z.boolean() }))
@@ -835,6 +862,7 @@ export const wastelandRouter = router({
           description: input.description,
           priority: input.priority,
           type: input.type,
+          direct: input.direct,
         });
       } catch (err) {
         return wantedBoardErrorToTRPC(err);
@@ -847,6 +875,7 @@ export const wastelandRouter = router({
         wastelandId: z.string().uuid(),
         itemId: z.string().min(1),
         evidence: z.string().url().min(1),
+        direct: z.boolean().optional(),
       })
     )
     .output(z.object({ success: z.boolean() }))
@@ -856,7 +885,80 @@ export const wastelandRouter = router({
         return await wantedBoard.markWantedItemDone(ctx.env, input.wastelandId, ctx.userId, {
           itemId: input.itemId,
           evidence: input.evidence,
+          direct: input.direct,
         });
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
+  acceptWantedItem: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        itemId: z.string().min(1),
+        quality: z.enum(['excellent', 'good', 'fair', 'poor']),
+        comment: z.string().optional(),
+        direct: z.boolean().optional(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await wantedBoard.acceptWantedItem(ctx.env, input.wastelandId, ctx.userId, {
+          itemId: input.itemId,
+          quality: input.quality,
+          comment: input.comment,
+          direct: input.direct,
+        });
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
+  rejectWantedItem: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        itemId: z.string().min(1),
+        comment: z.string().min(1),
+        direct: z.boolean().optional(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await wantedBoard.rejectWantedItem(ctx.env, input.wastelandId, ctx.userId, {
+          itemId: input.itemId,
+          comment: input.comment,
+          direct: input.direct,
+        });
+      } catch (err) {
+        return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
+  closeWantedItem: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        itemId: z.string().min(1),
+        direct: z.boolean().optional(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await wantedBoard.closeWantedItem(
+          ctx.env,
+          input.wastelandId,
+          ctx.userId,
+          input.itemId,
+          { direct: input.direct }
+        );
       } catch (err) {
         return wantedBoardErrorToTRPC(err);
       }

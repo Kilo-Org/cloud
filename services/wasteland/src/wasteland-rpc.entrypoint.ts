@@ -36,9 +36,29 @@ export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
     return wrap(() => wantedBoard.browseWantedBoard(this.env, params.wastelandId, params.userId));
   }
 
-  async claimWantedItem(params: { wastelandId: string; userId: string; itemId: string }) {
+  async claimWantedItem(params: {
+    wastelandId: string;
+    userId: string;
+    itemId: string;
+    direct?: boolean;
+  }) {
     return wrap(() =>
-      wantedBoard.claimWantedItem(this.env, params.wastelandId, params.userId, params.itemId)
+      wantedBoard.claimWantedItem(this.env, params.wastelandId, params.userId, params.itemId, {
+        direct: params.direct,
+      })
+    );
+  }
+
+  async unclaimWantedItem(params: {
+    wastelandId: string;
+    userId: string;
+    itemId: string;
+    direct?: boolean;
+  }) {
+    return wrap(() =>
+      wantedBoard.unclaimWantedItem(this.env, params.wastelandId, params.userId, params.itemId, {
+        direct: params.direct,
+      })
     );
   }
 
@@ -49,6 +69,7 @@ export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
     description: string;
     priority?: 'low' | 'medium' | 'high' | 'critical';
     type?: 'feature' | 'bug' | 'docs' | 'other';
+    direct?: boolean;
   }) {
     return wrap(() =>
       wantedBoard.postWantedItem(this.env, params.wastelandId, params.userId, {
@@ -56,6 +77,7 @@ export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
         description: params.description,
         priority: params.priority,
         type: params.type,
+        direct: params.direct,
       })
     );
   }
@@ -65,11 +87,60 @@ export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
     userId: string;
     itemId: string;
     evidence: string;
+    direct?: boolean;
   }) {
     return wrap(() =>
       wantedBoard.markWantedItemDone(this.env, params.wastelandId, params.userId, {
         itemId: params.itemId,
         evidence: params.evidence,
+        direct: params.direct,
+      })
+    );
+  }
+
+  async acceptWantedItem(params: {
+    wastelandId: string;
+    userId: string;
+    itemId: string;
+    quality: 'excellent' | 'good' | 'fair' | 'poor';
+    comment?: string;
+    direct?: boolean;
+  }) {
+    return wrap(() =>
+      wantedBoard.acceptWantedItem(this.env, params.wastelandId, params.userId, {
+        itemId: params.itemId,
+        quality: params.quality,
+        comment: params.comment,
+        direct: params.direct,
+      })
+    );
+  }
+
+  async rejectWantedItem(params: {
+    wastelandId: string;
+    userId: string;
+    itemId: string;
+    comment: string;
+    direct?: boolean;
+  }) {
+    return wrap(() =>
+      wantedBoard.rejectWantedItem(this.env, params.wastelandId, params.userId, {
+        itemId: params.itemId,
+        comment: params.comment,
+        direct: params.direct,
+      })
+    );
+  }
+
+  async closeWantedItem(params: {
+    wastelandId: string;
+    userId: string;
+    itemId: string;
+    direct?: boolean;
+  }) {
+    return wrap(() =>
+      wantedBoard.closeWantedItem(this.env, params.wastelandId, params.userId, params.itemId, {
+        direct: params.direct,
       })
     );
   }

@@ -9,7 +9,7 @@ RUN curl -L https://github.com/dolthub/dolt/releases/latest/download/install.sh 
 
 # Install Wasteland CLI
 # Pin to specific version for reproducibility
-ARG WL_VERSION=0.3.0
+ARG WL_VERSION=0.4.0
 RUN curl -fsSL https://github.com/gastownhall/wasteland/releases/download/v${WL_VERSION}/wasteland_${WL_VERSION}_linux_amd64.tar.gz \
     | tar xz -C /usr/local/bin/
 

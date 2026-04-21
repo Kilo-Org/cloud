@@ -312,6 +312,18 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       input: {
         wastelandId: string;
         itemId: string;
+        direct?: boolean | undefined;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
+    unclaimWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        itemId: string;
+        direct?: boolean | undefined;
       };
       output: {
         success: boolean;
@@ -325,6 +337,7 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         description: string;
         priority?: 'critical' | 'high' | 'low' | 'medium' | undefined;
         type?: 'bug' | 'docs' | 'feature' | 'other' | undefined;
+        direct?: boolean | undefined;
       };
       output: {
         success: boolean;
@@ -336,6 +349,43 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         wastelandId: string;
         itemId: string;
         evidence: string;
+        direct?: boolean | undefined;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
+    acceptWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        itemId: string;
+        quality: 'excellent' | 'fair' | 'good' | 'poor';
+        comment?: string | undefined;
+        direct?: boolean | undefined;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
+    rejectWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        itemId: string;
+        comment: string;
+        direct?: boolean | undefined;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
+    closeWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        itemId: string;
+        direct?: boolean | undefined;
       };
       output: {
         success: boolean;
@@ -671,6 +721,18 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
           input: {
             wastelandId: string;
             itemId: string;
+            direct?: boolean | undefined;
+          };
+          output: {
+            success: boolean;
+          };
+          meta: object;
+        }>;
+        unclaimWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            itemId: string;
+            direct?: boolean | undefined;
           };
           output: {
             success: boolean;
@@ -684,6 +746,7 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             description: string;
             priority?: 'critical' | 'high' | 'low' | 'medium' | undefined;
             type?: 'bug' | 'docs' | 'feature' | 'other' | undefined;
+            direct?: boolean | undefined;
           };
           output: {
             success: boolean;
@@ -695,6 +758,43 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             wastelandId: string;
             itemId: string;
             evidence: string;
+            direct?: boolean | undefined;
+          };
+          output: {
+            success: boolean;
+          };
+          meta: object;
+        }>;
+        acceptWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            itemId: string;
+            quality: 'excellent' | 'fair' | 'good' | 'poor';
+            comment?: string | undefined;
+            direct?: boolean | undefined;
+          };
+          output: {
+            success: boolean;
+          };
+          meta: object;
+        }>;
+        rejectWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            itemId: string;
+            comment: string;
+            direct?: boolean | undefined;
+          };
+          output: {
+            success: boolean;
+          };
+          meta: object;
+        }>;
+        closeWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            itemId: string;
+            direct?: boolean | undefined;
           };
           output: {
             success: boolean;

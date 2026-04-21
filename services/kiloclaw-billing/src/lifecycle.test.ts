@@ -177,11 +177,20 @@ describe('interrupted auto-resume sweep', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('requests async start and only records retry metadata on acceptance', async () => {
+  it('requests async start and records retry metadata on acceptance', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
     const { db, updates } = createMockDb([
-      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_attempt_count: 0 }],
+      [
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
+          auto_resume_attempt_count: 0,
+        },
+      ],
       [{ id: instanceId, sandbox_id: sandboxId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -218,11 +227,20 @@ describe('interrupted auto-resume sweep', () => {
     expect(updates[0]).not.toHaveProperty('destruction_deadline');
   });
 
-  it('keeps rows suspended when async resume request fails', async () => {
+  it('keeps retry metadata when async resume request fails', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
     const { db, updates } = createMockDb([
-      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_attempt_count: 1 }],
+      [
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
+          auto_resume_attempt_count: 1,
+        },
+      ],
       [{ id: instanceId, sandbox_id: sandboxId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -257,11 +275,20 @@ describe('interrupted auto-resume sweep', () => {
     expect(updates[0]).not.toHaveProperty('destruction_deadline');
   });
 
-  it('keeps 404 from async resume request on the normal failure path', async () => {
+  it('keeps retry metadata after 404 from async resume request', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
     const { db, updates } = createMockDb([
-      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_attempt_count: 0 }],
+      [
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
+          auto_resume_attempt_count: 0,
+        },
+      ],
       [{ id: instanceId, sandbox_id: sandboxId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -293,10 +320,19 @@ describe('interrupted auto-resume sweep', () => {
     );
   });
 
-  it('clears stale suspension state when no active instance remains', async () => {
+  it('clears stale resume state when no active instance remains', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const { db, updates, txUpdates, txDeletes } = createMockDb([
-      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_attempt_count: 1 }],
+      [
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
+          auto_resume_attempt_count: 1,
+        },
+      ],
       [],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -335,6 +371,9 @@ describe('interrupted auto-resume sweep', () => {
           user_id: 'user-1',
           instance_id: null,
           organization_id: null,
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
           auto_resume_attempt_count: 0,
         },
       ],

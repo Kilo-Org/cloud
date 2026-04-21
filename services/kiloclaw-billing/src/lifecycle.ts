@@ -1436,7 +1436,12 @@ async function runInterruptedAutoResumeSweep(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         eq(kiloclaw_subscriptions.status, 'active'),
         currentSubscriptionRowFilter(),
-        isNotNull(kiloclaw_subscriptions.suspended_at),
+        or(
+          isNotNull(kiloclaw_subscriptions.suspended_at),
+          isNotNull(kiloclaw_subscriptions.auto_resume_requested_at),
+          isNotNull(kiloclaw_subscriptions.auto_resume_retry_after),
+          gt(kiloclaw_subscriptions.auto_resume_attempt_count, 0)
+        ),
         sql`(${kiloclaw_subscriptions.auto_resume_retry_after} IS NULL OR ${kiloclaw_subscriptions.auto_resume_retry_after} <= ${now})`
       )
     );

@@ -56,6 +56,11 @@ const PAID_ACTIVATION_LIFECYCLE_CLEAR_SET = {
   auto_resume_retry_after: null,
   auto_resume_attempt_count: 0,
 } as const;
+const PAID_AUTO_RESUME_INITIAL_STATE = {
+  auto_resume_requested_at: null,
+  auto_resume_retry_after: null,
+  auto_resume_attempt_count: 0,
+} as const;
 
 type CreditSettlementPersonalRow = {
   subscription: typeof kiloclaw_subscriptions.$inferSelect;
@@ -583,6 +588,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       past_due_since: null,
       auto_top_up_triggered_for_period: null,
       ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
+      ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
       ...(shouldClearSchedule
         ? { scheduled_plan: null, scheduled_by: null, stripe_schedule_id: null }
         : {}),
@@ -617,7 +623,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   }
 
   if (wasSuspended) {
-    await autoResumeIfSuspended(userId, resolvedInstanceId, { recordRetryState: false });
+    await autoResumeIfSuspended(userId, resolvedInstanceId);
   }
 
   // Best-effort Kilo Pass bonus evaluation.
@@ -824,6 +830,7 @@ export async function enrollWithCredits(params: {
         trial_started_at: null,
         trial_ends_at: null,
         ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
+        ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
       })
       .onConflictDoUpdate({
         target: kiloclaw_subscriptions.instance_id,
@@ -840,6 +847,7 @@ export async function enrollWithCredits(params: {
           past_due_since: null,
           cancel_at_period_end: false,
           ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
+          ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
         },
       })
       .returning();
@@ -909,7 +917,7 @@ export async function enrollWithCredits(params: {
 
   // Step 5: Auto-resume if suspended (spec rule 7)
   if (wasSuspended && instanceId) {
-    await autoResumeIfSuspended(userId, instanceId, { recordRetryState: false });
+    await autoResumeIfSuspended(userId, instanceId);
   }
 
   logInfo('Credit enrollment completed', {

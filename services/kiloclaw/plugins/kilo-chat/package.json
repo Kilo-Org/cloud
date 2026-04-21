@@ -17,7 +17,9 @@
     "channel": {
       "id": "kilo-chat",
       "label": "Kilo Chat",
-      "blurb": "Kilo's hosted chat channel for OpenClaw instances."
+      "blurb": "Kilo's hosted chat channel for OpenClaw instances.",
+      "markdownCapable": true,
+      "exposure": "direct"
     }
   },
   "scripts": {

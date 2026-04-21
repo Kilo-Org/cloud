@@ -164,4 +164,68 @@ describe('handleKiloChatReadAction', () => {
       })
     ).rejects.toThrow(/conversationId/i);
   });
+
+  it('passes before param to listMessages', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({
+        messages: [{ id: 'M1', senderId: 'alice', content: [{ type: 'text', text: 'Hi' }] }],
+      }),
+    });
+
+    await handleKiloChatReadAction({
+      params: { to: 'CONV', before: 'MSG99' },
+      client,
+    });
+
+    expect(client.listMessages).toHaveBeenCalledWith({
+      conversationId: 'CONV',
+      before: 'MSG99',
+      limit: undefined,
+    });
+  });
+
+  it('includes ISO timestamp when updatedAt is present', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({
+        messages: [
+          {
+            id: 'MSG1',
+            senderId: 'alice',
+            content: [{ type: 'text', text: 'Hello' }],
+            updatedAt: 1713700000000,
+          },
+        ],
+      }),
+    });
+
+    const result = await handleKiloChatReadAction({
+      params: { to: 'CONV' },
+      client,
+    });
+
+    const expected = new Date(1713700000000).toISOString();
+    expect(result.content[0].text).toBe(`[MSG1] alice (${expected}): Hello`);
+  });
+
+  it('omits timestamp when updatedAt is null', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({
+        messages: [
+          {
+            id: 'MSG1',
+            senderId: 'alice',
+            content: [{ type: 'text', text: 'Hello' }],
+            updatedAt: null,
+          },
+        ],
+      }),
+    });
+
+    const result = await handleKiloChatReadAction({
+      params: { to: 'CONV' },
+      client,
+    });
+
+    expect(result.content[0].text).toBe('[MSG1] alice: Hello');
+  });
 });

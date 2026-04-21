@@ -14,6 +14,7 @@ import { renameConversationFor } from '../services/conversations';
 import { createMessageFor, deleteMessageFor, editMessageFor } from '../services/messages';
 import { addReactionFor, removeReactionFor } from '../services/reactions';
 import { setTypingFor, stopTypingFor } from '../services/typing';
+import { resolveUserDisplayInfo } from '../services/user-lookup';
 import {
   ulidSchema,
   createMessageSchema,
@@ -223,7 +224,19 @@ export async function handleGetMembers(c: HonoCtx) {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
-  return c.json({ members: info.members });
+  const userIds = info.members.filter(m => m.kind === 'user').map(m => m.id);
+  const displayInfo =
+    userIds.length > 0
+      ? await resolveUserDisplayInfo(c.env.HYPERDRIVE.connectionString, userIds)
+      : new Map();
+
+  const enrichedMembers = info.members.map(m => ({
+    ...m,
+    displayName: displayInfo.get(m.id)?.displayName ?? null,
+    avatarUrl: displayInfo.get(m.id)?.avatarUrl ?? null,
+  }));
+
+  return c.json({ members: enrichedMembers });
 }
 
 // ─── setTyping ───────────────────────────────────────────────────────────────

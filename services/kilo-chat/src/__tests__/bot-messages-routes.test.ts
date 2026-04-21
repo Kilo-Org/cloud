@@ -15,6 +15,10 @@ vi.mock('../services/sandbox-ownership', () => ({
     ownershipMap.get(userId)?.has(sandboxId) ?? false,
 }));
 
+vi.mock('../services/user-lookup', () => ({
+  resolveUserDisplayInfo: async () => new Map(),
+}));
+
 function grantSandbox(userId: string, sandboxId: string) {
   if (!ownershipMap.has(userId)) ownershipMap.set(userId, new Set());
   ownershipMap.get(userId)!.add(sandboxId);
@@ -681,12 +685,18 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members
     );
 
     expect(res.status).toBe(200);
-    const body = await res.json<{ members: { id: string; kind: string }[] }>();
+    const body = await res.json<{
+      members: { id: string; kind: string; displayName: string | null; avatarUrl: string | null }[];
+    }>();
     expect(Array.isArray(body.members)).toBe(true);
     // Should contain the user (created the conversation) and the bot (sandboxId)
     const ids = body.members.map(m => m.id);
     expect(ids).toContain(`user-bot-members-1`);
     expect(ids).toContain(`bot:kiloclaw:${sandboxId}`);
+    for (const member of body.members) {
+      expect(member).toHaveProperty('displayName');
+      expect(member).toHaveProperty('avatarUrl');
+    }
   });
 
   it('returns 403 for a non-member bot', async () => {

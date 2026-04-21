@@ -56,6 +56,8 @@ describe('admin.users.getKiloClawState', () => {
       accessReason: null,
       earlybird: null,
       activeInstanceId: null,
+      billingStateError: null,
+      needsSupportReview: false,
     });
   });
 
@@ -348,6 +350,75 @@ describe('admin.users.getKiloClawState', () => {
     expect(result.hasAccess).toBe(true);
     expect(result.accessReason).toBe('subscription');
     expect(result.subscriptions).toHaveLength(2);
+  });
+
+  it('keeps admin state inspectable when current personal rows conflict', async () => {
+    const [firstInstance, secondInstance] = await db
+      .insert(kiloclaw_instances)
+      .values([
+        {
+          user_id: targetUser.id,
+          sandbox_id: 'sandbox-conflict-first',
+        },
+        {
+          user_id: targetUser.id,
+          sandbox_id: 'sandbox-conflict-second',
+        },
+      ])
+      .returning();
+
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        user_id: targetUser.id,
+        instance_id: firstInstance.id,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+      },
+      {
+        user_id: targetUser.id,
+        instance_id: secondInstance.id,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+      },
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
+
+    expect(result.subscriptions).toHaveLength(2);
+    expect(result.subscription).toBeNull();
+    expect(result.effectiveSubscriptionId).toBeNull();
+    expect(result.hasAccess).toBe(false);
+    expect(result.accessReason).toBeNull();
+    expect(result.needsSupportReview).toBe(true);
+    expect(result.billingStateError).toContain(
+      'Expected at most one current personal subscription row'
+    );
+  });
+
+  it('uses detached non-transferred access rows when no current personal row grants access', async () => {
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        instance_id: null,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+      })
+      .returning();
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
+
+    expect(result.subscription?.id).toBe(subscription.id);
+    expect(result.effectiveSubscriptionId).toBe(subscription.id);
+    expect(result.hasAccess).toBe(true);
+    expect(result.accessReason).toBe('subscription');
+    expect(result.billingStateError).toBeNull();
+    expect(result.needsSupportReview).toBe(false);
   });
 
   it('returns subscription rows without eager-loading change log history', async () => {

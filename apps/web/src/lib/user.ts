@@ -122,6 +122,68 @@ if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
 const SIGNUP_RATE_LIMIT_MAX = 5;
 const SIGNUP_RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Threshold for the farm-shape signup-pattern SECURITY log. When the
+ * same registrable `email_domain` has signups across this many distinct
+ * email hostnames within the rolling window, emit a log for ops.
+ */
+const EMAIL_DOMAIN_DISTINCT_HOSTNAME_LOG_THRESHOLD = 5;
+
+/**
+ * Registrable domains skipped by the email-domain SECURITY log helpers.
+ * Consumer mailbox providers where a shared domain serves millions of
+ * unrelated mailboxes — any signal keyed on the domain is too noisy to
+ * be useful. The logs are purely for detection on non-exempt domains;
+ * they never block a signup.
+ */
+const EMAIL_DOMAIN_LOG_EXEMPT: ReadonlySet<string> = new Set([
+  // Google consumer
+  'gmail.com',
+  'googlemail.com',
+  // Microsoft consumer
+  'outlook.com',
+  'hotmail.com',
+  'live.com',
+  'msn.com',
+  // Apple
+  'icloud.com',
+  'me.com',
+  'mac.com',
+  // Yahoo family
+  'yahoo.com',
+  'yahoo.co.uk',
+  'yahoo.co.jp',
+  'yahoo.fr',
+  'yahoo.de',
+  'ymail.com',
+  'rocketmail.com',
+  // Proton
+  'proton.me',
+  'protonmail.com',
+  'pm.me',
+  // Other major free providers
+  'aol.com',
+  'gmx.com',
+  'gmx.de',
+  'gmx.net',
+  'web.de',
+  'mail.com',
+  't-online.de',
+  'qq.com',
+  '163.com',
+  '126.com',
+  'sina.com',
+  'yandex.ru',
+  'yandex.com',
+  'mail.ru',
+  'zoho.com',
+  'fastmail.com',
+  'fastmail.fm',
+  'tutanota.com',
+  'tuta.io',
+  'tuta.com',
+]);
+
 function getSignupIp(requestHeaders?: Headers): string | null {
   return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 }
@@ -151,6 +213,81 @@ async function checkSignupIpRateLimit(
   });
 
   return failureResult('SIGNUP-RATE-LIMITED');
+}
+
+/**
+ * Emit a `SECURITY:` log the first time any non-exempt `email_domain`
+ * is seen. Detection-only; never blocks a signup. Best-effort — swallows
+ * errors so a logging failure cannot break signup.
+ */
+async function maybeLogNewEmailDomainSignup(
+  emailDomain: string | null,
+  signupIp: string | null,
+  tx: DrizzleTransaction
+): Promise<void> {
+  if (IS_DEVELOPMENT) return;
+  if (!emailDomain) return;
+  if (EMAIL_DOMAIN_LOG_EXEMPT.has(emailDomain)) return;
+
+  try {
+    const [result] = await tx
+      .select({ count: count() })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.email_domain, emailDomain));
+
+    const lifetimeAccounts = result?.count ?? 0;
+    if (lifetimeAccounts !== 0) return;
+
+    console.warn('[auth] SECURITY: first signup on new email domain', {
+      email_domain: emailDomain,
+      ip_address: signupIp,
+    });
+  } catch (err) {
+    captureException(err, { tags: { source: 'new-email-domain-signup-log' } });
+  }
+}
+
+/**
+ * Emit a `SECURITY:` log when a non-exempt `email_domain` has signups
+ * spanning many distinct email hostnames within the rolling window.
+ * A legitimate custom domain typically concentrates its users under one
+ * (or a small handful of) hostnames; a wide hostname spread is a useful
+ * detection signal for ops. Detection-only; never blocks a signup.
+ * Best-effort — swallows errors so a logging failure cannot break signup.
+ */
+async function maybeLogEmailDomainHostnameSpread(
+  emailDomain: string | null,
+  tx: DrizzleTransaction
+): Promise<void> {
+  if (IS_DEVELOPMENT) return;
+  if (!emailDomain) return;
+  if (EMAIL_DOMAIN_LOG_EXEMPT.has(emailDomain)) return;
+
+  try {
+    const windowStart = new Date(Date.now() - SIGNUP_RATE_LIMIT_WINDOW_MS).toISOString();
+    const [result] = await tx
+      .select({
+        distinctHostnames: sql<number>`COUNT(DISTINCT LOWER(SUBSTRING(${kilocode_users.google_user_email} FROM '@(.+)$')))::int`,
+      })
+      .from(kilocode_users)
+      .where(
+        and(
+          eq(kilocode_users.email_domain, emailDomain),
+          gte(kilocode_users.created_at, windowStart)
+        )
+      );
+
+    const distinctHostnames = result?.distinctHostnames ?? 0;
+    if (distinctHostnames < EMAIL_DOMAIN_DISTINCT_HOSTNAME_LOG_THRESHOLD) return;
+
+    console.warn('[auth] SECURITY: high distinct-hostname count on email domain', {
+      email_domain: emailDomain,
+      distinct_hostnames_24h: distinctHostnames,
+      threshold: EMAIL_DOMAIN_DISTINCT_HOSTNAME_LOG_THRESHOLD,
+    });
+  } catch (err) {
+    captureException(err, { tags: { source: 'email-domain-hostname-spread-log' } });
+  }
 }
 
 async function checkNormalizedEmailUnique(
@@ -399,14 +536,22 @@ export async function createOrUpdateUser(
   let caughtError: unknown;
   try {
     txResult = await db.transaction(async tx => {
-      const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
-      if (!signupRateLimitResult.success) return signupRateLimitResult;
+      const ipRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
+      if (!ipRateLimitResult.success) return ipRateLimitResult;
 
       const dedupResult = await checkNormalizedEmailUnique(newUser.normalized_email, tx);
       if (!dedupResult.success) return dedupResult;
 
+      // Flag first-ever sighting of this email_domain. Detection-only.
+      await maybeLogNewEmailDomainSignup(newUser.email_domain, signupIp, tx);
+
       const [inserted] = await tx.insert(kilocode_users).values(newUser).returning();
       assert(inserted, 'Failed to save new user');
+
+      // Flag unusual hostname spread on the email_domain (see the helper
+      // comment for rationale). Runs after the insert so the current
+      // signup counts toward the spread. Detection-only.
+      await maybeLogEmailDomainHostnameSpread(newUser.email_domain, tx);
 
       await tx.insert(user_auth_provider).values({
         kilo_user_id: inserted.id,

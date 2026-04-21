@@ -189,6 +189,229 @@ describe('User', () => {
       if (result.success) return;
       expect(result.error).toBe('EMAIL-ALREADY-USED');
     });
+
+    it('emits a SECURITY log when a fresh email_domain is first seen', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'ceo@brand-new-corp.test',
+          google_user_name: 'New Corp CEO',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-new-domain',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '198.51.102.10' })
+      );
+
+      expect(result.success).toBe(true);
+      const newDomainLog = warnSpy.mock.calls.find(
+        ([msg]) =>
+          typeof msg === 'string' && msg === '[auth] SECURITY: first signup on new email domain'
+      );
+      expect(newDomainLog).toBeDefined();
+      expect(newDomainLog?.[1]).toEqual(
+        expect.objectContaining({
+          email_domain: 'brand-new-corp.test',
+          ip_address: '198.51.102.10',
+        })
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it('does NOT emit a new-domain SECURITY log once the domain has an existing account', async () => {
+      await insertTestUser({
+        id: 'seed-existing-domain',
+        google_user_email: 'first@existing-corp.test',
+        normalized_email: 'first@existing-corp.test',
+        email_domain: 'existing-corp.test',
+      });
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'second@existing-corp.test',
+          google_user_name: 'Second User',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-existing-domain',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '198.51.103.10' })
+      );
+
+      expect(result.success).toBe(true);
+      const newDomainLog = warnSpy.mock.calls.find(
+        ([msg]) =>
+          typeof msg === 'string' && msg === '[auth] SECURITY: first signup on new email domain'
+      );
+      expect(newDomainLog).toBeUndefined();
+
+      warnSpy.mockRestore();
+    });
+
+    it('does NOT emit a new-domain SECURITY log for exempt consumer-provider domains', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'someone@gmail.com',
+          google_user_name: 'Gmail User',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-gmail-fresh',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '198.51.104.10' })
+      );
+
+      expect(result.success).toBe(true);
+      const newDomainLog = warnSpy.mock.calls.find(
+        ([msg]) =>
+          typeof msg === 'string' && msg === '[auth] SECURITY: first signup on new email domain'
+      );
+      expect(newDomainLog).toBeUndefined();
+
+      warnSpy.mockRestore();
+    });
+
+    it('emits a SECURITY log when an email_domain crosses the distinct-hostname threshold', async () => {
+      // Seed 4 existing accounts on 4 distinct hostnames under the same
+      // registrable email_domain.
+      for (let i = 1; i <= 4; i++) {
+        await insertTestUser({
+          id: `hostname-spread-${i}`,
+          google_user_email: `user-${i}@host${i}.spread-corp.test`,
+          normalized_email: `user-${i}@host${i}.spread-corp.test`,
+          email_domain: 'spread-corp.test',
+          signup_ip: `198.51.105.${i}`,
+        });
+      }
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // This 5th signup on a 5th distinct hostname pushes the count to the
+      // threshold.
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'user-5@host5.spread-corp.test',
+          google_user_name: 'Spread User 5',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-hostname-spread',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '198.51.105.222' })
+      );
+
+      expect(result.success).toBe(true);
+      const spreadLog = warnSpy.mock.calls.find(
+        ([msg]) =>
+          typeof msg === 'string' &&
+          msg === '[auth] SECURITY: high distinct-hostname count on email domain'
+      );
+      expect(spreadLog).toBeDefined();
+      expect(spreadLog?.[1]).toEqual(
+        expect.objectContaining({
+          email_domain: 'spread-corp.test',
+        })
+      );
+      expect(spreadLog?.[1]?.distinct_hostnames_24h).toBeGreaterThanOrEqual(5);
+
+      warnSpy.mockRestore();
+    });
+
+    it('does NOT emit a hostname-spread SECURITY log when all signups share one hostname', async () => {
+      // Concentrated legit pattern: many users, one hostname. Must not
+      // trigger the spread signal regardless of volume.
+      for (let i = 1; i <= 30; i++) {
+        await insertTestUser({
+          id: `concentrated-${i}`,
+          google_user_email: `user-${i}@concentrated-corp.test`,
+          normalized_email: `user-${i}@concentrated-corp.test`,
+          email_domain: 'concentrated-corp.test',
+          signup_ip: `198.51.106.${i}`,
+        });
+      }
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'user-31@concentrated-corp.test',
+          google_user_name: 'Concentrated User 31',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-concentrated',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '198.51.106.222' })
+      );
+
+      expect(result.success).toBe(true);
+      const spreadLog = warnSpy.mock.calls.find(
+        ([msg]) =>
+          typeof msg === 'string' &&
+          msg === '[auth] SECURITY: high distinct-hostname count on email domain'
+      );
+      expect(spreadLog).toBeUndefined();
+
+      warnSpy.mockRestore();
+    });
+
+    it('does NOT emit a hostname-spread SECURITY log for exempt consumer-provider domains', async () => {
+      // Even if 5+ distinct hostnames happen to sit under an exempt
+      // email_domain bucket, the helper must short-circuit on exempt and
+      // not emit a log (the shared-provider case is uninformative).
+      for (let i = 1; i <= 4; i++) {
+        await insertTestUser({
+          id: `gmail-spread-${i}`,
+          google_user_email: `user-${i}@host${i}.example.com`,
+          normalized_email: `user-${i}@host${i}.example.com`,
+          email_domain: 'gmail.com',
+          signup_ip: `198.51.107.${i}`,
+        });
+      }
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'user-5@gmail.com',
+          google_user_name: 'Gmail User 5',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-gmail-spread',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '198.51.107.222' })
+      );
+
+      expect(result.success).toBe(true);
+      const spreadLog = warnSpy.mock.calls.find(
+        ([msg]) =>
+          typeof msg === 'string' &&
+          msg === '[auth] SECURITY: high distinct-hostname count on email domain'
+      );
+      expect(spreadLog).toBeUndefined();
+
+      warnSpy.mockRestore();
+    });
   });
 
   describe('softDeleteUser', () => {

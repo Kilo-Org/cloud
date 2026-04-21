@@ -143,6 +143,29 @@ function pathWithQuery(path: string, params: Record<string, string | number | bo
   return query ? `${path}?${query}` : path;
 }
 
+function loggableNorthflankPath(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return url;
+  }
+}
+
+function northflankRequestLogFields(params: {
+  context: string;
+  method: string;
+  url: string;
+  teamScoped: boolean;
+}): Record<string, unknown> {
+  return {
+    context: params.context,
+    method: params.method,
+    path: loggableNorthflankPath(params.url),
+    teamScoped: params.teamScoped,
+  };
+}
+
 async function requestJson<T>(
   config: NorthflankClientConfig,
   path: string,
@@ -152,9 +175,16 @@ async function requestJson<T>(
   context: string,
   options?: { teamScoped?: boolean }
 ): Promise<T> {
+  const method = init?.method ?? 'GET';
+  const teamScoped = options?.teamScoped ?? true;
+  const url = northflankPath(config, path, teamScoped);
+  const startedAt = Date.now();
+  const requestLogFields = northflankRequestLogFields({ context, method, url, teamScoped });
+  console.info('[northflank] api_request_start', requestLogFields);
+
   let response: Response;
   try {
-    response = await fetch(northflankPath(config, path, options?.teamScoped), {
+    response = await fetch(url, {
       ...init,
       headers: {
         Authorization: `Bearer ${config.apiToken}`,
@@ -164,6 +194,11 @@ async function requestJson<T>(
     });
   } catch (err) {
     const body = redactForError(err, config);
+    console.warn('[northflank] api_request_error', {
+      ...requestLogFields,
+      durationMs: Date.now() - startedAt,
+      error: body.slice(0, 1024),
+    });
     throw new NorthflankApiError(
       `Northflank API ${context} failed before response: ${body}`,
       503,
@@ -172,6 +207,10 @@ async function requestJson<T>(
       { limit: null, remaining: null, reset: null }
     );
   }
+
+  const durationMs = Date.now() - startedAt;
+  const requestId = response.headers.get('x-request-id');
+  const rateLimit = rateLimitFromHeaders(response.headers);
 
   const text = await response.text();
   let json: unknown = null;
@@ -185,25 +224,49 @@ async function requestJson<T>(
 
   if (!expectedStatuses.includes(response.status)) {
     const body = redactForError(json, config);
+    console.warn('[northflank] api_request_failed', {
+      ...requestLogFields,
+      status: response.status,
+      durationMs,
+      requestId,
+      rateLimit,
+      body: body.slice(0, 1024),
+    });
     throw new NorthflankApiError(
       `Northflank API ${context} failed (${response.status}): ${body}`,
       response.status,
       body,
-      response.headers.get('x-request-id'),
-      rateLimitFromHeaders(response.headers)
+      requestId,
+      rateLimit
     );
   }
 
   try {
-    return schema.parse(json);
+    const parsed = schema.parse(json);
+    console.info('[northflank] api_request_ok', {
+      ...requestLogFields,
+      status: response.status,
+      durationMs,
+      requestId,
+      rateLimit,
+    });
+    return parsed;
   } catch (err) {
     const body = redactForError({ response: json, parseError: err }, config);
+    console.warn('[northflank] api_response_parse_failed', {
+      ...requestLogFields,
+      status: response.status,
+      durationMs,
+      requestId,
+      rateLimit,
+      body: body.slice(0, 1024),
+    });
     throw new NorthflankApiError(
       `Northflank API ${context} returned an unexpected response: ${body}`,
       502,
       body,
-      response.headers.get('x-request-id'),
-      rateLimitFromHeaders(response.headers)
+      requestId,
+      rateLimit
     );
   }
 }

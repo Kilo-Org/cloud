@@ -68,6 +68,39 @@ afterEach(() => {
 });
 
 describe('Northflank Worker fetch client', () => {
+  it('logs Northflank requests without secrets', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    mockFetchSequence([[200, { data: { projects: [{ id: 'project-1', name: 'kc-ki-test' }] } }]]);
+
+    await expect(findProjectByName({ ...config, teamId: 'team-1' }, 'kc-ki-test')).resolves.toEqual(
+      {
+        id: 'project-1',
+        name: 'kc-ki-test',
+      }
+    );
+
+    expect(infoSpy).toHaveBeenCalledWith(
+      '[northflank] api_request_start',
+      expect.objectContaining({
+        context: 'findProjectByName',
+        method: 'GET',
+        path: '/v1/teams/team-1/projects',
+        teamScoped: true,
+      })
+    );
+    expect(infoSpy).toHaveBeenCalledWith(
+      '[northflank] api_request_ok',
+      expect.objectContaining({
+        context: 'findProjectByName',
+        method: 'GET',
+        path: '/v1/teams/team-1/projects',
+        status: 200,
+      })
+    );
+    expect(JSON.stringify(infoSpy.mock.calls)).not.toContain('nf-token');
+    expect(JSON.stringify(infoSpy.mock.calls)).not.toContain('edge-secret');
+  });
+
   it('sends auth headers and creates volumes mounted at /root', async () => {
     const fetchMock = mockFetchSequence([[201, { data: { id: 'volume-1', name: 'kc-ki-test' } }]]);
 
@@ -214,7 +247,8 @@ describe('Northflank Worker fetch client', () => {
     });
   });
 
-  it('redacts secret values from API errors', async () => {
+  it('redacts secret values from API errors and failure logs', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockFetchSequence([
       [
         500,
@@ -248,6 +282,20 @@ describe('Northflank Worker fetch client', () => {
     expect(caught.message).not.toContain('edge-secret');
     expect(caught.body).not.toContain('env-key-secret');
     expect(caught.body).not.toContain('registry-password');
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[northflank] api_request_failed',
+      expect.objectContaining({
+        context: 'getProjectSecretDetails',
+        method: 'GET',
+        path: '/v1/projects/project-1/secrets/secret-1/details',
+        teamScoped: false,
+        status: 500,
+      })
+    );
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('nf-token');
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('edge-secret');
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('env-key-secret');
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('registry-password');
   });
 
   it('includes thrown fetch error messages without leaking secrets', async () => {

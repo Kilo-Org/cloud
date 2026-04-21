@@ -20,7 +20,7 @@ describe('getNorthflankConfig', () => {
       storageClassName: 'nf-multi-rw',
       storageAccessMode: 'ReadWriteMany',
       volumeSizeMb: 10240,
-      ephemeralStorageMb: 2048,
+      ephemeralStorageMb: 10240,
       edgeHeaderName: 'x-kiloclaw-edge',
       edgeHeaderValue: 'edge-secret',
       imagePathTemplate: null,

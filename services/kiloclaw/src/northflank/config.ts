@@ -57,7 +57,7 @@ export function getNorthflankConfig(env: KiloClawEnv): NorthflankConfig {
     storageClassName: optionalEnv(env, 'NF_STORAGE_CLASS_NAME') ?? 'nf-multi-rw',
     storageAccessMode: optionalEnv(env, 'NF_STORAGE_ACCESS_MODE') ?? 'ReadWriteMany',
     volumeSizeMb: positiveIntegerEnv(env, 'NF_VOLUME_SIZE_MB', 10240),
-    ephemeralStorageMb: positiveIntegerEnv(env, 'NF_EPHEMERAL_STORAGE_MB', 2048),
+    ephemeralStorageMb: positiveIntegerEnv(env, 'NF_EPHEMERAL_STORAGE_MB', 10240),
     edgeHeaderName: requiredEnv(env, 'NF_EDGE_HEADER_NAME'),
     edgeHeaderValue: requiredEnv(env, 'NF_EDGE_HEADER_VALUE'),
     imagePathTemplate: optionalEnv(env, 'NF_IMAGE_PATH_TEMPLATE'),

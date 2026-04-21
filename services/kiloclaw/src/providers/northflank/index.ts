@@ -37,6 +37,22 @@ const NORTHFLANK_PORT_NAME = 'p01';
 
 type NorthflankProvisioningNames = Awaited<ReturnType<typeof northflankResourceNames>>;
 
+function logNorthflank(message: string, details: Record<string, unknown>): void {
+  console.info(`[northflank] ${message}`, details);
+}
+
+function northflankServiceSummary(service: NorthflankService): Record<string, unknown> {
+  return {
+    serviceId: service.id,
+    serviceName: service.name,
+    servicePaused: service.servicePaused ?? null,
+    deploymentStatus: service.status?.deployment?.status ?? null,
+    deploymentReason: service.status?.deployment?.reason ?? null,
+    instances: service.deployment?.instances ?? null,
+    ingressHost: firstIngressHost(service),
+  };
+}
+
 function requireSandboxId(state: { sandboxId: string | null }): string {
   if (!state.sandboxId) {
     throw new Error('Provider northflank requires a sandboxId');
@@ -347,6 +363,14 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       storageClassName: config.storageClassName,
       accessMode: config.storageAccessMode,
     });
+    logNorthflank('provisioning_resources_ready', {
+      sandboxId: state.sandboxId,
+      projectId: project.id,
+      projectName: project.name,
+      volumeId: volume.id,
+      volumeName: volume.name,
+      region: targetRegion,
+    });
 
     return {
       providerState: mergeProviderState(providerState, names, project, volume, targetRegion),
@@ -417,6 +441,11 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
         ));
     }
 
+    logNorthflank('start_runtime_service_ready', {
+      sandboxId: state.sandboxId,
+      projectId,
+      ...northflankServiceSummary(service),
+    });
     providerState = {
       ...providerState,
       serviceId: service.id,
@@ -438,14 +467,37 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       secretId: secret.id,
       secretName: secret.name || names.secretName,
     };
+    logNorthflank('start_runtime_secret_ready', {
+      sandboxId: state.sandboxId,
+      projectId,
+      serviceId: service.id,
+      secretId: secret.id,
+      secretName: secret.name,
+    });
     await onProviderResult?.({ providerState });
 
+    logNorthflank('start_runtime_patch_service', {
+      sandboxId: state.sandboxId,
+      projectId,
+      serviceId: service.id,
+      serviceName: names.serviceName,
+      volumeName,
+      imageRef: runtimeSpec.imageRef,
+      ephemeralStorageMb: config.ephemeralStorageMb,
+      instances: 0,
+    });
     await patchDeploymentService(
       config,
       projectId,
       service.id,
       buildServicePayload(config, runtimeSpec, names.serviceName, volumeName, 0)
     );
+    logNorthflank('start_runtime_scale_service', {
+      sandboxId: state.sandboxId,
+      projectId,
+      serviceId: service.id,
+      instances: 1,
+    });
     await scaleService(config, projectId, service.id, 1);
     const started = await waitForDeploymentCompleted(
       config,
@@ -453,6 +505,12 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       service.id,
       STARTUP_TIMEOUT_SECONDS
     );
+
+    logNorthflank('start_runtime_deployment_completed', {
+      sandboxId: state.sandboxId,
+      projectId,
+      ...northflankServiceSummary(started),
+    });
 
     return {
       providerState: {
@@ -492,6 +550,16 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     const serviceId = providerState.serviceId;
 
     const volumeName = providerState.volumeName ?? names.volumeName;
+    logNorthflank('restart_runtime_patch_service', {
+      sandboxId: state.sandboxId,
+      projectId,
+      serviceId,
+      serviceName: providerState.serviceName ?? names.serviceName,
+      volumeName,
+      imageRef: runtimeSpec.imageRef,
+      ephemeralStorageMb: config.ephemeralStorageMb,
+      instances: 0,
+    });
     await patchDeploymentService(
       config,
       projectId,
@@ -519,8 +587,21 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       secretId: secret.id,
       secretName: secret.name || names.secretName,
     };
+    logNorthflank('restart_runtime_secret_ready', {
+      sandboxId: state.sandboxId,
+      projectId,
+      serviceId,
+      secretId: secret.id,
+      secretName: secret.name,
+    });
     await onProviderResult?.({ providerState });
 
+    logNorthflank('restart_runtime_scale_service', {
+      sandboxId: state.sandboxId,
+      projectId,
+      serviceId,
+      instances: 1,
+    });
     await scaleService(config, projectId, serviceId, 1);
     const restarted = await waitForDeploymentCompleted(
       config,
@@ -528,6 +609,11 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       serviceId,
       STARTUP_TIMEOUT_SECONDS
     );
+    logNorthflank('restart_runtime_deployment_completed', {
+      sandboxId: state.sandboxId,
+      projectId,
+      ...northflankServiceSummary(restarted),
+    });
 
     return {
       providerState: {

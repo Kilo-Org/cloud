@@ -49,7 +49,7 @@ const env = {
   NF_STORAGE_CLASS_NAME: 'nf-multi-rw',
   NF_STORAGE_ACCESS_MODE: 'ReadWriteMany',
   NF_VOLUME_SIZE_MB: '10240',
-  NF_EPHEMERAL_STORAGE_MB: '2048',
+  NF_EPHEMERAL_STORAGE_MB: '10240',
   NF_EDGE_HEADER_NAME: 'x-kiloclaw-edge',
   NF_EDGE_HEADER_VALUE: 'edge-secret',
   NF_IMAGE_PATH_TEMPLATE: 'ghcr.io/kilo-org/kiloclaw:{tag}',

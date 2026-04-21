@@ -476,6 +476,18 @@ export async function deleteService(
   );
 }
 
+function northflankServiceDebug(service: NorthflankService): Record<string, unknown> {
+  return {
+    serviceId: service.id,
+    serviceName: service.name,
+    servicePaused: service.servicePaused ?? null,
+    deploymentStatus: service.status?.deployment?.status ?? null,
+    deploymentReason: service.status?.deployment?.reason ?? null,
+    instances: service.deployment?.instances ?? null,
+    ingressHost: service.ports?.find(port => port.dns)?.dns ?? null,
+  };
+}
+
 export async function waitForDeploymentCompleted(
   config: NorthflankClientConfig,
   projectId: string,
@@ -484,14 +496,32 @@ export async function waitForDeploymentCompleted(
 ): Promise<NorthflankService> {
   const deadline = Date.now() + timeoutSeconds * 1000;
   let lastService = await getService(config, projectId, serviceId);
+  let lastLoggedStatus: string | null = null;
   while (Date.now() < deadline) {
-    const deploymentStatus = lastService.status?.deployment?.status;
+    const deploymentStatus = lastService.status?.deployment?.status ?? null;
+    if (deploymentStatus !== lastLoggedStatus) {
+      lastLoggedStatus = deploymentStatus;
+      console.info('[northflank] deployment_wait_status', {
+        projectId,
+        ...northflankServiceDebug(lastService),
+      });
+    }
     if (deploymentStatus === 'COMPLETED') return lastService;
-    if (deploymentStatus === 'FAILED')
+    if (deploymentStatus === 'FAILED') {
+      console.warn('[northflank] deployment_wait_failed', {
+        projectId,
+        ...northflankServiceDebug(lastService),
+      });
       throw new Error(`Northflank deployment failed for service ${serviceId}`);
+    }
     await new Promise(resolve => setTimeout(resolve, 2_000));
     lastService = await getService(config, projectId, serviceId);
   }
+  console.warn('[northflank] deployment_wait_timeout', {
+    projectId,
+    timeoutSeconds,
+    ...northflankServiceDebug(lastService),
+  });
   throw new Error(`Timed out waiting for Northflank deployment ${serviceId} to complete`);
 }
 

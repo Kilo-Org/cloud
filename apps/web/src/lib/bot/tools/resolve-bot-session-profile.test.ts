@@ -10,7 +10,7 @@ import {
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { resolveBotSessionProfile } from './resolve-bot-session-profile';
-import { resolvePlatformIntegrationOwner } from './resolve-platform-integration-owner';
+import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { ProfileOwner } from '@/lib/agent/types';
 
 const fakeEnvelope = JSON.stringify({
@@ -112,11 +112,9 @@ describe('resolveBotSessionProfile', () => {
     const user = await insertTestUser();
     const integration = await insertPlatformIntegration({ userId: user.id, platform: 'github' });
 
-    const result = await resolveBotSessionProfile(
-      resolvePlatformIntegrationOwner(integration),
-      user.id,
-      { githubRepo: 'org/repo' }
-    );
+    const result = await resolveBotSessionProfile(ownerFromIntegration(integration), user.id, {
+      githubRepo: 'org/repo',
+    });
 
     expect(result.envVars).toBeUndefined();
     expect(result.encryptedSecrets).toBeUndefined();
@@ -133,11 +131,9 @@ describe('resolveBotSessionProfile', () => {
 
     const integration = await insertPlatformIntegration({ userId: user.id, platform: 'github' });
 
-    const result = await resolveBotSessionProfile(
-      resolvePlatformIntegrationOwner(integration),
-      user.id,
-      { githubRepo: 'org/repo' }
-    );
+    const result = await resolveBotSessionProfile(ownerFromIntegration(integration), user.id, {
+      githubRepo: 'org/repo',
+    });
 
     expect(result.envVars).toEqual({ DB_HOST: 'localhost' });
     expect(result.setupCommands).toEqual(['npm install']);
@@ -166,11 +162,9 @@ describe('resolveBotSessionProfile', () => {
       platform: 'github',
     });
 
-    const result = await resolveBotSessionProfile(
-      resolvePlatformIntegrationOwner(integration),
-      user.id,
-      { githubRepo: 'org/repo' }
-    );
+    const result = await resolveBotSessionProfile(ownerFromIntegration(integration), user.id, {
+      githubRepo: 'org/repo',
+    });
 
     expect(result.envVars).toEqual({ SOURCE: 'personal' });
   });
@@ -194,11 +188,9 @@ describe('resolveBotSessionProfile', () => {
       platform: 'github',
     });
 
-    const result = await resolveBotSessionProfile(
-      resolvePlatformIntegrationOwner(integration),
-      user.id,
-      { githubRepo: 'org/repo' }
-    );
+    const result = await resolveBotSessionProfile(ownerFromIntegration(integration), user.id, {
+      githubRepo: 'org/repo',
+    });
 
     expect(result.envVars).toEqual({ SOURCE: 'org' });
   });
@@ -220,11 +212,9 @@ describe('resolveBotSessionProfile', () => {
 
     const integration = await insertPlatformIntegration({ userId: user.id, platform: 'github' });
 
-    const result = await resolveBotSessionProfile(
-      resolvePlatformIntegrationOwner(integration),
-      user.id,
-      { githubRepo: 'org/repo' }
-    );
+    const result = await resolveBotSessionProfile(ownerFromIntegration(integration), user.id, {
+      githubRepo: 'org/repo',
+    });
 
     expect(result.envVars).toEqual({
       BASE_ONLY: 'base-val',
@@ -248,11 +238,9 @@ describe('resolveBotSessionProfile', () => {
 
     const integration = await insertPlatformIntegration({ userId: user.id, platform: 'gitlab' });
 
-    const result = await resolveBotSessionProfile(
-      resolvePlatformIntegrationOwner(integration),
-      user.id,
-      { gitlabProject: 'group/project' }
-    );
+    const result = await resolveBotSessionProfile(ownerFromIntegration(integration), user.id, {
+      gitlabProject: 'group/project',
+    });
 
     expect(result.envVars).toEqual({ FOR: 'gitlab' });
   });
@@ -270,11 +258,9 @@ describe('resolveBotSessionProfile', () => {
 
     const integration = await insertPlatformIntegration({ userId: user.id, platform: 'github' });
 
-    const result = await resolveBotSessionProfile(
-      resolvePlatformIntegrationOwner(integration),
-      user.id,
-      { githubRepo: 'org/repo' }
-    );
+    const result = await resolveBotSessionProfile(ownerFromIntegration(integration), user.id, {
+      githubRepo: 'org/repo',
+    });
 
     expect(result.envVars).toEqual({ FROM: 'default' });
   });

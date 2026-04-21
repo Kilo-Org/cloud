@@ -19,10 +19,8 @@ import { APP_URL } from '@/lib/constants';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { resolveBotSessionProfile } from '@/lib/bot/tools/resolve-bot-session-profile';
-import {
-  resolvePlatformIntegrationOwner,
-  type OwnerRef,
-} from '@/lib/bot/tools/resolve-platform-integration-owner';
+import { ownerFromIntegration } from '@/lib/integrations/core/owner';
+import type { Owner } from '@/lib/integrations/core/types';
 import type { MergeProfileConfigurationResult } from '@/lib/agent/profile-session-config';
 import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
@@ -124,24 +122,23 @@ export default async function spawnCloudAgentSession(
     prompt += options.prSignature;
   }
 
-  let ownerRef: OwnerRef;
+  const owner: Owner = ownerFromIntegration(platformIntegration);
   let profileConfig: MergeProfileConfigurationResult;
   try {
-    ownerRef = resolvePlatformIntegrationOwner(platformIntegration);
-    profileConfig = await resolveBotSessionProfile(ownerRef, ticketUserId, args);
+    profileConfig = await resolveBotSessionProfile(owner, ticketUserId, args);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { response: `Error resolving profile for Cloud Agent: ${message}` };
   }
 
-  const kilocodeOrganizationId = ownerRef.kind === 'org' ? ownerRef.id : undefined;
+  const kilocodeOrganizationId = owner.type === 'org' ? owner.id : undefined;
 
   if (args.gitlabProject) {
     // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
     const gitlabToken =
-      ownerRef.kind === 'org'
-        ? await getGitLabTokenForOrganization(ownerRef.id)
-        : await getGitLabTokenForUser(ownerRef.id);
+      owner.type === 'org'
+        ? await getGitLabTokenForOrganization(owner.id)
+        : await getGitLabTokenForUser(owner.id);
 
     if (!gitlabToken) {
       return {
@@ -151,9 +148,9 @@ export default async function spawnCloudAgentSession(
     }
 
     const instanceUrl =
-      ownerRef.kind === 'org'
-        ? await getGitLabInstanceUrlForOrganization(ownerRef.id)
-        : await getGitLabInstanceUrlForUser(ownerRef.id);
+      owner.type === 'org'
+        ? await getGitLabInstanceUrlForOrganization(owner.id)
+        : await getGitLabInstanceUrlForUser(owner.id);
 
     const gitUrl = buildGitLabCloneUrl(args.gitlabProject, instanceUrl);
 
@@ -183,9 +180,9 @@ export default async function spawnCloudAgentSession(
   } else {
     // GitHub path: get token, use githubRepo/githubToken
     const githubToken =
-      ownerRef.kind === 'org'
-        ? await getGitHubTokenForOrganization(ownerRef.id)
-        : await getGitHubTokenForUser(ownerRef.id);
+      owner.type === 'org'
+        ? await getGitHubTokenForOrganization(owner.id)
+        : await getGitHubTokenForUser(owner.id);
 
     if (!githubToken) {
       return {

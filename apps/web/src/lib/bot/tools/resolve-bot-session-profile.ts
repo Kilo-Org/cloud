@@ -3,7 +3,7 @@ import {
   type MergeProfileConfigurationResult,
 } from '@/lib/agent/profile-session-config';
 import type { ProfileOwner } from '@/lib/agent/types';
-import type { OwnerRef } from './resolve-platform-integration-owner';
+import type { Owner } from '@/lib/integrations/core/types';
 
 export type BotSessionProfileArgs = {
   githubRepo?: string;
@@ -22,21 +22,19 @@ export type BotSessionProfileArgs = {
  * in `mergeProfileConfiguration` is not used.
  */
 export async function resolveBotSessionProfile(
-  ownerRef: OwnerRef,
+  owner: Owner,
   ticketUserId: string,
   args: BotSessionProfileArgs
 ): Promise<MergeProfileConfigurationResult> {
-  const owner: ProfileOwner =
-    ownerRef.kind === 'org'
-      ? { type: 'organization', id: ownerRef.id }
-      : { type: 'user', id: ownerRef.id };
-  const userIdForMerge = ownerRef.kind === 'org' ? ticketUserId : undefined;
+  const profileOwner: ProfileOwner =
+    owner.type === 'org' ? { type: 'organization', id: owner.id } : { type: 'user', id: owner.id };
+  const userIdForMerge = owner.type === 'org' ? ticketUserId : undefined;
 
   const repoFullName = args.gitlabProject ?? args.githubRepo;
   const platform: 'github' | 'gitlab' = args.gitlabProject ? 'gitlab' : 'github';
 
   return mergeProfileConfiguration({
-    owner,
+    owner: profileOwner,
     userId: userIdForMerge,
     repoFullName,
     platform,

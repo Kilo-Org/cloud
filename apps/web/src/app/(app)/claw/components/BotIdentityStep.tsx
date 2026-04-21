@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronRight, Shuffle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,11 @@ import { Input } from '@/components/ui/input';
 import { OnboardingStepView } from './OnboardingStepView';
 import type { BotIdentity } from './claw.types';
 import { cn } from '@/lib/utils';
-import { WeatherLocationInput, type WeatherLocationSelection } from './WeatherLocationInput';
+import {
+  WeatherLocationInput,
+  type WeatherLocationInputHandle,
+  type WeatherLocationSelection,
+} from './WeatherLocationInput';
 
 const SHUFFLE_STEPS = 4;
 const SHUFFLE_INTERVAL_MS = 90;
@@ -75,7 +79,9 @@ export function BotIdentityStep({
   const [selectedNatureId, setSelectedNatureId] = useState('ai-assistant');
   const [weatherLocation, setWeatherLocation] = useState<WeatherLocationSelection | null>(null);
   const [isShuffling, setIsShuffling] = useState(false);
+  const [isContinuing, setIsContinuing] = useState(false);
   const [nameAnimKey, setNameAnimKey] = useState(0);
+  const weatherLocationInputRef = useRef<WeatherLocationInputHandle>(null);
   const reducedMotion = useReducedMotion();
 
   const nature = NATURE_PRESETS.find(n => n.id === selectedNatureId) ?? NATURE_PRESETS[0];
@@ -109,16 +115,26 @@ export function BotIdentityStep({
     setIsShuffling(false);
   }
 
-  function handleContinue() {
-    onContinue({
-      identity: {
-        botName: botName.trim() || 'KiloClaw',
-        botEmoji: selectedEmoji,
-        botNature: nature.label,
-        botVibe: nature.vibe,
-      },
-      weatherLocation,
-    });
+  async function handleContinue() {
+    if (isContinuing) return;
+
+    setIsContinuing(true);
+    try {
+      const weatherLocationCommit = await weatherLocationInputRef.current?.commitPendingLocation();
+      if (weatherLocationCommit && !weatherLocationCommit.ok) return;
+
+      onContinue({
+        identity: {
+          botName: botName.trim() || 'KiloClaw',
+          botEmoji: selectedEmoji,
+          botNature: nature.label,
+          botVibe: nature.vibe,
+        },
+        weatherLocation: weatherLocationCommit?.selection ?? weatherLocation,
+      });
+    } finally {
+      setIsContinuing(false);
+    }
   }
 
   return (
@@ -304,14 +320,18 @@ export function BotIdentityStep({
             </div>
           </section>
 
-          <WeatherLocationInput onSelectionChange={setWeatherLocation} />
+          <WeatherLocationInput
+            ref={weatherLocationInputRef}
+            onSelectionChange={setWeatherLocation}
+          />
         </div>
       </div>
 
       <div className="flex justify-end">
         <Button
           className="bg-brand-primary hover:bg-brand-primary/90 text-black"
-          onClick={handleContinue}
+          disabled={isContinuing}
+          onClick={() => void handleContinue()}
         >
           Continue
           <ChevronRight className="ml-1 h-4 w-4" />

@@ -561,7 +561,7 @@ const userTimezoneSchema = z
 const userLocationSchema = z.string().trim().min(1).max(200);
 const weatherLocationInputSchema = z.object({ location: userLocationSchema });
 const WTTR_LOCATION_TIMEOUT_MS = 4_000;
-const COORDINATE_LOCATION_PATTERN = /^-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?$/;
+const COORDINATE_LOCATION_PATTERN = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/;
 
 const wttrValueSchema = z.object({ value: z.string().trim().min(1) });
 const wttrNearestAreaSchema = z.object({
@@ -594,7 +594,19 @@ function formatCountryName(country: string): string {
   return country.toLowerCase() === 'netherlands' ? 'The Netherlands' : country;
 }
 
-function normalizeWeatherLocation(data: unknown): string | null {
+function isCoordinateLocation(location: string): boolean {
+  return COORDINATE_LOCATION_PATTERN.test(location.trim());
+}
+
+function locationIncludesCountry(location: string, country: string): boolean {
+  const normalizedCountry = country.toLowerCase().replace(/^the\s+/, '');
+  return location
+    .toLowerCase()
+    .split(',')
+    .some(part => part.trim().replace(/^the\s+/, '') === normalizedCountry);
+}
+
+function normalizeWeatherLocation(data: unknown, preferredAreaName?: string): string | null {
   const parsed = wttrLocationResponseSchema.safeParse(data);
   const text = JSON.stringify(data) ?? '';
   if (!parsed.success || text.toLowerCase().includes('unknown location')) return null;
@@ -602,11 +614,17 @@ function normalizeWeatherLocation(data: unknown): string | null {
   const nearestArea = parsed.data.nearest_area?.[0];
   if (!nearestArea) return null;
 
-  const areaName = wttrValue(nearestArea.areaName);
-  const region = wttrValue(nearestArea.region);
+  const wttrAreaName = wttrValue(nearestArea.areaName);
+  const areaName =
+    preferredAreaName && !isCoordinateLocation(preferredAreaName)
+      ? preferredAreaName
+      : wttrAreaName;
   const country = wttrValue(nearestArea.country);
   const formattedCountry = country ? formatCountryName(country) : null;
-  const parts = [areaName, region, formattedCountry];
+  const parts =
+    areaName && formattedCountry && locationIncludesCountry(areaName, formattedCountry)
+      ? [areaName]
+      : [areaName, formattedCountry];
   const uniqueParts = parts.filter((part, index): part is string => {
     if (!part) return false;
     return parts.findIndex(other => other?.toLowerCase() === part.toLowerCase()) === index;
@@ -658,13 +676,14 @@ async function fetchWttr(location: string, query: string): Promise<Response> {
   }
 }
 
-async function fetchCoordinateLocationName(location: string): Promise<string | null> {
-  if (!COORDINATE_LOCATION_PATTERN.test(location)) return null;
-
+async function fetchReadableLocationName(
+  location: string,
+  preferredAreaName: string
+): Promise<string | null> {
   try {
     const response = await fetchWttr(location, 'format=j1');
     if (!response.ok) return null;
-    return normalizeWeatherLocation(await response.json());
+    return normalizeWeatherLocation(await response.json(), preferredAreaName);
   } catch {
     return null;
   }
@@ -690,7 +709,7 @@ async function validateWeatherLocation(
     });
   }
 
-  const resolvedLocation = await fetchCoordinateLocationName(location);
+  const resolvedLocation = await fetchReadableLocationName(location, parsed.location);
   return { ...parsed, ...(resolvedLocation ? { location: resolvedLocation } : undefined) };
 }
 

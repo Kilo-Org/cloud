@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { forwardRef, useImperativeHandle, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,17 +15,27 @@ export type WeatherLocationSelection = {
   source: Exclude<WeatherLocationSource, 'skip'>;
 };
 
+export type WeatherLocationCommitResult =
+  | { ok: true; selection: WeatherLocationSelection | null }
+  | { ok: false };
+
+export type WeatherLocationInputHandle = {
+  commitPendingLocation: () => Promise<WeatherLocationCommitResult>;
+};
+
 type WeatherLocationInputProps = {
   disabled?: boolean;
   label?: string;
   onSelectionChange: (selection: WeatherLocationSelection | null) => void;
 };
 
-export function WeatherLocationInput({
-  disabled = false,
-  label = 'Your Location',
-  onSelectionChange,
-}: WeatherLocationInputProps) {
+export const WeatherLocationInput = forwardRef<
+  WeatherLocationInputHandle,
+  WeatherLocationInputProps
+>(function WeatherLocationInput(
+  { disabled = false, label = 'Your Location', onSelectionChange }: WeatherLocationInputProps,
+  ref
+) {
   const trpc = useTRPC();
   const validateLocation = useMutation(trpc.kiloclaw.validateWeatherLocation.mutationOptions());
   const [locationInput, setLocationInput] = useState('');
@@ -45,21 +55,40 @@ export function WeatherLocationInput({
     toast.error(message);
   }
 
-  async function validateLocationInput(location: string, source: 'browser' | 'text') {
+  async function validateLocationInput(
+    location: string,
+    source: 'browser' | 'text'
+  ): Promise<WeatherLocationSelection | null> {
     try {
       const result = await validateLocation.mutateAsync({ location });
-      if (source === 'browser') setLocationInput(result.location);
+      const selection = { location: result.location, source } satisfies WeatherLocationSelection;
+      setLocationInput(result.location);
       setCurrentWeatherText(result.currentWeatherText);
       setError(null);
-      onSelectionChange({ location: result.location, source });
+      onSelectionChange(selection);
+      return selection;
     } catch (caughtError) {
       showError(
         caughtError instanceof Error
           ? caughtError.message
           : 'Weather location could not be validated. Please try again or skip weather setup.'
       );
+      return null;
     }
   }
+
+  useImperativeHandle(ref, () => ({
+    async commitPendingLocation() {
+      const location = locationInput.trim();
+      if (!location) {
+        clearSelection();
+        return { ok: true, selection: null };
+      }
+
+      const selection = await validateLocationInput(location, 'text');
+      return selection ? { ok: true, selection } : { ok: false };
+    },
+  }));
 
   async function handleUseBrowserLocation() {
     setError(null);
@@ -131,7 +160,7 @@ export function WeatherLocationInput({
                 clearSelection();
               }}
               className="h-11 flex-1 border-0 bg-transparent shadow-none focus-visible:border-transparent focus-visible:ring-0"
-              placeholder="Amsterdam, North Holland"
+              placeholder="Amsterdam, The Netherlands"
               disabled={inputPending}
               maxLength={200}
               autoComplete="off"
@@ -167,4 +196,6 @@ export function WeatherLocationInput({
       </div>
     </section>
   );
-}
+});
+
+WeatherLocationInput.displayName = 'WeatherLocationInput';

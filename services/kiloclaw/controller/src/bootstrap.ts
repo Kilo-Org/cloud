@@ -361,6 +361,16 @@ function setUserMdProfileField(
     return updatedLines.join('\n');
   }
 
+  const notesIndex = lines.findIndex(line => /^\s*-\s*(?:\*\*)?Notes:(?:\*\*)?\s*.*$/i.test(line));
+  if (notesIndex !== -1) {
+    const indentation = lines[notesIndex].match(/^(\s*)-/)?.[1] ?? '';
+    const usesBoldFields = lines.some(line => /^\s*-\s*\*\*[^*]+:\*\*/.test(line));
+    const newFieldLine = usesBoldFields
+      ? `${indentation}- **${label}:** ${value}`
+      : `${indentation}- ${label}: ${value}`;
+    return [...lines.slice(0, notesIndex), newFieldLine, ...lines.slice(notesIndex)].join('\n');
+  }
+
   const separator = content.endsWith('\n') ? '' : '\n';
   return `${content}${separator}\n- ${label}: ${value}\n`;
 }

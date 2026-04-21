@@ -651,7 +651,28 @@ describe('setUserMdLocation', () => {
     expect(result).toContain('- Notes:');
   });
 
-  it('appends a location field when none exists', () => {
+  it('inserts a missing location field before bold notes', () => {
+    const result = setUserMdLocation(
+      [
+        '# USER.md - About Your Human',
+        '',
+        '- **Name:**',
+        '- **What to call them:**',
+        '- **Pronouns:** _(optional)_',
+        '- **Timezone:** Europe/Amsterdam',
+        '- **Notes:**',
+        '',
+        '## Context',
+      ].join('\n'),
+      'Amsterdam, Netherlands'
+    );
+
+    expect(result).toContain(
+      '- **Timezone:** Europe/Amsterdam\n- **Location:** Amsterdam, Netherlands\n- **Notes:**'
+    );
+  });
+
+  it('appends a location field when no profile list anchor exists', () => {
     const result = setUserMdLocation('# USER\n- Name:\n', 'Amsterdam, Netherlands');
 
     expect(result).toContain('- Name:');

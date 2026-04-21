@@ -11,6 +11,7 @@ import {
   formatBotIdentityMarkdown,
   writeBotIdentityFile,
   formatUserProfileMarkdown,
+  removeUserMdLocation,
   setUserMdTimezone,
   setUserMdLocation,
   writeUserProfileFile,
@@ -683,6 +684,17 @@ describe('setUserMdLocation', () => {
 
     expect(result).toContain('- Name:');
     expect(result).toContain('- Location: Amsterdam, Netherlands');
+  });
+});
+
+describe('removeUserMdLocation', () => {
+  it('removes plain and bold location fields', () => {
+    const result = removeUserMdLocation(
+      '# USER\n- Location: Amsterdam\n- **Location:** Rotterdam\n- Notes:\n'
+    );
+
+    expect(result).not.toContain('Location');
+    expect(result).toContain('- Notes:');
   });
 });
 

@@ -424,8 +424,22 @@ export function setUserMdTimezone(content: string, timezone: string): string {
   return setUserMdProfileField(content, 'Timezone', timezone);
 }
 
+function removeUserMdProfileField(content: string, label: 'Timezone' | 'Location'): string {
+  const lines = content.split('\n');
+  const updatedLines = lines.filter(line => findProfileFieldPrefixEnd(line, label) === null);
+  return updatedLines.length === lines.length ? content : updatedLines.join('\n');
+}
+
+export function removeUserMdTimezone(content: string): string {
+  return removeUserMdProfileField(content, 'Timezone');
+}
+
 export function setUserMdLocation(content: string, location: string): string {
   return setUserMdProfileField(content, 'Location', location);
+}
+
+export function removeUserMdLocation(content: string): string {
+  return removeUserMdProfileField(content, 'Location');
 }
 
 export function writeUserProfileFile(

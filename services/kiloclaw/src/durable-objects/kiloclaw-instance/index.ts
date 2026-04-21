@@ -649,8 +649,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const shouldWriteUserProfile =
       !isNew &&
       this.s.status === 'running' &&
-      (userTimezone !== previousUserTimezone || userLocation !== previousUserLocation) &&
-      (userTimezone !== null || userLocation !== null);
+      (userTimezone !== previousUserTimezone || userLocation !== previousUserLocation);
 
     const configFields = {
       userId,

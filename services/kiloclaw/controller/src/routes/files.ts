@@ -12,6 +12,8 @@ import {
   ensureWeatherSkillInstalled,
   formatBotIdentityMarkdown,
   formatUserProfileMarkdown,
+  removeUserMdLocation,
+  removeUserMdTimezone,
   setUserMdLocation,
   setUserMdTimezone,
 } from '../bootstrap';
@@ -215,9 +217,11 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
       return c.json({ error: 'Missing or invalid user profile fields' }, 400);
     }
 
-    const userTimezone = parsed.data.userTimezone ?? undefined;
-    const userLocation = parsed.data.userLocation ?? undefined;
-    if (!userTimezone && !userLocation) {
+    const hasUserTimezone = parsed.data.userTimezone !== undefined;
+    const hasUserLocation = parsed.data.userLocation !== undefined;
+    const userTimezone = parsed.data.userTimezone;
+    const userLocation = parsed.data.userLocation;
+    if (!hasUserTimezone && !hasUserLocation) {
       return c.json({ error: 'Missing or invalid user profile fields' }, 400);
     }
 
@@ -235,17 +239,23 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
 
     try {
       const userProfileExists = fs.existsSync(targetPath);
-      const content = userProfileExists
-        ? fs.readFileSync(targetPath, 'utf8')
-        : formatUserProfileMarkdown({
-            ...(userTimezone ? { timezone: userTimezone } : undefined),
-            ...(userLocation ? { location: userLocation } : undefined),
-          });
+      const hasProfileValue = Boolean(userTimezone || userLocation);
+      let content = '';
+      if (userProfileExists) {
+        content = fs.readFileSync(targetPath, 'utf8');
+      } else if (hasProfileValue) {
+        content = formatUserProfileMarkdown({
+          ...(userTimezone ? { timezone: userTimezone } : undefined),
+          ...(userLocation ? { location: userLocation } : undefined),
+        });
+      }
       let nextContent = content;
       if (userTimezone) nextContent = setUserMdTimezone(nextContent, userTimezone);
+      if (userTimezone === null) nextContent = removeUserMdTimezone(nextContent);
       if (userLocation) nextContent = setUserMdLocation(nextContent, userLocation);
+      if (userLocation === null) nextContent = removeUserMdLocation(nextContent);
 
-      if (!userProfileExists || nextContent !== content) {
+      if ((userProfileExists || nextContent) && nextContent !== content) {
         atomicWrite(targetPath, nextContent);
       }
       if (userLocation) {

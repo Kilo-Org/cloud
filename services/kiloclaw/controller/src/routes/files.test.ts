@@ -122,6 +122,28 @@ describe('file routes', () => {
       expect(body.path).toBe('workspace/USER.md');
       expect(vi.mocked(fs.copyFileSync)).toHaveBeenCalled();
     });
+
+    it('clears an existing workspace/USER.md location when location is null', async () => {
+      vi.mocked(fs.existsSync).mockImplementation(
+        (path: any) => typeof path === 'string' && path === `${ROOT}/workspace/USER.md`
+      );
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        '# USER\n- Timezone: Europe/Amsterdam\n- Location: Amsterdam\n- Notes:\n'
+      );
+
+      const res = await app.request('/_kilo/user-profile', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ userLocation: null }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(atomicWrite).toHaveBeenCalledWith(
+        `${ROOT}/workspace/USER.md`,
+        '# USER\n- Timezone: Europe/Amsterdam\n- Notes:\n'
+      );
+      expect(vi.mocked(fs.copyFileSync)).not.toHaveBeenCalled();
+    });
   });
 
   describe('GET /_kilo/files/tree', () => {

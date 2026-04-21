@@ -889,8 +889,8 @@ async function provisionInstance(
       kilocodeApiKey,
       kilocodeApiKeyExpiresAt,
       kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-      userTimezone: input.userTimezone ?? undefined,
-      userLocation: input.userLocation ?? undefined,
+      userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+      userLocation: input.userLocation === undefined ? undefined : input.userLocation,
       pinnedImageTag,
     },
     params.instanceId

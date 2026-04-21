@@ -429,8 +429,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
               kilocodeApiKey,
               kilocodeApiKeyExpiresAt,
               kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-              userTimezone: input.userTimezone ?? undefined,
-              userLocation: input.userLocation ?? undefined,
+              userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+              userLocation: input.userLocation === undefined ? undefined : input.userLocation,
             },
             { orgId: input.organizationId }
           );
@@ -484,8 +484,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
           kilocodeApiKey,
           kilocodeApiKeyExpiresAt,
           kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-          userTimezone: input.userTimezone ?? undefined,
-          userLocation: input.userLocation ?? undefined,
+          userTimezone: input.userTimezone === undefined ? undefined : input.userTimezone,
+          userLocation: input.userLocation === undefined ? undefined : input.userLocation,
           pinnedImageTag: pin?.image_tag,
         },
         { instanceId: instance.id, orgId: input.organizationId }

@@ -388,6 +388,14 @@ beforeEach(() => {
           })
         );
       }
+      if (typeof url === 'string' && url.includes('/_kilo/user-profile')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, path: 'workspace/USER.md' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
       // Root path probe — return non-502
       return Promise.resolve({ ok: true, status: 200 });
     })
@@ -5500,6 +5508,14 @@ describe('provision: auto-start after fresh provision', () => {
 
     expect(storage._store.get('userTimezone')).toBeNull();
     expect(storage._store.get('userLocation')).toBeNull();
+    const userProfileCall = vi
+      .mocked(fetch)
+      .mock.calls.find(
+        call => typeof call[0] === 'string' && call[0].includes('/_kilo/user-profile')
+      );
+    expect(userProfileCall?.[1]?.body).toBe(
+      JSON.stringify({ userTimezone: null, userLocation: null })
+    );
   });
 
   it('leaves user location absent when weather setup is skipped', async () => {

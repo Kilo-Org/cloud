@@ -103,7 +103,7 @@
       "id": "kilo-auto/free",
       "name": "Kilo Auto Free",
       "created": 0,
-      "description": "Free with limited capability. No credits required.",
+      "description": "Free with limited capability. No credits required. Note: prompts may be logged by the upstream provider and used to improve their services.",
       "architecture": {
         "input_modalities": [
           "text"

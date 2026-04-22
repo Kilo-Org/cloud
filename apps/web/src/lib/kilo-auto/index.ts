@@ -120,7 +120,8 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Kilo Auto Free',
-  description: 'Free with limited capability. No credits required.',
+  description:
+    'Free with limited capability. No credits required. Note: prompts may be logged by the upstream provider and used to improve their services.',
   context_length: 256_000,
   max_completion_tokens: 10_000,
   prompt_price: '0',

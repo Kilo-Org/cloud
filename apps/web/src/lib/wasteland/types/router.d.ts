@@ -374,7 +374,7 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         wastelandId: string;
         itemId: string;
         quality: 'excellent' | 'fair' | 'good' | 'poor';
-        comment?: string | undefined;
+        message?: string | undefined;
         direct?: boolean | undefined;
       };
       output: {
@@ -386,7 +386,7 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       input: {
         wastelandId: string;
         itemId: string;
-        comment: string;
+        reason: string;
         direct?: boolean | undefined;
       };
       output: {
@@ -399,6 +399,190 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         wastelandId: string;
         itemId: string;
         direct?: boolean | undefined;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
+    mergeUpstreamPR: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        pullId: string;
+      };
+      output: {
+        pull_id: string;
+        state: string;
+      };
+      meta: object;
+    }>;
+    closeUpstreamPR: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        pullId: string;
+      };
+      output: {
+        pull_id: string;
+        state: string;
+      };
+      meta: object;
+    }>;
+    verifyUpstreamAdmin: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+      };
+      output: {
+        hasWriteAccess: boolean;
+        error: string | null;
+      };
+      meta: object;
+    }>;
+    listInboxItems: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+      };
+      output: {
+        items: (
+          | {
+              pull_id: string;
+              title: string;
+              state: string;
+              from_branch: string | null;
+              submitter: string | null;
+              creator_name: string | null;
+              created_at: string | null;
+              updated_at: string | null;
+              kind: 'rig-registration';
+              handle: string;
+              display_name: string | null;
+              dolthub_org: string | null;
+              owner_email: string | null;
+              hop_uri: string | null;
+              gt_version: string | null;
+            }
+          | {
+              pull_id: string;
+              title: string;
+              state: string;
+              from_branch: string | null;
+              submitter: string | null;
+              creator_name: string | null;
+              created_at: string | null;
+              updated_at: string | null;
+              kind: 'wanted-post';
+              item_id: string;
+              item_title: string;
+              description: string | null;
+              type: string | null;
+              priority: string | null;
+              effort_level: string | null;
+              tags: string | null;
+              posted_by: string | null;
+            }
+          | {
+              pull_id: string;
+              title: string;
+              state: string;
+              from_branch: string | null;
+              submitter: string | null;
+              creator_name: string | null;
+              created_at: string | null;
+              updated_at: string | null;
+              kind: 'wanted-edit';
+              subkind: 'delete' | 'unclaim' | 'update';
+              item_id: string;
+              item_title: string;
+              submitter_is_poster: boolean | null;
+              posted_by: string | null;
+              status_transition: string | null;
+            }
+          | {
+              pull_id: string;
+              title: string;
+              state: string;
+              from_branch: string | null;
+              submitter: string | null;
+              creator_name: string | null;
+              created_at: string | null;
+              updated_at: string | null;
+              kind: 'work-submission';
+              item_id: string;
+              item_title: string;
+              claimer: string;
+              has_done: boolean;
+              evidence_url: string | null;
+              completion_id: string | null;
+            }
+          | {
+              pull_id: string;
+              title: string;
+              state: string;
+              from_branch: string | null;
+              submitter: string | null;
+              creator_name: string | null;
+              created_at: string | null;
+              updated_at: string | null;
+              kind: 'admin-action';
+              subkind: 'accept' | 'accept-upstream' | 'close' | 'close-upstream' | 'reject';
+              item_id: string;
+              item_title: string;
+              worker: string | null;
+              acceptor: string | null;
+              reject_reason: string | null;
+              stamp: {
+                quality: string | null;
+                severity: string | null;
+                skill_tags: string | null;
+                message: string | null;
+              } | null;
+            }
+          | {
+              pull_id: string;
+              title: string;
+              state: string;
+              from_branch: string | null;
+              submitter: string | null;
+              creator_name: string | null;
+              created_at: string | null;
+              updated_at: string | null;
+              kind: 'unknown';
+              commit_subjects: string[];
+            }
+        )[];
+      };
+      meta: object;
+    }>;
+    commentOnUpstreamPR: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        pullId: string;
+        comment: string;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
+    listUpstreamRigs: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+      };
+      output: {
+        rigs: {
+          rig_handle: string;
+          display_name: string | null;
+          trust_level: number;
+          registered_at: string | null;
+          last_seen_at: string | null;
+        }[];
+      };
+      meta: object;
+    }>;
+    setUpstreamRigTrust: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        rigHandle: string;
+        trustLevel: number;
       };
       output: {
         success: boolean;
@@ -796,7 +980,7 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             wastelandId: string;
             itemId: string;
             quality: 'excellent' | 'fair' | 'good' | 'poor';
-            comment?: string | undefined;
+            message?: string | undefined;
             direct?: boolean | undefined;
           };
           output: {
@@ -808,7 +992,7 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
           input: {
             wastelandId: string;
             itemId: string;
-            comment: string;
+            reason: string;
             direct?: boolean | undefined;
           };
           output: {
@@ -821,6 +1005,190 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             wastelandId: string;
             itemId: string;
             direct?: boolean | undefined;
+          };
+          output: {
+            success: boolean;
+          };
+          meta: object;
+        }>;
+        mergeUpstreamPR: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            pullId: string;
+          };
+          output: {
+            pull_id: string;
+            state: string;
+          };
+          meta: object;
+        }>;
+        closeUpstreamPR: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            pullId: string;
+          };
+          output: {
+            pull_id: string;
+            state: string;
+          };
+          meta: object;
+        }>;
+        verifyUpstreamAdmin: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+          };
+          output: {
+            hasWriteAccess: boolean;
+            error: string | null;
+          };
+          meta: object;
+        }>;
+        listInboxItems: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            wastelandId: string;
+          };
+          output: {
+            items: (
+              | {
+                  pull_id: string;
+                  title: string;
+                  state: string;
+                  from_branch: string | null;
+                  submitter: string | null;
+                  creator_name: string | null;
+                  created_at: string | null;
+                  updated_at: string | null;
+                  kind: 'rig-registration';
+                  handle: string;
+                  display_name: string | null;
+                  dolthub_org: string | null;
+                  owner_email: string | null;
+                  hop_uri: string | null;
+                  gt_version: string | null;
+                }
+              | {
+                  pull_id: string;
+                  title: string;
+                  state: string;
+                  from_branch: string | null;
+                  submitter: string | null;
+                  creator_name: string | null;
+                  created_at: string | null;
+                  updated_at: string | null;
+                  kind: 'wanted-post';
+                  item_id: string;
+                  item_title: string;
+                  description: string | null;
+                  type: string | null;
+                  priority: string | null;
+                  effort_level: string | null;
+                  tags: string | null;
+                  posted_by: string | null;
+                }
+              | {
+                  pull_id: string;
+                  title: string;
+                  state: string;
+                  from_branch: string | null;
+                  submitter: string | null;
+                  creator_name: string | null;
+                  created_at: string | null;
+                  updated_at: string | null;
+                  kind: 'wanted-edit';
+                  subkind: 'delete' | 'unclaim' | 'update';
+                  item_id: string;
+                  item_title: string;
+                  submitter_is_poster: boolean | null;
+                  posted_by: string | null;
+                  status_transition: string | null;
+                }
+              | {
+                  pull_id: string;
+                  title: string;
+                  state: string;
+                  from_branch: string | null;
+                  submitter: string | null;
+                  creator_name: string | null;
+                  created_at: string | null;
+                  updated_at: string | null;
+                  kind: 'work-submission';
+                  item_id: string;
+                  item_title: string;
+                  claimer: string;
+                  has_done: boolean;
+                  evidence_url: string | null;
+                  completion_id: string | null;
+                }
+              | {
+                  pull_id: string;
+                  title: string;
+                  state: string;
+                  from_branch: string | null;
+                  submitter: string | null;
+                  creator_name: string | null;
+                  created_at: string | null;
+                  updated_at: string | null;
+                  kind: 'admin-action';
+                  subkind: 'accept' | 'accept-upstream' | 'close' | 'close-upstream' | 'reject';
+                  item_id: string;
+                  item_title: string;
+                  worker: string | null;
+                  acceptor: string | null;
+                  reject_reason: string | null;
+                  stamp: {
+                    quality: string | null;
+                    severity: string | null;
+                    skill_tags: string | null;
+                    message: string | null;
+                  } | null;
+                }
+              | {
+                  pull_id: string;
+                  title: string;
+                  state: string;
+                  from_branch: string | null;
+                  submitter: string | null;
+                  creator_name: string | null;
+                  created_at: string | null;
+                  updated_at: string | null;
+                  kind: 'unknown';
+                  commit_subjects: string[];
+                }
+            )[];
+          };
+          meta: object;
+        }>;
+        commentOnUpstreamPR: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            pullId: string;
+            comment: string;
+          };
+          output: {
+            success: boolean;
+          };
+          meta: object;
+        }>;
+        listUpstreamRigs: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            wastelandId: string;
+          };
+          output: {
+            rigs: {
+              rig_handle: string;
+              display_name: string | null;
+              trust_level: number;
+              registered_at: string | null;
+              last_seen_at: string | null;
+            }[];
+          };
+          meta: object;
+        }>;
+        setUpstreamRigTrust: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            wastelandId: string;
+            rigHandle: string;
+            trustLevel: number;
           };
           output: {
             success: boolean;

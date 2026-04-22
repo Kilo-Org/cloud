@@ -16,6 +16,8 @@ import { resolveSecret } from '../util/secret.util';
 import { meterEvent } from '../util/billing.util';
 import * as wantedBoard from '../wanted-board/wanted-board-ops';
 import { WantedBoardOpError } from '../wanted-board/wanted-board-ops';
+import * as doltApi from '../util/dolthub-api.util';
+import * as inbox from '../inbox/inbox-classifier';
 import {
   RpcWastelandOutput,
   RpcWastelandMemberOutput,
@@ -23,6 +25,10 @@ import {
   RpcWastelandCredentialStatusOutput,
   RpcConnectedTownOutput,
   RpcWantedBoardRowOutput,
+  RpcInboxItemOutput,
+  RpcUpstreamAdminVerifyOutput,
+  RpcMergePullOutput,
+  RpcUpstreamRigOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
@@ -64,6 +70,47 @@ function wantedBoardErrorToTRPC(err: unknown): never {
     throw new TRPCError({ code, message: err.message });
   }
   throw err;
+}
+
+/**
+ * Load a decrypted DoltHub token + upstream for the caller's credential.
+ * Used by admin-only procedures that call DoltHub's REST API directly
+ * (listInboxItems, mergeUpstreamPR, verifyUpstreamAdmin, etc.).
+ */
+async function loadAdminContext(
+  env: Env,
+  wastelandId: string,
+  userId: string
+): Promise<{ token: string; upstream: string; isUpstreamAdmin: boolean }> {
+  const doStub = getWastelandDOStub(env, wastelandId);
+  const config = await doStub.getConfig();
+  if (!config?.dolthub_upstream) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Wasteland has no DoltHub upstream configured',
+    });
+  }
+  const credential = await doStub.getCredential(userId);
+  if (!credential) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'No DoltHub credential stored — connect DoltHub first',
+    });
+  }
+  const rawKey = await resolveSecret(env.WASTELAND_ENCRYPTION_KEY);
+  if (!rawKey) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Encryption key unavailable',
+    });
+  }
+  const cryptoKey = await deriveEncryptionKey(rawKey);
+  const token = await decryptToken(credential.encrypted_token, cryptoKey);
+  return {
+    token,
+    upstream: config.dolthub_upstream,
+    isUpstreamAdmin: credential.is_upstream_admin,
+  };
 }
 
 /**
@@ -987,7 +1034,11 @@ export const wastelandRouter = router({
         wastelandId: z.string().uuid(),
         itemId: z.string().min(1),
         quality: z.enum(['excellent', 'good', 'fair', 'poor']),
-        comment: z.string().optional(),
+        /**
+         * Free-form message attached to the reputation stamp
+         * (`stamps.message`). Maps to `wl accept --message`.
+         */
+        message: z.string().optional(),
         direct: z.boolean().optional(),
       })
     )
@@ -998,7 +1049,7 @@ export const wastelandRouter = router({
         return await wantedBoard.acceptWantedItem(ctx.env, input.wastelandId, ctx.userId, {
           itemId: input.itemId,
           quality: input.quality,
-          comment: input.comment,
+          message: input.message,
           direct: input.direct,
         });
       } catch (err) {
@@ -1011,7 +1062,11 @@ export const wastelandRouter = router({
       z.object({
         wastelandId: z.string().uuid(),
         itemId: z.string().min(1),
-        comment: z.string().min(1),
+        /**
+         * Rejection reason — becomes part of the `wl reject` commit
+         * message. Maps to `--reason` on the wl CLI.
+         */
+        reason: z.string().min(1),
         direct: z.boolean().optional(),
       })
     )
@@ -1021,7 +1076,7 @@ export const wastelandRouter = router({
       try {
         return await wantedBoard.rejectWantedItem(ctx.env, input.wastelandId, ctx.userId, {
           itemId: input.itemId,
-          comment: input.comment,
+          reason: input.reason,
           direct: input.direct,
         });
       } catch (err) {
@@ -1050,6 +1105,326 @@ export const wastelandRouter = router({
         );
       } catch (err) {
         return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
+  // ── Admin: Upstream PR management ──────────────────────────────────
+  // Admins with `is_upstream_admin=true` can list/merge/close upstream PRs
+  // using the stored DoltHub credential. Non-admins get FORBIDDEN since
+  // the underlying DoltHub API would reject the write anyway.
+
+  mergeUpstreamPR: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        pullId: z.string().min(1),
+      })
+    )
+    .output(RpcMergePullOutput)
+    .mutation(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      const { token, upstream, isUpstreamAdmin } = await loadAdminContext(
+        ctx.env,
+        input.wastelandId,
+        ctx.userId
+      );
+      if (!isUpstreamAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admin mode required to merge upstream PRs',
+        });
+      }
+      try {
+        const result = await doltApi.mergePull(upstream, token, input.pullId);
+        meterEvent(ctx.env, {
+          event: 'billing.api_operation',
+          userId: ctx.userId,
+          wastelandId: input.wastelandId,
+          label: 'merge_pr',
+        });
+        return { pull_id: input.pullId, state: result.state };
+      } catch (err) {
+        if (err instanceof doltApi.DoltHubApiError) {
+          throw new TRPCError({
+            code: err.status === 401 || err.status === 403 ? 'FORBIDDEN' : 'INTERNAL_SERVER_ERROR',
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+    }),
+
+  closeUpstreamPR: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        pullId: z.string().min(1),
+      })
+    )
+    .output(RpcMergePullOutput)
+    .mutation(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      const { token, upstream, isUpstreamAdmin } = await loadAdminContext(
+        ctx.env,
+        input.wastelandId,
+        ctx.userId
+      );
+      if (!isUpstreamAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admin mode required to close upstream PRs',
+        });
+      }
+      try {
+        const result = await doltApi.closePull(upstream, token, input.pullId);
+        meterEvent(ctx.env, {
+          event: 'billing.api_operation',
+          userId: ctx.userId,
+          wastelandId: input.wastelandId,
+          label: 'close_pr',
+        });
+        return { pull_id: input.pullId, state: result.state };
+      } catch (err) {
+        if (err instanceof doltApi.DoltHubApiError) {
+          throw new TRPCError({
+            code: err.status === 401 || err.status === 403 ? 'FORBIDDEN' : 'INTERNAL_SERVER_ERROR',
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+    }),
+
+  // ── Admin: Verify upstream write access ─────────────────────────────
+  // Probes DoltHub by attempting a no-op write against a scratch branch.
+  // Returns hasWriteAccess=true only when the write API reports success
+  // (a DoltHub token without push rights returns 403 here).
+
+  verifyUpstreamAdmin: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(RpcUpstreamAdminVerifyOutput)
+    .mutation(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      const { token, upstream, isUpstreamAdmin } = await loadAdminContext(
+        ctx.env,
+        input.wastelandId,
+        ctx.userId
+      );
+      if (!isUpstreamAdmin) {
+        return {
+          hasWriteAccess: false,
+          error: 'Credential is not marked as admin. Toggle "I own this upstream" first.',
+        };
+      }
+      // Use a unique scratch branch so concurrent verifications don't collide.
+      // DoltHub write API forks the target branch; a no-op DML (SELECT 1)
+      // is enough to probe auth without mutating data. Delete the branch
+      // after the probe so DoltHub doesn't accumulate dead branches.
+      const scratchBranch = `admin-verify-${crypto.randomUUID().slice(0, 8)}`;
+      try {
+        await doltApi.runWrite(upstream, token, 'main', scratchBranch, 'SELECT 1');
+        await doltApi.deleteBranch(upstream, token, scratchBranch);
+        return { hasWriteAccess: true, error: null };
+      } catch (err) {
+        // Best-effort cleanup in case the branch was created before failure.
+        await doltApi.deleteBranch(upstream, token, scratchBranch);
+        if (err instanceof doltApi.DoltHubApiError) {
+          return {
+            hasWriteAccess: false,
+            error: err.message,
+          };
+        }
+        return {
+          hasWriteAccess: false,
+          error: err instanceof Error ? err.message : 'Unknown error',
+        };
+      }
+    }),
+
+  // ── Admin: Review inbox (typed view of open upstream PRs) ──────────
+  // Replaces the raw `listPendingPRs` surface for UI clients. Classifies
+  // each PR into a typed card kind by parsing commit subjects and
+  // querying the branch tip for row-level context (item title, evidence,
+  // stamp, rig details).
+
+  listInboxItems: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(z.object({ items: z.array(RpcInboxItemOutput) }))
+    .query(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      const { token, upstream, isUpstreamAdmin } = await loadAdminContext(
+        ctx.env,
+        input.wastelandId,
+        ctx.userId
+      );
+      if (!isUpstreamAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admin mode required to view the review inbox',
+        });
+      }
+      try {
+        const items = await inbox.listInboxItems(upstream, token);
+        return { items };
+      } catch (err) {
+        if (err instanceof doltApi.DoltHubApiError) {
+          throw new TRPCError({
+            code: err.status === 401 || err.status === 403 ? 'FORBIDDEN' : 'INTERNAL_SERVER_ERROR',
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+    }),
+
+  // ── Admin: Post a comment on an upstream PR ────────────────────────
+
+  commentOnUpstreamPR: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        pullId: z.string().min(1),
+        comment: z.string().min(1).max(10_000),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      const { token, upstream, isUpstreamAdmin } = await loadAdminContext(
+        ctx.env,
+        input.wastelandId,
+        ctx.userId
+      );
+      if (!isUpstreamAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admin mode required to comment on upstream PRs',
+        });
+      }
+      try {
+        await doltApi.commentOnPull(upstream, token, input.pullId, input.comment);
+        meterEvent(ctx.env, {
+          event: 'billing.api_operation',
+          userId: ctx.userId,
+          wastelandId: input.wastelandId,
+          label: 'pr_comment',
+        });
+        return { success: true };
+      } catch (err) {
+        if (err instanceof doltApi.DoltHubApiError) {
+          throw new TRPCError({
+            code: err.status === 401 || err.status === 403 ? 'FORBIDDEN' : 'INTERNAL_SERVER_ERROR',
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+    }),
+
+  // ── Admin: List rigs registered on upstream ─────────────────────────
+
+  listUpstreamRigs: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(z.object({ rigs: z.array(RpcUpstreamRigOutput) }))
+    .query(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      const { token, upstream } = await loadAdminContext(ctx.env, input.wastelandId, ctx.userId);
+      try {
+        const result = await doltApi.runSql(
+          upstream,
+          token,
+          'main',
+          `SELECT handle, display_name, trust_level, registered_at, last_seen FROM rigs ORDER BY registered_at DESC`
+        );
+        const rigRow = z.object({
+          handle: z.string(),
+          display_name: z.string().nullable().default(null),
+          trust_level: z.union([z.string(), z.number()]).transform(v => Number(v)),
+          registered_at: z.string().nullable().default(null),
+          last_seen: z.string().nullable().default(null),
+        });
+        const rows = z.array(rigRow).safeParse(result.rows ?? []);
+        const rigs = (rows.success ? rows.data : []).map(r => ({
+          rig_handle: r.handle,
+          display_name: r.display_name,
+          trust_level: r.trust_level,
+          registered_at: r.registered_at,
+          last_seen_at: r.last_seen,
+        }));
+        return { rigs };
+      } catch (err) {
+        if (err instanceof doltApi.DoltHubApiError) {
+          throw new TRPCError({
+            code: err.status === 401 || err.status === 403 ? 'FORBIDDEN' : 'INTERNAL_SERVER_ERROR',
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+    }),
+
+  // ── Admin: Change rig trust level via direct upstream write ─────────
+  // `wl` has no CLI command for trust-level changes, so we use the
+  // DoltHub write API to update `rigs.trust_level` on a scratch branch
+  // that we immediately merge back via auto-PR. This requires admin
+  // write access on the upstream.
+
+  setUpstreamRigTrust: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        // `wl` rig handles are alphanumeric with `-` or `_`, max 64 chars.
+        // Validating at the Zod layer means the SQL interpolation below is
+        // safe by construction — the string CANNOT contain quotes, spaces,
+        // semicolons, SQL comment markers, or any other injection vector.
+        rigHandle: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[a-zA-Z0-9_-]+$/, 'rigHandle must be alphanumeric with - or _ only'),
+        trustLevel: z.number().int().min(0).max(3),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      const { token, upstream, isUpstreamAdmin } = await loadAdminContext(
+        ctx.env,
+        input.wastelandId,
+        ctx.userId
+      );
+      if (!isUpstreamAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admin mode required to change rig trust levels',
+        });
+      }
+      const scratchBranch = `trust-${input.rigHandle}-${crypto.randomUUID().slice(0, 8)}`;
+      try {
+        // `rigHandle` is validated by Zod to match /^[a-zA-Z0-9_-]+$/ and
+        // `trustLevel` is an integer in [0,3]. Both are safe to interpolate.
+        await doltApi.runWrite(
+          upstream,
+          token,
+          'main',
+          scratchBranch,
+          `UPDATE rigs SET trust_level = ${input.trustLevel} WHERE handle = '${input.rigHandle}'`
+        );
+        meterEvent(ctx.env, {
+          event: 'billing.api_operation',
+          userId: ctx.userId,
+          wastelandId: input.wastelandId,
+          label: 'rig_trust_update',
+        });
+        return { success: true };
+      } catch (err) {
+        if (err instanceof doltApi.DoltHubApiError) {
+          throw new TRPCError({
+            code: err.status === 401 || err.status === 403 ? 'FORBIDDEN' : 'INTERNAL_SERVER_ERROR',
+            message: err.message,
+          });
+        }
+        throw err;
       }
     }),
 });

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Skull, Globe, Lock } from 'lucide-react';
+import { useWastelandPageHeader } from './WastelandPageHeaderContext';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -20,6 +21,10 @@ export function WastelandDashboardHeader() {
 
   const wastelandQuery = useQuery(trpc.wasteland.getWasteland.queryOptions({ wastelandId }));
   const wasteland = wastelandQuery.data;
+  // Page-specific section contributed by the active route via
+  // `useSetWastelandPageHeader`. May be null during loading or if a page
+  // hasn't written one (e.g. placeholder routes).
+  const pageHeader = useWastelandPageHeader();
 
   return (
     <div className="border-b border-white/[0.06]">
@@ -57,6 +62,24 @@ export function WastelandDashboardHeader() {
                   {wasteland.visibility}
                 </Badge>
               </>
+            )}
+          </div>
+        )}
+
+        {/* Page-specific section — title + count + CTAs, right-aligned via flex-1. */}
+        {pageHeader && (
+          <div className="flex flex-1 items-center justify-between gap-2 pl-3">
+            <div className="flex items-center gap-2">
+              {pageHeader.icon}
+              <h2 className="text-lg font-semibold tracking-tight text-white/90">
+                {pageHeader.title}
+              </h2>
+              {pageHeader.count != null && (
+                <span className="ml-1 font-mono text-xs text-white/30">{pageHeader.count}</span>
+              )}
+            </div>
+            {pageHeader.actions && (
+              <div className="flex items-center gap-2">{pageHeader.actions}</div>
             )}
           </div>
         )}

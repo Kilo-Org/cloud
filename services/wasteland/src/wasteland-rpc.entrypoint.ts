@@ -103,14 +103,15 @@ export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
     userId: string;
     itemId: string;
     quality: 'excellent' | 'good' | 'fair' | 'poor';
-    comment?: string;
+    /** Free-form message attached to the reputation stamp. */
+    message?: string;
     direct?: boolean;
   }) {
     return wrap(() =>
       wantedBoard.acceptWantedItem(this.env, params.wastelandId, params.userId, {
         itemId: params.itemId,
         quality: params.quality,
-        comment: params.comment,
+        message: params.message,
         direct: params.direct,
       })
     );
@@ -120,13 +121,14 @@ export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
     wastelandId: string;
     userId: string;
     itemId: string;
-    comment: string;
+    /** Rejection reason (maps to `wl reject --reason`). */
+    reason: string;
     direct?: boolean;
   }) {
     return wrap(() =>
       wantedBoard.rejectWantedItem(this.env, params.wastelandId, params.userId, {
         itemId: params.itemId,
-        comment: params.comment,
+        reason: params.reason,
         direct: params.direct,
       })
     );

@@ -172,10 +172,14 @@ Six commits on `wasteland-staging-v3`, in order:
 **UI (frontend)**
 
 - `apps/web/src/app/(app)/gastown/[townId]/settings/WastelandSettingsSection.tsx`:
-  - Credentials step: "I own this upstream" checkbox wired to
-    `storeCredential`'s new `isUpstreamAdmin` field.
-  - Connected state: amber "Admin" badge; inline toggle row that calls
-    `setUpstreamAdmin` on change.
+  - Credentials step of the Connect dialog: "I own this upstream"
+    checkbox wired to `storeCredential`'s new `isUpstreamAdmin` field.
+    The post-connect toggle lives on the wasteland settings page, not
+    here — this page only shows connection status.
+- `apps/web/src/app/(app)/wasteland/[wastelandId]/settings/SettingsClient.tsx`:
+  - DoltHub Connection section: amber "Admin" badge next to the
+    connected label, plus an inline "I own this upstream (admin mode)"
+    toggle row that calls `setUpstreamAdmin` on change.
 - `apps/web/src/app/(app)/wasteland/[wastelandId]/wanted/WantedBoardClient.tsx`:
   - `parseDoltDate()` helper (UTC-assumption fallback).
   - Sort default changed from `priority` (no-op because
@@ -190,7 +194,24 @@ Six commits on `wasteland-staging-v3`, in order:
 ## What's still open
 
 Three remaining work items, all UI-heavy. Backend plumbing for each is
-already in place.
+already in place, but do keep an eye out for potentially missing backend plumbing or incorrect implementations. It's your job to verify that the UI works and that includes making backend changes as necessary.
+
+### Status (this session)
+
+All three workstreams below have landed behind the existing
+`is_upstream_admin` gate (no separate feature flag). New backend tRPC
+procedures added:
+
+- `listPendingPRs` / `mergeUpstreamPR` / `closeUpstreamPR` — DoltHub PR
+  management via the stored admin credential.
+- `verifyUpstreamAdmin` — probes DoltHub write access with a no-op
+  scratch-branch write.
+- `listUpstreamRigs` / `setUpstreamRigTrust` — reads the upstream `rigs`
+  table and writes trust-level changes via the DoltHub write API.
+
+These live in `src/trpc/router.ts` and share a small `dolthub-api.util.ts`
+client. Frontend types regenerated via `tsconfig.types.json` and copied
+into `apps/web/src/lib/wasteland/types/`.
 
 ### WS-Admin 7 — Split Connect dialog into Join + Create
 
@@ -247,9 +268,13 @@ implicitly the "create your own" path but not distinguished clearly.
     `connectTownToWasteland` (current behavior).
   - Create: `createWasteland(name, ownerType, dolthubUpstream)`, then
     `storeCredential({isUpstreamAdmin: true})`, then `createUpstream`
-    (runs `wl create` in the container), then `connectTownToWasteland`.
-    No `connectKiloTown` call — the create flow handles it implicitly
-    because the creator is already a member via `addMember('owner', 3)`.
+    (runs `wl create` in the container), then `connectKiloTown`
+    (persists the town↔wasteland mapping on the wasteland DO; no-ops on
+    the member add because `createWasteland` already registered the
+    caller as owner), then `connectTownToWasteland` (persists the
+    mapping on the Town DO). Both `connectKiloTown` and
+    `connectTownToWasteland` are required because each writes to a
+    different DO.
 - The Join branch's "Create new" fallback button can be dropped — it's
   redundant once the intent step exists.
 - Success copy differs: Join says "Connected to X"; Create says

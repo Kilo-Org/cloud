@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import type { WastelandOutputs } from '@/lib/wasteland/trpc';
+import { useSetWastelandPageHeader } from '../WastelandPageHeaderContext';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -23,6 +24,10 @@ import {
   Hand,
   CheckCircle2,
   Loader2,
+  ThumbsUp,
+  ThumbsDown,
+  XCircle,
+  UserMinus,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -62,13 +67,19 @@ function lastActivityMs(item: Record<string, unknown>): number {
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   claimed: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  in_review: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+  completed: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
   done: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+  withdrawn: 'bg-white/[0.04] text-white/40 border-white/10',
 };
 
 const STATUS_DOT: Record<string, string> = {
   open: 'bg-emerald-400',
   claimed: 'bg-amber-400',
+  in_review: 'bg-violet-400',
+  completed: 'bg-sky-400',
   done: 'bg-sky-400',
+  withdrawn: 'bg-white/20',
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -133,12 +144,23 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
   // Dialog state
   const [claimItem, setClaimItem] = useState<WantedItem | null>(null);
   const [doneItem, setDoneItem] = useState<WantedItem | null>(null);
+  const [acceptItem, setAcceptItem] = useState<WantedItem | null>(null);
+  const [rejectItem, setRejectItem] = useState<WantedItem | null>(null);
+  const [closeItem, setCloseItem] = useState<WantedItem | null>(null);
+  const [unclaimItem, setUnclaimItem] = useState<WantedItem | null>(null);
   const [showPostDialog, setShowPostDialog] = useState(false);
 
   const wantedQuery = useQuery({
     ...trpc.wasteland.browseWantedBoard.queryOptions({ wastelandId }),
     refetchInterval: 30_000,
   });
+
+  // Credential status drives admin affordances. Not required — contributors
+  // without credentials get `data = null` and isAdmin stays false.
+  const credentialQuery = useQuery(
+    trpc.wasteland.getCredentialStatus.queryOptions({ wastelandId })
+  );
+  const isAdmin = credentialQuery.data?.is_upstream_admin ?? false;
 
   const refreshMutation = {
     isPending: false,
@@ -158,7 +180,12 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
   const items = wantedQuery.data ?? [];
 
   const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { open: 0, claimed: 0, done: 0 };
+    const counts: Record<string, number> = {
+      open: 0,
+      claimed: 0,
+      in_review: 0,
+      completed: 0,
+    };
     for (const item of items) {
       counts[item.status] = (counts[item.status] ?? 0) + 1;
     }
@@ -201,38 +228,38 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
     return items.find(i => i.id === selectedItem.id) ?? selectedItem;
   }, [selectedItem, items]);
 
+  // Contribute page title, item count, and CTAs into the wasteland navbar.
+  useSetWastelandPageHeader({
+    title: 'Wanted Board',
+    icon: <ScrollText className="size-4 text-[color:oklch(70%_0.15_30_/_0.6)]" />,
+    count: items.length,
+    actions: (
+      <>
+        <button
+          type="button"
+          onClick={() => setShowPostDialog(true)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/80"
+        >
+          <Plus className="size-3" />
+          Post Wanted Item
+        </button>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={refreshMutation.isPending}
+          className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-50"
+        >
+          <RefreshCw className={`size-3 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+      </>
+    ),
+  });
+
   return (
     <div className="flex h-full">
       {/* Main list */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-3">
-          <div className="flex items-center gap-2">
-            <ScrollText className="size-4 text-[color:oklch(70%_0.15_30_/_0.6)]" />
-            <h2 className="text-lg font-semibold tracking-tight text-white/90">Wanted Board</h2>
-            <span className="ml-1 font-mono text-xs text-white/30">{items.length}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowPostDialog(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/80"
-            >
-              <Plus className="size-3" />
-              Post Wanted Item
-            </button>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={refreshMutation.isPending}
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-50"
-            >
-              <RefreshCw className={`size-3 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
-        </div>
-
         {/* Filter bar */}
         <div className="flex items-center gap-3 border-b border-white/[0.06] px-6 py-2">
           {/* Search */}
@@ -255,7 +282,7 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
               active={statusFilter === null}
               onClick={() => setStatusFilter(null)}
             />
-            {(['open', 'claimed', 'done'] as const).map(status => (
+            {(['open', 'claimed', 'in_review', 'completed'] as const).map(status => (
               <FilterChip
                 key={status}
                 label={status}
@@ -366,9 +393,14 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
         {resolvedSelectedItem && (
           <WantedDetailPanel
             item={resolvedSelectedItem}
+            isAdmin={isAdmin}
             onClose={() => setSelectedItem(null)}
             onClaim={setClaimItem}
             onDone={setDoneItem}
+            onAccept={setAcceptItem}
+            onReject={setRejectItem}
+            onCloseItem={setCloseItem}
+            onUnclaim={setUnclaimItem}
           />
         )}
       </AnimatePresence>
@@ -386,6 +418,30 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
         onClose={() => setDoneItem(null)}
         onSuccess={invalidateBoard}
       />
+      <AcceptDialog
+        wastelandId={wastelandId}
+        item={acceptItem}
+        onClose={() => setAcceptItem(null)}
+        onSuccess={invalidateBoard}
+      />
+      <RejectDialog
+        wastelandId={wastelandId}
+        item={rejectItem}
+        onClose={() => setRejectItem(null)}
+        onSuccess={invalidateBoard}
+      />
+      <CloseItemDialog
+        wastelandId={wastelandId}
+        item={closeItem}
+        onClose={() => setCloseItem(null)}
+        onSuccess={invalidateBoard}
+      />
+      <UnclaimDialog
+        wastelandId={wastelandId}
+        item={unclaimItem}
+        onClose={() => setUnclaimItem(null)}
+        onSuccess={invalidateBoard}
+      />
       <PostWantedItemDialog
         wastelandId={wastelandId}
         open={showPostDialog}
@@ -400,14 +456,24 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
 
 function WantedDetailPanel({
   item,
+  isAdmin,
   onClose,
   onClaim,
   onDone,
+  onAccept,
+  onReject,
+  onCloseItem,
+  onUnclaim,
 }: {
   item: WantedItem;
+  isAdmin: boolean;
   onClose: () => void;
   onClaim: (item: WantedItem) => void;
   onDone: (item: WantedItem) => void;
+  onAccept: (item: WantedItem) => void;
+  onReject: (item: WantedItem) => void;
+  onCloseItem: (item: WantedItem) => void;
+  onUnclaim: (item: WantedItem) => void;
 }) {
   return (
     <motion.div
@@ -512,6 +578,49 @@ function WantedDetailPanel({
                 Mark as done
               </button>
             )}
+            {isAdmin && item.status === 'claimed' && (
+              <button
+                type="button"
+                onClick={() => onUnclaim(item)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-500/20"
+              >
+                <UserMinus className="size-3.5" />
+                Unclaim (admin)
+              </button>
+            )}
+            {isAdmin && item.status === 'in_review' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onAccept(item)}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20"
+                >
+                  <ThumbsUp className="size-3.5" />
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onReject(item)}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20"
+                >
+                  <ThumbsDown className="size-3.5" />
+                  Reject
+                </button>
+              </>
+            )}
+            {isAdmin &&
+              (item.status === 'open' ||
+                item.status === 'claimed' ||
+                item.status === 'in_review') && (
+                <button
+                  type="button"
+                  onClick={() => onCloseItem(item)}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.08]"
+                >
+                  <XCircle className="size-3.5" />
+                  Close (admin)
+                </button>
+              )}
           </div>
 
           {/* Timestamps */}
@@ -711,6 +820,414 @@ function MarkDoneDialog({
             </button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Accept dialog ────────────────────────────────────────────────────────
+
+function AcceptDialog({
+  wastelandId,
+  item,
+  onClose,
+  onSuccess,
+}: {
+  wastelandId: string;
+  item: WantedItem | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const trpc = useWastelandTRPC();
+  const [quality, setQuality] = useState<'excellent' | 'good' | 'fair' | 'poor'>('good');
+  // `message` maps to `wl accept --message` — it's recorded on the stamp,
+  // not as a free-form PR comment.
+  const [message, setMessage] = useState('');
+
+  const acceptMutation = useMutation({
+    ...trpc.wasteland.acceptWantedItem.mutationOptions(),
+    onSuccess: () => {
+      toast.success('Contribution accepted');
+      onSuccess();
+      handleClose();
+    },
+    onError: err => toast.error(err.message || 'Failed to accept contribution'),
+  });
+
+  useSlowOperationToast(acceptMutation.isPending);
+
+  const handleClose = useCallback(() => {
+    setQuality('good');
+    setMessage('');
+    onClose();
+  }, [onClose]);
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!item) return;
+      acceptMutation.mutate({
+        wastelandId,
+        itemId: item.id,
+        quality,
+        message: message.trim() || undefined,
+      });
+    },
+    [acceptMutation, wastelandId, item, quality, message]
+  );
+
+  return (
+    <Dialog
+      open={item !== null}
+      onOpenChange={open => {
+        if (!open) handleClose();
+      }}
+    >
+      <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
+        <DialogHeader>
+          <DialogTitle className="text-white/90">Accept contribution</DialogTitle>
+          <DialogDescription className="text-white/50">
+            Stamp this contribution as approved. A stamp is committed to the upstream rigs table.
+          </DialogDescription>
+        </DialogHeader>
+
+        {item && (
+          <div className="rounded-md border border-white/[0.08] bg-white/[0.03] p-3">
+            <p className="text-sm font-medium text-white/80">{item.title}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label
+              htmlFor="accept-quality"
+              className="mb-1.5 block text-xs font-medium text-white/60"
+            >
+              Quality
+            </label>
+            <select
+              id="accept-quality"
+              value={quality}
+              onChange={e => setQuality(e.target.value as typeof quality)}
+              className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none focus:border-white/20"
+            >
+              <option value="excellent">Excellent</option>
+              <option value="good">Good</option>
+              <option value="fair">Fair</option>
+              <option value="poor">Poor</option>
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="accept-message"
+              className="mb-1.5 block text-xs font-medium text-white/60"
+            >
+              Stamp message (optional)
+            </label>
+            <textarea
+              id="accept-message"
+              rows={3}
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              placeholder="Leave a note on the stamp..."
+              className="w-full resize-none rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none placeholder:text-white/25 focus:border-white/20"
+            />
+          </div>
+
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={acceptMutation.isPending}
+              className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={acceptMutation.isPending}
+              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+            >
+              {acceptMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
+              Accept
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Reject dialog ────────────────────────────────────────────────────────
+
+function RejectDialog({
+  wastelandId,
+  item,
+  onClose,
+  onSuccess,
+}: {
+  wastelandId: string;
+  item: WantedItem | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const trpc = useWastelandTRPC();
+  // `reason` maps to `wl reject --reason` — it becomes part of the commit
+  // message on the rejection, visible to the contributor on the PR.
+  const [reason, setReason] = useState('');
+
+  const rejectMutation = useMutation({
+    ...trpc.wasteland.rejectWantedItem.mutationOptions(),
+    onSuccess: () => {
+      toast.success('Contribution rejected');
+      onSuccess();
+      handleClose();
+    },
+    onError: err => toast.error(err.message || 'Failed to reject contribution'),
+  });
+
+  useSlowOperationToast(rejectMutation.isPending);
+
+  const handleClose = useCallback(() => {
+    setReason('');
+    onClose();
+  }, [onClose]);
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!item || !reason.trim()) return;
+      rejectMutation.mutate({
+        wastelandId,
+        itemId: item.id,
+        reason: reason.trim(),
+      });
+    },
+    [rejectMutation, wastelandId, item, reason]
+  );
+
+  return (
+    <Dialog
+      open={item !== null}
+      onOpenChange={open => {
+        if (!open) handleClose();
+      }}
+    >
+      <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
+        <DialogHeader>
+          <DialogTitle className="text-white/90">Reject contribution</DialogTitle>
+          <DialogDescription className="text-white/50">
+            Reject this contribution. The reason lands in the commit message so the contributor sees
+            it on the PR.
+          </DialogDescription>
+        </DialogHeader>
+
+        {item && (
+          <div className="rounded-md border border-white/[0.08] bg-white/[0.03] p-3">
+            <p className="text-sm font-medium text-white/80">{item.title}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label
+              htmlFor="reject-reason"
+              className="mb-1.5 block text-xs font-medium text-white/60"
+            >
+              Reason <span className="text-red-400">*</span>
+            </label>
+            <textarea
+              id="reject-reason"
+              required
+              rows={3}
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="Explain why you're rejecting this contribution..."
+              className="w-full resize-none rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/80 outline-none placeholder:text-white/25 focus:border-white/20"
+            />
+          </div>
+
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={rejectMutation.isPending}
+              className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={rejectMutation.isPending || !reason.trim()}
+              className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
+            >
+              {rejectMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
+              Reject
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Close-item dialog ────────────────────────────────────────────────────
+
+function CloseItemDialog({
+  wastelandId,
+  item,
+  onClose,
+  onSuccess,
+}: {
+  wastelandId: string;
+  item: WantedItem | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const trpc = useWastelandTRPC();
+
+  const closeMutation = useMutation({
+    ...trpc.wasteland.closeWantedItem.mutationOptions(),
+    onSuccess: () => {
+      toast.success('Item closed');
+      onSuccess();
+      handleClose();
+    },
+    onError: err => toast.error(err.message || 'Failed to close item'),
+  });
+
+  useSlowOperationToast(closeMutation.isPending);
+
+  const handleClose = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
+  return (
+    <Dialog
+      open={item !== null}
+      onOpenChange={open => {
+        if (!open) handleClose();
+      }}
+    >
+      <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
+        <DialogHeader>
+          <DialogTitle className="text-white/90">Close wanted item</DialogTitle>
+          <DialogDescription className="text-white/50">
+            Close this item without accepting a contribution. No stamp is issued.
+          </DialogDescription>
+        </DialogHeader>
+
+        {item && (
+          <div className="rounded-md border border-white/[0.08] bg-white/[0.03] p-3">
+            <p className="text-sm font-medium text-white/80">{item.title}</p>
+          </div>
+        )}
+
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={closeMutation.isPending}
+            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={closeMutation.isPending || !item}
+            onClick={() => {
+              if (item) closeMutation.mutate({ wastelandId, itemId: item.id });
+            }}
+            className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.1] px-4 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/[0.15] disabled:opacity-50"
+          >
+            {closeMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
+            Close item
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Unclaim dialog ───────────────────────────────────────────────────────
+
+function UnclaimDialog({
+  wastelandId,
+  item,
+  onClose,
+  onSuccess,
+}: {
+  wastelandId: string;
+  item: WantedItem | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const trpc = useWastelandTRPC();
+
+  const unclaimMutation = useMutation({
+    ...trpc.wasteland.unclaimWantedItem.mutationOptions(),
+    onSuccess: () => {
+      toast.success('Claim released');
+      onSuccess();
+      handleClose();
+    },
+    onError: err => toast.error(err.message || 'Failed to unclaim item'),
+  });
+
+  useSlowOperationToast(unclaimMutation.isPending);
+
+  const handleClose = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
+  return (
+    <Dialog
+      open={item !== null}
+      onOpenChange={open => {
+        if (!open) handleClose();
+      }}
+    >
+      <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
+        <DialogHeader>
+          <DialogTitle className="text-white/90">Unclaim item</DialogTitle>
+          <DialogDescription className="text-white/50">
+            Release this claim. The item returns to the open pool.
+          </DialogDescription>
+        </DialogHeader>
+
+        {item && (
+          <div className="rounded-md border border-white/[0.08] bg-white/[0.03] p-3">
+            <p className="text-sm font-medium text-white/80">{item.title}</p>
+            {item.claimed_by && (
+              <p className="mt-1 font-mono text-xs text-white/40">
+                Currently claimed by {item.claimed_by}
+              </p>
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={unclaimMutation.isPending}
+            className="rounded-md border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={unclaimMutation.isPending || !item}
+            onClick={() => {
+              if (item) unclaimMutation.mutate({ wastelandId, itemId: item.id });
+            }}
+            className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500 disabled:opacity-50"
+          >
+            {unclaimMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
+            Unclaim
+          </button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

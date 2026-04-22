@@ -48,6 +48,7 @@ import {
 import { toast } from 'sonner';
 import { Users, Plus, Trash2, Pencil, Star } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useSetWastelandPageHeader } from '../WastelandPageHeaderContext';
 
 type WastelandMember = WastelandOutputs['wasteland']['listMembers'][number];
 
@@ -83,25 +84,22 @@ export function MembersClient({ wastelandId }: { wastelandId: string }) {
 
   const memberQueryKey = trpc.wasteland.listMembers.queryKey({ wastelandId });
 
+  useSetWastelandPageHeader({
+    title: 'Members',
+    icon: <Users className="size-4 text-[color:oklch(70%_0.15_30_/_0.6)]" />,
+    count: members.length,
+    actions: isOwnerOrAdmin ? (
+      <AddMemberDialog
+        wastelandId={wastelandId}
+        trpc={trpc}
+        queryClient={queryClient}
+        memberQueryKey={memberQueryKey}
+      />
+    ) : null,
+  });
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-3">
-        <div className="flex items-center gap-2">
-          <Users className="size-4 text-[color:oklch(70%_0.15_30_/_0.6)]" />
-          <h2 className="text-lg font-semibold tracking-tight text-white/90">Members</h2>
-          <span className="ml-1 font-mono text-xs text-white/30">{members.length}</span>
-        </div>
-        {isOwnerOrAdmin && (
-          <AddMemberDialog
-            wastelandId={wastelandId}
-            trpc={trpc}
-            queryClient={queryClient}
-            memberQueryKey={memberQueryKey}
-          />
-        )}
-      </div>
-
       {/* Table */}
       <div className="flex-1 overflow-y-auto">
         {membersQuery.isLoading && <MembersTableSkeleton />}

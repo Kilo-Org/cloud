@@ -131,6 +131,173 @@ export declare const WantedBoardRowOutput: z.ZodObject<
   },
   z.core.$strip
 >;
+export declare const MergePullOutput: z.ZodObject<
+  {
+    pull_id: z.ZodString;
+    state: z.ZodString;
+  },
+  z.core.$strip
+>;
+export declare const UpstreamAdminVerifyOutput: z.ZodObject<
+  {
+    hasWriteAccess: z.ZodBoolean;
+    error: z.ZodNullable<z.ZodString>;
+  },
+  z.core.$strip
+>;
+export declare const UpstreamRigOutput: z.ZodObject<
+  {
+    rig_handle: z.ZodString;
+    display_name: z.ZodNullable<z.ZodString>;
+    trust_level: z.ZodNumber;
+    registered_at: z.ZodNullable<z.ZodString>;
+    last_seen_at: z.ZodNullable<z.ZodString>;
+  },
+  z.core.$strip
+>;
+export declare const InboxItemOutput: z.ZodDiscriminatedUnion<
+  [
+    z.ZodObject<
+      {
+        pull_id: z.ZodString;
+        title: z.ZodString;
+        state: z.ZodString;
+        from_branch: z.ZodNullable<z.ZodString>;
+        submitter: z.ZodNullable<z.ZodString>;
+        creator_name: z.ZodNullable<z.ZodString>;
+        created_at: z.ZodNullable<z.ZodString>;
+        updated_at: z.ZodNullable<z.ZodString>;
+        kind: z.ZodLiteral<'rig-registration'>;
+        handle: z.ZodString;
+        display_name: z.ZodNullable<z.ZodString>;
+        dolthub_org: z.ZodNullable<z.ZodString>;
+        owner_email: z.ZodNullable<z.ZodString>;
+        hop_uri: z.ZodNullable<z.ZodString>;
+        gt_version: z.ZodNullable<z.ZodString>;
+      },
+      z.core.$strip
+    >,
+    z.ZodObject<
+      {
+        pull_id: z.ZodString;
+        title: z.ZodString;
+        state: z.ZodString;
+        from_branch: z.ZodNullable<z.ZodString>;
+        submitter: z.ZodNullable<z.ZodString>;
+        creator_name: z.ZodNullable<z.ZodString>;
+        created_at: z.ZodNullable<z.ZodString>;
+        updated_at: z.ZodNullable<z.ZodString>;
+        kind: z.ZodLiteral<'wanted-post'>;
+        item_id: z.ZodString;
+        item_title: z.ZodString;
+        description: z.ZodNullable<z.ZodString>;
+        type: z.ZodNullable<z.ZodString>;
+        priority: z.ZodNullable<z.ZodString>;
+        effort_level: z.ZodNullable<z.ZodString>;
+        tags: z.ZodNullable<z.ZodString>;
+        posted_by: z.ZodNullable<z.ZodString>;
+      },
+      z.core.$strip
+    >,
+    z.ZodObject<
+      {
+        pull_id: z.ZodString;
+        title: z.ZodString;
+        state: z.ZodString;
+        from_branch: z.ZodNullable<z.ZodString>;
+        submitter: z.ZodNullable<z.ZodString>;
+        creator_name: z.ZodNullable<z.ZodString>;
+        created_at: z.ZodNullable<z.ZodString>;
+        updated_at: z.ZodNullable<z.ZodString>;
+        kind: z.ZodLiteral<'wanted-edit'>;
+        subkind: z.ZodEnum<{
+          delete: 'delete';
+          unclaim: 'unclaim';
+          update: 'update';
+        }>;
+        item_id: z.ZodString;
+        item_title: z.ZodString;
+        submitter_is_poster: z.ZodNullable<z.ZodBoolean>;
+        posted_by: z.ZodNullable<z.ZodString>;
+        status_transition: z.ZodNullable<z.ZodString>;
+      },
+      z.core.$strip
+    >,
+    z.ZodObject<
+      {
+        pull_id: z.ZodString;
+        title: z.ZodString;
+        state: z.ZodString;
+        from_branch: z.ZodNullable<z.ZodString>;
+        submitter: z.ZodNullable<z.ZodString>;
+        creator_name: z.ZodNullable<z.ZodString>;
+        created_at: z.ZodNullable<z.ZodString>;
+        updated_at: z.ZodNullable<z.ZodString>;
+        kind: z.ZodLiteral<'work-submission'>;
+        item_id: z.ZodString;
+        item_title: z.ZodString;
+        claimer: z.ZodString;
+        has_done: z.ZodBoolean;
+        evidence_url: z.ZodNullable<z.ZodString>;
+        completion_id: z.ZodNullable<z.ZodString>;
+      },
+      z.core.$strip
+    >,
+    z.ZodObject<
+      {
+        pull_id: z.ZodString;
+        title: z.ZodString;
+        state: z.ZodString;
+        from_branch: z.ZodNullable<z.ZodString>;
+        submitter: z.ZodNullable<z.ZodString>;
+        creator_name: z.ZodNullable<z.ZodString>;
+        created_at: z.ZodNullable<z.ZodString>;
+        updated_at: z.ZodNullable<z.ZodString>;
+        kind: z.ZodLiteral<'admin-action'>;
+        subkind: z.ZodEnum<{
+          accept: 'accept';
+          'accept-upstream': 'accept-upstream';
+          close: 'close';
+          'close-upstream': 'close-upstream';
+          reject: 'reject';
+        }>;
+        item_id: z.ZodString;
+        item_title: z.ZodString;
+        worker: z.ZodNullable<z.ZodString>;
+        acceptor: z.ZodNullable<z.ZodString>;
+        reject_reason: z.ZodNullable<z.ZodString>;
+        stamp: z.ZodNullable<
+          z.ZodObject<
+            {
+              quality: z.ZodNullable<z.ZodString>;
+              severity: z.ZodNullable<z.ZodString>;
+              skill_tags: z.ZodNullable<z.ZodString>;
+              message: z.ZodNullable<z.ZodString>;
+            },
+            z.core.$strip
+          >
+        >;
+      },
+      z.core.$strip
+    >,
+    z.ZodObject<
+      {
+        pull_id: z.ZodString;
+        title: z.ZodString;
+        state: z.ZodString;
+        from_branch: z.ZodNullable<z.ZodString>;
+        submitter: z.ZodNullable<z.ZodString>;
+        creator_name: z.ZodNullable<z.ZodString>;
+        created_at: z.ZodNullable<z.ZodString>;
+        updated_at: z.ZodNullable<z.ZodString>;
+        kind: z.ZodLiteral<'unknown'>;
+        commit_subjects: z.ZodArray<z.ZodString>;
+      },
+      z.core.$strip
+    >,
+  ],
+  'kind'
+>;
 export declare const RpcWastelandOutput: z.ZodPipe<
   z.ZodAny,
   z.ZodObject<
@@ -284,5 +451,184 @@ export declare const RpcWantedBoardRowOutput: z.ZodPipe<
       updated_at: z.ZodDefault<z.ZodNullable<z.ZodString>>;
     },
     z.core.$strip
+  >
+>;
+export declare const RpcMergePullOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      pull_id: z.ZodString;
+      state: z.ZodString;
+    },
+    z.core.$strip
+  >
+>;
+export declare const RpcUpstreamAdminVerifyOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      hasWriteAccess: z.ZodBoolean;
+      error: z.ZodNullable<z.ZodString>;
+    },
+    z.core.$strip
+  >
+>;
+export declare const RpcUpstreamRigOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      rig_handle: z.ZodString;
+      display_name: z.ZodNullable<z.ZodString>;
+      trust_level: z.ZodNumber;
+      registered_at: z.ZodNullable<z.ZodString>;
+      last_seen_at: z.ZodNullable<z.ZodString>;
+    },
+    z.core.$strip
+  >
+>;
+export declare const RpcInboxItemOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodDiscriminatedUnion<
+    [
+      z.ZodObject<
+        {
+          pull_id: z.ZodString;
+          title: z.ZodString;
+          state: z.ZodString;
+          from_branch: z.ZodNullable<z.ZodString>;
+          submitter: z.ZodNullable<z.ZodString>;
+          creator_name: z.ZodNullable<z.ZodString>;
+          created_at: z.ZodNullable<z.ZodString>;
+          updated_at: z.ZodNullable<z.ZodString>;
+          kind: z.ZodLiteral<'rig-registration'>;
+          handle: z.ZodString;
+          display_name: z.ZodNullable<z.ZodString>;
+          dolthub_org: z.ZodNullable<z.ZodString>;
+          owner_email: z.ZodNullable<z.ZodString>;
+          hop_uri: z.ZodNullable<z.ZodString>;
+          gt_version: z.ZodNullable<z.ZodString>;
+        },
+        z.core.$strip
+      >,
+      z.ZodObject<
+        {
+          pull_id: z.ZodString;
+          title: z.ZodString;
+          state: z.ZodString;
+          from_branch: z.ZodNullable<z.ZodString>;
+          submitter: z.ZodNullable<z.ZodString>;
+          creator_name: z.ZodNullable<z.ZodString>;
+          created_at: z.ZodNullable<z.ZodString>;
+          updated_at: z.ZodNullable<z.ZodString>;
+          kind: z.ZodLiteral<'wanted-post'>;
+          item_id: z.ZodString;
+          item_title: z.ZodString;
+          description: z.ZodNullable<z.ZodString>;
+          type: z.ZodNullable<z.ZodString>;
+          priority: z.ZodNullable<z.ZodString>;
+          effort_level: z.ZodNullable<z.ZodString>;
+          tags: z.ZodNullable<z.ZodString>;
+          posted_by: z.ZodNullable<z.ZodString>;
+        },
+        z.core.$strip
+      >,
+      z.ZodObject<
+        {
+          pull_id: z.ZodString;
+          title: z.ZodString;
+          state: z.ZodString;
+          from_branch: z.ZodNullable<z.ZodString>;
+          submitter: z.ZodNullable<z.ZodString>;
+          creator_name: z.ZodNullable<z.ZodString>;
+          created_at: z.ZodNullable<z.ZodString>;
+          updated_at: z.ZodNullable<z.ZodString>;
+          kind: z.ZodLiteral<'wanted-edit'>;
+          subkind: z.ZodEnum<{
+            delete: 'delete';
+            unclaim: 'unclaim';
+            update: 'update';
+          }>;
+          item_id: z.ZodString;
+          item_title: z.ZodString;
+          submitter_is_poster: z.ZodNullable<z.ZodBoolean>;
+          posted_by: z.ZodNullable<z.ZodString>;
+          status_transition: z.ZodNullable<z.ZodString>;
+        },
+        z.core.$strip
+      >,
+      z.ZodObject<
+        {
+          pull_id: z.ZodString;
+          title: z.ZodString;
+          state: z.ZodString;
+          from_branch: z.ZodNullable<z.ZodString>;
+          submitter: z.ZodNullable<z.ZodString>;
+          creator_name: z.ZodNullable<z.ZodString>;
+          created_at: z.ZodNullable<z.ZodString>;
+          updated_at: z.ZodNullable<z.ZodString>;
+          kind: z.ZodLiteral<'work-submission'>;
+          item_id: z.ZodString;
+          item_title: z.ZodString;
+          claimer: z.ZodString;
+          has_done: z.ZodBoolean;
+          evidence_url: z.ZodNullable<z.ZodString>;
+          completion_id: z.ZodNullable<z.ZodString>;
+        },
+        z.core.$strip
+      >,
+      z.ZodObject<
+        {
+          pull_id: z.ZodString;
+          title: z.ZodString;
+          state: z.ZodString;
+          from_branch: z.ZodNullable<z.ZodString>;
+          submitter: z.ZodNullable<z.ZodString>;
+          creator_name: z.ZodNullable<z.ZodString>;
+          created_at: z.ZodNullable<z.ZodString>;
+          updated_at: z.ZodNullable<z.ZodString>;
+          kind: z.ZodLiteral<'admin-action'>;
+          subkind: z.ZodEnum<{
+            accept: 'accept';
+            'accept-upstream': 'accept-upstream';
+            close: 'close';
+            'close-upstream': 'close-upstream';
+            reject: 'reject';
+          }>;
+          item_id: z.ZodString;
+          item_title: z.ZodString;
+          worker: z.ZodNullable<z.ZodString>;
+          acceptor: z.ZodNullable<z.ZodString>;
+          reject_reason: z.ZodNullable<z.ZodString>;
+          stamp: z.ZodNullable<
+            z.ZodObject<
+              {
+                quality: z.ZodNullable<z.ZodString>;
+                severity: z.ZodNullable<z.ZodString>;
+                skill_tags: z.ZodNullable<z.ZodString>;
+                message: z.ZodNullable<z.ZodString>;
+              },
+              z.core.$strip
+            >
+          >;
+        },
+        z.core.$strip
+      >,
+      z.ZodObject<
+        {
+          pull_id: z.ZodString;
+          title: z.ZodString;
+          state: z.ZodString;
+          from_branch: z.ZodNullable<z.ZodString>;
+          submitter: z.ZodNullable<z.ZodString>;
+          creator_name: z.ZodNullable<z.ZodString>;
+          created_at: z.ZodNullable<z.ZodString>;
+          updated_at: z.ZodNullable<z.ZodString>;
+          kind: z.ZodLiteral<'unknown'>;
+          commit_subjects: z.ZodArray<z.ZodString>;
+        },
+        z.core.$strip
+      >,
+    ],
+    'kind'
   >
 >;

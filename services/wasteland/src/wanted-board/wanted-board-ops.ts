@@ -226,7 +226,8 @@ export async function acceptWantedItem(
   input: {
     itemId: string;
     quality: 'excellent' | 'good' | 'fair' | 'poor';
-    comment?: string;
+    /** Free-form message attached to the stamp (written to `stamps.message`). */
+    message?: string;
     direct?: boolean;
   }
 ): Promise<{ success: true }> {
@@ -242,7 +243,7 @@ export async function acceptWantedItem(
       upstream,
       itemId: input.itemId,
       quality: input.quality,
-      ...(input.comment ? { comment: input.comment } : {}),
+      ...(input.message ? { message: input.message } : {}),
       direct,
     },
     'Accept'
@@ -264,7 +265,16 @@ export async function rejectWantedItem(
   env: Env,
   wastelandId: string,
   userId: string,
-  input: { itemId: string; comment: string; direct?: boolean }
+  input: {
+    itemId: string;
+    /**
+     * Rejection reason — becomes part of the `wl reject` commit message.
+     * Maps to `--reason` on the wl CLI (not `--comment`, which is an
+     * approve/request-changes flag).
+     */
+    reason: string;
+    direct?: boolean;
+  }
 ): Promise<{ success: true }> {
   const { doStub, token, upstream, isUpstreamAdmin } = await loadContext(env, wastelandId, userId);
   const direct = resolveDirect(input.direct, isUpstreamAdmin);
@@ -274,7 +284,7 @@ export async function rejectWantedItem(
     wastelandId,
     '/wl/reject',
     token,
-    { upstream, itemId: input.itemId, comment: input.comment, direct },
+    { upstream, itemId: input.itemId, reason: input.reason, direct },
     'Reject'
   );
 

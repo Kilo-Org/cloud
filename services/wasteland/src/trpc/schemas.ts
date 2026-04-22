@@ -107,6 +107,114 @@ export const WantedBoardRowOutput = z.object({
   updated_at: z.string().nullable().default(null),
 });
 
+// ── Admin: mergeUpstreamPR result ───────────────────────────────────────
+
+export const MergePullOutput = z.object({
+  pull_id: z.string(),
+  state: z.string(),
+});
+
+// ── Admin: verifyUpstreamAdmin ─────────────────────────────────────────
+
+export const UpstreamAdminVerifyOutput = z.object({
+  hasWriteAccess: z.boolean(),
+  error: z.string().nullable(),
+});
+
+// ── Admin: upstream rigs row ────────────────────────────────────────────
+
+export const UpstreamRigOutput = z.object({
+  rig_handle: z.string(),
+  display_name: z.string().nullable(),
+  trust_level: z.number(),
+  registered_at: z.string().nullable(),
+  last_seen_at: z.string().nullable(),
+});
+
+// ── Admin: Review inbox items ──────────────────────────────────────────
+// Discriminated union matching the `InboxItem` type from
+// `../inbox/inbox-classifier`. Each kind renders as a distinct card in
+// the Review page UI.
+
+const InboxBase = {
+  pull_id: z.string(),
+  title: z.string(),
+  state: z.string(),
+  from_branch: z.string().nullable(),
+  submitter: z.string().nullable(),
+  creator_name: z.string().nullable(),
+  created_at: z.string().nullable(),
+  updated_at: z.string().nullable(),
+};
+
+export const InboxItemOutput = z.discriminatedUnion('kind', [
+  z.object({
+    ...InboxBase,
+    kind: z.literal('rig-registration'),
+    handle: z.string(),
+    display_name: z.string().nullable(),
+    dolthub_org: z.string().nullable(),
+    owner_email: z.string().nullable(),
+    hop_uri: z.string().nullable(),
+    gt_version: z.string().nullable(),
+  }),
+  z.object({
+    ...InboxBase,
+    kind: z.literal('wanted-post'),
+    item_id: z.string(),
+    item_title: z.string(),
+    description: z.string().nullable(),
+    type: z.string().nullable(),
+    priority: z.string().nullable(),
+    effort_level: z.string().nullable(),
+    tags: z.string().nullable(),
+    posted_by: z.string().nullable(),
+  }),
+  z.object({
+    ...InboxBase,
+    kind: z.literal('wanted-edit'),
+    subkind: z.enum(['update', 'delete', 'unclaim']),
+    item_id: z.string(),
+    item_title: z.string(),
+    submitter_is_poster: z.boolean().nullable(),
+    posted_by: z.string().nullable(),
+    status_transition: z.string().nullable(),
+  }),
+  z.object({
+    ...InboxBase,
+    kind: z.literal('work-submission'),
+    item_id: z.string(),
+    item_title: z.string(),
+    claimer: z.string(),
+    has_done: z.boolean(),
+    evidence_url: z.string().nullable(),
+    completion_id: z.string().nullable(),
+  }),
+  z.object({
+    ...InboxBase,
+    kind: z.literal('admin-action'),
+    subkind: z.enum(['accept', 'accept-upstream', 'reject', 'close', 'close-upstream']),
+    item_id: z.string(),
+    item_title: z.string(),
+    worker: z.string().nullable(),
+    acceptor: z.string().nullable(),
+    reject_reason: z.string().nullable(),
+    stamp: z
+      .object({
+        quality: z.string().nullable(),
+        severity: z.string().nullable(),
+        skill_tags: z.string().nullable(),
+        message: z.string().nullable(),
+      })
+      .nullable(),
+  }),
+  z.object({
+    ...InboxBase,
+    kind: z.literal('unknown'),
+    commit_subjects: z.array(z.string()),
+  }),
+]);
+
 // ── rpcSafe wrappers ────────────────────────────────────────────────────
 // tRPC's .output() forces TypeScript to check that the handler return type
 // is assignable to the schema's input type. When handlers return values from
@@ -121,3 +229,7 @@ export const RpcWastelandConfigOutput = rpcSafe(WastelandConfigOutput);
 export const RpcConnectedTownOutput = rpcSafe(ConnectedTownOutput);
 export const RpcWantedItemOutput = rpcSafe(WantedItemOutput);
 export const RpcWantedBoardRowOutput = rpcSafe(WantedBoardRowOutput);
+export const RpcMergePullOutput = rpcSafe(MergePullOutput);
+export const RpcUpstreamAdminVerifyOutput = rpcSafe(UpstreamAdminVerifyOutput);
+export const RpcUpstreamRigOutput = rpcSafe(UpstreamRigOutput);
+export const RpcInboxItemOutput = rpcSafe(InboxItemOutput);

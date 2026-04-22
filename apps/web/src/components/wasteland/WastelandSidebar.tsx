@@ -14,7 +14,16 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-import { ArrowLeft, ScrollText, ClipboardCheck, Users, Settings, Skull } from 'lucide-react';
+import {
+  ArrowLeft,
+  ScrollText,
+  ClipboardCheck,
+  Users,
+  Settings,
+  Skull,
+  Truck,
+  Inbox,
+} from 'lucide-react';
 import { motion } from 'motion/react';
 
 type WastelandSidebarProps = {
@@ -47,6 +56,10 @@ export function WastelandSidebar({
     { title: 'Wanted Board', icon: ScrollText, url: `${basePath}/wanted` },
     { title: 'Claims', icon: ClipboardCheck, url: `${basePath}/claims` },
     { title: 'Members', icon: Users, url: `${basePath}/members` },
+    // Review (admin inbox for open upstream PRs) sits before Rigs — admins
+    // typically spend more time triaging PRs than managing the rig registry.
+    { title: 'Review', icon: Inbox, url: `${basePath}/review` },
+    { title: 'Rigs', icon: Truck, url: `${basePath}/rigs` },
   ];
 
   return (

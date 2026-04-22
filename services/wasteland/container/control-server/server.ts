@@ -55,23 +55,25 @@ const BrowseBodySchema = z.object({
   upstream: z.string().min(1),
 });
 
-// `direct: true` makes the wl CLI push straight to upstream main instead of
-// fork + PR. Only admins should pass this — the wasteland worker gates it
-// server-side on the caller's is_upstream_admin credential flag.
-const DirectFlagShape = { direct: z.boolean().optional() } as const;
+// `direct` is NOT a flag on wanted-item subcommands — it's only accepted by
+// `wl join` and `wl create`. Wanted-item mutations always follow the mode
+// configured on the fork (pr vs wild-west) at join time. The `direct` field
+// below is kept in the body schemas for historical reasons (old callers) but
+// is now ignored at the CLI boundary — see `buildItemArgs` below.
+const LegacyDirectFlagShape = { direct: z.boolean().optional() } as const;
 
 const ClaimBodySchema = z.object({
   upstream: z.string().min(1),
   itemId: z.string().min(1),
   userId: z.string().min(1),
-  ...DirectFlagShape,
+  ...LegacyDirectFlagShape,
 });
 
 const DoneBodySchema = z.object({
   upstream: z.string().min(1),
   itemId: z.string().min(1),
   evidence: z.string().min(1),
-  ...DirectFlagShape,
+  ...LegacyDirectFlagShape,
 });
 
 const InitBodySchema = z.object({
@@ -87,7 +89,7 @@ const PostBodySchema = z.object({
   bounty: z.number().optional(),
   priority: z.number().int().min(0).max(3).optional(),
   type: z.enum(['feature', 'bug', 'docs', 'other']).optional(),
-  ...DirectFlagShape,
+  ...LegacyDirectFlagShape,
 });
 
 const SyncBodySchema = z.object({
@@ -114,46 +116,59 @@ const StatusBodySchema = z.object({
 const UnclaimBodySchema = z.object({
   upstream: z.string().min(1),
   itemId: z.string().min(1),
-  ...DirectFlagShape,
+  ...LegacyDirectFlagShape,
 });
 
+// `wl accept` takes --quality as an integer 1-5 (required), plus optional
+// --reliability, --severity, --skills, --message. `message` attaches to the
+// stamp, visible in `stamps.message`. We accept the user-friendly enum here
+// and map it to the CLI's integer below.
 const AcceptBodySchema = z.object({
   upstream: z.string().min(1),
   itemId: z.string().min(1),
   quality: z.enum(['excellent', 'good', 'fair', 'poor']),
-  comment: z.string().optional(),
-  ...DirectFlagShape,
+  message: z.string().optional(),
+  ...LegacyDirectFlagShape,
 });
 
+// `wl accept` expects quality as an integer on a 1-5 scale. We use a 4-level
+// enum in the admin UI (poor < fair < good < excellent) and translate here.
+const QUALITY_TO_INT: Record<'excellent' | 'good' | 'fair' | 'poor', number> = {
+  excellent: 5,
+  good: 4,
+  fair: 3,
+  poor: 2,
+};
+
+// `wl reject` takes --reason (included in commit message). No --comment.
 const RejectBodySchema = z.object({
   upstream: z.string().min(1),
   itemId: z.string().min(1),
-  comment: z.string().min(1),
-  ...DirectFlagShape,
+  reason: z.string().min(1),
+  ...LegacyDirectFlagShape,
 });
 
 const CloseBodySchema = z.object({
   upstream: z.string().min(1),
   itemId: z.string().min(1),
-  ...DirectFlagShape,
+  ...LegacyDirectFlagShape,
 });
 
-// Upstream-side (accept-upstream / reject-upstream / close-upstream) commands
-// always act on upstream main by definition — the --direct flag is implicit
-// and not needed on these.
+// Upstream-side commands adopt a fork submission. Same flag shapes as their
+// non-upstream counterparts, except reject-upstream takes no reason at all
+// (wl CLI has no flag for it — reject-upstream just closes the fork PR).
 const AcceptUpstreamBodySchema = z.object({
   upstream: z.string().min(1),
   itemId: z.string().min(1),
   rigHandle: z.string().min(1),
   quality: z.enum(['excellent', 'good', 'fair', 'poor']),
-  comment: z.string().optional(),
+  message: z.string().optional(),
 });
 
 const RejectUpstreamBodySchema = z.object({
   upstream: z.string().min(1),
   itemId: z.string().min(1),
   rigHandle: z.string().min(1),
-  comment: z.string().min(1),
 });
 
 const CloseUpstreamBodySchema = z.object({
@@ -207,16 +222,21 @@ type ExecResult = {
 };
 
 /**
- * Prepend `--direct` to a wl subcommand's args when the caller opted into
- * admin mode. wl expects the flag AFTER the subcommand but BEFORE positional
- * args, e.g. `wl claim --direct w-abc`. Putting flags after positionals is
- * also accepted by Cobra but we standardize on the prefix form for clarity.
+ * Log a warning when a caller passes `direct: true` on a wanted-item
+ * subcommand. `--direct` is only accepted by `wl join` / `wl create`; the
+ * wanted-item mutations inherit direct-vs-PR behavior from the mode the
+ * fork was joined with. Early iterations of this service plumbed `direct`
+ * through to every command, which was a bug — the CLI rejects those with
+ * "unknown flag: --direct". We accept the field for backwards compatibility
+ * but ignore it at the CLI boundary.
  */
-function withDirect(subcommand: string, rest: string[], direct: boolean | undefined): string[] {
+function warnIfDirectRequested(subcommand: string, direct: boolean | undefined): void {
   if (direct) {
-    return [subcommand, '--direct', ...rest];
+    log.warn('direct flag ignored', {
+      subcommand,
+      hint: 'wl wanted-item commands do not accept --direct; mode is set at join time',
+    });
   }
-  return [subcommand, ...rest];
 }
 
 async function execWl(
@@ -573,8 +593,9 @@ async function handleClaim(req: Request): Promise<Response> {
 
   await mutationMutex.acquire();
   try {
+    warnIfDirectRequested('claim', body.data.direct);
     const env = buildEnv(token, body.data.upstream);
-    const result = await execWl(withDirect('claim', [body.data.itemId], body.data.direct), env);
+    const result = await execWl(['claim', body.data.itemId], env);
 
     if (result.exitCode !== 0) {
       log.error('wl claim failed', {
@@ -586,7 +607,7 @@ async function handleClaim(req: Request): Promise<Response> {
     }
 
     lastOperationTimestamp = new Date().toISOString();
-    log.info('wl claim completed', { itemId: body.data.itemId, direct: !!body.data.direct });
+    log.info('wl claim completed', { itemId: body.data.itemId });
     return jsonResponse({ success: true });
   } finally {
     mutationMutex.release();
@@ -604,11 +625,9 @@ async function handleDone(req: Request): Promise<Response> {
 
   await mutationMutex.acquire();
   try {
+    warnIfDirectRequested('done', body.data.direct);
     const env = buildEnv(token, body.data.upstream);
-    const result = await execWl(
-      withDirect('done', [body.data.itemId, '--evidence', body.data.evidence], body.data.direct),
-      env
-    );
+    const result = await execWl(['done', body.data.itemId, '--evidence', body.data.evidence], env);
 
     if (result.exitCode !== 0) {
       log.error('wl done failed', {
@@ -638,6 +657,7 @@ async function handlePost(req: Request): Promise<Response> {
 
   await mutationMutex.acquire();
   try {
+    warnIfDirectRequested('post', body.data.direct);
     const env = buildEnv(token, body.data.upstream);
     const rest: string[] = ['--title', body.data.title, '--description', body.data.description];
     if (body.data.bounty !== undefined) {
@@ -649,7 +669,7 @@ async function handlePost(req: Request): Promise<Response> {
     if (body.data.type !== undefined) {
       rest.push('--type', body.data.type);
     }
-    const result = await execWl(withDirect('post', rest, body.data.direct), env);
+    const result = await execWl(['post', ...rest], env);
 
     if (result.exitCode !== 0) {
       return errorResponse(`wl post failed: ${result.stderr}`, 502);
@@ -690,14 +710,15 @@ async function runWlItemCmd(
 
   await mutationMutex.acquire();
   try {
+    warnIfDirectRequested(wlCmd, body.data.direct);
     const env = buildEnv(token, body.data.upstream);
-    const result = await execWl(withDirect(wlCmd, [body.data.itemId], body.data.direct), env);
+    const result = await execWl([wlCmd, body.data.itemId], env);
     if (result.exitCode !== 0) {
       log.error(`wl ${wlCmd} failed`, { stderr: result.stderr, itemId: body.data.itemId });
       return errorResponse(`wl ${wlCmd} failed: ${result.stderr}`, 502);
     }
     lastOperationTimestamp = new Date().toISOString();
-    log.info(`wl ${wlCmd} completed`, { itemId: body.data.itemId, direct: !!body.data.direct });
+    log.info(`wl ${wlCmd} completed`, { itemId: body.data.itemId });
     return jsonResponse({ success: true });
   } finally {
     mutationMutex.release();
@@ -723,18 +744,24 @@ async function handleAccept(req: Request): Promise<Response> {
 
   await mutationMutex.acquire();
   try {
+    warnIfDirectRequested('accept', body.data.direct);
     const env = buildEnv(token, body.data.upstream);
-    const rest: string[] = [body.data.itemId, '--quality', body.data.quality];
-    if (body.data.comment) {
-      rest.push('--comment', body.data.comment);
+    const args = [
+      'accept',
+      body.data.itemId,
+      '--quality',
+      String(QUALITY_TO_INT[body.data.quality]),
+    ];
+    if (body.data.message) {
+      args.push('--message', body.data.message);
     }
-    const result = await execWl(withDirect('accept', rest, body.data.direct), env);
+    const result = await execWl(args, env);
     if (result.exitCode !== 0) {
       log.error('wl accept failed', { stderr: result.stderr, itemId: body.data.itemId });
       return errorResponse(`wl accept failed: ${result.stderr}`, 502);
     }
     lastOperationTimestamp = new Date().toISOString();
-    log.info('wl accept completed', { itemId: body.data.itemId, direct: !!body.data.direct });
+    log.info('wl accept completed', { itemId: body.data.itemId });
     return jsonResponse({ success: true });
   } finally {
     mutationMutex.release();
@@ -752,17 +779,15 @@ async function handleReject(req: Request): Promise<Response> {
 
   await mutationMutex.acquire();
   try {
+    warnIfDirectRequested('reject', body.data.direct);
     const env = buildEnv(token, body.data.upstream);
-    const result = await execWl(
-      withDirect('reject', [body.data.itemId, '--comment', body.data.comment], body.data.direct),
-      env
-    );
+    const result = await execWl(['reject', body.data.itemId, '--reason', body.data.reason], env);
     if (result.exitCode !== 0) {
       log.error('wl reject failed', { stderr: result.stderr, itemId: body.data.itemId });
       return errorResponse(`wl reject failed: ${result.stderr}`, 502);
     }
     lastOperationTimestamp = new Date().toISOString();
-    log.info('wl reject completed', { itemId: body.data.itemId, direct: !!body.data.direct });
+    log.info('wl reject completed', { itemId: body.data.itemId });
     return jsonResponse({ success: true });
   } finally {
     mutationMutex.release();
@@ -786,10 +811,10 @@ async function handleAcceptUpstream(req: Request): Promise<Response> {
       body.data.itemId,
       body.data.rigHandle,
       '--quality',
-      body.data.quality,
+      String(QUALITY_TO_INT[body.data.quality]),
     ];
-    if (body.data.comment) {
-      args.push('--comment', body.data.comment);
+    if (body.data.message) {
+      args.push('--message', body.data.message);
     }
     const result = await execWl(args, env);
     if (result.exitCode !== 0) {
@@ -823,10 +848,8 @@ async function handleRejectUpstream(req: Request): Promise<Response> {
   await mutationMutex.acquire();
   try {
     const env = buildEnv(token, body.data.upstream);
-    const result = await execWl(
-      ['reject-upstream', body.data.itemId, body.data.rigHandle, '--comment', body.data.comment],
-      env
-    );
+    // reject-upstream takes no reason flag; the wl CLI just closes the fork PR.
+    const result = await execWl(['reject-upstream', body.data.itemId, body.data.rigHandle], env);
     if (result.exitCode !== 0) {
       log.error('wl reject-upstream failed', {
         stderr: result.stderr,

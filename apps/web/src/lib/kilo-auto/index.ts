@@ -122,7 +122,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   name: 'Kilo Auto Free',
   description: 'Free with limited capability. No credits required.',
   context_length: 256_000,
-  max_completion_tokens: 128_000,
+  max_completion_tokens: 10_000,
   prompt_price: '0',
   completion_price: '0',
   input_cache_read_price: '0',

@@ -26,7 +26,7 @@ import {
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
-import { isFreeModel, kiloExclusiveModels, preferredModels } from '@/lib/ai-gateway/models';
+import { isFreeModel, preferredModels } from '@/lib/ai-gateway/models';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -48,13 +48,6 @@ function getAutoFreeCandidates() {
   const candidates = new Set<string>();
   for (const model of preferredModels) {
     if (!isKiloAutoModel(model) && isFreeModel(model)) {
-      const exclusiveModel = kiloExclusiveModels.find(m => m.public_id === model);
-      if (
-        exclusiveModel &&
-        exclusiveModel.max_completion_tokens < KILO_AUTO_FREE_MODEL.max_completion_tokens
-      ) {
-        continue;
-      }
       candidates.add(model);
     }
   }

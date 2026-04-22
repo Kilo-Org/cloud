@@ -200,4 +200,17 @@ describe('handleKiloChatReactAction', () => {
     });
     expect(client.addReaction).toHaveBeenCalledWith(expect.objectContaining({ messageId: '42' }));
   });
+
+  it('accepts message_id (snake_case alias) from params', async () => {
+    const client = mockClient();
+    await handleKiloChatReactAction({
+      action: 'react',
+      cfg: {} as never,
+      params: { emoji: '\u{1F44D}', to: 'CONV', message_id: 'MID_SNAKE' },
+      client,
+    });
+    expect(client.addReaction).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: 'MID_SNAKE' })
+    );
+  });
 });

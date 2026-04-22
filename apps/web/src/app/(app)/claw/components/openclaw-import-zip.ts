@@ -30,8 +30,6 @@ export type ParsedOpenclawWorkspaceZip = {
 };
 
 export type OpenclawZipCommand = {
-  title: string;
-  shell: string;
   command: string;
 };
 
@@ -47,20 +45,14 @@ export class OpenclawWorkspaceZipError extends Error {
 
 const OPENCLAW_ZIP_COMMANDS: Record<OpenclawImportOs, OpenclawZipCommand> = {
   windows: {
-    title: 'Windows',
-    shell: 'PowerShell',
     command:
       '$w="$HOME\\.openclaw\\workspace";if(-not (Test-Path -LiteralPath $w -PathType Container)){Write-Error "Error: OpenClaw workspace folder not found at $w (expected ~/.openclaw/workspace).";exit 1};$p=@("$w\\USER.md","$w\\SOUL.md","$w\\IDENTITY.md","$w\\MEMORY.md","$w\\memory")|?{Test-Path -LiteralPath $_};Compress-Archive -Path $p -DestinationPath "$HOME\\Desktop\\openclaw-workspace.zip" -Force',
   },
   macos: {
-    title: 'macOS',
-    shell: 'Terminal',
     command:
       'w="$HOME/.openclaw/workspace";[ -d "$w" ] || { echo "Error: OpenClaw workspace folder not found at $w (expected ~/.openclaw/workspace)." >&2; exit 1; };cd "$w" && zip -r "$HOME/Desktop/openclaw-workspace.zip" USER.md SOUL.md IDENTITY.md MEMORY.md memory',
   },
   linux: {
-    title: 'Linux',
-    shell: 'Terminal',
     command:
       'w="$HOME/.openclaw/workspace";[ -d "$w" ] || { echo "Error: OpenClaw workspace folder not found at $w (expected ~/.openclaw/workspace)." >&2; exit 1; };cd "$w" && zip -r "$HOME/Desktop/openclaw-workspace.zip" USER.md SOUL.md IDENTITY.md MEMORY.md memory',
   },

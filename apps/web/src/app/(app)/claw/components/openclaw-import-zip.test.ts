@@ -174,14 +174,12 @@ describe('detectOpenclawImportOs', () => {
 });
 
 describe('getOpenclawZipCommandForOs', () => {
-  test('returns command metadata for each OS', () => {
-    expect(getOpenclawZipCommandForOs('windows').title).toBe('Windows');
-    expect(getOpenclawZipCommandForOs('windows').shell).toBe('PowerShell');
+  test('returns commands for each OS', () => {
+    expect(getOpenclawZipCommandForOs('windows').command).toContain('Compress-Archive');
 
-    expect(getOpenclawZipCommandForOs('macos').title).toBe('macOS');
-    expect(getOpenclawZipCommandForOs('macos').shell).toBe('Terminal');
-
-    expect(getOpenclawZipCommandForOs('linux').title).toBe('Linux');
-    expect(getOpenclawZipCommandForOs('linux').shell).toBe('Terminal');
+    const unixCommandSuffix =
+      'zip -r "$HOME/Desktop/openclaw-workspace.zip" USER.md SOUL.md IDENTITY.md MEMORY.md memory';
+    expect(getOpenclawZipCommandForOs('macos').command).toContain(unixCommandSuffix);
+    expect(getOpenclawZipCommandForOs('linux').command).toContain(unixCommandSuffix);
   });
 });

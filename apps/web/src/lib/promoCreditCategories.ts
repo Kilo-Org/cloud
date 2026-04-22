@@ -175,7 +175,7 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
   {
     credit_category: 'automatic-welcome-credits',
     description: 'Free credits for new users who pass both Turnstile and Stytch validation',
-    amount_usd: 2.5,
+    amount_usd: 1.25,
     is_idempotent: true,
     expiry_hours: WELCOME_CREDIT_EXPIRY_HRS,
   },

@@ -83,6 +83,12 @@ describe('mapOpenclawZipPathToImportPath', () => {
     expect(mapOpenclawZipPathToImportPath('memory/a.txt')).toBeNull();
     expect(mapOpenclawZipPathToImportPath('random.md')).toBeNull();
   });
+
+  it('rejects paths with invalid segments', () => {
+    expect(mapOpenclawZipPathToImportPath('memory/../SOUL.md')).toBeNull();
+    expect(mapOpenclawZipPathToImportPath('memory/./note.md')).toBeNull();
+    expect(mapOpenclawZipPathToImportPath('memory//note.md')).toBeNull();
+  });
 });
 
 describe('isOpenclawMarkdownContent', () => {

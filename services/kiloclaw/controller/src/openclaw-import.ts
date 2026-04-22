@@ -51,16 +51,23 @@ export function isOpenclawImportPathAllowed(importPath: string): boolean {
 }
 
 export function mapOpenclawZipPathToImportPath(archivePath: string): string | null {
-  const rootTarget = OPENCLAW_IMPORT_ROOT_NAME_TO_PATH.get(archivePath);
+  let normalizedArchivePath: string;
+  try {
+    normalizedArchivePath = normalizeOpenclawImportPath(archivePath);
+  } catch {
+    return null;
+  }
+
+  const rootTarget = OPENCLAW_IMPORT_ROOT_NAME_TO_PATH.get(normalizedArchivePath);
   if (rootTarget) {
     return rootTarget;
   }
 
-  if (!archivePath.startsWith(OPENCLAW_IMPORT_ZIP_MEMORY_PREFIX)) {
+  if (!normalizedArchivePath.startsWith(OPENCLAW_IMPORT_ZIP_MEMORY_PREFIX)) {
     return null;
   }
 
-  const memoryRelativePath = archivePath.slice(OPENCLAW_IMPORT_ZIP_MEMORY_PREFIX.length);
+  const memoryRelativePath = normalizedArchivePath.slice(OPENCLAW_IMPORT_ZIP_MEMORY_PREFIX.length);
   if (!memoryRelativePath || memoryRelativePath.endsWith('/')) {
     return null;
   }

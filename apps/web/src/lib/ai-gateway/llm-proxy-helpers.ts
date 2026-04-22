@@ -254,6 +254,25 @@ export function modelDoesNotExistResponse() {
   );
 }
 
+export function freeModelAuthRequiredResponse(suggestedModels: string[]) {
+  const suggestionText =
+    suggestedModels.length > 0
+      ? ` Or use a free model without signing in: ${suggestedModels.join(', ')}.`
+      : '';
+  const message = `kilo-auto/free requires a free Kilo account. Sign up or log in at ${APP_URL}.${suggestionText}`;
+  return NextResponse.json(
+    {
+      error: {
+        message,
+        signUpUrl: APP_URL,
+        suggestedModels,
+      },
+      error_type: ProxyErrorType.free_model_auth_required,
+    },
+    { status: 401 }
+  );
+}
+
 export function featureExclusiveModelResponse(modelId: string) {
   const exclusiveTo = kiloExclusiveModels.find(m => m.public_id === modelId)?.exclusive_to ?? [];
   const error = `${modelId} is only available for ${exclusiveTo.join(', ')}. Use ${KILO_AUTO_FREE_MODEL.id} as a free alternative.`;

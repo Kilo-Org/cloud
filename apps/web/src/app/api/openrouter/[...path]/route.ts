@@ -38,6 +38,7 @@ import {
   dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
   featureExclusiveModelResponse,
+  freeModelAuthRequiredResponse,
   invalidPathResponse,
   invalidRequestResponse,
   makeErrorReadable,
@@ -50,6 +51,7 @@ import {
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
+import { getSuggestedFreeModels } from '@/lib/ai-gateway/free-model-suggestions';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
@@ -82,7 +84,7 @@ import { grokCodeFastOptimizedRequest } from '@/lib/ai-gateway/custom-llm/custom
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
-import { isKiloAutoModel } from '@/lib/kilo-auto';
+import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
 import { applyResolvedAutoModel } from '@/lib/kilo-auto/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/processUsage.types';
@@ -318,6 +320,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (authFailedResponse) {
     // No valid auth
+    if (autoModel === KILO_AUTO_FREE_MODEL.id) {
+      // kilo-auto/free requires an account
+      const suggestedModels = await getSuggestedFreeModels();
+      return freeModelAuthRequiredResponse(suggestedModels);
+    }
+
     if (!isFreeModel(originalModelIdLowerCased)) {
       // Paid model requires authentication
       return NextResponse.json(

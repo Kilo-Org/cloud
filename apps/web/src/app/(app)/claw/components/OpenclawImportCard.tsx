@@ -2,6 +2,7 @@
 
 import { Check, Copy, Upload } from 'lucide-react';
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -91,6 +92,9 @@ export function OpenclawImportCard({
 }) {
   const posthog = usePostHog();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isMountedRef = useRef(true);
+  const parseAttemptRef = useRef(0);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [isDraggingCard, setIsDraggingCard] = useState(false);
   const [selectedZipName, setSelectedZipName] = useState<string | null>(null);
@@ -106,6 +110,16 @@ export function OpenclawImportCard({
   }, []);
 
   const zipCommand = useMemo(() => getOpenclawZipCommandForOs(detectedOs), [detectedOs]);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   function resetSelection() {
     setSelectedZipName(null);
@@ -129,11 +143,16 @@ export function OpenclawImportCard({
       return;
     }
 
+    const parseAttempt = parseAttemptRef.current + 1;
+    parseAttemptRef.current = parseAttempt;
+
     setIsParsing(true);
     setImportError(null);
 
     try {
       const parsed = await parseOpenclawWorkspaceZipFile(file);
+      if (!isMountedRef.current || parseAttempt !== parseAttemptRef.current) return;
+
       setSelectedZipName(file.name);
       setSelectedImport(parsed);
       posthog?.capture('claw_openclaw_import_zip_parsed', {
@@ -145,6 +164,8 @@ export function OpenclawImportCard({
         instance_status: instanceStatus,
       });
     } catch (error) {
+      if (!isMountedRef.current || parseAttempt !== parseAttemptRef.current) return;
+
       setSelectedZipName(file.name);
       setSelectedImport(null);
       if (error instanceof OpenclawWorkspaceZipError) {
@@ -158,7 +179,9 @@ export function OpenclawImportCard({
         setImportError('Failed to parse zip file.');
       }
     } finally {
-      setIsParsing(false);
+      if (isMountedRef.current && parseAttempt === parseAttemptRef.current) {
+        setIsParsing(false);
+      }
     }
   }
 
@@ -175,8 +198,17 @@ export function OpenclawImportCard({
 
   function handleCopyCommand() {
     void navigator.clipboard.writeText(zipCommand.command);
+
+    if (copyTimeoutRef.current) {
+      clearTimeout(copyTimeoutRef.current);
+    }
+
     setCopiedCommand(true);
-    setTimeout(() => setCopiedCommand(false), 2000);
+    copyTimeoutRef.current = setTimeout(() => {
+      if (!isMountedRef.current) return;
+      setCopiedCommand(false);
+      copyTimeoutRef.current = null;
+    }, 2000);
   }
 
   function handleCardDragOver(event: ReactDragEvent<HTMLDivElement>) {

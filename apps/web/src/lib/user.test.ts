@@ -40,6 +40,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_cli_runs,
   bot_requests,
+  bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
   user_push_tokens,
   security_advisor_scans,
@@ -102,6 +103,7 @@ describe('User', () => {
     await db.delete(cloud_agent_feedback);
     await db.delete(user_admin_notes);
     await db.delete(magic_link_tokens);
+    await db.delete(bot_request_cloud_agent_sessions);
     await db.delete(bot_requests);
     await db.delete(stytch_fingerprints);
     await db.delete(kiloclaw_cli_runs);
@@ -774,29 +776,39 @@ describe('User', () => {
       ).toBe(1);
     });
 
-    it('should delete bot_requests for the user', async () => {
+    it('should delete bot_requests and cascade child sessions for the user', async () => {
       const user1 = await insertTestUser();
       const user2 = await insertTestUser();
 
-      await db.insert(bot_requests).values([
-        {
+      const [br1] = await db
+        .insert(bot_requests)
+        .values({
           created_by: user1.id,
           platform: 'slack',
           platform_thread_id: 'slack:T123:C456:thread1',
           user_message: 'Hello from user1',
           status: 'completed',
-        },
-        {
-          created_by: user2.id,
-          platform: 'slack',
-          platform_thread_id: 'slack:T123:C456:thread2',
-          user_message: 'Hello from user2',
-          status: 'completed',
-        },
-      ]);
+        })
+        .returning({ id: bot_requests.id });
+
+      await db.insert(bot_requests).values({
+        created_by: user2.id,
+        platform: 'slack',
+        platform_thread_id: 'slack:T123:C456:thread2',
+        user_message: 'Hello from user2',
+        status: 'completed',
+      });
+
+      // Insert a child session row for user1's bot request
+      await db.insert(bot_request_cloud_agent_sessions).values({
+        bot_request_id: br1.id,
+        cloud_agent_session_id: 'cas-gdpr-test-session',
+        status: 'completed',
+      });
 
       await softDeleteUser(user1.id);
 
+      // bot_requests for user1 should be gone
       expect(
         await db
           .select({ count: count() })
@@ -804,6 +816,15 @@ describe('User', () => {
           .where(eq(bot_requests.created_by, user1.id))
           .then(r => r[0].count)
       ).toBe(0);
+      // child session should be gone via FK cascade
+      expect(
+        await db
+          .select({ count: count() })
+          .from(bot_request_cloud_agent_sessions)
+          .where(eq(bot_request_cloud_agent_sessions.bot_request_id, br1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      // user2's bot_requests should remain
       expect(
         await db
           .select({ count: count() })
@@ -811,6 +832,45 @@ describe('User', () => {
           .where(eq(bot_requests.created_by, user2.id))
           .then(r => r[0].count)
       ).toBe(1);
+    });
+
+    it('should allow multiple child sessions per bot request', async () => {
+      const user = await insertTestUser();
+
+      const [br] = await db
+        .insert(bot_requests)
+        .values({
+          created_by: user.id,
+          platform: 'slack',
+          platform_thread_id: 'slack:T123:C456:multi-child',
+          user_message: 'multi-session test',
+          status: 'pending',
+        })
+        .returning({ id: bot_requests.id });
+
+      await db.insert(bot_request_cloud_agent_sessions).values([
+        {
+          bot_request_id: br.id,
+          cloud_agent_session_id: 'cas-multi-1',
+          status: 'running',
+        },
+        {
+          bot_request_id: br.id,
+          cloud_agent_session_id: 'cas-multi-2',
+          status: 'completed',
+        },
+      ]);
+
+      const rows = await db
+        .select()
+        .from(bot_request_cloud_agent_sessions)
+        .where(eq(bot_request_cloud_agent_sessions.bot_request_id, br.id));
+
+      expect(rows).toHaveLength(2);
+      expect(rows.map(r => r.cloud_agent_session_id).sort()).toEqual([
+        'cas-multi-1',
+        'cas-multi-2',
+      ]);
     });
 
     it('should soft-delete and anonymize payment methods', async () => {

@@ -694,6 +694,13 @@
       "when": 1776724301780,
       "tag": "0098_google_oauth_kiloclaw_broker",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1776849044702,
+      "tag": "0099_abandoned_sugar_man",
+      "breakpoints": true
     }
   ]
 }

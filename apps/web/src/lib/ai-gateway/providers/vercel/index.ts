@@ -66,8 +66,7 @@ export async function shouldRouteToVercel(
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
   const passedRandomization =
-    getRandomNumber('vercel_routing_' + randomSeed, 100) <
-    (await getVercelRoutingPercentage());
+    getRandomNumber('vercel_routing_' + randomSeed, 100) < (await getVercelRoutingPercentage());
 
   if (!passedRandomization) {
     return false;

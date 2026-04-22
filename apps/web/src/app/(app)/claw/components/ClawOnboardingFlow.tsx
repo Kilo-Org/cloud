@@ -185,9 +185,8 @@ function ClawOnboardingFlowInner({
 
   const handleCreateFlowStarted = useCallback(() => {
     setLocalCreateSetupStarted(true);
-    resetWizardSelections();
     onCreateFlowStarted?.();
-  }, [onCreateFlowStarted, resetWizardSelections]);
+  }, [onCreateFlowStarted]);
 
   const handleCreateFlowFailed = useCallback(() => {
     setLocalCreateSetupStarted(false);

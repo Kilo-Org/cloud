@@ -50,13 +50,13 @@ describe('buildUpstreamBody', () => {
 
   it('should strip output_dtype and output_dimension even when other optional fields are absent', () => {
     const result = buildUpstreamBody({
-      model: 'mistralai/mistral-embed',
+      model: 'mistralai/mistral-embed-2312',
       input: 'hello',
       output_dtype: 'float',
       output_dimension: 512,
     });
 
-    expect(result).toEqual({ model: 'mistralai/mistral-embed', input: 'hello' });
+    expect(result).toEqual({ model: 'mistralai/mistral-embed-2312', input: 'hello' });
     expect(result).not.toHaveProperty('output_dtype');
     expect(result).not.toHaveProperty('output_dimension');
   });

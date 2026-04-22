@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePostHog } from 'posthog-js/react';
+import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { Check, Sparkles, TriangleAlert, X } from 'lucide-react';
 import { KILO_AUTO_BALANCED_MODEL } from '@/lib/kilo-auto';
@@ -21,7 +21,6 @@ import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
-import { CreateInstanceCard } from './CreateInstanceCard';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep, ProvisioningStepView } from './ProvisioningStep';
 import type { BotIdentity, ExecPreset } from './claw.types';
@@ -156,13 +155,15 @@ function ClawOnboardingFlowInner({
   });
 
   const { data: isServiceDegraded } = useClawServiceDegraded();
+  useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
 
   useEffect(() => {
-    if (!flowState.createSetupActive || hasCapturedIdentityView.current) return;
+    if (flowState.renderStep !== 'identity' || hasCapturedIdentityView.current) return;
     hasCapturedIdentityView.current = true;
+    posthog?.capture('claw_page_viewed');
     posthog?.capture('claw_setup_identity_viewed');
-  }, [flowState.createSetupActive, posthog]);
+  }, [flowState.renderStep, posthog]);
 
   useEffect(() => {
     if (
@@ -186,9 +187,8 @@ function ClawOnboardingFlowInner({
 
   const handleCreateFlowStarted = useCallback(() => {
     setLocalCreateSetupStarted(true);
-    resetWizardSelections();
     onCreateFlowStarted?.();
-  }, [onCreateFlowStarted, resetWizardSelections]);
+  }, [onCreateFlowStarted]);
 
   const handleCreateFlowFailed = useCallback(() => {
     setLocalCreateSetupStarted(false);
@@ -221,21 +221,11 @@ function ClawOnboardingFlowInner({
     );
   }
 
-  function renderCreateInstanceStep() {
-    return (
-      <CreateInstanceCard
-        isPending={mutations.provision.isPending}
-        onCreate={handleCreateFlowStarted}
-      />
-    );
-  }
-
   function renderIdentityStep() {
     return (
       <BotIdentityStep
         currentStep={flowState.currentStep}
         totalSteps={flowState.totalSteps}
-        instanceRunning={flowState.instanceRunning}
         onContinue={({ identity, weatherLocation }) => {
           posthog?.capture('claw_setup_identity_completed', {
             bot_name_is_custom: identity.botName !== 'KiloClaw',
@@ -247,6 +237,7 @@ function ClawOnboardingFlowInner({
           } else {
             posthog?.capture('claw_weather_location_skipped');
           }
+
           if (flowState.instanceStatus) {
             if (weatherLocation) {
               mutations.updateConfig.mutate(
@@ -255,6 +246,9 @@ function ClawOnboardingFlowInner({
               );
             }
           } else {
+            posthog?.capture('claw_create_instance_clicked', {
+              selected_model: KILO_AUTO_BALANCED_MODEL.id,
+            });
             provisionInstance(weatherLocation?.location);
           }
           posthog?.capture('claw_setup_permissions_viewed');
@@ -388,8 +382,6 @@ function ClawOnboardingFlowInner({
     const renderStep = flowState.renderStep;
 
     switch (renderStep) {
-      case 'create-instance':
-        return renderCreateInstanceStep();
       case 'identity':
         return renderIdentityStep();
       case 'permissions':

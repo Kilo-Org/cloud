@@ -20,12 +20,10 @@ import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { ClawSetupCompleteStep, ClawSetupErrorStep } from './ClawOnboardingFlow';
-import { CreateInstanceCardView } from './CreateInstanceCard';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStepView } from './ProvisioningStep';
 
 const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
-  'create-instance': 'Create',
   identity: 'Identity',
   permissions: 'Permissions',
   channels: 'Channels',
@@ -194,8 +192,6 @@ function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
     case 'provisioning':
     case 'pairing':
       return step;
-    case 'create-instance':
-      return 'identity';
     case 'complete':
     case 'error':
       return 'done';
@@ -212,16 +208,8 @@ function renderFakeStep({
   basePath,
 }: RenderFakeStepInput) {
   switch (step) {
-    case 'create-instance':
-      return <CreateInstanceCardView onCreate={() => setStep('identity')} />;
     case 'identity': {
-      return (
-        <BotIdentityStep
-          {...stepProgress}
-          instanceRunning={false}
-          onContinue={() => setStep('permissions')}
-        />
-      );
+      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('permissions')} />;
     }
     case 'permissions': {
       return (

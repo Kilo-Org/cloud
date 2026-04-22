@@ -26,7 +26,6 @@ export const CLAW_ONBOARDING_WIZARD_STEPS = [
 export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[number];
 
 export type ClawOnboardingRenderStep =
-  | 'create-instance'
   | 'identity'
   | 'permissions'
   | 'channels'
@@ -40,7 +39,6 @@ export type PairingChannelId = 'telegram' | 'discord';
 export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
 
 export const CLAW_ONBOARDING_FAKE_STEPS = [
-  'create-instance',
   'identity',
   'permissions',
   'channels',
@@ -274,25 +272,16 @@ function getRenderStepDecision({
         reason: 'post-provisioning mode is ready because the instance status is running',
       };
     }
-    // DB row + subscription exist but no DO provisioned yet (e.g. credit
-    // enrollment created the billing records without triggering provision).
-    // Show the onboarding entry point so the user can kick off provisioning.
-    if (!instanceStatus) {
-      return {
-        renderStep: 'create-instance',
-        reason: 'post-provisioning mode has no populated instance status yet',
-      };
-    }
     return {
       renderStep: 'provisioning',
-      reason: 'post-provisioning mode has an instance but it is not running yet',
+      reason: 'post-provisioning mode is waiting for the instance to become ready',
     };
   }
 
   if (instanceStatus === null && !createSetupStarted) {
     return {
-      renderStep: 'create-instance',
-      reason: 'create-first mode has no instance status and setup has not started',
+      renderStep: 'identity',
+      reason: 'create-first mode starts with bot identity before setup is requested',
     };
   }
 

@@ -84,10 +84,10 @@ describe('ClawOnboardingFlow state machine', () => {
     expect(isPairingChannel(null)).toBe(false);
   });
 
-  test('renders the create card before provisioning starts', () => {
+  test('renders identity before provisioning starts', () => {
     const state = getClawOnboardingFlowState(createInput());
 
-    expect(state.renderStep).toBe('create-instance');
+    expect(state.renderStep).toBe('identity');
     expect(state.createSetupActive).toBe(false);
     expect(state.instanceStatus).toBeNull();
   });
@@ -320,18 +320,18 @@ describe('ClawOnboardingFlow state machine', () => {
     }
   );
 
-  test('renders create-instance when post-provisioning has no provisioned DO', () => {
+  test('renders provisioning when post-provisioning has no provisioned DO', () => {
     // status undefined — no DO state at all (e.g. credit enrollment created DB
     // row + subscription but never triggered provision)
     expect(getClawOnboardingFlowState(createInput({ mode: 'post-provisioning' })).renderStep).toBe(
-      'create-instance'
+      'provisioning'
     );
     // status with null machine status — DO exists but returned status: null
     expect(
       getClawOnboardingFlowState(
         createInput({ mode: 'post-provisioning', status: createStatus(null) })
       ).renderStep
-    ).toBe('create-instance');
+    ).toBe('provisioning');
   });
 
   test('renders complete in post-provisioning mode once the machine is running', () => {

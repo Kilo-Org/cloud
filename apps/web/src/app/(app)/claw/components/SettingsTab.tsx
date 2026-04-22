@@ -46,9 +46,18 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DetailTile } from './DetailTile';
+import { EMBEDDING_MODELS, DEFAULT_EMBEDDING_MODEL } from './embeddingModels';
 
 import { getEntriesByCategory } from '@kilocode/kiloclaw-secret-catalog';
 import { SecretEntrySection } from './SecretEntrySection';
@@ -65,6 +74,7 @@ import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
 const EXA_SEARCH_UI_MIN_CONTROLLER_VERSION = '2026.4.14';
+const MEMORY_MIN_OPENCLAW_VERSION = '2026.4.5';
 
 // ---------------------------------------------------------------------------
 // 1Password setup guide dialog
@@ -776,6 +786,187 @@ function InboundEmailCard({
 }
 
 // ---------------------------------------------------------------------------
+// MemorySection
+// ---------------------------------------------------------------------------
+
+function MemorySection({
+  config,
+  mutations,
+  supportsMemoryConfig,
+  onRequestUpgrade,
+}: {
+  config:
+    | {
+        vectorMemoryEnabled: boolean;
+        vectorMemoryModel: string | null;
+        dreamingEnabled: boolean;
+      }
+    | undefined;
+  mutations: ClawMutations;
+  supportsMemoryConfig: boolean;
+  onRequestUpgrade?: () => void;
+}) {
+  const configVectorEnabled = config?.vectorMemoryEnabled ?? false;
+  const configVectorModel = config?.vectorMemoryModel ?? DEFAULT_EMBEDDING_MODEL;
+  const configDreamingEnabled = config?.dreamingEnabled ?? false;
+
+  const [vectorEnabled, setVectorEnabled] = useState(configVectorEnabled);
+  const [vectorModel, setVectorModel] = useState(configVectorModel);
+  const [dreamingEnabled, setDreamingEnabled] = useState(configDreamingEnabled);
+  const [lastSaved, setLastSaved] = useState<{
+    vectorEnabled: boolean;
+    vectorModel: string;
+    dreamingEnabled: boolean;
+  } | null>(null);
+
+  // Sync local state when config loads/changes from server
+  useEffect(() => {
+    if (config) {
+      if (lastSaved === null) {
+        setVectorEnabled(config.vectorMemoryEnabled);
+        setVectorModel(config.vectorMemoryModel ?? DEFAULT_EMBEDDING_MODEL);
+        setDreamingEnabled(config.dreamingEnabled);
+      }
+    }
+  }, [config, lastSaved]);
+
+  const savedVectorEnabled = lastSaved?.vectorEnabled ?? configVectorEnabled;
+  const savedVectorModel = lastSaved?.vectorModel ?? configVectorModel;
+  const savedDreamingEnabled = lastSaved?.dreamingEnabled ?? configDreamingEnabled;
+  const dirty =
+    vectorEnabled !== savedVectorEnabled ||
+    (vectorEnabled && vectorModel !== savedVectorModel) ||
+    dreamingEnabled !== savedDreamingEnabled;
+  const saving = mutations.patchConfig.isPending;
+
+  function handleVectorToggle(checked: boolean) {
+    setVectorEnabled(checked);
+    if (checked && !vectorModel) {
+      setVectorModel(DEFAULT_EMBEDDING_MODEL);
+    }
+  }
+
+  function handleSave() {
+    mutations.patchConfig.mutate(
+      {
+        vectorMemoryEnabled: vectorEnabled,
+        vectorMemoryModel: vectorEnabled ? vectorModel : null,
+        dreamingEnabled,
+      },
+      {
+        onSuccess: () => {
+          setLastSaved({ vectorEnabled, vectorModel, dreamingEnabled });
+          toast.success('Memory settings saved. Changes applied to running instance.');
+        },
+        onError: err => toast.error(`Failed to save: ${err.message}`),
+      }
+    );
+  }
+
+  return (
+    <div>
+      <h2 className="text-foreground mb-3 text-base font-semibold">Memory</h2>
+      <div className="rounded-lg border p-4">
+        {!supportsMemoryConfig && (
+          <div className="mb-4 flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-amber-200">Upgrade required</p>
+              <p className="text-muted-foreground text-xs">
+                Memory configuration requires OpenClaw {MEMORY_MIN_OPENCLAW_VERSION} or later.
+                Upgrade to the latest version to enable these settings.
+              </p>
+            </div>
+            {onRequestUpgrade && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300"
+                onClick={onRequestUpgrade}
+              >
+                Upgrade
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Vector Memory toggle */}
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Vector Search</p>
+            <p className="text-muted-foreground text-xs">
+              Use semantic search across memory files via embedding vectors.
+            </p>
+          </div>
+          <Switch
+            checked={vectorEnabled}
+            onCheckedChange={handleVectorToggle}
+            disabled={!supportsMemoryConfig}
+          />
+        </div>
+
+        {vectorEnabled && (
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Embedding Model</p>
+              <p className="text-muted-foreground text-xs">
+                Model used for generating vector embeddings.
+              </p>
+            </div>
+            <Select
+              value={vectorModel}
+              onValueChange={setVectorModel}
+              disabled={!supportsMemoryConfig}
+            >
+              <SelectTrigger className="w-full sm:w-[300px]">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                {EMBEDDING_MODELS.map(m => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <Separator className="my-4" />
+
+        {/* Dreaming toggle */}
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Dreaming</p>
+            <p className="text-muted-foreground text-xs">
+              Background memory consolidation — moves strong short-term signals into durable
+              long-term memory automatically.
+            </p>
+          </div>
+          <Switch
+            checked={dreamingEnabled}
+            onCheckedChange={setDreamingEnabled}
+            disabled={!supportsMemoryConfig}
+          />
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <Button
+            size="sm"
+            disabled={!supportsMemoryConfig || !dirty || saving}
+            variant={dirty ? 'default' : 'outline'}
+            onClick={handleSave}
+          >
+            <Save className="h-4 w-4" />
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // SettingsTab
 // ---------------------------------------------------------------------------
 
@@ -873,6 +1064,10 @@ export function SettingsTab({
   const supportsExaSearchUi = calverAtLeast(
     cleanVersion(controllerVersion?.version),
     EXA_SEARCH_UI_MIN_CONTROLLER_VERSION
+  );
+  const supportsMemoryConfig = calverAtLeast(
+    runningVersion ?? trackedVersion,
+    MEMORY_MIN_OPENCLAW_VERSION
   );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
@@ -1100,6 +1295,14 @@ export function SettingsTab({
           </div>
         </div>
       </div>
+
+      {/* ── Memory ── */}
+      <MemorySection
+        config={config}
+        mutations={mutations}
+        supportsMemoryConfig={supportsMemoryConfig}
+        onRequestUpgrade={onRequestUpgrade}
+      />
 
       {/* ── Default Permissions ── */}
       <PermissionPresetSection

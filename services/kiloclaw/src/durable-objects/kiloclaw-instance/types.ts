@@ -132,6 +132,9 @@ export type InstanceMutableState = {
   streamChatBotUserId: string | null;
   streamChatBotUserToken: string | null;
   streamChatChannelId: string | null;
+  vectorMemoryEnabled: boolean;
+  vectorMemoryModel: string | null;
+  dreamingEnabled: boolean;
   /** In-memory only — throttles live Fly checks in getStatus(). */
   lastLiveCheckAt: number | null;
 };

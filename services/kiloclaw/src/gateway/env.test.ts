@@ -582,4 +582,51 @@ describe('buildEnvVars', () => {
 
     expect(result.env.KILOCLAW_SECRET_CONFIG_PATHS).toBeUndefined();
   });
+
+  // ─── Vector memory + dreaming ───────────────────────────────────────
+
+  it('emits KILOCLAW_VECTOR_MEMORY_ENABLED only when vectorMemoryEnabled is truthy', async () => {
+    const env = createMockEnv();
+
+    const unset = await buildEnvVars(env, SANDBOX_ID, SECRET);
+    expect(unset.env.KILOCLAW_VECTOR_MEMORY_ENABLED).toBeUndefined();
+
+    const off = await buildEnvVars(env, SANDBOX_ID, SECRET, { vectorMemoryEnabled: false });
+    expect(off.env.KILOCLAW_VECTOR_MEMORY_ENABLED).toBeUndefined();
+
+    const on = await buildEnvVars(env, SANDBOX_ID, SECRET, { vectorMemoryEnabled: true });
+    expect(on.env.KILOCLAW_VECTOR_MEMORY_ENABLED).toBe('true');
+  });
+
+  it('emits KILOCLAW_VECTOR_MEMORY_MODEL only when vectorMemoryModel is set', async () => {
+    const env = createMockEnv();
+
+    const none = await buildEnvVars(env, SANDBOX_ID, SECRET, { vectorMemoryEnabled: true });
+    expect(none.env.KILOCLAW_VECTOR_MEMORY_MODEL).toBeUndefined();
+
+    const set = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: 'openai/text-embedding-3-small',
+    });
+    expect(set.env.KILOCLAW_VECTOR_MEMORY_MODEL).toBe('openai/text-embedding-3-small');
+
+    const nulled = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: null,
+    });
+    expect(nulled.env.KILOCLAW_VECTOR_MEMORY_MODEL).toBeUndefined();
+  });
+
+  it('emits KILOCLAW_DREAMING_ENABLED only when dreamingEnabled is truthy', async () => {
+    const env = createMockEnv();
+
+    const unset = await buildEnvVars(env, SANDBOX_ID, SECRET);
+    expect(unset.env.KILOCLAW_DREAMING_ENABLED).toBeUndefined();
+
+    const off = await buildEnvVars(env, SANDBOX_ID, SECRET, { dreamingEnabled: false });
+    expect(off.env.KILOCLAW_DREAMING_ENABLED).toBeUndefined();
+
+    const on = await buildEnvVars(env, SANDBOX_ID, SECRET, { dreamingEnabled: true });
+    expect(on.env.KILOCLAW_DREAMING_ENABLED).toBe('true');
+  });
 });

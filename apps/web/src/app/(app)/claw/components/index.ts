@@ -9,7 +9,6 @@ export {
 export { ClawHeader } from './ClawHeader';
 export { ClawChatPage } from './ClawChatPage';
 export { ClawSettingsPage } from './ClawSettingsPage';
-export { CreateInstanceCard } from './CreateInstanceCard';
 export { DetailTile } from './DetailTile';
 export { InstanceTab } from './InstanceTab';
 export { SettingsTab } from './SettingsTab';

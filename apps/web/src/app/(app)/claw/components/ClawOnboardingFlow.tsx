@@ -236,6 +236,14 @@ function ClawOnboardingFlowInner({
           } else {
             posthog?.capture('claw_weather_location_skipped');
           }
+
+          // Commit wizard state before triggering provisioning so the parent
+          // callback (onCreateFlowStarted) can't cause a re-render that sees
+          // stale onboardingStep / botIdentity values.
+          setBotIdentity(identity);
+          setOnboardingStep('permissions');
+          posthog?.capture('claw_setup_permissions_viewed');
+
           if (flowState.instanceStatus) {
             if (weatherLocation) {
               mutations.updateConfig.mutate(
@@ -246,9 +254,6 @@ function ClawOnboardingFlowInner({
           } else {
             provisionInstance(weatherLocation?.location);
           }
-          posthog?.capture('claw_setup_permissions_viewed');
-          setBotIdentity(identity);
-          setOnboardingStep('permissions');
         }}
       />
     );

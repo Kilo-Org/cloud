@@ -286,7 +286,6 @@ async function continueBotAgentAfterCallback(params: {
       user,
       botRequestId: params.botRequestId,
       prompt: params.continuationPrompt,
-      requestSource: 'cloud-agent-callback',
       completedStepCount: params.completedStepCount,
       initialSteps: params.requestRow.steps ?? [],
     });
@@ -463,7 +462,6 @@ async function persistTrackedCompletedSessionResult(params: {
     botRequestId: params.botRequestId,
     cloudAgentSessionId: params.cloudAgentSessionId,
     finalMessagePreview: finalMessage.slice(0, 200),
-    response: finalMessage,
   });
 }
 
@@ -608,7 +606,6 @@ async function handleCompletedCallback(
       results: results.map(result => ({
         cloudAgentSessionId: result.session.cloud_agent_session_id,
         finalMessagePreview: result.finalMessage.slice(0, 200),
-        response: result.finalMessage,
       })),
     });
 
@@ -663,7 +660,6 @@ async function handleCompletedCallback(
       botRequestId,
       hasFinalMessage: Boolean(finalMessage),
       finalMessagePreview: finalMessage?.slice(0, 200),
-      response: finalMessage,
     });
 
     if (!finalMessage) {
@@ -742,9 +738,8 @@ Original user request:
 
 ${cloudAgentResultsForPrompt}`;
 
-  logCallback('Continuing bot agent after Cloud Agent callback with prompt', {
+  logCallback('Continuing bot agent after Cloud Agent callback', {
     botRequestId,
-    prompt: continuationPrompt,
   });
 
   const continuation = await continueBotAgentAfterCallback({
@@ -758,7 +753,6 @@ ${cloudAgentResultsForPrompt}`;
     botRequestId,
     startedAnotherCloudAgentSession: continuation.startedCloudAgentSession,
     finalTextPreview: continuation.finalText.slice(0, 200),
-    response: continuation.finalText,
   });
 
   if (continuation.startedCloudAgentSession) {

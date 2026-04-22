@@ -4152,7 +4152,6 @@ export type BotRequestStep = {
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
   toolResults?: Array<{ name: string; result: unknown }>;
   usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
-  llm?: { prompt: string; response: string };
 };
 
 export const bot_requests = pgTable(

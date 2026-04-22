@@ -29,7 +29,6 @@ type StepData = {
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
   toolResults?: Array<{ name: string; result?: unknown }>;
   usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
-  llm?: { prompt: string; response: string };
 };
 
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -38,32 +37,6 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
       <span className="text-muted-foreground w-40 shrink-0 text-sm font-medium">{label}</span>
       <span className="text-sm">{children}</span>
     </div>
-  );
-}
-
-function LlmLogDetails({ step }: { step: StepData }) {
-  if (!step.llm) {
-    return <span className="text-muted-foreground">-</span>;
-  }
-
-  return (
-    <details className="max-w-xl text-sm">
-      <summary className="text-primary cursor-pointer">View prompt/response</summary>
-      <div className="mt-3 space-y-3">
-        <div>
-          <div className="mb-1 font-medium">Prompt</div>
-          <pre className="bg-muted max-h-80 overflow-auto rounded-md p-3 text-xs whitespace-pre-wrap">
-            {step.llm.prompt}
-          </pre>
-        </div>
-        <div>
-          <div className="mb-1 font-medium">Response</div>
-          <pre className="bg-muted max-h-80 overflow-auto rounded-md p-3 text-xs whitespace-pre-wrap">
-            {step.llm.response}
-          </pre>
-        </div>
-      </div>
-    </details>
   );
 }
 
@@ -86,7 +59,6 @@ function StepsTable({ steps }: { steps: StepData[] }) {
               <TableHead className="text-right">Output Tokens</TableHead>
               <TableHead className="text-right">Total Tokens</TableHead>
               <TableHead>Tool Calls</TableHead>
-              <TableHead>LLM Log</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -109,9 +81,6 @@ function StepsTable({ steps }: { steps: StepData[] }) {
                   {step.toolCalls && step.toolCalls.length > 0
                     ? step.toolCalls.map(tc => tc.name).join(', ')
                     : '-'}
-                </TableCell>
-                <TableCell>
-                  <LlmLogDetails step={step} />
                 </TableCell>
               </TableRow>
             ))}

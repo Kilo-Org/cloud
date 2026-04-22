@@ -226,7 +226,7 @@ export function KiloChatLayout({
         </div>
 
         {/* Main content */}
-        <div className="min-h-0 flex-1">{children}</div>
+        <div className="min-h-0 min-w-0 flex-1">{children}</div>
       </div>
     </KiloChatContext.Provider>
   );

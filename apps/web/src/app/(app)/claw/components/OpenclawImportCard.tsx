@@ -239,9 +239,9 @@ export function OpenclawImportCard({
 
           const summary = summarizeImportResult(result);
           if (result.ok) {
-            toast.success(`OpenClaw import complete: ${summary}`);
+            toast.success('OpenClaw import complete.');
           } else {
-            toast.error(`OpenClaw import completed with partial failures: ${summary}`);
+            toast.error(`OpenClaw import complete. (${summary})`);
           }
 
           posthog?.capture('claw_openclaw_import_completed', {
@@ -367,9 +367,7 @@ export function OpenclawImportCard({
           <p className="text-sm font-medium">
             Preview ({selectedImport.previewPaths.length} files)
           </p>
-          {selectedZipName && (
-            <p className="text-muted-foreground text-xs">zip file: {selectedZipName}</p>
-          )}
+          {selectedZipName && <p className="text-muted-foreground text-xs">{selectedZipName}</p>}
           <div className="max-h-40 overflow-auto rounded-md border p-2">
             <ul className="space-y-1 text-xs">
               {selectedImport.previewPaths.map(path => (

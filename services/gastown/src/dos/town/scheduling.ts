@@ -126,27 +126,31 @@ export async function dispatchAgent(
 
     const rigRecord = rigs.getRig(ctx.sql, rigId);
 
-    const started = await dispatch.startAgentInContainer(ctx.env, ctx.storage, {
-      townId: ctx.townId,
-      rigId,
-      userId: rigConfig.userId,
-      agentId: agent.id,
-      agentName: agent.name,
-      role: agent.role,
-      identity: agent.identity,
-      beadId: bead.bead_id,
-      beadTitle: bead.title,
-      beadBody: bead.body ?? '',
-      checkpoint: agent.checkpoint,
-      gitUrl: rigConfig.gitUrl,
-      defaultBranch: rigConfig.defaultBranch,
-      kilocodeToken,
-      townConfig,
-      rigOverride: rigRecord?.config ?? null,
-      platformIntegrationId: rigConfig.platformIntegrationId,
-      convoyFeatureBranch: convoyFeatureBranch ?? undefined,
-      systemPromptOverride: options?.systemPromptOverride,
-    });
+    const { started, containerFetchMs } = await dispatch.startAgentInContainer(
+      ctx.env,
+      ctx.storage,
+      {
+        townId: ctx.townId,
+        rigId,
+        userId: rigConfig.userId,
+        agentId: agent.id,
+        agentName: agent.name,
+        role: agent.role,
+        identity: agent.identity,
+        beadId: bead.bead_id,
+        beadTitle: bead.title,
+        beadBody: bead.body ?? '',
+        checkpoint: agent.checkpoint,
+        gitUrl: rigConfig.gitUrl,
+        defaultBranch: rigConfig.defaultBranch,
+        kilocodeToken,
+        townConfig,
+        rigOverride: rigRecord?.config ?? null,
+        platformIntegrationId: rigConfig.platformIntegrationId,
+        convoyFeatureBranch: convoyFeatureBranch ?? undefined,
+        systemPromptOverride: options?.systemPromptOverride,
+      }
+    );
 
     if (started) {
       // Reset dispatch_attempts on successful start — but NOT for refineries.
@@ -172,6 +176,7 @@ export async function dispatchAgent(
         agentId: agent.id,
         beadId: bead.bead_id,
         role: agent.role,
+        durationMs: containerFetchMs,
       });
     } else {
       // Container start returned false — but the container may have

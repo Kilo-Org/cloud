@@ -72,6 +72,16 @@ export const executeActionSchema = z.object({
   value: z.string().min(1).max(200),
 });
 
+export const paginationQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const listMessagesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  before: ulidSchema.optional(),
+});
+
 export const createBotConversationSchema = z.object({
   title: z.string().max(200).optional(),
   additionalMembers: z.array(z.string().min(1)).max(20).optional(),

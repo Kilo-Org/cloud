@@ -2,7 +2,7 @@ import { createMiddleware } from 'hono/factory';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { deriveGatewayToken } from './lib/gateway-token';
 import type { AuthContext } from './auth';
-import { SANDBOX_ID_PATTERN } from './routes/schemas';
+import { sandboxIdSchema } from './routes/schemas';
 
 /** Timing-safe string comparison using Web Crypto. */
 async function timingSafeEqual(a: string, b: string): Promise<boolean> {
@@ -44,10 +44,11 @@ export const botAuthMiddleware = createMiddleware<{
   Bindings: Env;
   Variables: AuthContext;
 }>(async (c, next) => {
-  const sandboxId = c.req.param('sandboxId');
-  if (!sandboxId || !SANDBOX_ID_PATTERN.test(sandboxId)) {
+  const result = sandboxIdSchema.safeParse(c.req.param('sandboxId'));
+  if (!result.success) {
     return c.json({ error: 'Invalid sandboxId' }, 400);
   }
+  const sandboxId = result.data;
 
   const token = extractBearerToken(c.req.header('authorization'));
   if (!token) {

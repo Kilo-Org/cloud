@@ -7,7 +7,12 @@ import {
   leaveConversationFor,
   markReadFor,
 } from '../services/conversations';
-import { ulidSchema, sandboxIdSchema, renameConversationSchema } from './schemas';
+import {
+  ulidSchema,
+  sandboxIdSchema,
+  paginationQuerySchema,
+  renameConversationSchema,
+} from './schemas';
 
 const createConversationSchema = z.object({
   sandboxId: sandboxIdSchema,
@@ -50,9 +55,25 @@ export function registerConversationRoutes(
   // GET /v1/conversations — list my conversations, optionally filtered by sandboxId
   app.get('/v1/conversations', async c => {
     const callerId = c.get('callerId');
-    const sandboxId = c.req.query('sandboxId') ?? undefined;
-    const limit = Math.min(Math.max(Number(c.req.query('limit')) || 50, 1), 100);
-    const offset = Math.max(Number(c.req.query('offset')) || 0, 0);
+
+    const rawSandboxId = c.req.query('sandboxId');
+    if (rawSandboxId !== undefined) {
+      const sbx = sandboxIdSchema.safeParse(rawSandboxId);
+      if (!sbx.success) {
+        return c.json({ error: 'Invalid sandboxId', issues: sbx.error.issues }, 400);
+      }
+    }
+    const sandboxId = rawSandboxId ?? undefined;
+
+    const query = paginationQuerySchema.safeParse({
+      limit: c.req.query('limit'),
+      offset: c.req.query('offset'),
+    });
+    if (!query.success) {
+      return c.json({ error: 'Invalid query parameters', issues: query.error.issues }, 400);
+    }
+    const { limit, offset } = query.data;
+
     const stub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
     const { conversations, total } = await stub.listConversations(sandboxId, limit, offset);
     return c.json({ conversations, total, limit, offset });

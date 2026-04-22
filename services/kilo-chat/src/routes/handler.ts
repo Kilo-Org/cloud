@@ -22,10 +22,13 @@ import { setTypingFor, stopTypingFor } from '../services/typing';
 import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
 import {
   ulidSchema,
+  sandboxIdSchema,
   createMessageSchema,
   createBotConversationSchema,
   editMessageSchema,
   executeActionSchema,
+  listMessagesQuerySchema,
+  paginationQuerySchema,
   reactionBodySchema,
   renameConversationSchema,
 } from './schemas';
@@ -63,6 +66,14 @@ function parseConversationId(c: HonoCtx) {
   const result = ulidSchema.safeParse(c.req.param('conversationId'));
   if (!result.success) {
     return { ok: false as const, response: c.json({ error: 'Invalid conversation ID' }, 400) };
+  }
+  return { ok: true as const, data: result.data };
+}
+
+function parseSandboxId(c: HonoCtx) {
+  const result = sandboxIdSchema.safeParse(c.req.param('sandboxId'));
+  if (!result.success) {
+    return { ok: false as const, response: c.json({ error: 'Invalid sandboxId' }, 400) };
   }
   return { ok: true as const, data: result.data };
 }
@@ -243,12 +254,18 @@ export async function handleListMessages(c: HonoCtx) {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
-  const beforeParam = c.req.query('before') || undefined;
-  const limitParam = c.req.query('limit');
-  const rawLimit = limitParam !== undefined ? Number(limitParam) : 50;
-  const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 50));
+  const query = listMessagesQuerySchema.safeParse({
+    limit: c.req.query('limit'),
+    before: c.req.query('before'),
+  });
+  if (!query.success) {
+    return c.json({ error: 'Invalid query parameters', issues: query.error.issues }, 400);
+  }
 
-  const result = await convStub.listMessages({ limit, before: beforeParam });
+  const result = await convStub.listMessages({
+    limit: query.data.limit,
+    before: query.data.before,
+  });
   return c.json({ messages: result.messages });
 }
 
@@ -310,16 +327,20 @@ export async function handleStopTyping(c: HonoCtx) {
 // ─── listBotConversations ────────────────────────────────────────────────────
 
 export async function handleListBotConversations(c: HonoCtx) {
-  const sandboxId = c.req.param('sandboxId');
-  if (!sandboxId) {
-    return c.json({ error: 'sandboxId required' }, 400);
+  const sbx = parseSandboxId(c);
+  if (!sbx.ok) return sbx.response;
+  const sandboxId = sbx.data;
+
+  const query = paginationQuerySchema.safeParse({
+    limit: c.req.query('limit'),
+    offset: c.req.query('offset'),
+  });
+  if (!query.success) {
+    return c.json({ error: 'Invalid query parameters', issues: query.error.issues }, 400);
   }
 
   const botCallerId = `bot:kiloclaw:${sandboxId}`;
-  const limitParam = c.req.query('limit');
-  const rawLimit = limitParam !== undefined ? Number(limitParam) : 50;
-  const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 50));
-  const offset = Math.max(Number(c.req.query('offset')) || 0, 0);
+  const { limit, offset } = query.data;
 
   const membershipStub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(botCallerId));
   const { conversations, total } = await membershipStub.listConversations(sandboxId, limit, offset);
@@ -358,10 +379,9 @@ export async function handleListBotConversations(c: HonoCtx) {
 // ─── createBotConversation ──────────────────────────────────────────────────
 
 export async function handleCreateBotConversation(c: HonoCtx) {
-  const sandboxId = c.req.param('sandboxId');
-  if (!sandboxId) {
-    return c.json({ error: 'sandboxId required' }, 400);
-  }
+  const sbx = parseSandboxId(c);
+  if (!sbx.ok) return sbx.response;
+  const sandboxId = sbx.data;
 
   const body = await parseBody(c, createBotConversationSchema);
   if (!body.ok) return body.response;

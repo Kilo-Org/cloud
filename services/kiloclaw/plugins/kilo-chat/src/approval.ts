@@ -29,7 +29,10 @@ function extractConversationIdFromSessionKey(sessionKey: string): string | null 
   if (directIdx === -1 || directIdx >= parts.length - 1) return null;
   // Everything after "direct:" is the peerId (conversationId); rejoin in case
   // it contained colons (unlikely for ULIDs, but defensive).
-  return parts.slice(directIdx + 1).join(':') || null;
+  // The SDK lowercases the peerId in the session key, but the kilo-chat
+  // controller expects the original uppercase ULID.
+  const raw = parts.slice(directIdx + 1).join(':');
+  return raw ? raw.toUpperCase() : null;
 }
 
 function makeClient() {
@@ -131,8 +134,14 @@ const nativeRuntime: ChannelApprovalNativeRuntimeAdapter<
   eventKinds: ['exec', 'plugin'],
 
   availability: {
-    isConfigured: () => true,
-    shouldHandle: () => true,
+    isConfigured: (...args: unknown[]) => {
+      console.log('[kilo-chat:approval] isConfigured called', JSON.stringify(args));
+      return true;
+    },
+    shouldHandle: (...args: unknown[]) => {
+      console.log('[kilo-chat:approval] shouldHandle called', JSON.stringify(args));
+      return true;
+    },
   },
 
   presentation: {
@@ -152,9 +161,18 @@ const nativeRuntime: ChannelApprovalNativeRuntimeAdapter<
   transport: {
     prepareTarget: ({ request }) => {
       const sessionKey = request.request?.sessionKey;
-      if (!sessionKey) return null;
+      console.log('[kilo-chat:approval] prepareTarget sessionKey:', sessionKey ?? '(none)');
+      if (!sessionKey) {
+        console.log('[kilo-chat:approval] prepareTarget → null (no sessionKey)');
+        return null;
+      }
       const conversationId = extractConversationIdFromSessionKey(sessionKey);
-      if (!conversationId) return null;
+      console.log('[kilo-chat:approval] prepareTarget conversationId:', conversationId ?? '(none)');
+      if (!conversationId) {
+        console.log('[kilo-chat:approval] prepareTarget → null (no conversationId)');
+        return null;
+      }
+      console.log('[kilo-chat:approval] prepareTarget → ok', { conversationId });
       return {
         dedupeKey: conversationId,
         target: { conversationId },
@@ -162,16 +180,27 @@ const nativeRuntime: ChannelApprovalNativeRuntimeAdapter<
     },
 
     deliverPending: async ({ preparedTarget, pendingPayload, request }) => {
-      const client = makeClient();
-      const { messageId } = await client.createMessage({
-        conversationId: preparedTarget.conversationId,
-        content: pendingPayload,
-      });
-      return {
-        messageId,
+      console.log('[kilo-chat:approval] deliverPending called', {
         conversationId: preparedTarget.conversationId,
         approvalId: request.id,
-      };
+        blockCount: pendingPayload.length,
+      });
+      const client = makeClient();
+      try {
+        const { messageId } = await client.createMessage({
+          conversationId: preparedTarget.conversationId,
+          content: pendingPayload,
+        });
+        console.log('[kilo-chat:approval] deliverPending → ok', { messageId });
+        return {
+          messageId,
+          conversationId: preparedTarget.conversationId,
+          approvalId: request.id,
+        };
+      } catch (err) {
+        console.error('[kilo-chat:approval] deliverPending → error', err);
+        throw err;
+      }
     },
 
     updateEntry: async ({ entry, payload }) => {
@@ -201,6 +230,15 @@ export function createKiloChatApprovalCapability(): ChannelApprovalCapability {
   return createChannelApprovalCapability({
     authorizeActorAction: () => ({ authorized: true }),
     getActionAvailabilityState: () => ({ kind: 'enabled' as const }),
+
+    delivery: {
+      shouldSuppressForwardingFallback: ({ target }) => {
+        const channel = target.channel;
+        const result = channel === 'kilo-chat';
+        console.log('[kilo-chat:approval] shouldSuppressForwardingFallback', { channel, result });
+        return result;
+      },
+    },
 
     native: {
       describeDeliveryCapabilities: () => ({

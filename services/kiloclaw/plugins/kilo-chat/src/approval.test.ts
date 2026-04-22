@@ -102,4 +102,29 @@ describe('createKiloChatApprovalCapability', () => {
     expect(capability.render!.plugin!.buildPendingPayload).toBeDefined();
     expect(capability.render!.plugin!.buildResolvedPayload).toBeDefined();
   });
+
+  it('suppresses forwarding fallback when target channel is kilo-chat', () => {
+    expect(capability.delivery).toBeDefined();
+    const suppress = capability.delivery!.shouldSuppressForwardingFallback!;
+    expect(
+      suppress({
+        cfg: {} as never,
+        approvalKind: 'exec',
+        target: { channel: 'kilo-chat', to: 'conv-1' },
+        request: { request: {} },
+      } as never)
+    ).toBe(true);
+  });
+
+  it('does not suppress forwarding fallback for other channels', () => {
+    const suppress = capability.delivery!.shouldSuppressForwardingFallback!;
+    expect(
+      suppress({
+        cfg: {} as never,
+        approvalKind: 'exec',
+        target: { channel: 'slack', to: 'target-1' },
+        request: { request: {} },
+      } as never)
+    ).toBe(false);
+  });
 });

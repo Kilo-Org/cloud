@@ -16,6 +16,8 @@ import { handleKiloChatRenameAction } from './rename-action';
 import { handleKiloChatListConversationsAction } from './list-conversations-action';
 import { handleKiloChatCreateConversationAction } from './create-conversation-action';
 import { createKiloChatApprovalCapability } from './approval';
+import { getExecApprovalReplyMetadata } from 'openclaw/plugin-sdk/approval-reply-runtime';
+import { CHANNEL_APPROVAL_NATIVE_RUNTIME_CONTEXT_CAPABILITY } from 'openclaw/plugin-sdk/approval-handler-adapter-runtime';
 import { stripPrefix } from './action-schemas';
 
 const CHANNEL_ID = 'kilo-chat';
@@ -69,7 +71,7 @@ const pluginBase = createChannelPluginBase({
     applyAccountConfig: ({ cfg }) => cfg,
   },
   config: {
-    listAccountIds: () => [],
+    listAccountIds: () => ['default'],
     resolveAccount,
     inspectAccount,
   },
@@ -197,7 +199,19 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
   },
   threading: { topLevelReplyToMode: 'reply' },
   outbound: {
-    base: { deliveryMode: 'direct' },
+    base: {
+      deliveryMode: 'direct',
+      shouldSuppressLocalPayloadPrompt: ({ payload }) => {
+        const meta = getExecApprovalReplyMetadata(payload);
+        const result = meta !== null;
+        console.log('[kilo-chat:approval] shouldSuppressLocalPayloadPrompt', {
+          result,
+          hasChannelData: !!payload?.channelData,
+          metaApprovalId: meta?.approvalId ?? '(none)',
+        });
+        return result;
+      },
+    },
     attachedResults: {
       channel: CHANNEL_ID,
       sendText: async params => {
@@ -212,5 +226,37 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
     },
   },
 });
+
+// Webhook-based channel — no long-running monitor needed. A minimal
+// gateway.startAccount ensures the approval handler bootstrap runs and
+// the native runtime can deliver rich approval messages.
+kiloChatPlugin.gateway = {
+  startAccount: async ({ abortSignal, channelRuntime }) => {
+    console.log('[kilo-chat] gateway.startAccount called', {
+      hasChannelRuntime: !!channelRuntime,
+      hasRuntimeContexts: !!channelRuntime?.runtimeContexts,
+    });
+
+    // Register the approval native runtime context on the gateway's channel
+    // runtime so the approval handler bootstrap can discover it.
+    if (channelRuntime?.runtimeContexts) {
+      const handle = channelRuntime.runtimeContexts.register({
+        channelId: CHANNEL_ID,
+        accountId: 'default',
+        capability: CHANNEL_APPROVAL_NATIVE_RUNTIME_CONTEXT_CAPABILITY,
+        context: {},
+        abortSignal,
+      });
+      console.log('[kilo-chat:approval] runtime context registered via channelRuntime', {
+        hasDispose: !!handle?.dispose,
+      });
+    }
+
+    // Keep alive until the account is stopped.
+    await new Promise<void>(resolve => {
+      abortSignal.addEventListener('abort', () => resolve(), { once: true });
+    });
+  },
+};
 
 kiloChatPlugin.approvalCapability = createKiloChatApprovalCapability();

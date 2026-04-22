@@ -26,7 +26,9 @@ import {
   Users,
   Rocket,
   ChevronLeft,
+  ArrowRight,
 } from 'lucide-react';
+import Link from 'next/link';
 
 const DEFAULT_UPSTREAM = 'hop/wl-commons';
 
@@ -111,10 +113,13 @@ function ConnectedState({
   // credential + upstream config), not here. This section only shows
   // whether the town is wired to a wasteland.
   return (
-    <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-      <div className="flex items-center gap-3">
+    <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 pr-4">
+      <Link
+        href={`/wasteland/${connection.wasteland_id}`}
+        className="group flex flex-1 items-center gap-3 rounded-l-lg px-4 py-3 transition-colors hover:bg-emerald-500/10"
+      >
         <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-sm text-white/70">
             Connected to <span className="font-mono text-emerald-400">{connection.upstream}</span>
           </p>
@@ -124,7 +129,8 @@ function ConnectedState({
             Org: <span className="font-mono text-white/50">{connection.dolthub_org}</span>
           </p>
         </div>
-      </div>
+        <ArrowRight className="size-3.5 shrink-0 text-emerald-400/40 transition-colors group-hover:text-emerald-400" />
+      </Link>
       <Button
         variant="secondary"
         size="sm"
@@ -242,6 +248,9 @@ function ConnectWastelandDialog({
   const [doltUserEmail, setDoltUserEmail] = useState('');
 
   const [connectedUpstream, setConnectedUpstream] = useState(DEFAULT_UPSTREAM);
+  /** wastelandId that just got connected — used to offer a "Visit wasteland"
+   *  link in the success step. */
+  const [connectedWastelandId, setConnectedWastelandId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Pre-fill identity fields from user profile
@@ -267,6 +276,7 @@ function ConnectWastelandDialog({
       setMode('join');
       setSelectedWastelandId(null);
       setConnectedUpstream(DEFAULT_UPSTREAM);
+      setConnectedWastelandId(null);
       setUpstreamInput(DEFAULT_UPSTREAM);
       setNewWastelandName('');
       setDolthubToken('');
@@ -325,6 +335,7 @@ function ConnectWastelandDialog({
       const selectedWasteland = wastelands.find(w => w.wasteland_id === wastelandId);
       const upstream = selectedWasteland?.dolthub_upstream ?? DEFAULT_UPSTREAM;
       setConnectedUpstream(upstream);
+      setConnectedWastelandId(wastelandId);
 
       await wastelandClient.wasteland.connectKiloTown.mutate({
         wastelandId,
@@ -368,6 +379,7 @@ function ConnectWastelandDialog({
       if (!wastelandId) {
         throw new Error('Select a wasteland to join, or switch to Create.');
       }
+      setConnectedWastelandId(wastelandId);
 
       await wastelandClient.wasteland.storeCredential.mutate({
         wastelandId,
@@ -422,6 +434,7 @@ function ConnectWastelandDialog({
         dolthubUpstream: upstream,
       });
       const wastelandId = created.wasteland_id;
+      setConnectedWastelandId(wastelandId);
 
       // 2. Store credentials with admin flag (required for createUpstream)
       await wastelandClient.wasteland.storeCredential.mutate({
@@ -875,6 +888,15 @@ function ConnectWastelandDialog({
               >
                 Done
               </Button>
+              {connectedWastelandId && (
+                <Link
+                  href={`/wasteland/${connectedWastelandId}`}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
+                >
+                  Visit wasteland
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              )}
             </DialogFooter>
           </>
         )}

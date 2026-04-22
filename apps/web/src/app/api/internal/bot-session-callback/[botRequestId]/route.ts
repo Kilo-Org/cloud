@@ -18,9 +18,9 @@ import {
   getBotRequestCloudAgentSessionGroupReadiness,
 } from '@/lib/bot/cloud-agent-session-groups';
 import {
-  markBotRequestCloudAgentSessionTerminal,
-  recordBotRequestCloudAgentSessionResult,
-  recordBotRequestCloudAgentSessionResultError,
+  markBotRequestCloudAgentSessionTerminalStrict,
+  recordBotRequestCloudAgentSessionResultErrorStrict,
+  recordBotRequestCloudAgentSessionResultStrict,
 } from '@/lib/bot/request-logging';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import {
@@ -181,6 +181,37 @@ async function failBotRequest(params: {
     .returning({ id: bot_requests.id });
 
   return row ?? null;
+}
+
+async function failBotRequestForCallbackProcessingError(params: {
+  botRequestId: string;
+  requestRow: NonNullable<Awaited<ReturnType<typeof getBotRequest>>>;
+  startedAt: number;
+  errorMessage: string;
+  logMessage: string;
+}): Promise<void> {
+  const updated = await failBotRequest({
+    botRequestId: params.botRequestId,
+    errorMessage: params.errorMessage,
+    responseTimeMs: Date.now() - params.startedAt,
+  });
+
+  logCallback(params.logMessage, {
+    botRequestId: params.botRequestId,
+    updated: Boolean(updated),
+    errorMessage: params.errorMessage,
+  });
+
+  if (!updated) {
+    return;
+  }
+
+  await postSlackThreadMessage({
+    threadId: params.requestRow.platform_thread_id,
+    markdown: params.errorMessage,
+    platformIntegrationId: params.requestRow.platform_integration_id,
+  });
+  await swapReaction(params.requestRow, false);
 }
 
 async function postSlackThreadMessage(params: {
@@ -402,19 +433,29 @@ async function persistTrackedCompletedSessionResult(params: {
   finalMessage: string | null;
 }): Promise<void> {
   if (!params.finalMessage) {
-    await recordBotRequestCloudAgentSessionResultError({
+    const updated = await recordBotRequestCloudAgentSessionResultErrorStrict({
       botRequestId: params.botRequestId,
       cloudAgentSessionId: params.cloudAgentSessionId,
       errorMessage: `Cloud Agent session ${params.cloudAgentSessionId} completed but the final response was not provided in the callback payload.`,
     });
+    if (!updated) {
+      throw new Error(
+        `Failed to record missing final response for Cloud Agent session ${params.cloudAgentSessionId}.`
+      );
+    }
     return;
   }
 
-  await recordBotRequestCloudAgentSessionResult({
+  const updated = await recordBotRequestCloudAgentSessionResultStrict({
     botRequestId: params.botRequestId,
     cloudAgentSessionId: params.cloudAgentSessionId,
     finalMessage: params.finalMessage,
   });
+  if (!updated) {
+    throw new Error(
+      `Failed to record final response for Cloud Agent session ${params.cloudAgentSessionId}.`
+    );
+  }
 
   logCallback('Persisted final message for tracked Cloud Agent session', {
     botRequestId: params.botRequestId,
@@ -465,11 +506,32 @@ async function handleCompletedCallback(
   if (trackedCallbackSession) {
     expectedCloudAgentSessionId = undefined;
     if (!trackedCallbackSession.final_message && !trackedCallbackSession.final_message_error) {
-      await persistTrackedCompletedSessionResult({
-        botRequestId,
-        cloudAgentSessionId: payload.cloudAgentSessionId,
-        finalMessage: getFinalMessageFromCallbackPayload(payload),
-      });
+      try {
+        await persistTrackedCompletedSessionResult({
+          botRequestId,
+          cloudAgentSessionId: payload.cloudAgentSessionId,
+          finalMessage: getFinalMessageFromCallbackPayload(payload),
+        });
+      } catch (error) {
+        captureException(error, {
+          tags: {
+            source: 'bot-session-callback-api',
+            op: 'persist-tracked-session-result',
+          },
+          extra: {
+            botRequestId,
+            cloudAgentSessionId: payload.cloudAgentSessionId,
+          },
+        });
+        await failBotRequestForCallbackProcessingError({
+          botRequestId,
+          requestRow,
+          startedAt,
+          errorMessage: 'Cloud Agent callback processing failed while saving session state.',
+          logMessage: 'Failed to persist tracked Cloud Agent session result',
+        });
+        return;
+      }
     }
 
     const readiness = await getTrackedGroupReadiness({
@@ -895,17 +957,44 @@ export async function POST(
       });
       try {
         if (childSessionStatus && trackedCallbackSession) {
-          await markBotRequestCloudAgentSessionTerminal({
-            botRequestId,
-            cloudAgentSessionId: callbackSessionId,
-            status: childSessionStatus,
-            executionId: payload.executionId,
-            kiloSessionId: payload.kiloSessionId,
-            errorMessage:
-              childSessionStatus === 'failed' && payload.status !== 'failed'
-                ? `Unknown callback status: ${String(payload.status)}`
-                : payload.errorMessage,
-          });
+          try {
+            const updated = await markBotRequestCloudAgentSessionTerminalStrict({
+              botRequestId,
+              cloudAgentSessionId: callbackSessionId,
+              status: childSessionStatus,
+              executionId: payload.executionId,
+              kiloSessionId: payload.kiloSessionId,
+              errorMessage:
+                childSessionStatus === 'failed' && payload.status !== 'failed'
+                  ? `Unknown callback status: ${String(payload.status)}`
+                  : payload.errorMessage,
+            });
+            if (!updated) {
+              throw new Error(
+                `Tracked session ${callbackSessionId} was not updated to ${childSessionStatus}.`
+              );
+            }
+          } catch (error) {
+            captureException(error, {
+              tags: {
+                source: 'bot-session-callback-api',
+                op: 'mark-tracked-session-terminal',
+              },
+              extra: {
+                botRequestId,
+                cloudAgentSessionId: callbackSessionId,
+                status: childSessionStatus,
+              },
+            });
+            await failBotRequestForCallbackProcessingError({
+              botRequestId,
+              requestRow,
+              startedAt,
+              errorMessage: 'Cloud Agent callback processing failed while saving session status.',
+              logMessage: 'Failed to mark tracked Cloud Agent session terminal',
+            });
+            return;
+          }
         }
 
         if (payload.status === 'completed') {
@@ -952,9 +1041,17 @@ export async function POST(
           botRequestId,
           error,
         });
+        const { lastAssistantMessageText, ...safePayload } = payload;
         captureException(error, {
           tags: { source: 'bot-session-callback-api' },
-          extra: { botRequestId, payload },
+          extra: {
+            botRequestId,
+            payload: {
+              ...safePayload,
+              hasLastAssistantMessageText: Boolean(lastAssistantMessageText),
+              lastAssistantMessageTextLength: lastAssistantMessageText?.length ?? 0,
+            },
+          },
         });
       }
     });

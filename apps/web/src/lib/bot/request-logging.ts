@@ -170,25 +170,34 @@ export async function recordBotRequestCloudAgentSession(
   }
 }
 
+export async function markBotRequestCloudAgentSessionTerminalStrict(
+  params: MarkBotRequestCloudAgentSessionTerminalParams
+): Promise<boolean> {
+  const [row] = await db
+    .update(bot_request_cloud_agent_sessions)
+    .set({
+      status: params.status,
+      terminal_at: params.terminalAt ?? new Date().toISOString(),
+      error_message: params.errorMessage ?? null,
+      ...(params.executionId !== undefined && { execution_id: params.executionId }),
+      ...(params.kiloSessionId !== undefined && { kilo_session_id: params.kiloSessionId }),
+    })
+    .where(
+      and(
+        eq(bot_request_cloud_agent_sessions.bot_request_id, params.botRequestId),
+        eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, params.cloudAgentSessionId)
+      )
+    )
+    .returning({ id: bot_request_cloud_agent_sessions.id });
+
+  return Boolean(row);
+}
+
 export async function markBotRequestCloudAgentSessionTerminal(
   params: MarkBotRequestCloudAgentSessionTerminalParams
 ): Promise<void> {
   try {
-    await db
-      .update(bot_request_cloud_agent_sessions)
-      .set({
-        status: params.status,
-        terminal_at: params.terminalAt ?? new Date().toISOString(),
-        error_message: params.errorMessage ?? null,
-        ...(params.executionId !== undefined && { execution_id: params.executionId }),
-        ...(params.kiloSessionId !== undefined && { kilo_session_id: params.kiloSessionId }),
-      })
-      .where(
-        and(
-          eq(bot_request_cloud_agent_sessions.bot_request_id, params.botRequestId),
-          eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, params.cloudAgentSessionId)
-        )
-      );
+    await markBotRequestCloudAgentSessionTerminalStrict(params);
   } catch (error) {
     captureException(error, {
       tags: { component: 'bot-request-log', op: 'mark-child-session-terminal' },
@@ -201,23 +210,32 @@ export async function markBotRequestCloudAgentSessionTerminal(
   }
 }
 
+export async function recordBotRequestCloudAgentSessionResultStrict(
+  params: RecordBotRequestCloudAgentSessionResultParams
+): Promise<boolean> {
+  const [row] = await db
+    .update(bot_request_cloud_agent_sessions)
+    .set({
+      final_message: params.finalMessage,
+      final_message_fetched_at: params.fetchedAt ?? new Date().toISOString(),
+      final_message_error: null,
+    })
+    .where(
+      and(
+        eq(bot_request_cloud_agent_sessions.bot_request_id, params.botRequestId),
+        eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, params.cloudAgentSessionId)
+      )
+    )
+    .returning({ id: bot_request_cloud_agent_sessions.id });
+
+  return Boolean(row);
+}
+
 export async function recordBotRequestCloudAgentSessionResult(
   params: RecordBotRequestCloudAgentSessionResultParams
 ): Promise<void> {
   try {
-    await db
-      .update(bot_request_cloud_agent_sessions)
-      .set({
-        final_message: params.finalMessage,
-        final_message_fetched_at: params.fetchedAt ?? new Date().toISOString(),
-        final_message_error: null,
-      })
-      .where(
-        and(
-          eq(bot_request_cloud_agent_sessions.bot_request_id, params.botRequestId),
-          eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, params.cloudAgentSessionId)
-        )
-      );
+    await recordBotRequestCloudAgentSessionResultStrict(params);
   } catch (error) {
     captureException(error, {
       tags: { component: 'bot-request-log', op: 'record-child-session-result' },
@@ -229,23 +247,32 @@ export async function recordBotRequestCloudAgentSessionResult(
   }
 }
 
+export async function recordBotRequestCloudAgentSessionResultErrorStrict(
+  params: RecordBotRequestCloudAgentSessionResultErrorParams
+): Promise<boolean> {
+  const [row] = await db
+    .update(bot_request_cloud_agent_sessions)
+    .set({
+      final_message: null,
+      final_message_fetched_at: null,
+      final_message_error: truncateFinalMessageError(params.errorMessage),
+    })
+    .where(
+      and(
+        eq(bot_request_cloud_agent_sessions.bot_request_id, params.botRequestId),
+        eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, params.cloudAgentSessionId)
+      )
+    )
+    .returning({ id: bot_request_cloud_agent_sessions.id });
+
+  return Boolean(row);
+}
+
 export async function recordBotRequestCloudAgentSessionResultError(
   params: RecordBotRequestCloudAgentSessionResultErrorParams
 ): Promise<void> {
   try {
-    await db
-      .update(bot_request_cloud_agent_sessions)
-      .set({
-        final_message: null,
-        final_message_fetched_at: null,
-        final_message_error: truncateFinalMessageError(params.errorMessage),
-      })
-      .where(
-        and(
-          eq(bot_request_cloud_agent_sessions.bot_request_id, params.botRequestId),
-          eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, params.cloudAgentSessionId)
-        )
-      );
+    await recordBotRequestCloudAgentSessionResultErrorStrict(params);
   } catch (error) {
     captureException(error, {
       tags: { component: 'bot-request-log', op: 'record-child-session-result-error' },

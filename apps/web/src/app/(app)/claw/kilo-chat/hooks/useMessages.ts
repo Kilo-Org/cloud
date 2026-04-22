@@ -389,7 +389,6 @@ export function useMessageCacheUpdater(conversationId: string | null) {
                     ? {
                         ...msg,
                         content: e.content,
-                        updatedAt: Date.now(),
                         clientUpdatedAt: e.clientUpdatedAt,
                       }
                     : msg

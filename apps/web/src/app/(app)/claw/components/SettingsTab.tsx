@@ -76,7 +76,7 @@ type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
 const EXA_SEARCH_UI_MIN_CONTROLLER_VERSION = '2026.4.14';
 const MEMORY_MIN_OPENCLAW_VERSION = '2026.4.5';
-const OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION = '2000.1.1';
+const OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION = '2026.4.22';
 
 // ---------------------------------------------------------------------------
 // 1Password setup guide dialog

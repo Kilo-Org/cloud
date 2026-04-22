@@ -21,6 +21,7 @@ import { CHANNEL_APPROVAL_NATIVE_RUNTIME_CONTEXT_CAPABILITY } from 'openclaw/plu
 import { stripPrefix } from './action-schemas';
 
 const CHANNEL_ID = 'kilo-chat';
+export const DEFAULT_ACCOUNT_ID = 'default';
 const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
 
 function isValidUlid(raw: string): boolean {
@@ -101,7 +102,7 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
           accountId,
           peer: { kind: 'direct', id: conversationId },
           chatType: 'direct',
-          from: `kilo-chat:${accountId ?? ''}`,
+          from: `kilo-chat:${accountId ?? DEFAULT_ACCOUNT_ID}`,
           to: `kilo-chat:${conversationId}`,
         });
       },

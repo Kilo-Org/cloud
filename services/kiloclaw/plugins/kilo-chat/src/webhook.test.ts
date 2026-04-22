@@ -192,13 +192,12 @@ function fakeClient(calls: { type: string; args: unknown }[]): KiloChatClient {
   return {
     createMessage: async args => {
       calls.push({ type: 'create', args });
-      return { messageId: 'm1', version: 1 };
+      return { messageId: 'm1' };
     },
     editMessage: async args => {
       calls.push({ type: 'edit', args });
       return {
         messageId: (args as { messageId: string }).messageId,
-        version: (args as { version: number }).version,
       };
     },
     deleteMessage: async args => {
@@ -206,6 +205,35 @@ function fakeClient(calls: { type: string; args: unknown }[]): KiloChatClient {
     },
     sendTyping: async args => {
       calls.push({ type: 'typing', args });
+    },
+    sendTypingStop: async args => {
+      calls.push({ type: 'typingStop', args });
+    },
+    addReaction: async args => {
+      calls.push({ type: 'addReaction', args });
+      return { id: 'r1' };
+    },
+    removeReaction: async args => {
+      calls.push({ type: 'removeReaction', args });
+    },
+    listMessages: async args => {
+      calls.push({ type: 'listMessages', args });
+      return { messages: [] };
+    },
+    getMembers: async args => {
+      calls.push({ type: 'getMembers', args });
+      return { members: [] };
+    },
+    renameConversation: async args => {
+      calls.push({ type: 'renameConversation', args });
+    },
+    listConversations: async args => {
+      calls.push({ type: 'listConversations', args });
+      return { conversations: [], total: 0, limit: 50, offset: 0 };
+    },
+    createConversation: async args => {
+      calls.push({ type: 'createConversation', args });
+      return { conversationId: 'c1' };
     },
   };
 }

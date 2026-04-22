@@ -173,8 +173,8 @@ export function KiloChatLayout({
         router.push('/claw/kilo-chat');
       }
       leaveConversation.mutate(conversationId, {
+        onSettled: () => setLeavingConversationId(null),
         onError: () => {
-          setLeavingConversationId(null);
           toast.error('Failed to leave conversation');
         },
       });

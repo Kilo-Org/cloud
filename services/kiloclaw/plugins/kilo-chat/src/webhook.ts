@@ -11,6 +11,7 @@ import type { ExecApprovalDecision } from 'openclaw/plugin-sdk/approval-runtime'
 
 import { createKiloChatClient, type KiloChatClient } from './client.js';
 import { resolveControllerUrl, resolveGatewayToken } from './env.js';
+import { DEFAULT_ACCOUNT_ID } from './channel.js';
 import { createPreviewStream } from './preview-stream.js';
 
 // ---------------------------------------------------------------------------
@@ -190,7 +191,7 @@ async function dispatchInbound(
   const { route, buildEnvelope } = resolveInboundRouteEnvelopeBuilderWithRuntime({
     cfg,
     channel: 'kilo-chat',
-    accountId: '',
+    accountId: DEFAULT_ACCOUNT_ID,
     peer: { kind: 'direct' as const, id: payload.conversationId },
     runtime: {
       routing: { resolveAgentRoute: channelRuntime.routing.resolveAgentRoute },
@@ -244,7 +245,7 @@ async function dispatchInbound(
     client,
     conversationId: payload.conversationId,
     inReplyToMessageId: payload.messageId,
-    warn: (msg, err) => console.error(`[kilo-chat] ${msg}:`, err),
+    warn: (msg, err) => console.warn(`[kilo-chat] ${msg}:`, err),
   });
 
   try {
@@ -259,7 +260,7 @@ async function dispatchInbound(
       cfg,
       agentId: route.agentId,
       channel: 'kilo-chat',
-      accountId: '',
+      accountId: DEFAULT_ACCOUNT_ID,
       typing: buildTypingParams({ client, conversationId: payload.conversationId }),
     });
 

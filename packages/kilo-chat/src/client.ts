@@ -88,18 +88,14 @@ export class KiloChatClient {
     messageId: string,
     conversationId: string,
     emoji: string
-  ): Promise<{ id: string; added: boolean }> {
+  ): Promise<{ id: string }> {
     return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'POST',
       body: { conversationId, emoji },
     });
   }
 
-  async removeReaction(
-    messageId: string,
-    conversationId: string,
-    emoji: string
-  ): Promise<{ ok: true }> {
+  async removeReaction(messageId: string, conversationId: string, emoji: string): Promise<void> {
     return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'DELETE',
       query: { conversationId, emoji },

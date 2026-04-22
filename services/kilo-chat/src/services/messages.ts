@@ -365,21 +365,21 @@ export async function executeActionFor(
     return { ok: false, code: result.code, error: result.error };
   }
 
-  // Push message.updated SSE event to human members
-  const convContext = await getConversationContext(env, conversationId);
-  if (convContext?.sandboxId) {
-    await pushEventToHumanMembers(
-      env,
-      conversationId,
-      convContext.sandboxId,
-      convContext.humanMemberIds,
-      'message.updated',
-      { messageId, content: result.content, clientUpdatedAt: null }
-    );
+  // Fetch conversation info once for both event push and webhook delivery
+  const info = await convStub.getInfo();
+  if (info) {
+    const convContext = extractConversationContext(info.members);
+    if (convContext.sandboxId) {
+      await pushEventToHumanMembers(
+        env,
+        conversationId,
+        convContext.sandboxId,
+        convContext.humanMemberIds,
+        'message.updated',
+        { messageId, content: result.content, clientUpdatedAt: null }
+      );
 
-    // Deliver action.executed webhook to bot members
-    const info = await convStub.getInfo();
-    if (info) {
+      // Deliver action.executed webhook to bot members
       const botMembers = info.members.filter(m => m.kind === 'bot');
       if (botMembers.length > 0) {
         const deliverPromise = Promise.all(

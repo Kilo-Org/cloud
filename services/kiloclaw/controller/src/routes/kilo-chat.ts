@@ -189,7 +189,7 @@ export function registerKiloChatDeleteRoute(app: Hono, options: KiloChatRouteOpt
     let upstream: Response;
     try {
       upstream = await fetchImpl(
-        upstreamUrl(options, `/messages/${encodeURIComponent(messageId)}${search ?? ''}`),
+        upstreamUrl(options, `/messages/${encodeURIComponent(messageId)}${search}`),
         { method: 'DELETE', headers: outboundHeaders(options) }
       );
     } catch {
@@ -226,7 +226,7 @@ export function registerKiloChatReactionDeleteRoute(
     let upstream: Response;
     try {
       upstream = await fetchImpl(
-        upstreamUrl(options, `/messages/${encodeURIComponent(messageId)}/reactions${search ?? ''}`),
+        upstreamUrl(options, `/messages/${encodeURIComponent(messageId)}/reactions${search}`),
         { method: 'DELETE', headers: outboundHeaders(options) }
       );
     } catch {
@@ -291,12 +291,11 @@ export function registerKiloChatListMessagesRoute(app: Hono, options: KiloChatRo
 
     const convId = routeParam(c, 'conversationId');
     const { search } = new URL(c.req.url);
-    const queryString = search ?? '';
 
     let upstream: Response;
     try {
       upstream = await fetchImpl(
-        upstreamUrl(options, `/conversations/${encodeURIComponent(convId)}/messages${queryString}`),
+        upstreamUrl(options, `/conversations/${encodeURIComponent(convId)}/messages${search}`),
         { method: 'GET', headers: outboundHeaders(options) }
       );
     } catch {
@@ -341,11 +340,10 @@ export function registerKiloChatListConversationsRoute(
     if (unauthorized) return unauthorized;
 
     const { search } = new URL(c.req.url);
-    const queryString = search ?? '';
 
     let upstream: Response;
     try {
-      upstream = await fetchImpl(upstreamUrl(options, `/conversations${queryString}`), {
+      upstream = await fetchImpl(upstreamUrl(options, `/conversations${search}`), {
         method: 'GET',
         headers: outboundHeaders(options),
       });

@@ -91,10 +91,16 @@ function authHeaders(token: string): HeadersInit {
   };
 }
 
-const createResultSchema = z.object({ messageId: z.string().min(1) });
+const createResultSchema = z.object({
+  messageId: z.string().min(1, 'missing messageId'),
+});
 const editResultSchema = z.object({ messageId: z.string().optional() });
-const addReactionResultSchema = z.object({ id: z.string().min(1) });
-const createConversationResultSchema = z.object({ conversationId: z.string().min(1) });
+const addReactionResultSchema = z.object({
+  id: z.string().min(1, 'missing reaction id'),
+});
+const createConversationResultSchema = z.object({
+  conversationId: z.string().min(1, 'missing conversationId'),
+});
 
 const memberSchema = z.object({
   id: z.string(),

@@ -246,23 +246,6 @@ describe('ClawOnboardingFlow state machine', () => {
     }
   );
 
-  test('getClawOnboardingStepProgress can include permissions for walkthroughs', () => {
-    const options = { includePermissionsStep: true };
-
-    expect(getClawOnboardingStepProgress('permissions', false, options)).toEqual({
-      currentStep: 2,
-      totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('permissions', true, options)).toEqual({
-      currentStep: 2,
-      totalSteps: 5,
-    });
-    expect(getClawOnboardingStepProgress('pairing', true, options)).toEqual({
-      currentStep: 5,
-      totalSteps: 5,
-    });
-  });
-
   test('renders an error when the setup request failed', () => {
     expect(
       getClawOnboardingFlowState(

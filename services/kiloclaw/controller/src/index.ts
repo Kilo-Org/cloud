@@ -117,10 +117,16 @@ async function handleHttpRequest(
   const method = (req.method ?? 'GET').toUpperCase();
 
   // Propagate client disconnects as an AbortSignal so long-running handlers
-  // (e.g. /_kilo/doctor/run) can react. Node emits 'close' on both normal
-  // completion and client abort; writableEnded tells them apart.
+  // (e.g. /_kilo/doctor/run) can react. We listen on `res` (ServerResponse)
+  // rather than `req` (IncomingMessage) because the IncomingMessage's 'close'
+  // event fires as soon as the request body stream is fully consumed — which
+  // happens mid-handler when we pass `req` as `init.body` and Hono reads the
+  // body with `c.req.json()`. That would falsely trigger abort before the
+  // response is sent. ServerResponse's 'close' event only fires on completion
+  // or premature connection termination; combined with `!res.writableEnded`
+  // we get the "client dropped before response" case.
   const clientAbort = new AbortController();
-  req.on('close', () => {
+  res.on('close', () => {
     if (!res.writableEnded) {
       clientAbort.abort();
     }

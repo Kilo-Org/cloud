@@ -1,5 +1,5 @@
 import type { KiloChatClient } from './client.js';
-import { deleteActionParams, resolveConversationId, resolveMessageId } from './action-schemas.js';
+import { resolveConversationId, resolveMessageId } from './action-schemas.js';
 
 export type HandleKiloChatDeleteActionParams = {
   params: Record<string, unknown>;
@@ -13,9 +13,8 @@ export type HandleKiloChatDeleteActionParams = {
 export async function handleKiloChatDeleteAction(
   args: HandleKiloChatDeleteActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-  const parsed = deleteActionParams.safeParse(args.params);
-  const conversationId = resolveConversationId(parsed.success ? parsed.data : {}, args.toolContext);
-  const messageId = resolveMessageId(parsed.success ? parsed.data : {}, args.toolContext);
+  const conversationId = resolveConversationId(args.params, args.toolContext);
+  const messageId = resolveMessageId(args.params, args.toolContext);
 
   await args.client.deleteMessage({ conversationId, messageId });
 

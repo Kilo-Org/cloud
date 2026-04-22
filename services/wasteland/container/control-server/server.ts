@@ -301,6 +301,12 @@ const startTime = Date.now();
 let lastOperationTimestamp: string | null = null;
 let cachedWlVersion: string | null = null;
 let joined = false;
+// True once the container has received a DoltHub token via either an
+// explicit /wl/init call OR the boot-time DOLTHUB_TOKEN env var. Reported
+// through /wl/config so the caller can tell whether to re-init. Kept as
+// a module flag instead of mutating process.env so the token itself
+// never lives anywhere outside the request that provided it.
+let hasInitToken = false;
 
 // Init gate: all handlers that need wl await this. Resolves once wl join
 // succeeds. On failure, resets so the next request retries.
@@ -1038,7 +1044,7 @@ async function getDoltCredPubKey(): Promise<string | null> {
 async function handleConfig(): Promise<Response> {
   const upstream = process.env.WL_UPSTREAM ?? null;
   const dolthubOrg = process.env.DOLTHUB_ORG ?? null;
-  const hasToken = !!process.env.DOLTHUB_TOKEN;
+  const hasToken = hasInitToken || !!process.env.DOLTHUB_TOKEN;
   const hasJwk = !!process.env.DOLT_CREDS_JWK;
   const wlVersion = await getWlVersion();
   const isJoined = await checkJoined(upstream);
@@ -1064,10 +1070,15 @@ async function handleInit(req: Request): Promise<Response> {
   const body = await parseBody(req, InitBodySchema);
   if ('error' in body) return body.error;
 
-  // Update process env so buildEnv picks up the org for this and future calls
+  // Update process env so `buildEnv` and other readers pick up the org
+  // and upstream. The token is NOT stored in process.env — it lives only
+  // in the current request's closure (and the per-command `wl` subprocess
+  // env that `buildEnv` constructs). Storing it at process scope would
+  // mean any future background task reading DOLTHUB_TOKEN picks up the
+  // last /wl/init caller's token.
   process.env.DOLTHUB_ORG = body.data.dolthubOrg;
   process.env.WL_UPSTREAM = body.data.upstream;
-  process.env.DOLTHUB_TOKEN = body.data.token;
+  hasInitToken = true;
 
   // Reset init state so joinUpstream runs fresh
   joined = false;

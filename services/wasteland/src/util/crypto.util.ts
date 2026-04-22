@@ -10,8 +10,14 @@
 const IV_BYTES = 12;
 const ALGORITHM = 'AES-GCM';
 
-// Fixed salt for PBKDF2 key derivation. Safe because the input key material
-// (WASTELAND_ENCRYPTION_KEY) is already a high-entropy secret.
+// Fixed salt for PBKDF2 key derivation. Safe against rainbow-table attacks
+// because the input key material (WASTELAND_ENCRYPTION_KEY) is already a
+// high-entropy secret. However this means every credential in the database
+// is encrypted with the same derived AES key — compromise of
+// WASTELAND_ENCRYPTION_KEY plus a dump of `wasteland_credentials` decrypts
+// all tokens at once. TODO (followup): add a per-credential `salt BLOB`
+// column and pass it through `deriveEncryptionKey(secret, salt)` so the
+// blast radius is limited to a single row.
 const PBKDF2_SALT = new TextEncoder().encode('wasteland-credential-encryption-salt-v1');
 const PBKDF2_ITERATIONS = 100_000;
 

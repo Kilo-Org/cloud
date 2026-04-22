@@ -19,7 +19,7 @@ import {
   listPulls,
   mapWithLimit,
   parseWlBranch,
-  runSql,
+  runUnsafeSql,
   DoltHubApiError,
 } from '../util/dolthub-api.util';
 
@@ -79,6 +79,19 @@ export function parseCommitSubject(subject: string): ParsedCommit {
 }
 
 // ── Branch-tip SQL enrichment ───────────────────────────────────────────
+
+/**
+ * Canonical wanted-item id shape. Produced by `GenerateWantedID` in the
+ * wl CLI (`internal/commons/commons.go`): `w-<10 lowercase hex>`. Enforce
+ * this at every interpolation point because `runUnsafeSql` sends raw SQL
+ * to DoltHub — a mismatched id either means an attacker-controlled value
+ * or a malformed branch name, and in both cases the safe default is to
+ * return null rather than interpolate.
+ */
+const WANTED_ID_PATTERN = /^w-[a-f0-9]{10}$/;
+
+/** Rig handles are free-form identifiers. Bound the length to stop absurd inputs. */
+const RIG_HANDLE_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
 
 const WantedRow = z
   .object({
@@ -141,10 +154,9 @@ async function fetchWantedRow(
   branch: string,
   itemId: string
 ): Promise<z.infer<typeof WantedRow> | null> {
-  // itemId format is `w-{10-hex}` — enforce the shape before interpolating.
-  if (!/^w-[a-f0-9]{1,32}$/.test(itemId)) return null;
+  if (!WANTED_ID_PATTERN.test(itemId)) return null;
   try {
-    const result = await runSql(
+    const result = await runUnsafeSql(
       upstream,
       token,
       branch,
@@ -163,9 +175,9 @@ async function fetchCompletionRow(
   branch: string,
   itemId: string
 ): Promise<z.infer<typeof CompletionRow> | null> {
-  if (!/^w-[a-f0-9]{1,32}$/.test(itemId)) return null;
+  if (!WANTED_ID_PATTERN.test(itemId)) return null;
   try {
-    const result = await runSql(
+    const result = await runUnsafeSql(
       upstream,
       token,
       branch,
@@ -184,9 +196,9 @@ async function fetchStampRow(
   branch: string,
   itemId: string
 ): Promise<z.infer<typeof StampRow> | null> {
-  if (!/^w-[a-f0-9]{1,32}$/.test(itemId)) return null;
+  if (!WANTED_ID_PATTERN.test(itemId)) return null;
   try {
-    const result = await runSql(
+    const result = await runUnsafeSql(
       upstream,
       token,
       branch,
@@ -205,9 +217,9 @@ async function fetchRigRow(
   branch: string,
   handle: string
 ): Promise<z.infer<typeof RigRow> | null> {
-  if (!/^[a-zA-Z0-9_-]+$/.test(handle)) return null;
+  if (!RIG_HANDLE_PATTERN.test(handle)) return null;
   try {
-    const result = await runSql(
+    const result = await runUnsafeSql(
       upstream,
       token,
       branch,
@@ -654,7 +666,7 @@ async function safeGetCommits(
   // back to state-based inference (`inferVerbsFromRows`) when empty.
   if (!branch || !SAFE_BRANCH_RE.test(branch)) return [];
   try {
-    const result = await runSql(
+    const result = await runUnsafeSql(
       upstream,
       token,
       branch,

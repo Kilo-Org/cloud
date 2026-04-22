@@ -263,7 +263,16 @@ const SqlResponse = z
 
 export type DoltHubSqlResultT = z.infer<typeof SqlResponse>;
 
-export async function runSql(
+/**
+ * Runs raw SQL against DoltHub — **the caller is responsible for escaping**.
+ * DoltHub's read API has no parameterized-query surface; we send the text
+ * over a URL query param. Every caller must either:
+ *   - use a static SQL literal with no user input, or
+ *   - validate any interpolated values against a tight regex (see the
+ *     `fetch*Row` helpers in `inbox/inbox-classifier.ts` for the pattern).
+ * Do not pass unvalidated user input through this function.
+ */
+export async function runUnsafeSql(
   upstream: string,
   token: string,
   branch: string,

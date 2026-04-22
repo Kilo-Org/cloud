@@ -39,13 +39,6 @@ const DEFAULT_WIDTH = 620;
 const DEFAULT_DEPTH_OFFSET = 40;
 const HOVER_EXTRA = 24;
 
-// Monotonic counter used so `AnimatePresence` retains exit animations even
-// when two consecutive entries have identical user-facing identity.
-let globalKeyCounter = 0;
-function makeKey() {
-  return `drawer-${++globalKeyCounter}`;
-}
-
 /**
  * Create a typed drawer-stack provider + hook pair for a specific entry type.
  * Keeping the factory generic lets each caller use their own discriminated
@@ -56,6 +49,13 @@ export function createDrawerStack<T>() {
     key: string;
     value: T;
   };
+
+  // Monotonic counter used so `AnimatePresence` retains exit animations even
+  // when two consecutive entries have identical user-facing identity.
+  // Scoped inside the factory so each `createDrawerStack<T>()` caller gets
+  // its own counter — gastown and wasteland don't share a sequence.
+  let keyCounter = 0;
+  const makeKey = () => `drawer-${++keyCounter}`;
 
   const Ctx = createContext<DrawerStackApi<T> | null>(null);
 

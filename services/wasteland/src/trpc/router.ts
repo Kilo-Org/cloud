@@ -1218,16 +1218,14 @@ export const wastelandRouter = router({
       }
       // Use a unique scratch branch so concurrent verifications don't collide.
       // DoltHub write API forks the target branch; a no-op DML (SELECT 1)
-      // is enough to probe auth without mutating data. Delete the branch
-      // after the probe so DoltHub doesn't accumulate dead branches.
+      // is enough to probe auth without mutating data. Cleanup runs in
+      // `finally` so the branch is always deleted exactly once regardless
+      // of whether the probe succeeded or failed.
       const scratchBranch = `admin-verify-${crypto.randomUUID().slice(0, 8)}`;
       try {
         await doltApi.runWrite(upstream, token, 'main', scratchBranch, 'SELECT 1');
-        await doltApi.deleteBranch(upstream, token, scratchBranch);
         return { hasWriteAccess: true, error: null };
       } catch (err) {
-        // Best-effort cleanup in case the branch was created before failure.
-        await doltApi.deleteBranch(upstream, token, scratchBranch);
         if (err instanceof doltApi.DoltHubApiError) {
           return {
             hasWriteAccess: false,
@@ -1238,6 +1236,8 @@ export const wastelandRouter = router({
           hasWriteAccess: false,
           error: err instanceof Error ? err.message : 'Unknown error',
         };
+      } finally {
+        await doltApi.deleteBranch(upstream, token, scratchBranch);
       }
     }),
 
@@ -1330,7 +1330,7 @@ export const wastelandRouter = router({
       await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
       const { token, upstream } = await loadAdminContext(ctx.env, input.wastelandId, ctx.userId);
       try {
-        const result = await doltApi.runSql(
+        const result = await doltApi.runUnsafeSql(
           upstream,
           token,
           'main',

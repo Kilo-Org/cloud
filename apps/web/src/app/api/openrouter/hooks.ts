@@ -195,5 +195,6 @@ export function useOpenRouterModelsAndProviders() {
     providers,
     isLoading: query.isLoading,
     error: query.error,
+    refetch: query.refetch,
   };
 }

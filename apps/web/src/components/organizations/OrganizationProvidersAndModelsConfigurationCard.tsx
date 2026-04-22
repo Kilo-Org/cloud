@@ -71,7 +71,11 @@ export function OrganizationProvidersAndModelsConfigurationCard({
   const [isAvailableModelsDialogOpen, setIsAvailableModelsDialogOpen] = useState(false);
   const { isLoading, organizationData, configurationData } =
     useOrganizationConfiguration(organizationId);
-  const { providers: openRouterProviders } = useOpenRouterModelsAndProviders();
+  const {
+    providers: openRouterProviders,
+    error: openRouterError,
+    refetch: refetchOpenRouter,
+  } = useOpenRouterModelsAndProviders();
 
   // Convert configuration data to ProviderSelection[] format
   const providerSelections = useMemo((): ProviderSelection[] | null => {
@@ -112,6 +116,24 @@ export function OrganizationProvidersAndModelsConfigurationCard({
         description="Error loading configuration data"
         error={new Error('Configuration data not available')}
         onRetry={() => {}}
+      />
+    );
+  }
+
+  if (openRouterError || openRouterProviders.length === 0) {
+    return (
+      <ErrorCard
+        title="Providers and models"
+        description="Error loading providers and models"
+        error={
+          openRouterError ??
+          new Error(
+            'No providers and models data available. In development, visit /admin/sync-providers to populate the cache.'
+          )
+        }
+        onRetry={() => {
+          void refetchOpenRouter();
+        }}
       />
     );
   }

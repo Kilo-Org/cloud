@@ -1,5 +1,6 @@
+import { readNumberParam, readStringParam } from 'openclaw/plugin-sdk/agent-runtime';
 import type { KiloChatClient } from './client.js';
-import { readActionParams, resolveConversationId } from './action-schemas.js';
+import { resolveConversationId } from './action-schemas.js';
 
 export type HandleKiloChatReadActionParams = {
   params: Record<string, unknown>;
@@ -10,11 +11,9 @@ export type HandleKiloChatReadActionParams = {
 export async function handleKiloChatReadAction(
   args: HandleKiloChatReadActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-  const parsed = readActionParams.safeParse(args.params);
-  const conversationId = resolveConversationId(parsed.success ? parsed.data : {}, args.toolContext);
-
-  const limit = parsed.success ? parsed.data.limit : undefined;
-  const before = parsed.success ? parsed.data.before : undefined;
+  const conversationId = resolveConversationId(args.params, args.toolContext);
+  const limit = readNumberParam(args.params, 'limit');
+  const before = readStringParam(args.params, 'before');
 
   const { messages } = await args.client.listMessages({ conversationId, limit, before });
 

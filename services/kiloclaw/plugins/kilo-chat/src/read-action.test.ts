@@ -34,7 +34,11 @@ describe('handleKiloChatReadAction', () => {
       client,
     });
 
-    expect(client.listMessages).toHaveBeenCalledWith({ conversationId: 'CONV', limit: undefined });
+    expect(client.listMessages).toHaveBeenCalledWith({
+      conversationId: 'CONV',
+      limit: undefined,
+      before: undefined,
+    });
     expect(result.content).toHaveLength(1);
     expect(result.content[0].text).toBe('[MSG1] alice: Hello\n[MSG2] bob: World');
   });
@@ -53,7 +57,7 @@ describe('handleKiloChatReadAction', () => {
     expect(result.content[0].text).toBe('No messages in this conversation.');
   });
 
-  it('passes limit param to listMessages', async () => {
+  it('passes limit and before params to listMessages', async () => {
     const client = mockClient({
       listMessages: vi.fn().mockResolvedValue({
         messages: [{ id: 'M1', senderId: 'alice', content: [{ type: 'text', text: 'Hi' }] }],
@@ -61,11 +65,15 @@ describe('handleKiloChatReadAction', () => {
     });
 
     await handleKiloChatReadAction({
-      params: { to: 'CONV', limit: 5 },
+      params: { to: 'CONV', limit: 5, before: 'MSG99' },
       client,
     });
 
-    expect(client.listMessages).toHaveBeenCalledWith({ conversationId: 'CONV', limit: 5 });
+    expect(client.listMessages).toHaveBeenCalledWith({
+      conversationId: 'CONV',
+      limit: 5,
+      before: 'MSG99',
+    });
   });
 
   it('joins multiple content blocks', async () => {
@@ -163,25 +171,6 @@ describe('handleKiloChatReadAction', () => {
         client,
       })
     ).rejects.toThrow(/conversationId/i);
-  });
-
-  it('passes before param to listMessages', async () => {
-    const client = mockClient({
-      listMessages: vi.fn().mockResolvedValue({
-        messages: [{ id: 'M1', senderId: 'alice', content: [{ type: 'text', text: 'Hi' }] }],
-      }),
-    });
-
-    await handleKiloChatReadAction({
-      params: { to: 'CONV', before: 'MSG99' },
-      client,
-    });
-
-    expect(client.listMessages).toHaveBeenCalledWith({
-      conversationId: 'CONV',
-      before: 'MSG99',
-      limit: undefined,
-    });
   });
 
   it('includes ISO timestamp when updatedAt is present', async () => {

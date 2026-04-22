@@ -799,7 +799,6 @@ describe('User', () => {
         status: 'completed',
       });
 
-      // Insert a child session row for user1's bot request
       await db.insert(bot_request_cloud_agent_sessions).values({
         bot_request_id: br1.id,
         cloud_agent_session_id: 'cas-gdpr-test-session',
@@ -808,7 +807,6 @@ describe('User', () => {
 
       await softDeleteUser(user1.id);
 
-      // bot_requests for user1 should be gone
       expect(
         await db
           .select({ count: count() })
@@ -816,7 +814,6 @@ describe('User', () => {
           .where(eq(bot_requests.created_by, user1.id))
           .then(r => r[0].count)
       ).toBe(0);
-      // child session should be gone via FK cascade
       expect(
         await db
           .select({ count: count() })
@@ -824,7 +821,6 @@ describe('User', () => {
           .where(eq(bot_request_cloud_agent_sessions.bot_request_id, br1.id))
           .then(r => r[0].count)
       ).toBe(0);
-      // user2's bot_requests should remain
       expect(
         await db
           .select({ count: count() })

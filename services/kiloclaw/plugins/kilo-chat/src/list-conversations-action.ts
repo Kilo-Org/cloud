@@ -1,4 +1,5 @@
 import type { KiloChatClient } from './client.js';
+import { listConversationsActionParams } from './action-schemas.js';
 
 export type HandleKiloChatListConversationsActionParams = {
   params: Record<string, unknown>;
@@ -19,8 +20,9 @@ function relativeTime(timestamp: number): string {
 export async function handleKiloChatListConversationsAction(
   args: HandleKiloChatListConversationsActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-  const limit = typeof args.params.limit === 'number' ? args.params.limit : undefined;
-  const offset = typeof args.params.offset === 'number' ? args.params.offset : undefined;
+  const parsed = listConversationsActionParams.safeParse(args.params);
+  const limit = parsed.success ? parsed.data.limit : undefined;
+  const offset = parsed.success ? parsed.data.offset : undefined;
   const { conversations, total } = await args.client.listConversations({ limit, offset });
 
   if (conversations.length === 0) {

@@ -1,5 +1,6 @@
 import { emojify, get } from 'node-emoji';
 import type { KiloChatClient } from './client.js';
+import { reactActionParams, resolveConversationId, resolveMessageId } from './action-schemas.js';
 
 /**
  * Common shortcode aliases that differ between GitHub/Slack and node-emoji v2.
@@ -68,40 +69,15 @@ export type HandleKiloChatReactActionResult =
       details: { removed: true; emoji: string };
     };
 
-function readString(params: Record<string, unknown>, key: string): string | undefined {
-  const v = params[key];
-  return typeof v === 'string' && v.length > 0 ? v : undefined;
-}
-
-function stripPrefix(raw: string): string {
-  return raw.trim().replace(/^kilo-chat:/i, '');
-}
-
 export async function handleKiloChatReactAction(
   args: HandleKiloChatReactActionParams
 ): Promise<HandleKiloChatReactActionResult> {
-  const raw =
-    readString(args.params, 'to') ??
-    (typeof args.toolContext?.currentChannelId === 'string'
-      ? args.toolContext.currentChannelId
-      : undefined);
-  if (!raw) {
-    throw new Error('kilo-chat: conversationId (or `to`) is required');
-  }
-  const conversationId = stripPrefix(raw);
+  const parsed = reactActionParams.safeParse(args.params);
+  const conversationId = resolveConversationId(parsed.success ? parsed.data : {}, args.toolContext);
+  const messageId = resolveMessageId(parsed.success ? parsed.data : {}, args.toolContext);
 
-  const paramMessageId = readString(args.params, 'messageId');
-  const ctxMessageId =
-    args.toolContext?.currentMessageId != null
-      ? String(args.toolContext.currentMessageId)
-      : undefined;
-  const messageId = paramMessageId ?? ctxMessageId;
-  if (!messageId) {
-    throw new Error('kilo-chat: messageId is required (explicit or via toolContext)');
-  }
-
-  const rawEmoji = typeof args.params.emoji === 'string' ? args.params.emoji : '';
-  const removeExplicit = typeof args.params.remove === 'boolean' ? args.params.remove : false;
+  const rawEmoji = parsed.success && typeof parsed.data.emoji === 'string' ? parsed.data.emoji : '';
+  const removeExplicit = parsed.success && parsed.data.remove === true;
 
   if (removeExplicit) {
     const emoji = normalizeEmoji(rawEmoji);

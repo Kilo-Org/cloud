@@ -1,4 +1,5 @@
 import type { KiloChatClient } from './client.js';
+import { editActionParams, resolveConversationId, resolveMessageId } from './action-schemas.js';
 
 export type HandleKiloChatEditActionParams = {
   params: Record<string, unknown>;
@@ -9,39 +10,14 @@ export type HandleKiloChatEditActionParams = {
   client: KiloChatClient;
 };
 
-function readString(params: Record<string, unknown>, key: string): string | undefined {
-  const v = params[key];
-  return typeof v === 'string' && v.length > 0 ? v : undefined;
-}
-
-function stripPrefix(raw: string): string {
-  return raw.trim().replace(/^kilo-chat:/i, '');
-}
-
 export async function handleKiloChatEditAction(
   args: HandleKiloChatEditActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-  const raw =
-    readString(args.params, 'to') ??
-    (typeof args.toolContext?.currentChannelId === 'string'
-      ? args.toolContext.currentChannelId
-      : undefined);
-  if (!raw) {
-    throw new Error('kilo-chat: conversationId (or `to`) is required');
-  }
-  const conversationId = stripPrefix(raw);
+  const parsed = editActionParams.safeParse(args.params);
+  const conversationId = resolveConversationId(parsed.success ? parsed.data : {}, args.toolContext);
+  const messageId = resolveMessageId(parsed.success ? parsed.data : {}, args.toolContext);
 
-  const paramMessageId = readString(args.params, 'messageId');
-  const ctxMessageId =
-    args.toolContext?.currentMessageId != null
-      ? String(args.toolContext.currentMessageId)
-      : undefined;
-  const messageId = paramMessageId ?? ctxMessageId;
-  if (!messageId) {
-    throw new Error('kilo-chat: messageId is required (explicit or via toolContext)');
-  }
-
-  const text = readString(args.params, 'text');
+  const text = parsed.success ? parsed.data.text : undefined;
   if (!text) {
     throw new Error('kilo-chat: text is required for edit action');
   }

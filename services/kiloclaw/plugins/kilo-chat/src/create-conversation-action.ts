@@ -1,20 +1,17 @@
 import type { KiloChatClient } from './client.js';
+import { createConversationActionParams } from './action-schemas.js';
 
 export type HandleKiloChatCreateConversationActionParams = {
   params: Record<string, unknown>;
   client: KiloChatClient;
 };
 
-function readString(params: Record<string, unknown>, key: string): string | undefined {
-  const v = params[key];
-  return typeof v === 'string' && v.length > 0 ? v : undefined;
-}
-
 export async function handleKiloChatCreateConversationAction(
   args: HandleKiloChatCreateConversationActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-  const title = readString(args.params, 'title');
-  const membersRaw = readString(args.params, 'members');
+  const parsed = createConversationActionParams.safeParse(args.params);
+  const title = parsed.success ? parsed.data.title : undefined;
+  const membersRaw = parsed.success ? parsed.data.members : undefined;
   const additionalMembers = membersRaw
     ? membersRaw
         .split(',')

@@ -1,4 +1,5 @@
 import type { KiloChatClient } from './client.js';
+import { readActionParams, resolveConversationId } from './action-schemas.js';
 
 export type HandleKiloChatReadActionParams = {
   params: Record<string, unknown>;
@@ -6,31 +7,14 @@ export type HandleKiloChatReadActionParams = {
   client: KiloChatClient;
 };
 
-function readString(params: Record<string, unknown>, key: string): string | undefined {
-  const v = params[key];
-  return typeof v === 'string' && v.length > 0 ? v : undefined;
-}
-
-function stripPrefix(raw: string): string {
-  return raw.trim().replace(/^kilo-chat:/i, '');
-}
-
 export async function handleKiloChatReadAction(
   args: HandleKiloChatReadActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-  const raw =
-    readString(args.params, 'to') ??
-    (typeof args.toolContext?.currentChannelId === 'string'
-      ? args.toolContext.currentChannelId
-      : undefined);
-  if (!raw) {
-    throw new Error('kilo-chat: conversationId (or `to`) is required');
-  }
-  const conversationId = stripPrefix(raw);
+  const parsed = readActionParams.safeParse(args.params);
+  const conversationId = resolveConversationId(parsed.success ? parsed.data : {}, args.toolContext);
 
-  const limitRaw = args.params.limit;
-  const limit = typeof limitRaw === 'number' ? limitRaw : undefined;
-  const before = readString(args.params, 'before');
+  const limit = parsed.success ? parsed.data.limit : undefined;
+  const before = parsed.success ? parsed.data.before : undefined;
 
   const { messages } = await args.client.listMessages({ conversationId, limit, before });
 

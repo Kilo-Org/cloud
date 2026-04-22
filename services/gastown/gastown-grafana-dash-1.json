@@ -3267,6 +3267,7 @@
           "useWindowFuncForMacros": true
         }
       ],
+      "timeFrom": "1h",
       "title": "Avg Health Ping (1h)",
       "type": "stat"
     },
@@ -3350,6 +3351,7 @@
           "useWindowFuncForMacros": true
         }
       ],
+      "timeFrom": "1h",
       "title": "Avg Agent Start Fetch (1h)",
       "type": "stat"
     },

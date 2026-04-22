@@ -31,22 +31,27 @@ type PanelProps = {
   push: DrawerStackHelpers<WastelandDrawerRef>['push'];
 };
 
-export function ReviewItemPanel({ wastelandId, item, actions, push }: PanelProps) {
+/** Header slot for a review-item drawer. Rendered by the primitive's
+ *  header row, inline with the back/close buttons. */
+export function reviewItemHeader(item: InboxItem) {
   const Icon = iconFor(item.kind);
+  return (
+    <>
+      <Icon className="size-4 shrink-0 text-white/60" />
+      <h3 className="truncate text-sm font-semibold text-white/90">{cardHeading(item)}</h3>
+      <Badge
+        variant="outline"
+        className="shrink-0 border-white/[0.08] font-mono text-[10px] text-white/50"
+      >
+        #{item.pull_id}
+      </Badge>
+    </>
+  );
+}
 
+export function ReviewItemPanel({ wastelandId, item, actions, push }: PanelProps) {
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-center gap-2">
-        <Icon className="size-4 text-white/60" />
-        <h3 className="text-sm font-semibold text-white/90">{cardHeading(item)}</h3>
-        <Badge
-          variant="outline"
-          className="border-white/[0.08] font-mono text-[10px] text-white/50"
-        >
-          #{item.pull_id}
-        </Badge>
-      </div>
-
       <CardBody item={item} wastelandId={wastelandId} push={push} />
 
       <div className="space-y-1.5 border-t border-white/[0.06] pt-3">

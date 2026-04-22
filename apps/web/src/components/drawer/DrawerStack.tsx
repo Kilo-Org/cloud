@@ -22,7 +22,28 @@ export type DrawerStackHelpers<T> = {
   closeAll: () => void;
 };
 
-export type DrawerStackRenderContent<T> = (entry: T, helpers: DrawerStackHelpers<T>) => ReactNode;
+/**
+ * Render result for a drawer entry. Either a plain body (the primitive's
+ * header row stays empty apart from the back/close buttons), or a
+ * `{ header, body }` split so the panel can contribute its own title
+ * inline with the close button.
+ */
+export type DrawerRenderResult = ReactNode | { header?: ReactNode; body: ReactNode };
+
+export type DrawerStackRenderContent<T> = (
+  entry: T,
+  helpers: DrawerStackHelpers<T>
+) => DrawerRenderResult;
+
+function splitRenderResult(result: DrawerRenderResult): {
+  header: ReactNode;
+  body: ReactNode;
+} {
+  if (result !== null && typeof result === 'object' && 'body' in result) {
+    return { header: result.header ?? null, body: result.body };
+  }
+  return { header: null, body: result };
+}
 
 export type DrawerStackApi<T> = {
   stack: readonly T[];
@@ -181,6 +202,14 @@ export function createDrawerStack<T>() {
             {stack.map((entry, index) => {
               const depth = stack.length - 1 - index; // 0 = top
               const isTop = depth === 0;
+              const rendered = splitRenderResult(
+                renderContent(entry.value, {
+                  push,
+                  pop,
+                  close: isTop ? pop : closeAll,
+                  closeAll,
+                })
+              );
 
               return (
                 <DrawerLayer
@@ -193,13 +222,9 @@ export function createDrawerStack<T>() {
                   rightOffset={rightOffset}
                   width={width}
                   depthOffset={depthOffset}
+                  headerContent={rendered.header}
                 >
-                  {renderContent(entry.value, {
-                    push,
-                    pop,
-                    close: isTop ? pop : closeAll,
-                    closeAll,
-                  })}
+                  {rendered.body}
                 </DrawerLayer>
               );
             })}
@@ -223,6 +248,7 @@ function DrawerLayer({
   rightOffset,
   width,
   depthOffset,
+  headerContent,
   children,
 }: {
   depth: number;
@@ -233,6 +259,7 @@ function DrawerLayer({
   rightOffset: number;
   width: number;
   depthOffset: number;
+  headerContent?: ReactNode;
   children: ReactNode;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -280,17 +307,18 @@ function DrawerLayer({
       }}
     >
       <div className="flex h-full flex-col overflow-hidden rounded-l-2xl border-l border-white/[0.08] bg-[oklch(0.12_0_0)] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2">
-          <div className="flex items-center gap-1">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="rounded-md p-1 text-white/30 transition-colors hover:bg-white/5 hover:text-white/60"
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-            )}
-          </div>
+        <div className="flex items-center gap-2 border-b border-white/[0.06] px-4 py-2">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="rounded-md p-1 text-white/30 transition-colors hover:bg-white/5 hover:text-white/60"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+          )}
+          {/* Panel-contributed title / badges / etc. Flex grow so it fills
+              the space between the back and close buttons. */}
+          <div className="flex min-w-0 flex-1 items-center gap-2">{headerContent}</div>
           {onClose && (
             <button
               onClick={onClose}

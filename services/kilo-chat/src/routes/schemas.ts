@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const ulidSchema = z.string().ulid();
 
-export const SANDBOX_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const SANDBOX_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 export const sandboxIdSchema = z.string().regex(SANDBOX_ID_PATTERN, 'Invalid sandboxId');
 
 const actionItemSchema = z.object({

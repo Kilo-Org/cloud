@@ -56,14 +56,15 @@ export function registerConversationRoutes(
   app.get('/v1/conversations', async c => {
     const callerId = c.get('callerId');
 
+    let sandboxId: string | undefined;
     const rawSandboxId = c.req.query('sandboxId');
     if (rawSandboxId !== undefined) {
       const sbx = sandboxIdSchema.safeParse(rawSandboxId);
       if (!sbx.success) {
         return c.json({ error: 'Invalid sandboxId', issues: sbx.error.issues }, 400);
       }
+      sandboxId = sbx.data;
     }
-    const sandboxId = rawSandboxId ?? undefined;
 
     const query = paginationQuerySchema.safeParse({
       limit: c.req.query('limit'),

@@ -240,9 +240,14 @@ export async function makeErrorReadable({
   const upstreamSaysOverflow = await upstreamResponseIndicatesContextOverflow(response);
 
   if (upstreamSaysOverflow || (response.status === 500 && estimateExceedsContext)) {
-    const error = model
-      ? `The maximum context length is ${model.context_length} tokens. However, about ${estimatedTokenCount} tokens were requested.`
-      : `The maximum context length was exceeded. Please reduce the size of your request.`;
+    // Only include our own estimate when it actually exceeds the known window.
+    // Otherwise (e.g. upstream complains about tool input bloat that we
+    // underestimate) the contradictory "about N tokens were requested" number
+    // would confuse users.
+    const error =
+      model && estimateExceedsContext
+        ? `The maximum context length is ${model.context_length} tokens. However, about ${estimatedTokenCount} tokens were requested.`
+        : `The maximum context length was exceeded. Please reduce the size of your request.`;
     warnExceptInTest(`Responding with ${response.status} ${error}`);
     return NextResponse.json(
       { error, error_type: ProxyErrorType.context_length_exceeded, message: error },

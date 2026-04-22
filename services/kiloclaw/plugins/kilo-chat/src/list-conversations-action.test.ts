@@ -68,6 +68,17 @@ describe('handleKiloChatListConversationsAction', () => {
     expect(result.content[0].text).toBe('No conversations found.');
   });
 
+  it('forwards limit and offset to listConversations', async () => {
+    const client = mockClient();
+
+    await handleKiloChatListConversationsAction({
+      params: { limit: 10, offset: 5 },
+      client,
+    });
+
+    expect(client.listConversations).toHaveBeenCalledWith({ limit: 10, offset: 5 });
+  });
+
   it('shows "no activity" when lastActivityAt is null', async () => {
     const client = mockClient({
       listConversations: vi.fn().mockResolvedValue({

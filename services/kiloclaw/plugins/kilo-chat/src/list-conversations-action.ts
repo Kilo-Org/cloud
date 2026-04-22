@@ -19,7 +19,9 @@ function relativeTime(timestamp: number): string {
 export async function handleKiloChatListConversationsAction(
   args: HandleKiloChatListConversationsActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-  const { conversations, total } = await args.client.listConversations({});
+  const limit = typeof args.params.limit === 'number' ? args.params.limit : undefined;
+  const offset = typeof args.params.offset === 'number' ? args.params.offset : undefined;
+  const { conversations, total } = await args.client.listConversations({ limit, offset });
 
   if (conversations.length === 0) {
     return { content: [{ type: 'text', text: 'No conversations found.' }] };

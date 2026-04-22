@@ -1,81 +1,15 @@
-import { z } from 'zod';
-
-const nonEmptyString = z.string().min(1);
-
-// Reusable param fragments
-export const conversationTargetParams = z
-  .object({
-    to: nonEmptyString.optional(),
-    // The message tool agent may pass the conversation ID as threadId.
-    threadId: nonEmptyString.optional(),
-  })
-  .passthrough();
-
-export const messageTargetParams = conversationTargetParams.extend({
-  messageId: nonEmptyString.optional(),
-});
-
-export const paginationParams = z
-  .object({
-    limit: z.number().int().min(1).max(100).optional(),
-    offset: z.number().int().min(0).optional(),
-    before: nonEmptyString.optional(),
-  })
-  .passthrough();
-
-// Per-action schemas
-export const readActionParams = conversationTargetParams.extend({
-  limit: z.number().int().min(1).max(100).optional(),
-  offset: z.number().int().min(0).optional(),
-  before: nonEmptyString.optional(),
-});
-
-export const reactActionParams = messageTargetParams.extend({
-  emoji: z.string().optional(),
-  remove: z.boolean().optional(),
-});
-
-export const renameActionParams = conversationTargetParams.extend({
-  title: nonEmptyString.optional(),
-  // The message tool agent may use these aliases instead of `title`.
-  threadName: nonEmptyString.optional(),
-  name: nonEmptyString.optional(),
-  text: nonEmptyString.optional(),
-});
-
-export const editActionParams = messageTargetParams.extend({
-  text: nonEmptyString.optional(),
-});
-
-export const deleteActionParams = messageTargetParams;
-
-export const memberInfoActionParams = conversationTargetParams;
-
-export const listConversationsActionParams = z
-  .object({
-    limit: z.number().int().min(1).max(100).optional(),
-    offset: z.number().int().min(0).optional(),
-  })
-  .passthrough();
-
-export const createConversationActionParams = z
-  .object({
-    title: nonEmptyString.optional(),
-    members: nonEmptyString.optional(),
-  })
-  .passthrough();
+import { readStringParam } from 'openclaw/plugin-sdk/agent-runtime';
 
 export function stripPrefix(raw: string): string {
   return raw.trim().replace(/^kilo-chat:/i, '');
 }
 
 export function resolveConversationId(
-  parsed: { to?: string; threadId?: string },
+  params: Record<string, unknown>,
   toolContext?: { currentChannelId?: string | null }
 ): string {
   const raw =
-    parsed.to ??
-    parsed.threadId ??
+    readStringParam(params, 'to') ??
     (typeof toolContext?.currentChannelId === 'string' ? toolContext.currentChannelId : undefined);
   if (!raw) {
     throw new Error('kilo-chat: conversationId (or `to`) is required');
@@ -84,10 +18,10 @@ export function resolveConversationId(
 }
 
 export function resolveMessageId(
-  parsed: { messageId?: string },
+  params: Record<string, unknown>,
   toolContext?: { currentMessageId?: string | number | null }
 ): string {
-  const paramId = parsed.messageId;
+  const paramId = readStringParam(params, 'messageId') ?? readStringParam(params, 'message_id');
   const ctxId =
     toolContext?.currentMessageId != null ? String(toolContext.currentMessageId) : undefined;
   const messageId = paramId ?? ctxId;

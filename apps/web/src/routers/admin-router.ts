@@ -261,7 +261,7 @@ const ResetToMagicLinkLoginSchema = z.object({
 
 const UpdateUserBlockStatusSchema = z.object({
   userId: z.string(),
-  blocked_reason: z.string().nullable(),
+  blocked_reason: z.string().trim().min(1).nullable(),
 });
 
 const GetStytchFingerprintsSchema = z.object({
@@ -478,10 +478,22 @@ export const adminRouter = createTRPCRouter({
 
     updateBlockStatus: adminProcedure
       .input(UpdateUserBlockStatusSchema)
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        const blockMetadata = input.blocked_reason
+          ? {
+              blocked_reason: input.blocked_reason,
+              blocked_at: new Date().toISOString(),
+              blocked_by_kilo_user_id: ctx.user.id,
+            }
+          : {
+              blocked_reason: null,
+              blocked_at: null,
+              blocked_by_kilo_user_id: null,
+            };
+
         await db
           .update(kilocode_users)
-          .set({ blocked_reason: input.blocked_reason })
+          .set(blockMetadata)
           .where(eq(kilocode_users.id, input.userId));
 
         return successResult();
@@ -1400,7 +1412,11 @@ export const adminRouter = createTRPCRouter({
           if (!user.blocked_reason) {
             await tx
               .update(kilocode_users)
-              .set({ blocked_reason: input.reason })
+              .set({
+                blocked_reason: input.reason,
+                blocked_at: new Date().toISOString(),
+                blocked_by_kilo_user_id: ctx.user.id,
+              })
               .where(eq(kilocode_users.id, input.userId));
           }
 

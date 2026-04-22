@@ -207,6 +207,8 @@ describe('User', () => {
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
+        blocked_at: '2026-01-15T12:00:00.000Z',
+        blocked_by_kilo_user_id: 'admin-user-id',
         is_admin: true,
       });
 
@@ -234,11 +236,36 @@ describe('User', () => {
       expect(softDeleted!.api_token_pepper).toBeNull();
       expect(softDeleted!.default_model).toBeNull();
       expect(softDeleted!.blocked_reason).toMatch(/^soft-deleted at \d{4}-\d{2}-\d{2}T/);
+      expect(softDeleted!.blocked_at).toBeNull();
+      expect(softDeleted!.blocked_by_kilo_user_id).toBeNull();
       expect(softDeleted!.auto_top_up_enabled).toBe(false);
       expect(softDeleted!.completed_welcome_form).toBe(false);
       expect(softDeleted!.is_admin).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
+    });
+
+    it('should clear block attribution on other users', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const blockedUser = await insertTestUser();
+
+      await db
+        .update(kilocode_users)
+        .set({
+          blocked_reason: 'manual block',
+          blocked_at: '2026-01-15T12:00:00.000Z',
+          blocked_by_kilo_user_id: admin.id,
+        })
+        .where(eq(kilocode_users.id, blockedUser.id));
+
+      await softDeleteUser(admin.id);
+
+      const blockedUserAfter = await findUserById(blockedUser.id);
+      expect(blockedUserAfter!.blocked_reason).toBe('manual block');
+      expect(new Date(blockedUserAfter!.blocked_at ?? '').toISOString()).toBe(
+        '2026-01-15T12:00:00.000Z'
+      );
+      expect(blockedUserAfter!.blocked_by_kilo_user_id).toBeNull();
     });
 
     it('should delete auth providers', async () => {

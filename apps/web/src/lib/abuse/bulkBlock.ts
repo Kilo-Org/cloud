@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { successResult, type CustomResult } from '@/lib/maybe-result';
 
 export type BulkBlockResponse = CustomResult<
@@ -10,7 +10,8 @@ export type BulkBlockResponse = CustomResult<
 
 export async function bulkBlockUsers(
   kilo_user_emails_or_ids: string[],
-  block_reason: string
+  block_reason: string,
+  blockedByKiloUserId: string
 ): Promise<BulkBlockResponse> {
   const reason = block_reason.trim();
   const idsOrEmails = [...new Set(kilo_user_emails_or_ids.map(id => id.trim()).filter(Boolean))];
@@ -47,22 +48,41 @@ export async function bulkBlockUsers(
     return { success: false, error, foundIds: valid };
   }
 
-  await db
+  const blockedAt = new Date().toISOString();
+  const updated = await db
     .update(kilocode_users)
-    .set({ blocked_reason: reason })
-    .where(inArray(kilocode_users.id, valid));
+    .set({
+      blocked_reason: reason,
+      blocked_at: blockedAt,
+      blocked_by_kilo_user_id: blockedByKiloUserId,
+    })
+    .where(inArray(kilocode_users.id, valid))
+    .returning({ id: kilocode_users.id });
 
-  return successResult({ updatedCount: idsOrEmails.length });
+  return successResult({ updatedCount: updated.length });
 }
 
-export async function unblockBulkBlockedUsers(blocked_reason: string, date: string) {
+export async function unblockBulkBlockedUsers(
+  blocked_reason: string,
+  date: string,
+  blockedByKiloUserId: string | null
+) {
+  const blockedByCondition = blockedByKiloUserId
+    ? eq(kilocode_users.blocked_by_kilo_user_id, blockedByKiloUserId)
+    : isNull(kilocode_users.blocked_by_kilo_user_id);
+
   const rows = await db
     .update(kilocode_users)
-    .set({ blocked_reason: null })
+    .set({
+      blocked_reason: null,
+      blocked_at: null,
+      blocked_by_kilo_user_id: null,
+    })
     .where(
       and(
         eq(kilocode_users.blocked_reason, blocked_reason.trim()),
-        sql<boolean>`DATE(${kilocode_users.updated_at}) = ${date}`
+        sql<boolean>`DATE(COALESCE(${kilocode_users.blocked_at}, ${kilocode_users.updated_at})) = ${date}`,
+        blockedByCondition
       )
     )
     .returning({ id: kilocode_users.id });

@@ -128,8 +128,16 @@ function BulkBlockTab() {
 type RecentBlockRow = {
   blocked_reason: string;
   date: string;
+  blocked_by_kilo_user_id: string | null;
+  blocked_by_email: string | null;
   blocked_count: number;
 };
+
+function formatBlockedBy(
+  row: Pick<RecentBlockRow, 'blocked_by_email' | 'blocked_by_kilo_user_id'>
+) {
+  return row.blocked_by_email ?? row.blocked_by_kilo_user_id ?? 'Unknown';
+}
 
 function RecentBlocksTab() {
   const trpc = useTRPC();
@@ -161,7 +169,7 @@ function RecentBlocksTab() {
         <CardHeader>
           <CardTitle>Recent Bulk Blocks</CardTitle>
           <CardDescription>
-            Blocked accounts grouped by reason and date (based on last update timestamp).
+            Blocked accounts grouped by reason, block date, and admin.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -176,22 +184,37 @@ function RecentBlocksTab() {
                   <TableRow>
                     <TableHead>Block Reason</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead>Blocked By</TableHead>
                     <TableHead className="text-right">Accounts Blocked</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rows.map(row => (
-                    <TableRow key={`${row.blocked_reason}-${row.date}`}>
+                    <TableRow
+                      key={`${row.blocked_reason}-${row.date}-${row.blocked_by_kilo_user_id ?? 'unknown'}`}
+                    >
                       <TableCell className="font-medium">
                         <code className="bg-muted rounded px-2 py-1 text-sm">
                           {row.blocked_reason}
                         </code>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">{row.date}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {row.blocked_by_kilo_user_id ? (
+                          <Link
+                            href={`/admin/users/${encodeURIComponent(row.blocked_by_kilo_user_id)}`}
+                            className="text-primary hover:underline"
+                          >
+                            {formatBlockedBy(row)}
+                          </Link>
+                        ) : (
+                          'Unknown'
+                        )}
+                      </TableCell>
                       <TableCell className="p-0 text-right">
                         <Link
-                          href={`/admin/users?${new URLSearchParams({ notesSearch: row.blocked_reason, sortBy: 'updated_at', sortOrder: 'desc', blockedStatus: 'blocked' })}`}
+                          href={`/admin/users?${new URLSearchParams({ notesSearch: row.blocked_reason, sortBy: 'blocked_at', sortOrder: 'desc', blockedStatus: 'blocked' })}`}
                           className="text-primary hover:underline block px-4 py-2"
                         >
                           {row.blocked_count.toLocaleString()} users
@@ -230,8 +253,8 @@ function RecentBlocksTab() {
               {unblockTarget && (
                 <>
                   This will unblock {unblockTarget.blocked_count.toLocaleString()} users with reason
-                  &ldquo;{unblockTarget.blocked_reason}&rdquo; from {unblockTarget.date}. This
-                  cannot be undone automatically.
+                  &ldquo;{unblockTarget.blocked_reason}&rdquo; from {unblockTarget.date}, blocked by{' '}
+                  {formatBlockedBy(unblockTarget)}. This cannot be undone automatically.
                 </>
               )}
             </AlertDialogDescription>
@@ -246,6 +269,7 @@ function RecentBlocksTab() {
                 unblockMutation.mutate({
                   blocked_reason: unblockTarget.blocked_reason,
                   date: unblockTarget.date,
+                  blocked_by_kilo_user_id: unblockTarget.blocked_by_kilo_user_id,
                 });
               }}
             >

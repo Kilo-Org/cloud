@@ -668,6 +668,8 @@ export async function softDeleteUser(userId: string) {
         api_token_pepper: null,
         default_model: null,
         blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
+        blocked_at: null,
+        blocked_by_kilo_user_id: null,
         auto_top_up_enabled: false,
         completed_welcome_form: false,
         cohorts: {},
@@ -696,6 +698,10 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(organization_membership_removals)
       .where(eq(organization_membership_removals.kilo_user_id, userId));
+    await tx
+      .update(kilocode_users)
+      .set({ blocked_by_kilo_user_id: null })
+      .where(eq(kilocode_users.blocked_by_kilo_user_id, userId));
     // Anonymize removed_by references where this user removed others
     await tx
       .update(organization_membership_removals)

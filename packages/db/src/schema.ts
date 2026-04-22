@@ -223,6 +223,8 @@ export const kilocode_users = pgTable(
     has_validation_stytch: boolean(),
     has_validation_novel_card_with_hold: boolean().default(false).notNull(),
     blocked_reason: text(),
+    blocked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    blocked_by_kilo_user_id: text(),
     api_token_pepper: text(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     is_bot: boolean().default(false).notNull(),
@@ -247,6 +249,8 @@ export const kilocode_users = pgTable(
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
     index('IDX_kilocode_users_signup_ip_created_at').on(table.signup_ip, table.created_at),
+    index('IDX_kilocode_users_blocked_at').on(table.blocked_at),
+    index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')

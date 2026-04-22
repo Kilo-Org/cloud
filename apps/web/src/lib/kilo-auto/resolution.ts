@@ -79,10 +79,7 @@ export function getAutoFreeCandidates(
   return [...candidates].toSorted();
 }
 
-function gatewaySupportsApiKind(
-  gateway: string,
-  apiKind: GatewayRequest['kind'] | null
-): boolean {
+function gatewaySupportsApiKind(gateway: string, apiKind: GatewayRequest['kind'] | null): boolean {
   if (apiKind === null) return true;
   const provider = Object.values(PROVIDERS).find(p => p.id === gateway);
   return provider?.supportedChatApis.includes(apiKind) ?? false;

@@ -22,7 +22,7 @@ describe('handleKiloChatEditAction', () => {
   it('edits a message with explicit params', async () => {
     const client = mockClient();
     const result = await handleKiloChatEditAction({
-      params: { to: 'CONV1', messageId: 'MSG1', text: 'updated text' },
+      params: { to: 'CONV1', messageId: 'MSG1', message: 'updated text' },
       client,
     });
     expect(client.editMessage).toHaveBeenCalledWith(
@@ -38,7 +38,7 @@ describe('handleKiloChatEditAction', () => {
   it('strips kilo-chat: prefix from conversationId', async () => {
     const client = mockClient();
     await handleKiloChatEditAction({
-      params: { to: 'kilo-chat:CONV1', messageId: 'MSG1', text: 'updated' },
+      params: { to: 'kilo-chat:CONV1', messageId: 'MSG1', message: 'updated' },
       client,
     });
     expect(client.editMessage).toHaveBeenCalledWith(
@@ -49,7 +49,7 @@ describe('handleKiloChatEditAction', () => {
   it('falls back to toolContext for conversationId and messageId', async () => {
     const client = mockClient();
     await handleKiloChatEditAction({
-      params: { text: 'updated' },
+      params: { message: 'updated' },
       toolContext: { currentChannelId: 'CTX_CONV', currentMessageId: 'CTX_MSG' },
       client,
     });
@@ -61,21 +61,21 @@ describe('handleKiloChatEditAction', () => {
     );
   });
 
-  it('throws when text is missing', async () => {
+  it('throws when message is missing', async () => {
     const client = mockClient();
     await expect(
       handleKiloChatEditAction({
         params: { to: 'CONV1', messageId: 'MSG1' },
         client,
       })
-    ).rejects.toThrow(/text is required/i);
+    ).rejects.toThrow(/message is required/i);
   });
 
   it('throws when conversationId is missing', async () => {
     const client = mockClient();
     await expect(
       handleKiloChatEditAction({
-        params: { messageId: 'MSG1', text: 'updated' },
+        params: { messageId: 'MSG1', message: 'updated' },
         client,
       })
     ).rejects.toThrow(/conversationId/i);
@@ -85,7 +85,7 @@ describe('handleKiloChatEditAction', () => {
     const client = mockClient();
     await expect(
       handleKiloChatEditAction({
-        params: { to: 'CONV1', text: 'updated' },
+        params: { to: 'CONV1', message: 'updated' },
         client,
       })
     ).rejects.toThrow(/messageId/i);
@@ -96,7 +96,7 @@ describe('handleKiloChatEditAction', () => {
       editMessage: vi.fn().mockResolvedValue({ messageId: 'MSG1', stale: true }),
     });
     const result = await handleKiloChatEditAction({
-      params: { to: 'CONV1', messageId: 'MSG1', text: 'updated' },
+      params: { to: 'CONV1', messageId: 'MSG1', message: 'updated' },
       client,
     });
     expect(result.content[0]!.text).toMatch(/stale/i);

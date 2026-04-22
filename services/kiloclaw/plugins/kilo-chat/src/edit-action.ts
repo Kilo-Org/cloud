@@ -1,5 +1,6 @@
+import { readStringParam } from 'openclaw/plugin-sdk/agent-runtime';
 import type { KiloChatClient } from './client.js';
-import { editActionParams, resolveConversationId, resolveMessageId } from './action-schemas.js';
+import { resolveConversationId, resolveMessageId } from './action-schemas.js';
 
 export type HandleKiloChatEditActionParams = {
   params: Record<string, unknown>;
@@ -13,19 +14,18 @@ export type HandleKiloChatEditActionParams = {
 export async function handleKiloChatEditAction(
   args: HandleKiloChatEditActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-  const parsed = editActionParams.safeParse(args.params);
-  const conversationId = resolveConversationId(parsed.success ? parsed.data : {}, args.toolContext);
-  const messageId = resolveMessageId(parsed.success ? parsed.data : {}, args.toolContext);
+  const conversationId = resolveConversationId(args.params, args.toolContext);
+  const messageId = resolveMessageId(args.params, args.toolContext);
 
-  const text = parsed.success ? parsed.data.text : undefined;
-  if (!text) {
-    throw new Error('kilo-chat: text is required for edit action');
+  const message = readStringParam(args.params, 'message');
+  if (!message) {
+    throw new Error('kilo-chat: message is required for edit action');
   }
 
   const result = await args.client.editMessage({
     conversationId,
     messageId,
-    content: [{ type: 'text', text }],
+    content: [{ type: 'text', text: message }],
     timestamp: Date.now(),
   });
 

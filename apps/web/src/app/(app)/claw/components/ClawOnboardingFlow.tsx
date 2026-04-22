@@ -237,9 +237,8 @@ function ClawOnboardingFlowInner({
             posthog?.capture('claw_weather_location_skipped');
           }
 
-          // Commit wizard state before triggering provisioning so the parent
-          // callback (onCreateFlowStarted) can't cause a re-render that sees
-          // stale onboardingStep / botIdentity values.
+          // Advance wizard state first so the state machine sees the new
+          // step and identity before any cross-component re-renders.
           setBotIdentity(identity);
           setOnboardingStep('permissions');
           posthog?.capture('claw_setup_permissions_viewed');
@@ -252,6 +251,9 @@ function ClawOnboardingFlowInner({
               );
             }
           } else {
+            // Start provisioning after the wizard state is set. This calls
+            // handleCreateFlowStarted, which updates the parent and triggers
+            // a re-render after onboardingStep and botIdentity are set.
             provisionInstance(weatherLocation?.location);
           }
         }}

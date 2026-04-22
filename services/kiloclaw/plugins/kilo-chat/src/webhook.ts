@@ -4,6 +4,7 @@ import { createChannelReplyPipeline } from 'openclaw/plugin-sdk/channel-reply-pi
 import { resolveInboundRouteEnvelopeBuilderWithRuntime } from 'openclaw/plugin-sdk/inbound-envelope';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/plugin-entry';
 import { createNormalizedOutboundDeliverer } from 'openclaw/plugin-sdk/reply-payload';
+import { z } from 'zod';
 
 import { resolveApprovalOverGateway } from 'openclaw/plugin-sdk/approval-gateway-runtime';
 import type { ExecApprovalDecision } from 'openclaw/plugin-sdk/approval-runtime';
@@ -35,38 +36,20 @@ export type KiloChatWebhookDeps = {
 // Payload parsing
 // ---------------------------------------------------------------------------
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0;
-}
+const inboundPayloadSchema = z.object({
+  conversationId: z.string().min(1),
+  from: z.string().min(1),
+  text: z.string().min(1),
+  messageId: z.string().min(1),
+  sentAt: z.string().min(1),
+  inReplyToMessageId: z.string().min(1).optional(),
+  inReplyToBody: z.string().min(1).optional(),
+  inReplyToSender: z.string().min(1).optional(),
+});
 
 export function parseInboundPayload(raw: unknown): KiloChatInboundPayload | null {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const o = raw as Record<string, unknown>;
-  if (!isNonEmptyString(o.conversationId)) return null;
-  if (!isNonEmptyString(o.from)) return null;
-  if (!isNonEmptyString(o.text)) return null;
-  if (!isNonEmptyString(o.messageId)) return null;
-  if (!isNonEmptyString(o.sentAt)) return null;
-  const inReplyToMessageId =
-    typeof o.inReplyToMessageId === 'string' && o.inReplyToMessageId.length > 0
-      ? o.inReplyToMessageId
-      : undefined;
-  const inReplyToBody =
-    typeof o.inReplyToBody === 'string' && o.inReplyToBody.length > 0 ? o.inReplyToBody : undefined;
-  const inReplyToSender =
-    typeof o.inReplyToSender === 'string' && o.inReplyToSender.length > 0
-      ? o.inReplyToSender
-      : undefined;
-  return {
-    conversationId: o.conversationId,
-    from: o.from,
-    text: o.text,
-    messageId: o.messageId,
-    sentAt: o.sentAt,
-    inReplyToMessageId,
-    inReplyToBody,
-    inReplyToSender,
-  };
+  const result = inboundPayloadSchema.safeParse(raw);
+  return result.success ? result.data : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,17 +62,15 @@ export type ActionExecutedPayload = {
   executedBy: string;
 };
 
+const actionExecutedPayloadSchema = z.object({
+  groupId: z.string().min(1),
+  value: z.string().min(1),
+  executedBy: z.string().min(1),
+});
+
 export function parseActionExecutedPayload(raw: unknown): ActionExecutedPayload | null {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const o = raw as Record<string, unknown>;
-  if (!isNonEmptyString(o.groupId)) return null;
-  if (!isNonEmptyString(o.value)) return null;
-  if (!isNonEmptyString(o.executedBy)) return null;
-  return {
-    groupId: o.groupId,
-    value: o.value,
-    executedBy: o.executedBy,
-  };
+  const result = actionExecutedPayloadSchema.safeParse(raw);
+  return result.success ? result.data : null;
 }
 
 async function handleActionExecuted(

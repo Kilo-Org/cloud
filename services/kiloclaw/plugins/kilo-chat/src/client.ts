@@ -1,4 +1,5 @@
 import type { ContentBlock } from '@kilocode/kilo-chat';
+import { z } from 'zod';
 
 export type KiloChatClientOptions = {
   controllerBaseUrl: string;
@@ -90,12 +91,12 @@ function authHeaders(token: string): HeadersInit {
   };
 }
 
+const createResultSchema = z.object({ messageId: z.string().min(1) });
+const addReactionResultSchema = z.object({ id: z.string().min(1) });
+const createConversationResultSchema = z.object({ conversationId: z.string().min(1) });
+
 function parseCreateResult(data: unknown): CreateMessageResult {
-  const o = (data ?? {}) as { messageId?: unknown };
-  if (typeof o.messageId !== 'string' || o.messageId.length === 0) {
-    throw new Error('kilo-chat: response missing messageId');
-  }
-  return { messageId: o.messageId };
+  return createResultSchema.parse(data);
 }
 
 export function createKiloChatClient(options: KiloChatClientOptions): KiloChatClient {
@@ -208,11 +209,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller POST reactions responded ${response.status}: ${await response.text()}`
       );
     }
-    const data = (await response.json()) as { id?: unknown };
-    if (typeof data.id !== 'string' || data.id.length === 0) {
-      throw new Error('kilo-chat: response missing reaction id');
-    }
-    return { id: data.id };
+    return addReactionResultSchema.parse(await response.json());
   }
 
   async function removeReaction(params: RemoveReactionParams): Promise<void> {
@@ -315,11 +312,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller POST conversations responded ${response.status}: ${await response.text()}`
       );
     }
-    const data = (await response.json()) as { conversationId?: unknown };
-    if (typeof data.conversationId !== 'string' || data.conversationId.length === 0) {
-      throw new Error('kilo-chat: response missing conversationId');
-    }
-    return { conversationId: data.conversationId };
+    return createConversationResultSchema.parse(await response.json());
   }
 
   return {

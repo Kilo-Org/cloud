@@ -5,6 +5,7 @@ import {
   CLAW_ONBOARDING_PROVISIONING_STATUSES,
   type ClawOnboardingFlowStateInput,
   getClawOnboardingFlowState,
+  getClawOnboardingStepProgress,
   hasPopulatedStatus,
   isPairingChannel,
 } from './ClawOnboardingFlow.state';
@@ -170,16 +171,67 @@ describe('ClawOnboardingFlow state machine', () => {
   });
 
   test('uses five steps only when the selected channel requires pairing', () => {
-    expect(
-      getClawOnboardingFlowState(createInput({ selectedChannelId: 'telegram' })).totalSteps
-    ).toBe(5);
-    expect(
-      getClawOnboardingFlowState(createInput({ selectedChannelId: 'discord' })).totalSteps
-    ).toBe(5);
-    expect(getClawOnboardingFlowState(createInput({ selectedChannelId: 'slack' })).totalSteps).toBe(
-      4
+    const pairingTelegram = getClawOnboardingFlowState(
+      createInput({ selectedChannelId: 'telegram' })
     );
-    expect(getClawOnboardingFlowState(createInput()).totalSteps).toBe(4);
+    expect(pairingTelegram.totalSteps).toBe(5);
+    expect(pairingTelegram.currentStep).toBe(1);
+
+    const pairingDiscord = getClawOnboardingFlowState(
+      createInput({ selectedChannelId: 'discord' })
+    );
+    expect(pairingDiscord.totalSteps).toBe(5);
+    expect(pairingDiscord.currentStep).toBe(1);
+
+    const noPairingSlack = getClawOnboardingFlowState(createInput({ selectedChannelId: 'slack' }));
+    expect(noPairingSlack.totalSteps).toBe(4);
+    expect(noPairingSlack.currentStep).toBe(1);
+
+    const defaultState = getClawOnboardingFlowState(createInput());
+    expect(defaultState.totalSteps).toBe(4);
+    expect(defaultState.currentStep).toBe(1);
+  });
+
+  test('getClawOnboardingStepProgress returns correct current and total steps', () => {
+    expect(getClawOnboardingStepProgress('identity', false)).toEqual({
+      currentStep: 1,
+      totalSteps: 4,
+    });
+    expect(getClawOnboardingStepProgress('permissions', false)).toEqual({
+      currentStep: 2,
+      totalSteps: 4,
+    });
+    expect(getClawOnboardingStepProgress('channels', false)).toEqual({
+      currentStep: 3,
+      totalSteps: 4,
+    });
+    expect(getClawOnboardingStepProgress('provisioning', false)).toEqual({
+      currentStep: 4,
+      totalSteps: 4,
+    });
+    expect(getClawOnboardingStepProgress('done', false)).toEqual({ currentStep: 4, totalSteps: 4 });
+
+    expect(getClawOnboardingStepProgress('identity', true)).toEqual({
+      currentStep: 1,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('permissions', true)).toEqual({
+      currentStep: 2,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('channels', true)).toEqual({
+      currentStep: 3,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('provisioning', true)).toEqual({
+      currentStep: 4,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('pairing', true)).toEqual({
+      currentStep: 5,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('done', true)).toEqual({ currentStep: 5, totalSteps: 5 });
   });
 
   test.each(CLAW_ONBOARDING_PROVISIONING_STATUSES)(

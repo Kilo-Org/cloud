@@ -15,6 +15,16 @@ export type OnboardingStep =
   | 'pairing'
   | 'done';
 
+export const CLAW_ONBOARDING_WIZARD_STEPS = [
+  'identity',
+  'permissions',
+  'channels',
+  'provisioning',
+  'pairing',
+] as const satisfies OnboardingStep[];
+
+export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[number];
+
 export type ClawOnboardingRenderStep =
   | 'create-instance'
   | 'identity'
@@ -80,6 +90,7 @@ export type ClawOnboardingFlowState = {
   createSetupActive: boolean;
   postProvisioningReady: boolean;
   hasPairingStep: boolean;
+  currentStep: number;
   totalSteps: number;
 };
 
@@ -98,6 +109,24 @@ export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status'
     if (status === errorStatus) return true;
   }
   return false;
+}
+
+export function getClawOnboardingStepProgress(
+  step: OnboardingStep,
+  hasPairingStep: boolean
+): { currentStep: number; totalSteps: number } {
+  const totalSteps = hasPairingStep
+    ? CLAW_ONBOARDING_WIZARD_STEPS.length
+    : CLAW_ONBOARDING_WIZARD_STEPS.length - 1;
+
+  if (step === 'done') {
+    return { currentStep: totalSteps, totalSteps };
+  }
+
+  const index = CLAW_ONBOARDING_WIZARD_STEPS.indexOf(step);
+  const currentStep = index === -1 ? 0 : index + 1;
+
+  return { currentStep, totalSteps };
 }
 
 export function getClawOnboardingFlowState({
@@ -120,7 +149,7 @@ export function getClawOnboardingFlowState({
   const createSetupActive =
     mode === 'create-first' && (createSetupStarted || instanceStatus !== null);
   const hasPairingStep = isPairingChannel(selectedChannelId);
-  const totalSteps = hasPairingStep ? 5 : 4;
+  const { currentStep, totalSteps } = getClawOnboardingStepProgress(onboardingStep, hasPairingStep);
   const renderStepDecision = getRenderStepDecision({
     mode,
     createSetupStarted,
@@ -141,6 +170,7 @@ export function getClawOnboardingFlowState({
     createSetupActive,
     postProvisioningReady,
     hasPairingStep,
+    currentStep,
     totalSteps,
   } satisfies ClawOnboardingFlowState;
 
@@ -162,6 +192,7 @@ export function getClawOnboardingFlowState({
     createSetupActive,
     postProvisioningReady,
     hasPairingStep,
+    currentStep,
     totalSteps,
     renderStepDecision,
   });
@@ -197,6 +228,7 @@ type ClawOnboardingFlowDebugLogInput = ClawOnboardingFlowStateInput & {
   createSetupActive: boolean;
   postProvisioningReady: boolean;
   hasPairingStep: boolean;
+  currentStep: number;
   totalSteps: number;
   renderStepDecision: RenderStepDecision;
 };
@@ -335,6 +367,7 @@ function logClawOnboardingFlowStateDecision({
   createSetupActive,
   postProvisioningReady,
   hasPairingStep,
+  currentStep,
   totalSteps,
   renderStepDecision,
 }: ClawOnboardingFlowDebugLogInput): void {
@@ -365,6 +398,7 @@ function logClawOnboardingFlowStateDecision({
       createSetupActive,
       postProvisioningReady,
       hasPairingStep,
+      currentStep,
       totalSteps,
     },
     null,

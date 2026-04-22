@@ -233,6 +233,8 @@ function ClawOnboardingFlowInner({
   function renderIdentityStep() {
     return (
       <BotIdentityStep
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
         instanceRunning={flowState.instanceRunning}
         onContinue={({ identity, weatherLocation }) => {
           posthog?.capture('claw_setup_identity_completed', {
@@ -266,6 +268,8 @@ function ClawOnboardingFlowInner({
   function renderPermissionsStep() {
     return (
       <PermissionStep
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
         instanceRunning={flowState.instanceRunning}
         onSelect={preset => {
           posthog?.capture('claw_setup_permissions_completed', { preset });
@@ -280,6 +284,8 @@ function ClawOnboardingFlowInner({
   function renderChannelsStep() {
     return (
       <ChannelSelectionStepView
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
         instanceRunning={flowState.instanceRunning}
         onSelect={(channelId, tokens) => {
           posthog?.capture('claw_setup_channels_completed', {
@@ -306,17 +312,24 @@ function ClawOnboardingFlowInner({
   }
 
   function renderProvisioningStep() {
-    if (mode === 'post-provisioning') return <ProvisioningStepView />;
+    if (mode === 'post-provisioning')
+      return (
+        <ProvisioningStepView
+          currentStep={flowState.currentStep}
+          totalSteps={flowState.totalSteps}
+        />
+      );
     if (selectedPreset === null) return renderPermissionsStep();
 
     return (
       <ProvisioningStep
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
         preset={selectedPreset}
         channelTokens={channelTokens}
         botIdentity={botIdentity}
         instanceRunning={flowState.instanceRunning}
         mutations={mutations}
-        totalSteps={flowState.totalSteps}
         onComplete={() => {
           posthog?.capture('claw_setup_provisioned');
           posthog?.capture(
@@ -333,6 +346,8 @@ function ClawOnboardingFlowInner({
 
     return (
       <ChannelPairingStep
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
         channelId={selectedChannelId}
         mutations={mutations}
         onComplete={() => {

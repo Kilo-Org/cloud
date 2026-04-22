@@ -119,6 +119,8 @@ import {
   handleMayorConvoyStart,
   handleMayorUiAction,
   handleMayorGetPendingNudges,
+  handleMayorConvoyAddBead,
+  handleMayorConvoyRemoveBead,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { townAuthMiddleware } from './middleware/town-auth.middleware';
@@ -1018,6 +1020,16 @@ app.post('/api/mayor/:townId/tools/escalations/:escalationId/acknowledge', c =>
 );
 app.post('/api/mayor/:townId/tools/convoys/:convoyId/start', c =>
   handleMayorConvoyStart(c, c.req.param())
+);
+app.post('/api/mayor/:townId/tools/convoys/:convoyId/add-bead', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/convoys/:convoyId/add-bead', () =>
+    handleMayorConvoyAddBead(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/convoys/:convoyId/remove-bead', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/convoys/:convoyId/remove-bead', () =>
+    handleMayorConvoyRemoveBead(c, c.req.param())
+  )
 );
 // ── tRPC ────────────────────────────────────────────────────────────────
 // Serve the gastown tRPC router directly. The frontend tRPC client

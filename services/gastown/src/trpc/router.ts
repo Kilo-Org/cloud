@@ -682,6 +682,7 @@ export const gastownRouter = router({
           metadata: z.record(z.string(), z.unknown()).optional(),
           rig_id: z.string().min(1).nullable().optional(),
           parent_bead_id: z.string().min(1).nullable().optional(),
+          depends_on: z.array(z.string().uuid()).optional(),
         })
         .refine(
           data =>
@@ -692,7 +693,8 @@ export const gastownRouter = router({
             data.labels !== undefined ||
             data.metadata !== undefined ||
             data.rig_id !== undefined ||
-            data.parent_bead_id !== undefined,
+            data.parent_bead_id !== undefined ||
+            data.depends_on !== undefined,
           { message: 'At least one field to update must be provided' }
         )
     )
@@ -712,6 +714,35 @@ export const gastownRouter = router({
 
       const { rigId: _rigId, beadId, townId: _townId, ...fields } = input;
       return townStub.updateBead(beadId, fields, ctx.userId);
+    }),
+
+  convoyAddBead: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        convoyId: z.string().uuid(),
+        beadId: z.string().uuid(),
+        depends_on: z.array(z.string().uuid()).optional(),
+      })
+    )
+    .output(z.object({ total_beads: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.convoyAddBead(input.convoyId, input.beadId, input.depends_on);
+    }),
+
+  convoyRemoveBead: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        convoyId: z.string().uuid(),
+        beadId: z.string().uuid(),
+      })
+    )
+    .output(z.object({ total_beads: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.convoyRemoveBead(input.convoyId, input.beadId);
     }),
 
   deleteBeadsByStatus: gastownProcedure

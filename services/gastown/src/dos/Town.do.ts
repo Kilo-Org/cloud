@@ -1183,6 +1183,7 @@ export class TownDO extends DurableObject<Env> {
       labels: string[];
       status: BeadStatus;
       metadata: Record<string, unknown>;
+      depends_on: string[];
     }>,
     actorId: string
   ): Promise<Bead> {
@@ -1195,7 +1196,12 @@ export class TownDO extends DurableObject<Env> {
       });
     }
 
-    const bead = beadOps.updateBeadFields(this.sql, beadId, fields, actorId);
+    const { depends_on, ...beadFields } = fields;
+    const bead = beadOps.updateBeadFields(this.sql, beadId, beadFields, actorId);
+
+    if (depends_on !== undefined) {
+      beadOps.setDependencies(this.sql, beadId, depends_on);
+    }
 
     // When a bead closes via field update, check for newly unblocked beads
     if (fields.status === 'closed' || fields.status === 'failed') {
@@ -1203,6 +1209,51 @@ export class TownDO extends DurableObject<Env> {
     }
 
     return bead;
+  }
+
+  /** Add an existing bead to a convoy's tracking. Returns updated convoy metadata. */
+  async convoyAddBead(
+    convoyId: string,
+    beadId: string,
+    dependsOn?: string[]
+  ): Promise<{ total_beads: number }> {
+    beadOps.convoyAddBead(this.sql, convoyId, beadId);
+    if (dependsOn !== undefined) {
+      beadOps.setDependencies(this.sql, beadId, dependsOn);
+    }
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${convoy_metadata.total_beads}
+          FROM ${convoy_metadata}
+          WHERE ${convoy_metadata.bead_id} = ?
+        `,
+        [convoyId]
+      ),
+    ];
+    const parsed = z.object({ total_beads: z.number() }).array().parse(rows);
+    const total = parsed[0]?.total_beads ?? 0;
+    return { total_beads: total };
+  }
+
+  /** Remove a bead from a convoy's tracking. Returns updated convoy metadata. */
+  async convoyRemoveBead(convoyId: string, beadId: string): Promise<{ total_beads: number }> {
+    beadOps.convoyRemoveBead(this.sql, convoyId, beadId);
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${convoy_metadata.total_beads}
+          FROM ${convoy_metadata}
+          WHERE ${convoy_metadata.bead_id} = ?
+        `,
+        [convoyId]
+      ),
+    ];
+    const parsed = z.object({ total_beads: z.number() }).array().parse(rows);
+    const total = parsed[0]?.total_beads ?? 0;
+    return { total_beads: total };
   }
 
   /**

@@ -531,6 +531,178 @@ export function insertDependency(
 }
 
 /**
+ * Atomically replace all 'blocks' edges for a bead.
+ * Deletes existing blockers then inserts the provided list.
+ * Self-loops are silently skipped.
+ */
+export function setDependencies(sql: SqlStorage, beadId: string, dependsOnBeadIds: string[]): void {
+  query(
+    sql,
+    /* sql */ `
+      DELETE FROM ${bead_dependencies}
+      WHERE ${bead_dependencies.bead_id} = ?
+        AND ${bead_dependencies.dependency_type} = 'blocks'
+    `,
+    [beadId]
+  );
+  for (const depId of dependsOnBeadIds) {
+    if (depId === beadId) continue; // no self-loops
+    query(
+      sql,
+      /* sql */ `
+        INSERT OR IGNORE INTO ${bead_dependencies} (
+          ${bead_dependencies.columns.bead_id},
+          ${bead_dependencies.columns.depends_on_bead_id},
+          ${bead_dependencies.columns.dependency_type}
+        ) VALUES (?, ?, 'blocks')
+      `,
+      [beadId, depId]
+    );
+  }
+}
+
+/**
+ * Add a bead to a convoy's tracking.
+ * Inserts a 'tracks' edge and increments total_beads — but only when the
+ * edge is genuinely new (INSERT OR IGNORE returns 0 changes if it already
+ * exists, so we check before updating the counter).
+ * Returns whether the bead was newly added (true) or already tracked (false).
+ */
+export function convoyAddBead(sql: SqlStorage, convoyId: string, beadId: string): boolean {
+  // Check if already tracked
+  const existing = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT 1 FROM ${bead_dependencies}
+        WHERE ${bead_dependencies.bead_id} = ?
+          AND ${bead_dependencies.depends_on_bead_id} = ?
+          AND ${bead_dependencies.dependency_type} = 'tracks'
+      `,
+      [beadId, convoyId]
+    ),
+  ];
+  if (existing.length > 0) return false;
+
+  query(
+    sql,
+    /* sql */ `
+      INSERT INTO ${bead_dependencies} (
+        ${bead_dependencies.columns.bead_id},
+        ${bead_dependencies.columns.depends_on_bead_id},
+        ${bead_dependencies.columns.dependency_type}
+      ) VALUES (?, ?, 'tracks')
+    `,
+    [beadId, convoyId]
+  );
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${convoy_metadata}
+      SET ${convoy_metadata.columns.total_beads} = ${convoy_metadata.columns.total_beads} + 1
+      WHERE ${convoy_metadata.bead_id} = ?
+    `,
+    [convoyId]
+  );
+  return true;
+}
+
+/**
+ * Remove a bead from a convoy's tracking.
+ * Deletes the 'tracks' edge, decrements total_beads (floor 0), and removes
+ * any 'blocks' edges between this bead and other beads in the same convoy.
+ * Returns whether the bead was actually tracked (true) or not found (false).
+ */
+export function convoyRemoveBead(sql: SqlStorage, convoyId: string, beadId: string): boolean {
+  // Check if tracked
+  const existing = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT 1 FROM ${bead_dependencies}
+        WHERE ${bead_dependencies.bead_id} = ?
+          AND ${bead_dependencies.depends_on_bead_id} = ?
+          AND ${bead_dependencies.dependency_type} = 'tracks'
+      `,
+      [beadId, convoyId]
+    ),
+  ];
+  if (existing.length === 0) return false;
+
+  // Remove the tracks edge
+  query(
+    sql,
+    /* sql */ `
+      DELETE FROM ${bead_dependencies}
+      WHERE ${bead_dependencies.bead_id} = ?
+        AND ${bead_dependencies.depends_on_bead_id} = ?
+        AND ${bead_dependencies.dependency_type} = 'tracks'
+    `,
+    [beadId, convoyId]
+  );
+  // Decrement total_beads, floor at 0
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${convoy_metadata}
+      SET ${convoy_metadata.columns.total_beads} = MAX(0, ${convoy_metadata.columns.total_beads} - 1)
+      WHERE ${convoy_metadata.bead_id} = ?
+    `,
+    [convoyId]
+  );
+
+  // Find all other beads tracked by this convoy
+  const siblingRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${bead_dependencies.bead_id}
+        FROM ${bead_dependencies}
+        WHERE ${bead_dependencies.depends_on_bead_id} = ?
+          AND ${bead_dependencies.dependency_type} = 'tracks'
+      `,
+      [convoyId]
+    ),
+  ];
+  const siblingIds = z
+    .object({ bead_id: z.string() })
+    .array()
+    .parse(siblingRows)
+    .map(r => r.bead_id);
+
+  if (siblingIds.length > 0) {
+    // Delete 'blocks' edges where beadId is the blocker of a sibling
+    for (const siblingId of siblingIds) {
+      query(
+        sql,
+        /* sql */ `
+          DELETE FROM ${bead_dependencies}
+          WHERE ${bead_dependencies.bead_id} = ?
+            AND ${bead_dependencies.depends_on_bead_id} = ?
+            AND ${bead_dependencies.dependency_type} = 'blocks'
+        `,
+        [siblingId, beadId]
+      );
+    }
+    // Delete 'blocks' edges where beadId depends on a sibling
+    for (const siblingId of siblingIds) {
+      query(
+        sql,
+        /* sql */ `
+          DELETE FROM ${bead_dependencies}
+          WHERE ${bead_dependencies.bead_id} = ?
+            AND ${bead_dependencies.depends_on_bead_id} = ?
+            AND ${bead_dependencies.dependency_type} = 'blocks'
+        `,
+        [beadId, siblingId]
+      );
+    }
+  }
+
+  return true;
+}
+
+/**
  * Find beads that were blocked by `closedBeadId` and are now fully unblocked
  * (all their 'blocks' dependencies are resolved).
  */

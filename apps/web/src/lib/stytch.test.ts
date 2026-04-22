@@ -427,7 +427,11 @@ describe('Stytch Fingerprint Functions', () => {
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
       const byCategory = new Map(grants.map(g => [g.credit_category, g]));
-      expect(byCategory.get('automatic-welcome-credits')?.amount_microdollars).toBe(2_500_000);
+      // Welcome subsidy was reduced from $2.50 to $1.25 on main (commit
+      // 0f43aeb92, merged into this branch). Campaign grant amount is
+      // independent of the welcome amount and is set per-campaign in the
+      // admin UI.
+      expect(byCategory.get('automatic-welcome-credits')?.amount_microdollars).toBe(1_250_000);
 
       const campaignGrant = byCategory.get(`c-${slug}`);
       expect(campaignGrant?.amount_microdollars).toBe(5_000_000);

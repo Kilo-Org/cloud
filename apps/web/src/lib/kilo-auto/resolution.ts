@@ -34,6 +34,7 @@ import {
 } from '@/lib/ai-gateway/models';
 import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -79,7 +80,7 @@ export function getAutoFreeCandidates(
   return [...candidates].toSorted();
 }
 
-function gatewaySupportsApiKind(gateway: string, apiKind: GatewayRequest['kind'] | null): boolean {
+function gatewaySupportsApiKind(gateway: ProviderId, apiKind: GatewayRequest['kind'] | null): boolean {
   if (apiKind === null) return true;
   const provider = Object.values(PROVIDERS).find(p => p.id === gateway);
   return provider?.supportedChatApis.some(k => k === apiKind) ?? false;

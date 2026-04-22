@@ -1,7 +1,7 @@
 import { db } from '@/lib/drizzle';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import { kiloclaw_subscriptions, type KiloClawSubscription } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -12,7 +12,12 @@ export type KiloClawAccessReason = 'trial' | 'subscription' | 'earlybird';
 export type KiloClawActivationState = 'pending_settlement' | 'activated';
 export type KiloClawSubscriptionAccessRecord = Pick<
   KiloClawSubscription,
-  'status' | 'trial_ends_at' | 'suspended_at' | 'access_origin' | 'payment_source'
+  | 'status'
+  | 'trial_ends_at'
+  | 'suspended_at'
+  | 'access_origin'
+  | 'payment_source'
+  | 'transferred_to_subscription_id'
 >;
 export type KiloClawEarlybirdState = {
   purchased: boolean;
@@ -60,6 +65,7 @@ export function getKiloClawSubscriptionAccessReason(
   now = new Date()
 ): KiloClawAccessReason | null {
   if (!subscription) return null;
+  if (subscription.transferred_to_subscription_id) return null;
   if (getKiloClawSubscriptionActivationState(subscription) === 'pending_settlement') return null;
   if (subscription.status === 'active') return 'subscription';
   if (subscription.status === 'past_due' && !subscription.suspended_at) return 'subscription';
@@ -80,9 +86,12 @@ export function getEffectiveKiloClawSubscription(
   subscriptions: KiloClawSubscription[],
   now = new Date()
 ): KiloClawSubscription | null {
-  if (subscriptions.length === 0) return null;
+  const currentSubscriptions = subscriptions.filter(
+    subscription => !subscription.transferred_to_subscription_id
+  );
+  if (currentSubscriptions.length === 0) return null;
 
-  return [...subscriptions].sort((left, right) => {
+  return [...currentSubscriptions].sort((left, right) => {
     const priorityDiff = subscriptionPriority(left, now) - subscriptionPriority(right, now);
     if (priorityDiff !== 0) return priorityDiff;
 
@@ -124,7 +133,8 @@ export async function getKiloClawEarlybirdStateForUser(
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, userId),
-        eq(kiloclaw_subscriptions.access_origin, 'earlybird')
+        eq(kiloclaw_subscriptions.access_origin, 'earlybird'),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
       )
     );
 

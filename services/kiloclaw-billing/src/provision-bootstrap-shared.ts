@@ -35,7 +35,7 @@ type BootstrapProvisionWithDbParams = {
 };
 
 async function insertSubscriptionIdempotent(
-  db: WorkerDb,
+  db: Pick<WorkerDb, 'insert' | 'select'>,
   values: NewKiloClawSubscription & { instance_id: string }
 ): Promise<{ row: KiloClawSubscription; created: boolean }> {
   const [inserted] = await db
@@ -113,6 +113,175 @@ function getTrialEndsAt(startedAt: Date): string {
   ).toISOString();
 }
 
+type OrgBootstrapWriter = Pick<WorkerDb, 'insert' | 'select' | 'update'>;
+
+type OrgSubscriptionRow = {
+  subscription: KiloClawSubscription;
+  instance: {
+    id: string;
+    destroyedAt: string | null;
+  };
+};
+
+type TransferUpdate = {
+  before: KiloClawSubscription;
+  transferredToSubscriptionId: string | null;
+};
+
+function compareSubscriptionsByCreatedAtAndId(
+  left: KiloClawSubscription,
+  right: KiloClawSubscription
+): number {
+  if (left.created_at === right.created_at) {
+    return left.id.localeCompare(right.id);
+  }
+  return left.created_at.localeCompare(right.created_at);
+}
+
+function buildTransferUpdates(subscriptions: KiloClawSubscription[]): TransferUpdate[] {
+  const orderedSubscriptions = [...subscriptions].sort(compareSubscriptionsByCreatedAtAndId);
+  const updates: TransferUpdate[] = [];
+
+  for (const [index, subscription] of orderedSubscriptions.entries()) {
+    const nextSubscription = orderedSubscriptions[index + 1];
+    const desiredTransferredTo = nextSubscription?.id ?? null;
+    if (subscription.transferred_to_subscription_id === desiredTransferredTo) {
+      continue;
+    }
+    updates.push({
+      before: subscription,
+      transferredToSubscriptionId: desiredTransferredTo,
+    });
+  }
+
+  return updates;
+}
+
+function currentOrganizationSubscriptionRows(rows: OrgSubscriptionRow[]): OrgSubscriptionRow[] {
+  return rows.filter(row => row.subscription.transferred_to_subscription_id === null);
+}
+
+function transferredToUnchangedWhere(subscription: KiloClawSubscription) {
+  return subscription.transferred_to_subscription_id === null
+    ? isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+    : eq(
+        kiloclaw_subscriptions.transferred_to_subscription_id,
+        subscription.transferred_to_subscription_id
+      );
+}
+
+async function listOrganizationSubscriptionRowsForTransfer(
+  executor: OrgBootstrapWriter,
+  userId: string,
+  orgId: string
+): Promise<OrgSubscriptionRow[]> {
+  return await executor
+    .select({
+      subscription: kiloclaw_subscriptions,
+      instance: {
+        id: kiloclaw_instances.id,
+        destroyedAt: kiloclaw_instances.destroyed_at,
+      },
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.organization_id, orgId)
+      )
+    )
+    .orderBy(kiloclaw_subscriptions.created_at, kiloclaw_subscriptions.id)
+    .for('update');
+}
+
+async function transferDestroyedOrganizationPredecessors(params: {
+  actor: KiloClawSubscriptionChangeActor;
+  executor: OrgBootstrapWriter;
+  orgId: string;
+  targetSubscription: KiloClawSubscription;
+  targetWasInserted: boolean;
+  userId: string;
+}) {
+  const rows = await listOrganizationSubscriptionRowsForTransfer(
+    params.executor,
+    params.userId,
+    params.orgId
+  );
+  const targetRow = rows.find(row => row.subscription.id === params.targetSubscription.id);
+
+  if (!targetRow || targetRow.instance.destroyedAt !== null) {
+    if (params.targetWasInserted) {
+      throw new Error('New organization bootstrap target row is missing or destroyed');
+    }
+    return;
+  }
+
+  const currentRows = currentOrganizationSubscriptionRows(rows);
+  const liveCurrentRows = currentRows.filter(row => row.instance.destroyedAt === null);
+  if (liveCurrentRows.length > 1) {
+    throw new Error('Multiple current organization subscription rows found during bootstrap');
+  }
+
+  if (!liveCurrentRows.some(row => row.subscription.id === params.targetSubscription.id)) {
+    if (params.targetWasInserted) {
+      throw new Error('New organization bootstrap target row is not the current live row');
+    }
+    return;
+  }
+
+  const destroyedCurrentRows = currentRows.filter(row => row.instance.destroyedAt !== null);
+  if (destroyedCurrentRows.length === 0) {
+    return;
+  }
+
+  const orderedSubscriptions = [...rows.map(row => row.subscription)].sort(
+    compareSubscriptionsByCreatedAtAndId
+  );
+  if (orderedSubscriptions.at(-1)?.id !== params.targetSubscription.id) {
+    if (params.targetWasInserted) {
+      throw new Error('New organization bootstrap target row is not the newest org row');
+    }
+    return;
+  }
+
+  const updates = buildTransferUpdates(orderedSubscriptions);
+  if (updates.length === 0) {
+    return;
+  }
+
+  for (const update of updates) {
+    const [after] = await params.executor
+      .update(kiloclaw_subscriptions)
+      .set({
+        transferred_to_subscription_id: update.transferredToSubscriptionId,
+      })
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.id, update.before.id),
+          transferredToUnchangedWhere(update.before)
+        )
+      )
+      .returning();
+
+    if (!after) {
+      throw new Error(
+        `Failed to transfer organization bootstrap predecessor subscription ${update.before.id}`
+      );
+    }
+
+    await insertKiloClawSubscriptionChangeLog(params.executor, {
+      subscriptionId: after.id,
+      actor: params.actor,
+      action: 'reassigned',
+      reason: 'org_provision_transfer_destroyed_predecessor',
+      before: update.before,
+      after,
+    });
+  }
+}
+
 async function bootstrapOrganizationSubscription(params: BootstrapProvisionWithDbParams) {
   const { db, input } = params;
   if (!input.orgId) {
@@ -122,79 +291,97 @@ async function bootstrapOrganizationSubscription(params: BootstrapProvisionWithD
   const now = new Date();
   const orgId = input.orgId;
 
-  const [existing, organization] = await Promise.all([
-    db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.instance_id, input.instanceId))
+  return await db.transaction(async tx => {
+    const [targetInstance] = await tx
+      .select({
+        id: kiloclaw_instances.id,
+        destroyedAt: kiloclaw_instances.destroyed_at,
+      })
+      .from(kiloclaw_instances)
+      .where(
+        and(
+          eq(kiloclaw_instances.id, input.instanceId),
+          eq(kiloclaw_instances.user_id, input.userId),
+          eq(kiloclaw_instances.organization_id, orgId)
+        )
+      )
       .limit(1)
-      .then(rows => rows[0] ?? null),
-    db
+      .for('update');
+
+    if (!targetInstance) {
+      throw new Error('Organization instance not found during subscription bootstrap');
+    }
+    if (targetInstance.destroyedAt !== null) {
+      throw new Error('Cannot bootstrap organization subscription on destroyed instance');
+    }
+
+    const [organization] = await tx
       .select({
         createdAt: organizations.created_at,
         freeTrialEndAt: organizations.free_trial_end_at,
       })
       .from(organizations)
       .where(eq(organizations.id, orgId))
-      .limit(1)
-      .then(rows => rows[0] ?? null),
-  ]);
+      .limit(1);
 
-  if (existing) {
-    return existing;
-  }
-  if (!organization) {
-    throw new Error('Organization not found during subscription bootstrap');
-  }
+    if (!organization) {
+      throw new Error('Organization not found during subscription bootstrap');
+    }
 
-  const hasManagedActiveAccess = true;
+    const hasManagedActiveAccess = true;
+    const trialEndsAt =
+      organization.freeTrialEndAt ??
+      new Date(
+        new Date(organization.createdAt).getTime() +
+          ORGANIZATION_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
+      ).toISOString();
 
-  const trialEndsAt =
-    organization.freeTrialEndAt ??
-    new Date(
-      new Date(organization.createdAt).getTime() +
-        ORGANIZATION_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
-    ).toISOString();
+    const { row: created, created: wasInserted } = await insertSubscriptionIdempotent(
+      tx,
+      hasManagedActiveAccess
+        ? {
+            user_id: input.userId,
+            instance_id: input.instanceId,
+            plan: 'standard',
+            status: 'active',
+            payment_source: 'credits',
+            cancel_at_period_end: false,
+          }
+        : {
+            user_id: input.userId,
+            instance_id: input.instanceId,
+            plan: 'trial',
+            status: new Date(trialEndsAt).getTime() > now.getTime() ? 'trialing' : 'canceled',
+            access_origin: null,
+            payment_source: null,
+            cancel_at_period_end: false,
+            trial_started_at: organization.createdAt,
+            trial_ends_at: trialEndsAt,
+          }
+    );
 
-  const { row: created, created: wasInserted } = await insertSubscriptionIdempotent(
-    db,
-    hasManagedActiveAccess
-      ? {
-          user_id: input.userId,
-          instance_id: input.instanceId,
-          plan: 'standard',
-          status: 'active',
-          payment_source: 'credits',
-          cancel_at_period_end: false,
-        }
-      : {
-          user_id: input.userId,
-          instance_id: input.instanceId,
-          plan: 'trial',
-          status: new Date(trialEndsAt).getTime() > now.getTime() ? 'trialing' : 'canceled',
-          access_origin: null,
-          payment_source: null,
-          cancel_at_period_end: false,
-          trial_started_at: organization.createdAt,
-          trial_ends_at: trialEndsAt,
-        }
-  );
+    if (wasInserted) {
+      await insertKiloClawSubscriptionChangeLog(tx, {
+        subscriptionId: created.id,
+        actor: params.actor,
+        action: 'created',
+        reason: hasManagedActiveAccess ? 'org_provision_managed' : 'org_provision_trial',
+        before: null,
+        after: created,
+      });
+    }
 
-  if (!wasInserted) {
+    await transferDestroyedOrganizationPredecessors({
+      actor: params.actor,
+      executor: tx,
+      orgId,
+      targetSubscription: created,
+      targetWasInserted: wasInserted,
+      userId: input.userId,
+    });
+
     return created;
-  }
-
-  await writeBootstrapChangeLogBestEffort({
-    db,
-    actor: params.actor,
-    subscriptionId: created.id,
-    action: 'created',
-    reason: hasManagedActiveAccess ? 'org_provision_managed' : 'org_provision_trial',
-    after: created,
-    onError: params.onChangeLogError,
   });
-
-  return created;
 }
 
 function currentPersonalSubscriptions(

@@ -64,7 +64,7 @@ const BLOCKED_REASON = 'domainblocked';
 export async function POST(): Promise<
   NextResponse<BlockBlacklistedDomainsBackfillResponse | { error: string }>
 > {
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
   const domains = await getBlacklistedDomains();
@@ -97,7 +97,11 @@ export async function POST(): Promise<
     // another writer set it between the select and the update.
     const updated = await db
       .update(kilocode_users)
-      .set({ blocked_reason: BLOCKED_REASON })
+      .set({
+        blocked_reason: BLOCKED_REASON,
+        blocked_at: new Date().toISOString(),
+        blocked_by_kilo_user_id: user.id,
+      })
       .where(
         and(
           inArray(

@@ -82,9 +82,7 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
     );
   }
 
-  const isFetchingEmptyStatus = statusQuery.isFetching && statusQuery.data?.status === null;
-
-  if (!setupFailed && (statusQuery.isLoading || !hasSettledStatus || isFetchingEmptyStatus)) {
+  if (!setupFailed && (statusQuery.isLoading || !hasSettledStatus)) {
     return (
       <ClawOnboardingWithBoundary
         statusQuery={{ data: undefined, isLoading: true, error: null }}
@@ -101,6 +99,20 @@ function OrgClawNewLiveClient({ organizationId }: { organizationId: string }) {
   const settledStatus = hasSettledStatus ? statusQuery.data : undefined;
   const hasSettledInstance = settledStatus !== undefined && settledStatus.status !== null;
   const mode: ClawOnboardingMode = hasSettledInstance ? 'post-provisioning' : 'create-first';
+
+  if (mode === 'create-first') {
+    return (
+      <ClawOnboardingFlow
+        status={settledStatus}
+        mode={mode}
+        organizationId={organizationId}
+        createFlowStarted={createFlowStartedAt !== null}
+        setupFailed={setupFailed}
+        onCreateFlowStarted={onCreateFlowStarted}
+        onCreateFlowFailed={onCreateFlowFailed}
+      />
+    );
+  }
 
   return (
     <ClawOnboardingWithBoundary

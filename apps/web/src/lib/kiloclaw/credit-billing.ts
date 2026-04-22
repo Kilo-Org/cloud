@@ -49,6 +49,18 @@ const CREDIT_BILLING_ACTOR = {
   actorType: 'system',
   actorId: 'kiloclaw-credit-billing',
 } as const;
+const PAID_ACTIVATION_LIFECYCLE_CLEAR_SET = {
+  suspended_at: null,
+  destruction_deadline: null,
+  auto_resume_requested_at: null,
+  auto_resume_retry_after: null,
+  auto_resume_attempt_count: 0,
+} as const;
+const PAID_AUTO_RESUME_INITIAL_STATE = {
+  auto_resume_requested_at: null,
+  auto_resume_retry_after: null,
+  auto_resume_attempt_count: 0,
+} as const;
 
 type CreditSettlementPersonalRow = {
   subscription: typeof kiloclaw_subscriptions.$inferSelect;
@@ -575,6 +587,8 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       commit_ends_at: commitEndsAt,
       past_due_since: null,
       auto_top_up_triggered_for_period: null,
+      ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
+      ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
       ...(shouldClearSchedule
         ? { scheduled_plan: null, scheduled_by: null, stripe_schedule_id: null }
         : {}),
@@ -815,7 +829,8 @@ export async function enrollWithCredits(params: {
         cancel_at_period_end: false,
         trial_started_at: null,
         trial_ends_at: null,
-        // DO NOT clear suspended_at or destruction_deadline (spec rule 5d)
+        ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
+        ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
       })
       .onConflictDoUpdate({
         target: kiloclaw_subscriptions.instance_id,
@@ -831,6 +846,8 @@ export async function enrollWithCredits(params: {
           commit_ends_at: commitEndsAt,
           past_due_since: null,
           cancel_at_period_end: false,
+          ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
+          ...(wasSuspended ? PAID_AUTO_RESUME_INITIAL_STATE : {}),
         },
       })
       .returning();

@@ -177,11 +177,20 @@ describe('interrupted auto-resume sweep', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('requests async start and only records retry metadata on acceptance', async () => {
+  it('requests async start and records retry metadata on acceptance', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
     const { db, updates } = createMockDb([
-      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_attempt_count: 0 }],
+      [
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
+          auto_resume_attempt_count: 0,
+        },
+      ],
       [{ id: instanceId, sandbox_id: sandboxId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -218,11 +227,20 @@ describe('interrupted auto-resume sweep', () => {
     expect(updates[0]).not.toHaveProperty('destruction_deadline');
   });
 
-  it('keeps rows suspended when async resume request fails', async () => {
+  it('keeps retry metadata when async resume request fails', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
     const { db, updates } = createMockDb([
-      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_attempt_count: 1 }],
+      [
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
+          auto_resume_attempt_count: 1,
+        },
+      ],
       [{ id: instanceId, sandbox_id: sandboxId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -257,11 +275,20 @@ describe('interrupted auto-resume sweep', () => {
     expect(updates[0]).not.toHaveProperty('destruction_deadline');
   });
 
-  it('keeps 404 from async resume request on the normal failure path', async () => {
+  it('keeps retry metadata after 404 from async resume request', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
     const { db, updates } = createMockDb([
-      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_attempt_count: 0 }],
+      [
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
+          auto_resume_attempt_count: 0,
+        },
+      ],
       [{ id: instanceId, sandbox_id: sandboxId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -293,10 +320,19 @@ describe('interrupted auto-resume sweep', () => {
     );
   });
 
-  it('clears stale suspension state when no active instance remains', async () => {
+  it('clears stale resume state when no active instance remains', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const { db, updates, txUpdates, txDeletes } = createMockDb([
-      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_attempt_count: 1 }],
+      [
+        {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
+          auto_resume_attempt_count: 1,
+        },
+      ],
       [],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -335,6 +371,9 @@ describe('interrupted auto-resume sweep', () => {
           user_id: 'user-1',
           instance_id: null,
           organization_id: null,
+          suspended_at: null,
+          auto_resume_requested_at: '2026-04-21T10:00:00.000Z',
+          auto_resume_retry_after: '2026-04-21T12:00:00.000Z',
           auto_resume_attempt_count: 0,
         },
       ],
@@ -561,6 +600,51 @@ describe('instance destruction sweep', () => {
     );
   });
 
+  it('does not destroy active subscriptions even with stale expired destruction fields', async () => {
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    const { db, updates, txUpdates, inserts, deletes } = createMockDb([
+      [
+        {
+          id: 'sub-active',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          sandbox_id: 'ki_11111111111141118111111111111111',
+          organization_id: null,
+          status: 'active',
+          email: 'user-1@example.com',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'abababab-abab-4bab-8bab-abababababab',
+        sweep: 'instance_destruction',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(txUpdates).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping instance destruction for active subscription row',
+          reason: 'active_subscription',
+        }),
+      ])
+    );
+  });
+
   it('keeps DB/email cleanup unchanged when platform destroy succeeds', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const { db, updates, txUpdates, inserts, deletes } = createMockDb([
@@ -570,6 +654,7 @@ describe('instance destruction sweep', () => {
           user_id: 'user-1',
           instance_id: instanceId,
           sandbox_id: 'ki_11111111111141118111111111111111',
+          status: 'canceled',
           email: 'user-1@example.com',
         },
       ],
@@ -639,6 +724,7 @@ describe('instance destruction sweep', () => {
           user_id: 'user-1',
           instance_id: firstInstanceId,
           sandbox_id: 'ki_11111111111141118111111111111111',
+          status: 'canceled',
           email: 'user-1@example.com',
         },
         {
@@ -646,6 +732,7 @@ describe('instance destruction sweep', () => {
           user_id: 'user-2',
           instance_id: secondInstanceId,
           sandbox_id: 'ki_22222222222242228222222222222222',
+          status: 'canceled',
           email: 'user-2@example.com',
         },
       ],
@@ -748,6 +835,7 @@ describe('instance destruction sweep', () => {
           user_id: 'user-1',
           instance_id: instanceId,
           sandbox_id: 'ki_11111111111141118111111111111111',
+          status: 'canceled',
           email: 'user-1@example.com',
         },
       ],
@@ -827,6 +915,7 @@ describe('instance destruction sweep', () => {
           user_id: 'user-1',
           instance_id: '11111111-1111-4111-8111-111111111111',
           sandbox_id: null,
+          status: 'canceled',
           email: 'user-1@example.com',
         },
       ],

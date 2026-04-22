@@ -19,6 +19,7 @@ import { WorkingIndicator } from './WorkingIndicator';
 import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
 import { PermissionCard, PermissionContextProvider } from './PermissionCard';
+import { SuggestionContextProvider } from './SuggestionCard';
 import { SessionContinuationPanel } from './SessionContinuationPanel';
 import { isMessageStreaming } from './types';
 import { useOrganizationModels } from './hooks/useOrganizationModels';
@@ -126,6 +127,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
+  const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const failedPrompt = useAtomValue(manager.atoms.failedPrompt);
   const staticMessages = useAtomValue(manager.atoms.staticMessages);
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
@@ -258,6 +260,16 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     [manager]
   );
 
+  const handleAcceptSuggestion = useCallback(
+    (requestId: string, index: number) => manager.acceptSuggestion(requestId, index),
+    [manager]
+  );
+
+  const handleDismissSuggestion = useCallback(
+    (requestId: string) => manager.dismissSuggestion(requestId),
+    [manager]
+  );
+
   const handleModeChange = useCallback(
     (mode: AgentMode) => {
       if (sessionConfig) setSessionConfig({ ...sessionConfig, mode });
@@ -341,136 +353,146 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
         organizationId={organizationId ?? null}
         respondToPermission={handleRespondToPermission}
       >
-        <div className="flex h-full w-full flex-col overflow-hidden">
-          <SetPageTitle
-            title={fetchedSessionData?.title || sessionConfig?.repository || 'Cloud Agent'}
-          >
-            {totalCost > 0 && (
-              <span className="text-muted-foreground text-sm">${totalCost.toFixed(4)}</span>
-            )}
-          </SetPageTitle>
-          {showChatInterface ? (
-            <>
-              {showLoadingIndicator && <div className="bg-primary h-0.5 w-full animate-pulse" />}
+        <SuggestionContextProvider
+          acceptSuggestion={handleAcceptSuggestion}
+          dismissSuggestion={handleDismissSuggestion}
+        >
+          <div className="flex h-full w-full flex-col overflow-hidden">
+            <SetPageTitle
+              title={fetchedSessionData?.title || sessionConfig?.repository || 'Cloud Agent'}
+            >
+              {totalCost > 0 && (
+                <span className="text-muted-foreground text-sm">${totalCost.toFixed(4)}</span>
+              )}
+            </SetPageTitle>
+            {showChatInterface ? (
+              <>
+                {showLoadingIndicator && <div className="bg-primary h-0.5 w-full animate-pulse" />}
 
-              <div className="flex shrink-0 items-center justify-between border-b px-3 py-2 lg:hidden">
-                <MobileSidebarToggle variant="inline" label="Sessions" />
-                {sessionActions}
-              </div>
-
-              <div className="relative min-h-0 flex-1">
-                <div className="absolute right-3 top-2 z-10 hidden lg:block">{sessionActions}</div>
-
-                <div
-                  ref={scrollContainerRef}
-                  className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 lg:pt-12 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
-                  onScroll={handleScroll}
-                >
-                  <StaticMessages messages={staticMessages} getChildMessages={getChildMessages} />
-                  <DynamicMessages messages={dynamicMessages} getChildMessages={getChildMessages} />
-
-                  <WorkingIndicator messages={dynamicMessages} isStreaming={isStreaming} />
-                  {statusIndicator && <SessionStatusIndicator indicator={statusIndicator} />}
-
-                  <div ref={messagesEndRef} />
+                <div className="flex shrink-0 items-center justify-between border-b px-3 py-2 lg:hidden">
+                  <MobileSidebarToggle variant="inline" label="Sessions" />
+                  {sessionActions}
                 </div>
 
-                {showScrollButton && (
-                  <button
-                    type="button"
-                    onClick={scrollToBottom}
-                    className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
-                  >
-                    <ArrowDown className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+                <div className="relative min-h-0 flex-1">
+                  <div className="absolute right-3 top-2 z-10 hidden lg:block">
+                    {sessionActions}
+                  </div>
 
-              {isReadOnly ? (
-                !isLoading && sessionIdFromParams && fetchedSessionData ? (
-                  <SessionContinuationPanel sessionId={sessionIdFromParams} />
-                ) : null
-              ) : (
-                <>
-                  {activeQuestion && (
-                    <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
-                      <QuestionToolCard
-                        key={activeQuestion.requestId}
-                        questions={activeQuestion.questions}
-                        requestId={activeQuestion.requestId}
-                        status="running"
-                      />
-                    </div>
-                  )}
-                  {activePermission && (
-                    <div className="flex items-center border-t p-4">
-                      <PermissionCard
-                        key={activePermission.requestId}
-                        requestId={activePermission.requestId}
-                        permission={activePermission.permission}
-                        patterns={activePermission.patterns}
-                        metadata={activePermission.metadata}
-                        always={activePermission.always}
-                      />
-                    </div>
-                  )}
-                  <div className={activeQuestion || activePermission ? 'hidden' : ''}>
-                    <ChatInput
-                      onSend={handleSendMessage}
-                      onStop={handleStopExecution}
-                      disabled={isStreaming || !canSend}
-                      isStreaming={isStreaming}
-                      placeholder={placeholder}
-                      slashCommands={availableCommands}
-                      mode={sessionConfig?.mode as AgentMode | undefined}
-                      model={sessionConfig?.model}
-                      modelOptions={modelOptions}
-                      isLoadingModels={isLoadingModels}
-                      onModeChange={handleModeChange}
-                      onModelChange={handleModelChange}
-                      variant={sessionConfig?.variant ?? undefined}
-                      onVariantChange={handleVariantChange}
-                      availableVariants={availableVariants}
-                      showToolbar={Boolean(sessionIdFromParams)}
-                      initialValue={failedPrompt ?? undefined}
-                      imageUploadOptions={{
-                        messageUuid: imageMessageUuid,
-                        organizationId,
-                        maxImages: CLOUD_AGENT_IMAGE_MAX_COUNT,
-                        maxOriginalFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
-                        maxFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
-                        allowedTypes: CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-                        resizeImages: { maxDimensionPx: CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX },
-                        getUploadUrl: {
-                          personal: personalUploadUrl,
-                          organization: orgUploadUrl,
-                        },
-                      }}
+                  <div
+                    ref={scrollContainerRef}
+                    className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 lg:pt-12 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                    onScroll={handleScroll}
+                  >
+                    <StaticMessages messages={staticMessages} getChildMessages={getChildMessages} />
+                    <DynamicMessages
+                      messages={dynamicMessages}
+                      getChildMessages={getChildMessages}
                     />
-                    {sessionConfig?.repository && (
-                      <div className="text-muted-foreground flex items-center gap-1.5 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
-                        <GitBranch className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{sessionConfig.repository}</span>
-                        {fetchedSessionData?.gitBranch && (
-                          <>
-                            <span>·</span>
-                            <span className="truncate">{fetchedSessionData.gitBranch}</span>
-                          </>
-                        )}
+
+                    <WorkingIndicator messages={dynamicMessages} isStreaming={isStreaming} />
+                    {statusIndicator && <SessionStatusIndicator indicator={statusIndicator} />}
+
+                    <div ref={messagesEndRef} />
+                  </div>
+
+                  {showScrollButton && (
+                    <button
+                      type="button"
+                      onClick={scrollToBottom}
+                      className="border-border bg-background absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border p-2 shadow-md"
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                {isReadOnly ? (
+                  !isLoading && sessionIdFromParams && fetchedSessionData ? (
+                    <SessionContinuationPanel sessionId={sessionIdFromParams} />
+                  ) : null
+                ) : (
+                  <>
+                    {activeQuestion && (
+                      <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
+                        <QuestionToolCard
+                          key={activeQuestion.requestId}
+                          questions={activeQuestion.questions}
+                          requestId={activeQuestion.requestId}
+                          status="running"
+                        />
                       </div>
                     )}
-                  </div>
-                </>
-              )}
-            </>
-          ) : (
-            <div className="text-muted-foreground relative flex h-full flex-col items-center justify-center gap-2">
-              <MobileSidebarToggle />
-              <p className="text-sm">No active session</p>
-              <p className="text-xs">Select a session from the sidebar or create a new one</p>
-            </div>
-          )}
-        </div>
+                    {activePermission && (
+                      <div className="flex items-center border-t p-4">
+                        <PermissionCard
+                          key={activePermission.requestId}
+                          requestId={activePermission.requestId}
+                          permission={activePermission.permission}
+                          patterns={activePermission.patterns}
+                          metadata={activePermission.metadata}
+                          always={activePermission.always}
+                        />
+                      </div>
+                    )}
+                    <div className={activeQuestion || activePermission ? 'hidden' : ''}>
+                      <ChatInput
+                        onSend={handleSendMessage}
+                        onStop={handleStopExecution}
+                        disabled={(isStreaming && !activeSuggestion) || !canSend}
+                        isStreaming={isStreaming && !activeSuggestion}
+                        placeholder={placeholder}
+                        slashCommands={availableCommands}
+                        mode={sessionConfig?.mode as AgentMode | undefined}
+                        model={sessionConfig?.model}
+                        modelOptions={modelOptions}
+                        isLoadingModels={isLoadingModels}
+                        onModeChange={handleModeChange}
+                        onModelChange={handleModelChange}
+                        variant={sessionConfig?.variant ?? undefined}
+                        onVariantChange={handleVariantChange}
+                        availableVariants={availableVariants}
+                        showToolbar={Boolean(sessionIdFromParams)}
+                        initialValue={failedPrompt ?? undefined}
+                        imageUploadOptions={{
+                          messageUuid: imageMessageUuid,
+                          organizationId,
+                          maxImages: CLOUD_AGENT_IMAGE_MAX_COUNT,
+                          maxOriginalFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
+                          maxFileSizeBytes: CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
+                          allowedTypes: CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
+                          resizeImages: { maxDimensionPx: CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX },
+                          getUploadUrl: {
+                            personal: personalUploadUrl,
+                            organization: orgUploadUrl,
+                          },
+                        }}
+                      />
+                      {sessionConfig?.repository && (
+                        <div className="text-muted-foreground flex items-center gap-1.5 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
+                          <GitBranch className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{sessionConfig.repository}</span>
+                          {fetchedSessionData?.gitBranch && (
+                            <>
+                              <span>·</span>
+                              <span className="truncate">{fetchedSessionData.gitBranch}</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="text-muted-foreground relative flex h-full flex-col items-center justify-center gap-2">
+                <MobileSidebarToggle />
+                <p className="text-sm">No active session</p>
+                <p className="text-xs">Select a session from the sidebar or create a new one</p>
+              </div>
+            )}
+          </div>
+        </SuggestionContextProvider>
       </PermissionContextProvider>
     </QuestionContextProvider>
   );

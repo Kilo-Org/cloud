@@ -6,7 +6,9 @@ import type { PopulatedClawStatus } from './ClawOnboardingFlow.state';
 import {
   CLAW_ONBOARDING_FAKE_STEPS,
   type ClawOnboardingRenderStep,
+  getClawOnboardingStepProgress,
   isPairingChannel,
+  type OnboardingStep,
   type PairingChannelId,
 } from './ClawOnboardingFlow.state';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -18,12 +20,10 @@ import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { ClawSetupCompleteStep, ClawSetupErrorStep } from './ClawOnboardingFlow';
-import { CreateInstanceCardView } from './CreateInstanceCard';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStepView } from './ProvisioningStep';
 
 const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
-  'create-instance': 'Create',
   identity: 'Identity',
   permissions: 'Permissions',
   channels: 'Channels',
@@ -94,7 +94,8 @@ export function ClawOnboardingFakeWalkthrough({
   const pairingChannelId: PairingChannelId = isPairingChannel(selectedChannelId)
     ? selectedChannelId
     : 'telegram';
-  const totalSteps = isPairingChannel(selectedChannelId) ? 6 : 5;
+  const hasPairingStep = isPairingChannel(selectedChannelId);
+  const stepProgress = getFakeStepProgress(step, hasPairingStep);
 
   return (
     <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -123,7 +124,7 @@ export function ClawOnboardingFakeWalkthrough({
         selectedChannelId,
         setSelectedChannelId,
         pairingChannelId,
-        totalSteps,
+        stepProgress,
         basePath,
       })}
     </div>
@@ -164,15 +165,38 @@ function FakeWalkthroughControls({ currentStep, onStepChange }: FakeWalkthroughC
   );
 }
 
+type StepProgress = ReturnType<typeof getClawOnboardingStepProgress>;
+
 type RenderFakeStepInput = {
   step: ClawOnboardingRenderStep;
   setStep: (step: ClawOnboardingRenderStep) => void;
   selectedChannelId: string | null;
   setSelectedChannelId: (channelId: string | null) => void;
   pairingChannelId: PairingChannelId;
-  totalSteps: number;
+  stepProgress: StepProgress;
   basePath: string;
 };
+
+function getFakeStepProgress(
+  step: ClawOnboardingRenderStep,
+  hasPairingStep: boolean
+): StepProgress {
+  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), hasPairingStep);
+}
+
+function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
+  switch (step) {
+    case 'identity':
+    case 'permissions':
+    case 'channels':
+    case 'provisioning':
+    case 'pairing':
+      return step;
+    case 'complete':
+    case 'error':
+      return 'done';
+  }
+}
 
 function renderFakeStep({
   step,
@@ -180,19 +204,26 @@ function renderFakeStep({
   selectedChannelId,
   setSelectedChannelId,
   pairingChannelId,
-  totalSteps,
+  stepProgress,
   basePath,
 }: RenderFakeStepInput) {
   switch (step) {
-    case 'create-instance':
-      return <CreateInstanceCardView onCreate={() => setStep('identity')} />;
-    case 'identity':
-      return <BotIdentityStep instanceRunning={false} onContinue={() => setStep('permissions')} />;
-    case 'permissions':
-      return <PermissionStep instanceRunning={false} onSelect={() => setStep('channels')} />;
-    case 'channels':
+    case 'identity': {
+      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('permissions')} />;
+    }
+    case 'permissions': {
+      return (
+        <PermissionStep
+          {...stepProgress}
+          instanceRunning={false}
+          onSelect={() => setStep('channels')}
+        />
+      );
+    }
+    case 'channels': {
       return (
         <ChannelSelectionStepView
+          {...stepProgress}
           instanceRunning={false}
           defaultSelected={isPairingChannel(selectedChannelId) ? selectedChannelId : null}
           onSelect={channelId => {
@@ -205,10 +236,11 @@ function renderFakeStep({
           }}
         />
       );
-    case 'provisioning':
+    }
+    case 'provisioning': {
       return (
         <div className="flex flex-col gap-4">
-          <ProvisioningStepView totalSteps={totalSteps} />
+          <ProvisioningStepView {...stepProgress} />
           <Card>
             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-muted-foreground text-sm">
@@ -232,9 +264,11 @@ function renderFakeStep({
           </Card>
         </div>
       );
-    case 'pairing':
+    }
+    case 'pairing': {
       return (
         <ChannelPairingStepView
+          {...stepProgress}
           channelId={pairingChannelId}
           matchingRequest={{
             channel: pairingChannelId,
@@ -245,6 +279,7 @@ function renderFakeStep({
           onSkip={() => setStep('complete')}
         />
       );
+    }
     case 'complete':
       return <ClawSetupCompleteStep status={fakeStatus} gatewayReady basePath={basePath} />;
     case 'error':

@@ -16,12 +16,13 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   modeSchema,
   BALANCED_CLAW_SETUP_MODEL,
-  BALANCED_CLAW_MODEL,
+  BALANCED_QWEN_MODEL,
   BALANCED_CODEX_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
   KILO_AUTO_LEGACY_MODEL,
+  BALANCED_HAIKU_MODEL,
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
@@ -68,18 +69,23 @@ export async function resolveAutoModel(
   }
   const mode = resolveMode(modeHeader, featureHeader);
   if (model === KILO_AUTO_BALANCED_MODEL.id || model === KILO_AUTO_LEGACY_MODEL) {
-    if (mode === 'claw') {
-      if (featureHeader === 'kiloclaw') {
-        const user = await userPromise;
-        if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
-          return BALANCED_CLAW_SETUP_MODEL;
-        }
-      }
-      if (apiKind !== 'messages') {
-        return BALANCED_CLAW_MODEL;
+    if (mode === 'claw' && featureHeader === 'kiloclaw') {
+      const user = await userPromise;
+      if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
+        return BALANCED_CLAW_SETUP_MODEL;
       }
     }
-    return BALANCED_CODEX_MODEL;
+
+    // Alibaba doesn't expose a messages endpoint
+    // and does not support prompt caching on the responses endpoint
+    // so we use a fallback in those cases.
+    if (apiKind === 'responses') {
+      return BALANCED_CODEX_MODEL;
+    } else if (apiKind === 'messages') {
+      return BALANCED_HAIKU_MODEL;
+    } else {
+      return BALANCED_QWEN_MODEL;
+    }
   }
   return (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL;
 }

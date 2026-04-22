@@ -26,7 +26,11 @@ export async function run() {
     outputFile.write(`blocking: ${email}\n`);
     const result = await db
       .update(kilocode_users)
-      .set({ blocked_reason: 'stytch-attacker-list' })
+      .set({
+        blocked_reason: 'stytch-attacker-list',
+        blocked_at: new Date().toISOString(),
+        blocked_by_kilo_user_id: null,
+      })
       .where(
         and(eq(kilocode_users.google_user_email, email), isNull(kilocode_users.blocked_reason))
       )

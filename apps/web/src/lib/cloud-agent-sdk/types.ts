@@ -94,6 +94,20 @@ export type PermissionState = {
   always: string[];
 };
 
+export type SuggestionAction = {
+  label: string;
+  description?: string;
+  prompt: string;
+};
+
+export type SuggestionState = {
+  requestId: string;
+  text: string;
+  actions: SuggestionAction[];
+  /** Tool call ID that emitted this suggestion, when available. */
+  callId?: string;
+};
+
 /** Full service state — all non-chat state in one place. */
 export type ServiceStateSnapshot = {
   activity: SessionActivity;
@@ -102,6 +116,7 @@ export type ServiceStateSnapshot = {
   sessionInfo: SessionInfo | null;
   question: QuestionState | null;
   permission: PermissionState | null;
+  suggestion: SuggestionState | null;
 };
 
 // ---------------------------------------------------------------------------

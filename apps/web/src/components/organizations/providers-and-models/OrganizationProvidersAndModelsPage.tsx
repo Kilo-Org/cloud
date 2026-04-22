@@ -50,10 +50,7 @@ function EnterpriseOnlyMessage() {
 // NOTE: pricing formatting is shared with the model selector UI.
 
 function formatPriceCompact(raw: string): string {
-  return formatPrice(raw)
-    .replace('/1M tokens', '/1M')
-    .replace('/1K tokens', '/1K')
-    .replace('/token', '');
+  return formatPrice(raw).replace('/1M tokens', '/1M');
 }
 
 function normalizeProviderIconUrl(rawUrl: string): string {

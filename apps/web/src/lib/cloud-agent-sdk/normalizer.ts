@@ -4,7 +4,7 @@
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
 import type { Part, SessionStatus, QuestionInfo, Message } from '@/types/opencode.gen';
-import type { SessionInfo, CloudStatus } from './types';
+import type { SessionInfo, CloudStatus, SuggestionAction } from './types';
 import {
   cloudAgentEventSchema,
   kilocodePayloadSchema,
@@ -23,6 +23,9 @@ import {
   questionRejectedDataSchema,
   permissionAskedDataSchema,
   permissionRepliedDataSchema,
+  suggestionShownDataSchema,
+  suggestionAcceptedDataSchema,
+  suggestionDismissedDataSchema,
   completeDataSchema,
   errorDataSchema,
   preparingDataSchema,
@@ -76,6 +79,16 @@ export type ServiceEvent =
       always: string[];
     }
   | { type: 'permission.replied'; requestId: string }
+  | {
+      type: 'suggestion.shown';
+      requestId: string;
+      text: string;
+      actions: SuggestionAction[];
+      /** Tool call ID that emitted this suggestion, when available. */
+      callId?: string;
+    }
+  | { type: 'suggestion.accepted'; requestId: string; index: number; action?: SuggestionAction }
+  | { type: 'suggestion.dismissed'; requestId: string }
   | {
       type: 'stopped';
       reason: 'complete' | 'interrupted' | 'disconnected' | 'error';
@@ -266,6 +279,35 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       const r = permissionRepliedDataSchema.safeParse(data);
       if (!r.success) return null;
       return { type: 'permission.replied', requestId: r.data.requestID };
+    }
+
+    case 'suggestion.shown': {
+      const r = suggestionShownDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'suggestion.shown',
+        requestId: r.data.id,
+        text: r.data.text,
+        actions: r.data.actions,
+        callId: r.data.tool?.callID,
+      };
+    }
+
+    case 'suggestion.accepted': {
+      const r = suggestionAcceptedDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'suggestion.accepted',
+        requestId: r.data.requestID,
+        index: r.data.index,
+        action: r.data.action,
+      };
+    }
+
+    case 'suggestion.dismissed': {
+      const r = suggestionDismissedDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return { type: 'suggestion.dismissed', requestId: r.data.requestID };
     }
 
     case 'complete': {

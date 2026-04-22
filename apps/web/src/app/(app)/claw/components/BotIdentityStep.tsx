@@ -68,10 +68,12 @@ export type BotIdentityStepResult = {
 };
 
 export function BotIdentityStep({
-  instanceRunning,
+  currentStep,
+  totalSteps,
   onContinue,
 }: {
-  instanceRunning: boolean;
+  currentStep: number;
+  totalSteps: number;
   onContinue: (result: BotIdentityStepResult) => void;
 }) {
   const [botName, setBotName] = useState('');
@@ -139,11 +141,10 @@ export function BotIdentityStep({
 
   return (
     <OnboardingStepView
-      currentStep={1}
-      totalSteps={4}
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       title="Give your bot an identity"
       description="Make it yours. You can always change this later."
-      showProvisioningBanner={!instanceRunning}
       contentClassName="gap-6"
     >
       <div className="grid gap-6 md:grid-cols-[1fr_2fr] md:gap-8">

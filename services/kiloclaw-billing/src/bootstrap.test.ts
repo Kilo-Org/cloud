@@ -20,7 +20,9 @@ import type { BillingWorkerEnv } from './types.js';
 
 type SelectBuilder<T> = PromiseLike<T[]> & {
   from: ReturnType<typeof vi.fn>;
+  innerJoin: ReturnType<typeof vi.fn>;
   where: ReturnType<typeof vi.fn>;
+  orderBy: ReturnType<typeof vi.fn>;
   limit: ReturnType<typeof vi.fn>;
   for: ReturnType<typeof vi.fn>;
   then: Promise<T[]>['then'];
@@ -30,13 +32,17 @@ function createSelectBuilder<T>(rows: T[]): SelectBuilder<T> {
   const promise = Promise.resolve(rows);
   const builder = {
     from: vi.fn(),
+    innerJoin: vi.fn(),
     where: vi.fn(),
+    orderBy: vi.fn(),
     limit: vi.fn(),
     for: vi.fn(async () => rows),
     then: promise.then.bind(promise),
   } as SelectBuilder<T>;
   builder.from.mockReturnValue(builder);
+  builder.innerJoin.mockReturnValue(builder);
   builder.where.mockReturnValue(builder);
+  builder.orderBy.mockReturnValue(builder);
   builder.limit.mockReturnValue(builder);
   return builder;
 }
@@ -64,6 +70,9 @@ function createMockDb(params: {
             insertValues.push(values);
             return {
               returning: vi.fn(async () => insertQueue.shift() ?? []),
+              onConflictDoNothing: vi.fn(() => ({
+                returning: vi.fn(async () => insertQueue.shift() ?? []),
+              })),
             };
           }),
         })),
@@ -608,6 +617,7 @@ describe('bootstrapProvisionSubscription successor transfer', () => {
 
 type FreshInsertDbParams = {
   selectRows: unknown[][];
+  txSelectRows?: unknown[][];
   insertFirstReturningRows: unknown[];
   reselectAfterConflictRows: unknown[];
 };
@@ -616,18 +626,23 @@ function createFreshInsertSelectBuilder<T>(rows: T[]) {
   const promise = Promise.resolve(rows);
   const builder: {
     from: ReturnType<typeof vi.fn>;
+    innerJoin: ReturnType<typeof vi.fn>;
     where: ReturnType<typeof vi.fn>;
     orderBy: ReturnType<typeof vi.fn>;
     limit: ReturnType<typeof vi.fn>;
+    for: ReturnType<typeof vi.fn>;
     then: Promise<T[]>['then'];
   } = {
     from: vi.fn(),
+    innerJoin: vi.fn(),
     where: vi.fn(),
     orderBy: vi.fn(),
     limit: vi.fn(),
+    for: vi.fn(async () => rows),
     then: promise.then.bind(promise),
   };
   builder.from.mockReturnValue(builder);
+  builder.innerJoin.mockReturnValue(builder);
   builder.where.mockReturnValue(builder);
   builder.orderBy.mockReturnValue(builder);
   builder.limit.mockReturnValue(builder);
@@ -636,31 +651,42 @@ function createFreshInsertSelectBuilder<T>(rows: T[]) {
 
 function createFreshInsertDb(params: FreshInsertDbParams) {
   const selectQueue = [...params.selectRows];
+  const txSelectQueue = [...(params.txSelectRows ?? [])];
   const insertValues: Array<Record<string, unknown>> = [];
   const onConflictCalls: Array<unknown> = [];
   let firstInsert = true;
 
+  const createInsertBuilder = () => ({
+    values: vi.fn((values: Record<string, unknown>) => {
+      insertValues.push(values);
+      return {
+        onConflictDoNothing: vi.fn((target: unknown) => {
+          onConflictCalls.push(target);
+          return {
+            returning: vi.fn(async () => {
+              if (firstInsert) {
+                firstInsert = false;
+                return params.insertFirstReturningRows;
+              }
+              return [];
+            }),
+          };
+        }),
+      };
+    }),
+  });
+
   const db = {
     select: vi.fn(() => createFreshInsertSelectBuilder(selectQueue.shift() ?? [])),
-    insert: vi.fn(() => ({
-      values: vi.fn((values: Record<string, unknown>) => {
-        insertValues.push(values);
-        return {
-          onConflictDoNothing: vi.fn((target: unknown) => {
-            onConflictCalls.push(target);
-            return {
-              returning: vi.fn(async () => {
-                if (firstInsert) {
-                  firstInsert = false;
-                  return params.insertFirstReturningRows;
-                }
-                return [];
-              }),
-            };
-          }),
-        };
-      }),
-    })),
+    insert: vi.fn(() => createInsertBuilder()),
+    transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        select: vi.fn(() => createFreshInsertSelectBuilder(txSelectQueue.shift() ?? [])),
+        insert: vi.fn(() => createInsertBuilder()),
+      };
+
+      return await callback(tx);
+    }),
   };
 
   return { db, insertValues, onConflictCalls };
@@ -767,15 +793,22 @@ describe('bootstrapProvisionSubscription concurrent insert race', () => {
       updated_at: '2026-04-16T00:00:00.000Z',
     };
     const { db, insertValues, onConflictCalls } = createFreshInsertDb({
-      selectRows: [
-        [], // existing subscription for instance (none yet — TOCTOU window)
+      selectRows: [],
+      txSelectRows: [
+        [{ id: 'instance-new', destroyedAt: null }],
         [
           {
             createdAt: '2026-04-01T00:00:00.000Z',
             freeTrialEndAt: null,
           },
-        ], // organization row
-        [winnerRow], // reselect after conflict
+        ],
+        [winnerRow],
+        [
+          {
+            subscription: winnerRow,
+            instance: { id: 'instance-new', destroyedAt: null },
+          },
+        ],
       ],
       insertFirstReturningRows: [], // onConflictDoNothing swallowed our insert
       reselectAfterConflictRows: [winnerRow],

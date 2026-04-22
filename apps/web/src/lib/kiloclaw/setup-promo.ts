@@ -6,7 +6,7 @@ export async function userIsWithinFirstKiloClawInstanceWindow(params: {
   userId: string;
   maxAgeHours?: number;
 }): Promise<boolean> {
-  const maxAgeHours = params.maxAgeHours ?? 6;
+  const maxAgeHours = params.maxAgeHours ?? 2;
   const [row] = await readDb
     .select({
       eligible: sql<boolean>`

@@ -1,7 +1,5 @@
 import { Chat, emoji, type ActionEvent, type Message, type Thread } from 'chat';
 import { createSlackAdapter } from '@chat-adapter/slack';
-import { createRedisState } from '@chat-adapter/state-redis';
-import { createMemoryState } from '@chat-adapter/state-memory';
 import { captureException } from '@sentry/nextjs';
 import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
 import { getPlatformIdentity, getPlatformIntegration } from '@/lib/bot/platform-helpers';
@@ -9,6 +7,7 @@ import { LINK_ACCOUNT_ACTION_PREFIX, promptLinkAccount } from '@/lib/bot/link-ac
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { findUserById } from '@/lib/user';
 import { processMessage } from '@/lib/bot/run';
+import { createChatState } from '@/lib/bot/state';
 
 const slackAdapter = createSlackAdapter({
   clientId: process.env.SLACK_NEXT_CLIENT_ID,
@@ -22,7 +21,7 @@ export const bot = new Chat({
   adapters: {
     slack: slackAdapter,
   },
-  state: process.env.REDIS_URL ? createRedisState() : createMemoryState(),
+  state: createChatState(),
 });
 
 bot.onNewMention(async function handleIncomingMessage(

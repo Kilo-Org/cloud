@@ -38,6 +38,7 @@ type AnyMock = jest.Mock<(...args: any[]) => any>;
 
 type KiloclawInternalClientMockShape = {
   __provisionMock: AnyMock;
+  __startAsyncMock: AnyMock;
 };
 
 jest.setTimeout(15_000);
@@ -102,9 +103,11 @@ jest.mock('next/server', () => {
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const fn = jest.fn as (...args: unknown[]) => AnyMock;
   const provisionMock = fn().mockResolvedValue({});
+  const startAsyncMock = fn().mockResolvedValue(undefined);
   return {
     KiloClawInternalClient: fn().mockImplementation(() => ({
       start: fn().mockResolvedValue(undefined),
+      startAsync: startAsyncMock,
       stop: fn().mockResolvedValue(undefined),
       provision: provisionMock,
       getStatus: fn().mockResolvedValue({}),
@@ -119,6 +122,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
       }
     },
     __provisionMock: provisionMock,
+    __startAsyncMock: startAsyncMock,
   };
 });
 
@@ -195,6 +199,8 @@ beforeEach(async () => {
   stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
   kiloclawInternalClientMock.__provisionMock.mockReset();
   kiloclawInternalClientMock.__provisionMock.mockResolvedValue(defaultProvisionResult);
+  kiloclawInternalClientMock.__startAsyncMock.mockReset();
+  kiloclawInternalClientMock.__startAsyncMock.mockResolvedValue(undefined);
   posthogCaptureMock.mockReset();
 
   // Default mock returns for live-fetch calls
@@ -4659,6 +4665,146 @@ describe('cancelPlanSwitch', () => {
   });
 });
 
+// ── Stripe-Funded Credit Settlement ─────────────────────────────────────────
+
+describe('applyStripeFundedKiloClawPeriod', () => {
+  async function giveUserCredits(userId: string, microdollars: number) {
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: microdollars })
+      .where(eq(kilocode_users.id, userId));
+  }
+
+  it('clears destruction fields and records resume retry state when settlement activates a suspended trial', async () => {
+    await giveUserCredits(user.id, 1_000_000);
+    const instance = await createKiloclawInstance(user.id);
+    const now = new Date();
+    const suspendedAt = new Date(now.getTime() - 10 * 86_400_000).toISOString();
+    const deadline = new Date(now.getTime() - 3 * 86_400_000).toISOString();
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      stripe_subscription_id: 'sub_settlement_resume',
+      payment_source: 'stripe',
+      plan: 'trial',
+      status: 'canceled',
+      trial_started_at: new Date(now.getTime() - 17 * 86_400_000).toISOString(),
+      trial_ends_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
+      suspended_at: suspendedAt,
+      destruction_deadline: deadline,
+      auto_resume_requested_at: new Date(now.getTime() - 2 * 86_400_000).toISOString(),
+      auto_resume_retry_after: new Date(now.getTime() - 1 * 86_400_000).toISOString(),
+      auto_resume_attempt_count: 3,
+    });
+
+    const { applyStripeFundedKiloClawPeriod } = await import('@/lib/kiloclaw/credit-billing');
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId: 'sub_settlement_resume',
+      stripePaymentId: 'ch_settlement_resume',
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: '2026-04-16T09:40:37.000Z',
+      periodEnd: '2026-05-16T09:40:37.000Z',
+    });
+
+    expect(applied).toBe(true);
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(subscription).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        payment_source: 'credits',
+        stripe_subscription_id: 'sub_settlement_resume',
+        plan: 'standard',
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_attempt_count: 1,
+      })
+    );
+    expect(subscription.auto_resume_requested_at).toEqual(expect.any(String));
+    expect(subscription.auto_resume_retry_after).toEqual(expect.any(String));
+    expect(kiloclawInternalClientMock.__startAsyncMock).toHaveBeenCalledTimes(1);
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+    expect(logs[0]?.after_state).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: null,
+        auto_resume_retry_after: null,
+        auto_resume_attempt_count: 0,
+      })
+    );
+  });
+
+  it('keeps settlement subscription retryable when auto-resume request fails', async () => {
+    kiloclawInternalClientMock.__startAsyncMock.mockRejectedValueOnce(new Error('start failed'));
+    await giveUserCredits(user.id, 1_000_000);
+    const instance = await createKiloclawInstance(user.id);
+    const now = new Date();
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      stripe_subscription_id: 'sub_settlement_resume_failed',
+      payment_source: 'stripe',
+      plan: 'trial',
+      status: 'canceled',
+      trial_started_at: new Date(now.getTime() - 17 * 86_400_000).toISOString(),
+      trial_ends_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
+      suspended_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
+      destruction_deadline: new Date(now.getTime() - 3 * 86_400_000).toISOString(),
+      auto_resume_requested_at: new Date(now.getTime() - 2 * 86_400_000).toISOString(),
+      auto_resume_retry_after: new Date(now.getTime() - 1 * 86_400_000).toISOString(),
+      auto_resume_attempt_count: 3,
+    });
+
+    const { applyStripeFundedKiloClawPeriod } = await import('@/lib/kiloclaw/credit-billing');
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId: 'sub_settlement_resume_failed',
+      stripePaymentId: 'ch_settlement_resume_failed',
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: '2026-04-16T09:40:37.000Z',
+      periodEnd: '2026-05-16T09:40:37.000Z',
+    });
+
+    expect(applied).toBe(true);
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(subscription).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        payment_source: 'credits',
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_attempt_count: 1,
+      })
+    );
+    expect(subscription.auto_resume_requested_at).toEqual(expect.any(String));
+    expect(subscription.auto_resume_retry_after).toEqual(expect.any(String));
+  });
+});
+
 // ── Credit Enrollment ──────────────────────────────────────────────────────
 
 describe('enrollWithCredits', () => {
@@ -4692,6 +4838,109 @@ describe('enrollWithCredits', () => {
     });
     return instance;
   }
+
+  it('clears destruction fields and records resume retry state when credit enrollment activates a suspended trial', async () => {
+    const instance = await createInstance(user.id);
+    await giveUserCredits(user.id, 50_000_000);
+    const now = new Date();
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'canceled',
+      trial_started_at: new Date(now.getTime() - 17 * 86_400_000).toISOString(),
+      trial_ends_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
+      suspended_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
+      destruction_deadline: new Date(now.getTime() - 3 * 86_400_000).toISOString(),
+      auto_resume_requested_at: new Date(now.getTime() - 2 * 86_400_000).toISOString(),
+      auto_resume_retry_after: new Date(now.getTime() - 1 * 86_400_000).toISOString(),
+      auto_resume_attempt_count: 4,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+
+    expect(result).toEqual({ success: true });
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(subscription).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        payment_source: 'credits',
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_attempt_count: 1,
+      })
+    );
+    expect(subscription.auto_resume_requested_at).toEqual(expect.any(String));
+    expect(subscription.auto_resume_retry_after).toEqual(expect.any(String));
+    expect(kiloclawInternalClientMock.__startAsyncMock).toHaveBeenCalledTimes(1);
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+    expect(logs[0]?.after_state).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: null,
+        auto_resume_retry_after: null,
+        auto_resume_attempt_count: 0,
+      })
+    );
+  });
+
+  it('keeps credit-enrolled subscription retryable when auto-resume request fails', async () => {
+    kiloclawInternalClientMock.__startAsyncMock.mockRejectedValueOnce(new Error('start failed'));
+    const instance = await createInstance(user.id);
+    await giveUserCredits(user.id, 50_000_000);
+    const now = new Date();
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'canceled',
+      trial_started_at: new Date(now.getTime() - 17 * 86_400_000).toISOString(),
+      trial_ends_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
+      suspended_at: new Date(now.getTime() - 10 * 86_400_000).toISOString(),
+      destruction_deadline: new Date(now.getTime() - 3 * 86_400_000).toISOString(),
+      auto_resume_requested_at: new Date(now.getTime() - 2 * 86_400_000).toISOString(),
+      auto_resume_retry_after: new Date(now.getTime() - 1 * 86_400_000).toISOString(),
+      auto_resume_attempt_count: 4,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+
+    expect(result).toEqual({ success: true });
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .limit(1);
+
+    expect(subscription).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        payment_source: 'credits',
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_attempt_count: 1,
+      })
+    );
+    expect(subscription.auto_resume_requested_at).toEqual(expect.any(String));
+    expect(subscription.auto_resume_retry_after).toEqual(expect.any(String));
+  });
 
   it('enrolls with credits for standard plan at intro price for first-time subscriber', async () => {
     const instance = await createInstance(user.id);

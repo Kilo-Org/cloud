@@ -207,6 +207,19 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
+  if (requestBodyParsed.kind === 'chat_completions' || requestBodyParsed.kind === 'messages') {
+    if (!Array.isArray(requestBodyParsed.body.messages)) {
+      return invalidRequestResponse();
+    }
+  }
+
+  if (requestBodyParsed.kind === 'responses') {
+    const { input } = requestBodyParsed.body;
+    if (input != null && typeof input !== 'string' && !Array.isArray(input)) {
+      return invalidRequestResponse();
+    }
+  }
+
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
   const isLegacyOpenRouterPath = url.pathname.includes('/openrouter');

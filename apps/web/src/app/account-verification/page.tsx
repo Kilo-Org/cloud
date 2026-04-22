@@ -9,11 +9,7 @@ import { getStytchStatus, handleSignupPromotion, type SignupSource } from '@/lib
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
-
-// Matches exactly the `/openclaw-advisor` pathname, optionally followed by a
-// trailing slash, query string, or fragment. Guards against sibling paths like
-// `/openclaw-advisor-fake` that would otherwise pass a naive `startsWith` check.
-const OPENCLAW_ADVISOR_PATH_RE = /^\/openclaw-advisor(?:[/?#]|$)/;
+import { isOpenclawAdvisorCallback } from '@/lib/signup-source';
 
 export default async function AccountVerificationPage({ searchParams }: AppPageProps) {
   const user = await getUserFromAuthOrRedirect('/users/sign_in');
@@ -33,7 +29,7 @@ export default async function AccountVerificationPage({ searchParams }: AppPageP
     isFirstValidation &&
     callbackStr &&
     isValidCallbackPath(callbackStr) &&
-    OPENCLAW_ADVISOR_PATH_RE.test(callbackStr)
+    isOpenclawAdvisorCallback(callbackStr)
       ? 'openclaw-security-advisor'
       : null;
 

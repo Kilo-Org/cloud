@@ -68,6 +68,10 @@ yarn-error.log*
 .kilo/plans
 .superpowers/
 docs/superpowers/
+.kilo/node_modules
+.kilo/package.json
+.kilo/package-lock.json
+.kilo/bun.lock
 
 # legacy config (migrated to .kilo/)
 .kilocode/

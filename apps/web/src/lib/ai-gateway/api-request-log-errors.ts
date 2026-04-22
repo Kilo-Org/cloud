@@ -82,7 +82,13 @@ export function detectToolCallArgumentErrors(
       const parameters = toolSchemaByName.get(name);
       if (parameters == null) continue;
 
-      const zodSchema = z.fromJSONSchema(parameters as Parameters<typeof z.fromJSONSchema>[0]);
+      let zodSchema: ReturnType<typeof z.fromJSONSchema>;
+      try {
+        zodSchema = z.fromJSONSchema(parameters as Parameters<typeof z.fromJSONSchema>[0]);
+      } catch {
+        // Unsupported schema features — skip validation for this tool
+        continue;
+      }
       const result = zodSchema.safeParse(parsedArgs);
       if (!result.success) {
         errors.push({

@@ -211,6 +211,75 @@ describe('bot request Cloud Agent session groups', () => {
     ).resolves.toBe(true);
   });
 
+  it('waits for sibling results before claiming a group with result errors', async () => {
+    const botRequestId = await createBotRequest();
+    const spawnGroupId = randomUUID();
+    const firstCloudAgentSessionId = `cas-child-group-result-error-first-${randomUUID()}`;
+    const secondCloudAgentSessionId = `cas-child-group-result-error-second-${randomUUID()}`;
+    createdCloudAgentSessionIds.add(firstCloudAgentSessionId);
+    createdCloudAgentSessionIds.add(secondCloudAgentSessionId);
+
+    await recordBotRequestCloudAgentSession({
+      botRequestId,
+      spawnGroupId,
+      cloudAgentSessionId: firstCloudAgentSessionId,
+    });
+    await recordBotRequestCloudAgentSession({
+      botRequestId,
+      spawnGroupId,
+      cloudAgentSessionId: secondCloudAgentSessionId,
+    });
+    await markBotRequestCloudAgentSessionTerminal({
+      botRequestId,
+      cloudAgentSessionId: firstCloudAgentSessionId,
+      status: 'completed',
+      kiloSessionId: `kilo-result-error-first-${randomUUID()}`,
+    });
+    await markBotRequestCloudAgentSessionTerminal({
+      botRequestId,
+      cloudAgentSessionId: secondCloudAgentSessionId,
+      status: 'completed',
+      kiloSessionId: `kilo-result-error-second-${randomUUID()}`,
+    });
+    await recordBotRequestCloudAgentSessionResultError({
+      botRequestId,
+      cloudAgentSessionId: firstCloudAgentSessionId,
+      errorMessage: 'ingest returned no final assistant text',
+    });
+
+    await expect(
+      getBotRequestCloudAgentSessionGroupReadiness({
+        botRequestId,
+        cloudAgentSessionId: firstCloudAgentSessionId,
+      })
+    ).resolves.toMatchObject({ status: 'waiting-for-result' });
+    await expect(
+      claimBotRequestCloudAgentSessionGroupContinuation({
+        botRequestId,
+        cloudAgentSessionId: firstCloudAgentSessionId,
+      })
+    ).resolves.toBe(false);
+
+    await recordBotRequestCloudAgentSessionResult({
+      botRequestId,
+      cloudAgentSessionId: secondCloudAgentSessionId,
+      finalMessage: 'second final message',
+    });
+
+    await expect(
+      getBotRequestCloudAgentSessionGroupReadiness({
+        botRequestId,
+        cloudAgentSessionId: firstCloudAgentSessionId,
+      })
+    ).resolves.toMatchObject({ status: 'result-error' });
+    await expect(
+      claimBotRequestCloudAgentSessionGroupContinuation({
+        botRequestId,
+        cloudAgentSessionId: firstCloudAgentSessionId,
+      })
+    ).resolves.toBe(true);
+  });
+
   it('orders child session groups by callback step, creation time, and session id', async () => {
     const botRequestId = await createBotRequest();
     const spawnGroupId = randomUUID();

@@ -121,16 +121,19 @@ export async function getBotRequestCloudAgentSessionGroupReadiness(params: {
     return { status: 'terminal-failure', sessions: group.sessions, failedSessions };
   }
 
+  const missingResultSessions = group.sessions.filter(
+    session =>
+      session.status === 'completed' && !session.final_message && !session.final_message_error
+  );
+  if (missingResultSessions.length > 0) {
+    return { status: 'waiting-for-result', sessions: group.sessions, missingResultSessions };
+  }
+
   const resultErrorSessions = group.sessions.filter(
     session => session.status === 'completed' && session.final_message_error
   );
   if (resultErrorSessions.length > 0) {
     return { status: 'result-error', sessions: group.sessions, resultErrorSessions };
-  }
-
-  const missingResultSessions = group.sessions.filter(session => !session.final_message);
-  if (missingResultSessions.length > 0) {
-    return { status: 'waiting-for-result', sessions: group.sessions, missingResultSessions };
   }
 
   return { status: 'ready', sessions: group.sessions };
@@ -159,15 +162,13 @@ export async function claimBotRequestCloudAgentSessionGroupContinuation(params: 
     session => !isTerminalBotRequestCloudAgentSessionStatus(session.status)
   );
   const failedSessions = group.sessions.filter(session => session.status !== 'completed');
-  const resultErrorSessions = group.sessions.filter(
-    session => session.status === 'completed' && session.final_message_error
+  const missingResultSessions = group.sessions.filter(
+    session =>
+      session.status === 'completed' && !session.final_message && !session.final_message_error
   );
-  const missingResultSessions = group.sessions.filter(session => !session.final_message);
   if (
     waitingSessions.length > 0 ||
-    (failedSessions.length === 0 &&
-      resultErrorSessions.length === 0 &&
-      missingResultSessions.length > 0)
+    (failedSessions.length === 0 && missingResultSessions.length > 0)
   ) {
     return false;
   }

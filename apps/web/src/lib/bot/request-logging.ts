@@ -1,11 +1,12 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { after } from 'next/server';
 import {
   bot_request_cloud_agent_sessions,
   bot_requests,
+  type BotRequestCloudAgentSessionStatus,
   type BotRequestStatus,
   type BotRequestStep,
 } from '@kilocode/db/schema';
@@ -71,6 +72,21 @@ type RecordBotRequestCloudAgentSessionParams = {
   callbackStep?: number;
 };
 
+type TerminalBotRequestCloudAgentSessionStatus = Extract<
+  BotRequestCloudAgentSessionStatus,
+  'completed' | 'failed' | 'interrupted'
+>;
+
+type MarkBotRequestCloudAgentSessionTerminalParams = {
+  botRequestId: string;
+  cloudAgentSessionId: string;
+  status: TerminalBotRequestCloudAgentSessionStatus;
+  executionId?: string;
+  kiloSessionId?: string;
+  errorMessage?: string;
+  terminalAt?: string;
+};
+
 async function performUpdate(id: string, params: UpdateBotRequestParams): Promise<void> {
   try {
     await db
@@ -131,6 +147,37 @@ export async function recordBotRequestCloudAgentSession(
         botRequestId: params.botRequestId,
         spawnGroupId: params.spawnGroupId,
         cloudAgentSessionId: params.cloudAgentSessionId,
+      },
+    });
+  }
+}
+
+export async function markBotRequestCloudAgentSessionTerminal(
+  params: MarkBotRequestCloudAgentSessionTerminalParams
+): Promise<void> {
+  try {
+    await db
+      .update(bot_request_cloud_agent_sessions)
+      .set({
+        status: params.status,
+        terminal_at: params.terminalAt ?? new Date().toISOString(),
+        error_message: params.errorMessage ?? null,
+        ...(params.executionId !== undefined && { execution_id: params.executionId }),
+        ...(params.kiloSessionId !== undefined && { kilo_session_id: params.kiloSessionId }),
+      })
+      .where(
+        and(
+          eq(bot_request_cloud_agent_sessions.bot_request_id, params.botRequestId),
+          eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, params.cloudAgentSessionId)
+        )
+      );
+  } catch (error) {
+    captureException(error, {
+      tags: { component: 'bot-request-log', op: 'mark-child-session-terminal' },
+      extra: {
+        botRequestId: params.botRequestId,
+        cloudAgentSessionId: params.cloudAgentSessionId,
+        status: params.status,
       },
     });
   }

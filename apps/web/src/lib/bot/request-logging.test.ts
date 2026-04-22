@@ -1,6 +1,7 @@
 import { db } from '@/lib/drizzle';
 import {
   linkBotRequestToSession,
+  markBotRequestCloudAgentSessionTerminal,
   recordBotRequestCloudAgentSession,
 } from '@/lib/bot/request-logging';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -172,6 +173,44 @@ describe('bot request logging', () => {
     expect(row.error_message).toBe('kept terminal error');
     expect(new Date(row.terminal_at ?? '').toISOString()).toBe(terminalAt);
     expect(new Date(row.continuation_started_at ?? '').toISOString()).toBe(continuationStartedAt);
+  });
+
+  it('marks a child Cloud Agent session terminal from callback metadata', async () => {
+    const botRequestId = await createBotRequest();
+    const spawnGroupId = randomUUID();
+    const cloudAgentSessionId = `cas-child-terminal-${randomUUID()}`;
+    const kiloSessionId = `kilo-child-terminal-${randomUUID()}`;
+    const terminalAt = new Date('2026-01-03T04:05:06.000Z').toISOString();
+    createdCloudAgentSessionIds.add(cloudAgentSessionId);
+
+    await recordBotRequestCloudAgentSession({
+      botRequestId,
+      spawnGroupId,
+      cloudAgentSessionId,
+    });
+
+    await markBotRequestCloudAgentSessionTerminal({
+      botRequestId,
+      cloudAgentSessionId,
+      status: 'failed',
+      executionId: 'execution-terminal-test',
+      kiloSessionId,
+      errorMessage: 'session failed',
+      terminalAt,
+    });
+
+    const row = expectSingleRow(
+      await db
+        .select()
+        .from(bot_request_cloud_agent_sessions)
+        .where(eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
+    );
+
+    expect(row.status).toBe('failed');
+    expect(row.execution_id).toBe('execution-terminal-test');
+    expect(row.kilo_session_id).toBe(kiloSessionId);
+    expect(row.error_message).toBe('session failed');
+    expect(new Date(row.terminal_at ?? '').toISOString()).toBe(terminalAt);
   });
 
   it('continues linking the legacy Cloud Agent session column', async () => {

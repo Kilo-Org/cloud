@@ -1079,10 +1079,11 @@ export function SettingsTab({
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
   const braveSearchConfigured = configuredSecrets['brave-search'] ?? false;
+  const exaDefaultSelected =
+    supportsExaSearchUi && kiloExaSearchMode === null && !braveSearchConfigured;
   const exaSearchConfigured =
-    supportsExaSearchUi && (kiloExaSearchMode === 'kilo-proxy' || kiloExaSearchMode === null);
-  const exaSearchDisplayMode =
-    supportsExaSearchUi && kiloExaSearchMode === null ? 'kilo-proxy' : kiloExaSearchMode;
+    supportsExaSearchUi && (kiloExaSearchMode === 'kilo-proxy' || exaDefaultSelected);
+  const exaSearchDisplayMode = exaDefaultSelected ? 'kilo-proxy' : kiloExaSearchMode;
   const braveSearchEnabled = braveSearchConfigured && !exaSearchConfigured;
   const toolEntries = getEntriesByCategory('tool');
   const googleCalendarConnectHref = useMemo(() => {

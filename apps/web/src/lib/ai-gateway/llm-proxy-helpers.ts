@@ -35,7 +35,7 @@ import type {
   MicrodollarUsageStats,
   PromptInfo,
 } from '@/lib/ai-gateway/processUsage.types';
-import { getMaxTokens } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 export { proxyErrorTypeSchema, ProxyErrorType } from '@/lib/proxy-error-types';
@@ -161,64 +161,6 @@ function byokErrorMessage(status: number): string | undefined {
   return byokErrorMessages[status];
 }
 
-function sumTextCharLength(value: unknown): number {
-  if (typeof value === 'string') return value.length;
-  if (Array.isArray(value)) {
-    let sum = 0;
-    for (const item of value) sum += sumTextCharLength(item);
-    return sum;
-  }
-  if (value && typeof value === 'object') {
-    let sum = 0;
-    for (const v of Object.values(value)) sum += sumTextCharLength(v);
-    return sum;
-  }
-  return 0;
-}
-
-// Underestimates tokens on purpose: we only count actual text content (not JSON
-// punctuation or field names), then add the reserved max output tokens. It is
-// better to underestimate than overestimate: this count is used to detect
-// context overflows on vague upstream errors, so we want to avoid false positives.
-export function estimateTokenCount(request: GatewayRequest) {
-  return Math.round(sumTextCharLength(request.body) / 4 + (getMaxTokens(request) ?? 0));
-}
-
-// Matches upstream responses like:
-//   "This endpoint's maximum context length is 204800 tokens. However, you
-//    requested about 301688 tokens (...)."
-const UPSTREAM_CONTEXT_OVERFLOW_PATTERN = /maximum context length is\s+\d+\s+tokens/i;
-
-// Returns the upstream's own error message when it already explains the
-// context overflow clearly, so we can pass it through verbatim instead of
-// replacing it with a less informative generic message.
-async function extractUpstreamContextOverflowMessage(response: Response): Promise<string | null> {
-  try {
-    const text = await response.clone().text();
-    try {
-      const parsed: unknown = JSON.parse(text);
-      if (parsed && typeof parsed === 'object' && 'error' in parsed) {
-        const errField: unknown = (parsed as { error: unknown }).error;
-        const candidate =
-          errField && typeof errField === 'object' && 'message' in errField
-            ? (errField as { message: unknown }).message
-            : errField;
-        if (typeof candidate === 'string' && UPSTREAM_CONTEXT_OVERFLOW_PATTERN.test(candidate)) {
-          return candidate;
-        }
-      }
-    } catch {
-      // body is not JSON; fall through to raw text match
-    }
-    if (UPSTREAM_CONTEXT_OVERFLOW_PATTERN.test(text)) {
-      return text.slice(0, 2000);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 export async function makeErrorReadable({
   requestedModel,
   request,
@@ -249,33 +191,8 @@ export async function makeErrorReadable({
     }
   }
 
-  // Detect context overflows in two ways:
-  //   1. Upstream explicitly says the context length was exceeded.
-  //   2. Upstream returns a generic 500 ("Internal Server Error",
-  //      "No allowed providers are available for the selected model", etc.)
-  //      and our own (conservative) token estimate already exceeds the model's
-  //      context window.
-  const model = kiloExclusiveModels.find(m => m.public_id === requestedModel);
-  const estimatedTokenCount = estimateTokenCount(request);
-  const estimateExceedsContext = !!model && estimatedTokenCount >= model.context_length;
-  const upstreamOverflowMessage = await extractUpstreamContextOverflowMessage(response);
-
-  if (upstreamOverflowMessage || (response.status === 500 && estimateExceedsContext)) {
-    // If upstream already produced an appropriate context-overflow message,
-    // pass it through verbatim. Otherwise fall back to our own message, and
-    // only include the estimated token count when it actually exceeds the
-    // known window (to avoid a self-contradictory "about N tokens" number).
-    const error =
-      upstreamOverflowMessage ??
-      (model && estimateExceedsContext
-        ? `The maximum context length is ${model.context_length} tokens. However, about ${estimatedTokenCount} tokens were requested.`
-        : `The maximum context length was exceeded. Please reduce the size of your request.`);
-    warnExceptInTest(`Responding with ${response.status} ${error}`);
-    return NextResponse.json(
-      { error, error_type: ProxyErrorType.context_length_exceeded, message: error },
-      { status: response.status }
-    );
-  }
+  const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
+  if (overflowResponse) return overflowResponse;
 
   if (isKiloStealthModel(requestedModel)) {
     return await stealthModelError(response);

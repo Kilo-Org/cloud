@@ -1,21 +1,10 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   checkOrganizationModelRestrictions,
-  estimateTokenCount,
   extractEmbeddingPromptInfo,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
-  ProxyErrorType,
 } from './llm-proxy-helpers';
-import type {
-  GatewayRequest,
-  OpenRouterChatCompletionRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
-import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
-
-function chatRequest(body: OpenRouterChatCompletionRequest): GatewayRequest {
-  return { kind: 'chat_completions', body };
-}
 
 describe('checkOrganizationModelRestrictions', () => {
   describe('enterprise plan - model deny list restrictions', () => {
@@ -371,120 +360,15 @@ describe('parseEmbeddingUsageFromResponse', () => {
   });
 });
 
-describe('estimateTokenCount', () => {
-  it('counts only text content, not JSON keys and punctuation', () => {
-    const request = chatRequest({
-      model: 'foo',
-      messages: [{ role: 'user', content: 'hello world' }],
-    });
-
-    // 'foo' (3) + 'user' (4) + 'hello world' (11) = 18 chars / 4 = 4.5 → rounded to 5
-    expect(estimateTokenCount(request)).toBe(5);
-  });
-
-  it('adds max_tokens to the estimate', () => {
-    const request = chatRequest({
-      model: '',
-      messages: [{ role: 'user', content: 'x'.repeat(400) }],
-      max_tokens: 1000,
-    });
-
-    // 400 chars from content + 4 chars from 'user' = 404 / 4 = 101, plus 1000 reserved.
-    expect(estimateTokenCount(request)).toBe(1101);
-  });
-
-  it('recurses into nested structures like tool definitions', () => {
-    const request = chatRequest({
-      model: '',
-      messages: [],
-      tools: [
-        {
-          type: 'function',
-          function: { name: 'do_thing', description: 'x'.repeat(100) },
-        },
-      ],
-    });
-
-    // 'function' (8) + 'do_thing' (8) + 'x' * 100 = 116 / 4 = 29
-    expect(estimateTokenCount(request)).toBe(29);
-  });
-});
-
 describe('makeErrorReadable', () => {
-  const emptyRequest: GatewayRequest = chatRequest({ model: 'test', messages: [] });
-
   it('returns undefined for non-error responses', async () => {
     const response = new Response('{}', { status: 200 });
     const result = await makeErrorReadable({
       requestedModel: 'anything',
-      request: emptyRequest,
+      request: { kind: 'chat_completions', body: { model: 'test', messages: [] } },
       response,
       isUserByok: false,
     });
-    expect(result).toBeUndefined();
-  });
-
-  it('passes through the upstream context-length error message verbatim', async () => {
-    const upstreamMessage =
-      "This endpoint's maximum context length is 204800 tokens. However, you requested about 301688 tokens (124054 of text input, 145634 of tool input, 32000 in the output). Please reduce the length of either one, or use the context-compression plugin to compress your prompt automatically.";
-    const upstreamBody = JSON.stringify({ error: { message: upstreamMessage } });
-    const response = new Response(upstreamBody, { status: 400 });
-
-    const result = await makeErrorReadable({
-      requestedModel: 'some-unknown-model',
-      request: emptyRequest,
-      response,
-      isUserByok: false,
-    });
-
-    if (!result) throw new Error('expected a response');
-    const json = await result.json();
-    expect(json.error_type).toBe(ProxyErrorType.context_length_exceeded);
-    expect(String(json.message)).toMatch(/maximum context length/i);
-    // The upstream already wrote a reasonable, detailed message — we should
-    // pass it through unchanged, not replace it with our own generic copy.
-    expect(json.message).toBe(upstreamMessage);
-  });
-
-  it('converts a generic 500 into context_length_exceeded when our estimate exceeds the window', async () => {
-    // minimax_m25_free_model has context_length 204_800 and max_completion_tokens 131_072.
-    // Provide enough text so the estimate (text/4 + max_tokens) exceeds the window.
-    const hugeRequest = chatRequest({
-      model: minimax_m25_free_model.public_id,
-      messages: [{ role: 'user', content: 'x'.repeat(400_000) }],
-      max_tokens: 131_072,
-    });
-
-    const response = new Response('Internal Server Error', { status: 500 });
-
-    const result = await makeErrorReadable({
-      requestedModel: minimax_m25_free_model.public_id,
-      request: hugeRequest,
-      response,
-      isUserByok: false,
-    });
-
-    if (!result) throw new Error('expected a response');
-    const json = await result.json();
-    expect(json.error_type).toBe(ProxyErrorType.context_length_exceeded);
-    expect(String(json.message)).toMatch(/maximum context length/i);
-  });
-
-  it('does not trigger context_length_exceeded on a 500 when the estimate fits the window', async () => {
-    const smallRequest = chatRequest({
-      model: minimax_m25_free_model.public_id,
-      messages: [{ role: 'user', content: 'hi' }],
-    });
-
-    const response = new Response('Internal Server Error', { status: 500 });
-
-    const result = await makeErrorReadable({
-      requestedModel: minimax_m25_free_model.public_id,
-      request: smallRequest,
-      response,
-      isUserByok: false,
-    });
-
     expect(result).toBeUndefined();
   });
 });

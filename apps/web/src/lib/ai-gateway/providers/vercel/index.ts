@@ -20,7 +20,7 @@ import { redisGet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { GatewayPercentageSchema, DEFAULT_VERCEL_PERCENTAGE } from '@/lib/gateway-config';
 import { GATEWAY_METADATA_REDIS_KEYS, VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
-import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
+import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -66,7 +66,7 @@ export async function shouldRouteToVercel(
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
   const passedRandomization =
-    getRandomNumberLessThan100('vercel_routing_' + randomSeed) <
+    getRandomNumber('vercel_routing_' + randomSeed, 100) <
     (await getVercelRoutingPercentage());
 
   if (!passedRandomization) {

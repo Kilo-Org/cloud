@@ -294,8 +294,7 @@ export function OpenclawImportCard({
           <div>
             <p className="text-sm font-medium">OpenClaw Import</p>
             <p className="text-muted-foreground text-xs">
-              Import USER.md, SOUL.md, IDENTITY.md, MEMORY.md, and memory/* from an OpenClaw
-              workspace zip file.
+              Import USER.md, SOUL.md, IDENTITY.md, MEMORY.md, and memory/* from a zip file.
             </p>
           </div>
         </div>

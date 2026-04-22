@@ -7,16 +7,18 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import {
   AlertCircle,
+  Check,
+  ExternalLink,
   FolderGit2,
   Loader2,
   Lock,
+  Paperclip,
   RefreshCw,
   Send,
   Settings,
   Unlock,
-  Check,
-  Paperclip,
   Upload,
+  X,
 } from 'lucide-react';
 import { startOfDay, subDays } from 'date-fns';
 import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
@@ -98,6 +100,8 @@ type NewSessionPanelProps = {
   organizationId?: string;
 };
 
+const KIMI_K26_BANNER_STORAGE_KEY = 'cloud-agent-kimi-k26-banner-dismissed';
+
 export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -162,6 +166,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [showKimiBanner, setShowKimiBanner] = useState(false);
   const [imageMessageUuid, setImageMessageUuid] = useState(() => crypto.randomUUID());
 
   const imageUpload = useImageUpload({
@@ -195,6 +200,24 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   useEffect(() => {
     resetSessionForm();
   }, [resetSessionForm]);
+
+  useEffect(() => {
+    try {
+      const dismissed = localStorage.getItem(KIMI_K26_BANNER_STORAGE_KEY) === 'true';
+      setShowKimiBanner(!dismissed);
+    } catch {
+      setShowKimiBanner(true);
+    }
+  }, []);
+
+  const dismissKimiBanner = useCallback(() => {
+    try {
+      localStorage.setItem(KIMI_K26_BANNER_STORAGE_KEY, 'true');
+    } catch {
+      // Ignore localStorage failures so dismiss still works.
+    }
+    setShowKimiBanner(false);
+  }, []);
 
   const availableVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
 
@@ -780,6 +803,38 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       </SetPageTitle>
       <MobileSidebarToggle />
       <div className="w-full max-w-2xl space-y-4">
+        {showKimiBanner && (
+          <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-blue-100">Kimi K2.6 is now available</p>
+                <p className="text-sm text-blue-200/90">
+                  Use Kimi K2.6 in Cloud Agent sessions for your next tasks.
+                </p>
+                <a
+                  href="https://blog.kilo.ai/p/kimi-k26-has-arrived-an-open-weight"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-blue-200 underline underline-offset-4 hover:text-blue-100"
+                >
+                  Read the launch post
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+              <UIButton
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-blue-200 hover:bg-blue-500/20 hover:text-blue-100"
+                onClick={dismissKimiBanner}
+                aria-label="Dismiss Kimi K2.6 announcement"
+              >
+                <X className="h-4 w-4" />
+              </UIButton>
+            </div>
+          </div>
+        )}
+
         {/* Insufficient balance banner */}
         {hasInsufficientBalance && eligibilityData && (
           <InsufficientBalanceBanner

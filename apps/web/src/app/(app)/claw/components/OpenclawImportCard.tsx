@@ -112,6 +112,8 @@ export function OpenclawImportCard({
   const zipCommand = useMemo(() => getOpenclawZipCommandForOs(detectedOs), [detectedOs]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     return () => {
       isMountedRef.current = false;
       if (copyTimeoutRef.current) {

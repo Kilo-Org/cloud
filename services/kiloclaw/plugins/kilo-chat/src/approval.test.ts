@@ -48,7 +48,7 @@ describe('createKiloChatApprovalCapability', () => {
         expiresAtMs: 0,
       } as never,
     });
-    expect(target).toEqual({ to: '01hwxyz123abc456def789gh' });
+    expect(target).toEqual({ to: '01HWXYZ123ABC456DEF789GH' });
   });
 
   it('resolveOriginTarget returns null when sessionKey is absent', () => {

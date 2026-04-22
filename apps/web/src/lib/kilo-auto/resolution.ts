@@ -1,5 +1,4 @@
 import type { FeatureValue } from '@/lib/feature-detection';
-import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
 import {
   gemma_4_26b_a4b_it_free_model,
   GEMMA_4_31B_IT_ID,
@@ -23,12 +22,11 @@ import {
   type ResolvedAutoModel,
   KILO_AUTO_LEGACY_MODEL,
   BALANCED_HAIKU_MODEL,
+  isKiloAutoModel,
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
-import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
-
-const STEP_FLASH_ROUTING_PERCENTAGE = 20;
+import { isFreeModel, preferredModels } from '@/lib/ai-gateway/models';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -36,6 +34,7 @@ type ResolveAutoModelParams = {
   featureHeader: FeatureValue | null;
   sessionId: string | null;
   apiKind: GatewayRequest['kind'] | null;
+  clientIp: string | null;
 };
 
 function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | null) {
@@ -45,21 +44,29 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
   return null;
 }
 
+function getAutoFreeCandidates() {
+  const candidates = new Set<string>();
+  for (const model of preferredModels) {
+    if (!isKiloAutoModel(model) && isFreeModel(model)) {
+      candidates.add(model);
+    }
+  }
+  return [...candidates].toSorted();
+}
+
+const AUTO_FREE_CANDIDATES: ReadonlyArray<string> = getAutoFreeCandidates();
+
 export async function resolveAutoModel(
   params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ): Promise<ResolvedAutoModel> {
-  const { model, modeHeader, featureHeader, sessionId, apiKind } = params;
+  const { model, modeHeader, featureHeader, sessionId, apiKind, clientIp } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
-    if (
-      sessionId &&
-      stepfun_35_flash_free_model.status === 'public' &&
-      getRandomNumberLessThan100('step_routing_' + sessionId) < STEP_FLASH_ROUTING_PERCENTAGE
-    ) {
-      return { model: stepfun_35_flash_free_model.public_id };
-    }
-    return { model: minimax_m25_free_model.public_id };
+    const randomNumber = getRandomNumberLessThan100(
+      'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp)
+    );
+    return { model: AUTO_FREE_CANDIDATES[randomNumber % AUTO_FREE_CANDIDATES.length] };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {

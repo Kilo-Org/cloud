@@ -101,7 +101,13 @@ import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
  * Error codes whose messages may contain raw internal details (e.g. filesystem
  * paths) and should NOT be forwarded to the client.
  */
-const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed']);
+const UNSAFE_ERROR_CODES = new Set([
+  'config_read_failed',
+  'config_replace_failed',
+  'openclaw_import_symlink_escape',
+  'openclaw_import_symlink_target',
+  'openclaw_import_target_not_file',
+]);
 const KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON = {
   cancelRequested: 'user_requested_cancellation',
   reactivated: 'user_reactivated_subscription',
@@ -3381,6 +3387,34 @@ export const kiloclawRouter = createTRPCRouter({
         );
       } catch (err) {
         handleFileOperationError(err, 'write file');
+      }
+    }),
+
+  importOpenclawWorkspace: clawAccessProcedure
+    .input(
+      z.object({
+        files: z
+          .array(
+            z.object({
+              path: z.string().min(1),
+              content: z.string(),
+            })
+          )
+          .min(1)
+          .max(500),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        return await client.importOpenclawWorkspace(
+          ctx.user.id,
+          input.files,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        handleFileOperationError(err, 'import OpenClaw workspace');
       }
     }),
 

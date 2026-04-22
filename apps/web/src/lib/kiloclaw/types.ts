@@ -332,6 +332,24 @@ export type DoctorControllerResponse = {
   timedOut: boolean;
 };
 
+export type OpenclawWorkspaceImportFailure = {
+  path: string;
+  operation: 'write' | 'delete';
+  error: string;
+  code?: string;
+};
+
+export type OpenclawWorkspaceImportResponse = {
+  ok: boolean;
+  attemptedWriteCount: number;
+  writtenCount: number;
+  attemptedDeleteCount: number;
+  deletedCount: number;
+  failedCount: number;
+  totalUtf8Bytes: number;
+  failures: OpenclawWorkspaceImportFailure[];
+};
+
 /** Response from POST /api/platform/kilo-cli-run/start */
 export type KiloCliRunStartResponse = {
   ok: boolean;

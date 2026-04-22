@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { OpenclawImportCard } from './OpenclawImportCard';
 
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
@@ -75,6 +76,7 @@ type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
 const EXA_SEARCH_UI_MIN_CONTROLLER_VERSION = '2026.4.14';
 const MEMORY_MIN_OPENCLAW_VERSION = '2026.4.5';
+const OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION = '2026.4.22';
 
 // ---------------------------------------------------------------------------
 // 1Password setup guide dialog
@@ -1069,6 +1071,10 @@ export function SettingsTab({
     runningVersion ?? trackedVersion,
     MEMORY_MIN_OPENCLAW_VERSION
   );
+  const supportsOpenclawImportUi = calverAtLeast(
+    cleanVersion(controllerVersion?.version),
+    OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION
+  );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
@@ -1259,6 +1265,14 @@ export function SettingsTab({
           </div>
         )}
       </div>
+
+      {supportsOpenclawImportUi && (
+        <OpenclawImportCard
+          mutations={mutations}
+          isRunning={isRunning}
+          instanceStatus={status.status}
+        />
+      )}
 
       {/* ── Model Configuration ── */}
       <div>

@@ -25,7 +25,7 @@ export type KiloClawCoverageArea = {
 };
 
 /**
- * All customer-visible content for the security advisor, loaded from the DB
+ * All customer-visible content for shell security, loaded from the DB
  * and cached in-process with a TTL.
  *
  * - `checkCatalog`: server-authoritative severity/explanation/risk per known
@@ -35,7 +35,7 @@ export type KiloClawCoverageArea = {
  * - `content`: flat key/value store for CTA, framing templates, and fallback
  *   strings (the six Tier-1 editable pieces of copy).
  */
-export type LoadedSecurityAdvisorContent = {
+export type LoadedShellSecurityContent = {
   checkCatalog: Map<string, CatalogCheck>;
   kiloclawCoverage: KiloClawCoverageArea[];
   content: Map<string, string>;
@@ -50,14 +50,14 @@ export type LoadedSecurityAdvisorContent = {
 // re-query. That's the intended dev behavior.
 const CACHE_TTL_MS = process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000;
 
-let cached: { data: LoadedSecurityAdvisorContent; expiresAt: number } | null = null;
+let cached: { data: LoadedShellSecurityContent; expiresAt: number } | null = null;
 
 // Singleflight: when the cache is expired, the first request starts a DB load
 // and stashes its promise here. Subsequent requests that arrive before the
 // load resolves await the same promise instead of kicking off their own
 // parallel query. Without this, a burst of requests right after expiry would
 // each fire its own loadFromDb().
-let inFlight: Promise<LoadedSecurityAdvisorContent> | null = null;
+let inFlight: Promise<LoadedShellSecurityContent> | null = null;
 
 // Version counter bumped on every invalidation. A load captures the version
 // when it starts; if the version changes before the load resolves (because
@@ -71,7 +71,7 @@ let cacheVersion = 0;
  * object on every call so a downstream caller that accidentally mutates
  * the Maps or arrays can't corrupt a shared singleton.
  */
-function emptyContent(): LoadedSecurityAdvisorContent {
+function emptyContent(): LoadedShellSecurityContent {
   return {
     checkCatalog: new Map(),
     kiloclawCoverage: [],
@@ -80,7 +80,7 @@ function emptyContent(): LoadedSecurityAdvisorContent {
 }
 
 /**
- * Load security advisor content from the DB, served from an in-process TTL cache.
+ * Load shell security content from the DB, served from an in-process TTL cache.
  *
  * Uses the read replica. Falls back to empty maps/arrays if the DB is unreachable,
  * so the report generator can still produce output (using client-reported values and
@@ -90,7 +90,7 @@ function emptyContent(): LoadedSecurityAdvisorContent {
  * DB load via `inFlight` (singleflight pattern) so a burst never fans out
  * into N parallel queries.
  */
-export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisorContent> {
+export async function getShellSecurityContent(): Promise<LoadedShellSecurityContent> {
   const now = Date.now();
   if (cached !== null && now < cached.expiresAt) {
     return cached.data;
@@ -99,7 +99,7 @@ export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisor
     return inFlight;
   }
   const startVersion = cacheVersion;
-  const thisLoad: Promise<LoadedSecurityAdvisorContent> = (async () => {
+  const thisLoad: Promise<LoadedShellSecurityContent> = (async () => {
     try {
       const data = await loadFromDb();
       // Only write back to `cached` if no invalidation happened while we
@@ -117,7 +117,7 @@ export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisor
       // coverage text when the loader returns empty, so the request still
       // succeeds — just without server-overridden copy.
       // Intentionally NOT caching the empty result, so the next request retries.
-      console.error('[SecurityAdvisor] content-loader failed; returning empty content', err);
+      console.error('[ShellSecurity] content-loader failed; returning empty content', err);
       return emptyContent();
     }
   })();
@@ -149,13 +149,19 @@ export async function getSecurityAdvisorContent(): Promise<LoadedSecurityAdvisor
  * Also clears `inFlight` so a new request after invalidation starts a
  * fresh DB load (rather than coalescing onto a pre-write load whose
  * result is about to be discarded by the cacheVersion check). */
-export function invalidateSecurityAdvisorContentCache(): void {
+export function invalidateShellSecurityContentCache(): void {
   cached = null;
   inFlight = null;
   cacheVersion++;
 }
 
-async function loadFromDb(): Promise<LoadedSecurityAdvisorContent> {
+// The `security_advisor_*` DB tables deliberately keep their pre-rename names.
+// The shell-security rebrand covers server code and public surfaces, but
+// renaming the tables would require a migration with zero functional payoff —
+// and would break existing PostHog/Metabase dashboards keyed on the table
+// names. Expect this naming asymmetry between the module and the tables to
+// remain permanent unless a future migration retires `security_advisor_*`.
+async function loadFromDb(): Promise<LoadedShellSecurityContent> {
   const [catalogRows, coverageRows, contentRows] = await Promise.all([
     readDb
       .select({
@@ -201,7 +207,7 @@ async function loadFromDb(): Promise<LoadedSecurityAdvisorContent> {
       });
     } else {
       console.warn(
-        `[SecurityAdvisor] skipping check_id="${row.check_id}" with invalid severity="${row.severity}". Valid values: critical, warn, info.`
+        `[ShellSecurity] skipping check_id="${row.check_id}" with invalid severity="${row.severity}". Valid values: critical, warn, info.`
       );
     }
   }
@@ -241,7 +247,7 @@ export function findCoverageForCheckId(
   if (matches.length === 0) return null;
   if (matches.length > 1) {
     console.warn(
-      `[SecurityAdvisor] checkId "${checkId}" is covered by ${matches.length} active areas: ${matches
+      `[ShellSecurity] checkId "${checkId}" is covered by ${matches.length} active areas: ${matches
         .map(a => a.area)
         .join(
           ', '

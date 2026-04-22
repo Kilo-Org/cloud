@@ -572,7 +572,8 @@ describe('formatBotIdentityMarkdown', () => {
 
     expect(result).toContain('# IDENTITY');
     expect(result).toContain('- Name: KiloClaw');
-    expect(result).toContain('- Nature: AI executive assistant');
+    expect(result).toContain('- Nature: Operator');
+    expect(result).toContain('- Vibe: Focused, capable, effective');
   });
 });
 

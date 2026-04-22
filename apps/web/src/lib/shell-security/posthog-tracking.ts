@@ -1,5 +1,5 @@
 /**
- * PostHog tracking for security-advisor feature.
+ * PostHog tracking for shell security feature.
  *
  * Tracks scan completions for product analytics, conversion attribution,
  * and usage reporting. Events follow the wide-event pattern used by security-agent.
@@ -11,13 +11,13 @@ import { captureException } from '@sentry/nextjs';
 
 const posthogClient = PostHogClient();
 
-type BaseSecurityAdvisorEvent = {
+type BaseShellSecurityEvent = {
   distinctId: string;
   userId: string;
   organizationId?: string;
 };
 
-type SecurityAdvisorScanCompletedEvent = BaseSecurityAdvisorEvent & {
+type ShellSecurityScanCompletedEvent = BaseShellSecurityEvent & {
   sourcePlatform: string;
   sourceMethod: string;
   pluginVersion?: string;
@@ -33,13 +33,17 @@ type SecurityAdvisorScanCompletedEvent = BaseSecurityAdvisorEvent & {
 };
 
 /**
- * Track a completed security advisor scan.
+ * Track a completed shell security scan.
  * Fired after the report is generated and the scan is recorded in the DB.
  */
-export function trackSecurityAdvisorScanCompleted(
-  properties: SecurityAdvisorScanCompletedEvent
-): void {
+export function trackShellSecurityScanCompleted(properties: ShellSecurityScanCompletedEvent): void {
   try {
+    // The PostHog `event` name and the `feature` property are intentionally
+    // kept as their pre-rename values (`security_advisor_*` / `security-advisor`)
+    // so existing dashboards, funnels, and trend queries keep producing an
+    // unbroken timeseries across the rename. Change only in coordination with
+    // a dashboard migration. The Sentry `source` tag below is a separate
+    // concern — it has no continuity requirement, so it tracks the module name.
     posthogClient.capture({
       distinctId: properties.distinctId,
       event: 'security_advisor_scan_completed',
@@ -51,7 +55,7 @@ export function trackSecurityAdvisorScanCompleted(
     });
   } catch (error) {
     captureException(error, {
-      tags: { source: 'posthog_security_advisor_scan_completed' },
+      tags: { source: 'posthog_shell_security_scan_completed' },
       extra: { properties },
     });
   }

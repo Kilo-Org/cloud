@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { SecurityAdvisorRequestSchema } from '../schemas';
+import { ShellSecurityRequestSchema } from '../schemas';
 
 const VALID_PAYLOAD = {
   apiVersion: '2026-04-01',
@@ -33,9 +33,9 @@ const VALID_PAYLOAD = {
   publicIp: '1.2.3.4',
 };
 
-describe('SecurityAdvisorRequestSchema', () => {
+describe('ShellSecurityRequestSchema', () => {
   it('accepts a valid payload', () => {
-    const result = SecurityAdvisorRequestSchema.safeParse(VALID_PAYLOAD);
+    const result = ShellSecurityRequestSchema.safeParse(VALID_PAYLOAD);
     expect(result.success).toBe(true);
   });
 
@@ -51,13 +51,13 @@ describe('SecurityAdvisorRequestSchema', () => {
         findings: [],
       },
     };
-    const result = SecurityAdvisorRequestSchema.safeParse(minimal);
+    const result = ShellSecurityRequestSchema.safeParse(minimal);
     expect(result.success).toBe(true);
   });
 
   it('rejects plugin-method payload missing pluginVersion', () => {
     // superRefine requires pluginVersion when method === 'plugin'.
-    const result = SecurityAdvisorRequestSchema.safeParse({
+    const result = ShellSecurityRequestSchema.safeParse({
       ...VALID_PAYLOAD,
       source: { platform: 'openclaw', method: 'plugin' },
     });
@@ -73,7 +73,7 @@ describe('SecurityAdvisorRequestSchema', () => {
       findings: [],
     };
     for (const method of ['api', 'webhook', 'cloud-agent'] as const) {
-      const result = SecurityAdvisorRequestSchema.safeParse({
+      const result = ShellSecurityRequestSchema.safeParse({
         apiVersion: '2026-04-01',
         source: { platform: 'openclaw', method },
         audit: baseAudit,
@@ -83,7 +83,7 @@ describe('SecurityAdvisorRequestSchema', () => {
   });
 
   it('rejects payload with non-semver pluginVersion', () => {
-    const result = SecurityAdvisorRequestSchema.safeParse({
+    const result = ShellSecurityRequestSchema.safeParse({
       ...VALID_PAYLOAD,
       source: { ...VALID_PAYLOAD.source, pluginVersion: 'banana' },
     });
@@ -91,7 +91,7 @@ describe('SecurityAdvisorRequestSchema', () => {
   });
 
   it('accepts pluginVersion with prerelease and build metadata', () => {
-    const result = SecurityAdvisorRequestSchema.safeParse({
+    const result = ShellSecurityRequestSchema.safeParse({
       ...VALID_PAYLOAD,
       source: { ...VALID_PAYLOAD.source, pluginVersion: '1.2.3-beta.4+build.5' },
     });
@@ -99,7 +99,7 @@ describe('SecurityAdvisorRequestSchema', () => {
   });
 
   it('rejects wrong apiVersion', () => {
-    const result = SecurityAdvisorRequestSchema.safeParse({
+    const result = ShellSecurityRequestSchema.safeParse({
       ...VALID_PAYLOAD,
       apiVersion: '2025-01-01',
     });
@@ -107,7 +107,7 @@ describe('SecurityAdvisorRequestSchema', () => {
   });
 
   it('rejects invalid source platform', () => {
-    const result = SecurityAdvisorRequestSchema.safeParse({
+    const result = ShellSecurityRequestSchema.safeParse({
       ...VALID_PAYLOAD,
       source: { ...VALID_PAYLOAD.source, platform: 'unknown' },
     });
@@ -115,7 +115,7 @@ describe('SecurityAdvisorRequestSchema', () => {
   });
 
   it('rejects invalid source method', () => {
-    const result = SecurityAdvisorRequestSchema.safeParse({
+    const result = ShellSecurityRequestSchema.safeParse({
       ...VALID_PAYLOAD,
       source: { ...VALID_PAYLOAD.source, method: 'smoke-signal' },
     });
@@ -124,7 +124,7 @@ describe('SecurityAdvisorRequestSchema', () => {
 
   it('rejects missing audit', () => {
     const { audit: _, ...noAudit } = VALID_PAYLOAD;
-    const result = SecurityAdvisorRequestSchema.safeParse(noAudit);
+    const result = ShellSecurityRequestSchema.safeParse(noAudit);
     expect(result.success).toBe(false);
   });
 
@@ -133,7 +133,7 @@ describe('SecurityAdvisorRequestSchema', () => {
     // findings rather than setting it to null. The schema must treat the
     // field as .nullable().optional(), not just .nullable(). Reverting to
     // plain .nullable() would 400 every real-world audit submission.
-    const result = SecurityAdvisorRequestSchema.safeParse({
+    const result = ShellSecurityRequestSchema.safeParse({
       ...VALID_PAYLOAD,
       audit: {
         ...VALID_PAYLOAD.audit,
@@ -152,7 +152,7 @@ describe('SecurityAdvisorRequestSchema', () => {
   });
 
   it('rejects invalid finding severity', () => {
-    const result = SecurityAdvisorRequestSchema.safeParse({
+    const result = ShellSecurityRequestSchema.safeParse({
       ...VALID_PAYLOAD,
       audit: {
         ...VALID_PAYLOAD.audit,
@@ -172,12 +172,12 @@ describe('SecurityAdvisorRequestSchema', () => {
 
   it('rejects missing source', () => {
     const { source: _, ...noSource } = VALID_PAYLOAD;
-    const result = SecurityAdvisorRequestSchema.safeParse(noSource);
+    const result = ShellSecurityRequestSchema.safeParse(noSource);
     expect(result.success).toBe(false);
   });
 
   it('rejects invalid publicIp', () => {
-    const result = SecurityAdvisorRequestSchema.safeParse({
+    const result = ShellSecurityRequestSchema.safeParse({
       ...VALID_PAYLOAD,
       publicIp: '<script>alert(1)</script>',
     });
@@ -185,7 +185,7 @@ describe('SecurityAdvisorRequestSchema', () => {
   });
 
   it('accepts valid IPv6 publicIp', () => {
-    const result = SecurityAdvisorRequestSchema.safeParse({
+    const result = ShellSecurityRequestSchema.safeParse({
       ...VALID_PAYLOAD,
       publicIp: '2001:db8::1',
     });
@@ -193,8 +193,8 @@ describe('SecurityAdvisorRequestSchema', () => {
   });
 
   it('rejects non-object payload', () => {
-    expect(SecurityAdvisorRequestSchema.safeParse('hello').success).toBe(false);
-    expect(SecurityAdvisorRequestSchema.safeParse(42).success).toBe(false);
-    expect(SecurityAdvisorRequestSchema.safeParse(null).success).toBe(false);
+    expect(ShellSecurityRequestSchema.safeParse('hello').success).toBe(false);
+    expect(ShellSecurityRequestSchema.safeParse(42).success).toBe(false);
+    expect(ShellSecurityRequestSchema.safeParse(null).success).toBe(false);
   });
 });

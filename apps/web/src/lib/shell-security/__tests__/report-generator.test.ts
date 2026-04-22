@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { generateSecurityReport } from '../report-generator';
-import type { AuditFinding, SecurityAdvisorRequest } from '../schemas';
-import type { LoadedSecurityAdvisorContent } from '../content-loader';
+import type { AuditFinding, ShellSecurityRequest } from '../schemas';
+import type { LoadedShellSecurityContent } from '../content-loader';
 import { KILOCLAW_MITIGATED_CHECKS } from '../kiloclaw-mitigations';
 
 /**
@@ -13,7 +13,7 @@ import { KILOCLAW_MITIGATED_CHECKS } from '../kiloclaw-mitigations';
  * still exercising the server-authoritative severity override + comparison
  * framing behavior.
  */
-function buildTestContent(): LoadedSecurityAdvisorContent {
+function buildTestContent(): LoadedShellSecurityContent {
   const checkCatalog = new Map<
     string,
     { severity: 'critical' | 'warn' | 'info'; explanation: string; risk: string }
@@ -88,7 +88,7 @@ function buildTestContent(): LoadedSecurityAdvisorContent {
   return { checkCatalog, kiloclawCoverage, content };
 }
 
-const FIXTURE_AUDIT: SecurityAdvisorRequest['audit'] = {
+const FIXTURE_AUDIT: ShellSecurityRequest['audit'] = {
   ts: 1775491369820,
   summary: { critical: 1, warn: 4, info: 1 },
   findings: [
@@ -457,7 +457,7 @@ describe('generateSecurityReport', () => {
     const MITIGATED_EXAMPLE = MITIGATED_IDS[0]!;
     const NOT_MITIGATED_EXAMPLE = 'tools.exec.security_full_configured';
 
-    function auditWith(checkIds: string[]): SecurityAdvisorRequest['audit'] {
+    function auditWith(checkIds: string[]): ShellSecurityRequest['audit'] {
       return {
         ts: 1,
         summary: { critical: 0, warn: checkIds.length, info: 0 },

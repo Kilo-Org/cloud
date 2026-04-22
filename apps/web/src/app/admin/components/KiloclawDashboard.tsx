@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { KiloclawInstancesPage } from './KiloclawInstances/KiloclawInstancesPage';
 import { KiloclawOrphansTab } from './KiloclawInstances/KiloclawOrphansTab';
@@ -19,7 +19,7 @@ const VALID_TABS: readonly string[] = [
   'regions',
   'providers',
   'cli-runs',
-  'security-advisor-content',
+  'shell-security-content',
 ];
 type Tab =
   | 'instances'
@@ -29,9 +29,26 @@ type Tab =
   | 'regions'
   | 'providers'
   | 'cli-runs'
-  | 'security-advisor-content';
+  | 'shell-security-content';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
+
+// Legacy tab value from before the ShellSecurity rename. Redirect any bookmarks
+// to the new tab value. Remove 30 days after launch (~2026-05-22) once bookmark
+// traffic has migrated.
+//
+// Map (not plain object) so prototype keys like `__proto__` / `constructor` /
+// `toString` from a crafted `?tab=` value cannot resolve to a non-Tab value
+// and get written back into the URL.
+const LEGACY_TAB_REDIRECTS: ReadonlyMap<string, Tab> = new Map([
+  ['security-advisor-content', 'shell-security-content'],
+]);
+
+function resolveTab(tabParam: string | null): Tab {
+  if (tabParam === null) return 'instances';
+  if (isValidTab(tabParam)) return tabParam;
+  return LEGACY_TAB_REDIRECTS.get(tabParam) ?? 'instances';
+}
 
 const tabTriggerClass =
   'text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
@@ -42,7 +59,20 @@ export function KiloclawDashboard() {
   const pathname = usePathname();
 
   const tabParam = searchParams.get('tab');
-  const activeTab: Tab = isValidTab(tabParam) ? tabParam : 'instances';
+  const activeTab = resolveTab(tabParam);
+
+  // Rewrite a deprecated tab value in the URL so bookmarks to
+  // ?tab=security-advisor-content persist as the new name on navigation.
+  // `resolveTab` already handles the first-render state so the tab content
+  // doesn't flash while the effect fires.
+  useEffect(() => {
+    if (tabParam === null || isValidTab(tabParam)) return;
+    const canonical = LEGACY_TAB_REDIRECTS.get(tabParam);
+    if (canonical === undefined) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', canonical);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [tabParam, searchParams, router, pathname]);
 
   const onTabChange = useCallback(
     (value: string) => {
@@ -83,8 +113,8 @@ export function KiloclawDashboard() {
           <TabsTrigger value="cli-runs" className={tabTriggerClass}>
             CLI Runs
           </TabsTrigger>
-          <TabsTrigger value="security-advisor-content" className={tabTriggerClass}>
-            Security Advisor Content
+          <TabsTrigger value="shell-security-content" className={tabTriggerClass}>
+            ShellSecurity Content
           </TabsTrigger>
         </TabsList>
         <TabsContent value="instances" className="mt-4">
@@ -108,7 +138,7 @@ export function KiloclawDashboard() {
         <TabsContent value="cli-runs" className="mt-4">
           <CliRunsTab />
         </TabsContent>
-        <TabsContent value="security-advisor-content" className="mt-4">
+        <TabsContent value="shell-security-content" className="mt-4">
           <KiloclawSecurityAdvisorContentTab />
         </TabsContent>
       </Tabs>

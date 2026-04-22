@@ -3,13 +3,14 @@
 import { useState, useRef, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile } from 'lucide-react';
+import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile, Copy } from 'lucide-react';
 import { EmojiQuickPick } from './EmojiQuickPick';
 import { EmojiPicker } from './EmojiPicker';
 import { ReactionPills } from './ReactionPills';
 import type { Message, ContentBlock, ActionsBlock } from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './KiloChatLayout';
+import { toast } from 'sonner';
 
 const MemoizedMarkdown = memo(function MemoizedMarkdown({ content }: { content: string }) {
   return (
@@ -130,6 +131,18 @@ export const MessageBubble = memo(function MessageBubble({
         title="React"
       >
         <Smile className="h-3.5 w-3.5" />
+      </button>
+      <button
+        onClick={() => {
+          void navigator.clipboard.writeText(textContent).then(
+            () => toast.success('Copied to clipboard'),
+            () => toast.error('Failed to copy')
+          );
+        }}
+        className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+        title="Copy"
+      >
+        <Copy className="h-3.5 w-3.5" />
       </button>
       {isOwn && !message.deliveryFailed && (
         <button

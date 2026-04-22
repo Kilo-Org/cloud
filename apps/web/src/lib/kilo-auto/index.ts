@@ -84,13 +84,18 @@ export const BALANCED_CODEX_MODEL: ResolvedAutoModel = {
   reasoning: { enabled: true, effort: 'low' },
 };
 
+export const BALANCED_HAIKU_MODEL: ResolvedAutoModel = {
+  model: 'anthropic/claude-haiku-4.5',
+  reasoning: { enabled: true, effort: 'medium' },
+};
+
 export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   model: claude_sonnet_clawsetup_model.public_id,
   reasoning: { enabled: true, effort: 'high' },
   verbosity: 'high',
 };
 
-export const BALANCED_CLAW_MODEL: ResolvedAutoModel = {
+export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
   model: qwen36_plus_model.public_id,
   reasoning: { enabled: true },
 };

@@ -4389,13 +4389,21 @@ export class TownDO extends DurableObject<Env> {
           headers,
         });
         const durationMs = Date.now() - t0;
-        writeEvent(this.env, {
-          event: 'container.health_ping',
-          townId,
-          durationMs,
-          healthPingStatus: 'ok',
-        });
-        if (healthResp.ok) {
+        if (!healthResp.ok) {
+          writeEvent(this.env, {
+            event: 'container.health_ping',
+            townId,
+            durationMs,
+            statusCode: healthResp.status,
+            error: `non-ok status ${healthResp.status}`,
+          });
+        } else {
+          writeEvent(this.env, {
+            event: 'container.health_ping',
+            townId,
+            durationMs,
+            statusCode: healthResp.status,
+          });
           const rawBody: unknown = await healthResp.json().catch(() => null);
           const HealthBody = z
             .object({ startedAt: z.string().optional(), uptime: z.number().optional() })
@@ -4417,7 +4425,6 @@ export class TownDO extends DurableObject<Env> {
           event: 'container.health_ping',
           townId,
           durationMs,
-          healthPingStatus: 'timeout',
           error: 'timeout',
         });
         // Container is starting up or unavailable — alarm will retry

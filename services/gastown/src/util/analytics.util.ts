@@ -45,11 +45,10 @@ export type GastownEventData = {
   value?: number;
   label?: string;
   // Container cold-start instrumentation fields.
-  // Use durationMs for all timing (event name disambiguates the metric).
+  // Use durationMs for timing (event name disambiguates the metric).
   // Use error (absence = success) instead of a wasSuccess boolean.
   statusCode?: number;
   containerStartedAt?: string;
-  healthPingStatus?: string;
   // Additional doubles for reconciler_tick events (double3–double10).
   // Analytics Engine supports up to 20 doubles per data point.
   double3?: number;
@@ -88,8 +87,7 @@ export function writeEvent(
         data.role ?? '', // blob12
         data.beadType ?? '', // blob13
         data.reason ?? '', // blob14
-        data.healthPingStatus ?? '', // blob15
-        data.containerStartedAt ?? '', // blob16
+        data.containerStartedAt ?? '', // blob15
       ],
       doubles: [
         data.durationMs ?? 0, // double1

@@ -26,6 +26,7 @@ const config: Config = {
   moduleNameMapper: {
     '^@/lib/integrations/platforms/github/adapter$':
       '<rootDir>/src/tests/setup/__mocks__/lib/integrations/platforms/github/adapter.ts',
+    '^@/lib/bot$': '<rootDir>/src/tests/setup/__mocks__/lib/bot.js',
     '^@kilocode/db/(.*)$': '<rootDir>/../../packages/db/src/$1',
     '^@kilocode/db$': '<rootDir>/../../packages/db/src/index.ts',
     '^@kilocode/worker-utils/(.*)$': '<rootDir>/../../packages/worker-utils/src/$1',
@@ -33,6 +34,8 @@ const config: Config = {
     '^(\\.{1,2}/.+)\\.js$': '$1',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^server-only$': '<rootDir>/src/tests/setup/__mocks__/server-only.js',
+    '^chat$': '<rootDir>/src/tests/setup/__mocks__/chat.js',
+    '^@chat-adapter/slack$': '<rootDir>/src/tests/setup/__mocks__/@chat-adapter/slack.js',
   },
   testMatch: ['**/src/**/*.test.ts', '<rootDir>/../../packages/db/src/**/*.test.ts'],
   testPathIgnorePatterns: [

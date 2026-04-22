@@ -10,8 +10,9 @@ import {
   formatConversationContextForPrompt,
 } from '@/lib/bot/conversation-context';
 import { buildPrSignature, getRequesterInfo } from '@/lib/bot/pr-signature';
-import { updateBotRequest, linkBotRequestToSession } from '@/lib/bot/request-logging';
+import { updateBotRequest, recordBotRequestCloudAgentSession } from '@/lib/bot/request-logging';
 import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/step-budget';
+import { randomUUID } from 'crypto';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
@@ -230,6 +231,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
   const remainingIterations = getRemainingBotIterations(completedStepCount);
   const collectedSteps: BotRequestStep[] = [];
   let startedCloudAgentSession = false;
+  const spawnGroupId = params.botRequestId ? randomUUID() : undefined;
 
   if (params.botRequestId) {
     updateBotRequest(params.botRequestId, { modelUsed: modelSlug });
@@ -260,6 +262,12 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
         inputSchema: spawnCloudAgentInputSchema,
         execute: async args => {
           let resolvedSessionId: string | undefined;
+          let resolvedKiloSessionId: string | undefined;
+
+          const currentStep = getNextBotCallbackStep({
+            completedStepCount,
+            completedStepsInCurrentRun: collectedSteps.length,
+          });
 
           const result = await spawnCloudAgentSession(
             args,
@@ -271,6 +279,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
             ({ kiloSessionId, cloudAgentSessionId }) => {
               startedCloudAgentSession = true;
               resolvedSessionId = cloudAgentSessionId;
+              resolvedKiloSessionId = kiloSessionId;
               params.onSessionReady?.({ kiloSessionId, cloudAgentSessionId, prompt: args.prompt });
               const sessionUrl = buildSessionUrl(kiloSessionId, owner);
               void postSessionLinkEphemeral({
@@ -285,17 +294,23 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
             {
               prSignature,
               chatPlatform,
-              currentStep: getNextBotCallbackStep({
-                completedStepCount,
-                completedStepsInCurrentRun: collectedSteps.length,
-              }),
+              currentStep,
             }
           );
 
-          // Persist the session link synchronously so callbacks can
+          // Persist the child session synchronously so callbacks can
           // correlate immediately — must complete before we return.
-          if (params.botRequestId && resolvedSessionId) {
-            await linkBotRequestToSession(params.botRequestId, resolvedSessionId);
+          if (params.botRequestId && spawnGroupId && resolvedSessionId) {
+            await recordBotRequestCloudAgentSession({
+              botRequestId: params.botRequestId,
+              spawnGroupId,
+              cloudAgentSessionId: resolvedSessionId,
+              kiloSessionId: resolvedKiloSessionId,
+              mode: args.mode,
+              githubRepo: args.githubRepo,
+              gitlabProject: args.gitlabProject,
+              callbackStep: currentStep,
+            });
           }
 
           return result;

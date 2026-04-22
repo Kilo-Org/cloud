@@ -242,9 +242,18 @@ export default function BotRequestDetailPage() {
             <InfoRow label="Thread ID">
               <code className="text-xs">{data.platformThreadId}</code>
             </InfoRow>
-            {data.cloudAgentSessionId && (
-              <InfoRow label="Cloud Agent Session">
-                <code className="text-xs">{data.cloudAgentSessionId}</code>
+            {data.cloudAgentSessions.length > 0 && (
+              <InfoRow label="Cloud Agent Sessions">
+                <div className="space-y-1">
+                  {data.cloudAgentSessions.map(s => (
+                    <div key={s.cloudAgentSessionId} className="text-xs">
+                      <code>{s.cloudAgentSessionId}</code>
+                      <span className="text-muted-foreground ml-2">({s.status})</span>
+                      {s.githubRepo && <span className="ml-2">{s.githubRepo}</span>}
+                      {s.gitlabProject && <span className="ml-2">{s.gitlabProject}</span>}
+                    </div>
+                  ))}
+                </div>
               </InfoRow>
             )}
             <InfoRow label="Created">

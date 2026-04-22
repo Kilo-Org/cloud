@@ -40,6 +40,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_cli_runs,
   bot_requests,
+  bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
   user_push_tokens,
   security_advisor_scans,
@@ -778,22 +779,31 @@ describe('User', () => {
       const user1 = await insertTestUser();
       const user2 = await insertTestUser();
 
-      await db.insert(bot_requests).values([
-        {
+      const [request1] = await db
+        .insert(bot_requests)
+        .values({
           created_by: user1.id,
           platform: 'slack',
           platform_thread_id: 'slack:T123:C456:thread1',
           user_message: 'Hello from user1',
           status: 'completed',
-        },
-        {
-          created_by: user2.id,
-          platform: 'slack',
-          platform_thread_id: 'slack:T123:C456:thread2',
-          user_message: 'Hello from user2',
-          status: 'completed',
-        },
-      ]);
+        })
+        .returning({ id: bot_requests.id });
+
+      await db.insert(bot_requests).values({
+        created_by: user2.id,
+        platform: 'slack',
+        platform_thread_id: 'slack:T123:C456:thread2',
+        user_message: 'Hello from user2',
+        status: 'completed',
+      });
+
+      await db.insert(bot_request_cloud_agent_sessions).values({
+        bot_request_id: request1.id,
+        spawn_group_id: randomUUID(),
+        cloud_agent_session_id: 'agent_user1',
+        status: 'completed',
+      });
 
       await softDeleteUser(user1.id);
 
@@ -811,6 +821,14 @@ describe('User', () => {
           .where(eq(bot_requests.created_by, user2.id))
           .then(r => r[0].count)
       ).toBe(1);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(bot_request_cloud_agent_sessions)
+          .where(eq(bot_request_cloud_agent_sessions.bot_request_id, request1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
     });
 
     it('should soft-delete and anonymize payment methods', async () => {

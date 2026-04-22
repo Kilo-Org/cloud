@@ -4176,7 +4176,6 @@ export const bot_requests = pgTable(
 
     steps: jsonb().$type<BotRequestStep[]>(),
 
-    cloud_agent_session_id: text(),
     response_time_ms: integer(),
 
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -4195,6 +4194,64 @@ export const bot_requests = pgTable(
 );
 
 export type BotRequest = typeof bot_requests.$inferSelect;
+
+export type BotRequestCloudAgentSessionStatus =
+  | 'prepared'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'interrupted';
+
+export const bot_request_cloud_agent_sessions = pgTable(
+  'bot_request_cloud_agent_sessions',
+  {
+    id: idPrimaryKeyColumn,
+
+    bot_request_id: uuid()
+      .notNull()
+      .references(() => bot_requests.id, { onDelete: 'cascade' }),
+
+    spawn_group_id: uuid().notNull(),
+    cloud_agent_session_id: text().notNull(),
+    kilo_session_id: text(),
+    execution_id: text(),
+
+    status: text().notNull().$type<BotRequestCloudAgentSessionStatus>().default('running'),
+    mode: text().$type<'code' | 'ask'>(),
+    github_repo: text(),
+    gitlab_project: text(),
+
+    callback_step: integer().notNull().default(0),
+    error_message: text(),
+
+    terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
+    continuation_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_bot_request_cloud_agent_sessions_cloud_agent_session_id').on(
+      table.cloud_agent_session_id
+    ),
+    index('IDX_bot_request_cloud_agent_sessions_bot_request_id').on(table.bot_request_id),
+    index('IDX_bot_request_cloud_agent_sessions_spawn_group').on(
+      table.bot_request_id,
+      table.spawn_group_id
+    ),
+    index('IDX_bot_request_cloud_agent_sessions_status').on(
+      table.bot_request_id,
+      table.spawn_group_id,
+      table.status
+    ),
+  ]
+);
+
+export type BotRequestCloudAgentSession = typeof bot_request_cloud_agent_sessions.$inferSelect;
+export type NewBotRequestCloudAgentSession = typeof bot_request_cloud_agent_sessions.$inferInsert;
 
 export const app_min_versions = pgTable('app_min_versions', {
   id: uuid()

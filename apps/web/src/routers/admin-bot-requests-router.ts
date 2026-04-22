@@ -1,6 +1,11 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { bot_requests, kilocode_users, organizations } from '@kilocode/db/schema';
+import {
+  bot_requests,
+  bot_request_cloud_agent_sessions,
+  kilocode_users,
+  organizations,
+} from '@kilocode/db/schema';
 import * as z from 'zod';
 import { sql, desc, eq, gte, count } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -153,7 +158,6 @@ export const adminBotRequestsRouter = createTRPCRouter({
         errorMessage: bot_requests.error_message,
         modelUsed: bot_requests.model_used,
         steps: bot_requests.steps,
-        cloudAgentSessionId: bot_requests.cloud_agent_session_id,
         responseTimeMs: bot_requests.response_time_ms,
         createdAt: bot_requests.created_at,
         updatedAt: bot_requests.updated_at,
@@ -172,6 +176,24 @@ export const adminBotRequestsRouter = createTRPCRouter({
       });
     }
 
+    const cloudAgentSessions = await db
+      .select({
+        cloudAgentSessionId: bot_request_cloud_agent_sessions.cloud_agent_session_id,
+        kiloSessionId: bot_request_cloud_agent_sessions.kilo_session_id,
+        status: bot_request_cloud_agent_sessions.status,
+        mode: bot_request_cloud_agent_sessions.mode,
+        githubRepo: bot_request_cloud_agent_sessions.github_repo,
+        gitlabProject: bot_request_cloud_agent_sessions.gitlab_project,
+        callbackStep: bot_request_cloud_agent_sessions.callback_step,
+        errorMessage: bot_request_cloud_agent_sessions.error_message,
+        createdAt: bot_request_cloud_agent_sessions.created_at,
+        updatedAt: bot_request_cloud_agent_sessions.updated_at,
+        terminalAt: bot_request_cloud_agent_sessions.terminal_at,
+      })
+      .from(bot_request_cloud_agent_sessions)
+      .where(eq(bot_request_cloud_agent_sessions.bot_request_id, input.id))
+      .orderBy(bot_request_cloud_agent_sessions.created_at);
+
     return {
       id: row.id,
       userEmail: row.userEmail,
@@ -187,10 +209,10 @@ export const adminBotRequestsRouter = createTRPCRouter({
       errorMessage: row.errorMessage,
       modelUsed: row.modelUsed,
       steps: row.steps,
-      cloudAgentSessionId: row.cloudAgentSessionId,
       responseTimeMs: row.responseTimeMs,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      cloudAgentSessions,
     };
   }),
 });

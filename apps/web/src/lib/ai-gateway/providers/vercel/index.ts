@@ -60,7 +60,7 @@ export async function shouldRouteToVercel(
 
   const vercelModels = await getVercelModels();
   const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
-  if (!vercelModels.includes(vercelModelId)) {
+  if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
   }

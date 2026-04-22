@@ -61,7 +61,7 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
  * the current `apiKind`; when `apiKind` is null no API-kind filtering is applied.
  */
 export function getAutoFreeCandidates(
-  openRouterModels: ReadonlyArray<string>,
+  openRouterModels: ReadonlySet<string>,
   apiKind: GatewayRequest['kind'] | null
 ): ReadonlyArray<string> {
   const candidates = new Set<string>();
@@ -72,7 +72,7 @@ export function getAutoFreeCandidates(
         if (kiloModel && gatewaySupportsApiKind(kiloModel.gateway, apiKind)) {
           candidates.add(model);
         }
-      } else if (openRouterModels.includes(model)) {
+      } else if (openRouterModels.has(model)) {
         candidates.add(model);
       }
     }

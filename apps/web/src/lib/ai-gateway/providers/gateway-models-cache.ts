@@ -12,12 +12,14 @@ function createGatewayModelsFetcher(redisKey: RedisKey, name: string) {
       if (Object.keys(result).length === 0) {
         console.debug(`[getGatewayModels] no ${name} models found in Redis`);
       }
-      return Object.values(z.record(z.string(), StoredModelSchema).parse(result))
-        .filter(model => model.type === 'language' && model.endpoints.length > 0)
-        .map(model => model.id);
+      return new Set(
+        Object.values(z.record(z.string(), StoredModelSchema).parse(result))
+          .filter(model => model.type === 'language' && model.endpoints.length > 0)
+          .map(model => model.id)
+      );
     },
     60_000,
-    [] as string[]
+    new Set<string>()
   );
 }
 

@@ -26,7 +26,8 @@ import {
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
-import { isFreeModel, preferredModels } from '@/lib/ai-gateway/models';
+import { isFreeModel, isKiloExclusiveFreeModel, preferredModels } from '@/lib/ai-gateway/models';
+import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -44,17 +45,25 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
   return null;
 }
 
-function getAutoFreeCandidates() {
+/**
+ * Returns the candidate models for kilo-auto/free routing.
+ *
+ * Kilo-exclusive free models are always included (they are routed internally
+ * and do not depend on OpenRouter availability). Non-kilo-exclusive free models
+ * are only included when they appear in the supplied `openRouterModels` list,
+ * which is sourced from the Redis OpenRouter models cache.
+ */
+export function getAutoFreeCandidates(openRouterModels: ReadonlyArray<string>): ReadonlyArray<string> {
   const candidates = new Set<string>();
   for (const model of preferredModels) {
     if (!isKiloAutoModel(model) && isFreeModel(model)) {
-      candidates.add(model);
+      if (isKiloExclusiveFreeModel(model) || openRouterModels.includes(model)) {
+        candidates.add(model);
+      }
     }
   }
   return [...candidates].toSorted();
 }
-
-const AUTO_FREE_CANDIDATES: ReadonlyArray<string> = getAutoFreeCandidates();
 
 export async function resolveAutoModel(
   params: ResolveAutoModelParams,
@@ -63,10 +72,12 @@ export async function resolveAutoModel(
 ): Promise<ResolvedAutoModel> {
   const { model, modeHeader, featureHeader, sessionId, apiKind, clientIp } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
+    const openRouterModels = await getOpenRouterModels();
+    const candidates = getAutoFreeCandidates(openRouterModels);
     const randomNumber = getRandomNumberLessThan100(
       'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp)
     );
-    return { model: AUTO_FREE_CANDIDATES[randomNumber % AUTO_FREE_CANDIDATES.length] };
+    return { model: candidates[randomNumber % candidates.length] };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {

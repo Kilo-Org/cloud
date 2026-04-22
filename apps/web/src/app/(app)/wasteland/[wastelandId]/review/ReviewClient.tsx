@@ -1,12 +1,13 @@
 'use client';
 
 /**
- * Review inbox — typed-card view of open upstream pull requests.
+ * Review inbox — typed list of open upstream pull requests.
  *
- * Each PR is classified server-side into one of five kinds (plus
- * `unknown` for foreign PRs) by the inbox classifier. This file renders
- * each kind as a dedicated card with reviewer-relevant context, and
- * exposes Merge / Close / Comment / View-on-DoltHub actions.
+ * Layout mirrors the Wanted Board: dense one-line list on the left,
+ * slide-over detail panel on the right, search + kind filter + sort
+ * toolbar at the top. Each PR is classified server-side into one of
+ * five kinds (plus `unknown` for foreign PRs) and rendered with kind-
+ * specific metadata both in the row and in the drawer body.
  *
  * Gating: only wasteland owners with admin mode enabled can load this
  * page. Contributors (no credential, or credential without
@@ -14,14 +15,14 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import type { WastelandOutputs } from '@/lib/wasteland/trpc';
 import { useUser } from '@/hooks/useUser';
 import { useSetWastelandPageHeader } from '../WastelandPageHeaderContext';
+import { useDrawerStack } from '@/components/wasteland/drawer/WastelandDrawerStack';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -31,45 +32,66 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import {
-  Inbox,
-  Loader2,
-  GitMerge,
-  XCircle,
-  MessageSquare,
-  ExternalLink,
-  UserPlus,
-  ScrollText,
-  Pencil,
-  Hand,
-  ThumbsUp,
-  ThumbsDown,
-  ShieldCheck,
-  HelpCircle,
-  AlertTriangle,
-  Star,
-  CheckCircle2,
-} from 'lucide-react';
+import { ArrowUpDown, CheckCircle2, Inbox, Loader2, Search, ShieldCheck } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { formatDistanceToNow } from 'date-fns';
 
 type InboxItem = WastelandOutputs['wasteland']['listInboxItems']['items'][number];
+type InboxKind = InboxItem['kind'];
+type SortField = 'activity' | 'kind';
 
-type Filter = 'all' | InboxItem['kind'];
-
-const FILTER_LABELS: Record<Filter, string> = {
-  all: 'All',
-  'rig-registration': 'Registrations',
-  'wanted-post': 'New Posts',
-  'wanted-edit': 'Edits',
-  'work-submission': 'Submissions',
-  'admin-action': 'Admin Actions',
-  unknown: 'Unknown',
+const KIND_LABEL: Record<InboxKind, string> = {
+  'rig-registration': 'Registration',
+  'wanted-post': 'New post',
+  'wanted-edit': 'Edit',
+  'work-submission': 'Submission',
+  'admin-action': 'Admin action',
+  unknown: 'Foreign',
 };
+
+// Short-form label used in the row's trailing kind chip.
+const KIND_SHORT: Record<InboxKind, string> = {
+  'rig-registration': 'rig',
+  'wanted-post': 'post',
+  'wanted-edit': 'edit',
+  'work-submission': 'submission',
+  'admin-action': 'admin',
+  unknown: 'foreign',
+};
+
+const KIND_DOT: Record<InboxKind, string> = {
+  'rig-registration': 'bg-emerald-400',
+  'wanted-post': 'bg-sky-400',
+  'wanted-edit': 'bg-amber-400',
+  'work-submission': 'bg-violet-400',
+  'admin-action': 'bg-indigo-400',
+  unknown: 'bg-white/20',
+};
+
+const KIND_CHIP: Record<InboxKind, string> = {
+  'rig-registration': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  'wanted-post': 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+  'wanted-edit': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  'work-submission': 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+  'admin-action': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  unknown: 'bg-white/[0.04] text-white/40 border-white/10',
+};
+
+// Stable order for filter chips (matches the taxonomy docs).
+const KIND_ORDER: InboxKind[] = [
+  'rig-registration',
+  'wanted-post',
+  'wanted-edit',
+  'work-submission',
+  'admin-action',
+  'unknown',
+];
 
 export function ReviewClient({ wastelandId }: { wastelandId: string }) {
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
   const { data: currentUser } = useUser();
+  const { open: openDrawer, closeAll: closeDrawer } = useDrawerStack();
 
   const wastelandQuery = useQuery(trpc.wasteland.getWasteland.queryOptions({ wastelandId }));
   const credentialQuery = useQuery(
@@ -88,26 +110,43 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
     refetchInterval: 30_000,
   });
 
-  const [filter, setFilter] = useState<Filter>('all');
+  // ── Filter / sort state ──────────────────────────────────────────
+  const [search, setSearch] = useState('');
+  const [kindFilter, setKindFilter] = useState<InboxKind | null>(null);
+  const [sortField, setSortField] = useState<SortField>('activity');
   const [commentOnItem, setCommentOnItem] = useState<InboxItem | null>(null);
 
-  const items = inboxQuery.data?.items ?? [];
-  const filtered = useMemo(
-    () => (filter === 'all' ? items : items.filter(i => i.kind === filter)),
-    [items, filter]
-  );
+  const items = useMemo(() => inboxQuery.data?.items ?? [], [inboxQuery.data]);
 
   const counts = useMemo(() => countByKind(items), [items]);
-  const upstream = wastelandQuery.data?.dolthub_upstream ?? null;
 
+  const filteredItems = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const filtered = items.filter(item => {
+      if (kindFilter && item.kind !== kindFilter) return false;
+      if (!query) return true;
+      return itemSearchHaystack(item).includes(query);
+    });
+    return filtered.sort((a, b) => {
+      if (sortField === 'kind') {
+        const ak = KIND_ORDER.indexOf(a.kind);
+        const bk = KIND_ORDER.indexOf(b.kind);
+        if (ak !== bk) return ak - bk;
+      }
+      // Fall back to activity (newest first).
+      return timestampMs(b.updated_at) - timestampMs(a.updated_at);
+    });
+  }, [items, search, kindFilter, sortField]);
+
+  // ── Mutations ─────────────────────────────────────────────────────
   const refetch = () => {
     void queryClient.invalidateQueries({ queryKey: inboxQueryKey });
   };
 
-  // Post-merge, DoltHub merges asynchronously — schedule a few refetches
-  // over ~30s so the row drops out of the inbox without manual refresh.
-  // Track timers in a ref so we can clear them on unmount (tab closed mid
-  // merge) and avoid lingering callbacks.
+  // DoltHub merges async. Schedule 4 invalidations over ~30s so the row
+  // disappears as soon as the merge lands server-side without requiring
+  // a manual refresh. Timers are tracked in a ref so they can be
+  // cancelled on unmount.
   const pendingTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   useEffect(
     () => () => {
@@ -121,6 +160,7 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
     ...trpc.wasteland.mergeUpstreamPR.mutationOptions(),
     onSuccess: () => {
       toast.success('Merge initiated');
+      closeDrawer();
       const refetchAt = [2_000, 5_000, 15_000, 30_000];
       for (const ms of refetchAt) {
         pendingTimers.current.push(setTimeout(refetch, ms));
@@ -133,14 +173,15 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
     ...trpc.wasteland.closeUpstreamPR.mutationOptions(),
     onSuccess: () => {
       toast.success('PR closed');
+      closeDrawer();
       refetch();
     },
     onError: err => toast.error(`Close failed: ${err.message}`),
   });
 
-  // Contribute the Review page section to the wasteland navbar on every
-  // render path. Count is null until the inbox is loaded; the Admin-view
-  // pill always renders for owners who have admin mode on.
+  const busy = mergeMutation.isPending || closeMutation.isPending;
+
+  // ── Page header contribution ──────────────────────────────────────
   useSetWastelandPageHeader({
     title: 'Review',
     icon: <Inbox className="size-4 text-[color:oklch(70%_0.15_30_/_0.6)]" />,
@@ -153,9 +194,9 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
     ) : null,
   });
 
-  // ── Loading / permission-gated states ────────────────────────────
+  // ── Permission / loading states ───────────────────────────────────
   if (wastelandQuery.isLoading || credentialQuery.isLoading || membersQuery.isLoading) {
-    return <ReviewShell>{<CardSkeleton />}</ReviewShell>;
+    return <ReviewShell>{<InboxListSkeleton />}</ReviewShell>;
   }
 
   if (!isOwner) {
@@ -180,95 +221,186 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
     );
   }
 
-  return (
-    <ReviewShell>
-      {/* Filter chips */}
-      <div className="flex flex-wrap gap-1.5">
-        {(Object.keys(FILTER_LABELS) as Filter[]).map(key => {
-          const count = key === 'all' ? items.length : (counts[key] ?? 0);
-          if (key !== 'all' && count === 0) return null;
-          const active = filter === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setFilter(key)}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors ${
-                active
-                  ? 'border-violet-500/30 bg-violet-500/10 text-violet-300'
-                  : 'border-white/[0.08] bg-white/[0.02] text-white/50 hover:bg-white/[0.05]'
-              }`}
-            >
-              {FILTER_LABELS[key]}
-              <span
-                className={`rounded px-1 font-mono text-[10px] ${
-                  active ? 'text-violet-300/70' : 'text-white/30'
-                }`}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+  const upstream = wastelandQuery.data?.dolthub_upstream ?? null;
 
-      {/* Content */}
-      {inboxQuery.isLoading ? (
-        <CardSkeleton />
-      ) : inboxQuery.isError ? (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3">
-          <p className="text-sm text-red-400">Failed to load inbox</p>
-          <p className="mt-1 font-mono text-[11px] text-white/40">{inboxQuery.error.message}</p>
-        </div>
-      ) : items.length === 0 ? (
-        <EmptyInbox />
-      ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-6 py-12 text-center">
-          <p className="text-sm text-white/40">No items match this filter.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map(item => (
-            <InboxCard
-              key={item.pull_id}
-              item={item}
-              upstream={upstream}
-              busy={mergeMutation.isPending || closeMutation.isPending}
-              onMerge={() => mergeMutation.mutate({ wastelandId, pullId: item.pull_id })}
-              onClose={() => closeMutation.mutate({ wastelandId, pullId: item.pull_id })}
-              onComment={() => setCommentOnItem(item)}
+  const handleOpenItem = (item: InboxItem) => {
+    openDrawer({
+      type: 'review-item',
+      item,
+      actions: {
+        upstream,
+        busy,
+        onMerge: pr => mergeMutation.mutate({ wastelandId, pullId: pr.pull_id }),
+        onCloseAction: pr => closeMutation.mutate({ wastelandId, pullId: pr.pull_id }),
+        onComment: pr => setCommentOnItem(pr),
+      },
+    });
+  };
+
+  return (
+    <div className="flex h-full">
+      {/* Main list */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center gap-3 border-b border-white/[0.06] px-6 py-2">
+          {/* Search */}
+          <div className="flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5">
+            <Search className="size-3 text-white/30" />
+            <input
+              type="text"
+              placeholder="Search PRs, items, rigs..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-56 bg-transparent text-xs text-white/80 outline-none placeholder:text-white/25"
             />
-          ))}
+          </div>
+
+          {/* Kind filter chips */}
+          <div className="flex items-center gap-1">
+            <FilterChip
+              label="All"
+              count={items.length}
+              active={kindFilter === null}
+              onClick={() => setKindFilter(null)}
+            />
+            {KIND_ORDER.map(kind => {
+              const count = counts[kind] ?? 0;
+              if (count === 0) return null;
+              return (
+                <FilterChip
+                  key={kind}
+                  label={KIND_LABEL[kind]}
+                  count={count}
+                  active={kindFilter === kind}
+                  onClick={() => setKindFilter(kindFilter === kind ? null : kind)}
+                  dotColor={KIND_DOT[kind]}
+                />
+              );
+            })}
+          </div>
+
+          {/* Sort toggle */}
+          <button
+            type="button"
+            onClick={() => setSortField(s => (s === 'activity' ? 'kind' : 'activity'))}
+            className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-white/30 transition-colors hover:bg-white/[0.04] hover:text-white/50"
+          >
+            <ArrowUpDown className="size-3" />
+            {sortField === 'activity' ? 'Last activity' : 'Kind'}
+          </button>
         </div>
-      )}
+
+        {/* Item list */}
+        <div className="flex-1 overflow-y-auto">
+          {inboxQuery.isLoading && <InboxListSkeleton />}
+
+          {inboxQuery.isError && !inboxQuery.isLoading && (
+            <div className="mx-6 mt-6 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3">
+              <p className="text-sm text-red-400">Failed to load inbox</p>
+              <p className="mt-1 font-mono text-[11px] text-white/40">{inboxQuery.error.message}</p>
+            </div>
+          )}
+
+          {!inboxQuery.isLoading && !inboxQuery.isError && items.length === 0 && <EmptyInbox />}
+
+          {!inboxQuery.isLoading &&
+            !inboxQuery.isError &&
+            items.length > 0 &&
+            filteredItems.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Inbox className="mb-3 size-8 text-white/10" />
+                <p className="text-sm text-white/30">No inbox items match your filters.</p>
+              </div>
+            )}
+
+          <AnimatePresence mode="popLayout">
+            {filteredItems.map((item, i) => (
+              <motion.div
+                key={item.pull_id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ delay: Math.min(i * 0.02, 0.3), duration: 0.15 }}
+                onClick={() => handleOpenItem(item)}
+                className="group flex cursor-pointer items-center gap-3 border-b border-white/[0.04] px-6 py-2.5 transition-colors hover:bg-white/[0.02]"
+              >
+                <span className={`size-2 shrink-0 rounded-full ${KIND_DOT[item.kind]}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm text-white/80">{rowTitle(item)}</span>
+                    <Badge variant="outline" className={`text-[9px] ${KIND_CHIP[item.kind]}`}>
+                      {KIND_SHORT[item.kind]}
+                    </Badge>
+                    <span className="font-mono text-[10px] text-white/30">#{item.pull_id}</span>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-2 text-[10px] text-white/30">
+                    <span className="line-clamp-1 max-w-xs">{rowSubtitle(item)}</span>
+                    {item.submitter && (
+                      <>
+                        <span className="text-white/15">|</span>
+                        <span className="font-mono">{item.submitter}</span>
+                      </>
+                    )}
+                    {item.updated_at && (
+                      <>
+                        <span className="text-white/15">|</span>
+                        <span>{formatRelative(item.updated_at)}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <span className="shrink-0 text-[10px] font-medium text-white/40">
+                  {rowAccent(item)}
+                </span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      </div>
 
       <CommentDialog
         wastelandId={wastelandId}
         item={commentOnItem}
         onClose={() => setCommentOnItem(null)}
       />
-    </ReviewShell>
+    </div>
   );
 }
 
-// ── Shell ───────────────────────────────────────────────────────────────
-// Body-only wrapper; the title/count/Admin-pill live in the wasteland
-// navbar via `useSetWastelandPageHeader`.
+// ── Shell (used for loading / access-denied states) ─────────────────────
 
 function ReviewShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-4xl space-y-4 p-6">{children}</div>
-      </div>
+      <div className="flex-1 overflow-y-auto">{children}</div>
+    </div>
+  );
+}
+
+function InboxListSkeleton() {
+  return (
+    <div className="space-y-0">
+      {Array.from({ length: 10 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex animate-pulse items-center gap-3 border-b border-white/[0.04] px-6 py-3"
+        >
+          <div className="size-2 rounded-full bg-white/10" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 w-64 rounded bg-white/5" />
+            <div className="h-2 w-40 rounded bg-white/[0.03]" />
+          </div>
+          <div className="h-3 w-10 rounded bg-white/5" />
+        </div>
+      ))}
     </div>
   );
 }
 
 function EmptyInbox() {
   return (
-    <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-6 py-16 text-center">
-      <CheckCircle2 className="mx-auto mb-3 size-8 text-emerald-500/40" />
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <CheckCircle2 className="mb-3 size-8 text-emerald-500/40" />
       <p className="text-sm text-white/70">Inbox zero</p>
       <p className="mt-1 text-xs text-white/40">No open pull requests on the upstream.</p>
     </div>
@@ -277,7 +409,7 @@ function EmptyInbox() {
 
 function AccessDenied({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-6 py-12 text-center">
+    <div className="mx-auto max-w-md px-6 py-16 text-center">
       <ShieldCheck className="mx-auto mb-3 size-8 text-white/15" />
       <p className="text-sm text-white/70">{title}</p>
       <p className="mt-1 text-xs text-white/40">{description}</p>
@@ -285,198 +417,45 @@ function AccessDenied({ title, description }: { title: string; description: stri
   );
 }
 
-function CardSkeleton() {
-  return (
-    <div className="space-y-3">
-      <Skeleton className="h-28 w-full rounded-xl" />
-      <Skeleton className="h-28 w-full rounded-xl" />
-      <Skeleton className="h-28 w-full rounded-xl" />
-    </div>
-  );
-}
+// ── Filter chip ──────────────────────────────────────────────────────────
 
-// ── Cards ───────────────────────────────────────────────────────────────
-
-function InboxCard({
-  item,
-  upstream,
-  busy,
-  onMerge,
-  onClose,
-  onComment,
+function FilterChip({
+  label,
+  count,
+  active,
+  onClick,
+  dotColor,
 }: {
-  item: InboxItem;
-  upstream: string | null;
-  busy: boolean;
-  onMerge: () => void;
-  onClose: () => void;
-  onComment: () => void;
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+  dotColor?: string;
 }) {
-  const accent = accentFor(item.kind);
-
   return (
-    <article
-      className={`relative overflow-hidden rounded-xl border bg-[color:oklch(0.15_0_0)] ${accent.border}`}
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-medium capitalize transition-colors ${
+        active
+          ? 'bg-white/[0.08] text-white/70'
+          : 'text-white/30 hover:bg-white/[0.04] hover:text-white/50'
+      }`}
     >
-      <div className={`absolute inset-y-0 left-0 w-1 ${accent.bar}`} />
-      <div className="pl-4">
-        {/* Header strip */}
-        <div className="flex items-start justify-between gap-3 border-b border-white/[0.04] px-4 py-2.5">
-          <div className="flex items-center gap-2">
-            <accent.Icon className={`size-4 ${accent.icon}`} />
-            <span className={`text-xs font-medium ${accent.label}`}>{cardHeading(item)}</span>
-            <Badge
-              variant="outline"
-              className="border-white/[0.08] font-mono text-[10px] text-white/50"
-            >
-              #{item.pull_id}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-3 text-[10px] text-white/30">
-            {item.submitter && (
-              <span>
-                by <span className="font-mono text-white/50">{item.submitter}</span>
-              </span>
-            )}
-            {item.updated_at && <span>{formatRelative(item.updated_at)}</span>}
-          </div>
-        </div>
-
-        {/* Body — per-kind content */}
-        <div className="px-4 py-3">
-          <CardBody item={item} />
-        </div>
-
-        {/* Action strip */}
-        <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-white/[0.04] px-4 py-2.5">
-          {upstream && (
-            <a
-              href={`https://www.dolthub.com/repositories/${upstream}/pulls/${item.pull_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[11px] text-white/60 transition-colors hover:bg-white/[0.06]"
-            >
-              <ExternalLink className="size-3" />
-              DoltHub
-            </a>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 gap-1 border-white/[0.08] px-2 text-[11px] text-white/60 hover:bg-white/[0.06]"
-            onClick={onComment}
-          >
-            <MessageSquare className="size-3" />
-            Comment
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 gap-1 border-red-500/20 px-2 text-[11px] text-red-400 hover:bg-red-500/10"
-            disabled={busy}
-            onClick={onClose}
-          >
-            <XCircle className="size-3" />
-            Close
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 gap-1 border-emerald-500/20 px-2 text-[11px] text-emerald-400 hover:bg-emerald-500/10"
-            disabled={busy}
-            onClick={onMerge}
-          >
-            <GitMerge className="size-3" />
-            Merge
-          </Button>
-        </div>
-      </div>
-    </article>
+      {dotColor && <span className={`size-1.5 rounded-full ${dotColor}`} />}
+      {label}
+      <span className="font-mono text-[9px] opacity-60">{count}</span>
+    </button>
   );
 }
 
-function CardBody({ item }: { item: InboxItem }) {
-  switch (item.kind) {
-    case 'rig-registration':
-      return <RigRegistrationBody item={item} />;
-    case 'wanted-post':
-      return <WantedPostBody item={item} />;
-    case 'wanted-edit':
-      return <WantedEditBody item={item} />;
-    case 'work-submission':
-      return <WorkSubmissionBody item={item} />;
-    case 'admin-action':
-      return <AdminActionBody item={item} />;
-    case 'unknown':
-      return <UnknownBody item={item} />;
-  }
-}
-
-// ─── Rig registration ────
-
-function RigRegistrationBody({ item }: { item: Extract<InboxItem, { kind: 'rig-registration' }> }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
-          <UserPlus className="size-4 text-emerald-400" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-mono text-sm text-white/85">{item.handle}</p>
-          {item.display_name && <p className="text-xs text-white/50">{item.display_name}</p>}
-        </div>
-      </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[11px]">
-        {item.owner_email && (
-          <MetaRow label="Owner">
-            <span className="font-mono">{item.owner_email}</span>
-          </MetaRow>
-        )}
-        {item.dolthub_org && (
-          <MetaRow label="DoltHub org">
-            <span className="font-mono">{item.dolthub_org}</span>
-          </MetaRow>
-        )}
-        {item.hop_uri && (
-          <MetaRow label="Hop URI">
-            <span className="font-mono break-all">{item.hop_uri}</span>
-          </MetaRow>
-        )}
-        {item.gt_version && (
-          <MetaRow label="wl version">
-            <span className="font-mono">{item.gt_version}</span>
-          </MetaRow>
-        )}
-      </dl>
-      <ScrutinyHint text="Verify the handle matches the DoltHub org (spam/sybil risk). New rigs land with trust_level=1." />
-    </div>
-  );
-}
-
-// ─── Wanted post ────
-
-function WantedPostBody({ item }: { item: Extract<InboxItem, { kind: 'wanted-post' }> }) {
-  return (
-    <div className="space-y-2">
-      <div>
-        <p className="text-sm font-medium text-white/85">{item.item_title}</p>
-        <p className="mt-0.5 font-mono text-[10px] text-white/30">{item.item_id}</p>
-      </div>
-      {item.description && (
-        <p className="line-clamp-3 text-xs whitespace-pre-wrap text-white/55">{item.description}</p>
-      )}
-      <div className="flex flex-wrap gap-1.5 text-[10px]">
-        {item.type && <TagPill>{`type: ${item.type}`}</TagPill>}
-        {item.priority && <TagPill>{`priority: ${item.priority}`}</TagPill>}
-        {item.effort_level && <TagPill>{`effort: ${item.effort_level}`}</TagPill>}
-        {item.posted_by && <TagPill>{`by: ${item.posted_by}`}</TagPill>}
-      </div>
-      {item.tags && <p className="font-mono text-[10px] text-white/35">tags: {item.tags}</p>}
-    </div>
-  );
-}
-
-// ─── Wanted edit ────
+// ── Row-title label maps ────────────────────────────────────────────────
+//
+// These two const maps are also defined inside ReviewItemPanel.tsx for use
+// by the drawer body. They're duplicated here intentionally because the
+// row-title formatters (`rowTitle`, `rowAccent`) need them too, and
+// importing from a sibling panel component would couple the row rendering
+// to the drawer-internal structure.
 
 const EDIT_SUBKIND_LABEL: Record<'update' | 'delete' | 'unclaim', string> = {
   update: 'Update',
@@ -484,219 +463,16 @@ const EDIT_SUBKIND_LABEL: Record<'update' | 'delete' | 'unclaim', string> = {
   unclaim: 'Unclaim',
 };
 
-function WantedEditBody({ item }: { item: Extract<InboxItem, { kind: 'wanted-edit' }> }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="rounded border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
-          {EDIT_SUBKIND_LABEL[item.subkind]}
-        </span>
-        <p className="truncate text-sm text-white/80">{item.item_title}</p>
-        <span className="font-mono text-[10px] text-white/30">{item.item_id}</span>
-      </div>
-      {item.status_transition && (
-        <p className="font-mono text-[11px] text-white/50">{item.status_transition}</p>
-      )}
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[11px]">
-        {item.posted_by && (
-          <MetaRow label="Posted by">
-            <span className="font-mono">{item.posted_by}</span>
-          </MetaRow>
-        )}
-        {item.submitter_is_poster !== null && (
-          <MetaRow label="Submitter">
-            {item.submitter_is_poster ? (
-              <span className="text-emerald-400">is the original poster ✓</span>
-            ) : (
-              <span className="text-amber-400">
-                is <em>not</em> the original poster ⚠
-              </span>
-            )}
-          </MetaRow>
-        )}
-      </dl>
-      {item.submitter_is_poster === false && (
-        <ScrutinyHint text="Edit submitted by someone other than the original poster. Verify they should be able to modify this item." />
-      )}
-    </div>
-  );
-}
-
-// ─── Work submission ────
-
-function WorkSubmissionBody({ item }: { item: Extract<InboxItem, { kind: 'work-submission' }> }) {
-  return (
-    <div className="space-y-2">
-      <div>
-        <p className="text-sm font-medium text-white/85">{item.item_title}</p>
-        <p className="mt-0.5 font-mono text-[10px] text-white/30">{item.item_id}</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-[11px]">
-        <span className="inline-flex items-center gap-1 rounded border border-violet-500/20 bg-violet-500/10 px-1.5 py-0.5 text-violet-300">
-          <Hand className="size-3" />
-          Claimed
-        </span>
-        {item.has_done ? (
-          <span className="inline-flex items-center gap-1 rounded border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-sky-300">
-            <CheckCircle2 className="size-3" />
-            Evidence submitted
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 text-white/50">
-            Claim only — waiting on evidence
-          </span>
-        )}
-        <span className="text-white/40">
-          by <span className="font-mono text-white/70">{item.claimer}</span>
-        </span>
-      </div>
-      {item.evidence_url && (
-        <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
-          <p className="mb-1 text-[10px] font-medium tracking-wide text-white/40 uppercase">
-            Evidence
-          </p>
-          <a
-            href={item.evidence_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono text-[11px] text-sky-400 hover:text-sky-300 break-all"
-          >
-            {item.evidence_url}
-          </a>
-        </div>
-      )}
-      {item.completion_id && (
-        <p className="font-mono text-[10px] text-white/25">completion {item.completion_id}</p>
-      )}
-    </div>
-  );
-}
-
-// ─── Admin action ────
-
 const ADMIN_SUBKIND_LABEL: Record<
   'accept' | 'accept-upstream' | 'reject' | 'close' | 'close-upstream',
-  { label: string; icon: typeof ThumbsUp; tone: 'emerald' | 'red' | 'white' }
+  { label: string; tone: 'emerald' | 'red' | 'white' }
 > = {
-  accept: { label: 'Accept + stamp', icon: ThumbsUp, tone: 'emerald' },
-  'accept-upstream': { label: 'Accept upstream + stamp', icon: ThumbsUp, tone: 'emerald' },
-  reject: { label: 'Reject', icon: ThumbsDown, tone: 'red' },
-  close: { label: 'Close (no stamp)', icon: XCircle, tone: 'white' },
-  'close-upstream': { label: 'Close upstream (no stamp)', icon: XCircle, tone: 'white' },
+  accept: { label: 'Accept + stamp', tone: 'emerald' },
+  'accept-upstream': { label: 'Accept upstream + stamp', tone: 'emerald' },
+  reject: { label: 'Reject', tone: 'red' },
+  close: { label: 'Close (no stamp)', tone: 'white' },
+  'close-upstream': { label: 'Close upstream (no stamp)', tone: 'white' },
 };
-
-function AdminActionBody({ item }: { item: Extract<InboxItem, { kind: 'admin-action' }> }) {
-  const { label, tone } = ADMIN_SUBKIND_LABEL[item.subkind];
-  const toneClass =
-    tone === 'emerald'
-      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
-      : tone === 'red'
-        ? 'border-red-500/20 bg-red-500/10 text-red-300'
-        : 'border-white/[0.08] bg-white/[0.03] text-white/70';
-
-  const selfStamp = item.stamp && item.worker && item.acceptor && item.worker === item.acceptor;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${toneClass}`}>
-          {label}
-        </span>
-        <p className="truncate text-sm text-white/80">{item.item_title}</p>
-        <span className="font-mono text-[10px] text-white/30">{item.item_id}</span>
-      </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[11px]">
-        {item.worker && (
-          <MetaRow label="Worker">
-            <span className="font-mono">{item.worker}</span>
-          </MetaRow>
-        )}
-        {item.acceptor && (
-          <MetaRow label="Actor">
-            <span className="font-mono">{item.acceptor}</span>
-          </MetaRow>
-        )}
-      </dl>
-      {item.reject_reason && (
-        <div className="rounded-md border border-red-500/10 bg-red-500/5 p-2">
-          <p className="mb-1 text-[10px] font-medium tracking-wide text-red-400/70 uppercase">
-            Rejection reason
-          </p>
-          <p className="text-xs text-white/70">{item.reject_reason}</p>
-        </div>
-      )}
-      {item.stamp && (
-        <div className="space-y-1 rounded-md border border-emerald-500/10 bg-emerald-500/5 p-2">
-          <div className="flex items-center gap-2">
-            <Star className="size-3 text-emerald-400" />
-            <p className="text-[10px] font-medium tracking-wide text-emerald-400/80 uppercase">
-              Stamp
-            </p>
-          </div>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[11px]">
-            {item.stamp.quality && (
-              <MetaRow label="Quality">
-                <span>{item.stamp.quality}</span>
-              </MetaRow>
-            )}
-            {item.stamp.severity && (
-              <MetaRow label="Severity">
-                <span>{item.stamp.severity}</span>
-              </MetaRow>
-            )}
-            {item.stamp.skill_tags && (
-              <MetaRow label="Skills">
-                <span className="font-mono">{item.stamp.skill_tags}</span>
-              </MetaRow>
-            )}
-            {item.stamp.message && (
-              <MetaRow label="Message">
-                <span>{item.stamp.message}</span>
-              </MetaRow>
-            )}
-          </dl>
-        </div>
-      )}
-      {selfStamp && (
-        <ScrutinyHint
-          tone="red"
-          text="Author and subject of this stamp are the same rig. wl rejects self-stamps at the CLI, so this PR was likely hand-crafted — do not merge without understanding who authored it."
-        />
-      )}
-      {item.subkind === 'reject' && !item.reject_reason && (
-        <ScrutinyHint
-          tone="red"
-          text="Rejection has no reason — the contributor will see an empty reject commit. Consider asking the actor to resubmit with --reason."
-        />
-      )}
-    </div>
-  );
-}
-
-// ─── Unknown ────
-
-function UnknownBody({ item }: { item: Extract<InboxItem, { kind: 'unknown' }> }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-sm text-white/80">{item.title}</p>
-      {item.commit_subjects.length > 0 && (
-        <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
-          <p className="mb-1 text-[10px] font-medium tracking-wide text-white/40 uppercase">
-            Commits
-          </p>
-          <ul className="space-y-0.5 font-mono text-[11px] text-white/60">
-            {item.commit_subjects.map((subject, idx) => (
-              <li key={idx} className="truncate">
-                {subject}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <ScrutinyHint text="This PR wasn't produced by the wl CLI. Inspect it on DoltHub before merging — there's no typed context to compare against." />
-    </div>
-  );
-}
 
 // ── Comment dialog ──────────────────────────────────────────────────────
 
@@ -795,120 +571,126 @@ function CommentDialog({
   );
 }
 
-// ── Small helpers ───────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────
 
-function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <>
-      <dt className="text-white/30">{label}</dt>
-      <dd className="truncate text-white/70">{children}</dd>
-    </>
-  );
-}
-
-function TagPill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded border border-white/[0.08] bg-white/[0.03] px-1.5 py-0.5 font-mono text-[10px] text-white/55">
-      {children}
-    </span>
-  );
-}
-
-function ScrutinyHint({ text, tone = 'amber' }: { text: string; tone?: 'amber' | 'red' }) {
-  const toneClass =
-    tone === 'red'
-      ? 'border-red-500/20 bg-red-500/5 text-red-300/80'
-      : 'border-amber-500/20 bg-amber-500/5 text-amber-200/80';
-  return (
-    <div className={`flex items-start gap-2 rounded-md border px-2 py-1.5 ${toneClass}`}>
-      <AlertTriangle className="mt-0.5 size-3 shrink-0" />
-      <p className="text-[11px] leading-snug">{text}</p>
-    </div>
-  );
-}
-
-function accentFor(kind: InboxItem['kind']): {
-  Icon: typeof Inbox;
-  icon: string;
-  label: string;
-  border: string;
-  bar: string;
-} {
-  switch (kind) {
-    case 'rig-registration':
-      return {
-        Icon: UserPlus,
-        icon: 'text-emerald-400',
-        label: 'text-emerald-300',
-        border: 'border-emerald-500/15',
-        bar: 'bg-emerald-500/50',
-      };
-    case 'wanted-post':
-      return {
-        Icon: ScrollText,
-        icon: 'text-sky-400',
-        label: 'text-sky-300',
-        border: 'border-sky-500/15',
-        bar: 'bg-sky-500/50',
-      };
-    case 'wanted-edit':
-      return {
-        Icon: Pencil,
-        icon: 'text-amber-400',
-        label: 'text-amber-300',
-        border: 'border-amber-500/15',
-        bar: 'bg-amber-500/50',
-      };
-    case 'work-submission':
-      return {
-        Icon: Hand,
-        icon: 'text-violet-400',
-        label: 'text-violet-300',
-        border: 'border-violet-500/15',
-        bar: 'bg-violet-500/50',
-      };
-    case 'admin-action':
-      return {
-        Icon: ShieldCheck,
-        icon: 'text-indigo-400',
-        label: 'text-indigo-300',
-        border: 'border-indigo-500/15',
-        bar: 'bg-indigo-500/50',
-      };
-    case 'unknown':
-      return {
-        Icon: HelpCircle,
-        icon: 'text-white/40',
-        label: 'text-white/50',
-        border: 'border-white/[0.08]',
-        bar: 'bg-white/20',
-      };
-  }
-}
-
-function cardHeading(item: InboxItem): string {
+/**
+ * Title shown as the bold first line of each list row. Different per
+ * kind so the row communicates the PR's purpose at a glance without
+ * requiring the reviewer to parse the tiny metadata line.
+ */
+function rowTitle(item: InboxItem): string {
   switch (item.kind) {
     case 'rig-registration':
-      return 'Rig registration';
+      return `Register rig ${item.handle}`;
     case 'wanted-post':
-      return 'New wanted post';
+      return item.item_title;
     case 'wanted-edit':
-      return `Wanted edit — ${item.subkind}`;
+      return `${EDIT_SUBKIND_LABEL[item.subkind]}: ${item.item_title}`;
     case 'work-submission':
-      return item.has_done ? 'Work submitted' : 'Claim';
+      return item.has_done ? `Evidence: ${item.item_title}` : `Claim: ${item.item_title}`;
     case 'admin-action':
-      return `Admin — ${item.subkind}`;
+      return `${ADMIN_SUBKIND_LABEL[item.subkind].label}: ${item.item_title}`;
     case 'unknown':
-      return 'Foreign PR';
+      return item.title;
   }
 }
 
-function countByKind(items: InboxItem[]): Partial<Record<InboxItem['kind'], number>> {
-  const counts: Partial<Record<InboxItem['kind'], number>> = {};
+/**
+ * Secondary subtitle shown beneath `rowTitle`. Kept short — the details
+ * live in the drawer. Returns a plain string so it can be truncated
+ * with `line-clamp-1`.
+ */
+function rowSubtitle(item: InboxItem): string {
+  switch (item.kind) {
+    case 'rig-registration':
+      return item.display_name ?? item.owner_email ?? '';
+    case 'wanted-post':
+      return item.description ?? '';
+    case 'wanted-edit':
+      return item.status_transition ?? (item.posted_by ? `posted by ${item.posted_by}` : '');
+    case 'work-submission':
+      return item.evidence_url ? item.evidence_url : `claimed by ${item.claimer}`;
+    case 'admin-action':
+      if (item.stamp?.message) return item.stamp.message;
+      if (item.reject_reason) return item.reject_reason;
+      return item.worker ? `worker: ${item.worker}` : '';
+    case 'unknown':
+      return item.commit_subjects[0] ?? '';
+  }
+}
+
+/**
+ * Trailing badge text on each row (rightmost column). Used to surface a
+ * one-word signal about severity/importance without requiring reading
+ * the subtitle. Returns an empty string when nothing meaningful applies.
+ */
+function rowAccent(item: InboxItem): string {
+  switch (item.kind) {
+    case 'work-submission':
+      return item.has_done ? 'review' : 'claim';
+    case 'admin-action':
+      return item.stamp?.quality ?? item.subkind;
+    case 'wanted-post':
+      return item.priority ?? '';
+    default:
+      return '';
+  }
+}
+
+function itemSearchHaystack(item: InboxItem): string {
+  const parts: Array<string | null | undefined> = [
+    item.title,
+    item.pull_id,
+    item.from_branch,
+    item.submitter,
+    item.creator_name,
+    KIND_LABEL[item.kind],
+  ];
+  switch (item.kind) {
+    case 'rig-registration':
+      parts.push(item.handle, item.display_name, item.owner_email, item.dolthub_org);
+      break;
+    case 'wanted-post':
+      parts.push(item.item_id, item.item_title, item.description, item.posted_by, item.tags);
+      break;
+    case 'wanted-edit':
+      parts.push(item.item_id, item.item_title, item.posted_by, item.subkind);
+      break;
+    case 'work-submission':
+      parts.push(item.item_id, item.item_title, item.claimer, item.evidence_url);
+      break;
+    case 'admin-action':
+      parts.push(
+        item.item_id,
+        item.item_title,
+        item.worker,
+        item.acceptor,
+        item.reject_reason,
+        item.stamp?.message
+      );
+      break;
+    case 'unknown':
+      parts.push(...item.commit_subjects);
+      break;
+  }
+  return parts.filter(Boolean).join(' ').toLowerCase();
+}
+
+function countByKind(items: InboxItem[]): Partial<Record<InboxKind, number>> {
+  const counts: Partial<Record<InboxKind, number>> = {};
   for (const item of items) {
     counts[item.kind] = (counts[item.kind] ?? 0) + 1;
   }
   return counts;
+}
+
+function timestampMs(iso: string | null): number {
+  if (!iso) return 0;
+  try {
+    return new Date(iso).getTime() || 0;
+  } catch {
+    return 0;
+  }
 }
 
 function formatRelative(iso: string): string {

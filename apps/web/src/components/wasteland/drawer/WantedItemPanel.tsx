@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, Hand, ThumbsDown, ThumbsUp, UserMinus, XCircle } from 'lucide-react';
 import type { DrawerStackHelpers } from '@/components/drawer';
+import { MarkdownProse } from '@/components/security-agent/MarkdownProse';
 import type { WantedItem, WantedPanelActions, WastelandDrawerRef } from './types';
 import { RigLink } from './CrossRefs';
 
@@ -66,9 +67,11 @@ export function WantedItemPanel({
         <label className="mb-1 block text-[10px] font-semibold tracking-[0.08em] text-white/30 uppercase">
           Description
         </label>
-        <p className="whitespace-pre-wrap text-sm text-white/70 leading-relaxed">
-          {item.description || 'No description provided.'}
-        </p>
+        {item.description ? (
+          <MarkdownProse markdown={item.description} className="text-sm text-white/70" />
+        ) : (
+          <p className="text-sm text-white/40 italic">No description provided.</p>
+        )}
       </div>
 
       {item.posted_by && (

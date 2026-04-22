@@ -18,6 +18,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import type { DrawerStackHelpers } from '@/components/drawer';
+import { MarkdownProse } from '@/components/security-agent/MarkdownProse';
 import type { InboxItem, ReviewPanelActions, WastelandDrawerRef } from './types';
 import { RigLink, WantedItemLink } from './CrossRefs';
 
@@ -205,7 +206,9 @@ function WantedPostBody({
         </div>
       </div>
       {item.description && (
-        <p className="line-clamp-6 text-xs whitespace-pre-wrap text-white/55">{item.description}</p>
+        <div className="max-h-40 overflow-y-auto rounded-md border border-white/[0.04] bg-white/[0.02] px-3 py-2">
+          <MarkdownProse markdown={item.description} className="prose-xs text-xs text-white/55" />
+        </div>
       )}
       <div className="flex flex-wrap gap-1.5 text-[10px]">
         {item.type && <TagPill>{`type: ${item.type}`}</TagPill>}
@@ -381,7 +384,7 @@ function AdminActionBody({
           <p className="mb-1 text-[10px] font-medium tracking-wide text-red-400/70 uppercase">
             Rejection reason
           </p>
-          <p className="text-xs text-white/70">{item.reject_reason}</p>
+          <MarkdownProse markdown={item.reject_reason} className="prose-xs text-xs text-white/70" />
         </div>
       )}
       {item.stamp && (
@@ -408,12 +411,18 @@ function AdminActionBody({
                 <span className="font-mono">{item.stamp.skill_tags}</span>
               </MetaRow>
             )}
-            {item.stamp.message && (
-              <MetaRow label="Message">
-                <span>{item.stamp.message}</span>
-              </MetaRow>
-            )}
           </dl>
+          {item.stamp.message && (
+            <div className="border-t border-emerald-500/10 pt-1.5">
+              <p className="mb-1 text-[10px] font-medium tracking-wide text-emerald-400/70 uppercase">
+                Message
+              </p>
+              <MarkdownProse
+                markdown={item.stamp.message}
+                className="prose-xs text-xs text-white/70"
+              />
+            </div>
+          )}
         </div>
       )}
       {selfStamp && (

@@ -22,6 +22,13 @@ const mockGetKiloCliRunStatus: jest.Mock<any, any> = jest.fn();
 const mockCancelKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStartKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStart: jest.Mock<any, any> = jest.fn();
+const startedResponse = {
+  ok: true,
+  started: true,
+  previousStatus: 'stopped',
+  currentStatus: 'running',
+  startedAt: 1_776_885_000_000,
+};
 
 function mockKiloClawInternalClient() {
   const { KiloClawInternalClient } = jest.requireMock('@/lib/kiloclaw/kiloclaw-internal-client');
@@ -137,7 +144,7 @@ beforeEach(async () => {
   mockCancelKiloCliRun.mockReset();
   mockStartKiloCliRun.mockReset();
   mockStart.mockReset();
-  mockStart.mockResolvedValue({ ok: true });
+  mockStart.mockResolvedValue(startedResponse);
   mockKiloClawInternalClient();
 });
 
@@ -320,13 +327,61 @@ describe('admin.kiloclawInstances.machineStart', () => {
       instanceId: instance.id,
     });
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual(startedResponse);
     expect(mockStart).toHaveBeenCalledWith(regularUser.id, instance.id, { skipCooldown: true });
 
     const updatedInstance = await db.query.kiloclaw_instances.findFirst({
       where: eq(kiloclaw_instances.id, instance.id),
     });
     expect(updatedInstance?.inactive_trial_stopped_at).toBeNull();
+  });
+
+  it('does not clear the inactivity marker when admin start is a no-op', async () => {
+    mockStart.mockResolvedValueOnce({
+      ok: true,
+      started: false,
+      previousStatus: 'stopped',
+      currentStatus: 'stopped',
+      startedAt: null,
+    });
+
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: regularUser.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.machineStart({
+      userId: regularUser.id,
+      instanceId: instance.id,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      started: false,
+      previousStatus: 'stopped',
+      currentStatus: 'stopped',
+      startedAt: null,
+    });
+
+    const updatedInstance = await db.query.kiloclaw_instances.findFirst({
+      where: eq(kiloclaw_instances.id, instance.id),
+    });
+    expect(new Date(String(updatedInstance?.inactive_trial_stopped_at)).toISOString()).toBe(
+      '2026-04-20T12:00:00.000Z'
+    );
   });
 });
 

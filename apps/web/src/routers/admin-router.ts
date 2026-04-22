@@ -977,11 +977,16 @@ export const adminRouter = createTRPCRouter({
           if (activeInstance) {
             try {
               const client = new KiloClawInternalClient();
-              await client.start(input.userId, workerInstanceId(activeInstance));
-              await clearTrialInactivityStopAfterStart({
-                kiloUserId: input.userId,
-                instanceId: activeInstance.id,
-              });
+              const startResult = await client.start(
+                input.userId,
+                workerInstanceId(activeInstance)
+              );
+              if (startResult.currentStatus === 'running') {
+                await clearTrialInactivityStopAfterStart({
+                  kiloUserId: input.userId,
+                  instanceId: activeInstance.id,
+                });
+              }
             } catch {
               // Best effort — instance will be startable by the user from the dashboard
             }

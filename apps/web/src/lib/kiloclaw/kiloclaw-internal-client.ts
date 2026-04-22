@@ -154,7 +154,13 @@ export class KiloClawInternalClient {
     userId: string,
     instanceId?: string,
     options?: { skipCooldown?: boolean }
-  ): Promise<{ ok: true }> {
+  ): Promise<{
+    ok: true;
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/start${params}`,

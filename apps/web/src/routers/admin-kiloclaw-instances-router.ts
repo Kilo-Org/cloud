@@ -1107,7 +1107,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       const result = await client.start(input.userId, workerInstanceId(instance), {
         skipCooldown: true,
       });
-      if (instance) {
+      if (instance && result.currentStatus === 'running') {
         try {
           await clearTrialInactivityStopAfterStart({
             kiloUserId: input.userId,

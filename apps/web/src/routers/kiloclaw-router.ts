@@ -2407,7 +2407,7 @@ export const kiloclawRouter = createTRPCRouter({
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
     const result = await client.start(ctx.user.id, workerInstanceId(instance));
-    if (instance) {
+    if (instance && result.currentStatus === 'running') {
       try {
         await clearTrialInactivityStopAfterStart({
           kiloUserId: ctx.user.id,
@@ -2417,9 +2417,6 @@ export const kiloclawRouter = createTRPCRouter({
         console.error('Failed to clear trial inactivity stop marker after start:', error);
       }
     }
-    // /api/platform/start always returns { ok: true } regardless of whether
-    // the machine transitioned state, so this may fire for no-op requests.
-    // The UI only enables Start when isStartable is true, so false fires are rare.
     PostHogClient().capture({
       distinctId: ctx.user.google_user_email,
       event: 'claw_instance_started',

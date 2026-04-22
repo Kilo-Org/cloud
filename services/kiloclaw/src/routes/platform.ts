@@ -2202,8 +2202,6 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
 
   try {
     const route = mode === 'async' ? '/api/platform/start-async' : '/api/platform/start';
-    const eventBase =
-      mode === 'async' ? 'instance.async_start_requested' : 'instance.manual_start_succeeded';
     const options = result.data.skipCooldown ? { skipCooldown: true } : undefined;
 
     if (mode === 'async') {
@@ -2214,27 +2212,36 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
         stub => stub.startAsync(result.data.userId),
         'startAsync'
       );
-    } else {
-      const { started } = await withResolvedDORetry(
-        c.env,
-        result.data.userId,
-        instanceId,
-        stub => stub.start(result.data.userId, options),
-        'start'
-      );
-      if (!started) {
-        return c.json({ ok: true });
-      }
+
+      writeEvent(c.env, {
+        event: 'instance.async_start_requested',
+        delivery: 'http',
+        route,
+        userId: result.data.userId,
+        durationMs: performance.now() - startedAt,
+      });
+      return c.json({ ok: true });
     }
 
-    writeEvent(c.env, {
-      event: eventBase,
-      delivery: 'http',
-      route,
-      userId: result.data.userId,
-      durationMs: performance.now() - startedAt,
-    });
-    return c.json({ ok: true });
+    const startResult = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      instanceId,
+      stub => stub.start(result.data.userId, options),
+      'start'
+    );
+
+    if (startResult.currentStatus === 'running') {
+      writeEvent(c.env, {
+        event: 'instance.manual_start_succeeded',
+        delivery: 'http',
+        route,
+        userId: result.data.userId,
+        durationMs: performance.now() - startedAt,
+      });
+    }
+
+    return c.json({ ok: true, ...startResult });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'start');
     writeEvent(c.env, {

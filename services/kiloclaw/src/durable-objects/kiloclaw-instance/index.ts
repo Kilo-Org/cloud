@@ -1508,13 +1508,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async start(
     userId?: string,
     options?: { skipCooldown?: boolean }
-  ): Promise<{ started: boolean }> {
+  ): Promise<{
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     // Guard against concurrent start() calls — two overlapping invocations
     // (e.g. startAsync via waitUntil + a direct RPC start) can both see
     // flyMachineId as null and each create a Fly machine, orphaning one.
     if (this.startInProgress) {
       doWarn(this.s, 'start: already in progress, skipping duplicate call');
-      return { started: false };
+      return {
+        started: false,
+        previousStatus: this.s.status,
+        currentStatus: this.s.status,
+        startedAt: this.s.lastStartedAt,
+      };
     }
     this.startInProgress = true;
 
@@ -1528,8 +1538,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private async _startInner(
     userId?: string,
     options?: { skipCooldown?: boolean }
-  ): Promise<{ started: boolean }> {
+  ): Promise<{
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     await this.loadState();
+    const previousStatus = this.s.status;
 
     if (this.s.status === 'destroying') {
       throw new Error('Cannot start: instance is being destroyed');
@@ -1651,7 +1667,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             );
             console.log('[DO] Machine already running, mount verified');
             await this.scheduleAlarm();
-            return { started: false };
+            return {
+              started: false,
+              previousStatus,
+              currentStatus: this.s.status,
+              startedAt: this.s.lastStartedAt,
+            };
           }
           console.log(
             '[DO] Status is running but machine state is:',
@@ -1743,7 +1764,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const currentStatus = await this.ctx.storage.get('status');
     if (!currentStatus || currentStatus === 'destroying') {
       doWarn(this.s, 'start: instance was destroyed while starting, aborting');
-      return { started: false };
+      return {
+        started: false,
+        previousStatus,
+        currentStatus: typeof currentStatus === 'string' ? currentStatus : this.s.status,
+        startedAt: this.s.lastStartedAt,
+      };
     }
 
     const startingAt = this.s.startingAt;
@@ -1772,7 +1798,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
 
     await this.scheduleAlarm();
-    return { started: true };
+    return {
+      started: true,
+      previousStatus,
+      currentStatus: this.s.status,
+      startedAt: this.s.lastStartedAt,
+    };
   }
 
   /**

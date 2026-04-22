@@ -1,4 +1,3 @@
-/* eslint-disable drizzle/enforce-delete-with-where */
 import { db } from '@/lib/drizzle';
 import {
   linkBotRequestToSession,
@@ -10,29 +9,8 @@ import {
   bot_requests,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { count, eq } from 'drizzle-orm';
+import { count, eq, inArray } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-
-async function createBotRequest() {
-  const user = await insertTestUser();
-  const [row] = await db
-    .insert(bot_requests)
-    .values({
-      created_by: user.id,
-      platform: 'slack',
-      platform_thread_id: `slack:T123:C456:${randomUUID()}`,
-      platform_message_id: `message-${randomUUID()}`,
-      user_message: 'Please make a change',
-      status: 'pending',
-    })
-    .returning({ id: bot_requests.id });
-
-  if (!row) {
-    throw new Error('Failed to create bot request fixture');
-  }
-
-  return row.id;
-}
 
 function expectSingleRow<T>(rows: T[]): T {
   expect(rows).toHaveLength(1);
@@ -44,21 +22,71 @@ function expectSingleRow<T>(rows: T[]): T {
 }
 
 describe('bot request logging', () => {
+  const createdBotRequestIds = new Set<string>();
+  const createdCloudAgentSessionIds = new Set<string>();
+  const createdUserIds = new Set<string>();
+
+  async function createBotRequest() {
+    const user = await insertTestUser();
+    createdUserIds.add(user.id);
+
+    const [row] = await db
+      .insert(bot_requests)
+      .values({
+        created_by: user.id,
+        platform: 'slack',
+        platform_thread_id: `slack:T123:C456:${randomUUID()}`,
+        platform_message_id: `message-${randomUUID()}`,
+        user_message: 'Please make a change',
+        status: 'pending',
+      })
+      .returning({ id: bot_requests.id });
+
+    if (!row) {
+      throw new Error('Failed to create bot request fixture');
+    }
+
+    createdBotRequestIds.add(row.id);
+    return row.id;
+  }
+
   afterEach(async () => {
-    await db.delete(bot_request_cloud_agent_sessions);
-    await db.delete(bot_requests);
-    await db.delete(kilocode_users);
+    const cloudAgentSessionIds = Array.from(createdCloudAgentSessionIds);
+    if (cloudAgentSessionIds.length > 0) {
+      await db
+        .delete(bot_request_cloud_agent_sessions)
+        .where(
+          inArray(bot_request_cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionIds)
+        );
+    }
+
+    const botRequestIds = Array.from(createdBotRequestIds);
+    if (botRequestIds.length > 0) {
+      await db.delete(bot_requests).where(inArray(bot_requests.id, botRequestIds));
+    }
+
+    const userIds = Array.from(createdUserIds);
+    if (userIds.length > 0) {
+      await db.delete(kilocode_users).where(inArray(kilocode_users.id, userIds));
+    }
+
+    createdCloudAgentSessionIds.clear();
+    createdBotRequestIds.clear();
+    createdUserIds.clear();
   });
 
   it('records a child Cloud Agent session for an existing bot request', async () => {
     const botRequestId = await createBotRequest();
     const spawnGroupId = randomUUID();
+    const cloudAgentSessionId = `cas-child-insert-${randomUUID()}`;
+    const kiloSessionId = `kilo-child-insert-${randomUUID()}`;
+    createdCloudAgentSessionIds.add(cloudAgentSessionId);
 
     await recordBotRequestCloudAgentSession({
       botRequestId,
       spawnGroupId,
-      cloudAgentSessionId: 'cas-child-insert',
-      kiloSessionId: 'kilo-child-insert',
+      cloudAgentSessionId,
+      kiloSessionId,
       mode: 'code',
       githubRepo: 'kilocode/cloud',
       gitlabProject: 'group/project',
@@ -69,13 +97,13 @@ describe('bot request logging', () => {
       await db
         .select()
         .from(bot_request_cloud_agent_sessions)
-        .where(eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, 'cas-child-insert'))
+        .where(eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
     );
 
     expect(row.bot_request_id).toBe(botRequestId);
     expect(row.spawn_group_id).toBe(spawnGroupId);
-    expect(row.cloud_agent_session_id).toBe('cas-child-insert');
-    expect(row.kilo_session_id).toBe('kilo-child-insert');
+    expect(row.cloud_agent_session_id).toBe(cloudAgentSessionId);
+    expect(row.kilo_session_id).toBe(kiloSessionId);
     expect(row.mode).toBe('code');
     expect(row.github_repo).toBe('kilocode/cloud');
     expect(row.gitlab_project).toBe('group/project');
@@ -87,13 +115,16 @@ describe('bot request logging', () => {
     const botRequestId = await createBotRequest();
     const initialSpawnGroupId = randomUUID();
     const updatedSpawnGroupId = randomUUID();
+    const cloudAgentSessionId = `cas-child-upsert-${randomUUID()}`;
+    const kiloSessionId = `kilo-child-upsert-${randomUUID()}`;
     const terminalAt = new Date('2026-01-02T03:04:05.000Z').toISOString();
     const continuationStartedAt = new Date('2026-01-02T03:05:06.000Z').toISOString();
+    createdCloudAgentSessionIds.add(cloudAgentSessionId);
 
     await recordBotRequestCloudAgentSession({
       botRequestId,
       spawnGroupId: initialSpawnGroupId,
-      cloudAgentSessionId: 'cas-child-upsert',
+      cloudAgentSessionId,
     });
 
     await db
@@ -104,13 +135,13 @@ describe('bot request logging', () => {
         terminal_at: terminalAt,
         continuation_started_at: continuationStartedAt,
       })
-      .where(eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, 'cas-child-upsert'));
+      .where(eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId));
 
     await recordBotRequestCloudAgentSession({
       botRequestId,
       spawnGroupId: updatedSpawnGroupId,
-      cloudAgentSessionId: 'cas-child-upsert',
-      kiloSessionId: 'kilo-child-upsert',
+      cloudAgentSessionId,
+      kiloSessionId,
       mode: 'ask',
       gitlabProject: 'group/subgroup/project',
       callbackStep: 7,
@@ -120,7 +151,7 @@ describe('bot request logging', () => {
       await db
         .select({ childSessionCount: count() })
         .from(bot_request_cloud_agent_sessions)
-        .where(eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, 'cas-child-upsert'))
+        .where(eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
     );
 
     expect(countRow.childSessionCount).toBe(1);
@@ -129,11 +160,11 @@ describe('bot request logging', () => {
       await db
         .select()
         .from(bot_request_cloud_agent_sessions)
-        .where(eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, 'cas-child-upsert'))
+        .where(eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
     );
 
     expect(row.spawn_group_id).toBe(updatedSpawnGroupId);
-    expect(row.kilo_session_id).toBe('kilo-child-upsert');
+    expect(row.kilo_session_id).toBe(kiloSessionId);
     expect(row.mode).toBe('ask');
     expect(row.gitlab_project).toBe('group/subgroup/project');
     expect(row.callback_step).toBe(7);
@@ -145,13 +176,14 @@ describe('bot request logging', () => {
 
   it('continues linking the legacy Cloud Agent session column', async () => {
     const botRequestId = await createBotRequest();
+    const cloudAgentSessionId = `cas-legacy-link-${randomUUID()}`;
 
-    await linkBotRequestToSession(botRequestId, 'cas-legacy-link');
+    await linkBotRequestToSession(botRequestId, cloudAgentSessionId);
 
     const row = expectSingleRow(
       await db.select().from(bot_requests).where(eq(bot_requests.id, botRequestId))
     );
 
-    expect(row.cloud_agent_session_id).toBe('cas-legacy-link');
+    expect(row.cloud_agent_session_id).toBe(cloudAgentSessionId);
   });
 });

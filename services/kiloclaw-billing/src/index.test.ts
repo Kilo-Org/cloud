@@ -13,6 +13,7 @@ vi.mock('cloudflare:workers', () => ({
 
 vi.mock('./lifecycle.js', () => ({
   runSweep: vi.fn(),
+  processTrialInactivityStopCandidate: vi.fn(),
 }));
 
 vi.mock('./bootstrap.js', () => ({
@@ -21,7 +22,7 @@ vi.mock('./bootstrap.js', () => ({
 
 import { handler, KiloClawBillingService } from './index.js';
 import { bootstrapProvisionSubscription } from './bootstrap.js';
-import { runSweep } from './lifecycle.js';
+import { processTrialInactivityStopCandidate, runSweep } from './lifecycle.js';
 import type { BillingQueueMessage, BillingWorkerEnv } from './types.js';
 
 let loggedValues: unknown[] = [];
@@ -55,6 +56,7 @@ function createEnv(): {
       } as unknown as BillingWorkerEnv['LIFECYCLE_QUEUE'],
       TRIAL_INACTIVITY_QUEUE: {
         send: trialInactivitySend,
+        sendBatch: vi.fn(),
       } as unknown as BillingWorkerEnv['TRIAL_INACTIVITY_QUEUE'],
       KILOCLAW: {
         fetch: vi.fn(),
@@ -65,6 +67,8 @@ function createEnv(): {
       STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
       INTERNAL_API_SECRET: 'next-internal-api-secret',
       KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+      TRIAL_INACTIVITY_STOP_ENABLED: 'false',
+      TRIAL_INACTIVITY_STOP_DRY_RUN: 'true',
     },
     lifecycleSend,
     trialInactivitySend,
@@ -87,7 +91,7 @@ describe('kiloclaw billing worker handler', () => {
     vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
       loggedValues.push(value);
     });
-    vi.mocked(runSweep).mockResolvedValue({
+    const emptySummary = {
       credit_renewals: 0,
       credit_renewals_canceled: 0,
       credit_renewals_past_due: 0,
@@ -97,6 +101,7 @@ describe('kiloclaw billing worker handler', () => {
       trial_inactivity_candidates: 0,
       trial_inactivity_batches: 0,
       trial_inactivity_batch_fallbacks: 0,
+      trial_inactivity_stop_messages_enqueued: 0,
       trial_inactivity_stops: 0,
       trial_inactivity_dry_run_candidates: 0,
       trial_warnings: 0,
@@ -111,7 +116,9 @@ describe('kiloclaw billing worker handler', () => {
       emails_sent: 0,
       emails_skipped: 0,
       errors: 0,
-    });
+    };
+    vi.mocked(runSweep).mockResolvedValue(emptySummary);
+    vi.mocked(processTrialInactivityStopCandidate).mockResolvedValue(emptySummary);
   });
 
   it('enqueues the first lifecycle sweep on the hourly cron', async () => {
@@ -130,8 +137,9 @@ describe('kiloclaw billing worker handler', () => {
     expect(trialInactivitySend).not.toHaveBeenCalled();
   });
 
-  it('enqueues the daily trial inactivity run on the daily cron', async () => {
+  it('enqueues the daily trial inactivity run on the daily cron when enabled', async () => {
     const { env, lifecycleSend, trialInactivitySend } = createEnv();
+    env.TRIAL_INACTIVITY_STOP_ENABLED = 'true';
 
     await handler.scheduled?.(
       { cron: '0 8 * * *' } as ScheduledController,
@@ -144,6 +152,31 @@ describe('kiloclaw billing worker handler', () => {
       expect.objectContaining({ kind: 'trial_inactivity_stop', sweep: 'trial_inactivity_stop' })
     );
     expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(findLogRecord('Enqueued daily trial inactivity kickoff')).toMatchObject({
+      event: 'run_started',
+      outcome: 'started',
+      dryRun: true,
+    });
+  });
+
+  it('logs and skips the daily trial inactivity cron when disabled', async () => {
+    const { env, lifecycleSend, trialInactivitySend } = createEnv();
+
+    await handler.scheduled?.(
+      { cron: '0 8 * * *' } as ScheduledController,
+      env,
+      {} as ExecutionContext
+    );
+
+    expect(trialInactivitySend).not.toHaveBeenCalled();
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(
+      findLogRecord('Skipping daily trial inactivity kickoff because feature is disabled')
+    ).toMatchObject({
+      event: 'run_skipped',
+      outcome: 'discarded',
+      cron: '0 8 * * *',
+    });
   });
 
   it('acks invalid queue messages', async () => {
@@ -244,7 +277,7 @@ describe('kiloclaw billing worker handler', () => {
     );
   });
 
-  it('does not enqueue a follow-up message after a trial inactivity run', async () => {
+  it('does not enqueue a follow-up message after a trial inactivity coordinator run', async () => {
     const { env, lifecycleSend, trialInactivitySend } = createEnv();
     const message = {
       body: {
@@ -268,12 +301,56 @@ describe('kiloclaw billing worker handler', () => {
       },
       1
     );
+    expect(processTrialInactivityStopCandidate).not.toHaveBeenCalled();
     expect(lifecycleSend).not.toHaveBeenCalled();
     expect(trialInactivitySend).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(findLogRecord('Completed daily trial inactivity run')).toMatchObject({
       event: 'run_completed',
       outcome: 'completed',
+    });
+  });
+
+  it('processes trial inactivity stop candidate messages without chaining follow-up work', async () => {
+    const { env, lifecycleSend, trialInactivitySend } = createEnv();
+    const message = {
+      body: {
+        kind: 'trial_inactivity_stop_candidate',
+        runId: '33333333-3333-4333-8333-333333333333',
+        sweep: 'trial_inactivity_stop_candidate',
+        subscriptionId: '44444444-4444-4444-8444-444444444444',
+        userId: 'user-1',
+        instanceId: '55555555-5555-4555-8555-555555555555',
+      },
+      attempts: 1,
+      ack: vi.fn(),
+      retry: vi.fn(),
+    };
+
+    await handler.queue?.(createBatch(message), env, {} as ExecutionContext);
+
+    expect(processTrialInactivityStopCandidate).toHaveBeenCalledWith(
+      env,
+      {
+        kind: 'trial_inactivity_stop_candidate',
+        runId: '33333333-3333-4333-8333-333333333333',
+        sweep: 'trial_inactivity_stop_candidate',
+        subscriptionId: '44444444-4444-4444-8444-444444444444',
+        userId: 'user-1',
+        instanceId: '55555555-5555-4555-8555-555555555555',
+      },
+      1
+    );
+    expect(runSweep).not.toHaveBeenCalled();
+    expect(lifecycleSend).not.toHaveBeenCalled();
+    expect(trialInactivitySend).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(findLogRecord('Completed trial inactivity stop candidate')).toMatchObject({
+      event: 'run_completed',
+      outcome: 'completed',
+      subscriptionId: '44444444-4444-4444-8444-444444444444',
+      userId: 'user-1',
+      instanceId: '55555555-5555-4555-8555-555555555555',
     });
   });
 

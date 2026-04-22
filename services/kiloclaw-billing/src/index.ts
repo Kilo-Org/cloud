@@ -6,13 +6,14 @@ import {
   BILLING_QUEUE_MAX_RETRIES,
   BILLING_SWEEP_ORDER,
   TRIAL_INACTIVITY_DAILY_CRON,
+  TRIAL_INACTIVITY_STOP_CANDIDATE_SWEEP,
   TRIAL_INACTIVITY_SWEEP,
   type BillingQueueMessage,
   type BillingSweepKind,
   type LifecycleQueueMessage,
   type BillingWorkerEnv,
 } from './types.js';
-import { runSweep } from './lifecycle.js';
+import { processTrialInactivityStopCandidate, runSweep } from './lifecycle.js';
 import { logger, withLogTags, type BillingLogFields } from './logger.js';
 import { bootstrapProvisionSubscription } from './bootstrap.js';
 
@@ -34,9 +35,19 @@ const TrialInactivityQueueMessageSchema = z.object({
   sweep: z.literal(TRIAL_INACTIVITY_SWEEP),
 });
 
+const TrialInactivityStopCandidateQueueMessageSchema = z.object({
+  kind: z.literal('trial_inactivity_stop_candidate'),
+  runId: z.string().uuid(),
+  sweep: z.literal(TRIAL_INACTIVITY_STOP_CANDIDATE_SWEEP),
+  subscriptionId: z.string().uuid(),
+  userId: z.string().min(1),
+  instanceId: z.string().uuid(),
+});
+
 const BillingQueueMessageSchema = z.discriminatedUnion('kind', [
   LifecycleQueueMessageSchema,
   TrialInactivityQueueMessageSchema,
+  TrialInactivityStopCandidateQueueMessageSchema,
 ]);
 
 function nextSweep(current: BillingSweepKind): BillingSweepKind | null {
@@ -57,6 +68,15 @@ function log(level: 'info' | 'warn' | 'error', message: string, fields: BillingL
     return;
   }
   logger.withFields(fields).info(message);
+}
+
+function isEnvFlagEnabled(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
 /**
@@ -154,12 +174,22 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
           },
         },
         async () => {
+          if (!isEnvFlagEnabled(env.TRIAL_INACTIVITY_STOP_ENABLED)) {
+            log('info', 'Skipping daily trial inactivity kickoff because feature is disabled', {
+              event: 'run_skipped',
+              outcome: 'discarded',
+              cron: controller.cron,
+            });
+            return;
+          }
+
           await env.TRIAL_INACTIVITY_QUEUE.send(message);
 
           log('info', 'Enqueued daily trial inactivity kickoff', {
             event: 'run_started',
             outcome: 'started',
             cron: controller.cron,
+            dryRun: isEnvFlagEnabled(env.TRIAL_INACTIVITY_STOP_DRY_RUN),
           });
         }
       );
@@ -254,27 +284,38 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
         },
         async () => {
           try {
-            await runSweep(env, parsed.data, message.attempts);
+            if (parsed.data.kind === 'trial_inactivity_stop_candidate') {
+              await processTrialInactivityStopCandidate(env, parsed.data, message.attempts);
+              log('info', 'Completed trial inactivity stop candidate', {
+                event: 'run_completed',
+                outcome: 'completed',
+                subscriptionId: parsed.data.subscriptionId,
+                userId: parsed.data.userId,
+                instanceId: parsed.data.instanceId,
+              });
+            } else {
+              await runSweep(env, parsed.data, message.attempts);
 
-            if (parsed.data.kind === 'lifecycle') {
-              const next = nextSweep(parsed.data.sweep);
-              if (next) {
-                await env.LIFECYCLE_QUEUE.send({
-                  kind: 'lifecycle',
-                  runId: parsed.data.runId,
-                  sweep: next,
-                });
+              if (parsed.data.kind === 'lifecycle') {
+                const next = nextSweep(parsed.data.sweep);
+                if (next) {
+                  await env.LIFECYCLE_QUEUE.send({
+                    kind: 'lifecycle',
+                    runId: parsed.data.runId,
+                    sweep: next,
+                  });
+                } else {
+                  log('info', 'Completed billing lifecycle run', {
+                    event: 'run_completed',
+                    outcome: 'completed',
+                  });
+                }
               } else {
-                log('info', 'Completed billing lifecycle run', {
+                log('info', 'Completed daily trial inactivity run', {
                   event: 'run_completed',
                   outcome: 'completed',
                 });
               }
-            } else {
-              log('info', 'Completed daily trial inactivity run', {
-                event: 'run_completed',
-                outcome: 'completed',
-              });
             }
 
             message.ack();

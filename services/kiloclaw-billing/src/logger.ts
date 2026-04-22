@@ -22,7 +22,7 @@ export type BillingLogTags = BillingCorrelationContext & {
   billingSweep?: BillingMessageSweep;
   source?: string;
   event?: string;
-  outcome?: 'started' | 'completed' | 'failed' | 'retry' | 'discarded';
+  outcome?: 'started' | 'completed' | 'failed' | 'retry' | 'discarded' | 'skipped';
   userId?: string;
   instanceId?: string;
   stripeSubscriptionId?: string;

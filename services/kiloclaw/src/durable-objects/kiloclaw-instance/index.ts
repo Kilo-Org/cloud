@@ -1874,12 +1874,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     );
   }
 
-  async stop(): Promise<void> {
+  async stop(): Promise<{
+    stopped: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    stoppedAt: number | null;
+  }> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.sandboxId) {
       throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
     }
+    const previousStatus = this.s.status;
     if (
       this.s.status === 'stopped' ||
       this.s.status === 'provisioned' ||
@@ -1890,7 +1896,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.status === 'restoring'
     ) {
       console.log('[DO] Instance not running (status:', this.s.status, '), no-op');
-      return;
+      return {
+        stopped: false,
+        previousStatus,
+        currentStatus: this.s.status,
+        stoppedAt: this.s.lastStoppedAt,
+      };
     }
 
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
@@ -1927,6 +1938,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
 
     await this.scheduleAlarm();
+
+    return {
+      stopped: true,
+      previousStatus,
+      currentStatus: this.s.status,
+      stoppedAt: this.s.lastStoppedAt,
+    };
   }
 
   async destroy(): Promise<DestroyResult> {

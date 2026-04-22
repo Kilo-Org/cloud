@@ -1631,8 +1631,13 @@ describe('status guards', () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { status: 'destroying' });
 
-    await instance.stop();
+    const result = await instance.stop();
 
+    expect(result).toMatchObject({
+      stopped: false,
+      previousStatus: 'destroying',
+      currentStatus: 'destroying',
+    });
     // Status unchanged
     expect(storage._store.get('status')).toBe('destroying');
     expect(flyClient.stopMachineAndWait).not.toHaveBeenCalled();
@@ -4452,8 +4457,14 @@ describe('stop: error propagation', () => {
 
     (flyClient.stopMachineAndWait as Mock).mockResolvedValue(undefined);
 
-    await instance.stop();
+    const result = await instance.stop();
 
+    expect(result).toMatchObject({
+      stopped: true,
+      previousStatus: 'running',
+      currentStatus: 'stopped',
+    });
+    expect(typeof result.stoppedAt).toBe('number');
     expect(storage._store.get('status')).toBe('stopped');
     expect(storage._store.get('lastStoppedAt')).toBeDefined();
   });

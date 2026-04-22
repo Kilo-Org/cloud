@@ -33,6 +33,51 @@ vi.mock('jose', () => ({
 import type { BillingWorkerEnv } from './types.js';
 import { getMissingSnowflakeConfig, queryKiloclawActiveUserIds } from './snowflake.js';
 
+function requestUrlToString(requestUrl: RequestInfo | URL): string {
+  return requestUrl instanceof Request ? requestUrl.url : requestUrl.toString();
+}
+
+function parseRequestBody(body: BodyInit | null | undefined): unknown {
+  if (typeof body !== 'string') {
+    throw new Error('Expected request body to be a string');
+  }
+
+  return JSON.parse(body);
+}
+
+function expectSubmitBody(value: unknown): {
+  statement: string;
+  bindings: unknown;
+} {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error('Expected parsed request body to be an object');
+  }
+
+  if (!('statement' in value)) {
+    throw new Error('Expected Snowflake statement to be present');
+  }
+
+  if (!('bindings' in value)) {
+    throw new Error('Expected Snowflake bindings to be present');
+  }
+
+  const statement = value.statement;
+  const bindings = value.bindings;
+
+  if (typeof statement !== 'string') {
+    throw new Error('Expected Snowflake statement to be a string');
+  }
+
+  if (typeof bindings !== 'object' || bindings === null) {
+    throw new Error('Expected Snowflake bindings to be an object');
+  }
+
+  return {
+    statement,
+    bindings,
+  };
+}
+
 function createEnv(): BillingWorkerEnv {
   return {
     HYPERDRIVE: { connectionString: 'postgres://test' },
@@ -97,14 +142,21 @@ describe('queryKiloclawActiveUserIds', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
     const [requestUrl, requestInit] = fetchSpy.mock.calls[0];
-    expect(String(requestUrl)).toContain('requestId=11111111-1111-4111-8111-111111111111');
-    expect(String(requestUrl)).not.toContain('retry=true');
+    expect(requestUrlToString(requestUrl)).toContain(
+      'requestId=11111111-1111-4111-8111-111111111111'
+    );
+    expect(requestUrlToString(requestUrl)).not.toContain('retry=true');
     expect(requestInit?.method).toBe('POST');
+    expect(requestInit?.headers).toEqual(
+      expect.objectContaining({
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'user-agent': 'kiloclaw-billing/1.0',
+        'x-snowflake-authorization-token-type': 'KEYPAIR_JWT',
+      })
+    );
 
-    const body = JSON.parse(String(requestInit?.body)) as {
-      statement: string;
-      bindings: Record<string, { type: string; value: string }>;
-    };
+    const body = expectSubmitBody(parseRequestBody(requestInit?.body));
     expect(body.statement).toContain('kilo_user_id in (?, ?)');
     expect(body.bindings).toEqual({
       '1': { type: 'TEXT', value: 'user-1' },
@@ -142,10 +194,17 @@ describe('queryKiloclawActiveUserIds', () => {
 
     expect([...userIds]).toEqual(['user-1']);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
-    expect(String(fetchSpy.mock.calls[1][0])).toBe(
+    expect(requestUrlToString(fetchSpy.mock.calls[1][0])).toBe(
       'https://fyc17898.us-east-1/api/v2/statements/handle-1'
     );
     expect(fetchSpy.mock.calls[1][1]?.method).toBeUndefined();
+    expect(fetchSpy.mock.calls[1][1]?.headers).toEqual(
+      expect.objectContaining({
+        accept: 'application/json',
+        'user-agent': 'kiloclaw-billing/1.0',
+        'x-snowflake-authorization-token-type': 'KEYPAIR_JWT',
+      })
+    );
   });
 
   it('retries a 429 submit by resubmitting the POST with retry=true', async () => {
@@ -171,16 +230,45 @@ describe('queryKiloclawActiveUserIds', () => {
 
     expect([...userIds]).toEqual([]);
     expect(fetchSpy).toHaveBeenCalledTimes(2);
-    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+    expect(requestUrlToString(fetchSpy.mock.calls[0][0])).toContain(
       'requestId=11111111-1111-4111-8111-111111111111'
     );
-    expect(String(fetchSpy.mock.calls[0][0])).not.toContain('retry=true');
-    expect(String(fetchSpy.mock.calls[1][0])).toContain(
+    expect(requestUrlToString(fetchSpy.mock.calls[0][0])).not.toContain('retry=true');
+    expect(requestUrlToString(fetchSpy.mock.calls[1][0])).toContain(
       'requestId=11111111-1111-4111-8111-111111111111'
     );
-    expect(String(fetchSpy.mock.calls[1][0])).toContain('retry=true');
+    expect(requestUrlToString(fetchSpy.mock.calls[1][0])).toContain('retry=true');
     expect(fetchSpy.mock.calls[0][1]?.method).toBe('POST');
     expect(fetchSpy.mock.calls[1][1]?.method).toBe('POST');
+  });
+
+  it('includes Snowflake response details for non-422 submit failures', async () => {
+    const log = vi.fn();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ code: '390144', message: 'JWT token is invalid' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    await expect(
+      queryKiloclawActiveUserIds({
+        env: createEnv(),
+        userIds: ['user-1'],
+        log,
+      })
+    ).rejects.toThrow('Snowflake SQL API submit failed (400): JWT token is invalid (code: 390144)');
+
+    expect(log).toHaveBeenCalledWith(
+      'warn',
+      'Snowflake SQL API submit completed',
+      expect.objectContaining({
+        statusCode: 400,
+        snowflakeCode: '390144',
+        snowflakeMessage: 'JWT token is invalid',
+        responseBody: JSON.stringify({ code: '390144', message: 'JWT token is invalid' }),
+      })
+    );
   });
 
   it('throws on 422 query failures so the caller can fail open', async () => {

@@ -26,6 +26,7 @@
     "dev:status": "tsx dev/local/cli.ts status",
     "dev:restart": "tsx dev/local/cli.ts restart",
     "dev:env": "tsx dev/local/cli.ts env",
+    "dev:seed": "tsx dev/seed/index.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",
     "dev:kiloclaw-fly-instances": "tsx services/kiloclaw/scripts/dev-fly-instances.ts"
   },

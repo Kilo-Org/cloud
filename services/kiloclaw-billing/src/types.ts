@@ -1,6 +1,7 @@
 export const BILLING_HOURLY_CRON = '0 * * * *';
 export const TRIAL_INACTIVITY_DAILY_CRON = '0 8 * * *';
 export const TRIAL_INACTIVITY_SWEEP = 'trial_inactivity_stop' as const;
+export const TRIAL_INACTIVITY_STOP_CANDIDATE_SWEEP = 'trial_inactivity_stop_candidate' as const;
 
 export const BILLING_SWEEP_ORDER = [
   'credit_renewal',
@@ -19,7 +20,9 @@ export const BILLING_SWEEP_ORDER = [
 export const BILLING_QUEUE_MAX_RETRIES = 3;
 
 export type BillingSweepKind = (typeof BILLING_SWEEP_ORDER)[number];
-export type TrialInactivitySweepKind = typeof TRIAL_INACTIVITY_SWEEP;
+export type TrialInactivitySweepKind =
+  | typeof TRIAL_INACTIVITY_SWEEP
+  | typeof TRIAL_INACTIVITY_STOP_CANDIDATE_SWEEP;
 export type BillingMessageSweep = BillingSweepKind | TrialInactivitySweepKind;
 
 export type LifecycleQueueMessage = {
@@ -28,11 +31,24 @@ export type LifecycleQueueMessage = {
   sweep: BillingSweepKind;
 };
 
-export type TrialInactivityQueueMessage = {
+export type TrialInactivityKickoffQueueMessage = {
   kind: 'trial_inactivity_stop';
   runId: string;
-  sweep: TrialInactivitySweepKind;
+  sweep: typeof TRIAL_INACTIVITY_SWEEP;
 };
+
+export type TrialInactivityStopCandidateQueueMessage = {
+  kind: 'trial_inactivity_stop_candidate';
+  runId: string;
+  sweep: typeof TRIAL_INACTIVITY_STOP_CANDIDATE_SWEEP;
+  subscriptionId: string;
+  userId: string;
+  instanceId: string;
+};
+
+export type TrialInactivityQueueMessage =
+  | TrialInactivityKickoffQueueMessage
+  | TrialInactivityStopCandidateQueueMessage;
 
 export type BillingQueueMessage = LifecycleQueueMessage | TrialInactivityQueueMessage;
 

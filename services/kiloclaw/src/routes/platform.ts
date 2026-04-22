@@ -2331,8 +2331,14 @@ platform.post('/stop', async c => {
   const { instanceId } = iidResult;
 
   try {
-    await withResolvedDORetry(c.env, result.data.userId, instanceId, stub => stub.stop(), 'stop');
-    return c.json({ ok: true });
+    const stopResult = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      instanceId,
+      stub => stub.stop(),
+      'stop'
+    );
+    return c.json({ ok: true, ...stopResult });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'stop');
     return jsonError(message, status);

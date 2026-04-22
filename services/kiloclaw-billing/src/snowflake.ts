@@ -8,6 +8,8 @@ const SNOWFLAKE_JWT_LIFETIME_SECONDS = 59 * 60;
 const SNOWFLAKE_MAX_SUBMIT_ATTEMPTS = 3;
 const SNOWFLAKE_MAX_POLL_ATTEMPTS = 10;
 const SNOWFLAKE_RETRY_BASE_DELAY_MS = 1_000;
+const SNOWFLAKE_ERROR_RESPONSE_MAX_LENGTH = 1_000;
+const SNOWFLAKE_USER_AGENT = 'kiloclaw-billing/1.0';
 
 export type SnowflakeConfig = {
   accountHost: string;
@@ -33,6 +35,12 @@ type SnowflakeStatementResponse = {
   statementHandle?: string;
   statementStatusUrl?: string;
   data?: unknown[];
+};
+
+type SnowflakeErrorDetails = {
+  code?: string;
+  message?: string;
+  responseBody?: string;
 };
 
 function sleep(ms: number): Promise<void> {
@@ -107,7 +115,64 @@ async function buildJwt(config: SnowflakeConfig): Promise<string> {
 }
 
 async function readJson(response: Response): Promise<SnowflakeStatementResponse> {
-  return (await response.json()) as SnowflakeStatementResponse;
+  return await response.json();
+}
+
+function truncateResponseBody(value: string): string {
+  if (value.length <= SNOWFLAKE_ERROR_RESPONSE_MAX_LENGTH) {
+    return value;
+  }
+
+  return `${value.slice(0, SNOWFLAKE_ERROR_RESPONSE_MAX_LENGTH)}…`;
+}
+
+async function readErrorDetails(response: Response): Promise<SnowflakeErrorDetails> {
+  const contentType = response.headers.get('content-type') ?? '';
+
+  if (contentType.includes('application/json')) {
+    try {
+      const payload = await readJson(response);
+      return {
+        code: payload.code,
+        message: payload.message,
+        responseBody: truncateResponseBody(JSON.stringify(payload)),
+      };
+    } catch {
+      // Fall through and try reading plain text below.
+    }
+  }
+
+  try {
+    const responseBody = truncateResponseBody(await response.text());
+    return {
+      responseBody: responseBody.length > 0 ? responseBody : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function formatSnowflakeApiError(
+  fallbackMessage: string,
+  details: SnowflakeErrorDetails | null | undefined
+): string {
+  if (!details) {
+    return fallbackMessage;
+  }
+
+  if (details.message && details.code) {
+    return `${fallbackMessage}: ${details.message} (code: ${details.code})`;
+  }
+
+  if (details.message) {
+    return `${fallbackMessage}: ${details.message}`;
+  }
+
+  if (details.responseBody) {
+    return `${fallbackMessage}: ${details.responseBody}`;
+  }
+
+  return fallbackMessage;
 }
 
 async function submitStatement(params: {
@@ -130,8 +195,10 @@ async function submitStatement(params: {
   const response = await fetch(url, {
     method: 'POST',
     headers: {
+      accept: 'application/json',
       authorization: `Bearer ${params.jwt}`,
       'content-type': 'application/json',
+      'user-agent': SNOWFLAKE_USER_AGENT,
       'x-snowflake-authorization-token-type': 'KEYPAIR_JWT',
     },
     body: JSON.stringify({
@@ -144,6 +211,8 @@ async function submitStatement(params: {
     }),
   });
 
+  const errorDetails = response.ok ? undefined : await readErrorDetails(response.clone());
+
   params.log(response.ok ? 'info' : 'warn', 'Snowflake SQL API submit completed', {
     event: 'downstream_call',
     outcome: response.ok ? 'completed' : 'failed',
@@ -153,6 +222,9 @@ async function submitStatement(params: {
     durationMs: performance.now() - startedAt,
     batchSize: params.batchSize,
     retry: params.retry,
+    snowflakeCode: errorDetails?.code,
+    snowflakeMessage: errorDetails?.message,
+    responseBody: errorDetails?.responseBody,
   });
 
   return response;
@@ -172,10 +244,14 @@ async function pollStatement(params: {
     const startedAt = performance.now();
     const response = await fetch(statusUrl, {
       headers: {
+        accept: 'application/json',
         authorization: `Bearer ${params.jwt}`,
+        'user-agent': SNOWFLAKE_USER_AGENT,
         'x-snowflake-authorization-token-type': 'KEYPAIR_JWT',
       },
     });
+
+    const logErrorDetails = response.ok ? undefined : await readErrorDetails(response.clone());
 
     params.log(response.ok ? 'info' : 'warn', 'Snowflake SQL API poll completed', {
       event: 'downstream_call',
@@ -187,6 +263,9 @@ async function pollStatement(params: {
       batchSize: params.batchSize,
       pollAttempt: attempt,
       statementHandle: params.statementHandle,
+      snowflakeCode: logErrorDetails?.code,
+      snowflakeMessage: logErrorDetails?.message,
+      responseBody: logErrorDetails?.responseBody,
     });
 
     if (response.status === 200) {
@@ -202,7 +281,10 @@ async function pollStatement(params: {
       return await readJson(response);
     }
 
-    throw new Error(`Snowflake statement poll failed (${response.status})`);
+    const errorDetails = await readErrorDetails(response);
+    throw new Error(
+      formatSnowflakeApiError(`Snowflake statement poll failed (${response.status})`, errorDetails)
+    );
   }
 
   throw new Error('Snowflake statement poll timed out');
@@ -322,7 +404,10 @@ export async function queryKiloclawActiveUserIds(params: {
       throw new Error(payload.message ?? 'Snowflake statement failed');
     }
 
-    throw new Error(`Snowflake SQL API submit failed (${response.status})`);
+    const errorDetails = await readErrorDetails(response);
+    throw new Error(
+      formatSnowflakeApiError(`Snowflake SQL API submit failed (${response.status})`, errorDetails)
+    );
   }
 
   throw new Error('Snowflake SQL API submit exhausted retries');

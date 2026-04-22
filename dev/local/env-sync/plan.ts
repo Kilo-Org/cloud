@@ -33,6 +33,7 @@ import {
 const FLY_TOKEN_ENV_KEY = 'FLY_API_TOKEN';
 const FLY_ORG_SLUG_ENV_KEY = 'FLY_ORG_SLUG';
 const DEFAULT_FLY_ORG_SLUG = 'kilo-dev';
+const KILOCLAW_PROVIDER_KEY = 'KILOCLAW_DEFAULT_PROVIDER';
 
 function createFlyTokenAutoCreate(flyOrgSlug: string): EnvLocalAutoCreate {
   return {
@@ -367,8 +368,16 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       }
     }
 
+    // Only auto-create FLY_API_TOKEN when the effective provider is "fly".
+    // When KILOCLAW_DEFAULT_PROVIDER is "docker-local" (the default), Fly access
+    // isn't required and the token creation (which needs the kilo-dev Fly org) is skipped.
+    const effectiveProvider =
+      oldVars.get(KILOCLAW_PROVIDER_KEY) || resolvedVars.get(KILOCLAW_PROVIDER_KEY);
+    const providerNeedsFly = !effectiveProvider || effectiveProvider === 'fly';
+
     if (
       shouldCreateFlyToken &&
+      providerNeedsFly &&
       !envLocalAutoCreates.some(create => create.key === FLY_TOKEN_ENV_KEY)
     ) {
       const flyOrgSlug =

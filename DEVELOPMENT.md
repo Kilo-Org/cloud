@@ -317,6 +317,17 @@ Each worker in the workspace can be started individually with `wrangler dev` (or
 
 The easiest way to run workers is with `pnpm dev:start` (see [Common Development Commands](#common-development-commands)), which starts groups of related services in a tmux dashboard.
 
+### KiloClaw local setup
+
+KiloClaw uses `docker-local` by default for local development — no Fly.io access required. To set it up:
+
+1. Expose the Docker socket over loopback: `socat TCP-LISTEN:23750,bind=127.0.0.1,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock`
+2. Build the local image: `cd services/kiloclaw && ./scripts/build-local-image.sh`
+3. Run `pnpm dev:env` to create the `.dev.vars` file (already configured for docker-local)
+4. Start KiloClaw: `pnpm dev:start kiloclaw`
+
+See `services/kiloclaw/README.md` for more details, including how to switch to the Fly provider.
+
 ### Worker `.dev.vars` setup
 
 Most workers require a `.dev.vars` file with secrets like `NEXTAUTH_SECRET` and `INTERNAL_API_SECRET`. A script automates this:

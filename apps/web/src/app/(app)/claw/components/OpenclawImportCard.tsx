@@ -236,15 +236,12 @@ export function OpenclawImportCard({
 
           const summary = summarizeImportResult(result);
           if (result.ok) {
-            toast.success('OpenClaw import complete.');
+            toast.success('OpenClaw import complete. Restarting KiloClaw.');
           } else {
-            toast.error(`OpenClaw import complete. (${summary})`);
+            toast.error(`OpenClaw import complete. Restarting KiloClaw. (${summary})`);
           }
 
           mutations.restartOpenClaw.mutate(undefined, {
-            onSuccess: () => {
-              toast.success('KiloClaw restarting.');
-            },
             onError: err => {
               const message = err.message || 'Failed to restart KiloClaw';
               toast.error(`OpenClaw imported, but failed to restart KiloClaw: ${message}`);

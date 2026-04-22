@@ -16,6 +16,7 @@ import { GenericToolCard } from './GenericToolCard';
 import { TodoReadToolCard } from './TodoReadToolCard';
 import { TodoWriteToolCard } from './TodoWriteToolCard';
 import { QuestionToolStatus } from './QuestionToolStatus';
+import { SuggestToolCard } from './SuggestToolCard';
 import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
 import type { RenderPartFn } from './ChildSessionSection';
 import { useState } from 'react';
@@ -115,6 +116,7 @@ function hasRequiredInput(part: Extract<Part, { type: 'tool' }>): boolean {
     case 'todoread':
     case 'todowrite':
     case 'question':
+    case 'suggest':
       // These tools can render without specific input or handle empty arrays gracefully
       return true;
     default:
@@ -239,6 +241,12 @@ function ToolPartRenderer({
   // Question tool — read-only status in message stream (interactive UI is in the dock)
   if (part.tool === 'question') {
     return <QuestionToolStatus toolPart={part} />;
+  }
+
+  // Suggest tool — interactive card rendered inline (no dock), so the text
+  // input stays available for the user to send messages in parallel.
+  if (part.tool === 'suggest') {
+    return <SuggestToolCard toolPart={part} />;
   }
 
   return <GenericToolCard toolPart={part} />;

@@ -14,6 +14,8 @@ import type {
   QuestionState,
   PermissionState,
   ServiceStateSnapshot,
+  SuggestionAction,
+  SuggestionState,
   CloudStatus,
 } from './types';
 
@@ -31,6 +33,15 @@ type ServiceStateConfig = {
     always?: string[]
   ) => void;
   onPermissionResolved?: (requestId: string) => void;
+  /** Fired when a `suggest` tool asks the user to pick an action. */
+  onSuggestionAsked?: (
+    requestId: string,
+    text: string,
+    actions: SuggestionAction[],
+    callId?: string
+  ) => void;
+  /** Fired when a suggestion is resolved (accepted or dismissed). */
+  onSuggestionResolved?: (requestId: string) => void;
   onBranchChanged?: (branch: string) => void;
   onSessionCreated?: (info: SessionInfo) => void;
   onSessionUpdated?: (info: SessionInfo) => void;
@@ -47,6 +58,7 @@ type ServiceState = {
   getCloudStatus(): CloudStatus | null;
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
+  getSuggestion(): SuggestionState | null;
   getSessionInfo(): SessionInfo | null;
   snapshot(): ServiceStateSnapshot;
   /** Set activity directly (for transport lifecycle events like connecting/disconnected). */
@@ -69,6 +81,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let sessionInfo: SessionInfo | null = null;
   let question: QuestionState | null = null;
   let permission: PermissionState | null = null;
+  let suggestion: SuggestionState | null = null;
 
   // Tracks whether we've received a terminal stopped event (error/interrupted/disconnected).
   // While terminated, session.error events are suppressed as aftershocks.
@@ -198,6 +211,30 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     notify();
   }
 
+  function processSuggestionShown(
+    event: Extract<ServiceEvent, { type: 'suggestion.shown' }>
+  ): void {
+    suggestion = {
+      requestId: event.requestId,
+      text: event.text,
+      actions: event.actions,
+      callId: event.callId,
+    };
+    config.onSuggestionAsked?.(event.requestId, event.text, event.actions, event.callId);
+    notify();
+  }
+
+  function processSuggestionResolved(requestId: string): void {
+    // Clear only when the resolution matches the currently-pending suggestion.
+    // The CLI emits both a command `response` and a `suggestion.accepted` /
+    // `suggestion.dismissed` bus event; whichever arrives first clears state,
+    // and the second is fully a no-op (no callback, no notify).
+    if (!suggestion || suggestion.requestId !== requestId) return;
+    suggestion = null;
+    config.onSuggestionResolved?.(requestId);
+    notify();
+  }
+
   function processPreparing(event: Extract<ServiceEvent, { type: 'preparing' }>): void {
     if (event.step === 'ready') {
       cloudStatus = { type: 'ready' };
@@ -285,6 +322,13 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     } else {
       permission = null;
     }
+    if (suggestion) {
+      const { requestId } = suggestion;
+      suggestion = null;
+      config.onSuggestionResolved?.(requestId);
+    } else {
+      suggestion = null;
+    }
 
     // Clear terminated on connected
     terminated = false;
@@ -330,6 +374,13 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       case 'permission.replied':
         processPermissionResolved(event.requestId);
         break;
+      case 'suggestion.shown':
+        processSuggestionShown(event);
+        break;
+      case 'suggestion.accepted':
+      case 'suggestion.dismissed':
+        processSuggestionResolved(event.requestId);
+        break;
       case 'preparing':
         processPreparing(event);
         break;
@@ -361,6 +412,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     getCloudStatus: () => cloudStatus,
     getQuestion: () => question,
     getPermission: () => permission,
+    getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
 
     snapshot: () => ({
@@ -370,6 +422,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       sessionInfo,
       question,
       permission,
+      suggestion,
     }),
 
     setActivity(next: SessionActivity): void {
@@ -401,6 +454,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       sessionInfo = null;
       question = null;
       permission = null;
+      suggestion = null;
       terminated = false;
       notify();
     },

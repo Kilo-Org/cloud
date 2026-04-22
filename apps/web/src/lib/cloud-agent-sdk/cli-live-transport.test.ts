@@ -708,6 +708,46 @@ describe('CliLiveTransport typed command methods', () => {
     return promise;
   });
 
+  it('acceptSuggestion() sends suggestion_accept command with requestID and index', () => {
+    const { transport } = createTransportWithSinks();
+
+    transport.connect();
+    openConnection();
+    mockWs.send.mockClear();
+
+    const promise = transport.acceptSuggestion!({ requestId: 'sug-1', index: 1 });
+
+    const sent = JSON.parse(mockWs.send.mock.calls[0][0]) as {
+      command: string;
+      data: Record<string, unknown>;
+    };
+    expect(sent.command).toBe('suggestion_accept');
+    expect(sent.data).toEqual({ requestID: 'sug-1', index: 1 });
+
+    sendInbound({ type: 'response', id: 'mock-uuid-1234', result: {} });
+    return promise;
+  });
+
+  it('dismissSuggestion() sends suggestion_dismiss command with requestID', () => {
+    const { transport } = createTransportWithSinks();
+
+    transport.connect();
+    openConnection();
+    mockWs.send.mockClear();
+
+    const promise = transport.dismissSuggestion!({ requestId: 'sug-2' });
+
+    const sent = JSON.parse(mockWs.send.mock.calls[0][0]) as {
+      command: string;
+      data: Record<string, unknown>;
+    };
+    expect(sent.command).toBe('suggestion_dismiss');
+    expect(sent.data).toEqual({ requestID: 'sug-2' });
+
+    sendInbound({ type: 'response', id: 'mock-uuid-1234', result: {} });
+    return promise;
+  });
+
   it('resolves when response arrives', async () => {
     const { transport } = createTransportWithSinks();
 

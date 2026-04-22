@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { run } from '@/scripts/db/kiloclaw-subscription-alignment';
+import {
+  applyPersonalDestroyedCurrentAccessRow,
+  listPersonalDestroyedCurrentAccessCandidates,
+  run,
+} from '@/scripts/db/kiloclaw-subscription-alignment';
 import {
   kiloclaw_instances,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 
@@ -20,6 +24,523 @@ describe('kiloclaw-subscription-alignment script', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  async function insertDestroyedCurrentAccessRow(params: {
+    email: string;
+    plan: 'trial' | 'standard' | 'commit';
+    status: 'active' | 'trialing' | 'canceled';
+    paymentSource: 'credits' | 'stripe' | null;
+    organizationId?: string;
+    stripeSubscriptionId?: string | null;
+    trialEndsAt?: string;
+  }) {
+    const user = await insertTestUser({ google_user_email: params.email });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      organization_id: params.organizationId,
+      sandbox_id: `ki_${instanceId.replaceAll('-', '')}`,
+      created_at: '2026-04-01T00:00:00.000Z',
+      destroyed_at: '2026-04-02T00:00:00.000Z',
+    });
+
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: instanceId,
+        plan: params.plan,
+        status: params.status,
+        payment_source: params.paymentSource,
+        stripe_subscription_id: params.stripeSubscriptionId ?? null,
+        cancel_at_period_end: true,
+        pending_conversion: true,
+        scheduled_plan: 'standard',
+        scheduled_by: 'user',
+        trial_started_at: params.status === 'trialing' ? '2026-04-01T00:00:00.000Z' : null,
+        trial_ends_at: params.trialEndsAt ?? null,
+        suspended_at: '2026-04-02T00:00:00.000Z',
+        destruction_deadline: '2026-04-03T00:00:00.000Z',
+        auto_resume_requested_at: '2026-04-02T01:00:00.000Z',
+        auto_resume_retry_after: '2026-04-02T03:00:00.000Z',
+        auto_resume_attempt_count: 3,
+        auto_top_up_triggered_for_period: '2026-04-01T00:00:00.000Z',
+        created_at: '2026-04-01T00:00:00.000Z',
+        updated_at: '2026-04-01T00:00:00.000Z',
+      })
+      .returning();
+
+    if (!subscription) {
+      throw new Error('Expected destroyed current subscription row');
+    }
+
+    return { user, instanceId, subscription };
+  }
+
+  it('previews destroyed trialing personal current row as cancel_destroyed_trial', async () => {
+    const { subscription } = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-trial-preview@example.com',
+      plan: 'trial',
+      status: 'trialing',
+      paymentSource: null,
+      trialEndsAt: '2999-04-08T00:00:00.000Z',
+    });
+
+    const candidates = await listPersonalDestroyedCurrentAccessCandidates();
+
+    expect(candidates).toEqual([
+      expect.objectContaining({
+        action: 'cancel_destroyed_trial',
+        subscriptionId: subscription.id,
+      }),
+    ]);
+  });
+
+  it('cancels destroyed trialing personal current row and writes canceled change log', async () => {
+    const { subscription } = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-trial-apply@example.com',
+      plan: 'trial',
+      status: 'trialing',
+      paymentSource: null,
+      trialEndsAt: '2999-04-08T00:00:00.000Z',
+    });
+
+    await run('apply-personal-destroyed-current-access');
+
+    const [updated] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+
+    expect(updated).toEqual(
+      expect.objectContaining({
+        status: 'canceled',
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: null,
+        auto_resume_retry_after: null,
+        auto_resume_attempt_count: 0,
+        auto_top_up_triggered_for_period: null,
+        cancel_at_period_end: false,
+        pending_conversion: false,
+        scheduled_plan: null,
+        scheduled_by: null,
+      })
+    );
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'canceled',
+          actor_type: 'system',
+          actor_id: 'kiloclaw-subscription-alignment',
+          reason: 'apply_personal_destroyed_current_access_cancel_trial',
+        }),
+      ])
+    );
+  });
+
+  it('previews destroyed active credits rows as cancel_destroyed_credits_subscription', async () => {
+    const standard = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-standard-preview@example.com',
+      plan: 'standard',
+      status: 'active',
+      paymentSource: 'credits',
+    });
+    const commit = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-commit-preview@example.com',
+      plan: 'commit',
+      status: 'active',
+      paymentSource: 'credits',
+    });
+
+    const candidates = await listPersonalDestroyedCurrentAccessCandidates();
+
+    expect(candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'cancel_destroyed_credits_subscription',
+          subscriptionId: standard.subscription.id,
+        }),
+        expect.objectContaining({
+          action: 'cancel_destroyed_credits_subscription',
+          subscriptionId: commit.subscription.id,
+        }),
+      ])
+    );
+    expect(candidates).toHaveLength(2);
+  });
+
+  it('skips destroyed active credits row without confirm flag', async () => {
+    const { subscription } = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-credits-no-confirm@example.com',
+      plan: 'standard',
+      status: 'active',
+      paymentSource: 'credits',
+    });
+
+    await run('apply-personal-destroyed-current-access');
+
+    const [updated] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+
+    expect(updated?.status).toBe('active');
+    expect(logs).toHaveLength(0);
+  });
+
+  it('cancels destroyed active credits row with confirm flag and writes credits reason', async () => {
+    const { subscription } = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-credits-confirm@example.com',
+      plan: 'commit',
+      status: 'active',
+      paymentSource: 'credits',
+    });
+
+    await run('apply-personal-destroyed-current-access', '--confirm-cancel-credit-access');
+
+    const [updated] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, subscription.id));
+
+    expect(updated?.status).toBe('canceled');
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'canceled',
+          reason: 'apply_personal_destroyed_current_access_cancel_credits',
+        }),
+      ])
+    );
+  });
+
+  it('reports destroyed active Stripe and hybrid rows for manual review without mutation', async () => {
+    const stripe = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-stripe@example.com',
+      plan: 'standard',
+      status: 'active',
+      paymentSource: 'stripe',
+      stripeSubscriptionId: 'sub_destroyed_current_stripe',
+    });
+    const hybrid = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-hybrid@example.com',
+      plan: 'standard',
+      status: 'active',
+      paymentSource: 'credits',
+      stripeSubscriptionId: 'sub_destroyed_current_hybrid',
+    });
+
+    const candidates = await listPersonalDestroyedCurrentAccessCandidates();
+    expect(candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'manual_review_stripe',
+          subscriptionId: stripe.subscription.id,
+        }),
+        expect.objectContaining({
+          action: 'manual_review_stripe',
+          subscriptionId: hybrid.subscription.id,
+        }),
+      ])
+    );
+    expect(candidates).toHaveLength(2);
+
+    await run('apply-personal-destroyed-current-access', '--confirm-cancel-credit-access');
+
+    const updated = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(inArray(kiloclaw_subscriptions.id, [stripe.subscription.id, hybrid.subscription.id]));
+
+    expect(updated).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: stripe.subscription.id, status: 'active' }),
+        expect.objectContaining({ id: hybrid.subscription.id, status: 'active' }),
+      ])
+    );
+  });
+
+  it('does not touch org-scoped destroyed current row', async () => {
+    const user = await insertTestUser({ google_user_email: 'destroyed-current-org@example.com' });
+    const org = await createTestOrganization('destroyed-current-org', user.id, 0);
+    const { subscription } = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-org-owner@example.com',
+      plan: 'standard',
+      status: 'active',
+      paymentSource: 'credits',
+      organizationId: org.id,
+    });
+
+    await run('apply-personal-destroyed-current-access', '--confirm-cancel-credit-access');
+
+    const candidates = await listPersonalDestroyedCurrentAccessCandidates();
+    const [updated] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+
+    expect(candidates).toHaveLength(0);
+    expect(updated?.status).toBe('active');
+  });
+
+  it('does not touch destroyed non-access row', async () => {
+    const { subscription } = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-non-access@example.com',
+      plan: 'trial',
+      status: 'canceled',
+      paymentSource: null,
+      trialEndsAt: '2026-04-08T00:00:00.000Z',
+    });
+
+    await run('apply-personal-destroyed-current-access');
+
+    const candidates = await listPersonalDestroyedCurrentAccessCandidates();
+    const [updated] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+
+    expect(candidates).toHaveLength(0);
+    expect(updated?.status).toBe('canceled');
+  });
+
+  it('does not touch user with live current personal row plus destroyed current row', async () => {
+    const user = await insertTestUser({ google_user_email: 'destroyed-plus-live@example.com' });
+    const destroyedInstanceId = crypto.randomUUID();
+    const liveInstanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: destroyedInstanceId,
+        user_id: user.id,
+        sandbox_id: `ki_${destroyedInstanceId.replaceAll('-', '')}`,
+        destroyed_at: '2026-04-02T00:00:00.000Z',
+      },
+      {
+        id: liveInstanceId,
+        user_id: user.id,
+        sandbox_id: `ki_${liveInstanceId.replaceAll('-', '')}`,
+      },
+    ]);
+    const [destroyedSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: destroyedInstanceId,
+        plan: 'standard',
+        status: 'active',
+        payment_source: 'credits',
+        cancel_at_period_end: false,
+      })
+      .returning();
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: liveInstanceId,
+      plan: 'standard',
+      status: 'active',
+      payment_source: 'credits',
+      cancel_at_period_end: false,
+    });
+
+    await run('apply-personal-destroyed-current-access', '--confirm-cancel-credit-access');
+
+    const candidates = await listPersonalDestroyedCurrentAccessCandidates();
+    const [updated] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, destroyedSubscription?.id));
+
+    expect(candidates).toHaveLength(0);
+    expect(updated?.status).toBe('active');
+  });
+
+  it('race guard skips already transferred row and live current row before update', async () => {
+    const transferred = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-transferred-race@example.com',
+      plan: 'trial',
+      status: 'trialing',
+      paymentSource: null,
+      trialEndsAt: '2999-04-08T00:00:00.000Z',
+    });
+    const [transferredCandidate] = await listPersonalDestroyedCurrentAccessCandidates();
+    if (!transferredCandidate) {
+      throw new Error('Expected transferred race candidate');
+    }
+    const successorId = crypto.randomUUID();
+    await db.insert(kiloclaw_subscriptions).values({
+      id: successorId,
+      user_id: transferred.user.id,
+      instance_id: null,
+      plan: 'trial',
+      status: 'canceled',
+      cancel_at_period_end: false,
+    });
+    await db
+      .update(kiloclaw_subscriptions)
+      .set({ transferred_to_subscription_id: successorId })
+      .where(eq(kiloclaw_subscriptions.id, transferred.subscription.id));
+
+    await expect(
+      applyPersonalDestroyedCurrentAccessRow(transferredCandidate, {
+        confirmSandboxesDestroyed: false,
+        confirmCancelCreditAccess: false,
+        bulk: false,
+      })
+    ).resolves.toBe('skipped_already_transferred');
+
+    const liveRace = await insertDestroyedCurrentAccessRow({
+      email: 'destroyed-current-live-race@example.com',
+      plan: 'trial',
+      status: 'trialing',
+      paymentSource: null,
+      trialEndsAt: '2999-04-08T00:00:00.000Z',
+    });
+    const [liveRaceCandidate] = await listPersonalDestroyedCurrentAccessCandidates();
+    if (!liveRaceCandidate) {
+      throw new Error('Expected live row race candidate');
+    }
+    const liveInstanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: liveInstanceId,
+      user_id: liveRace.user.id,
+      sandbox_id: `ki_${liveInstanceId.replaceAll('-', '')}`,
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: liveRace.user.id,
+      instance_id: liveInstanceId,
+      plan: 'standard',
+      status: 'active',
+      payment_source: 'credits',
+      cancel_at_period_end: false,
+    });
+
+    await expect(
+      applyPersonalDestroyedCurrentAccessRow(liveRaceCandidate, {
+        confirmSandboxesDestroyed: false,
+        confirmCancelCreditAccess: false,
+        bulk: false,
+      })
+    ).resolves.toBe('skipped_has_live_current_row');
+  });
+
+  it('repairs org destroyed current chain into live successor', async () => {
+    const user = await insertTestUser({ google_user_email: 'org-chain-repair@example.com' });
+    const org = await createTestOrganization('org-chain-repair', user.id, 0);
+    const destroyedA = crypto.randomUUID();
+    const destroyedB = crypto.randomUUID();
+    const live = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: destroyedA,
+        user_id: user.id,
+        organization_id: org.id,
+        sandbox_id: `ki_${destroyedA.replaceAll('-', '')}`,
+        created_at: '2026-04-01T00:00:00.000Z',
+        destroyed_at: '2026-04-02T00:00:00.000Z',
+      },
+      {
+        id: destroyedB,
+        user_id: user.id,
+        organization_id: org.id,
+        sandbox_id: `ki_${destroyedB.replaceAll('-', '')}`,
+        created_at: '2026-04-03T00:00:00.000Z',
+        destroyed_at: '2026-04-04T00:00:00.000Z',
+      },
+      {
+        id: live,
+        user_id: user.id,
+        organization_id: org.id,
+        sandbox_id: `ki_${live.replaceAll('-', '')}`,
+        created_at: '2026-04-05T00:00:00.000Z',
+      },
+    ]);
+
+    const [subA, subB, liveSub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values([
+        {
+          user_id: user.id,
+          instance_id: destroyedA,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-04-01T00:00:00.000Z',
+        },
+        {
+          user_id: user.id,
+          instance_id: destroyedB,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-04-03T00:00:00.000Z',
+        },
+        {
+          user_id: user.id,
+          instance_id: live,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-04-05T00:00:00.000Z',
+        },
+      ])
+      .returning();
+
+    if (!subA || !subB || !liveSub) {
+      throw new Error('Expected org chain subscription rows');
+    }
+
+    await run('apply-org-destroyed-current-chain');
+
+    const subscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .orderBy(kiloclaw_subscriptions.created_at);
+
+    expect(subscriptions.map(subscription => subscription.transferred_to_subscription_id)).toEqual([
+      subB.id,
+      liveSub.id,
+      null,
+    ]);
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.actor_id, 'kiloclaw-subscription-alignment'));
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subscription_id: subA.id,
+          action: 'reassigned',
+          reason: 'apply_org_destroyed_current_chain_transfer',
+        }),
+        expect.objectContaining({
+          subscription_id: subB.id,
+          action: 'reassigned',
+          reason: 'apply_org_destroyed_current_chain_transfer',
+        }),
+      ])
+    );
   });
 
   it('reassigns duplicate active personal subscription to canonical instance and destroys duplicate', async () => {
@@ -920,6 +1441,279 @@ describe('kiloclaw-subscription-alignment script', () => {
           action: 'backfilled',
           reason: 'apply_org_backfill_active_standard_credits',
         }),
+      ])
+    );
+  });
+
+  it('repairs org replacement drift by transferring destroyed predecessor to live row', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'org-replacement-drift@example.com',
+    });
+    const organization = await createTestOrganization('org-replacement', user.id, 0);
+
+    const destroyedInstanceId = crypto.randomUUID();
+    const liveInstanceId = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: destroyedInstanceId,
+        user_id: user.id,
+        organization_id: organization.id,
+        sandbox_id: `ki_${destroyedInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-03-01T00:00:00.000Z',
+        destroyed_at: '2026-03-10T00:00:00.000Z',
+      },
+      {
+        id: liveInstanceId,
+        user_id: user.id,
+        organization_id: organization.id,
+        sandbox_id: `ki_${liveInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-04-01T00:00:00.000Z',
+      },
+    ]);
+
+    const [destroyedSubscription, liveSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values([
+        {
+          user_id: user.id,
+          instance_id: destroyedInstanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-03-01T00:00:00.000Z',
+          updated_at: '2026-03-01T00:00:00.000Z',
+        },
+        {
+          user_id: user.id,
+          instance_id: liveInstanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-04-01T00:00:00.000Z',
+          updated_at: '2026-04-01T00:00:00.000Z',
+        },
+      ])
+      .returning();
+
+    if (!destroyedSubscription || !liveSubscription) {
+      throw new Error('Expected org subscription seed rows');
+    }
+
+    await run('apply-org-replacement');
+
+    const subscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .orderBy(kiloclaw_subscriptions.created_at);
+
+    const destroyedAfter = subscriptions.find(
+      subscription => subscription.id === destroyedSubscription.id
+    );
+    const liveAfter = subscriptions.find(subscription => subscription.id === liveSubscription.id);
+
+    expect(destroyedAfter?.transferred_to_subscription_id).toBe(liveSubscription.id);
+    expect(liveAfter?.transferred_to_subscription_id).toBeNull();
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_subscription_change_log)
+      .where(eq(kiloclaw_subscription_change_log.subscription_id, destroyedSubscription.id));
+
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'reassigned',
+          reason: 'apply_org_replacement_transfer_destroyed_predecessor',
+        }),
+      ])
+    );
+
+    const metricsCall = (console.table as jest.Mock).mock.calls.find(
+      ([rows]) => Array.isArray(rows) && rows.some(row => row.metric === 'orgs_succeeded')
+    );
+    expect(metricsCall?.[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ metric: 'orgs_succeeded', count: 1 }),
+        expect.objectContaining({ metric: 'orgs_skipped_no_work', count: 0 }),
+        expect.objectContaining({ metric: 'orgs_skipped_race', count: 0 }),
+        expect.objectContaining({ metric: 'orgs_error', count: 0 }),
+      ])
+    );
+  });
+
+  it('chains multiple destroyed org predecessors without violating transferred_to uniqueness', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'org-replacement-chain@example.com',
+    });
+    const organization = await createTestOrganization('org-replacement-chain', user.id, 0);
+
+    const oldestDestroyedInstanceId = crypto.randomUUID();
+    const newestDestroyedInstanceId = crypto.randomUUID();
+    const liveInstanceId = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: oldestDestroyedInstanceId,
+        user_id: user.id,
+        organization_id: organization.id,
+        sandbox_id: `ki_${oldestDestroyedInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-02-01T00:00:00.000Z',
+        destroyed_at: '2026-02-10T00:00:00.000Z',
+      },
+      {
+        id: newestDestroyedInstanceId,
+        user_id: user.id,
+        organization_id: organization.id,
+        sandbox_id: `ki_${newestDestroyedInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-03-01T00:00:00.000Z',
+        destroyed_at: '2026-03-10T00:00:00.000Z',
+      },
+      {
+        id: liveInstanceId,
+        user_id: user.id,
+        organization_id: organization.id,
+        sandbox_id: `ki_${liveInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-04-01T00:00:00.000Z',
+      },
+    ]);
+
+    const [oldestDestroyedSubscription, newestDestroyedSubscription, liveSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values([
+        {
+          user_id: user.id,
+          instance_id: oldestDestroyedInstanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-02-01T00:00:00.000Z',
+          updated_at: '2026-02-01T00:00:00.000Z',
+        },
+        {
+          user_id: user.id,
+          instance_id: newestDestroyedInstanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-03-01T00:00:00.000Z',
+          updated_at: '2026-03-01T00:00:00.000Z',
+        },
+        {
+          user_id: user.id,
+          instance_id: liveInstanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-04-01T00:00:00.000Z',
+          updated_at: '2026-04-01T00:00:00.000Z',
+        },
+      ])
+      .returning();
+
+    if (!oldestDestroyedSubscription || !newestDestroyedSubscription || !liveSubscription) {
+      throw new Error('Expected org chain seed rows');
+    }
+
+    await run('apply-org-replacement');
+
+    const subscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id))
+      .orderBy(kiloclaw_subscriptions.created_at);
+
+    expect(subscriptions.map(subscription => subscription.transferred_to_subscription_id)).toEqual([
+      newestDestroyedSubscription.id,
+      liveSubscription.id,
+      null,
+    ]);
+  });
+
+  it('skips cleanly when org replacement candidate is repaired concurrently', async () => {
+    const user = await insertTestUser({
+      google_user_email: 'org-replacement-race@example.com',
+    });
+    const organization = await createTestOrganization('org-replacement-race', user.id, 0);
+
+    const destroyedInstanceId = crypto.randomUUID();
+    const liveInstanceId = crypto.randomUUID();
+
+    await db.insert(kiloclaw_instances).values([
+      {
+        id: destroyedInstanceId,
+        user_id: user.id,
+        organization_id: organization.id,
+        sandbox_id: `ki_${destroyedInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-03-01T00:00:00.000Z',
+        destroyed_at: '2026-03-10T00:00:00.000Z',
+      },
+      {
+        id: liveInstanceId,
+        user_id: user.id,
+        organization_id: organization.id,
+        sandbox_id: `ki_${liveInstanceId.replaceAll('-', '')}`,
+        created_at: '2026-04-01T00:00:00.000Z',
+      },
+    ]);
+
+    const [destroyedSubscription, liveSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values([
+        {
+          user_id: user.id,
+          instance_id: destroyedInstanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-03-01T00:00:00.000Z',
+          updated_at: '2026-03-01T00:00:00.000Z',
+        },
+        {
+          user_id: user.id,
+          instance_id: liveInstanceId,
+          plan: 'standard',
+          status: 'active',
+          payment_source: 'credits',
+          cancel_at_period_end: false,
+          created_at: '2026-04-01T00:00:00.000Z',
+          updated_at: '2026-04-01T00:00:00.000Z',
+        },
+      ])
+      .returning();
+
+    if (!destroyedSubscription || !liveSubscription) {
+      throw new Error('Expected org race seed rows');
+    }
+
+    const originalTransaction = db.transaction.bind(db);
+    jest.spyOn(db, 'transaction').mockImplementationOnce(async callback => {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ transferred_to_subscription_id: liveSubscription.id })
+        .where(eq(kiloclaw_subscriptions.id, destroyedSubscription.id));
+
+      return await originalTransaction(callback);
+    });
+
+    await run('apply-org-replacement');
+
+    const metricsCall = (console.table as jest.Mock).mock.calls.find(
+      ([rows]) => Array.isArray(rows) && rows.some(row => row.metric === 'orgs_skipped_race')
+    );
+    expect(metricsCall?.[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ metric: 'orgs_succeeded', count: 0 }),
+        expect.objectContaining({ metric: 'orgs_skipped_no_work', count: 0 }),
+        expect.objectContaining({ metric: 'orgs_skipped_race', count: 1 }),
+        expect.objectContaining({ metric: 'orgs_error', count: 0 }),
       ])
     );
   });

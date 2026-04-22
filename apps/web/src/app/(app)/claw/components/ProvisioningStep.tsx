@@ -33,20 +33,22 @@ function playChime() {
 }
 
 export function ProvisioningStep({
+  currentStep,
+  totalSteps,
   preset,
   channelTokens,
   botIdentity,
   instanceRunning,
   mutations,
-  totalSteps = 4,
   onComplete,
 }: {
+  currentStep: number;
+  totalSteps: number;
   preset: ExecPreset;
   channelTokens: Record<string, string> | null;
   botIdentity: BotIdentity | null;
   instanceRunning: boolean;
   mutations: ClawMutations;
-  totalSteps?: number;
   onComplete: () => void;
 }) {
   const completedRef = useRef(false);
@@ -167,10 +169,10 @@ export function ProvisioningStep({
   }, [configReady, isGatewaySettled]);
 
   if (gateway502Expired) {
-    return <ProvisioningErrorView totalSteps={totalSteps} />;
+    return <ProvisioningErrorView currentStep={currentStep} totalSteps={totalSteps} />;
   }
 
-  return <ProvisioningStepView totalSteps={totalSteps} />;
+  return <ProvisioningStepView currentStep={currentStep} totalSteps={totalSteps} />;
 }
 
 const PROVISIONING_PHRASES = [
@@ -211,10 +213,16 @@ const PROVISIONING_PHRASES = [
 ];
 
 /** Error view shown when the gateway returns a 502 during provisioning. */
-export function ProvisioningErrorView({ totalSteps = 4 }: { totalSteps?: number }) {
+export function ProvisioningErrorView({
+  currentStep,
+  totalSteps,
+}: {
+  currentStep: number;
+  totalSteps: number;
+}) {
   return (
     <OnboardingStepView
-      currentStep={4}
+      currentStep={currentStep}
       totalSteps={totalSteps}
       stepLabel="Provisioning failed"
       contentClassName="items-center gap-8"
@@ -246,7 +254,13 @@ export function ProvisioningErrorView({ totalSteps = 4 }: { totalSteps?: number 
 }
 
 /** Pure visual shell — extracted so Storybook can render it without wiring up mutations. */
-export function ProvisioningStepView({ totalSteps = 4 }: { totalSteps?: number }) {
+export function ProvisioningStepView({
+  currentStep,
+  totalSteps,
+}: {
+  currentStep: number;
+  totalSteps: number;
+}) {
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -269,7 +283,7 @@ export function ProvisioningStepView({ totalSteps = 4 }: { totalSteps?: number }
   }, []);
   return (
     <OnboardingStepView
-      currentStep={4}
+      currentStep={currentStep}
       totalSteps={totalSteps}
       stepLabel="Almost there..."
       contentClassName="items-center gap-8"

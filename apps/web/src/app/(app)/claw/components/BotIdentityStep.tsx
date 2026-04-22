@@ -68,9 +68,13 @@ export type BotIdentityStepResult = {
 };
 
 export function BotIdentityStep({
+  currentStep,
+  totalSteps,
   instanceRunning,
   onContinue,
 }: {
+  currentStep: number;
+  totalSteps: number;
   instanceRunning: boolean;
   onContinue: (result: BotIdentityStepResult) => void;
 }) {
@@ -139,8 +143,8 @@ export function BotIdentityStep({
 
   return (
     <OnboardingStepView
-      currentStep={1}
-      totalSteps={4}
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       title="Give your bot an identity"
       description="Make it yours. You can always change this later."
       showProvisioningBanner={!instanceRunning}

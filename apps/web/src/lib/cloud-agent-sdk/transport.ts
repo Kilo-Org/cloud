@@ -44,6 +44,10 @@ type Transport = {
     requestId: string;
     response: 'once' | 'always' | 'reject';
   }) => Promise<unknown>;
+  /** Accept a `suggest` tool action. Requires Kilo CLI >= v7.2.7 on the remote side. */
+  acceptSuggestion?: (payload: { requestId: string; index: number }) => Promise<unknown>;
+  /** Dismiss a `suggest` tool request. Requires Kilo CLI >= v7.2.7 on the remote side. */
+  dismissSuggestion?: (payload: { requestId: string }) => Promise<unknown>;
 };
 
 /** Factory signature — creates a transport wired to the given sink. */

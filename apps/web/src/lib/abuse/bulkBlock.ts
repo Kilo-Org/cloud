@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
-import { inArray, or } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { successResult, type CustomResult } from '@/lib/maybe-result';
 
 export type BulkBlockResponse = CustomResult<
@@ -53,4 +53,19 @@ export async function bulkBlockUsers(
     .where(inArray(kilocode_users.id, valid));
 
   return successResult({ updatedCount: idsOrEmails.length });
+}
+
+export async function unblockBulkBlockedUsers(blocked_reason: string, date: string) {
+  const rows = await db
+    .update(kilocode_users)
+    .set({ blocked_reason: null })
+    .where(
+      and(
+        eq(kilocode_users.blocked_reason, blocked_reason.trim()),
+        sql<boolean>`DATE(${kilocode_users.updated_at}) = ${date}`
+      )
+    )
+    .returning({ id: kilocode_users.id });
+
+  return { updatedCount: rows.length };
 }

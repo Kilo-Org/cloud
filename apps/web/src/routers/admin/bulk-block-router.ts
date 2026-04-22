@@ -1,7 +1,14 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
+import { unblockBulkBlockedUsers } from '@/lib/abuse/bulkBlock';
 import { sql, count, isNotNull, desc } from 'drizzle-orm';
+import * as z from 'zod';
+
+const BulkBlockRowSchema = z.object({
+  blocked_reason: z.string().trim().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
 
 export const adminBulkBlockRouter = createTRPCRouter({
   recentBlocks: adminProcedure.query(async () => {
@@ -22,5 +29,9 @@ export const adminBulkBlockRouter = createTRPCRouter({
       date: r.date,
       blocked_count: r.blocked_count,
     }));
+  }),
+
+  unblockRecentBlock: adminProcedure.input(BulkBlockRowSchema).mutation(async ({ input }) => {
+    return unblockBulkBlockedUsers(input.blocked_reason, input.date);
   }),
 });

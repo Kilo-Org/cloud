@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { bulkBlockUsers } from '@/lib/abuse/bulkBlock';
+import { bulkBlockUsers, unblockBulkBlockedUsers } from '@/lib/abuse/bulkBlock';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
@@ -63,5 +63,53 @@ describe('bulkBlockUsers (integration)', () => {
     expect(reasons.get(uById2.id)).toBe(reasonB);
     expect(reasons.get(uByEmail1.id)).toBe(reasonB);
     expect(reasons.get(uByEmail2.id)).toBe(reasonB);
+  });
+
+  test('unblocks a grouped bulk block by reason and date only', async () => {
+    const targetDate = '2026-01-15';
+    const reason = `test-unblock-${Date.now()}-${Math.random()}`;
+    const otherReason = `${reason}-other`;
+
+    const targetUser1 = await insertTestUser();
+    const targetUser2 = await insertTestUser();
+    const otherReasonUser = await insertTestUser();
+    const otherDateUser = await insertTestUser();
+
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: reason, updated_at: `${targetDate}T12:00:00.000Z` })
+      .where(inArray(kilocode_users.id, [targetUser1.id, targetUser2.id]));
+
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: otherReason, updated_at: `${targetDate}T12:00:00.000Z` })
+      .where(inArray(kilocode_users.id, [otherReasonUser.id]));
+
+    await db
+      .update(kilocode_users)
+      .set({ blocked_reason: reason, updated_at: '2026-01-16T12:00:00.000Z' })
+      .where(inArray(kilocode_users.id, [otherDateUser.id]));
+
+    const result = await unblockBulkBlockedUsers(reason, targetDate);
+
+    expect(result.updatedCount).toBe(2);
+
+    const rows = await db
+      .select({ id: kilocode_users.id, blocked_reason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(
+        inArray(kilocode_users.id, [
+          targetUser1.id,
+          targetUser2.id,
+          otherReasonUser.id,
+          otherDateUser.id,
+        ])
+      );
+
+    const reasons = new Map(rows.map(r => [r.id, r.blocked_reason]));
+    expect(reasons.get(targetUser1.id)).toBeNull();
+    expect(reasons.get(targetUser2.id)).toBeNull();
+    expect(reasons.get(otherReasonUser.id)).toBe(otherReason);
+    expect(reasons.get(otherDateUser.id)).toBe(reason);
   });
 });

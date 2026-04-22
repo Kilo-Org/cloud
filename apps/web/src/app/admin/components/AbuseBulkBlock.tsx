@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,16 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -20,6 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import type { BulkBlockResponse } from '@/lib/abuse/bulkBlock';
 
 function BulkBlockTab() {
@@ -114,61 +125,136 @@ function BulkBlockTab() {
   );
 }
 
+type RecentBlockRow = {
+  blocked_reason: string;
+  date: string;
+  blocked_count: number;
+};
+
 function RecentBlocksTab() {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [unblockTarget, setUnblockTarget] = useState<RecentBlockRow | null>(null);
 
   const { data, isLoading } = useQuery(trpc.admin.bulkBlock.recentBlocks.queryOptions());
+
+  const unblockMutation = useMutation(
+    trpc.admin.bulkBlock.unblockRecentBlock.mutationOptions({
+      onSuccess: result => {
+        setUnblockTarget(null);
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.bulkBlock.recentBlocks.queryKey(),
+        });
+        toast.success(`Unblocked ${result.updatedCount.toLocaleString()} users`);
+      },
+      onError: error => {
+        toast.error(error.message || 'Failed to unblock users');
+      },
+    })
+  );
 
   const rows = data ?? [];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent Bulk Blocks</CardTitle>
-        <CardDescription>
-          Blocked accounts grouped by reason and date (based on last update timestamp).
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
-        ) : rows.length === 0 ? (
-          <div className="text-muted-foreground py-8 text-center">No blocked accounts found</div>
-        ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Block Reason</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Accounts Blocked</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map(row => (
-                  <TableRow key={`${row.blocked_reason}-${row.date}`}>
-                    <TableCell className="font-medium">
-                      <code className="bg-muted rounded px-2 py-1 text-sm">
-                        {row.blocked_reason}
-                      </code>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{row.date}</TableCell>
-                    <TableCell className="p-0 text-right">
-                      <Link
-                        href={`/admin/users?${new URLSearchParams({ notesSearch: row.blocked_reason, sortBy: 'updated_at', sortOrder: 'desc', blockedStatus: 'blocked' })}`}
-                        className="text-primary hover:underline block px-4 py-2"
-                      >
-                        {row.blocked_count.toLocaleString()} users
-                      </Link>
-                    </TableCell>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Bulk Blocks</CardTitle>
+          <CardDescription>
+            Blocked accounts grouped by reason and date (based on last update timestamp).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+          ) : rows.length === 0 ? (
+            <div className="text-muted-foreground py-8 text-center">No blocked accounts found</div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Block Reason</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Accounts Blocked</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                </TableHeader>
+                <TableBody>
+                  {rows.map(row => (
+                    <TableRow key={`${row.blocked_reason}-${row.date}`}>
+                      <TableCell className="font-medium">
+                        <code className="bg-muted rounded px-2 py-1 text-sm">
+                          {row.blocked_reason}
+                        </code>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{row.date}</TableCell>
+                      <TableCell className="p-0 text-right">
+                        <Link
+                          href={`/admin/users?${new URLSearchParams({ notesSearch: row.blocked_reason, sortBy: 'updated_at', sortOrder: 'desc', blockedStatus: 'blocked' })}`}
+                          className="text-primary hover:underline block px-4 py-2"
+                        >
+                          {row.blocked_count.toLocaleString()} users
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setUnblockTarget(row)}
+                          disabled={unblockMutation.isPending}
+                        >
+                          Unblock
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      <AlertDialog
+        open={unblockTarget !== null}
+        onOpenChange={open => {
+          if (!open && !unblockMutation.isPending) {
+            setUnblockTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unblock this bulk block?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {unblockTarget && (
+                <>
+                  This will unblock {unblockTarget.blocked_count.toLocaleString()} users with reason
+                  &ldquo;{unblockTarget.blocked_reason}&rdquo; from {unblockTarget.date}. This
+                  cannot be undone automatically.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={unblockMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={!unblockTarget || unblockMutation.isPending}
+              onClick={() => {
+                if (!unblockTarget) return;
+                unblockMutation.mutate({
+                  blocked_reason: unblockTarget.blocked_reason,
+                  date: unblockTarget.date,
+                });
+              }}
+            >
+              {unblockMutation.isPending ? 'Unblocking...' : 'Confirm unblock'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

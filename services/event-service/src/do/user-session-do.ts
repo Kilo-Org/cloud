@@ -1,5 +1,12 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { ClientMessage, ServerMessage } from '../types';
+import { z } from 'zod';
+import type { ServerMessage } from '../types';
+
+const clientMessageSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('context.subscribe'), contexts: z.array(z.string()) }),
+  z.object({ type: z.literal('context.unsubscribe'), contexts: z.array(z.string()) }),
+  z.object({ type: z.literal('presence.ping') }),
+]);
 
 type SerializedState = { contexts: string[]; userId: string };
 
@@ -25,12 +32,16 @@ export class UserSessionDO extends DurableObject<Env> {
   async webSocketMessage(ws: WebSocket, rawMessage: string | ArrayBuffer): Promise<void> {
     if (typeof rawMessage !== 'string') return;
 
-    let msg: ClientMessage;
+    let parsed: unknown;
     try {
-      msg = JSON.parse(rawMessage) as ClientMessage;
+      parsed = JSON.parse(rawMessage);
     } catch {
       return;
     }
+
+    const result = clientMessageSchema.safeParse(parsed);
+    if (!result.success) return;
+    const msg = result.data;
 
     switch (msg.type) {
       case 'context.subscribe': {

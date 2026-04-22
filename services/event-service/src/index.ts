@@ -1,7 +1,13 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { z } from 'zod';
 import { authenticateToken } from './auth';
+
+const connectQuerySchema = z.object({
+  ticket: z.string().min(1),
+  userId: z.string().min(1),
+});
 
 export { UserSessionDO } from './do/user-session-do';
 export { TicketDO } from './do/ticket-do';
@@ -27,11 +33,14 @@ app.post('/connect/ticket', async c => {
 
 // Step 2: Connect WebSocket using the ticket.
 app.get('/connect', async c => {
-  const ticket = c.req.query('ticket') ?? null;
-  const userId = c.req.query('userId') ?? null;
-  if (!ticket || !userId) {
+  const result = connectQuerySchema.safeParse({
+    ticket: c.req.query('ticket'),
+    userId: c.req.query('userId'),
+  });
+  if (!result.success) {
     return c.json({ error: 'Missing ticket or userId' }, 400);
   }
+  const { ticket, userId } = result.data;
 
   const ticketDO = c.env.TICKET_DO.get(c.env.TICKET_DO.idFromName(userId));
   const redeemedUserId = await ticketDO.redeem(ticket);

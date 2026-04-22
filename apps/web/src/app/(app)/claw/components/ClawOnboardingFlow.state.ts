@@ -272,19 +272,9 @@ function getRenderStepDecision({
         reason: 'post-provisioning mode is ready because the instance status is running',
       };
     }
-    // DB row + subscription exist but no DO provisioned yet (e.g. credit
-    // enrollment created the billing records without triggering provision).
-    // Show the identity step so the user can kick off provisioning.
-    if (!instanceStatus) {
-      return {
-        renderStep: 'identity',
-        reason:
-          'post-provisioning mode has no populated instance status yet, so identity is the entry point',
-      };
-    }
     return {
       renderStep: 'provisioning',
-      reason: 'post-provisioning mode has an instance but it is not running yet',
+      reason: 'post-provisioning mode is waiting for the instance to become ready',
     };
   }
 

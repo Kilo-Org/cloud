@@ -10,7 +10,25 @@ export type KiloChatClientConfig = {
 
 // ── Content blocks ──────────────────────────────────────────────────
 export type TextBlock = { type: 'text'; text: string };
-export type ContentBlock = TextBlock; // union — extend when new types land
+
+export type ActionItem = {
+  label: string;
+  style: 'primary' | 'danger' | 'secondary';
+  value: string;
+};
+
+export type ActionsBlock = {
+  type: 'actions';
+  groupId: string;
+  actions: ActionItem[];
+  resolved?: {
+    value: string;
+    resolvedBy: string;
+    resolvedAt: number;
+  };
+};
+
+export type ContentBlock = TextBlock | ActionsBlock;
 
 // ── Reactions ───────────────────────────────────────────────────────
 export type ReactionSummary = {
@@ -122,6 +140,14 @@ export type ConversationReadEvent = {
 export type ConversationActivityEvent = {
   conversationId: string;
   lastActivityAt: number;
+};
+
+export type ActionExecutedEvent = {
+  conversationId: string;
+  messageId: string;
+  groupId: string;
+  value: string;
+  executedBy: string;
 };
 
 // ── API request/response types ──────────────────────────────────────

@@ -46,6 +46,10 @@ kiloclaw.get('/config', c =>
     }
 
     const config = await stub.getConfig();
+    const activeWebSearchProvider = await stub
+      .getOpenclawConfig()
+      .then(openclawConfig => deriveActiveWebSearchProvider(extractOpenclawConfig(openclawConfig)))
+      .catch(() => null);
 
     return c.json({
       envVarKeys: config.envVars ? Object.keys(config.envVars) : [],
@@ -57,6 +61,7 @@ kiloclaw.get('/config', c =>
       kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
       configuredSecrets: buildConfiguredSecrets(config),
       kiloExaSearchMode: config.webSearch?.exaMode ?? null,
+      activeWebSearchProvider,
       customSecretKeys: config.encryptedSecrets
         ? Object.keys(config.encryptedSecrets).filter(isCustomSecretEnvVar)
         : [],
@@ -67,6 +72,28 @@ kiloclaw.get('/config', c =>
     });
   })
 );
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function extractOpenclawConfig(value: unknown): unknown {
+  if (!isRecord(value)) return null;
+  return value.config;
+}
+
+function deriveActiveWebSearchProvider(openclawConfig: unknown): string | null {
+  if (!isRecord(openclawConfig)) return null;
+  if (!isRecord(openclawConfig.tools)) return null;
+  if (!isRecord(openclawConfig.tools.web)) return null;
+  if (!isRecord(openclawConfig.tools.web.search)) return null;
+
+  const provider = openclawConfig.tools.web.search.provider;
+  if (typeof provider !== 'string') return null;
+
+  const trimmedProvider = provider.trim();
+  return trimmedProvider.length > 0 ? trimmedProvider : null;
+}
 
 // GET /api/kiloclaw/status -- user's instance status from the DO
 kiloclaw.get('/status', c =>
@@ -145,4 +172,4 @@ function buildConfiguredSecrets(config: {
   return result;
 }
 
-export { kiloclaw, buildConfiguredSecrets };
+export { kiloclaw, buildConfiguredSecrets, deriveActiveWebSearchProvider };

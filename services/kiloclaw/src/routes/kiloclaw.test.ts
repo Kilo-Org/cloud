@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildConfiguredSecrets } from './kiloclaw';
+import { buildConfiguredSecrets, deriveActiveWebSearchProvider } from './kiloclaw';
 
 describe('buildConfiguredSecrets', () => {
   const envelope = {
@@ -126,5 +126,67 @@ describe('buildConfiguredSecrets', () => {
       },
     });
     expect(result.telegram).toBe(false);
+  });
+});
+
+describe('deriveActiveWebSearchProvider', () => {
+  it('returns the provider from live openclaw config', () => {
+    const provider = deriveActiveWebSearchProvider({
+      tools: {
+        web: {
+          search: {
+            provider: 'custom-provider',
+          },
+        },
+      },
+    });
+
+    expect(provider).toBe('custom-provider');
+  });
+
+  it('trims provider values and returns null for blank providers', () => {
+    const trimmed = deriveActiveWebSearchProvider({
+      tools: {
+        web: {
+          search: {
+            provider: '  brave  ',
+          },
+        },
+      },
+    });
+    const blank = deriveActiveWebSearchProvider({
+      tools: {
+        web: {
+          search: {
+            provider: '   ',
+          },
+        },
+      },
+    });
+
+    expect(trimmed).toBe('brave');
+    expect(blank).toBeNull();
+  });
+
+  it('returns null when config shape is missing', () => {
+    expect(deriveActiveWebSearchProvider(null)).toBeNull();
+    expect(deriveActiveWebSearchProvider({})).toBeNull();
+    expect(deriveActiveWebSearchProvider({ tools: {} })).toBeNull();
+    expect(deriveActiveWebSearchProvider({ tools: { web: {} } })).toBeNull();
+    expect(deriveActiveWebSearchProvider({ tools: { web: { search: {} } } })).toBeNull();
+  });
+
+  it('returns null when provider is non-string', () => {
+    const provider = deriveActiveWebSearchProvider({
+      tools: {
+        web: {
+          search: {
+            provider: 123,
+          },
+        },
+      },
+    });
+
+    expect(provider).toBeNull();
   });
 });

@@ -302,6 +302,8 @@ export type UserConfigResponse = {
   configuredSecrets: Record<string, boolean>;
   /** Search mode selected for Kilo-integrated Exa. */
   kiloExaSearchMode: 'kilo-proxy' | 'disabled' | null;
+  /** Active web search provider from live OpenClaw config, if available. */
+  activeWebSearchProvider: string | null;
   /** Env var names of user-defined custom (non-catalog) secrets. */
   customSecretKeys: string[];
   /** Metadata for custom secrets (config paths, etc.). */

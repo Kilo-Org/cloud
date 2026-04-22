@@ -104,7 +104,7 @@ const memberSchema = z.object({
 });
 
 const listMessagesResultSchema = z.object({
-  messages: z.array(z.record(z.unknown())),
+  messages: z.array(z.record(z.string(), z.unknown())),
 });
 
 const getMembersResultSchema = z.object({

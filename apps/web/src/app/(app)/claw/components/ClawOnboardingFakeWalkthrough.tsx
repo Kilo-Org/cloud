@@ -209,13 +209,7 @@ function renderFakeStep({
 }: RenderFakeStepInput) {
   switch (step) {
     case 'identity': {
-      return (
-        <BotIdentityStep
-          {...stepProgress}
-          showProvisioningBanner={false}
-          onContinue={() => setStep('permissions')}
-        />
-      );
+      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('permissions')} />;
     }
     case 'permissions': {
       return (

@@ -224,7 +224,6 @@ function ClawOnboardingFlowInner({
       <BotIdentityStep
         currentStep={flowState.currentStep}
         totalSteps={flowState.totalSteps}
-        showProvisioningBanner={flowState.createSetupActive && !flowState.instanceRunning}
         onContinue={({ identity, weatherLocation }) => {
           posthog?.capture('claw_setup_identity_completed', {
             bot_name_is_custom: identity.botName !== 'KiloClaw',

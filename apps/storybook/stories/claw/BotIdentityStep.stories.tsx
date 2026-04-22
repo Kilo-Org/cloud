@@ -19,14 +19,4 @@ const meta: Meta<typeof BotIdentityStep> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {
-  args: {
-    showProvisioningBanner: false,
-  },
-};
-
-export const WithProvisioningBanner: Story = {
-  args: {
-    showProvisioningBanner: true,
-  },
-};
+export const Default: Story = {};

@@ -74,6 +74,10 @@ export function getUptime(): number {
   return Date.now() - startTime;
 }
 
+export function getStartTime(): string {
+  return new Date(startTime).toISOString();
+}
+
 async function hydrateDbFromSnapshot(
   agentId: string,
   apiUrl: string,
@@ -943,6 +947,7 @@ export async function startAgent(
 
   const { signal } = startupAbortController;
   let sessionCounted = false;
+  const t0 = Date.now();
   try {
     // 0. Hydrate agent DB from KV snapshot before starting the SDK server
     const apiUrl = agent.gastownApiUrl;
@@ -950,10 +955,23 @@ export async function startAgent(
     if (apiUrl && token) {
       await hydrateDbFromSnapshot(request.agentId, apiUrl, token, request.rigId, request.townId);
     }
+    const tDbDone = Date.now();
+    log.info('agent.startup_phase', {
+      agentId: request.agentId,
+      phase: 'db_hydrated',
+      elapsedMs: tDbDone - t0,
+    });
 
     // 1. Ensure SDK server is running for this workdir
     const { client, port } = await ensureSDKServer(workdir, env);
     agent.serverPort = port;
+    const tSdkDone = Date.now();
+    log.info('agent.startup_phase', {
+      agentId: request.agentId,
+      phase: 'sdk_ready',
+      elapsedMs: tSdkDone - t0,
+      phaseMs: tSdkDone - tDbDone,
+    });
 
     // Check if startup was cancelled while waiting for the SDK server
     if (signal.aborted) {
@@ -1001,6 +1019,14 @@ export async function startAgent(
       );
     }
     agent.sessionId = sessionId;
+    const tSessionDone = Date.now();
+    log.info('agent.startup_phase', {
+      agentId: request.agentId,
+      phase: 'session_created',
+      elapsedMs: tSessionDone - t0,
+      phaseMs: tSessionDone - tSdkDone,
+      resumed,
+    });
 
     // Now check if startup was cancelled while creating the session.
     // agent.sessionId is already set, so the catch block will abort it.
@@ -1066,6 +1092,12 @@ export async function startAgent(
       name: request.name,
       sessionId,
       port,
+    });
+
+    log.info('agent.startup_complete', {
+      agentId: request.agentId,
+      totalMs: Date.now() - t0,
+      containerUptimeMs: getUptime(),
     });
 
     syncRegistry();

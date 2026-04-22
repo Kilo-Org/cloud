@@ -186,6 +186,7 @@ export async function handleExecuteAction(c: HonoCtx) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
     if (result.code === 'already_resolved') return c.json({ error: result.error }, 409);
+    if (result.code === 'invalid_value') return c.json({ error: result.error }, 400);
     return c.json({ error: result.error }, 500);
   }
 

@@ -97,7 +97,11 @@ export type ExecuteActionParams = {
 
 export type ExecuteActionResult =
   | { ok: true; content: ContentBlock[] }
-  | { ok: false; code: 'not_found' | 'forbidden' | 'already_resolved'; error: string };
+  | {
+      ok: false;
+      code: 'not_found' | 'forbidden' | 'already_resolved' | 'invalid_value';
+      error: string;
+    };
 
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =

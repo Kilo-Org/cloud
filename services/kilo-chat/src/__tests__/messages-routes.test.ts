@@ -370,7 +370,7 @@ describe('DELETE /v1/messages/:id', () => {
     // Delete it (conversationId goes in query string, not body)
     const delQs = new URLSearchParams({ conversationId });
     const deleteRes = await userApp.request(
-      `/v1/messages/${messageId}?${delQs}`,
+      `/v1/messages/${messageId}?${delQs.toString()}`,
       {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
@@ -412,7 +412,7 @@ describe('DELETE /v1/messages/:id', () => {
     // Bot tries to delete user's message
     const delQs = new URLSearchParams({ conversationId });
     const deleteRes = await botApp.request(
-      `/v1/messages/${messageId}?${delQs}`,
+      `/v1/messages/${messageId}?${delQs.toString()}`,
       {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
@@ -428,7 +428,7 @@ describe('DELETE /v1/messages/:id', () => {
 
     const delQs = new URLSearchParams({ conversationId });
     const deleteRes = await userApp.request(
-      `/v1/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV?${delQs}`,
+      `/v1/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV?${delQs.toString()}`,
       {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
@@ -605,7 +605,7 @@ describe('Webhook reply context', () => {
 
     const deleteQs = new URLSearchParams({ conversationId });
     await userApp.request(
-      `/v1/messages/${deletedParentId}?${deleteQs}`,
+      `/v1/messages/${deletedParentId}?${deleteQs.toString()}`,
       {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },

@@ -339,7 +339,11 @@ export type ExecuteActionParams = {
 
 export type ExecuteActionResult =
   | { ok: true }
-  | { ok: false; code: 'forbidden' | 'not_found' | 'already_resolved' | 'internal'; error: string };
+  | {
+      ok: false;
+      code: 'forbidden' | 'not_found' | 'already_resolved' | 'invalid_value' | 'internal';
+      error: string;
+    };
 
 export async function executeActionFor(
   env: Env,

@@ -301,7 +301,7 @@ export const MessageBubble = memo(function MessageBubble({
 
                   if (actionsBlock.resolved) {
                     const resolvedAction = actionsBlock.actions.find(
-                      a => a.value === actionsBlock.resolved!.value
+                      a => a.value === actionsBlock.resolved?.value
                     );
                     const label = resolvedAction?.label ?? actionsBlock.resolved.value;
                     const isApproved = actionsBlock.resolved.value !== 'deny';

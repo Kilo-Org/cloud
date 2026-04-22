@@ -377,7 +377,7 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
 
     const qs = new URLSearchParams({ conversationId });
     const delRes = await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}?${qs}`,
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}?${qs.toString()}`,
       {
         method: 'DELETE',
         headers: { authorization: `Bearer ${token}` },
@@ -395,7 +395,7 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
 
     const qs = new URLSearchParams({ conversationId });
     const res = await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV?${qs}`,
+      `/bot/v1/sandboxes/${sandboxId}/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV?${qs.toString()}`,
       {
         method: 'DELETE',
         headers: { authorization: `Bearer ${token}` },
@@ -413,7 +413,7 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
 
     const qs = new URLSearchParams({ conversationId });
     const delRes = await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}?${qs}`,
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}?${qs.toString()}`,
       {
         method: 'DELETE',
         headers: { authorization: `Bearer ${token}` },
@@ -431,7 +431,7 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
 
     const qs = new URLSearchParams({ conversationId });
     const res = await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/messages/bad-id?${qs}`,
+      `/bot/v1/sandboxes/${sandboxId}/messages/bad-id?${qs.toString()}`,
       {
         method: 'DELETE',
         headers: { authorization: `Bearer ${token}` },

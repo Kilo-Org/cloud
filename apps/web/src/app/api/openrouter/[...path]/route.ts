@@ -332,28 +332,30 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       );
     }
 
-    const promotionLimit = await checkPromotionLimit(ipAddress);
+    if (isKiloExclusiveFreeModel(originalModelIdLowerCased)) {
+      const promotionLimit = await checkPromotionLimit(ipAddress);
 
-    if (!promotionLimit.allowed) {
-      console.warn(
-        `Promotion model limit exceeded, ip: ${ipAddress}, ` +
-          `model: ${originalModelIdLowerCased}, ` +
-          `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
-          `in ${PROMOTION_WINDOW_HOURS}h window`
-      );
+      if (!promotionLimit.allowed) {
+        console.warn(
+          `Promotion model limit exceeded, ip: ${ipAddress}, ` +
+            `model: ${originalModelIdLowerCased}, ` +
+            `requests: ${promotionLimit.requestCount}/${PROMOTION_MAX_REQUESTS} ` +
+            `in ${PROMOTION_WINDOW_HOURS}h window`
+        );
 
-      return NextResponse.json(
-        {
-          error: {
-            code: PROMOTION_MODEL_LIMIT_REACHED,
-            message:
-              'Sign up for free to continue and explore 500 other models. ' +
-              'Takes 2 minutes, no credit card required. Or come back later.',
+        return NextResponse.json(
+          {
+            error: {
+              code: PROMOTION_MODEL_LIMIT_REACHED,
+              message:
+                'Sign up for free to continue and explore 500 other models. ' +
+                'Takes 2 minutes, no credit card required. Or come back later.',
+            },
+            error_type: ProxyErrorType.promotion_limit_reached,
           },
-          error_type: ProxyErrorType.promotion_limit_reached,
-        },
-        { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
-      );
+          { status: 401 } // TODO: Change to 429 once the extension supports it (see kilocode errorUtils.ts)
+        );
+      }
     }
 
     // Anonymous access for free model (already rate-limited above)

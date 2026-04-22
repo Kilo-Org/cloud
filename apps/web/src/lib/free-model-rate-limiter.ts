@@ -54,7 +54,8 @@ async function getModelUsageSinceTimeByUser(
 
 /**
  * Check if an IP address is within the free model rate limit.
- * This applies to ALL free model requests, both anonymous and authenticated.
+ * Applies to Kilo-exclusive free model requests (both anonymous and authenticated).
+ * For server-side products use checkFreeModelRateLimitByUser instead.
  */
 export async function checkFreeModelRateLimit(ipAddress: string): Promise<RateLimitResult> {
   const windowStart = new Date(Date.now() - FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000);
@@ -84,8 +85,8 @@ export async function checkFreeModelRateLimitByUser(kiloUserId: string): Promise
 }
 
 /**
- * Check if an IP address is within the promotion limit.
- * Applies to free model requests without authentication.
+ * Check if an IP address is within the anonymous daily promotion limit.
+ * Applies only to unauthenticated requests for Kilo-exclusive free models.
  */
 export async function checkPromotionLimit(ipAddress: string): Promise<RateLimitResult> {
   const windowStart = new Date(Date.now() - PROMOTION_WINDOW_HOURS * 60 * 60 * 1000);

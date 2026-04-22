@@ -56,7 +56,7 @@ export const ADMIN_RATE_LIMIT_TEST_MODEL = 'admin-rate-limit-test';
 // Stripe publishable key (client-side, inlined at build time)
 export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 
-export const PROMOTION_MAX_REQUESTS = 10000;
+export const PROMOTION_MAX_REQUESTS = 1000;
 export const PROMOTION_WINDOW_HOURS = 24;
 
 export const EXA_MONTHLY_ALLOWANCE_MICRODOLLARS = 10_000_000;

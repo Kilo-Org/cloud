@@ -2,6 +2,7 @@ import { SafetyIdentifiersBackfill } from '../components/SafetyIdentifiersBackfi
 import { NormalizedEmailBackfill } from '../components/NormalizedEmailBackfill';
 import { EmailDomainBackfill } from '../components/EmailDomainBackfill';
 import { BlockBlacklistedDomainsBackfill } from '../components/BlockBlacklistedDomainsBackfill';
+import { BlockedAtBackfill } from '../components/BlockedAtBackfill';
 import { SafetyIdentifierHashGenerator } from '../components/SafetyIdentifierHashGenerator';
 import AdminPage from '../components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
@@ -30,6 +31,10 @@ export default function BackfillsPage() {
           <h2 className="text-2xl font-bold">Block Blacklisted Domains</h2>
         </div>
         <BlockBlacklistedDomainsBackfill />
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Blocked At Backfill</h2>
+        </div>
+        <BlockedAtBackfill />
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Safety Identifier Backfill</h2>
         </div>

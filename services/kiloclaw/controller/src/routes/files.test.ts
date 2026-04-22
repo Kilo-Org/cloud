@@ -374,4 +374,276 @@ describe('file routes', () => {
       expect(res.status).toBe(400);
     });
   });
+
+  describe('POST /_kilo/files/import-openclaw-workspace', () => {
+    it('imports valid root files and memory markdown files', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: any) => {
+        if (typeof p !== 'string') return false;
+        if (p === `${ROOT}/workspace/USER.md`) return true;
+        if (p === `${ROOT}/workspace/memory`) return true;
+        if (p === `${ROOT}/workspace/memory/old.md`) return true;
+        return false;
+      });
+      vi.mocked(fs.lstatSync).mockImplementation((p: any) => {
+        if (p === `${ROOT}/workspace/memory`) {
+          return {
+            isSymbolicLink: () => false,
+            isDirectory: () => true,
+            isFile: () => false,
+          } as any;
+        }
+        return {
+          isSymbolicLink: () => false,
+          isDirectory: () => false,
+          isFile: () => true,
+        } as any;
+      });
+      vi.mocked(fs.readdirSync).mockImplementation((dir: any) => {
+        if (dir === `${ROOT}/workspace/memory`) {
+          return [mockDirent('old.md', false)] as any;
+        }
+        return [];
+      });
+
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          files: [
+            { path: 'workspace/USER.md', content: '# User\n' },
+            { path: 'workspace/MEMORY.md', content: '# Memory\n' },
+            { path: 'workspace/memory/new.md', content: '# Note\n' },
+          ],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(atomicWrite).toHaveBeenCalledWith(`${ROOT}/workspace/USER.md`, '# User\n');
+      expect(atomicWrite).toHaveBeenCalledWith(`${ROOT}/workspace/MEMORY.md`, '# Memory\n');
+      expect(atomicWrite).toHaveBeenCalledWith(`${ROOT}/workspace/memory/new.md`, '# Note\n');
+      expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(`${ROOT}/workspace/memory/old.md`);
+
+      const body = (await res.json()) as any;
+      expect(body.ok).toBe(true);
+      expect(body.writtenCount).toBe(3);
+      expect(body.deletedCount).toBe(1);
+      expect(body.failedCount).toBe(0);
+    });
+
+    it('does not delete memory files when MEMORY.md is absent', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          files: [{ path: 'workspace/USER.md', content: '# User\n' }],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.attemptedDeleteCount).toBe(0);
+      expect(vi.mocked(fs.unlinkSync)).not.toHaveBeenCalled();
+    });
+
+    it('rejects unsupported paths', async () => {
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ files: [{ path: 'workspace/AGENTS.md', content: 'x' }] }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.code).toBe('openclaw_import_invalid_path');
+    });
+
+    it('rejects case-insensitive path collisions', async () => {
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          files: [
+            { path: 'workspace/memory/Foo.md', content: '# A' },
+            { path: 'workspace/memory/foo.md', content: '# B' },
+          ],
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.code).toBe('openclaw_import_path_case_conflict');
+    });
+
+    it('rejects non-markdown memory extensions', async () => {
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          files: [{ path: 'workspace/memory/binary.bin', content: 'abc' }],
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.code).toBe('openclaw_import_invalid_path');
+    });
+
+    it('rejects binary-like content', async () => {
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          files: [{ path: 'workspace/USER.md', content: '\u0001bad' }],
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.code).toBe('openclaw_import_invalid_markdown');
+    });
+
+    it('enforces extracted UTF-8 size limit', async () => {
+      const tooLarge = 'a'.repeat(5 * 1024 * 1024 + 1);
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          files: [{ path: 'workspace/USER.md', content: tooLarge }],
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.code).toBe('openclaw_import_too_large');
+    });
+
+    it('keeps partial success when one write fails', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(atomicWrite)
+        .mockImplementationOnce(() => {
+          throw new Error('disk full');
+        })
+        .mockImplementation(() => undefined);
+
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          files: [
+            { path: 'workspace/USER.md', content: '# User\n' },
+            { path: 'workspace/SOUL.md', content: '# Soul\n' },
+          ],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.ok).toBe(false);
+      expect(body.writtenCount).toBe(1);
+      expect(body.failedCount).toBe(1);
+      expect(body.failures[0].operation).toBe('write');
+    });
+
+    it('skips memory deletions when any write fails', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: any) => {
+        if (typeof p !== 'string') return false;
+        if (p === `${ROOT}/workspace/memory`) return true;
+        if (p === `${ROOT}/workspace/memory/old.md`) return true;
+        return false;
+      });
+      vi.mocked(fs.lstatSync).mockImplementation((p: any) => {
+        if (p === `${ROOT}/workspace/memory`) {
+          return {
+            isSymbolicLink: () => false,
+            isDirectory: () => true,
+            isFile: () => false,
+          } as any;
+        }
+        return {
+          isSymbolicLink: () => false,
+          isDirectory: () => false,
+          isFile: () => true,
+        } as any;
+      });
+      vi.mocked(fs.readdirSync).mockImplementation((dir: any) => {
+        if (dir === `${ROOT}/workspace/memory`) {
+          return [mockDirent('old.md', false)] as any;
+        }
+        return [];
+      });
+      vi.mocked(atomicWrite)
+        .mockImplementationOnce(() => {
+          throw new Error('disk full');
+        })
+        .mockImplementation(() => undefined);
+
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          files: [
+            { path: 'workspace/MEMORY.md', content: '# Memory\n' },
+            { path: 'workspace/memory/new.md', content: '# Note\n' },
+          ],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.ok).toBe(false);
+      expect(body.writtenCount).toBe(1);
+      expect(body.attemptedDeleteCount).toBe(0);
+      expect(body.deletedCount).toBe(0);
+      expect(vi.mocked(fs.unlinkSync)).not.toHaveBeenCalled();
+      expect(body.failures.some((failure: any) => failure.operation === 'write')).toBe(true);
+    });
+
+    it('rejects import when an ancestor directory is a symlink', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: any) => {
+        if (typeof p !== 'string') return false;
+        return p === `${ROOT}/workspace`;
+      });
+      vi.mocked(fs.lstatSync).mockImplementation((p: any) => {
+        if (p === `${ROOT}/workspace`) {
+          return {
+            isSymbolicLink: () => true,
+            isDirectory: () => false,
+            isFile: () => false,
+          } as any;
+        }
+        return {
+          isSymbolicLink: () => false,
+          isDirectory: () => false,
+          isFile: () => true,
+        } as any;
+      });
+
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          files: [{ path: 'workspace/USER.md', content: '# User\n' }],
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.code).toBe('openclaw_import_symlink_ancestor');
+      expect(atomicWrite).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for malformed request body', async () => {
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ files: [{ path: 123, content: true }] }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.code).toBe('invalid_request_body');
+    });
+  });
 });

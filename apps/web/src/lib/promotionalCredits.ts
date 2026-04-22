@@ -41,6 +41,18 @@ type GrantCreditResult = CustomResult<
   { message: string }
 >;
 
+/**
+ * Substrings embedded in the failure `message` of `GrantCreditResult` that
+ * callers (like `grantCreditCampaignBonus` in credit-campaigns.ts) branch
+ * on to recover from expected race/idempotency outcomes. Exporting as
+ * named constants so the message text and the caller stay pinned to the
+ * same source of truth — changing the message below will break callers
+ * at compile/test time rather than silently routing to the generic error
+ * branch.
+ */
+export const GRANT_MSG_ALREADY_APPLIED = 'has already been applied';
+export const GRANT_MSG_CAP_REACHED = 'reached its redemption limit';
+
 async function getTotalRedemptions(dbOrTx: DbOrTx, promoCreditCategory: string): Promise<number> {
   try {
     const result = await dbOrTx
@@ -111,7 +123,7 @@ export async function grantCreditForCategoryConfig(
     if (totalRedemptions >= promotion.total_redemptions_allowed) {
       return {
         success: false,
-        message: 'This promotional code has reached its redemption limit',
+        message: `This promotional code ${GRANT_MSG_CAP_REACHED}`,
       };
     }
   }
@@ -187,7 +199,7 @@ export async function grantCreditForCategoryConfig(
       return {
         success: false,
         message: promotion.is_idempotent
-          ? `Code ${promotion.credit_category} has already been applied to ${entityName}.`
+          ? `Code ${promotion.credit_category} ${GRANT_MSG_ALREADY_APPLIED} to ${entityName}.`
           : `FAIL: Code ${promotion.credit_category} not applied to ${entityName}.`,
       };
     }

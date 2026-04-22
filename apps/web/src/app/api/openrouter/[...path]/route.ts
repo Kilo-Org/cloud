@@ -235,6 +235,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       : { balance: 0, settings: undefined, plan: undefined }
   );
 
+  // Extract IP early (needed for free model routing fallback and rate limiting)
+  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   let autoModel: string | null = null;
@@ -247,6 +250,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         featureHeader: feature,
         sessionId: taskId ?? null,
         apiKind: requestBodyParsed.kind,
+        clientIp: ipAddress ?? null,
       },
       requestBodyParsed,
       authPromise.then(res => res.user),
@@ -263,9 +267,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
     return featureExclusiveModelResponse(originalModelIdLowerCased);
   }
-
-  // Extract IP for all requests (needed for free model rate limiting)
-  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   if (!ipAddress) {
     return NextResponse.json(
       {

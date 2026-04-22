@@ -53,7 +53,13 @@ import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
 
 /** Error codes whose messages may contain raw internal details. */
-const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed']);
+const UNSAFE_ERROR_CODES = new Set([
+  'config_read_failed',
+  'config_replace_failed',
+  'openclaw_import_symlink_escape',
+  'openclaw_import_symlink_target',
+  'openclaw_import_target_not_file',
+]);
 
 function getKiloClawApiErrorPayload(err: KiloClawApiError): { message?: string; code?: string } {
   if (!err.responseBody) return {};
@@ -176,6 +182,9 @@ const updateConfigSchema = z.object({
 const updateKiloCodeConfigSchema = z.object({
   organizationId: z.uuid(),
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
+  vectorMemoryEnabled: z.boolean().optional(),
+  vectorMemoryModel: z.string().nullable().optional(),
+  dreamingEnabled: z.boolean().optional(),
 });
 
 const patchWebSearchConfigSchema = z.object({
@@ -232,7 +241,11 @@ function buildWorkerChannelsPatch(
 
 type KiloCodeConfigPublicResponse = Pick<
   KiloCodeConfigResponse,
-  'kilocodeApiKeyExpiresAt' | 'kilocodeDefaultModel'
+  | 'kilocodeApiKeyExpiresAt'
+  | 'kilocodeDefaultModel'
+  | 'vectorMemoryEnabled'
+  | 'vectorMemoryModel'
+  | 'dreamingEnabled'
 >;
 
 function sanitizeKiloCodeConfigResponse(
@@ -241,6 +254,9 @@ function sanitizeKiloCodeConfigResponse(
   return {
     kilocodeApiKeyExpiresAt: response.kilocodeApiKeyExpiresAt,
     kilocodeDefaultModel: response.kilocodeDefaultModel,
+    vectorMemoryEnabled: response.vectorMemoryEnabled,
+    vectorMemoryModel: response.vectorMemoryModel,
+    dreamingEnabled: response.dreamingEnabled,
   };
 }
 
@@ -1358,6 +1374,35 @@ export const organizationKiloclawRouter = createTRPCRouter({
         );
       } catch (err) {
         handleFileOperationError(err, 'write file');
+      }
+    }),
+
+  importOpenclawWorkspace: organizationMemberMutationProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid(),
+        files: z
+          .array(
+            z.object({
+              path: z.string().min(1),
+              content: z.string(),
+            })
+          )
+          .min(1)
+          .max(500),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        return await client.importOpenclawWorkspace(
+          ctx.user.id,
+          input.files,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        handleFileOperationError(err, 'import OpenClaw workspace');
       }
     }),
 

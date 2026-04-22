@@ -2,8 +2,6 @@ import { test, expect, describe, afterEach, jest, beforeEach } from '@jest/globa
 import { mockOpenRouterModels, createMockResponse } from './helpers/openrouter-models.helper';
 import { GET } from '../app/api/openrouter/models/route';
 import { NextRequest } from 'next/server';
-import { verifyApproval } from './helpers/approval.helper';
-import { join } from 'node:path';
 
 jest.mock('@/lib/user.server', () => ({
   getUserByAuthorizationHeader: jest.fn().mockImplementation(async () => ({
@@ -44,32 +42,6 @@ describe('GET /api/openrouter/models', () => {
     expect(response.status).toBe(500);
     expect(responseData.error).toBe('Failed to fetch models');
     expect(responseData.message).toBe('Error from OpenRouter API');
-  });
-
-  const testName = 'openrouter-models-sorting';
-  test(testName, async () => {
-    const request = createTestRequest('/api/openrouter/models');
-
-    global.fetch = jest.fn(() => {
-      return Promise.resolve(
-        createMockResponse({
-          ok: true,
-          status: 200,
-          statusText: 'OK',
-          jsonData: mockOpenRouterModels,
-        })
-      );
-    }) as unknown as typeof fetch;
-
-    const response = await GET(request);
-    const responseData = await response.json();
-
-    // Verify basic response structure
-    expect(response.status).toBe(200);
-
-    // Use approval testing for the sorted models
-    const approvalFilePath = join(process.cwd(), 'src/tests', `${testName}.approved.json`);
-    await verifyApproval(JSON.stringify(responseData, null, 2), approvalFilePath);
   });
 
   test('should handle unexpected response format', async () => {

@@ -14,8 +14,8 @@ export type BotIdentity = {
 
 export const DEFAULT_BOT_IDENTITY: BotIdentity = {
   botName: 'KiloClaw',
-  botNature: 'AI executive assistant',
-  botVibe: 'Helpful, calm, and proactive',
+  botNature: 'Operator',
+  botVibe: 'Focused, capable, effective',
   botEmoji: '🦾',
 };
 

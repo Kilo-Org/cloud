@@ -36,13 +36,27 @@ jest.mock('@/lib/user.server', () => ({
   getUserFromAuthOrRedirect: (...args: [string?]) => mockGetUserFromAuthOrRedirect(...args),
 }));
 
-type SignupSourceArg = 'openclaw-security-advisor' | null;
+type SignupSourceArg =
+  | { kind: 'openclaw-security-advisor' }
+  | { kind: 'credit-campaign'; slug: string }
+  | null;
 const mockGetStytchStatus = jest.fn<Promise<boolean | null>, [User, string | null, Headers]>();
 const mockHandleSignupPromotion = jest.fn<Promise<void>, [User, boolean, SignupSourceArg?]>();
 jest.mock('@/lib/stytch', () => ({
   getStytchStatus: (...args: [User, string | null, Headers]) => mockGetStytchStatus(...args),
   handleSignupPromotion: (...args: [User, boolean, SignupSourceArg?]) =>
     mockHandleSignupPromotion(...args),
+}));
+
+// Mock the DB-backed campaign lookup. The page calls this to confirm that a
+// /c/<slug> callback refers to a real campaign before attributing the
+// signup; tests stub it per-case via `mockLookupCampaignBySlug`.
+const mockLookupCampaignBySlug = jest.fn<Promise<unknown>, [string]>();
+jest.mock('@/lib/credit-campaigns', () => ({
+  // Re-export the pure helpers so `isCreditCampaignCallback` still runs in
+  // the page. Only the DB-touching function needs mocking.
+  ...jest.requireActual('@/lib/credit-campaigns-shared'),
+  lookupCampaignBySlug: (slug: string) => mockLookupCampaignBySlug(slug),
 }));
 
 // Mock React components that aren't relevant to redirect testing
@@ -295,11 +309,9 @@ describe('account-verification redirect logic', () => {
 
       await renderPage({ callbackPath: '/openclaw-advisor?code=ABCD-1234' });
 
-      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(
-        user,
-        true,
-        'openclaw-security-advisor'
-      );
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, {
+        kind: 'openclaw-security-advisor',
+      });
     });
 
     it('does NOT attribute sibling path /openclaw-advisor-fake (exact-pathname match)', async () => {
@@ -370,6 +382,161 @@ describe('account-verification redirect logic', () => {
       // 17 ASCII alphanumerics — within the charset but longer than the
       // device-auth generator ever produces. Rejected by the format guard.
       await renderPage({ callbackPath: '/openclaw-advisor?code=ABCDEFGHIJKLMNOPQ' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // Bonus attribution for admin-managed URL campaigns (/c/<slug>).
+  // Mirrors the openclaw-advisor attribution guards (exact-path match,
+  // first-validation-only, sibling-path rejection) because the same
+  // class of abuse applies: a manually-constructed callback must not
+  // award a signup bonus without completing the real flow.
+  // ---------------------------------------------------------------
+  describe('credit-campaign signupSource attribution', () => {
+    beforeEach(() => {
+      // Default: slug lookup succeeds with a minimal campaign stub. Tests
+      // that exercise the "dead callback" path override with null.
+      mockLookupCampaignBySlug.mockResolvedValue({ slug: 'mocked', id: 1 });
+    });
+
+    it('attributes a new user with callbackPath=/c/<slug> when campaign exists and strips the callback', async () => {
+      // A /c/<slug> URL is a one-shot signup entry — once the bonus is
+      // granted, sending the user back to /c/<slug> just shows them the
+      // "for new accounts" message. Always strip the callback so they
+      // land on /get-started like any other new signup.
+      const user = makeUser({ has_validation_stytch: null, customer_source: 'Reddit' });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c/summit' });
+
+      expect(mockLookupCampaignBySlug).toHaveBeenCalledWith('summit');
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, {
+        kind: 'credit-campaign',
+        slug: 'summit',
+      });
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
+    });
+
+    it('attributes a slug with internal hyphens and digits', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c/podcast-q1-2026' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, {
+        kind: 'credit-campaign',
+        slug: 'podcast-q1-2026',
+      });
+    });
+
+    it('does NOT attribute when the slug format is valid but the campaign is not in DB', async () => {
+      // Prevents phantom `credit-campaign` analytics tags; strip still
+      // fires on the callback so signup lands on /get-started instead of
+      // the dead /c/<slug> URL.
+      mockLookupCampaignBySlug.mockResolvedValue(null);
+      const user = makeUser({ has_validation_stytch: null, customer_source: 'Reddit' });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c/doesnotexist' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
+    });
+
+    it('strips malformed /c/<slug> callbacks (uppercase, too short) — no bounce to the malformed URL', async () => {
+      // `isValidCallbackPath` whitelists any `/c/` prefix, but
+      // `isCreditCampaignCallback` requires the slug to match
+      // `/^[a-z0-9-]{5,40}$/`. Without the prefix-level strip, a crafted
+      // /c/Summit (uppercase) or /c/xx (short) would pass the callback
+      // whitelist but skip the strip, and the user would be redirected
+      // to the malformed URL post-signup.
+      const user = makeUser({ has_validation_stytch: null, customer_source: 'Reddit' });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c/Summit' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
+    });
+
+    it('strips /c/<slug> callbacks on the post-validation pass (has_validation_stytch already set)', async () => {
+      // During a real signup, account-verification renders twice: first
+      // to mount the Stytch client, then after Stytch completes. By the
+      // second pass `has_validation_stytch` is no longer null. The strip
+      // decision runs independently of `isFirstValidation` so the redirect
+      // still routes to /get-started, not the (now-useless) /c/<slug>.
+      const user = makeUser({ has_validation_stytch: true, customer_source: 'Reddit' });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c/summit' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
+    });
+
+    it('does NOT attribute sibling path /c-fake/<slug> (prefix-match guard)', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c-fake/summit' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    it('does NOT attribute when residual path segments follow the slug', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c/summit/extra' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    it('does NOT attribute a bare /c/ with no slug', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c/' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    it('does NOT attribute a slug shorter than 5 chars', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c/abc' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    it('does NOT attribute already-validated user with /c/<slug> callback', async () => {
+      const user = makeUser({ has_validation_stytch: true });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c/summit' });
+
+      expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
+    });
+
+    it('does NOT attribute slugs with uppercase or invalid chars', async () => {
+      const user = makeUser({ has_validation_stytch: null });
+      mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
+      mockGetStytchStatus.mockResolvedValue(true);
+
+      await renderPage({ callbackPath: '/c/Summit' });
 
       expect(mockHandleSignupPromotion).toHaveBeenCalledWith(user, true, null);
     });

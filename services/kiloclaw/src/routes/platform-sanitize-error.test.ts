@@ -426,3 +426,198 @@ describe('sanitizeError: explicit provider support errors', () => {
     expect(provision).not.toHaveBeenCalled();
   });
 });
+
+describe('openclaw import platform route', () => {
+  function envWithImportOpenclawWorkspace(
+    importOpenclawWorkspace: (files: Array<{ path: string; content: string }>) => Promise<unknown>,
+    getStatus: () => Promise<{ status: string }> | { status: string } = async () => ({
+      status: 'running',
+    })
+  ) {
+    return {
+      KILOCLAW_INSTANCE: {
+        idFromName: (id: string) => id,
+        get: () => ({ importOpenclawWorkspace, getStatus }),
+      },
+      KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      KV_CLAW_CACHE: {
+        get: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue({ keys: [], list_complete: true }),
+        getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+      },
+    } as never;
+  }
+
+  it('returns 400 for malformed body', async () => {
+    const env = envWithImportOpenclawWorkspace(async () => ({ ok: true }));
+
+    const resp = await platform.request(
+      '/files/import-openclaw-workspace',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1', files: [{ path: 123, content: true }] }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(400);
+    await expect(jsonBody(resp)).resolves.toEqual(
+      expect.objectContaining({ error: 'Invalid request' })
+    );
+  });
+
+  it('returns 400 when files exceeds max count', async () => {
+    const importOpenclawWorkspace = vi.fn().mockResolvedValue({ ok: true });
+    const env = envWithImportOpenclawWorkspace(importOpenclawWorkspace);
+
+    const files = Array.from({ length: 501 }, (_, idx) => ({
+      path: `workspace/memory/note-${idx}.md`,
+      content: '# note',
+    }));
+
+    const resp = await platform.request(
+      '/files/import-openclaw-workspace',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1', files }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(400);
+    await expect(jsonBody(resp)).resolves.toEqual(
+      expect.objectContaining({ error: 'Invalid request' })
+    );
+    expect(importOpenclawWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('forwards import payload to DO and returns the response', async () => {
+    const importOpenclawWorkspace = vi.fn().mockResolvedValue({
+      ok: true,
+      attemptedWriteCount: 2,
+      writtenCount: 2,
+      attemptedDeleteCount: 0,
+      deletedCount: 0,
+      failedCount: 0,
+      totalUtf8Bytes: 42,
+      failures: [],
+    });
+
+    const env = envWithImportOpenclawWorkspace(importOpenclawWorkspace);
+
+    const resp = await platform.request(
+      '/files/import-openclaw-workspace?instanceId=11111111-1111-4111-8111-111111111111',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          files: [
+            { path: 'workspace/USER.md', content: '# User' },
+            { path: 'workspace/MEMORY.md', content: '# Memory' },
+          ],
+        }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(200);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      ok: true,
+      attemptedWriteCount: 2,
+      writtenCount: 2,
+      attemptedDeleteCount: 0,
+      deletedCount: 0,
+      failedCount: 0,
+      totalUtf8Bytes: 42,
+      failures: [],
+    });
+    expect(importOpenclawWorkspace).toHaveBeenCalledWith([
+      { path: 'workspace/USER.md', content: '# User' },
+      { path: 'workspace/MEMORY.md', content: '# Memory' },
+    ]);
+  });
+
+  it('returns 404 controller_route_unavailable when DO returns null', async () => {
+    const env = envWithImportOpenclawWorkspace(async () => null);
+
+    const resp = await platform.request(
+      '/files/import-openclaw-workspace',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          files: [{ path: 'workspace/USER.md', content: '# User' }],
+        }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(404);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      error: 'OpenClaw import not available (controller too old)',
+      code: 'controller_route_unavailable',
+    });
+  });
+
+  it('returns 503 when instance is not running', async () => {
+    const importOpenclawWorkspace = vi.fn().mockResolvedValue({ ok: true });
+    const env = envWithImportOpenclawWorkspace(importOpenclawWorkspace, async () => ({
+      status: 'stopped',
+    }));
+
+    const resp = await platform.request(
+      '/files/import-openclaw-workspace',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          files: [{ path: 'workspace/USER.md', content: '# User' }],
+        }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(503);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      error: 'Instance is not running',
+      code: 'instance_not_running',
+    });
+    expect(importOpenclawWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('passes through sanitized openclaw import error code', async () => {
+    const upstream = Object.assign(new Error('Import exceeds byte limit'), {
+      status: 400,
+      code: 'openclaw_import_too_large',
+    });
+    const env = envWithImportOpenclawWorkspace(async () => {
+      throw upstream;
+    });
+
+    const resp = await platform.request(
+      '/files/import-openclaw-workspace',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          files: [{ path: 'workspace/USER.md', content: '# User' }],
+        }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(400);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      error: 'Import exceeds byte limit',
+      code: 'openclaw_import_too_large',
+    });
+  });
+});

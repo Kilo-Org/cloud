@@ -13,13 +13,17 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';
 import { isOpenclawAdvisorCallback } from '@/lib/signup-source';
+import { isCreditCampaignCallback, lookupCampaignBySlug } from '@/lib/credit-campaigns';
 
 /**
  * Resolves a product identifier from the signup entry point. Returns null when
  * the entry point is generic (e.g. /get-started, /profile) so we leave the
  * property unset rather than guessing.
  */
-function resolveSignupProduct(callbackPath: string | null, hasSource: boolean): string | null {
+async function resolveSignupProduct(
+  callbackPath: string | null,
+  hasSource: boolean
+): Promise<string | null> {
   if (hasSource) return 'kilo-code'; // IDE install flow
   if (!callbackPath) return null;
   if (callbackPath.startsWith('/claw')) return 'kiloclaw';
@@ -33,6 +37,16 @@ function resolveSignupProduct(callbackPath: string | null, hasSource: boolean): 
   // the same reason; keeping both sides on the shared check prevents the two
   // attribution paths from drifting.
   if (isOpenclawAdvisorCallback(callbackPath)) return 'openclaw-security-advisor';
+  // Admin-managed URL campaigns (/c/<slug>). Bucketed under a single product
+  // key so PostHog doesn't fragment analytics across every slug;
+  // per-campaign breakdown is available via credit_transactions.credit_category.
+  // DB-verify the slug exists so a manually crafted /c/<garbage> callback
+  // doesn't leak a phantom `credit-campaign` attribution event.
+  const campaignMatch = isCreditCampaignCallback(callbackPath);
+  if (campaignMatch) {
+    const campaign = await lookupCampaignBySlug(campaignMatch.slug);
+    if (campaign) return 'credit-campaign';
+  }
   return null;
 }
 
@@ -66,7 +80,7 @@ export async function GET(request: NextRequest) {
       // callbackPath query param, so the value cannot be user-tampered. This
       // runs exactly once per signup because has_validation_stytch is set
       // after account verification completes.
-      const product = resolveSignupProduct(
+      const product = await resolveSignupProduct(
         callbackPath && isValidCallbackPath(callbackPath) ? responsePath : null,
         !!url.searchParams.get('source')
       );

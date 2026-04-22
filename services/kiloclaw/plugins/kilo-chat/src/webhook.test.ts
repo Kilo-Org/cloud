@@ -5,6 +5,7 @@ import {
   buildDeliverWiring,
   buildTypingParams,
   createKiloChatWebhookHandler,
+  parseActionExecutedPayload,
   parseInboundPayload,
 } from './webhook.js';
 import type { KiloChatClient } from './client.js';
@@ -67,6 +68,39 @@ describe('parseInboundPayload', () => {
   });
 });
 
+describe('parseActionExecutedPayload', () => {
+  it('parses a well-formed action.executed payload', () => {
+    const parsed = parseActionExecutedPayload({
+      type: 'action.executed',
+      groupId: 'approval-123',
+      value: 'allow-once',
+      executedBy: 'user-1',
+    });
+    expect(parsed).toEqual({
+      groupId: 'approval-123',
+      value: 'allow-once',
+      executedBy: 'user-1',
+    });
+  });
+
+  it('returns null when groupId is missing', () => {
+    expect(parseActionExecutedPayload({ value: 'deny', executedBy: 'u1' })).toBeNull();
+  });
+
+  it('returns null when value is missing', () => {
+    expect(parseActionExecutedPayload({ groupId: 'g1', executedBy: 'u1' })).toBeNull();
+  });
+
+  it('returns null when executedBy is missing', () => {
+    expect(parseActionExecutedPayload({ groupId: 'g1', value: 'deny' })).toBeNull();
+  });
+
+  it('returns null for non-object input', () => {
+    expect(parseActionExecutedPayload('not-an-object')).toBeNull();
+    expect(parseActionExecutedPayload(null)).toBeNull();
+  });
+});
+
 function makeReq(body: string): IncomingMessage {
   const req = new IncomingMessage(new Socket());
   req.method = 'POST';
@@ -122,6 +156,35 @@ describe('createKiloChatWebhookHandler', () => {
     await handler(makeReq(body), res);
     expect(getStatus()).toBe(413);
     expect(getBody()).toContain('Payload too large');
+  });
+
+  it('returns 400 on unknown webhook type', async () => {
+    const body = JSON.stringify({ type: 'unknown.event', data: {} });
+    const handler = createKiloChatWebhookHandler({ api: {} as never });
+    const { res, getStatus, getBody } = makeRes();
+    await handler(makeReq(body), res);
+    expect(getStatus()).toBe(400);
+    expect(getBody()).toContain('Unknown webhook type');
+  });
+
+  it('returns 400 when action.executed payload is malformed', async () => {
+    const body = JSON.stringify({ type: 'action.executed', groupId: 'g1' });
+    const handler = createKiloChatWebhookHandler({ api: {} as never });
+    const { res, getStatus, getBody } = makeRes();
+    await handler(makeReq(body), res);
+    expect(getStatus()).toBe(400);
+    expect(getBody()).toContain('Invalid action payload');
+  });
+
+  it('accepts message.created type explicitly', async () => {
+    // message.created with missing required message fields should 400 with
+    // "Invalid payload" (not "Unknown webhook type").
+    const body = JSON.stringify({ type: 'message.created', conversationId: 'c1' });
+    const handler = createKiloChatWebhookHandler({ api: {} as never });
+    const { res, getStatus, getBody } = makeRes();
+    await handler(makeReq(body), res);
+    expect(getStatus()).toBe(400);
+    expect(getBody()).toContain('Invalid payload');
   });
 });
 

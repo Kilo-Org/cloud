@@ -14,6 +14,7 @@ import { handleKiloChatReactAction } from './react-action';
 import { handleKiloChatRenameAction } from './rename-action';
 import { handleKiloChatListConversationsAction } from './list-conversations-action';
 import { handleKiloChatCreateConversationAction } from './create-conversation-action';
+import { createKiloChatApprovalCapability } from './approval';
 
 const CHANNEL_ID = 'kilo-chat';
 const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
@@ -203,3 +204,5 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
     },
   },
 });
+
+kiloChatPlugin.approvalCapability = createKiloChatApprovalCapability();

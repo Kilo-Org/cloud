@@ -5,6 +5,9 @@ import { resolveInboundRouteEnvelopeBuilderWithRuntime } from 'openclaw/plugin-s
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/plugin-entry';
 import { createNormalizedOutboundDeliverer } from 'openclaw/plugin-sdk/reply-payload';
 
+import { resolveApprovalOverGateway } from 'openclaw/plugin-sdk/approval-gateway-runtime';
+import type { ExecApprovalDecision } from 'openclaw/plugin-sdk/approval-runtime';
+
 import { createKiloChatClient, type KiloChatClient } from './client.js';
 import { resolveControllerUrl, resolveGatewayToken } from './env.js';
 import { createPreviewStream } from './preview-stream.js';
@@ -64,6 +67,43 @@ export function parseInboundPayload(raw: unknown): KiloChatInboundPayload | null
     inReplyToBody,
     inReplyToSender,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Action-executed payload parsing
+// ---------------------------------------------------------------------------
+
+export type ActionExecutedPayload = {
+  groupId: string;
+  value: string;
+  executedBy: string;
+};
+
+export function parseActionExecutedPayload(raw: unknown): ActionExecutedPayload | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const o = raw as Record<string, unknown>;
+  if (!isNonEmptyString(o.groupId)) return null;
+  if (!isNonEmptyString(o.value)) return null;
+  if (!isNonEmptyString(o.executedBy)) return null;
+  return {
+    groupId: o.groupId,
+    value: o.value,
+    executedBy: o.executedBy,
+  };
+}
+
+async function handleActionExecuted(
+  api: OpenClawPluginApi,
+  payload: ActionExecutedPayload
+): Promise<void> {
+  const decision = payload.value as ExecApprovalDecision;
+  await resolveApprovalOverGateway({
+    cfg: api.config,
+    approvalId: payload.groupId,
+    decision,
+    senderId: payload.executedBy,
+    clientDisplayName: 'Kilo Chat',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +356,41 @@ export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
       res.statusCode = 400;
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify({ error: 'Invalid JSON' }));
+      return true;
+    }
+
+    const type = (parsed as { type?: string }).type;
+
+    if (type === 'action.executed') {
+      // Resolve an approval via a button click in kilo-chat.
+      const actionPayload = parseActionExecutedPayload(parsed);
+      if (!actionPayload) {
+        res.statusCode = 400;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ error: 'Invalid action payload' }));
+        return true;
+      }
+      try {
+        await handleActionExecuted(deps.api, actionPayload);
+      } catch (err) {
+        console.error('[kilo-chat] action.executed failed:', err);
+        res.statusCode = 500;
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ error: 'Action execution failed' }));
+        return true;
+      }
+      res.statusCode = 200;
+      res.setHeader('content-type', 'application/json');
+      res.end('{}');
+      return true;
+    }
+
+    // Default: treat as message.created (for backwards compat, also accept
+    // payloads without a type field).
+    if (type !== undefined && type !== 'message.created') {
+      res.statusCode = 400;
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ error: 'Unknown webhook type' }));
       return true;
     }
 

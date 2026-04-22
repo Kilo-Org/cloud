@@ -633,6 +633,12 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c =
   return c.json({ success: true });
 });
 
+app.delete('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
+  const { agentId } = c.req.param();
+  await c.env.AGENT_DB_SNAPSHOTS_KV.delete(agentId);
+  return c.json({ success: true });
+});
+
 // ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for dashboard/user
 // routes. Container→worker routes use the agent JWT middleware instead

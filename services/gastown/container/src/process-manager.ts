@@ -113,6 +113,108 @@ async function hydrateDbFromSnapshot(
   }
 }
 
+async function deleteLocalDb(agentId: string): Promise<void> {
+  const dir = `/tmp/agent-home-${agentId}/.local/share/kilo`;
+  for (const suffix of ['kilo.db', 'kilo.db-wal', 'kilo.db-shm']) {
+    try {
+      await fs.unlink(`${dir}/${suffix}`);
+    } catch {
+      // File may not exist — that's fine.
+    }
+  }
+  console.log(`${MANAGER_LOG} Deleted local kilo.db for agent ${agentId}`);
+}
+
+async function deleteRemoteDbSnapshot(
+  agentId: string,
+  apiUrl: string,
+  token: string,
+  rigId: string,
+  townId: string
+): Promise<void> {
+  try {
+    const resp = await fetch(
+      `${apiUrl}/api/towns/${townId}/rigs/${rigId}/agents/${agentId}/db-snapshot`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (resp.ok) {
+      console.log(`${MANAGER_LOG} Deleted remote DB snapshot for agent ${agentId}`);
+    } else {
+      console.warn(
+        `${MANAGER_LOG} Failed to delete remote DB snapshot for ${agentId}: ${resp.status}`
+      );
+    }
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} deleteRemoteDbSnapshot failed for ${agentId}:`, err);
+  }
+}
+
+/**
+ * Try session.create; if it fails (e.g. stale kilo.db from an older CLI
+ * version whose schema is incompatible), delete the local DB, tear down
+ * the SDK server, restart it fresh, and retry once.
+ */
+async function createSessionWithStaleDbFallback(
+  client: KiloClient,
+  workdir: string,
+  env: Record<string, string>,
+  agentId: string,
+  agent: ManagedAgent
+): Promise<string> {
+  const sessionResult = await client.session.create({ body: {} });
+  const rawSession: unknown = sessionResult.data ?? sessionResult;
+  const parsed = SessionResponse.safeParse(rawSession);
+  if (parsed.success) {
+    console.log(`${MANAGER_LOG} Created new session ${parsed.data.id}`);
+    return parsed.data.id;
+  }
+
+  // session.create failed — likely a stale kilo.db migration error.
+  const rawStr = JSON.stringify(rawSession).slice(0, 300);
+  console.warn(
+    `${MANAGER_LOG} session.create failed for ${agentId}, attempting stale DB recovery. Response: ${rawStr}`
+  );
+
+  // 1. Delete local kilo.db so the CLI starts with a fresh schema.
+  await deleteLocalDb(agentId);
+
+  // 2. Tear down the SDK server so ensureSDKServer creates a new one.
+  const instance = sdkInstances.get(workdir);
+  if (instance) {
+    instance.server.close();
+    sdkInstances.delete(workdir);
+  }
+
+  // 3. Delete the stale KV snapshot (fire-and-forget) so future container
+  //    restarts don't re-hydrate the broken DB.
+  const apiUrl = agent.gastownApiUrl;
+  const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+  if (apiUrl && token) {
+    void deleteRemoteDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
+  }
+
+  // 4. Restart SDK server and retry session.create.
+  const { client: freshClient, port } = await ensureSDKServer(workdir, env);
+  agent.serverPort = port;
+
+  const retryResult = await freshClient.session.create({ body: {} });
+  const retryRaw: unknown = retryResult.data ?? retryResult;
+  const retryParsed = SessionResponse.safeParse(retryRaw);
+  if (!retryParsed.success) {
+    console.error(
+      `${MANAGER_LOG} session.create still failing after DB reset:`,
+      JSON.stringify(retryRaw).slice(0, 200),
+      retryParsed.error.issues
+    );
+    throw new Error('SDK session.create failed even after stale DB recovery');
+  }
+
+  console.log(
+    `${MANAGER_LOG} Stale DB recovery succeeded for ${agentId}, new session ${retryParsed.data.id}`
+  );
+  return retryParsed.data.id;
+}
+
 async function saveDbSnapshot(
   agentId: string,
   apiUrl: string,
@@ -890,19 +992,13 @@ export async function startAgent(
       }
     }
     if (!resumed) {
-      const sessionResult = await client.session.create({ body: {} });
-      const rawSession: unknown = sessionResult.data ?? sessionResult;
-      const parsed = SessionResponse.safeParse(rawSession);
-      if (!parsed.success) {
-        console.error(
-          `${MANAGER_LOG} SDK session.create returned unexpected shape:`,
-          JSON.stringify(rawSession).slice(0, 200),
-          parsed.error.issues
-        );
-        throw new Error('SDK session.create response missing required "id" field');
-      }
-      sessionId = parsed.data.id;
-      console.log(`${MANAGER_LOG} Created new session ${sessionId}`);
+      sessionId = await createSessionWithStaleDbFallback(
+        client,
+        workdir,
+        env,
+        request.agentId,
+        agent
+      );
     }
     agent.sessionId = sessionId;
 
@@ -1338,13 +1434,13 @@ export async function updateAgentModel(
       }
     }
     if (!resumedSession) {
-      const sessionResult = await client.session.create({ body: {} });
-      const rawSession: unknown = sessionResult.data ?? sessionResult;
-      const parsed = SessionResponse.safeParse(rawSession);
-      if (!parsed.success) {
-        throw new Error('SDK session.create response missing required "id" field');
-      }
-      newSessionId = parsed.data.id;
+      newSessionId = await createSessionWithStaleDbFallback(
+        client,
+        agent.workdir,
+        hotSwapEnv,
+        agentId,
+        agent
+      );
     }
     agent.sessionId = newSessionId;
 

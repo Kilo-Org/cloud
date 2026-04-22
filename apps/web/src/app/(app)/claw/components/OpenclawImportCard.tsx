@@ -100,7 +100,6 @@ export function OpenclawImportCard({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [copiedCommand, setCopiedCommand] = useState(false);
-  const [lastResult, setLastResult] = useState<OpenclawWorkspaceImportResponse | null>(null);
 
   const detectedOs = useMemo(() => {
     if (typeof navigator === 'undefined') return 'linux';
@@ -113,7 +112,6 @@ export function OpenclawImportCard({
     setSelectedZipName(null);
     setSelectedImport(null);
     setImportError(null);
-    setLastResult(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -139,7 +137,6 @@ export function OpenclawImportCard({
       const parsed = await parseOpenclawWorkspaceZipFile(file);
       setSelectedZipName(file.name);
       setSelectedImport(parsed);
-      setLastResult(null);
       posthog?.capture('claw_openclaw_import_zip_parsed', {
         source,
         zip_name: file.name,
@@ -234,8 +231,8 @@ export function OpenclawImportCard({
       { files: selectedImport.files },
       {
         onSuccess: result => {
-          setLastResult(result);
           setConfirmOpen(false);
+          resetSelection();
 
           const summary = summarizeImportResult(result);
           if (result.ok) {
@@ -243,6 +240,16 @@ export function OpenclawImportCard({
           } else {
             toast.error(`OpenClaw import complete. (${summary})`);
           }
+
+          mutations.restartOpenClaw.mutate(undefined, {
+            onSuccess: () => {
+              toast.success('KiloClaw restarting.');
+            },
+            onError: err => {
+              const message = err.message || 'Failed to restart KiloClaw';
+              toast.error(`OpenClaw imported, but failed to restart KiloClaw: ${message}`);
+            },
+          });
 
           posthog?.capture('claw_openclaw_import_completed', {
             ok: result.ok,
@@ -324,9 +331,6 @@ export function OpenclawImportCard({
               </Button>
             )}
           </div>
-          {selectedZipName && (
-            <p className="text-muted-foreground text-xs">File: {selectedZipName}</p>
-          )}
         </div>
       </div>
 
@@ -399,18 +403,13 @@ export function OpenclawImportCard({
         </p>
       )}
 
-      {lastResult && (
-        <p className="text-muted-foreground mt-2 text-xs">
-          Last import: {summarizeImportResult(lastResult)}
-        </p>
-      )}
-
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Import OpenClaw Workspace</DialogTitle>
             <DialogDescription>
-              This will overwrite matching files in your KiloClaw workspace.
+              This will overwrite matching files in your KiloClaw workspace and restart your
+              KiloClaw.
             </DialogDescription>
           </DialogHeader>
 

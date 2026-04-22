@@ -53,7 +53,9 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
  * are only included when they appear in the supplied `openRouterModels` list,
  * which is sourced from the Redis OpenRouter models cache.
  */
-export function getAutoFreeCandidates(openRouterModels: ReadonlyArray<string>): ReadonlyArray<string> {
+export function getAutoFreeCandidates(
+  openRouterModels: ReadonlyArray<string>
+): ReadonlyArray<string> {
   const candidates = new Set<string>();
   for (const model of preferredModels) {
     if (!isKiloAutoModel(model) && isFreeModel(model)) {

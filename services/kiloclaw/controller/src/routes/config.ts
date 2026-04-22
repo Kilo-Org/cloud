@@ -196,12 +196,11 @@ export function registerConfigRoutes(
       const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
       const config = JSON.parse(raw);
       deepMerge(config, patch as Record<string, unknown>);
-      const serialized = JSON.stringify(config, null, 2);
-      atomicWrite(CONFIG_PATH, serialized, undefined, { mode: 0o600 });
 
-      // Sync exec-approvals.json when exec policy was patched, so the host
-      // layer matches the requested config. Without this, the gateway takes
-      // the more restrictive intersection and ignores the config change.
+      // Sync exec-approvals.json BEFORE writing openclaw.json so the host
+      // layer is already correct when the gateway's file watcher triggers a
+      // reload from the openclaw.json change. Without this, the gateway
+      // takes the more restrictive intersection and ignores the config.
       const mergedExec = (config.tools as Record<string, unknown> | undefined)?.exec as
         | Record<string, unknown>
         | undefined;
@@ -213,11 +212,10 @@ export function registerConfigRoutes(
           KILOCLAW_EXEC_SECURITY: mergedExec.security as string,
           KILOCLAW_EXEC_ASK: mergedExec.ask as string,
         });
-        // The gateway caches exec-approvals.json at startup. SIGUSR1
-        // triggers a graceful reload so it picks up the new host defaults.
-        if (supervisor.getState() === 'running') supervisor.signal('SIGUSR1');
       }
 
+      const serialized = JSON.stringify(config, null, 2);
+      atomicWrite(CONFIG_PATH, serialized, undefined, { mode: 0o600 });
       console.log('[controller] Config patched:', JSON.stringify(patch));
       return c.json({ ok: true });
     } catch (err) {

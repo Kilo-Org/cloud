@@ -293,13 +293,21 @@ describe('/_kilo/config/patch routes', () => {
     expect(resp.status).toBe(500);
   });
 
-  it('syncs exec-approvals.json and signals gateway when patch includes tools.exec settings', async () => {
+  it('syncs exec-approvals.json before writing config when patch includes tools.exec', async () => {
     const app = new Hono();
-    const supervisor = createMockSupervisor();
-    registerConfigRoutes(app, supervisor, 'test-token');
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
 
     const existingConfig = { tools: { profile: 'full' }, gateway: { port: 3001 } };
     readMock.mockReturnValue(JSON.stringify(existingConfig));
+
+    // Track call order: seedExecApprovalsDefaults must run before atomicWrite
+    const callOrder: string[] = [];
+    seedExecMock.mockImplementation(() => {
+      callOrder.push('seedExec');
+    });
+    atomicWriteMock.mockImplementation(() => {
+      callOrder.push('atomicWrite');
+    });
 
     const resp = await app.request('/_kilo/config/patch', {
       method: 'POST',
@@ -313,13 +321,12 @@ describe('/_kilo/config/patch routes', () => {
       KILOCLAW_EXEC_SECURITY: 'full',
       KILOCLAW_EXEC_ASK: 'off',
     });
-    expect(supervisor.signal).toHaveBeenCalledWith('SIGUSR1');
+    expect(callOrder).toEqual(['seedExec', 'atomicWrite']);
   });
 
-  it('does not sync exec-approvals.json or signal when patch has no tools.exec', async () => {
+  it('does not sync exec-approvals.json when patch has no tools.exec', async () => {
     const app = new Hono();
-    const supervisor = createMockSupervisor();
-    registerConfigRoutes(app, supervisor, 'test-token');
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
 
     const existingConfig = { tools: { profile: 'full' }, gateway: { port: 3001 } };
     readMock.mockReturnValue(JSON.stringify(existingConfig));
@@ -332,7 +339,6 @@ describe('/_kilo/config/patch routes', () => {
 
     expect(resp.status).toBe(200);
     expect(seedExecMock).not.toHaveBeenCalled();
-    expect(supervisor.signal).not.toHaveBeenCalled();
   });
 });
 

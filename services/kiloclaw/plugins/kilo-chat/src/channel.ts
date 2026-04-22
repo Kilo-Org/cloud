@@ -16,13 +16,10 @@ import { handleKiloChatRenameAction } from './rename-action';
 import { handleKiloChatListConversationsAction } from './list-conversations-action';
 import { handleKiloChatCreateConversationAction } from './create-conversation-action';
 import { createKiloChatApprovalCapability } from './approval';
+import { stripPrefix } from './action-schemas';
 
 const CHANNEL_ID = 'kilo-chat';
 const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
-
-function stripKiloChatPrefix(raw: string): string {
-  return raw.trim().replace(/^kilo-chat:/i, '');
-}
 
 function isValidUlid(raw: string): boolean {
   return ULID_RE.test(raw);
@@ -82,19 +79,19 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
   base: {
     ...pluginBase,
     messaging: {
-      normalizeTarget: raw => stripKiloChatPrefix(raw) || undefined,
+      normalizeTarget: raw => stripPrefix(raw) || undefined,
       parseExplicitTarget: ({ raw }) => {
-        const cleaned = stripKiloChatPrefix(raw);
+        const cleaned = stripPrefix(raw);
         if (!isValidUlid(cleaned)) return null;
         return { to: cleaned, chatType: 'direct' as const };
       },
       inferTargetChatType: () => 'direct' as const,
       targetResolver: {
-        looksLikeId: raw => isValidUlid(stripKiloChatPrefix(raw)),
+        looksLikeId: raw => isValidUlid(stripPrefix(raw)),
         hint: '<conversationId (ULID)>',
       },
       resolveOutboundSessionRoute: ({ cfg, agentId, accountId, target }) => {
-        const conversationId = stripKiloChatPrefix(target);
+        const conversationId = stripPrefix(target);
         return buildChannelOutboundSessionRoute({
           cfg,
           agentId,

@@ -130,7 +130,9 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   input_cache_write_price: '0',
   supports_images: false,
   roocode_settings: undefined,
-  opencode_settings: undefined,
+  opencode_settings: {
+    ai_sdk_provider: 'openai',
+  },
 };
 
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {

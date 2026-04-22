@@ -1,6 +1,6 @@
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { isOpenCodeBasedClient, isRooCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
+import { isOpenCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/ai-gateway/processUsage';
 import {
@@ -78,7 +78,6 @@ import {
   getToolsAvailable,
   getToolsUsed,
 } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { grokCodeFastOptimizedRequest } from '@/lib/ai-gateway/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
@@ -533,23 +532,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     userByok
   );
 
-  let response: Response;
-  if (requestBodyParsed.kind === 'chat_completions' && provider.id === 'martian') {
-    response = await grokCodeFastOptimizedRequest(
-      requestBodyParsed.body,
-      isRooCodeBasedClient(fraudHeaders)
-    );
-  } else {
-    response = await openRouterRequest({
-      path,
-      search: url.search,
-      method: request.method,
-      body: requestBodyParsed.body,
-      extraHeaders,
-      provider,
-      signal: request.signal,
-    });
-  }
+  const response = await openRouterRequest({
+    path,
+    search: url.search,
+    method: request.method,
+    body: requestBodyParsed.body,
+    extraHeaders,
+    provider,
+    signal: request.signal,
+  });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
 
   emitApiMetricsForResponse(

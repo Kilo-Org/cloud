@@ -66,6 +66,8 @@ yarn-error.log*
 /prototypes/
 .plan/
 .kilo/plans
+.kilo/node_modules
+.kilo/package-lock.json
 
 # legacy config (migrated to .kilo/)
 .kilocode/

@@ -276,6 +276,7 @@ async function dispatchInbound(
       replyOptions: {
         ...wiring.replyOptions,
         onModelSelected,
+        disableBlockStreaming: false,
       },
     });
     await wiring.finalize();

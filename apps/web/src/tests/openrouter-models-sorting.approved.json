@@ -365,7 +365,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 14,
+      "preferredIndex": 13,
       "isFree": false,
       "opencode": {
         "ai_sdk_provider": "openai-compatible",

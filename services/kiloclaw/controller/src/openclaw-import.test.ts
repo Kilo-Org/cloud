@@ -10,7 +10,7 @@ import {
   OPENCLAW_IMPORT_MAX_ZIP_BYTES,
   OPENCLAW_IMPORT_MEMORY_PREFIX,
   OPENCLAW_IMPORT_ZIP_MEMORY_PREFIX,
-} from './openclaw-import.js';
+} from './openclaw-import';
 
 describe('openclaw import constants', () => {
   it('exposes expected limits', () => {

@@ -10,7 +10,7 @@ import {
   isOpenclawImportPathAllowed,
   isOpenclawMarkdownContent,
   normalizeOpenclawImportPath,
-} from '@kilocode/worker-utils/openclaw-import';
+} from '../openclaw-import';
 import { getBearerToken } from './gateway';
 import { timingSafeTokenEqual } from '../auth';
 import { resolveSafePath, verifyCanonicalized, SafePathError } from '../safe-path';

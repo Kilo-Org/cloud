@@ -29,6 +29,8 @@ declare namespace Cloudflare {
 		WASTELAND_CONTAINER: DurableObjectNamespace<import("./src/wasteland.worker").WastelandContainerDO>;
 		WASTELAND_REGISTRY: DurableObjectNamespace<import("./src/wasteland.worker").WastelandRegistryDO>;
 		CF_VERSION_METADATA?: WorkerVersionMetadata;
+		SENTRY_DSN?: string; // worker secret
+		SENTRY_RELEASE?: string; // deploy-time --var
 	}
 }
 interface Env extends Cloudflare.Env {}

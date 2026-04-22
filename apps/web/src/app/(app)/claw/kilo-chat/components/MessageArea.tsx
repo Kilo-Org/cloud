@@ -12,6 +12,7 @@ import {
   useMessageCacheUpdater,
   useAddReaction,
   useRemoveReaction,
+  useExecuteAction,
 } from '../hooks/useMessages';
 import { useConversationContext } from '../hooks/useEventService';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
@@ -62,6 +63,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const deleteMessage = useDeleteMessage(kiloChatClient, conversationId);
   const addReaction = useAddReaction(kiloChatClient, conversationId, currentUserId);
   const removeReaction = useRemoveReaction(kiloChatClient, conversationId, currentUserId);
+  const executeAction = useExecuteAction(kiloChatClient, conversationId, currentUserId);
 
   const updateCache = useMessageCacheUpdater(conversationId);
   const { typingMembers, handleTypingEvent, clearTypingForMember } = useTypingState(currentUserId);
@@ -232,6 +234,16 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     [removeReaction.mutate]
   );
 
+  const handleExecuteAction = useCallback(
+    (messageId: string, groupId: string, value: string) => {
+      executeAction.mutate(
+        { messageId, groupId, value },
+        { onError: () => toast.error('Failed to execute action') }
+      );
+    },
+    [executeAction.mutate]
+  );
+
   const messageMap = useMemo(() => new Map(messages.map(m => [m.id, m])), [messages]);
 
   const title = conversationDetail.data?.title ?? 'Untitled';
@@ -322,6 +334,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
               onReply={setReplyingTo}
               onAddReaction={handleAddReaction}
               onRemoveReaction={handleRemoveReaction}
+              onExecuteAction={handleExecuteAction}
               currentUserId={currentUserId}
             />
           ))}

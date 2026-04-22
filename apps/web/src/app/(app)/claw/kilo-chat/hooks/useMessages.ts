@@ -11,6 +11,7 @@ import type {
   MessageDeliveryFailedEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
+  ActionsBlock,
 } from '@kilocode/kilo-chat';
 import { useCallback } from 'react';
 
@@ -253,6 +254,66 @@ export function useRemoveReaction(
                     reactions: applyReactionRemoved(msg.reactions, variables.emoji, currentUserId),
                   }
             )
+          ),
+        };
+      });
+      return { previous, queryKey };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
+    },
+  });
+}
+
+export function useExecuteAction(
+  client: KiloChatClient,
+  conversationId: string | null,
+  currentUserId: string
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      messageId,
+      groupId,
+      value,
+    }: {
+      messageId: string;
+      groupId: string;
+      value: string;
+    }) => client.executeAction(conversationId ?? '', messageId, { groupId, value }),
+    onMutate: async variables => {
+      if (!conversationId) return;
+      const queryKey = ['kilo-chat', 'messages', conversationId];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData(queryKey);
+      // Optimistically mark the action as resolved
+      queryClient.setQueryData(queryKey, (old: unknown) => {
+        if (!old || typeof old !== 'object') return old;
+        const data = old as { pages: Message[][]; pageParams: unknown[] };
+        return {
+          ...data,
+          pages: data.pages.map(page =>
+            page.map(msg => {
+              if (msg.id !== variables.messageId) return msg;
+              return {
+                ...msg,
+                content: msg.content.map(block => {
+                  if (block.type !== 'actions') return block;
+                  const actionsBlock = block as ActionsBlock;
+                  if (actionsBlock.groupId !== variables.groupId) return block;
+                  return {
+                    ...actionsBlock,
+                    resolved: {
+                      value: variables.value,
+                      resolvedBy: currentUserId,
+                      resolvedAt: Date.now(),
+                    },
+                  };
+                }),
+              };
+            })
           ),
         };
       });

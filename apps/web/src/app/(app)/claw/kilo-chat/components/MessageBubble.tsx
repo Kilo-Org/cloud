@@ -7,7 +7,7 @@ import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile } from 'lucide-reac
 import { EmojiQuickPick } from './EmojiQuickPick';
 import { EmojiPicker } from './EmojiPicker';
 import { ReactionPills } from './ReactionPills';
-import type { Message, ContentBlock } from '@kilocode/kilo-chat';
+import type { Message, ContentBlock, ActionsBlock } from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './KiloChatLayout';
 
@@ -40,6 +40,7 @@ type MessageBubbleProps = {
   onReply: (message: Message) => void;
   onAddReaction: (messageId: string, emoji: string) => void;
   onRemoveReaction: (messageId: string, emoji: string) => void;
+  onExecuteAction: (messageId: string, groupId: string, value: string) => void;
   currentUserId: string;
 };
 
@@ -55,6 +56,7 @@ export const MessageBubble = memo(function MessageBubble({
   onReply,
   onAddReaction,
   onRemoveReaction,
+  onExecuteAction,
   currentUserId,
 }: MessageBubbleProps) {
   const { assistantName } = useKiloChatContext();
@@ -276,6 +278,53 @@ export const MessageBubble = memo(function MessageBubble({
                 <MemoizedMarkdown content={textContent} />
               </div>
             )}
+
+            {!message.deleted &&
+              message.content
+                .filter(b => b.type === 'actions')
+                .map(block => {
+                  if (block.type !== 'actions') return null;
+                  const actionsBlock = block as ActionsBlock;
+
+                  if (actionsBlock.resolved) {
+                    const resolvedAction = actionsBlock.actions.find(
+                      a => a.value === actionsBlock.resolved!.value
+                    );
+                    const label = resolvedAction?.label ?? actionsBlock.resolved.value;
+                    const isApproved = actionsBlock.resolved.value !== 'deny';
+                    return (
+                      <div
+                        key={actionsBlock.groupId}
+                        className="mt-2 flex items-center gap-1.5 text-xs opacity-70"
+                      >
+                        {isApproved ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                        <span>{label}</span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={actionsBlock.groupId} className="mt-2 flex items-center gap-2">
+                      {actionsBlock.actions.map(action => (
+                        <button
+                          key={action.value}
+                          onClick={() =>
+                            onExecuteAction(message.id, actionsBlock.groupId, action.value)
+                          }
+                          className={`rounded-md px-3 py-1 text-xs font-medium cursor-pointer transition-colors ${
+                            action.style === 'primary'
+                              ? 'bg-green-600 hover:bg-green-700 text-white'
+                              : action.style === 'danger'
+                                ? 'bg-red-600 hover:bg-red-700 text-white'
+                                : 'bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200'
+                          }`}
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
 
             <div
               className={`mt-1 flex items-center gap-1 text-[10px] ${

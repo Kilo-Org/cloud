@@ -106,6 +106,17 @@ export class KiloChatClient {
     });
   }
 
+  async executeAction(
+    conversationId: string,
+    messageId: string,
+    req: { groupId: string; value: string }
+  ): Promise<{ ok: true }> {
+    return this.httpRequest(
+      `/v1/conversations/${conversationId}/messages/${messageId}/execute-action`,
+      { method: 'POST', body: req }
+    );
+  }
+
   // ── Queries via HTTP ──────────────────────────────────────────────────────
 
   async listConversations(

@@ -662,7 +662,8 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
 
     const deletedPaths: string[] = [];
     let attemptedDeleteCount = 0;
-    if (validation.hasMemoryMd) {
+    const hasWriteFailure = failures.some(failure => failure.operation === 'write');
+    if (validation.hasMemoryMd && !hasWriteFailure) {
       const existingMemoryFiles = collectWorkspaceMemoryFiles(rootDir);
       for (const existingPath of existingMemoryFiles) {
         if (validation.importedMemoryPaths.has(existingPath)) {

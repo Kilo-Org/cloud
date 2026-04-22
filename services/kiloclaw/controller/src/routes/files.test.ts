@@ -546,6 +546,60 @@ describe('file routes', () => {
       expect(body.failures[0].operation).toBe('write');
     });
 
+    it('skips memory deletions when any write fails', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: any) => {
+        if (typeof p !== 'string') return false;
+        if (p === `${ROOT}/workspace/memory`) return true;
+        if (p === `${ROOT}/workspace/memory/old.md`) return true;
+        return false;
+      });
+      vi.mocked(fs.lstatSync).mockImplementation((p: any) => {
+        if (p === `${ROOT}/workspace/memory`) {
+          return {
+            isSymbolicLink: () => false,
+            isDirectory: () => true,
+            isFile: () => false,
+          } as any;
+        }
+        return {
+          isSymbolicLink: () => false,
+          isDirectory: () => false,
+          isFile: () => true,
+        } as any;
+      });
+      vi.mocked(fs.readdirSync).mockImplementation((dir: any) => {
+        if (dir === `${ROOT}/workspace/memory`) {
+          return [mockDirent('old.md', false)] as any;
+        }
+        return [];
+      });
+      vi.mocked(atomicWrite)
+        .mockImplementationOnce(() => {
+          throw new Error('disk full');
+        })
+        .mockImplementation(() => undefined);
+
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          files: [
+            { path: 'workspace/MEMORY.md', content: '# Memory\n' },
+            { path: 'workspace/memory/new.md', content: '# Note\n' },
+          ],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as any;
+      expect(body.ok).toBe(false);
+      expect(body.writtenCount).toBe(1);
+      expect(body.attemptedDeleteCount).toBe(0);
+      expect(body.deletedCount).toBe(0);
+      expect(vi.mocked(fs.unlinkSync)).not.toHaveBeenCalled();
+      expect(body.failures.some((failure: any) => failure.operation === 'write')).toBe(true);
+    });
+
     it('returns 400 for malformed request body', async () => {
       const res = await app.request('/_kilo/files/import-openclaw-workspace', {
         method: 'POST',

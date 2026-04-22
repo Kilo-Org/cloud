@@ -61,6 +61,11 @@ RUN npm install -g openclaw@2026.4.9 \
     && if [ "$AFTER" -ne 1 ]; then echo "ERROR: sed patch failed - expected 1 occurrence of 60e3, found $AFTER" >&2; exit 1; fi \
     && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null; then echo "ERROR: old 5e3 value still present after patch" >&2; exit 1; fi \
     && echo "OK: patched DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
+    && CT_FILE=$(find "$OC_DIST" -name 'channel-target-*.js' | head -1) \
+    && if [ -z "$CT_FILE" ]; then echo "ERROR: channel-target-*.js not found in openclaw dist" >&2; exit 1; fi \
+    && sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' "$CT_FILE" \
+    && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
+    && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
     && openclaw --version
 
 # Install ClawHub CLI

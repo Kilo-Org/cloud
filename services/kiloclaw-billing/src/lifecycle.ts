@@ -27,8 +27,9 @@ import type {
   KiloClawSubscriptionStatus,
 } from '@kilocode/db/schema-types';
 
-import type { BillingSweepMessage, BillingWorkerEnv } from './types.js';
+import type { BillingMessageSweep, BillingWorkerEnv } from './types.js';
 import { logger, withLogTags, type BillingLogFields } from './logger.js';
+import { getMissingSnowflakeConfig, queryKiloclawActiveUserIds } from './snowflake.js';
 
 const MS_PER_DAY = 86_400_000;
 const DESTRUCTION_GRACE_DAYS = 7;
@@ -38,6 +39,7 @@ const DESTRUCTION_WARNING_DAYS = 2;
 const EARLYBIRD_WARNING_DAYS = 14;
 const AUTO_RESUME_INITIAL_BACKOFF_MS = 2 * 60 * 60 * 1000;
 const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
+const TRIAL_INACTIVITY_BATCH_SIZE = 50;
 const SOFT_DELETED_EMAIL_SUFFIX = '@deleted.invalid';
 const LIFECYCLE_ACTOR = {
   actorType: 'system',
@@ -73,6 +75,11 @@ type BillingSummary = {
   credit_renewals_auto_top_up: number;
   credit_renewals_skipped_duplicate: number;
   interrupted_auto_resume_requests: number;
+  trial_inactivity_candidates: number;
+  trial_inactivity_batches: number;
+  trial_inactivity_batch_fallbacks: number;
+  trial_inactivity_stops: number;
+  trial_inactivity_dry_run_candidates: number;
   trial_warnings: number;
   earlybird_warnings: number;
   sweep1_trial_expiry: number;
@@ -152,10 +159,20 @@ type InterruptedAutoResumeRow = {
   auto_resume_attempt_count: number;
 };
 
+type TrialInactivityCandidateRow = {
+  subscription_id: string;
+  user_id: string;
+  instance_id: string;
+  sandbox_id: string;
+  organization_id: string | null;
+  instance_destroyed_at: string | null;
+  instance_created_at: string;
+};
+
 type SweepExecutionContext = BillingCorrelationContext & {
   billingFlow: typeof BILLING_FLOW;
   billingRunId: string;
-  billingSweep: BillingSweepMessage['sweep'];
+  billingSweep: BillingMessageSweep;
   billingAttempt: number;
 };
 
@@ -228,6 +245,11 @@ function createSummary(): BillingSummary {
     credit_renewals_auto_top_up: 0,
     credit_renewals_skipped_duplicate: 0,
     interrupted_auto_resume_requests: 0,
+    trial_inactivity_candidates: 0,
+    trial_inactivity_batches: 0,
+    trial_inactivity_batch_fallbacks: 0,
+    trial_inactivity_stops: 0,
+    trial_inactivity_dry_run_candidates: 0,
     trial_warnings: 0,
     earlybird_warnings: 0,
     sweep1_trial_expiry: 0,
@@ -499,7 +521,10 @@ function emailLogTypesCondition(
   );
 }
 
-function createSweepContext(message: BillingSweepMessage, attempt: number): SweepExecutionContext {
+function createSweepContext(
+  message: { runId: string; sweep: BillingMessageSweep },
+  attempt: number
+): SweepExecutionContext {
   return {
     billingFlow: BILLING_FLOW,
     billingRunId: message.runId,
@@ -638,6 +663,63 @@ async function requestKiloClaw<T>(
       }
 
       return (await response.json()) as T;
+    }
+  );
+}
+
+function isEnvFlagEnabled(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+function chunkArray<T>(values: T[], chunkSize: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += chunkSize) {
+    chunks.push(values.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
+
+async function getPlatformStatus(
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  userId: string,
+  instanceId?: string
+): Promise<{ status: string | null }> {
+  const params = new URLSearchParams({ userId });
+  if (instanceId) {
+    params.set('instanceId', instanceId);
+  }
+
+  return await requestKiloClaw<{ status: string | null }>(
+    env,
+    context,
+    `/api/platform/status?${params.toString()}`,
+    undefined,
+    { userId, instanceId }
+  );
+}
+
+function snowflakeLog(
+  context: SweepExecutionContext,
+  level: 'info' | 'warn' | 'error',
+  message: string,
+  fields: BillingLogFields
+) {
+  return withLogTags(
+    {
+      source: 'snowflake',
+      tags: {
+        ...context,
+        billingComponent: 'snowflake_sql_api',
+      },
+    },
+    async () => {
+      log(level, message, fields);
     }
   );
 }
@@ -1603,6 +1685,10 @@ async function runTrialExpirySweep(
         .where(eq(kiloclaw_subscriptions.id, row.id))
         .returning();
 
+      if (row.instance_id) {
+        await setInactiveTrialStoppedAt(database, row.instance_id, null);
+      }
+
       await insertLifecycleChangeLogBestEffort(database, {
         subscriptionId: row.id,
         action: 'suspended',
@@ -2482,9 +2568,210 @@ async function runComplementaryInferenceEndedSweep(
   }
 }
 
+async function setInactiveTrialStoppedAt(
+  database: WorkerDb,
+  instanceId: string,
+  stoppedAtIso: string | null
+): Promise<void> {
+  await database
+    .update(kiloclaw_instances)
+    .set({ inactive_trial_stopped_at: stoppedAtIso })
+    .where(eq(kiloclaw_instances.id, instanceId));
+}
+
+async function stopInstanceForTrialInactivity(
+  database: WorkerDb,
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  row: TrialInactivityCandidateRow,
+  summary: BillingSummary,
+  dryRun: boolean
+): Promise<void> {
+  try {
+    const platformStatus = await getPlatformStatus(env, context, row.user_id, row.instance_id);
+    if (platformStatus.status !== 'running') {
+      logSkippedSubscriptionRow(
+        'Skipping trial inactivity stop because instance is not running',
+        {
+          id: row.subscription_id,
+          user_id: row.user_id,
+          instance_id: row.instance_id,
+        },
+        {
+          reason: 'instance_not_running',
+          platformStatus: platformStatus.status,
+        }
+      );
+      return;
+    }
+
+    if (dryRun) {
+      summary.trial_inactivity_dry_run_candidates++;
+      log('info', 'Trial inactivity dry-run candidate identified', {
+        event: 'trial_inactivity_dry_run_candidate',
+        outcome: 'completed',
+        subscriptionId: row.subscription_id,
+        userId: row.user_id,
+        instanceId: row.instance_id,
+      });
+      return;
+    }
+
+    await stopInstance(env, context, row.user_id, row.instance_id);
+    const stoppedAtIso = new Date().toISOString();
+    await setInactiveTrialStoppedAt(database, row.instance_id, stoppedAtIso);
+    summary.trial_inactivity_stops++;
+
+    log('info', 'Stopped trial instance for inactivity', {
+      event: 'trial_inactivity_stop',
+      outcome: 'completed',
+      subscriptionId: row.subscription_id,
+      userId: row.user_id,
+      instanceId: row.instance_id,
+      stoppedAt: stoppedAtIso,
+    });
+  } catch (error) {
+    summary.errors++;
+    log('error', 'Trial inactivity stop failed for user', {
+      event: 'trial_inactivity_stop',
+      outcome: 'failed',
+      subscriptionId: row.subscription_id,
+      userId: row.user_id,
+      instanceId: row.instance_id,
+      error: errorMessage(error),
+    });
+  }
+}
+
+async function runTrialInactivityStopSweep(
+  database: WorkerDb,
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  summary: BillingSummary
+): Promise<void> {
+  if (!isEnvFlagEnabled(env.TRIAL_INACTIVITY_STOP_ENABLED)) {
+    log('info', 'Trial inactivity stop is disabled', {
+      event: 'trial_inactivity_disabled',
+      outcome: 'completed',
+    });
+    return;
+  }
+
+  const missingSnowflakeConfig = getMissingSnowflakeConfig(env);
+  if (missingSnowflakeConfig.length > 0) {
+    summary.errors++;
+    log('error', 'Skipping trial inactivity stop due to missing Snowflake config', {
+      event: 'trial_inactivity_config_missing',
+      outcome: 'failed',
+      missingSnowflakeConfig,
+    });
+    return;
+  }
+
+  const dryRun = isEnvFlagEnabled(env.TRIAL_INACTIVITY_STOP_DRY_RUN);
+  const cutoffIso = new Date(Date.now() - 2 * MS_PER_DAY).toISOString();
+  const candidates = await database
+    .select({
+      subscription_id: kiloclaw_subscriptions.id,
+      user_id: kiloclaw_subscriptions.user_id,
+      instance_id: kiloclaw_instances.id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+      organization_id: kiloclaw_instances.organization_id,
+      instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      instance_created_at: kiloclaw_instances.created_at,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.plan, 'trial'),
+        eq(kiloclaw_subscriptions.status, 'trialing'),
+        currentSubscriptionRowFilter(),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at),
+        lte(kiloclaw_instances.created_at, cutoffIso),
+        isNull(kiloclaw_instances.inactive_trial_stopped_at)
+      )
+    );
+
+  summary.trial_inactivity_candidates = candidates.length;
+  if (candidates.length === 0) {
+    log('info', 'No trial inactivity candidates found', {
+      event: 'trial_inactivity_candidates_loaded',
+      outcome: 'completed',
+      candidateCount: 0,
+      dryRun,
+    });
+    return;
+  }
+
+  const candidateBatches = chunkArray(candidates, TRIAL_INACTIVITY_BATCH_SIZE);
+  for (const batch of candidateBatches) {
+    summary.trial_inactivity_batches++;
+
+    try {
+      const activeUserIds = await queryKiloclawActiveUserIds({
+        env,
+        userIds: batch.map(candidate => candidate.user_id),
+        log: (level, message, fields) => {
+          void snowflakeLog(context, level, message, fields);
+        },
+      });
+
+      for (const row of batch) {
+        if (activeUserIds.has(row.user_id)) {
+          continue;
+        }
+
+        await stopInstanceForTrialInactivity(database, env, context, row, summary, dryRun);
+      }
+    } catch (batchError) {
+      summary.trial_inactivity_batch_fallbacks++;
+      log('warn', 'Snowflake batch query failed, falling back to per-user checks', {
+        event: 'trial_inactivity_batch_fallback',
+        outcome: 'retry',
+        batchSize: batch.length,
+        error: errorMessage(batchError),
+      });
+
+      for (const row of batch) {
+        try {
+          const activeUserIds = await queryKiloclawActiveUserIds({
+            env,
+            userIds: [row.user_id],
+            log: (level, message, fields) => {
+              void snowflakeLog(context, level, message, {
+                ...fields,
+                userId: row.user_id,
+                instanceId: row.instance_id,
+              });
+            },
+          });
+
+          if (activeUserIds.has(row.user_id)) {
+            continue;
+          }
+
+          await stopInstanceForTrialInactivity(database, env, context, row, summary, dryRun);
+        } catch (error) {
+          summary.errors++;
+          log('warn', 'Snowflake per-user trial inactivity query failed; failing open', {
+            event: 'trial_inactivity_user_query_failed',
+            outcome: 'failed',
+            subscriptionId: row.subscription_id,
+            userId: row.user_id,
+            instanceId: row.instance_id,
+            error: errorMessage(error),
+          });
+        }
+      }
+    }
+  }
+}
+
 export async function runSweep(
   env: BillingWorkerEnv,
-  message: BillingSweepMessage,
+  message: { runId: string; sweep: BillingMessageSweep },
   attempt = 1
 ): Promise<BillingSummary> {
   const context = createSweepContext(message, attempt);
@@ -2541,6 +2828,9 @@ export async function runSweep(
             break;
           case 'complementary_inference_ended':
             await runComplementaryInferenceEndedSweep(database, env, context, summary);
+            break;
+          case 'trial_inactivity_stop':
+            await runTrialInactivityStopSweep(database, env, context, summary);
             break;
         }
 

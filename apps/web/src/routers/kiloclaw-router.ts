@@ -53,7 +53,10 @@ import {
   getPersonalProvisionLockKey,
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
-import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
+import {
+  clearSubscriptionLifecycleAfterInstanceDestroy,
+  clearTrialInactivityStopAfterStart,
+} from '@/lib/kiloclaw/instance-lifecycle';
 
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import {
@@ -2404,6 +2407,16 @@ export const kiloclawRouter = createTRPCRouter({
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
     const result = await client.start(ctx.user.id, workerInstanceId(instance));
+    if (instance) {
+      try {
+        await clearTrialInactivityStopAfterStart({
+          kiloUserId: ctx.user.id,
+          instanceId: instance.id,
+        });
+      } catch (error) {
+        console.error('Failed to clear trial inactivity stop marker after start:', error);
+      }
+    }
     // /api/platform/start always returns { ok: true } regardless of whether
     // the machine transitioned state, so this may fire for no-op requests.
     // The UI only enables Start when isStartable is true, so false fires are rare.

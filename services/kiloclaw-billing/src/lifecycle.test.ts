@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetWorkerDb } = vi.hoisted(() => ({
-  mockGetWorkerDb: vi.fn(),
-}));
+const { mockGetWorkerDb, mockGetMissingSnowflakeConfig, mockQueryKiloclawActiveUserIds } =
+  vi.hoisted(() => ({
+    mockGetWorkerDb: vi.fn(),
+    mockGetMissingSnowflakeConfig: vi.fn<() => string[]>(() => []),
+    mockQueryKiloclawActiveUserIds: vi.fn(),
+  }));
 
 vi.mock('@kilocode/db', async importOriginal => {
   const actual: Record<string, unknown> = await importOriginal();
@@ -11,6 +14,11 @@ vi.mock('@kilocode/db', async importOriginal => {
     getWorkerDb: mockGetWorkerDb,
   };
 });
+
+vi.mock('./snowflake.js', () => ({
+  getMissingSnowflakeConfig: mockGetMissingSnowflakeConfig,
+  queryKiloclawActiveUserIds: mockQueryKiloclawActiveUserIds,
+}));
 
 import { runSweep } from './lifecycle.js';
 import type { BillingWorkerEnv } from './types.js';
@@ -157,6 +165,9 @@ function createEnv(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch']): BillingWor
     LIFECYCLE_QUEUE: {
       send: vi.fn(),
     } as never,
+    TRIAL_INACTIVITY_QUEUE: {
+      send: vi.fn(),
+    } as never,
     KILOCLAW: {
       fetch: fetchImpl,
     },
@@ -166,6 +177,17 @@ function createEnv(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch']): BillingWor
     STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
     INTERNAL_API_SECRET: 'next-internal-api-secret',
     KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+    TRIAL_INACTIVITY_STOP_ENABLED: 'true',
+    TRIAL_INACTIVITY_STOP_DRY_RUN: 'false',
+    SNOWFLAKE_ACCOUNT_HOST: 'fyc17898.us-east-1',
+    SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER: 'FYC17898',
+    SNOWFLAKE_USERNAME: 'KILOCODE_USER',
+    SNOWFLAKE_ROLE: 'KILOCODE_ROLE',
+    SNOWFLAKE_WAREHOUSE: 'WH_KILOCODE',
+    SNOWFLAKE_DATABASE: 'KILO_DW',
+    SNOWFLAKE_SCHEMA: 'DBT_PROD',
+    SNOWFLAKE_PRIVATE_KEY_PEM: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----',
+    SNOWFLAKE_PUBLIC_KEY_FINGERPRINT: 'SHA256:test',
   };
 }
 
@@ -1660,5 +1682,130 @@ describe('soft-deleted user lifecycle exclusion', () => {
     expect(summary.earlybird_warnings).toBe(0);
     expect(inserts).toEqual([]);
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('trial inactivity stop sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    mockGetMissingSnowflakeConfig.mockReset();
+    mockGetMissingSnowflakeConfig.mockReturnValue([]);
+    mockQueryKiloclawActiveUserIds.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('stops a personal trial instance with no qualifying Snowflake usage', async () => {
+    const instanceId = '77777777-7777-4777-8777-777777777777';
+    const { db, updates } = createMockDb([
+      [
+        {
+          subscription_id: 'sub-1',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          sandbox_id: 'ki_77777777777747778777777777777777',
+          organization_id: null,
+          instance_destroyed_at: null,
+          instance_created_at: '2026-04-18T00:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    mockQueryKiloclawActiveUserIds.mockResolvedValue(new Set());
+    const fetch = vi.fn(async (request: RequestInfo | URL) => {
+      const url = request instanceof Request ? request.url : String(request);
+      if (url.includes('/api/platform/status')) {
+        return new Response(JSON.stringify({ status: 'running' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/api/platform/stop')) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '77777777-7777-4777-8777-777777777770',
+        sweep: 'trial_inactivity_stop',
+      },
+      1
+    );
+
+    expect(summary.trial_inactivity_candidates).toBe(1);
+    expect(summary.trial_inactivity_batches).toBe(1);
+    expect(summary.trial_inactivity_stops).toBe(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(updates).toContainEqual(
+      expect.objectContaining({ inactive_trial_stopped_at: expect.any(String) })
+    );
+  });
+
+  it('does not stop or mark a candidate during dry-run mode', async () => {
+    const instanceId = '88888888-8888-4888-8888-888888888888';
+    const { db, updates } = createMockDb([
+      [
+        {
+          subscription_id: 'sub-1',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          sandbox_id: 'ki_88888888888848888888888888888888',
+          organization_id: null,
+          instance_destroyed_at: null,
+          instance_created_at: '2026-04-18T00:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    mockQueryKiloclawActiveUserIds.mockResolvedValue(new Set());
+    const fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ status: 'running' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    const env = createEnv(fetch);
+    env.TRIAL_INACTIVITY_STOP_DRY_RUN = 'true';
+
+    const summary = await runSweep(
+      env,
+      {
+        runId: '88888888-8888-4888-8888-888888888880',
+        sweep: 'trial_inactivity_stop',
+      },
+      1
+    );
+
+    expect(summary.trial_inactivity_dry_run_candidates).toBe(1);
+    expect(summary.trial_inactivity_stops).toBe(0);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(updates).toEqual([]);
+  });
+
+  it('logs and skips the run when Snowflake config is missing', async () => {
+    const { db } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    mockGetMissingSnowflakeConfig.mockReturnValue(['SNOWFLAKE_ACCOUNT_HOST']);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '99999999-9999-4999-8999-999999999999',
+        sweep: 'trial_inactivity_stop',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(1);
+    expect(summary.trial_inactivity_candidates).toBe(0);
+    expect(mockQueryKiloclawActiveUserIds).not.toHaveBeenCalled();
   });
 });

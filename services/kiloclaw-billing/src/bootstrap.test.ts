@@ -101,6 +101,9 @@ function createEnv(): BillingWorkerEnv {
     LIFECYCLE_QUEUE: {
       send: vi.fn(),
     } as unknown as BillingWorkerEnv['LIFECYCLE_QUEUE'],
+    TRIAL_INACTIVITY_QUEUE: {
+      send: vi.fn(),
+    } as unknown as BillingWorkerEnv['TRIAL_INACTIVITY_QUEUE'],
     KILOCLAW: {
       fetch: vi.fn(),
     },

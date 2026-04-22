@@ -10,7 +10,7 @@ Important dimensions:
 
 | Field              | Meaning                                                                                                                                                                     |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `billingComponent` | `worker`, `side_effects`, or `kiloclaw_platform`                                                                                                                            |
+| `billingComponent` | `worker`, `side_effects`, `kiloclaw_platform`, or `snowflake_sql_api`                                                                                                       |
 | `billingRunId`     | One hourly billing run across all sweeps                                                                                                                                    |
 | `billingSweep`     | The current sweep name                                                                                                                                                      |
 | `billingCallId`    | One downstream call from the worker                                                                                                                                         |
@@ -51,7 +51,7 @@ Display:
 Filter:
 
 - `billingFlow = "kiloclaw_lifecycle"`
-- `billingComponent in ("side_effects", "kiloclaw_platform")`
+- `billingComponent in ("side_effects", "kiloclaw_platform", "snowflake_sql_api")`
 - `outcome = "failed"`
 
 Display:
@@ -99,6 +99,10 @@ Create these monitors in Axiom:
 
 4. `billing-run-missing-completion`
    Trigger when a `run_started` event has no matching `run_completed` event for the same `billingRunId` within 75 minutes.
+   Severity: ticket.
+
+5. `billing-snowflake-failure-spike`
+   Trigger when `billingComponent = "snowflake_sql_api"` and `outcome = "failed"` count is `>= 5` in 15 minutes.
    Severity: ticket.
 
 ## Notes

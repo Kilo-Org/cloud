@@ -675,6 +675,32 @@ rows renew.
    for those subscriptions. This MUST include hybrid rows; a hybrid
    row can need retry if auto-resume was interrupted after invoice
    settlement recovered it to active.
+6. The system MAY run additional background jobs that are not part of
+   the hourly lifecycle sweep order when those jobs have different
+   cadence or operational isolation requirements. Such jobs MUST still
+   follow rules 1–3.
+
+### Trial Inactivity Stop
+
+1. The system MUST evaluate personal trial inactivity at most once per
+   day, not as part of the hourly lifecycle sweep order.
+2. The inactivity job MUST consider only the current personal
+   subscription row whose plan is `trial`, whose status is `trialing`,
+   and whose associated instance is active, personal, and older than 48
+   hours.
+3. The activity check MUST use qualifying KiloClaw usage from the last
+   2 days using the product-approved Snowflake semantics. If the
+   activity source is unavailable or ambiguous for a user, the system
+   MUST fail open for that user.
+4. When a qualifying personal trial row has no qualifying usage in the
+   last 2 days, the system MUST stop the instance.
+5. The system MUST NOT change the subscription status, trial dates,
+   suspension timestamp, destruction deadline, or other billing
+   entitlement fields when applying a trial inactivity stop.
+6. The system MUST NOT send an email for a trial inactivity stop.
+7. Restart after a trial inactivity stop MUST require an explicit user
+   or admin start action; trialing access remains governed by the
+   normal access rules.
 
 ### Credit Renewal
 

@@ -1732,7 +1732,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               <div className="flex items-center gap-3">
                 {isActive ? (
                   <>
-                    <Badge className="bg-green-600">Active</Badge>
+                    {data.lifecycle_state === 'suspended' ? (
+                      <Badge className="bg-amber-600">Suspended</Badge>
+                    ) : data.lifecycle_state === 'inactive_trial_stopped' ? (
+                      <Badge className="bg-sky-700">Inactive Trial Stopped</Badge>
+                    ) : (
+                      <Badge className="bg-green-600">Active</Badge>
+                    )}
                     <Button
                       variant="destructive"
                       size="sm"
@@ -1787,6 +1793,19 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 {data.destroyed_at ? (
                   <span title={formatAbsoluteTime(data.destroyed_at)}>
                     {formatRelativeTime(data.destroyed_at)}
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </DetailField>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Calendar className="text-muted-foreground h-4 w-4 shrink-0" />
+              <DetailField label="Inactive Trial Stopped At">
+                {data.inactive_trial_stopped_at ? (
+                  <span title={formatAbsoluteTime(data.inactive_trial_stopped_at)}>
+                    {formatRelativeTime(data.inactive_trial_stopped_at)}
                   </span>
                 ) : (
                   '—'

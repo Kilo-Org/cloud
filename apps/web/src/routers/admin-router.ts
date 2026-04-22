@@ -47,6 +47,7 @@ import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
+import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
 import { eq, and, ne, or, ilike, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
@@ -967,6 +968,7 @@ export const adminRouter = createTRPCRouter({
             .where(
               and(
                 eq(kiloclaw_instances.user_id, input.userId),
+                isNull(kiloclaw_instances.organization_id),
                 isNull(kiloclaw_instances.destroyed_at)
               )
             )
@@ -976,6 +978,10 @@ export const adminRouter = createTRPCRouter({
             try {
               const client = new KiloClawInternalClient();
               await client.start(input.userId, workerInstanceId(activeInstance));
+              await clearTrialInactivityStopAfterStart({
+                kiloUserId: input.userId,
+                instanceId: activeInstance.id,
+              });
             } catch {
               // Best effort — instance will be startable by the user from the dashboard
             }

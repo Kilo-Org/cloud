@@ -3765,6 +3765,7 @@ export const kiloclaw_instances = pgTable(
     organization_id: uuid().references(() => organizations.id),
     name: text(),
     inbound_email_enabled: boolean().default(true).notNull(),
+    inactive_trial_stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
   },

@@ -697,8 +697,7 @@ async function handlePost(req: Request): Promise<Response> {
 async function runWlItemCmd(
   req: Request,
   schema: typeof UnclaimBodySchema | typeof CloseBodySchema,
-  wlCmd: 'unclaim' | 'close',
-  label: string
+  wlCmd: 'unclaim' | 'close'
 ): Promise<Response> {
   const token = extractToken(req);
   if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
@@ -726,11 +725,11 @@ async function runWlItemCmd(
 }
 
 async function handleUnclaim(req: Request): Promise<Response> {
-  return runWlItemCmd(req, UnclaimBodySchema, 'unclaim', 'unclaim');
+  return runWlItemCmd(req, UnclaimBodySchema, 'unclaim');
 }
 
 async function handleClose(req: Request): Promise<Response> {
-  return runWlItemCmd(req, CloseBodySchema, 'close', 'close');
+  return runWlItemCmd(req, CloseBodySchema, 'close');
 }
 
 async function handleAccept(req: Request): Promise<Response> {

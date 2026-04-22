@@ -152,12 +152,12 @@ function RecentBlocksTab() {
                       </code>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">{row.date}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="p-0 text-right">
                       <Link
                         href={`/admin/users?${new URLSearchParams({ notesSearch: row.blocked_reason, sortBy: 'updated_at', sortOrder: 'desc', blockedStatus: 'blocked' })}`}
-                        className="text-primary hover:underline"
+                        className="text-primary hover:underline block px-4 py-2"
                       >
-                        {row.blocked_count.toLocaleString()}
+                        {row.blocked_count.toLocaleString()} users
                       </Link>
                     </TableCell>
                   </TableRow>

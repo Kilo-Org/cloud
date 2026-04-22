@@ -213,6 +213,9 @@ export function registerConfigRoutes(
           KILOCLAW_EXEC_SECURITY: mergedExec.security as string,
           KILOCLAW_EXEC_ASK: mergedExec.ask as string,
         });
+        // The gateway caches exec-approvals.json at startup. SIGUSR1
+        // triggers a graceful reload so it picks up the new host defaults.
+        if (supervisor.getState() === 'running') supervisor.signal('SIGUSR1');
       }
 
       console.log('[controller] Config patched:', JSON.stringify(patch));

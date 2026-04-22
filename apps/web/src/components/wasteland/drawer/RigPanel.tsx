@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -300,17 +301,27 @@ function ActivitySection({
   count: number;
   children: React.ReactNode;
 }) {
+  const [expanded, setExpanded] = useState(true);
   if (count === 0) return null;
   return (
     <div className="border-b border-white/[0.06] px-3 py-3">
-      <div className="mb-2 flex items-center gap-1.5 px-2">
+      <button
+        type="button"
+        onClick={() => setExpanded(e => !e)}
+        className="mb-2 flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors hover:bg-white/[0.03]"
+      >
         <Icon className="size-3 text-white/25" />
         <span className="text-[10px] font-medium tracking-wide text-white/30 uppercase">
           {title}
         </span>
         <span className="text-[10px] text-white/20">· {count}</span>
-      </div>
-      {children}
+        <ChevronRight
+          className={`ml-auto size-3 text-white/25 transition-transform duration-150 ${
+            expanded ? '' : 'rotate-90'
+          }`}
+        />
+      </button>
+      {expanded && children}
     </div>
   );
 }

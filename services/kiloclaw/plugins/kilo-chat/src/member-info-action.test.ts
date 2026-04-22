@@ -30,7 +30,8 @@ describe('handleKiloChatMemberInfoAction', () => {
     });
 
     const result = await handleKiloChatMemberInfoAction({
-      params: { to: 'CONV' },
+      params: {},
+      toolContext: { currentChannelId: 'CONV' },
       client,
     });
 
@@ -47,39 +48,12 @@ describe('handleKiloChatMemberInfoAction', () => {
     });
 
     const result = await handleKiloChatMemberInfoAction({
-      params: { to: 'CONV' },
+      params: {},
+      toolContext: { currentChannelId: 'CONV' },
       client,
     });
 
     expect(result.content[0].text).toBe('Members (1):\n- user-x (user)');
-  });
-
-  it('resolves conversationId from toolContext when params.to is absent', async () => {
-    const client = mockClient({
-      getMembers: vi.fn().mockResolvedValue({ members: [] }),
-    });
-
-    await handleKiloChatMemberInfoAction({
-      params: {},
-      toolContext: { currentChannelId: 'CTX_CONV' },
-      client,
-    });
-
-    expect(client.getMembers).toHaveBeenCalledWith({ conversationId: 'CTX_CONV' });
-  });
-
-  it('prefers params.to over toolContext', async () => {
-    const client = mockClient({
-      getMembers: vi.fn().mockResolvedValue({ members: [] }),
-    });
-
-    await handleKiloChatMemberInfoAction({
-      params: { to: 'PARAM_CONV' },
-      toolContext: { currentChannelId: 'CTX_CONV' },
-      client,
-    });
-
-    expect(client.getMembers).toHaveBeenCalledWith({ conversationId: 'PARAM_CONV' });
   });
 
   it('throws when conversationId cannot be resolved', async () => {

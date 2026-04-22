@@ -2,7 +2,12 @@ import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AuthContext } from '../auth';
 import { ulidSchema } from './schemas';
-import { handleCreateMessage, handleEditMessage, handleDeleteMessage } from './handler';
+import {
+  handleCreateMessage,
+  handleEditMessage,
+  handleDeleteMessage,
+  handleExecuteAction,
+} from './handler';
 
 const listMessagesQuerySchema = z.object({
   before: ulidSchema.optional(),
@@ -49,4 +54,10 @@ export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: Auth
 
   // DELETE /v1/messages/:messageId — soft delete
   app.delete('/v1/messages/:messageId', handleDeleteMessage);
+
+  // POST /v1/conversations/:conversationId/messages/:messageId/execute-action
+  app.post(
+    '/v1/conversations/:conversationId/messages/:messageId/execute-action',
+    handleExecuteAction
+  );
 }

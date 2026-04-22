@@ -5,8 +5,28 @@ export const ulidSchema = z.string().ulid();
 export const SANDBOX_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 export const sandboxIdSchema = z.string().regex(SANDBOX_ID_PATTERN, 'Invalid sandboxId');
 
+const actionItemSchema = z.object({
+  label: z.string().min(1).max(200),
+  style: z.enum(['primary', 'danger', 'secondary']),
+  value: z.string().min(1).max(200),
+});
+
+const actionsBlockSchema = z.object({
+  type: z.literal('actions'),
+  groupId: z.string().min(1).max(200),
+  actions: z.array(actionItemSchema).min(1).max(10),
+  resolved: z
+    .object({
+      value: z.string(),
+      resolvedBy: z.string(),
+      resolvedAt: z.number(),
+    })
+    .optional(),
+});
+
 export const contentBlockSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string().min(1).max(8000) }),
+  actionsBlockSchema,
 ]);
 
 export const createMessageSchema = z.object({
@@ -45,6 +65,11 @@ export const reactionBodySchema = z.object({
 
 export const renameConversationSchema = z.object({
   title: z.string().min(1).max(200),
+});
+
+export const executeActionSchema = z.object({
+  groupId: z.string().min(1).max(200),
+  value: z.string().min(1).max(200),
 });
 
 export const createBotConversationSchema = z.object({

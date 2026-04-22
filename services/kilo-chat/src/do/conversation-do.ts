@@ -1,4 +1,4 @@
-import type { ContentBlock } from '@kilocode/kilo-chat';
+import type { ContentBlock, ActionsBlock } from '@kilocode/kilo-chat';
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -87,6 +87,17 @@ export type DeleteMessageParams = {
 export type DeleteMessageResult =
   | { ok: true }
   | { ok: false; code: 'not_found' | 'forbidden'; error: string };
+
+export type ExecuteActionParams = {
+  messageId: string;
+  memberId: string;
+  groupId: string;
+  value: string;
+};
+
+export type ExecuteActionResult =
+  | { ok: true; content: ContentBlock[] }
+  | { ok: false; code: 'not_found' | 'forbidden' | 'already_resolved'; error: string };
 
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
@@ -345,6 +356,47 @@ export class ConversationDO extends DurableObject<Env> {
       .run();
 
     return { ok: true };
+  }
+
+  executeAction(params: ExecuteActionParams): ExecuteActionResult {
+    if (!this.isMember(params.memberId)) {
+      return { ok: false, code: 'forbidden', error: 'Not a member' };
+    }
+
+    const row = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
+    if (!row || row.deleted === 1) {
+      return { ok: false, code: 'not_found', error: 'Message not found' };
+    }
+
+    const content = JSON.parse(row.content) as ContentBlock[];
+    const actionsBlock = content.find(
+      (b): b is ActionsBlock => b.type === 'actions' && b.groupId === params.groupId
+    );
+    if (!actionsBlock) {
+      return { ok: false, code: 'not_found', error: 'Action group not found' };
+    }
+    if (actionsBlock.resolved) {
+      return { ok: false, code: 'already_resolved', error: 'Action already resolved' };
+    }
+
+    actionsBlock.resolved = {
+      value: params.value,
+      resolvedBy: params.memberId,
+      resolvedAt: Date.now(),
+    };
+
+    const newVersion = row.version + 1;
+    this.db
+      .update(messages)
+      .set({
+        content: JSON.stringify(content),
+        version: newVersion,
+        updated_at: Date.now(),
+      })
+      .where(eq(messages.id, params.messageId))
+      .run();
+
+    return { ok: true, content };
   }
 
   addReaction(params: AddReactionParams): AddReactionResult {

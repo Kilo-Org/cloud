@@ -8,7 +8,7 @@
  */
 
 import type { ContentBlock } from '@kilocode/kilo-chat';
-import { deliverToBot } from '../webhook/deliver';
+import { deliverToBot, deliverActionExecutedToBot } from '../webhook/deliver';
 import {
   extractConversationContext,
   getConversationContext,
@@ -323,6 +323,78 @@ export async function deleteMessageFor(
       'message.deleted',
       { messageId }
     );
+  }
+
+  return { ok: true };
+}
+
+// ─── executeAction ─────────────────────────────────────────────────────────
+
+export type ExecuteActionParams = {
+  conversationId: string;
+  messageId: string;
+  groupId: string;
+  value: string;
+};
+
+export type ExecuteActionResult =
+  | { ok: true }
+  | { ok: false; code: 'forbidden' | 'not_found' | 'already_resolved' | 'internal'; error: string };
+
+export async function executeActionFor(
+  env: Env,
+  callerId: string,
+  params: ExecuteActionParams,
+  ctx: DeferCtx
+): Promise<ExecuteActionResult> {
+  const { conversationId, messageId, groupId, value } = params;
+  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
+
+  const result = await convStub.executeAction({
+    messageId,
+    memberId: callerId,
+    groupId,
+    value,
+  });
+
+  if (!result.ok) {
+    return { ok: false, code: result.code, error: result.error };
+  }
+
+  // Push message.updated SSE event to human members
+  const convContext = await getConversationContext(env, conversationId);
+  if (convContext?.sandboxId) {
+    await pushEventToHumanMembers(
+      env,
+      conversationId,
+      convContext.sandboxId,
+      convContext.humanMemberIds,
+      'message.updated',
+      { messageId, content: result.content, clientUpdatedAt: null }
+    );
+
+    // Deliver action.executed webhook to bot members
+    const info = await convStub.getInfo();
+    if (info) {
+      const botMembers = info.members.filter(m => m.kind === 'bot');
+      if (botMembers.length > 0) {
+        const deliverPromise = Promise.all(
+          botMembers.map(bot =>
+            deliverActionExecutedToBot(env, {
+              type: 'action.executed',
+              targetBotId: bot.id,
+              conversationId,
+              messageId,
+              groupId,
+              value,
+              executedBy: callerId,
+              executedAt: new Date().toISOString(),
+            })
+          )
+        );
+        if (ctx) ctx.waitUntil(deliverPromise);
+      }
+    }
   }
 
   return { ok: true };

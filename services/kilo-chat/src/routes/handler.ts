@@ -11,7 +11,12 @@ import type { Context } from 'hono';
 import type { ZodSchema } from 'zod';
 import type { AuthContext } from '../auth';
 import { createBotConversationFor, renameConversationFor } from '../services/conversations';
-import { createMessageFor, deleteMessageFor, editMessageFor } from '../services/messages';
+import {
+  createMessageFor,
+  deleteMessageFor,
+  editMessageFor,
+  executeActionFor,
+} from '../services/messages';
 import { addReactionFor, removeReactionFor } from '../services/reactions';
 import { setTypingFor, stopTypingFor } from '../services/typing';
 import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
@@ -20,6 +25,7 @@ import {
   createMessageSchema,
   createBotConversationSchema,
   editMessageSchema,
+  executeActionSchema,
   reactionBodySchema,
   renameConversationSchema,
 } from './schemas';
@@ -138,6 +144,41 @@ export async function handleDeleteMessage(c: HonoCtx) {
     return c.json({ error: result.error }, 500);
   }
   return new Response(null, { status: 204 });
+}
+
+// ─── executeAction ──────────────────────────────────────────────────────────
+
+export async function handleExecuteAction(c: HonoCtx) {
+  const convId = parseConversationId(c);
+  if (!convId.ok) return convId.response;
+
+  const msgId = parseMessageId(c);
+  if (!msgId.ok) return msgId.response;
+
+  const body = await parseBody(c, executeActionSchema);
+  if (!body.ok) return body.response;
+
+  const callerId = c.get('callerId');
+  const result = await executeActionFor(
+    c.env,
+    callerId,
+    {
+      conversationId: convId.data,
+      messageId: msgId.data,
+      groupId: body.data.groupId,
+      value: body.data.value,
+    },
+    { waitUntil: makeSchedule(c) }
+  );
+
+  if (!result.ok) {
+    if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    if (result.code === 'not_found') return c.json({ error: result.error }, 404);
+    if (result.code === 'already_resolved') return c.json({ error: result.error }, 409);
+    return c.json({ error: result.error }, 500);
+  }
+
+  return c.json({ ok: true });
 }
 
 // ─── addReaction ─────────────────────────────────────────────────────────────

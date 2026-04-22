@@ -347,6 +347,8 @@ export function generateBaseConfig(
 
   const kiloExaSearchMode = resolveKiloExaSearchMode(env.KILO_EXA_SEARCH_MODE);
   const shouldForceExa = kiloExaSearchMode === 'kilo-proxy';
+  const shouldPreferBrave =
+    kiloExaSearchMode === 'unset' && !hasExplicitSearchProvider && braveConfigured;
   const shouldAutoAssignExa =
     kiloExaSearchMode === 'unset' && !hasExplicitSearchProvider && !braveConfigured;
   if (shouldForceExa || shouldAutoAssignExa) {
@@ -359,6 +361,13 @@ export function generateBaseConfig(
     if (shouldAutoAssignExa) {
       console.log('[config-writer] Auto-assigned web search provider to kilo-exa (mode=unset)');
     }
+  } else if (shouldPreferBrave) {
+    customizerWebSearchConfig.enabled = false;
+    config.tools = config.tools ?? {};
+    config.tools.web = config.tools.web ?? {};
+    config.tools.web.search = config.tools.web.search ?? {};
+    config.tools.web.search.enabled = true;
+    config.tools.web.search.provider = 'brave';
   } else if (kiloExaSearchMode === 'disabled') {
     customizerWebSearchConfig.enabled = false;
 

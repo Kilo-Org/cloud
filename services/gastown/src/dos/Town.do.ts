@@ -1217,14 +1217,10 @@ export class TownDO extends DurableObject<Env> {
     beadId: string,
     dependsOn?: string[]
   ): Promise<{ total_beads: number }> {
-    const convoyCheck = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT 1 FROM ${convoy_metadata} WHERE ${convoy_metadata.bead_id} = ?`,
-        [convoyId]
-      ),
-    ];
-    if (convoyCheck.length === 0) throw new Error(`Bead ${convoyId} is not a convoy`);
+    const convoy = this.getConvoy(convoyId);
+    if (!convoy) throw new Error(`Bead ${convoyId} is not a convoy`);
+    if (!convoy.staged) throw new Error(`Cannot add beads to a non-staged convoy: ${convoyId}`);
+    if (convoy.status === 'landed') throw new Error(`Cannot add beads to a closed convoy: ${convoyId}`);
     beadOps.convoyAddBead(this.sql, convoyId, beadId);
     if (dependsOn !== undefined) {
       beadOps.setDependencies(this.sql, beadId, dependsOn);

@@ -576,4 +576,114 @@ describe('Convoy DAG and Feature Branches', () => {
       expect(mrBead?.metadata?.convoy_id).toBe(result.convoy.id);
     });
   });
+
+  // ── convoyAddBead: staged guard ─────────────────────────────────────
+
+  describe('convoyAddBead: staged convoy guard', () => {
+    it('should insert tracks row with correct direction (bead_id=task, depends_on_bead_id=convoy)', async () => {
+      await town.addRig({
+        rigId: 'rig-1',
+        name: 'main-rig',
+        gitUrl: 'https://github.com/test/repo.git',
+        defaultBranch: 'main',
+      });
+
+      // Create a staged convoy with one initial task
+      const convoy = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'Staged Add Bead',
+        tasks: [{ title: 'Initial task' }],
+        staged: true,
+      });
+
+      // Create an extra bead to add to the convoy
+      const newBead = await town.createBead({
+        type: 'issue',
+        title: 'Extra task',
+        rig_id: 'rig-1',
+      });
+
+      await town.convoyAddBead(convoy.convoy.id, newBead.bead_id);
+
+      // Verify via getConvoyStatus: the new bead should appear in tracked beads
+      const status = await town.getConvoyStatus(convoy.convoy.id);
+      expect(status).toBeTruthy();
+      const trackedBeadIds = status!.beads.map(b => b.bead_id);
+      expect(trackedBeadIds).toContain(newBead.bead_id);
+    });
+
+    it('should hold newly added bead unassigned while convoy is staged', async () => {
+      await town.addRig({
+        rigId: 'rig-1',
+        name: 'main-rig',
+        gitUrl: 'https://github.com/test/repo.git',
+        defaultBranch: 'main',
+      });
+
+      // Create a staged convoy
+      const convoy = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'Staged Hold Test',
+        tasks: [{ title: 'Placeholder' }],
+        staged: true,
+      });
+
+      // Create and add a bead to the staged convoy
+      const newBead = await town.createBead({
+        type: 'issue',
+        title: 'Held bead',
+        rig_id: 'rig-1',
+      });
+
+      await town.convoyAddBead(convoy.convoy.id, newBead.bead_id);
+
+      // Run the reconciler — the bead must NOT be dispatched because the convoy is staged
+      await runDurableObjectAlarm(town);
+
+      const bead = await town.getBeadAsync(newBead.bead_id);
+      expect(bead?.status).toBe('open');
+      expect(bead?.assignee_agent_bead_id).toBeNull();
+    });
+
+    it('should dispatch newly added bead after convoy is started', async () => {
+      await town.addRig({
+        rigId: 'rig-1',
+        name: 'main-rig',
+        gitUrl: 'https://github.com/test/repo.git',
+        defaultBranch: 'main',
+      });
+
+      // Create a staged convoy
+      const convoy = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'Start After Add',
+        tasks: [{ title: 'Placeholder' }],
+        staged: true,
+      });
+
+      // Add a bead to the staged convoy
+      const newBead = await town.createBead({
+        type: 'issue',
+        title: 'Will be dispatched after start',
+        rig_id: 'rig-1',
+      });
+
+      await town.convoyAddBead(convoy.convoy.id, newBead.bead_id);
+
+      // Start the convoy — this clears staged=1
+      await town.startConvoy(convoy.convoy.id);
+
+      // Run the reconciler — bead should now be dispatched
+      await runDurableObjectAlarm(town);
+
+      const bead = await town.getBeadAsync(newBead.bead_id);
+      expect(bead?.assignee_agent_bead_id).toBeTruthy();
+    });
+
+    // Note: testing that convoyAddBead rejects non-staged or closed convoys
+    // cannot be done in workers integration tests — DO exceptions corrupt the
+    // vitest-pool-workers isolated storage stack frame (same limitation as
+    // cycle detection tests above). The validation is exercised by unit tests
+    // in test/unit/convoy-add-bead-validation.test.ts instead.
+  });
 });

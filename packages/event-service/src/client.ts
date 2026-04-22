@@ -1,4 +1,12 @@
+import { z } from 'zod';
 import type { ClientMessage, EventServiceConfig, ServerMessage } from './types';
+
+const serverMessageSchema: z.ZodType<ServerMessage> = z.object({
+  type: z.literal('event'),
+  context: z.string(),
+  event: z.string(),
+  payload: z.unknown(),
+});
 
 export class EventServiceClient {
   private readonly url: string;
@@ -147,12 +155,15 @@ export class EventServiceClient {
   }
 
   private handleMessage(data: string): void {
-    let message: ServerMessage;
+    let parsed: unknown;
     try {
-      message = JSON.parse(data) as ServerMessage;
+      parsed = JSON.parse(data);
     } catch {
       return;
     }
+    const result = serverMessageSchema.safeParse(parsed);
+    if (!result.success) return;
+    const message = result.data;
 
     if (message.type === 'event') {
       const handlers = this.eventHandlers.get(message.event);

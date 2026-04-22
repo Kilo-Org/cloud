@@ -19,5 +19,8 @@
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
     "vitest": "~3.2.4"
+  },
+  "dependencies": {
+    "zod": "catalog:"
   }
 }

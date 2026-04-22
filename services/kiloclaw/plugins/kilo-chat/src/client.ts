@@ -92,8 +92,38 @@ function authHeaders(token: string): HeadersInit {
 }
 
 const createResultSchema = z.object({ messageId: z.string().min(1) });
+const editResultSchema = z.object({ messageId: z.string().optional() });
 const addReactionResultSchema = z.object({ id: z.string().min(1) });
 const createConversationResultSchema = z.object({ conversationId: z.string().min(1) });
+
+const memberSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  displayName: z.string().nullable(),
+  avatarUrl: z.string().nullable(),
+});
+
+const listMessagesResultSchema = z.object({
+  messages: z.array(z.record(z.unknown())),
+});
+
+const getMembersResultSchema = z.object({
+  members: z.array(memberSchema),
+});
+
+const conversationSummarySchema = z.object({
+  conversationId: z.string(),
+  title: z.string().nullable(),
+  lastActivityAt: z.number().nullable(),
+  members: z.array(memberSchema),
+});
+
+const listConversationsResultSchema = z.object({
+  conversations: z.array(conversationSummarySchema),
+  total: z.number(),
+  limit: z.number(),
+  offset: z.number(),
+});
 
 function parseCreateResult(data: unknown): CreateMessageResult {
   return createResultSchema.parse(data);
@@ -145,7 +175,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller PATCH responded ${response.status}: ${await response.text()}`
       );
     }
-    const body = (await response.json()) as { messageId?: string };
+    const body = editResultSchema.parse(await response.json());
     return {
       messageId: body.messageId ?? params.messageId,
       stale: false,
@@ -244,7 +274,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller GET messages responded ${response.status}: ${await response.text()}`
       );
     }
-    return (await response.json()) as ListMessagesResult;
+    return listMessagesResultSchema.parse(await response.json());
   }
 
   async function getMembers(params: GetMembersParams): Promise<GetMembersResult> {
@@ -257,7 +287,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller GET members responded ${response.status}: ${await response.text()}`
       );
     }
-    return (await response.json()) as GetMembersResult;
+    return getMembersResultSchema.parse(await response.json());
   }
 
   async function renameConversation(params: RenameConversationParams): Promise<void> {
@@ -291,7 +321,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller GET conversations responded ${response.status}: ${await response.text()}`
       );
     }
-    return (await response.json()) as ListConversationsResult;
+    return listConversationsResultSchema.parse(await response.json());
   }
 
   async function createConversation(

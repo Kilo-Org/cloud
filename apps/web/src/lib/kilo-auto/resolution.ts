@@ -51,15 +51,7 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
   return null;
 }
 
-/**
- * Returns the candidate models for kilo-auto/free routing.
- *
- * Non-kilo-exclusive free models are only included when they appear in the
- * supplied `openRouterModels` list (sourced from the Redis OpenRouter models
- * cache). Kilo-exclusive free models are included when their gateway supports
- * the current `apiKind`; when `apiKind` is null no API-kind filtering is applied.
- */
-export function getAutoFreeCandidates(
+function buildAutoFreeCandidates(
   openRouterModels: ReadonlyArray<string>,
   apiKind: GatewayRequest['kind'] | null
 ): ReadonlyArray<string> {
@@ -83,6 +75,31 @@ function gatewaySupportsApiKind(gateway: string, apiKind: GatewayRequest['kind']
   if (apiKind === null) return true;
   const provider = Object.values(PROVIDERS).find(p => p.id === gateway);
   return provider?.supportedChatApis.some(k => k === apiKind) ?? false;
+}
+
+// Keyed on the openRouterModels array reference, which is stable for the duration of
+// getOpenRouterModels()'s in-process TTL (60 s). Old entries become GC-eligible once
+// the reference is replaced.
+const autoFreeCandidatesCache = new WeakMap<
+  ReadonlyArray<string>,
+  Map<GatewayRequest['kind'] | null, ReadonlyArray<string>>
+>();
+
+function getAutoFreeCandidates(
+  openRouterModels: ReadonlyArray<string>,
+  apiKind: GatewayRequest['kind'] | null
+): ReadonlyArray<string> {
+  let perKind = autoFreeCandidatesCache.get(openRouterModels);
+  if (!perKind) {
+    perKind = new Map();
+    autoFreeCandidatesCache.set(openRouterModels, perKind);
+  }
+  let candidates = perKind.get(apiKind);
+  if (!candidates) {
+    candidates = buildAutoFreeCandidates(openRouterModels, apiKind);
+    perKind.set(apiKind, candidates);
+  }
+  return candidates;
 }
 
 export async function resolveAutoModel(

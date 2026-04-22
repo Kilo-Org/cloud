@@ -102,6 +102,7 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
           peer: { kind: 'direct', id: conversationId },
           chatType: 'direct',
           from: `kilo-chat:${accountId ?? ''}`,
+          to: `kilo-chat:${conversationId}`,
         });
       },
     },

@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { KiloChatClient } from '../src/client';
 import { KiloChatApiError } from '../src/errors';
-import type { KiloChatConfig } from '../src/types';
+import type { KiloChatClientConfig } from '../src/types';
 
-function createMockConfig(fetchFn: typeof globalThis.fetch): KiloChatConfig {
+function createMockConfig(fetchFn: typeof globalThis.fetch): KiloChatClientConfig {
   return {
+    eventService: { on: vi.fn(() => () => {}) } as unknown as KiloChatClientConfig['eventService'],
     baseUrl: 'https://chat.example.com',
     getToken: vi.fn().mockResolvedValue('test-token'),
     fetch: fetchFn,
@@ -113,30 +114,30 @@ describe('KiloChatClient', () => {
 
   describe('editMessage', () => {
     it('sends PATCH /v1/messages/:id', async () => {
-      const fetch = mockFetch(200, { messageId: 'm1', version: 2 });
+      const fetch = mockFetch(200, { messageId: 'm1' });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.editMessage('m1', {
         conversationId: 'c1',
         content: [{ type: 'text', text: 'edited' }],
-        version: 1,
+        timestamp: Date.now(),
       });
       expect(fetch).toHaveBeenCalledWith(
         'https://chat.example.com/v1/messages/m1',
         expect.objectContaining({ method: 'PATCH' })
       );
-      expect(res).toEqual({ messageId: 'm1', version: 2 });
+      expect(res).toEqual({ messageId: 'm1' });
     });
   });
 
   describe('deleteMessage', () => {
-    it('sends DELETE /v1/messages/:id and returns void', async () => {
+    it('sends DELETE /v1/messages/:id with conversationId query param', async () => {
       const fetch = vi
         .fn()
         .mockResolvedValue({ ok: true, status: 204, json: () => Promise.resolve(null) });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.deleteMessage('m1', { conversationId: 'c1' });
       expect(fetch).toHaveBeenCalledWith(
-        'https://chat.example.com/v1/messages/m1',
+        'https://chat.example.com/v1/messages/m1?conversationId=c1',
         expect.objectContaining({ method: 'DELETE' })
       );
       expect(res).toBeUndefined();
@@ -167,12 +168,12 @@ describe('KiloChatClient', () => {
     });
 
     it('calls getToken before each request', async () => {
-      const getToken = vi.fn().mockResolvedValue('fresh-token');
       const fetch = mockFetch(200, { conversations: [] });
-      const client = new KiloChatClient({ baseUrl: 'https://chat.example.com', getToken, fetch });
+      const config = createMockConfig(fetch);
+      const client = new KiloChatClient(config);
       await client.listConversations();
       await client.listConversations();
-      expect(getToken).toHaveBeenCalledTimes(2);
+      expect(config.getToken).toHaveBeenCalledTimes(2);
     });
   });
 });

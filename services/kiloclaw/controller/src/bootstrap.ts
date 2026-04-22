@@ -602,6 +602,7 @@ function toConfigWriterDeps(deps: BootstrapDeps): ConfigWriterDeps {
     renameSync: deps.renameSync,
     chmodSync: deps.chmodSync,
     copyFileSync: deps.copyFileSync,
+    mkdirSync: (p, opts) => deps.mkdirSync(p, { recursive: opts?.recursive ?? false }),
     readdirSync: deps.readdirSync,
     unlinkSync: deps.unlinkSync,
     existsSync: deps.existsSync,

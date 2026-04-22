@@ -48,7 +48,7 @@ app.get('/connect', async c => {
     return c.json({ error: 'Invalid or expired ticket' }, 401);
   }
 
-  const doId = c.env.USER_SESSION_DO.idFromName(userId);
+  const doId = c.env.USER_SESSION_DO.idFromName(redeemedUserId);
   const stub = c.env.USER_SESSION_DO.get(doId);
   return stub.fetch(c.req.raw);
 });

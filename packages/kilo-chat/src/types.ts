@@ -67,17 +67,7 @@ export type Message = {
   reactions: ReactionSummary[];
 };
 
-export type MessageRow = {
-  id: string;
-  senderId: string;
-  content: ContentBlock[];
-  inReplyToMessageId: string | null;
-  updatedAt: number | null;
-  clientUpdatedAt: number | null;
-  deleted: boolean;
-  deliveryFailed: boolean;
-  reactions: ReactionSummary[];
-};
+export type MessageRow = Message;
 
 // ── Events ──────────────────────────────────────────────────────────
 export type MessageCreatedEvent = {

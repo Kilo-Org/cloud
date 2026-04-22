@@ -123,6 +123,7 @@ export type ConfigWriterDeps = {
   renameSync: (oldPath: string, newPath: string) => void;
   chmodSync: (path: string, mode: number) => void;
   copyFileSync: (src: string, dest: string) => void;
+  mkdirSync: (path: string, opts?: { recursive?: boolean }) => void;
   readdirSync: (dir: string) => string[];
   unlinkSync: (path: string) => void;
   existsSync: (path: string) => boolean;
@@ -135,6 +136,7 @@ const defaultDeps: ConfigWriterDeps = {
   renameSync: (oldPath, newPath) => fs.renameSync(oldPath, newPath),
   chmodSync: (p, mode) => fs.chmodSync(p, mode),
   copyFileSync: (src, dest) => fs.copyFileSync(src, dest),
+  mkdirSync: (p, opts) => fs.mkdirSync(p, opts),
   readdirSync: dir => fs.readdirSync(dir),
   unlinkSync: p => fs.unlinkSync(p),
   existsSync: p => fs.existsSync(p),
@@ -712,7 +714,7 @@ export function writeMcporterConfig(
 
   const dir = path.dirname(configPath);
   if (!deps.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    deps.mkdirSync(dir, { recursive: true });
   }
 
   deps.writeFileSync(configPath, JSON.stringify(existing, null, 2));

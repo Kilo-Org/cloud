@@ -57,7 +57,6 @@ export class UserSessionDO extends DurableObject<Env> {
         break;
       }
       case 'presence.ping': {
-        await this.ctx.storage.put('presence:lastPingAt', Date.now());
         break;
       }
     }
@@ -103,10 +102,6 @@ export class UserSessionDO extends DurableObject<Env> {
       if (state.contexts.has(context)) return true;
     }
     return false;
-  }
-
-  async getLastPingAt(): Promise<number> {
-    return (await this.ctx.storage.get<number>('presence:lastPingAt')) ?? 0;
   }
 
   // ── Helpers ────────────────────────────────────────────────────────

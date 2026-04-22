@@ -6,7 +6,9 @@ const CLEANUP_INTERVAL_MS = 60_000; // 1 minute
 type TicketEntry = { userId: string; expiresAt: number };
 
 /**
- * Singleton DO that stores short-lived, single-use connection tickets.
+ * Per-user DO — one instance per userId, so tickets are user-scoped by construction.
+ * This prevents cross-user ticket leakage without needing to embed userId in the
+ * ticket itself.
  *
  * Flow:
  *   1. Client POSTs /connect/ticket with Bearer JWT

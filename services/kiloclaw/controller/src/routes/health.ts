@@ -30,7 +30,7 @@ export function startKiloChatHealthProbe(options: {
   const timeoutMs = options.timeoutMs ?? 5_000;
 
   let state: KiloChatHealthState = {
-    status: 'ok',
+    status: 'unreachable',
     lastCheckedAt: 0,
   };
 

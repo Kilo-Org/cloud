@@ -46,6 +46,7 @@ function fakeDeps(existingConfig?: string) {
         copied.push({ src, dest });
         dirEntries = [...dirEntries, dest.split('/').pop() ?? dest];
       }),
+      mkdirSync: vi.fn(),
       readdirSync: vi.fn(() => dirEntries),
       unlinkSync: vi.fn((filePath: string) => {
         unlinked.push(filePath);
@@ -1550,6 +1551,7 @@ function mcporterFakeDeps(existingMcporterConfig?: string) {
       renameSync: vi.fn(),
       chmodSync: vi.fn(),
       copyFileSync: vi.fn(),
+      mkdirSync: vi.fn(),
       readdirSync: vi.fn(() => []),
       unlinkSync: vi.fn(),
       existsSync: vi.fn((filePath: string) => {

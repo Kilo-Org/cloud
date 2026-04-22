@@ -25,7 +25,7 @@ export async function POST() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const token = generateApiToken(user, undefined, { expiresIn: ONE_HOUR_SECONDS });
-  const expiresAt = new Date(Date.now() + 55 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + ONE_HOUR_SECONDS * 1000).toISOString();
 
   return NextResponse.json({ token, expiresAt });
 }

@@ -1,18 +1,12 @@
 import type { Hono } from 'hono';
-import { z } from 'zod';
 import type { AuthContext } from '../auth';
-import { ulidSchema } from './schemas';
+import { ulidSchema, listMessagesQuerySchema } from './schemas';
 import {
   handleCreateMessage,
   handleEditMessage,
   handleDeleteMessage,
   handleExecuteAction,
 } from './handler';
-
-const listMessagesQuerySchema = z.object({
-  before: ulidSchema.optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-});
 
 export function registerMessageRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
   // POST /v1/messages — create message (returns clientId if present)

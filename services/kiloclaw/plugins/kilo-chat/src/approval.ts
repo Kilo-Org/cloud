@@ -188,19 +188,15 @@ const nativeRuntime: ChannelApprovalNativeRuntimeAdapter<
 
     updateEntry: async ({ entry, payload }) => {
       const client = makeClient();
-      try {
-        await client.editMessage({
-          conversationId: entry.conversationId,
-          messageId: entry.messageId,
-          content: payload,
-          timestamp: Date.now(),
-        });
-      } catch (err: unknown) {
-        // 409 means the message was already updated (e.g. user resolved via UI
-        // while the gateway also resolved). Suppress gracefully.
-        if (err instanceof Error && err.message.includes('409')) return;
-        throw err;
-      }
+      const result = await client.editMessage({
+        conversationId: entry.conversationId,
+        messageId: entry.messageId,
+        content: payload,
+        timestamp: Date.now(),
+      });
+      // stale means the message was already updated (e.g. user resolved via UI
+      // while the gateway also resolved). Suppress gracefully.
+      if (result.stale) return;
     },
   },
 };

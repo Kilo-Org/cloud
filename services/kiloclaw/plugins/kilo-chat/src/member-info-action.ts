@@ -15,7 +15,7 @@ export async function handleKiloChatMemberInfoAction(
   const { members } = await args.client.getMembers({ conversationId });
 
   const lines = members.map(m => {
-    const display = (m as { displayName?: string | null }).displayName;
+    const display = m.displayName;
     if (display) {
       return `- ${display} (${m.id}, ${m.kind})`;
     }

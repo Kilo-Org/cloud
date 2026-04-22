@@ -22,7 +22,7 @@ describe('handleKiloChatRenameAction', () => {
   it('renames with explicit params', async () => {
     const client = mockClient();
     const result = await handleKiloChatRenameAction({
-      params: { to: 'CONV1', title: 'New Title' },
+      params: { to: 'CONV1', name: 'New Title' },
       client,
     });
     expect(client.renameConversation).toHaveBeenCalledWith({
@@ -35,7 +35,7 @@ describe('handleKiloChatRenameAction', () => {
   it('strips kilo-chat: prefix from conversationId', async () => {
     const client = mockClient();
     await handleKiloChatRenameAction({
-      params: { to: 'kilo-chat:CONV1', title: 'New Title' },
+      params: { to: 'kilo-chat:CONV1', name: 'New Title' },
       client,
     });
     expect(client.renameConversation).toHaveBeenCalledWith(
@@ -46,7 +46,7 @@ describe('handleKiloChatRenameAction', () => {
   it('falls back to toolContext for conversationId', async () => {
     const client = mockClient();
     await handleKiloChatRenameAction({
-      params: { title: 'New Title' },
+      params: { name: 'New Title' },
       toolContext: { currentChannelId: 'CTX_CONV' },
       client,
     });
@@ -60,29 +60,29 @@ describe('handleKiloChatRenameAction', () => {
     const client = mockClient();
     await expect(
       handleKiloChatRenameAction({
-        params: { title: 'New Title' },
+        params: { name: 'New Title' },
         client,
       })
     ).rejects.toThrow(/conversationId/i);
   });
 
-  it('throws when title is missing', async () => {
+  it('throws when name is missing', async () => {
     const client = mockClient();
     await expect(
       handleKiloChatRenameAction({
         params: { to: 'CONV1' },
         client,
       })
-    ).rejects.toThrow(/title is required/i);
+    ).rejects.toThrow(/name is required/i);
   });
 
-  it('throws when title is empty', async () => {
+  it('throws when name is empty', async () => {
     const client = mockClient();
     await expect(
       handleKiloChatRenameAction({
-        params: { to: 'CONV1', title: '' },
+        params: { to: 'CONV1', name: '' },
         client,
       })
-    ).rejects.toThrow(/title is required/i);
+    ).rejects.toThrow(/name is required/i);
   });
 });

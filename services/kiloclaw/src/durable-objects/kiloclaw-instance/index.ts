@@ -75,6 +75,7 @@ import { buildUserEnvVars, resolveImageTag, resolveRuntimeImageRef } from './con
 import * as gateway from './gateway';
 import * as pairing from './pairing';
 import * as kiloCliRun from './kilo-cli-run';
+import * as doctorRun from './doctor-run';
 import {
   reconcileWithFly,
   syncStatusFromLiveCheck,
@@ -1458,6 +1459,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async runDoctor() {
     await this.loadState();
     return pairing.runDoctor(this.s, this.env);
+  }
+
+  async runDoctorViaController(fix: boolean) {
+    await this.loadState();
+    return doctorRun.runDoctorViaController(this.s, this.env, fix);
   }
 
   // ── Kilo CLI Run ────────────────────────────────────────────────────

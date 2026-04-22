@@ -104,6 +104,13 @@ const KiloCliRunConflictSchema = z.object({
   }),
 });
 
+const DoctorRunConflictSchema = z.object({
+  conflict: z.object({
+    code: z.enum(['openclaw_doctor_instance_not_running', 'openclaw_doctor_already_active']),
+    error: z.string().min(1),
+  }),
+});
+
 const platform = new Hono<AppEnv>();
 type KiloClawInstanceStub = ReturnType<AppEnv['Bindings']['KILOCLAW_INSTANCE']['get']>;
 
@@ -693,6 +700,20 @@ function kiloCliRunConflictResponse(response: unknown): Response | undefined {
 
   if (isRecord(response) && 'conflict' in response) {
     return jsonError('Invalid Kilo CLI conflict response', 502, 'upstream_invalid_response');
+  }
+
+  return undefined;
+}
+
+function doctorRunConflictResponse(response: unknown): Response | undefined {
+  const result = DoctorRunConflictSchema.safeParse(response);
+  if (result.success) {
+    const { code, error } = result.data.conflict;
+    return jsonError(error, 409, code);
+  }
+
+  if (isRecord(response) && 'conflict' in response) {
+    return jsonError('Invalid doctor conflict response', 502, 'upstream_invalid_response');
   }
 
   return undefined;
@@ -2028,6 +2049,54 @@ platform.post('/doctor', async c => {
     return c.json(doctor, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'doctor');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/doctor-controller
+//
+// Runs `openclaw doctor` via the machine's controller HTTP API (NOT the Fly
+// Machines exec API). Synchronous buffered: blocks until the child exits or
+// the controller's 120s cap trips. Intended to replace /api/platform/doctor
+// once validated; both paths are live in parallel during the migration.
+const DoctorControllerRunSchema = z.object({
+  userId: z.string().min(1),
+  fix: z.boolean().optional(),
+});
+
+platform.post('/doctor-controller', async c => {
+  const result = await parseBody(c, DoctorControllerRunSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    // The DO returns a discriminated union: success | { conflict } | null.
+    // `.then(r => r)` collapses CF Workers' RPC Promise wrapping back to a
+    // plain Promise union (same pattern as startKiloCliRun).
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      // Default is `true` to match the Fly-exec flow (which always passed
+      // --fix) and the admin UI checkbox default. Explicit `false` opts into
+      // read-only diagnostics.
+      stub => stub.runDoctorViaController(result.data.fix ?? true).then(r => r),
+      'runDoctorViaController'
+    );
+    if (!response) {
+      return jsonError(
+        'Doctor runner not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    const conflictResponse = doctorRunConflictResponse(response);
+    if (conflictResponse) return conflictResponse;
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'doctor-controller');
     return jsonError(message, status);
   }
 });

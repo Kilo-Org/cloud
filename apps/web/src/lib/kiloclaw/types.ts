@@ -320,6 +320,18 @@ export type DoctorResponse = {
   output: string;
 };
 
+/** Response from POST /api/platform/doctor-controller */
+export type DoctorControllerResponse = {
+  ok: boolean;
+  status: 'completed' | 'failed' | 'cancelled' | 'timed_out';
+  fix: boolean;
+  output: string;
+  exitCode: number | null;
+  startedAt: string;
+  completedAt: string;
+  timedOut: boolean;
+};
+
 /** Response from POST /api/platform/kilo-cli-run/start */
 export type KiloCliRunStartResponse = {
   ok: boolean;

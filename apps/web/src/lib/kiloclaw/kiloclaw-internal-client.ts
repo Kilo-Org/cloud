@@ -23,6 +23,7 @@ import type {
   DevicePairingApproveResponse,
   VolumeSnapshotsResponse,
   DoctorResponse,
+  DoctorControllerResponse,
   KiloCliRunStartResponse,
   KiloCliRunStatusResponse,
   GatewayProcessStatusResponse,
@@ -420,6 +421,22 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async runDoctorViaController(
+    userId: string,
+    fix: boolean,
+    instanceId?: string
+  ): Promise<DoctorControllerResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/doctor-controller${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, fix }),
       },
       { userId }
     );

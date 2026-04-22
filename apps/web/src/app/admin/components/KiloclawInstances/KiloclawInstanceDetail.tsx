@@ -34,6 +34,9 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import type { DoctorControllerResponse } from '@/lib/kiloclaw/types';
 import {
   User,
   Calendar,
@@ -1146,6 +1149,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const queryClient = useQueryClient();
   const [destroyDialogOpen, setDestroyDialogOpen] = useState(false);
   const [doctorDialogOpen, setDoctorDialogOpen] = useState(false);
+  const [doctorControllerDialogOpen, setDoctorControllerDialogOpen] = useState(false);
+  const [doctorControllerFix, setDoctorControllerFix] = useState(true);
   const [restoreConfigDialogOpen, setRestoreConfigDialogOpen] = useState(false);
   const [destroyMachineDialogOpen, setDestroyMachineDialogOpen] = useState(false);
   const [resizeMachineDialogOpen, setResizeMachineDialogOpen] = useState(false);
@@ -1284,6 +1289,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const supportsConfigRestore = calverAtLeast(
     cleanVersion(controllerVersion?.version),
     '2026.2.26'
+  );
+  // /_kilo/doctor/run was added to the controller on 2026-04-22. Older
+  // controllers fall through to the catch-all proxy and return 404 —
+  // disable the button with a tooltip until they redeploy.
+  const supportsDoctorController = calverAtLeast(
+    cleanVersion(controllerVersion?.version),
+    '2026.4.22'
   );
 
   // After a restart/upgrade, poll the machine status until it returns to "running",
@@ -1614,6 +1626,17 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     })
   );
 
+  const runDoctorControllerMutation = useMutation(
+    trpc.admin.kiloclawInstances.runDoctorViaController.mutationOptions({
+      onSuccess: () => {
+        invalidateGatewayQueries();
+      },
+      onError: err => {
+        toast.error(`Failed to run doctor (controller): ${err.message}`);
+      },
+    })
+  );
+
   const restoreConfigMutation = useMutation(
     trpc.admin.kiloclawInstances.restoreConfig.mutationOptions({
       onSuccess: data => {
@@ -1716,6 +1739,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     isGatewayStopping ||
     isGatewayRestarting ||
     runDoctorMutation.isPending ||
+    runDoctorControllerMutation.isPending ||
     restoreConfigMutation.isPending;
 
   return (
@@ -2949,6 +2973,32 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                         <span>
                           <Button
                             size="sm"
+                            variant="outline"
+                            disabled={!supportsDoctorController || gatewayActionPending}
+                            onClick={() => {
+                              runDoctorControllerMutation.reset();
+                              setDoctorControllerDialogOpen(true);
+                              runDoctorControllerMutation.mutate({
+                                userId: data.user_id,
+                                instanceId: data.id,
+                                fix: doctorControllerFix,
+                              });
+                            }}
+                          >
+                            <Stethoscope className="mr-1 h-4 w-4" />
+                            Run Doctor (Controller)
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!supportsDoctorController && (
+                        <TooltipContent>Unavailable until redeploy</TooltipContent>
+                      )}
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            size="sm"
                             variant="destructive"
                             disabled={!supportsConfigRestore || gatewayActionPending}
                             onClick={() => setRestoreConfigDialogOpen(true)}
@@ -3356,6 +3406,23 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           mutation={runDoctorMutation}
         />
 
+        {/* Run Doctor (Controller) Dialog */}
+        <RunDoctorControllerDialog
+          open={doctorControllerDialogOpen && supportsDoctorController}
+          onOpenChange={setDoctorControllerDialogOpen}
+          fix={doctorControllerFix}
+          onFixChange={setDoctorControllerFix}
+          mutation={runDoctorControllerMutation}
+          onRerun={() => {
+            runDoctorControllerMutation.reset();
+            runDoctorControllerMutation.mutate({
+              userId: data.user_id,
+              instanceId: data.id,
+              fix: doctorControllerFix,
+            });
+          }}
+        />
+
         {/* Restore Default Config Confirmation Dialog */}
         <Dialog
           open={restoreConfigDialogOpen && supportsConfigRestore}
@@ -3497,6 +3564,160 @@ function RunDoctorDialog({
             disabled={mutation.isPending}
           >
             Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type DoctorControllerMutationLike = {
+  data: DoctorControllerResponse | undefined;
+  isPending: boolean;
+  isError: boolean;
+  error: { message: string } | null;
+  reset: () => void;
+};
+
+function formatRunDuration(startedAt: string, completedAt: string): string {
+  const start = new Date(startedAt).getTime();
+  const end = new Date(completedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '–';
+  const ms = end - start;
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function doctorStatusLabel(status: DoctorControllerResponse['status']): string {
+  switch (status) {
+    case 'completed':
+      return 'Completed successfully';
+    case 'failed':
+      return 'Completed with issues';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'timed_out':
+      return 'Timed out after 120s';
+  }
+}
+
+function RunDoctorControllerDialog({
+  open,
+  onOpenChange,
+  fix,
+  onFixChange,
+  mutation,
+  onRerun,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  fix: boolean;
+  onFixChange: (next: boolean) => void;
+  mutation: DoctorControllerMutationLike;
+  onRerun: () => void;
+}) {
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (mutation.isPending) return;
+    onOpenChange(nextOpen);
+    if (!nextOpen) {
+      mutation.reset();
+    }
+  };
+
+  const rawResult = mutation.data;
+  const result = rawResult ? { ...rawResult, output: stripAnsi(rawResult.output) } : rawResult;
+
+  return (
+    <Dialog open={open} onOpenChange={mutation.isPending ? () => {} : handleOpenChange}>
+      <DialogContent className="sm:max-w-[750px]">
+        <DialogHeader>
+          <DialogTitle>OpenClaw Doctor (via Controller)</DialogTitle>
+          <DialogDescription>
+            Runs <code>openclaw doctor</code> inside the machine via the controller HTTP API. Blocks
+            up to 120s.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="doctor-controller-fix"
+            checked={fix}
+            onCheckedChange={onFixChange}
+            disabled={mutation.isPending}
+          />
+          <Label htmlFor="doctor-controller-fix" className="text-sm">
+            Pass <code>--fix</code>
+          </Label>
+        </div>
+
+        {mutation.isPending && (
+          <div className="flex flex-col items-center justify-center gap-3 py-12">
+            <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+            <p className="text-muted-foreground text-sm">
+              Running <code>openclaw doctor{fix ? ' --fix' : ''}</code>…
+            </p>
+          </div>
+        )}
+
+        {mutation.isError && !mutation.isPending && (
+          <div className="flex flex-col items-center justify-center gap-3 py-12">
+            <XCircle className="h-8 w-8 text-red-400" />
+            <p className="text-sm text-red-400">
+              {mutation.error?.message || 'Failed to run doctor (controller)'}
+            </p>
+          </div>
+        )}
+
+        {result && !mutation.isPending && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {result.ok ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <XCircle className="h-4 w-4 text-red-400" />
+              )}
+              <span className="text-sm font-medium">{doctorStatusLabel(result.status)}</span>
+              <Badge variant="outline" className="text-xs">
+                exit {result.exitCode ?? 'n/a'}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {formatRunDuration(result.startedAt, result.completedAt)}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {result.fix ? '--fix' : 'no --fix'}
+              </Badge>
+              {result.timedOut && (
+                <Badge variant="outline" className="border-yellow-500/30 text-xs text-yellow-400">
+                  timed out
+                </Badge>
+              )}
+            </div>
+            <div className="border-border bg-background max-h-[400px] overflow-auto rounded-md border">
+              {/* prettier-ignore */}
+              <pre
+                className="p-3 text-xs leading-relaxed whitespace-pre"
+                style={{ fontFamily: "'Courier New', Courier, monospace", tabSize: 8 }}
+              >{result.output}</pre>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button
+            variant="outline"
+            onClick={() => handleOpenChange(false)}
+            disabled={mutation.isPending}
+          >
+            Close
+          </Button>
+          <Button
+            variant="default"
+            onClick={onRerun}
+            disabled={mutation.isPending}
+            title="Re-run with the current --fix setting"
+          >
+            <Stethoscope className="mr-1 h-4 w-4" />
+            Re-run
           </Button>
         </DialogFooter>
       </DialogContent>

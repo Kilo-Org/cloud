@@ -714,6 +714,31 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }
   }),
 
+  runDoctorViaController: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        fix: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to run doctor (controller)';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
+        const client = new KiloClawInternalClient();
+        return await client.runDoctorViaController(
+          input.userId,
+          input.fix ?? true,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        console.error('Failed to run doctor (controller) for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
   startKiloCliRun: adminProcedure
     .input(
       z.object({

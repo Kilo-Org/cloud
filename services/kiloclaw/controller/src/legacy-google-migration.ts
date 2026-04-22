@@ -66,6 +66,36 @@ function runGogJson(args: string[], env: NodeJS.ProcessEnv): Record<string, unkn
   return JSON.parse(output) as Record<string, unknown>;
 }
 
+function exportTokenToFile(email: string, outPath: string, env: NodeJS.ProcessEnv): boolean {
+  try {
+    execFileSync(
+      '/usr/local/bin/gog.real',
+      ['auth', 'tokens', 'export', email, '--out', outPath, '--overwrite'],
+      {
+        env,
+        encoding: 'utf8',
+      }
+    );
+    return true;
+  } catch {
+    // Backward-compatible fallback for older gog.real versions that still accept
+    // positional output-path arguments.
+    try {
+      execFileSync(
+        '/usr/local/bin/gog.real',
+        ['auth', 'tokens', 'export', email, outPath, '--overwrite'],
+        {
+          env,
+          encoding: 'utf8',
+        }
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
 function mapServicesToCapabilities(services: readonly string[]): string[] {
   const capabilities = new Set<string>();
   for (const service of services) {
@@ -159,23 +189,15 @@ export async function migrateLegacyGoogleCredentialsToBroker(
   const tmpPath = path.join(tmpDir, 'token.json');
 
   try {
-    try {
-      execFileSync(
-        '/usr/local/bin/gog.real',
-        ['auth', 'tokens', 'export', email, tmpPath, '--overwrite'],
-        {
-          env: gogEnv,
-          encoding: 'utf8',
-        }
-      );
-
-      try {
-        fs.chmodSync(tmpPath, 0o600);
-      } catch {
-        // best effort: continue migration even if chmod is unsupported
-      }
-    } catch {
+    const exported = exportTokenToFile(email, tmpPath, gogEnv);
+    if (!exported) {
       return { attempted: true, migrated: false, reason: 'token_export_failed' };
+    }
+
+    try {
+      fs.chmodSync(tmpPath, 0o600);
+    } catch {
+      // best effort: continue migration even if chmod is unsupported
     }
 
     const exportPayload = JSON.parse(fs.readFileSync(tmpPath, 'utf8')) as GogTokenExportJson;

@@ -92,6 +92,23 @@ export async function applyResolvedAutoModel(
 ) {
   const resolved = await resolveAutoModel(params, userPromise, balancePromise);
   request.body.model = resolved.model;
+
+  // The minimax/minimax-m2.5:free backing model has a 204,800-token context window that
+  // code-agent workloads (large system prompts + tool definitions + file reads) routinely
+  // clip by single-digit percent margins, causing openrouter to return 400
+  // "context length exceeded". Inject openrouter's `middle-out` transform so over-budget
+  // prompts are auto-compressed upstream instead of rejected. Only applies to chat
+  // completions (the transform is a chat-completions feature), and only when the caller
+  // hasn't already set `transforms` (respect explicit opt-outs / custom transforms).
+  // See incidents/2026-04-21-minimax-m2.5-slo-breach-context-length.md in kilo-org/on-call.
+  if (
+    resolved.model === minimax_m25_free_model.public_id &&
+    request.kind === 'chat_completions' &&
+    !request.body.transforms?.length
+  ) {
+    request.body.transforms = ['middle-out'];
+  }
+
   if (resolved.reasoning) {
     if (request.kind === 'messages') {
       request.body.thinking = { type: resolved.reasoning.enabled ? 'adaptive' : 'disabled' };

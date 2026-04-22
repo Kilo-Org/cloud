@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -174,8 +175,23 @@ function RecentBlocksTab() {
 const tabTriggerClass =
   'text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
 
+const DEFAULT_TAB = 'bulk-block';
+
 export function AbuseBulkBlock() {
-  const [activeTab, setActiveTab] = useState('bulk-block');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab') || DEFAULT_TAB;
+
+  function setActiveTab(tab: string) {
+    const params = new URLSearchParams(searchParams);
+    if (tab === DEFAULT_TAB) {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
+    }
+    const qs = params.toString();
+    router.push(qs ? `?${qs}` : window.location.pathname);
+  }
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab}>

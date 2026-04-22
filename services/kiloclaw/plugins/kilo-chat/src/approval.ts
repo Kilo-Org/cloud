@@ -52,6 +52,14 @@ function buildMetadataText(
   const lines: string[] = [];
   lines.push(`**${view.title}**`);
   if (view.description) lines.push(view.description);
+  // Show the command being approved for exec approvals.
+  if (view.approvalKind === 'exec') {
+    lines.push('');
+    lines.push(`\`${view.commandText}\``);
+    if (view.commandPreview && view.commandPreview !== view.commandText) {
+      lines.push(`_${view.commandPreview}_`);
+    }
+  }
   if (view.metadata.length > 0) {
     lines.push('');
     for (const m of view.metadata) {

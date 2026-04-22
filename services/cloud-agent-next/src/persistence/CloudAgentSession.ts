@@ -111,11 +111,17 @@ const HUNG_EXECUTION_TIMEOUT_MS = 5 * 60 * 1000;
  *  Covers the first few reconnection attempts (exponential backoff: 1s, 2s, 4s …). */
 const DISCONNECT_GRACE_MS = 10_000;
 
+/** Delay before building and queueing successful completion callbacks. */
+const COMPLETION_CALLBACK_DELAY_MS = 30_000;
+
 /** DO storage key for persisting disconnect grace state across hibernation. */
 const DISCONNECT_GRACE_KEY = 'disconnect_grace';
 
 /** DO storage key for pending async preparation input. */
 const PENDING_PREPARATION_KEY = 'pending_preparation';
+
+/** DO storage key prefix for delayed successful completion callbacks. */
+const PENDING_COMPLETION_CALLBACK_PREFIX = 'pending_completion_callback:';
 
 /** Stored in DO storage under DISCONNECT_GRACE_KEY while a grace period is active. */
 type DisconnectGraceState = {
@@ -123,6 +129,16 @@ type DisconnectGraceState = {
   disconnectedAt: number;
   wsCloseCode: number;
   wsCloseReason: string;
+};
+
+type TerminalCallbackStatus = 'completed' | 'failed' | 'interrupted';
+
+type PendingCompletionCallback = {
+  executionId: ExecutionId;
+  status: 'completed';
+  dueAt: number;
+  error?: string;
+  gateResult?: 'pass' | 'fail';
 };
 
 /**
@@ -158,9 +174,19 @@ export class CloudAgentSession extends DurableObject {
     return status === 'completed' || status === 'failed' || status === 'interrupted';
   }
 
-  private async enqueueCallbackNotification(
+  private getPendingCompletionCallbackKey(executionId: ExecutionId): string {
+    return `${PENDING_COMPLETION_CALLBACK_PREFIX}${executionId}`;
+  }
+
+  private async scheduleAlarmNoLater(scheduledTimeMs: number): Promise<void> {
+    const currentAlarm = await this.ctx.storage.getAlarm();
+    if (currentAlarm === null || scheduledTimeMs < currentAlarm) {
+      await this.ctx.storage.setAlarm(scheduledTimeMs);
+    }
+  }
+
+  private async scheduleCompletionCallbackNotification(
     executionId: ExecutionId,
-    status: 'completed' | 'failed' | 'interrupted',
     error?: string,
     gateResult?: 'pass' | 'fail'
   ): Promise<void> {
@@ -171,12 +197,41 @@ export class CloudAgentSession extends DurableObject {
       return;
     }
 
-    logger.info('Enqueued callback job', {
+    const dueAt = Date.now() + COMPLETION_CALLBACK_DELAY_MS;
+    const pendingCallback: PendingCompletionCallback = {
+      executionId,
+      status: 'completed',
+      dueAt,
+      ...(error !== undefined ? { error } : {}),
+      ...(gateResult !== undefined ? { gateResult } : {}),
+    };
+
+    await this.ctx.storage.put(this.getPendingCompletionCallbackKey(executionId), pendingCallback);
+    await this.scheduleAlarmNoLater(dueAt);
+
+    logger.info('Scheduled completion callback job', {
       cloudAgentSessionId: metadata.sessionId,
       kiloSessionId: metadata.kiloSessionId,
       executionId,
       callbackUrl: metadata.callbackTarget.url,
+      delayMs: COMPLETION_CALLBACK_DELAY_MS,
+      dueAt,
     });
+  }
+
+  private async sendCallbackNotification(
+    executionId: ExecutionId,
+    status: TerminalCallbackStatus,
+    error?: string,
+    gateResult?: 'pass' | 'fail',
+    opts?: { waitForQueue?: boolean }
+  ): Promise<void> {
+    const metadata = await this.getMetadata();
+    const callbackQueue = (this.env as unknown as WorkerEnv).CALLBACK_QUEUE;
+
+    if (!metadata?.callbackTarget || !callbackQueue) {
+      return;
+    }
 
     const resolvedSessionId = await this.resolveSessionId(metadata.sessionId as SessionId);
     const sessionId = resolvedSessionId ?? metadata.sessionId ?? '';
@@ -199,16 +254,103 @@ export class CloudAgentSession extends DurableObject {
       },
     };
 
-    // Fire-and-forget enqueue - don't block execution completion
-    callbackQueue.send(callbackJob).catch(err => {
+    const sendPromise = callbackQueue.send(callbackJob);
+    if (opts?.waitForQueue === false) {
+      sendPromise.catch(err => {
+        logger
+          .withFields({
+            sessionId,
+            executionId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+          .error('Failed to enqueue callback job');
+      });
+    } else {
+      await sendPromise;
+    }
+
+    logger.info('Enqueued callback job', {
+      cloudAgentSessionId: metadata.sessionId,
+      kiloSessionId: metadata.kiloSessionId,
+      executionId,
+      callbackUrl: metadata.callbackTarget.url,
+    });
+  }
+
+  private async enqueueCallbackNotification(
+    executionId: ExecutionId,
+    status: TerminalCallbackStatus,
+    error?: string,
+    gateResult?: 'pass' | 'fail'
+  ): Promise<void> {
+    try {
+      await this.sendCallbackNotification(executionId, status, error, gateResult, {
+        waitForQueue: false,
+      });
+    } catch (err) {
       logger
         .withFields({
-          sessionId,
+          sessionId: this.sessionId,
           executionId,
           error: err instanceof Error ? err.message : String(err),
         })
         .error('Failed to enqueue callback job');
+    }
+  }
+
+  private async getNextPendingCompletionCallbackDueAt(): Promise<number | null> {
+    const pendingCallbacks = await this.ctx.storage.list<PendingCompletionCallback>({
+      prefix: PENDING_COMPLETION_CALLBACK_PREFIX,
     });
+    let nextDueAt: number | null = null;
+
+    for (const pendingCallback of pendingCallbacks.values()) {
+      if (nextDueAt === null || pendingCallback.dueAt < nextDueAt) {
+        nextDueAt = pendingCallback.dueAt;
+      }
+    }
+
+    return nextDueAt;
+  }
+
+  private async processDueCompletionCallbacks(now: number): Promise<void> {
+    const pendingCallbacks = await this.ctx.storage.list<PendingCompletionCallback>({
+      prefix: PENDING_COMPLETION_CALLBACK_PREFIX,
+    });
+
+    for (const [key, pendingCallback] of pendingCallbacks) {
+      if (pendingCallback.dueAt > now) continue;
+
+      try {
+        await this.sendCallbackNotification(
+          pendingCallback.executionId,
+          pendingCallback.status,
+          pendingCallback.error,
+          pendingCallback.gateResult
+        );
+        await this.ctx.storage.delete(key);
+      } catch (err) {
+        const retryAt = Date.now() + REAPER_ACTIVE_INTERVAL_MS;
+        await this.ctx.storage.put(key, { ...pendingCallback, dueAt: retryAt });
+        logger
+          .withFields({
+            sessionId: this.sessionId,
+            executionId: pendingCallback.executionId,
+            retryAt,
+            error: err instanceof Error ? err.message : String(err),
+          })
+          .error('Failed to enqueue delayed completion callback job');
+      }
+    }
+  }
+
+  private async getNextAlarmTime(now: number, reaperInterval: number): Promise<number> {
+    const reaperAlarm = now + reaperInterval;
+    const pendingCallbackDueAt = await this.getNextPendingCompletionCallbackDueAt();
+    if (pendingCallbackDueAt !== null && pendingCallbackDueAt < reaperAlarm) {
+      return pendingCallbackDueAt;
+    }
+    return reaperAlarm;
   }
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -1337,6 +1479,8 @@ export class CloudAgentSession extends DurableObject {
         }
       }
 
+      await this.processDueCompletionCallbacks(Date.now());
+
       // Check disconnect grace period first — this alarm may have been
       // rescheduled specifically for the grace deadline.
       await this.checkDisconnectGrace();
@@ -1418,10 +1562,16 @@ export class CloudAgentSession extends DurableObject {
       // reaper retries soon rather than sleeping for an hour.
       nextInterval = REAPER_INTERVAL_MS_DEFAULT;
     }
+    const nextAlarm = await this.getNextAlarmTime(Date.now(), nextInterval);
     logger
-      .withFields({ sessionId: this.sessionId, nextInterval, elapsedMs: Date.now() - now })
+      .withFields({
+        sessionId: this.sessionId,
+        nextInterval,
+        nextAlarm,
+        elapsedMs: Date.now() - now,
+      })
       .info('Rescheduling alarm');
-    await this.ctx.storage.setAlarm(Date.now() + nextInterval);
+    await this.ctx.storage.setAlarm(nextAlarm);
   }
 
   /**
@@ -1783,12 +1933,20 @@ export class CloudAgentSession extends DurableObject {
     const result = await this.executionQueries.updateStatus(params);
 
     if (result.ok && this.isTerminalStatus(params.status) && !opts?.suppressCallback) {
-      await this.enqueueCallbackNotification(
-        params.executionId,
-        params.status,
-        params.error,
-        params.gateResult
-      );
+      if (params.status === 'completed') {
+        await this.scheduleCompletionCallbackNotification(
+          params.executionId,
+          params.error,
+          params.gateResult
+        );
+      } else {
+        await this.enqueueCallbackNotification(
+          params.executionId,
+          params.status,
+          params.error,
+          params.gateResult
+        );
+      }
     }
 
     return result;

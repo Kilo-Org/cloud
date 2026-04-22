@@ -22,6 +22,16 @@ type CapturedQueue = {
   captured: CallbackJob[];
 };
 
+type StoredPendingCompletionCallback = {
+  executionId: string;
+  status: 'completed';
+  dueAt: number;
+  error?: string;
+  gateResult?: 'pass' | 'fail';
+};
+
+const PENDING_COMPLETION_CALLBACK_PREFIX = 'pending_completion_callback:';
+
 function createCapturedQueue(): CapturedQueue {
   const captured: CallbackJob[] = [];
   return {
@@ -36,6 +46,23 @@ function injectCallbackQueue(instance: CloudAgentSession, queue: CapturedQueue):
   // CALLBACK_QUEUE is not bound in the test wrangler config; inject a
   // capturing fake onto the DO's env so enqueueCallbackNotification runs.
   (instance as unknown as { env: { CALLBACK_QUEUE: CapturedQueue } }).env.CALLBACK_QUEUE = queue;
+}
+
+async function flushPendingCompletionCallback(
+  instance: CloudAgentSession,
+  state: DurableObjectState
+): Promise<void> {
+  const pendingCallbacks = await state.storage.list<StoredPendingCompletionCallback>({
+    prefix: PENDING_COMPLETION_CALLBACK_PREFIX,
+  });
+  expect(pendingCallbacks.size).toBe(1);
+
+  const dueAt = Date.now() - 1;
+  for (const [key, pendingCallback] of pendingCallbacks) {
+    await state.storage.put(key, { ...pendingCallback, dueAt });
+  }
+
+  await instance.alarm();
 }
 
 const kiloSessionId = 'ses_root';
@@ -121,10 +148,7 @@ describe('Callback notification with latest assistant message', () => {
       await prepareSessionWithCallback(instance, sessionId, userId);
       await seedAssistantMessage(state, sessionId, {
         messageId: 'msg_00000000000000000000000010',
-        parts: [
-          { id: 'part_00000000000000000000000001', type: 'text', text: 'Hello ' },
-          { id: 'part_00000000000000000000000002', type: 'text', text: 'world' },
-        ],
+        parts: [{ id: 'part_00000000000000000000000001', type: 'text', text: 'Hello ' }],
       });
 
       const addResult = await instance.addExecution({
@@ -136,6 +160,16 @@ describe('Callback notification with latest assistant message', () => {
 
       await instance.updateExecutionStatus({ executionId, status: 'running' });
       await instance.updateExecutionStatus({ executionId, status: 'completed' });
+      expect(queue.captured).toHaveLength(0);
+
+      await seedAssistantMessage(state, sessionId, {
+        messageId: 'msg_00000000000000000000000010',
+        parts: [
+          { id: 'part_00000000000000000000000001', type: 'text', text: 'Hello ' },
+          { id: 'part_00000000000000000000000002', type: 'text', text: 'world' },
+        ],
+      });
+      await flushPendingCompletionCallback(instance, state);
     });
 
     expect(queue.captured).toHaveLength(1);
@@ -258,6 +292,8 @@ describe('Callback notification with latest assistant message', () => {
       });
       await instance.updateExecutionStatus({ executionId, status: 'running' });
       await instance.updateExecutionStatus({ executionId, status: 'completed' });
+      expect(queue.captured).toHaveLength(0);
+      await flushPendingCompletionCallback(instance, state);
     });
 
     expect(queue.captured).toHaveLength(1);

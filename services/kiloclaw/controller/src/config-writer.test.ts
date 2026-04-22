@@ -218,6 +218,27 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
   });
 
+  it('preserves explicit custom provider when mode is unset and Brave is configured', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'custom-provider',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('custom-provider');
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(false);
+  });
+
   it('selects kilo-exa provider when KILO_EXA_SEARCH_MODE=kilo-proxy', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv(), KILO_EXA_SEARCH_MODE: 'kilo-proxy' };

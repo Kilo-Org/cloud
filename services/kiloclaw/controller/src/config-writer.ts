@@ -346,6 +346,8 @@ export function generateBaseConfig(
   const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
 
   const kiloExaSearchMode = resolveKiloExaSearchMode(env.KILO_EXA_SEARCH_MODE);
+  // Only assign dashboard-managed defaults when provider is unset.
+  // Preserve any explicit provider value, including user-defined custom providers.
   const shouldForceExa = kiloExaSearchMode === 'kilo-proxy';
   const shouldPreferBrave =
     kiloExaSearchMode === 'unset' && !hasExplicitSearchProvider && braveConfigured;

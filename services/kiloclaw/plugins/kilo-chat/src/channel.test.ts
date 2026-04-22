@@ -119,7 +119,7 @@ describe('kilo-chat messaging adapter', () => {
 });
 
 describe('kilo-chat actions adapter', () => {
-  it('describeMessageTool returns all six actions', () => {
+  it('describeMessageTool returns all eight actions with openclaw-standard names', () => {
     const adapter = kiloChatPlugin.actions;
     expect(adapter).toBeDefined();
     const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
@@ -128,22 +128,35 @@ describe('kilo-chat actions adapter', () => {
     expect(discovery?.actions).toContain('member-info');
     expect(discovery?.actions).toContain('edit');
     expect(discovery?.actions).toContain('delete');
-    expect(discovery?.actions).toContain('rename');
-    expect(discovery?.actions).toContain('conversations');
-    expect(discovery?.actions).toContain('create-conversation');
+    expect(discovery?.actions).toContain('renameGroup');
+    expect(discovery?.actions).toContain('channel-list');
+    expect(discovery?.actions).toContain('channel-create');
   });
 
-  it('supportsAction returns true for react, read, member-info, edit, delete, rename and false for pin', () => {
+  it('describeMessageTool returns schema contribution for additionalMembers', () => {
+    const adapter = kiloChatPlugin.actions;
+    const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
+    expect(discovery?.schema).toBeDefined();
+    const schema = Array.isArray(discovery?.schema) ? discovery.schema[0] : discovery?.schema;
+    expect(schema?.properties).toHaveProperty('additionalMembers');
+    expect(schema?.visibility).toBe('current-channel');
+  });
+
+  it('supportsAction returns true for standard actions and false for unsupported ones', () => {
     const adapter = kiloChatPlugin.actions;
     expect(adapter?.supportsAction?.({ action: 'react' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'read' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'member-info' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'edit' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'delete' as never })).toBe(true);
-    expect(adapter?.supportsAction?.({ action: 'rename' as never })).toBe(true);
-    expect(adapter?.supportsAction?.({ action: 'conversations' as never })).toBe(true);
-    expect(adapter?.supportsAction?.({ action: 'create-conversation' as never })).toBe(true);
+    expect(adapter?.supportsAction?.({ action: 'renameGroup' as never })).toBe(true);
+    expect(adapter?.supportsAction?.({ action: 'channel-list' as never })).toBe(true);
+    expect(adapter?.supportsAction?.({ action: 'channel-create' as never })).toBe(true);
     expect(adapter?.supportsAction?.({ action: 'pin' as never })).toBe(false);
+    // Old names should NOT be supported
+    expect(adapter?.supportsAction?.({ action: 'rename' as never })).toBe(false);
+    expect(adapter?.supportsAction?.({ action: 'conversations' as never })).toBe(false);
+    expect(adapter?.supportsAction?.({ action: 'create-conversation' as never })).toBe(false);
   });
 
   it('resolveExecutionMode returns "local"', () => {

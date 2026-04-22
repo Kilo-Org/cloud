@@ -1,3 +1,4 @@
+import { Type } from '@sinclair/typebox';
 import {
   buildChannelOutboundSessionRoute,
   createChannelPluginBase,
@@ -113,10 +114,20 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
           'member-info',
           'edit',
           'delete',
-          'rename',
-          'conversations',
-          'create-conversation',
+          'renameGroup',
+          'channel-list',
+          'channel-create',
         ] as const,
+        schema: {
+          properties: {
+            additionalMembers: Type.Optional(
+              Type.String({
+                description: 'Comma-separated member IDs to add when creating a conversation.',
+              })
+            ),
+          },
+          visibility: 'current-channel' as const,
+        },
       }),
       supportsAction: ({ action }: { action: string }) =>
         action === 'react' ||
@@ -124,9 +135,9 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         action === 'member-info' ||
         action === 'edit' ||
         action === 'delete' ||
-        action === 'rename' ||
-        action === 'conversations' ||
-        action === 'create-conversation',
+        action === 'renameGroup' ||
+        action === 'channel-list' ||
+        action === 'channel-create',
       resolveExecutionMode: () => 'local' as const,
       handleAction: async (ctx: ChannelMessageActionContext) => {
         const client = makeClient();
@@ -158,20 +169,20 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
             client,
           });
         }
-        if (ctx.action === 'rename') {
+        if (ctx.action === 'renameGroup') {
           return handleKiloChatRenameAction({
             params: ctx.params,
             toolContext: ctx.toolContext,
             client,
           });
         }
-        if (ctx.action === 'conversations') {
+        if (ctx.action === 'channel-list') {
           return handleKiloChatListConversationsAction({
             params: ctx.params,
             client,
           });
         }
-        if (ctx.action === 'create-conversation') {
+        if (ctx.action === 'channel-create') {
           return handleKiloChatCreateConversationAction({
             params: ctx.params,
             client,

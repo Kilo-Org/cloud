@@ -131,6 +131,9 @@ export function OpenclawImportCard({
   }
 
   async function parseZipFile(file: File, source: 'browse' | 'drop') {
+    const parseAttempt = parseAttemptRef.current + 1;
+    parseAttemptRef.current = parseAttempt;
+
     if (!isRunning) {
       setImportError('Instance must be running before uploading OpenClaw workspace files.');
       return;
@@ -142,9 +145,6 @@ export function OpenclawImportCard({
       setImportError('Please select a .zip file.');
       return;
     }
-
-    const parseAttempt = parseAttemptRef.current + 1;
-    parseAttemptRef.current = parseAttempt;
 
     setIsParsing(true);
     setImportError(null);

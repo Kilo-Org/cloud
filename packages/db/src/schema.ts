@@ -4476,7 +4476,7 @@ export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
 // Three tables are read together by a TTL-cached content loader and injected
 // into the report generator so copy changes (check descriptions, KiloClaw
 // coverage blurbs, CTA copy) do not require a code deploy. Edited via the
-// admin UI under /admin/kiloclaw?tab=security-advisor-content. Rows can be
+// admin UI under /admin/kiloclaw?tab=shell-security-content. Rows can be
 // soft-disabled via is_active.
 //
 // Note on `updated_at`: `.$onUpdateFn(() => sql\`now()\`)` only fires on

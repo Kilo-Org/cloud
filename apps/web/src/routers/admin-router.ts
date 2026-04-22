@@ -41,7 +41,7 @@ import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
-import { adminSecurityAdvisorContentRouter } from '@/routers/admin/security-advisor-content-router';
+import { adminShellSecurityContentRouter } from '@/routers/admin/shell-security-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
@@ -1932,6 +1932,6 @@ export const adminRouter = createTRPCRouter({
   gatewayConfig: adminGatewayConfigRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   bulkBlock: adminBulkBlockRouter,
-  securityAdvisorContent: adminSecurityAdvisorContentRouter,
+  securityAdvisorContent: adminShellSecurityContentRouter,
   freeModelUsage: adminFreeModelUsageRouter,
 });

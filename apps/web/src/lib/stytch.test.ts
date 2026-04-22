@@ -201,7 +201,7 @@ describe('Stytch Fingerprint Functions', () => {
       });
 
       expect(creditTransaction?.credit_category).toBe('automatic-welcome-credits');
-      expect(creditTransaction?.amount_microdollars).toBe(2500000); // $2.50 in microdollars
+      expect(creditTransaction?.amount_microdollars).toBe(1250000); // $1.25 in microdollars
     });
 
     test('should set kilo_free_tier_allowed to false when email local part has too many digits', async () => {
@@ -318,7 +318,7 @@ describe('Stytch Fingerprint Functions', () => {
       });
 
       const byCategory = new Map(grants.map(g => [g.credit_category, g]));
-      expect(byCategory.get('automatic-welcome-credits')?.amount_microdollars).toBe(2_500_000);
+      expect(byCategory.get('automatic-welcome-credits')?.amount_microdollars).toBe(1_250_000);
 
       const bonus = byCategory.get('openclaw-security-advisor-signup-bonus');
       expect(bonus?.amount_microdollars).toBe(7_130_000);

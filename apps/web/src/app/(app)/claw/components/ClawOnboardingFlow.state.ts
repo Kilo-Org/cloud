@@ -15,8 +15,17 @@ export type OnboardingStep =
   | 'pairing'
   | 'done';
 
+export const CLAW_ONBOARDING_WIZARD_STEPS = [
+  'identity',
+  'permissions',
+  'channels',
+  'provisioning',
+  'pairing',
+] as const satisfies OnboardingStep[];
+
+export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[number];
+
 export type ClawOnboardingRenderStep =
-  | 'create-instance'
   | 'identity'
   | 'permissions'
   | 'channels'
@@ -30,7 +39,6 @@ export type PairingChannelId = 'telegram' | 'discord';
 export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
 
 export const CLAW_ONBOARDING_FAKE_STEPS = [
-  'create-instance',
   'identity',
   'permissions',
   'channels',
@@ -80,6 +88,7 @@ export type ClawOnboardingFlowState = {
   createSetupActive: boolean;
   postProvisioningReady: boolean;
   hasPairingStep: boolean;
+  currentStep: number;
   totalSteps: number;
 };
 
@@ -98,6 +107,24 @@ export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status'
     if (status === errorStatus) return true;
   }
   return false;
+}
+
+export function getClawOnboardingStepProgress(
+  step: OnboardingStep,
+  hasPairingStep: boolean
+): { currentStep: number; totalSteps: number } {
+  const totalSteps = hasPairingStep
+    ? CLAW_ONBOARDING_WIZARD_STEPS.length
+    : CLAW_ONBOARDING_WIZARD_STEPS.length - 1;
+
+  if (step === 'done') {
+    return { currentStep: totalSteps, totalSteps };
+  }
+
+  const index = CLAW_ONBOARDING_WIZARD_STEPS.indexOf(step);
+  const currentStep = index === -1 ? 0 : index + 1;
+
+  return { currentStep, totalSteps };
 }
 
 export function getClawOnboardingFlowState({
@@ -120,7 +147,7 @@ export function getClawOnboardingFlowState({
   const createSetupActive =
     mode === 'create-first' && (createSetupStarted || instanceStatus !== null);
   const hasPairingStep = isPairingChannel(selectedChannelId);
-  const totalSteps = hasPairingStep ? 5 : 4;
+  const { currentStep, totalSteps } = getClawOnboardingStepProgress(onboardingStep, hasPairingStep);
   const renderStepDecision = getRenderStepDecision({
     mode,
     createSetupStarted,
@@ -141,6 +168,7 @@ export function getClawOnboardingFlowState({
     createSetupActive,
     postProvisioningReady,
     hasPairingStep,
+    currentStep,
     totalSteps,
   } satisfies ClawOnboardingFlowState;
 
@@ -162,6 +190,7 @@ export function getClawOnboardingFlowState({
     createSetupActive,
     postProvisioningReady,
     hasPairingStep,
+    currentStep,
     totalSteps,
     renderStepDecision,
   });
@@ -197,6 +226,7 @@ type ClawOnboardingFlowDebugLogInput = ClawOnboardingFlowStateInput & {
   createSetupActive: boolean;
   postProvisioningReady: boolean;
   hasPairingStep: boolean;
+  currentStep: number;
   totalSteps: number;
   renderStepDecision: RenderStepDecision;
 };
@@ -242,37 +272,16 @@ function getRenderStepDecision({
         reason: 'post-provisioning mode is ready because the instance status is running',
       };
     }
-    // DB row + subscription exist but no DO provisioned yet (e.g. credit
-    // enrollment created the billing records without triggering provision).
-    // Show the onboarding entry point so the user can kick off provisioning.
-    if (!instanceStatus) {
-      // After the user clicks "Get Started", the status poll lag (up to ~10s)
-      // would otherwise keep the create-instance step rendered, giving the
-      // button a wide window to be clicked again and produce a duplicate
-      // provision RPC. Flip to provisioning immediately so the button is
-      // unmounted before the next poll resolves.
-      if (createSetupStarted) {
-        return {
-          renderStep: 'provisioning',
-          reason:
-            'post-provisioning mode has no populated instance status yet, but setup has been started',
-        };
-      }
-      return {
-        renderStep: 'create-instance',
-        reason: 'post-provisioning mode has no populated instance status yet',
-      };
-    }
     return {
       renderStep: 'provisioning',
-      reason: 'post-provisioning mode has an instance but it is not running yet',
+      reason: 'post-provisioning mode is waiting for the instance to become ready',
     };
   }
 
   if (instanceStatus === null && !createSetupStarted) {
     return {
-      renderStep: 'create-instance',
-      reason: 'create-first mode has no instance status and setup has not started',
+      renderStep: 'identity',
+      reason: 'create-first mode starts with bot identity before setup is requested',
     };
   }
 
@@ -347,6 +356,7 @@ function logClawOnboardingFlowStateDecision({
   createSetupActive,
   postProvisioningReady,
   hasPairingStep,
+  currentStep,
   totalSteps,
   renderStepDecision,
 }: ClawOnboardingFlowDebugLogInput): void {
@@ -377,6 +387,7 @@ function logClawOnboardingFlowStateDecision({
       createSetupActive,
       postProvisioningReady,
       hasPairingStep,
+      currentStep,
       totalSteps,
     },
     null,

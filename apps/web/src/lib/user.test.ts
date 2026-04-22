@@ -40,6 +40,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_cli_runs,
   bot_requests,
+  bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
   user_push_tokens,
   security_advisor_scans,
@@ -102,6 +103,7 @@ describe('User', () => {
     await db.delete(cloud_agent_feedback);
     await db.delete(user_admin_notes);
     await db.delete(magic_link_tokens);
+    await db.delete(bot_request_cloud_agent_sessions);
     await db.delete(bot_requests);
     await db.delete(stytch_fingerprints);
     await db.delete(kiloclaw_cli_runs);
@@ -205,6 +207,8 @@ describe('User', () => {
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
+        blocked_at: '2026-01-15T12:00:00.000Z',
+        blocked_by_kilo_user_id: 'admin-user-id',
         is_admin: true,
       });
 
@@ -232,11 +236,36 @@ describe('User', () => {
       expect(softDeleted!.api_token_pepper).toBeNull();
       expect(softDeleted!.default_model).toBeNull();
       expect(softDeleted!.blocked_reason).toMatch(/^soft-deleted at \d{4}-\d{2}-\d{2}T/);
+      expect(softDeleted!.blocked_at).toBeNull();
+      expect(softDeleted!.blocked_by_kilo_user_id).toBeNull();
       expect(softDeleted!.auto_top_up_enabled).toBe(false);
       expect(softDeleted!.completed_welcome_form).toBe(false);
       expect(softDeleted!.is_admin).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
+    });
+
+    it('should clear block attribution on other users', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const blockedUser = await insertTestUser();
+
+      await db
+        .update(kilocode_users)
+        .set({
+          blocked_reason: 'manual block',
+          blocked_at: '2026-01-15T12:00:00.000Z',
+          blocked_by_kilo_user_id: admin.id,
+        })
+        .where(eq(kilocode_users.id, blockedUser.id));
+
+      await softDeleteUser(admin.id);
+
+      const blockedUserAfter = await findUserById(blockedUser.id);
+      expect(blockedUserAfter!.blocked_reason).toBe('manual block');
+      expect(new Date(blockedUserAfter!.blocked_at ?? '').toISOString()).toBe(
+        '2026-01-15T12:00:00.000Z'
+      );
+      expect(blockedUserAfter!.blocked_by_kilo_user_id).toBeNull();
     });
 
     it('should delete auth providers', async () => {
@@ -774,26 +803,34 @@ describe('User', () => {
       ).toBe(1);
     });
 
-    it('should delete bot_requests for the user', async () => {
+    it('should delete bot_requests and cascade child sessions for the user', async () => {
       const user1 = await insertTestUser();
       const user2 = await insertTestUser();
 
-      await db.insert(bot_requests).values([
-        {
+      const [br1] = await db
+        .insert(bot_requests)
+        .values({
           created_by: user1.id,
           platform: 'slack',
           platform_thread_id: 'slack:T123:C456:thread1',
           user_message: 'Hello from user1',
           status: 'completed',
-        },
-        {
-          created_by: user2.id,
-          platform: 'slack',
-          platform_thread_id: 'slack:T123:C456:thread2',
-          user_message: 'Hello from user2',
-          status: 'completed',
-        },
-      ]);
+        })
+        .returning({ id: bot_requests.id });
+
+      await db.insert(bot_requests).values({
+        created_by: user2.id,
+        platform: 'slack',
+        platform_thread_id: 'slack:T123:C456:thread2',
+        user_message: 'Hello from user2',
+        status: 'completed',
+      });
+
+      await db.insert(bot_request_cloud_agent_sessions).values({
+        bot_request_id: br1.id,
+        cloud_agent_session_id: 'cas-gdpr-test-session',
+        status: 'completed',
+      });
 
       await softDeleteUser(user1.id);
 
@@ -807,10 +844,56 @@ describe('User', () => {
       expect(
         await db
           .select({ count: count() })
+          .from(bot_request_cloud_agent_sessions)
+          .where(eq(bot_request_cloud_agent_sessions.bot_request_id, br1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
           .from(bot_requests)
           .where(eq(bot_requests.created_by, user2.id))
           .then(r => r[0].count)
       ).toBe(1);
+    });
+
+    it('should allow multiple child sessions per bot request', async () => {
+      const user = await insertTestUser();
+
+      const [br] = await db
+        .insert(bot_requests)
+        .values({
+          created_by: user.id,
+          platform: 'slack',
+          platform_thread_id: 'slack:T123:C456:multi-child',
+          user_message: 'multi-session test',
+          status: 'pending',
+        })
+        .returning({ id: bot_requests.id });
+
+      await db.insert(bot_request_cloud_agent_sessions).values([
+        {
+          bot_request_id: br.id,
+          cloud_agent_session_id: 'cas-multi-1',
+          status: 'running',
+        },
+        {
+          bot_request_id: br.id,
+          cloud_agent_session_id: 'cas-multi-2',
+          status: 'completed',
+        },
+      ]);
+
+      const rows = await db
+        .select()
+        .from(bot_request_cloud_agent_sessions)
+        .where(eq(bot_request_cloud_agent_sessions.bot_request_id, br.id));
+
+      expect(rows).toHaveLength(2);
+      expect(rows.map(r => r.cloud_agent_session_id).sort()).toEqual([
+        'cas-multi-1',
+        'cas-multi-2',
+      ]);
     });
 
     it('should soft-delete and anonymize payment methods', async () => {

@@ -3003,6 +3003,215 @@ describe('updateSecrets', () => {
 });
 
 // ============================================================================
+// updateKiloCodeConfig — memory & dreaming fields
+// ============================================================================
+
+describe('updateKiloCodeConfig memory fields', () => {
+  it('persists vector memory and dreaming fields on a provisioned instance', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const result = await instance.updateKiloCodeConfig({
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: 'openai/text-embedding-3-small',
+      dreamingEnabled: true,
+    });
+
+    expect(result.vectorMemoryEnabled).toBe(true);
+    expect(result.vectorMemoryModel).toBe('openai/text-embedding-3-small');
+    expect(result.dreamingEnabled).toBe(true);
+
+    expect(storage._store.get('vectorMemoryEnabled')).toBe(true);
+    expect(storage._store.get('vectorMemoryModel')).toBe('openai/text-embedding-3-small');
+    expect(storage._store.get('dreamingEnabled')).toBe(true);
+  });
+
+  it('clears vectorMemoryModel when disabling vector memory', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: 'openai/text-embedding-3-small',
+    });
+
+    const result = await instance.updateKiloCodeConfig({
+      vectorMemoryEnabled: false,
+      vectorMemoryModel: null,
+    });
+
+    expect(result.vectorMemoryEnabled).toBe(false);
+    expect(result.vectorMemoryModel).toBeNull();
+    expect(storage._store.get('vectorMemoryEnabled')).toBe(false);
+    expect(storage._store.get('vectorMemoryModel')).toBeNull();
+  });
+
+  it('returns defaults (false/null/false) for legacy instances with no persisted values', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const result = await instance.updateKiloCodeConfig({});
+
+    expect(result.vectorMemoryEnabled).toBe(false);
+    expect(result.vectorMemoryModel).toBeNull();
+    expect(result.dreamingEnabled).toBe(false);
+  });
+
+  it('only touches keys present in the patch', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: 'openai/text-embedding-3-small',
+      dreamingEnabled: false,
+    });
+
+    const result = await instance.updateKiloCodeConfig({ dreamingEnabled: true });
+
+    expect(result.vectorMemoryEnabled).toBe(true);
+    expect(result.vectorMemoryModel).toBe('openai/text-embedding-3-small');
+    expect(result.dreamingEnabled).toBe(true);
+  });
+
+  it('live-patches memorySearch with a full remote block when enabling on a running instance', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      flyAppName: 'acct-test',
+      kilocodeApiKey: 'tok-123',
+      orgId: 'org_abc',
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await instance.updateKiloCodeConfig({
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: 'openai/text-embedding-3-small',
+    });
+
+    const configPatchCalls = fetchSpy.mock.calls.filter(call =>
+      fetchInputUrl(call[0]).endsWith('/_kilo/config/patch')
+    );
+    expect(configPatchCalls).toHaveLength(1);
+
+    const body = JSON.parse(configPatchCalls[0][1]?.body as string) as Record<string, unknown>;
+    expect(body).toEqual({
+      agents: {
+        defaults: {
+          memorySearch: {
+            enabled: true,
+            provider: 'openai',
+            model: 'openai/text-embedding-3-small',
+            remote: {
+              baseUrl: 'https://api.kilo.ai/api/gateway/',
+              apiKey: 'tok-123',
+              headers: {
+                'x-kilocode-feature': 'kiloclaw-embedding',
+                'X-KiloCode-OrganizationId': 'org_abc',
+              },
+            },
+          },
+        },
+      },
+    });
+
+    fetchSpy.mockRestore();
+  });
+
+  it('live-patches explicit nulls for provider/model/remote when disabling memory', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      flyAppName: 'acct-test',
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: 'openai/text-embedding-3-small',
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await instance.updateKiloCodeConfig({
+      vectorMemoryEnabled: false,
+      vectorMemoryModel: null,
+    });
+
+    const configPatchCalls = fetchSpy.mock.calls.filter(call =>
+      fetchInputUrl(call[0]).endsWith('/_kilo/config/patch')
+    );
+    expect(configPatchCalls).toHaveLength(1);
+
+    const body = JSON.parse(configPatchCalls[0][1]?.body as string) as Record<string, unknown>;
+    expect(body).toEqual({
+      agents: {
+        defaults: {
+          memorySearch: {
+            enabled: false,
+            provider: null,
+            model: null,
+            remote: null,
+          },
+        },
+      },
+    });
+
+    fetchSpy.mockRestore();
+  });
+
+  it('live-patches memory-core dreaming when toggled on a running instance', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await instance.updateKiloCodeConfig({ dreamingEnabled: true });
+
+    const configPatchCalls = fetchSpy.mock.calls.filter(call =>
+      fetchInputUrl(call[0]).endsWith('/_kilo/config/patch')
+    );
+    expect(configPatchCalls).toHaveLength(1);
+
+    const body = JSON.parse(configPatchCalls[0][1]?.body as string) as Record<string, unknown>;
+    expect(body).toEqual({
+      plugins: {
+        entries: {
+          'memory-core': { config: { dreaming: { enabled: true } } },
+        },
+      },
+    });
+
+    fetchSpy.mockRestore();
+  });
+
+  it('skips live-patch when the machine is not running', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    await instance.updateKiloCodeConfig({
+      vectorMemoryEnabled: true,
+      dreamingEnabled: true,
+    });
+
+    const configPatchCalls = fetchSpy.mock.calls.filter(call =>
+      fetchInputUrl(call[0]).endsWith('/_kilo/config/patch')
+    );
+    expect(configPatchCalls).toHaveLength(0);
+
+    fetchSpy.mockRestore();
+  });
+});
+
+// ============================================================================
 // updateGoogleCredentials
 // ============================================================================
 

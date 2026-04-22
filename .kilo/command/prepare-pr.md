@@ -30,10 +30,11 @@ Arguments:
    - Include enough context for a reviewer unfamiliar with this code area.
    - Keep it concise and reviewer-friendly.
 
-3. Prefill `## Verification` from this session.
-   - Capture verification already performed in this session (tests, typecheck, lint, builds, manual checks).
-   - Include command names and short pass/fail outcomes when available.
-   - Add a final placeholder bullet for extra user-provided verification details.
+3. Prefill `## Verification` with manual verification only.
+   - Do not list automated checks such as tests, typecheck, lint, builds, formatting, validation commands, or CI status.
+   - Include manually tested paths or behavior from this session when available.
+   - If no manual verification was performed, state that directly and explain why.
+   - Add a final placeholder bullet for extra user-provided manual verification details.
 
 4. Prepare `## Visual Changes`.
    - Detect likely visual/UI changes from changed files (for example: `*.tsx`, `*.jsx`, CSS, Tailwind config, component/page/view files).

@@ -46,6 +46,7 @@ export const preferredModels = [
   'openai/gpt-5.4',
   'google/gemini-3.1-pro-preview',
   MINIMAX_CURRENT_MODEL_ID,
+  qwen36_plus_model.public_id,
   'z-ai/glm-5.1',
 ].filter(m => m !== null);
 

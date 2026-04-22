@@ -68,10 +68,12 @@ export type BotIdentityStepResult = {
 };
 
 export function BotIdentityStep({
-  instanceRunning,
+  currentStep,
+  totalSteps,
   onContinue,
 }: {
-  instanceRunning: boolean;
+  currentStep: number;
+  totalSteps: number;
   onContinue: (result: BotIdentityStepResult) => void;
 }) {
   const [botName, setBotName] = useState('');
@@ -80,6 +82,13 @@ export function BotIdentityStep({
   const [weatherLocation, setWeatherLocation] = useState<WeatherLocationSelection | null>(null);
   const [isShuffling, setIsShuffling] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
+  // Synchronous re-entry guard. setIsContinuing only takes effect after
+  // React's next render, so a rapid double-click on the Continue button
+  // can invoke handleContinue twice before disabled={isContinuing} applies.
+  // A duplicate invocation cascades into a duplicate onContinue -> duplicate
+  // provision RPC, which the Worker DO partially serializes but can still
+  // manifest as a redundant provider.startRuntime on Northflank.
+  const isContinuingRef = useRef(false);
   const [nameAnimKey, setNameAnimKey] = useState(0);
   const weatherLocationInputRef = useRef<WeatherLocationInputHandle>(null);
   const reducedMotion = useReducedMotion();
@@ -116,7 +125,8 @@ export function BotIdentityStep({
   }
 
   async function handleContinue() {
-    if (isContinuing) return;
+    if (isContinuingRef.current || isContinuing) return;
+    isContinuingRef.current = true;
 
     setIsContinuing(true);
     try {
@@ -133,17 +143,17 @@ export function BotIdentityStep({
         weatherLocation: weatherLocationCommit?.selection ?? weatherLocation,
       });
     } finally {
+      isContinuingRef.current = false;
       setIsContinuing(false);
     }
   }
 
   return (
     <OnboardingStepView
-      currentStep={1}
-      totalSteps={4}
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       title="Give your bot an identity"
       description="Make it yours. You can always change this later."
-      showProvisioningBanner={!instanceRunning}
       contentClassName="gap-6"
     >
       <div className="grid gap-6 md:grid-cols-[1fr_2fr] md:gap-8">

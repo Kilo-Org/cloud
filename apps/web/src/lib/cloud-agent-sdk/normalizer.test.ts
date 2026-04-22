@@ -727,6 +727,112 @@ describe('normalize', () => {
     });
   });
 
+  describe('suggestion.shown', () => {
+    it('normalizes suggestion.shown with all fields', () => {
+      const data = {
+        id: 'sug-1',
+        sessionID: 'ses-1',
+        text: 'Would you like to run a code review?',
+        actions: [
+          {
+            label: 'Review uncommitted',
+            description: 'Run /local-review-uncommitted',
+            prompt: '/local-review-uncommitted',
+          },
+          { label: 'Review branch', prompt: '/local-review' },
+        ],
+        tool: { messageID: 'msg-1', callID: 'call-1' },
+      };
+      const result = normalize(createKilocode('suggestion.shown', data));
+      expect(result).toEqual({
+        type: 'suggestion.shown',
+        requestId: 'sug-1',
+        text: 'Would you like to run a code review?',
+        actions: [
+          {
+            label: 'Review uncommitted',
+            description: 'Run /local-review-uncommitted',
+            prompt: '/local-review-uncommitted',
+          },
+          { label: 'Review branch', prompt: '/local-review' },
+        ],
+        callId: 'call-1',
+      });
+    });
+
+    it('defaults actions to empty array when missing', () => {
+      const data = { id: 'sug-2', text: 'Any follow-up?' };
+      const result = normalize(createRaw('suggestion.shown', data));
+      expect(result).toEqual({
+        type: 'suggestion.shown',
+        requestId: 'sug-2',
+        text: 'Any follow-up?',
+        actions: [],
+        callId: undefined,
+      });
+    });
+
+    it('returns null when id is missing', () => {
+      expect(normalize(createRaw('suggestion.shown', { text: 'hi', actions: [] }))).toBeNull();
+    });
+
+    it('returns null when text is missing', () => {
+      expect(normalize(createRaw('suggestion.shown', { id: 'sug-3', actions: [] }))).toBeNull();
+    });
+  });
+
+  describe('suggestion.accepted', () => {
+    it('normalizes suggestion.accepted with action', () => {
+      const data = {
+        requestID: 'sug-1',
+        index: 0,
+        action: { label: 'Review', prompt: '/local-review' },
+      };
+      const result = normalize(createRaw('suggestion.accepted', data));
+      expect(result).toEqual({
+        type: 'suggestion.accepted',
+        requestId: 'sug-1',
+        index: 0,
+        action: { label: 'Review', prompt: '/local-review' },
+      });
+    });
+
+    it('normalizes suggestion.accepted without action', () => {
+      const data = { requestID: 'sug-2', index: 1 };
+      const result = normalize(createRaw('suggestion.accepted', data));
+      expect(result).toEqual({
+        type: 'suggestion.accepted',
+        requestId: 'sug-2',
+        index: 1,
+        action: undefined,
+      });
+    });
+
+    it('returns null when requestID is missing', () => {
+      expect(normalize(createRaw('suggestion.accepted', { index: 0 }))).toBeNull();
+    });
+
+    it('returns null when index is not a number', () => {
+      expect(
+        normalize(createRaw('suggestion.accepted', { requestID: 'sug-1', index: 'zero' }))
+      ).toBeNull();
+    });
+  });
+
+  describe('suggestion.dismissed', () => {
+    it('normalizes suggestion.dismissed', () => {
+      const result = normalize(createRaw('suggestion.dismissed', { requestID: 'sug-1' }));
+      expect(result).toEqual({
+        type: 'suggestion.dismissed',
+        requestId: 'sug-1',
+      });
+    });
+
+    it('returns null when requestID is missing', () => {
+      expect(normalize(createRaw('suggestion.dismissed', {}))).toBeNull();
+    });
+  });
+
   describe('complete → stopped(complete)', () => {
     it('maps to stopped with reason complete and branch', () => {
       const result = normalize(createRaw('complete', { currentBranch: 'main' }));

@@ -9,6 +9,7 @@ import { captureException } from '@sentry/nextjs';
 import { fetchFinalAssistantTextWithRetries } from '@/lib/cloud-agent-next/session-result';
 import { bot } from '@/lib/bot';
 import { MAX_ITERATIONS } from '@/lib/bot/constants';
+import { markBotRequestCloudAgentSessionTerminal } from '@/lib/bot/request-logging';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import {
   createSyntheticThread,
@@ -26,6 +27,8 @@ type ExecutionCallbackPayload = {
   kiloSessionId?: string;
   lastSeenBranch?: string;
 };
+
+type TerminalCallbackStatus = ExecutionCallbackPayload['status'];
 
 async function getBotRequest(botRequestId: string) {
   const [request] = await db
@@ -78,6 +81,18 @@ async function getSlackBotToken(platformIntegrationId: string | null): Promise<s
 
 function logCallback(message: string, extra?: Record<string, unknown>) {
   console.log('[BotSessionCallback]', message, extra ?? {});
+}
+
+function parseTerminalCallbackStatus(status: unknown): TerminalCallbackStatus | undefined {
+  if (status === 'completed' || status === 'failed' || status === 'interrupted') {
+    return status;
+  }
+
+  if (typeof status === 'string') {
+    return 'failed';
+  }
+
+  return undefined;
 }
 
 /**
@@ -560,6 +575,23 @@ export async function POST(
       platformIntegrationId: requestRow.platform_integration_id,
       completedStepCount,
     });
+
+    const childSessionStatus = parseTerminalCallbackStatus(payload.status);
+    if (childSessionStatus) {
+      after(() =>
+        markBotRequestCloudAgentSessionTerminal({
+          botRequestId,
+          cloudAgentSessionId: callbackSessionId,
+          status: childSessionStatus,
+          executionId: payload.executionId,
+          kiloSessionId: payload.kiloSessionId,
+          errorMessage:
+            childSessionStatus === 'failed' && payload.status !== 'failed'
+              ? `Unknown callback status: ${String(payload.status)}`
+              : payload.errorMessage,
+        })
+      );
+    }
 
     if (
       requestRow.cloud_agent_session_id &&

@@ -151,7 +151,11 @@ export async function saveFingerprints(
   if (verdict.action === 'BLOCK' && verdict.reasons.includes('SMART_RATE_LIMIT_BANNED')) {
     await db
       .update(kilocode_users)
-      .set({ blocked_reason: 'autoban: stytch SMART_RATE_LIMIT_BANNED' })
+      .set({
+        blocked_reason: 'autoban: stytch SMART_RATE_LIMIT_BANNED',
+        blocked_at: new Date().toISOString(),
+        blocked_by_kilo_user_id: null,
+      })
       .where(and(eq(kilocode_users.id, user.id), isNull(kilocode_users.blocked_reason)));
     if (process.env.NODE_ENV !== 'test')
       console.log('SECURITY: autobanned user for SMART_RATE_LIMIT_BANNED:', {

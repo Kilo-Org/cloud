@@ -88,6 +88,17 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           const event = normalize(raw);
           if (!event) return;
 
+          // Cloud Agent sessions have no command path for accepting or
+          // dismissing suggestions, so drop these events before they reach the
+          // sink — otherwise the UI would render a card whose buttons throw.
+          if (
+            event.type === 'suggestion.shown' ||
+            event.type === 'suggestion.accepted' ||
+            event.type === 'suggestion.dismissed'
+          ) {
+            return;
+          }
+
           if (event.type === 'stopped') {
             stoppedReceived = true;
           }

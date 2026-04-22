@@ -28,6 +28,8 @@ const mockUser: User = {
   has_validation_stytch: null,
   has_validation_novel_card_with_hold: false,
   blocked_reason: null,
+  blocked_at: null,
+  blocked_by_kilo_user_id: null,
   api_token_pepper: 'test-pepper-456',
   auto_top_up_enabled: false,
   default_model: null,

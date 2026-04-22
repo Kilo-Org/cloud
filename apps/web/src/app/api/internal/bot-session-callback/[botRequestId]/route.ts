@@ -10,7 +10,6 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { fetchFinalAssistantTextWithRetries } from '@/lib/cloud-agent-next/session-result';
 import { bot } from '@/lib/bot';
 import { MAX_ITERATIONS } from '@/lib/bot/constants';
 import {
@@ -39,6 +38,7 @@ type ExecutionCallbackPayload = {
   errorMessage?: string;
   kiloSessionId?: string;
   lastSeenBranch?: string;
+  lastAssistantMessageText?: string;
 };
 
 type TerminalCallbackStatus = ExecutionCallbackPayload['status'];
@@ -392,62 +392,20 @@ function formatCloudAgentResultsForSlack(results: CloudAgentResultForPrompt[]): 
     .join('\n\n---\n\n');
 }
 
-async function fetchFinalAssistantTextForCallback(params: {
-  botRequestId: string;
-  cloudAgentSessionId?: string;
-  kiloSessionId: string;
-  userId: string;
-}): Promise<string | null> {
-  return await fetchFinalAssistantTextWithRetries({
-    kiloSessionId: params.kiloSessionId,
-    userId: params.userId,
-    onRetry: attempt => {
-      logCallback('Retrying ingest fetch for final bot message', {
-        botRequestId: params.botRequestId,
-        cloudAgentSessionId: params.cloudAgentSessionId,
-        kiloSessionId: params.kiloSessionId,
-        attempt,
-      });
-    },
-    onFetchError: (attempt, error) => {
-      logCallback('Ingest fetch failed for bot callback', {
-        botRequestId: params.botRequestId,
-        cloudAgentSessionId: params.cloudAgentSessionId,
-        kiloSessionId: params.kiloSessionId,
-        attempt,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    },
-  });
+function getFinalMessageFromCallbackPayload(payload: ExecutionCallbackPayload): string | null {
+  return payload.lastAssistantMessageText || null;
 }
 
 async function persistTrackedCompletedSessionResult(params: {
   botRequestId: string;
   cloudAgentSessionId: string;
-  kiloSessionId?: string;
-  userId: string;
+  finalMessage: string | null;
 }): Promise<void> {
-  if (!params.kiloSessionId) {
+  if (!params.finalMessage) {
     await recordBotRequestCloudAgentSessionResultError({
       botRequestId: params.botRequestId,
       cloudAgentSessionId: params.cloudAgentSessionId,
-      errorMessage: `Cloud Agent session ${params.cloudAgentSessionId} completed but no kilo session id was provided.`,
-    });
-    return;
-  }
-
-  const finalMessage = await fetchFinalAssistantTextForCallback({
-    botRequestId: params.botRequestId,
-    cloudAgentSessionId: params.cloudAgentSessionId,
-    kiloSessionId: params.kiloSessionId,
-    userId: params.userId,
-  });
-
-  if (!finalMessage) {
-    await recordBotRequestCloudAgentSessionResultError({
-      botRequestId: params.botRequestId,
-      cloudAgentSessionId: params.cloudAgentSessionId,
-      errorMessage: `Cloud Agent session ${params.cloudAgentSessionId} completed but the final response was not available from session ingest.`,
+      errorMessage: `Cloud Agent session ${params.cloudAgentSessionId} completed but the final response was not provided in the callback payload.`,
     });
     return;
   }
@@ -455,13 +413,13 @@ async function persistTrackedCompletedSessionResult(params: {
   await recordBotRequestCloudAgentSessionResult({
     botRequestId: params.botRequestId,
     cloudAgentSessionId: params.cloudAgentSessionId,
-    finalMessage,
+    finalMessage: params.finalMessage,
   });
 
   logCallback('Persisted final message for tracked Cloud Agent session', {
     botRequestId: params.botRequestId,
     cloudAgentSessionId: params.cloudAgentSessionId,
-    finalMessagePreview: finalMessage.slice(0, 200),
+    finalMessagePreview: params.finalMessage.slice(0, 200),
   });
 }
 
@@ -510,8 +468,7 @@ async function handleCompletedCallback(
       await persistTrackedCompletedSessionResult({
         botRequestId,
         cloudAgentSessionId: payload.cloudAgentSessionId,
-        kiloSessionId: payload.kiloSessionId,
-        userId: requestRow.created_by,
+        finalMessage: getFinalMessageFromCallbackPayload(payload),
       });
     }
 
@@ -612,51 +569,9 @@ async function handleCompletedCallback(
     cloudAgentResultsForPrompt = formatCloudAgentResultsForPrompt(results);
     cloudAgentResultsForSlack = formatCloudAgentResultsForSlack(results);
   } else {
-    if (!payload.kiloSessionId) {
-      const errorMessage = 'Cloud Agent completed but no kilo session id was provided.';
-      const updated = await failBotRequest({
-        botRequestId,
-        expectedCloudAgentSessionId,
-        errorMessage,
-        responseTimeMs: Date.now() - startedAt,
-      });
+    const finalMessage = getFinalMessageFromCallbackPayload(payload);
 
-      logCallback('Completed callback missing kiloSessionId', {
-        botRequestId,
-        updated: Boolean(updated),
-      });
-
-      if (updated) {
-        await postSlackThreadMessage({
-          threadId: requestRow.platform_thread_id,
-          markdown: errorMessage,
-          platformIntegrationId: requestRow.platform_integration_id,
-        });
-      }
-      return;
-    }
-
-    const finalMessage = await fetchFinalAssistantTextWithRetries({
-      kiloSessionId: payload.kiloSessionId,
-      userId: requestRow.created_by,
-      onRetry: attempt => {
-        logCallback('Retrying ingest fetch for final bot message', {
-          botRequestId,
-          kiloSessionId: payload.kiloSessionId,
-          attempt,
-        });
-      },
-      onFetchError: (attempt, error) => {
-        logCallback('Ingest fetch failed for bot callback', {
-          botRequestId,
-          kiloSessionId: payload.kiloSessionId,
-          attempt,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      },
-    });
-
-    logCallback('Resolved final message from ingest', {
+    logCallback('Resolved final message from callback payload', {
       botRequestId,
       hasFinalMessage: Boolean(finalMessage),
       finalMessagePreview: finalMessage?.slice(0, 200),
@@ -664,7 +579,7 @@ async function handleCompletedCallback(
 
     if (!finalMessage) {
       const errorMessage =
-        'Cloud Agent completed but the final response was not available from session ingest.';
+        'Cloud Agent completed but the final response was not provided in the callback payload.';
       const updated = await failBotRequest({
         botRequestId,
         expectedCloudAgentSessionId,
@@ -672,7 +587,7 @@ async function handleCompletedCallback(
         responseTimeMs: Date.now() - startedAt,
       });
 
-      logCallback('Completed callback missing final message from ingest', {
+      logCallback('Completed callback missing final message from payload', {
         botRequestId,
         updated: Boolean(updated),
       });

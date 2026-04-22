@@ -201,16 +201,8 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
   outbound: {
     base: {
       deliveryMode: 'direct',
-      shouldSuppressLocalPayloadPrompt: ({ payload }) => {
-        const meta = getExecApprovalReplyMetadata(payload);
-        const result = meta !== null;
-        console.log('[kilo-chat:approval] shouldSuppressLocalPayloadPrompt', {
-          result,
-          hasChannelData: !!payload?.channelData,
-          metaApprovalId: meta?.approvalId ?? '(none)',
-        });
-        return result;
-      },
+      shouldSuppressLocalPayloadPrompt: ({ payload }) =>
+        getExecApprovalReplyMetadata(payload) !== null,
     },
     attachedResults: {
       channel: CHANNEL_ID,
@@ -233,23 +225,15 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
 // the native runtime can deliver rich approval messages.
 kiloChatPlugin.gateway = {
   startAccount: async ({ abortSignal, channelRuntime }) => {
-    console.log('[kilo-chat] gateway.startAccount called', {
-      hasChannelRuntime: !!channelRuntime,
-      hasRuntimeContexts: !!channelRuntime?.runtimeContexts,
-    });
-
     // Register the approval native runtime context on the gateway's channel
     // runtime so the approval handler bootstrap can discover it.
     if (channelRuntime?.runtimeContexts) {
-      const handle = channelRuntime.runtimeContexts.register({
+      channelRuntime.runtimeContexts.register({
         channelId: CHANNEL_ID,
         accountId: 'default',
         capability: CHANNEL_APPROVAL_NATIVE_RUNTIME_CONTEXT_CAPABILITY,
         context: {},
         abortSignal,
-      });
-      console.log('[kilo-chat:approval] runtime context registered via channelRuntime', {
-        hasDispose: !!handle?.dispose,
       });
     }
 

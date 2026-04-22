@@ -127,35 +127,23 @@ export function buildDeliverWiring(params: {
   return {
     replyOptions: {
       onPartialReply: async payload => {
-        console.log('[kilo-chat:deliver] onPartialReply', {
-          hasText: typeof payload.text === 'string',
-          textLen: typeof payload.text === 'string' ? payload.text.length : 0,
-        });
         if (typeof payload.text === 'string' && payload.text.length > 0) {
           stream.update(payload.text);
         }
       },
     },
     deliver: async payload => {
-      console.log('[kilo-chat:deliver] deliver called', {
-        hasText: !!payload.text,
-        textLen: payload.text?.length ?? 0,
-        textPreview: payload.text?.slice(0, 100) ?? '(empty)',
-        firstDelivered,
-      });
       if (!payload.text) return;
       if (!firstDelivered) {
         firstDelivered = true;
         await stream.finalize(payload.text);
-        console.log('[kilo-chat:deliver] stream.finalize done (first delivery)');
         return;
       }
       // Subsequent blocks: plain create.
-      const { messageId } = await params.client.createMessage({
+      await params.client.createMessage({
         conversationId: params.conversationId,
         content: [{ type: 'text', text: payload.text }],
       });
-      console.log('[kilo-chat:deliver] createMessage done (subsequent)', { messageId });
     },
     finalize: async err => {
       // Abort the preview only when dispatch errored or nothing was delivered

@@ -2858,6 +2858,30 @@ describe('updateChannels', () => {
     expectStructuredWarn(warnSpy, 'updateChannels: gateway patch failed');
     vi.unstubAllGlobals();
   });
+
+  it('keeps channelsApplyPending when live channel patch cannot decrypt stored tokens', async () => {
+    const env = {
+      ...createFakeEnv(),
+      FLY_APP_NAME: 'channels-app',
+      AGENT_ENV_VARS_PRIVATE_KEY: '',
+    };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, { flyMachineId: 'machine-1', sandboxId: 'sandbox-1' });
+
+    await instance.updateChannels({ telegramBotToken: fakeEnvelope });
+
+    expect(
+      fetchMock.mock.calls.some(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/config/patch')
+      )
+    ).toBe(false);
+    expect(storage._store.get('channelsApplyPending')).toBe(true);
+    expectStructuredWarn(warnSpy, 'updateChannels: gateway patch failed');
+    vi.unstubAllGlobals();
+  });
 });
 
 // ============================================================================
@@ -8523,19 +8547,22 @@ describe('channel config patch builder', () => {
     });
   });
 
-  it('returns null for empty channels, missing private key, or partial slack state', () => {
+  it('returns null for empty channels or partial slack state', () => {
     const env = createFakeEnv();
 
     expect(buildChannelConfigPatch(env, null)).toBeNull();
-    expect(
+    expect(buildChannelConfigPatch(env, { slackBotToken: fakeEnvelope })).toBeNull();
+  });
+
+  it('throws when stored channels need decrypting but the worker has no private key', () => {
+    expect(() =>
       buildChannelConfigPatch(
-        { ...env, AGENT_ENV_VARS_PRIVATE_KEY: undefined },
+        { ...createFakeEnv(), AGENT_ENV_VARS_PRIVATE_KEY: undefined },
         {
           telegramBotToken: fakeEnvelope,
         }
       )
-    ).toBeNull();
-    expect(buildChannelConfigPatch(env, { slackBotToken: fakeEnvelope })).toBeNull();
+    ).toThrow('AGENT_ENV_VARS_PRIVATE_KEY is required to build live channel config patch');
   });
 });
 
@@ -8704,6 +8731,48 @@ describe('flushPendingConfigToGateway: alarm retry for pending identity/exec/cha
 
     await instance.alarm();
 
+    expect(storage._store.get('channelsApplyPending')).toBe(true);
+    expectStructuredWarn(warnSpy, 'flushPendingConfigToGateway: channels failed');
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps pending channel config set when alarm retry cannot decrypt stored tokens', async () => {
+    const env = {
+      ...createFakeEnv(),
+      FLY_APP_NAME: 'flush-app',
+      AGENT_ENV_VARS_PRIVATE_KEY: '',
+    };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      flyMachineId: 'machine-1',
+      sandboxId: 'sandbox-1',
+      channels: {
+        telegramBotToken: {
+          encryptedData: 'telegram-token',
+          encryptedDEK: 'dek',
+          algorithm: 'rsa-aes-256-gcm',
+          version: 1,
+        },
+      },
+      channelsApplyPending: true,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { mounts: [{ volume: 'vol-1', path: '/root' }] },
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.alarm();
+
+    expect(
+      fetchMock.mock.calls.some(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/config/patch')
+      )
+    ).toBe(false);
     expect(storage._store.get('channelsApplyPending')).toBe(true);
     expectStructuredWarn(warnSpy, 'flushPendingConfigToGateway: channels failed');
     vi.unstubAllGlobals();

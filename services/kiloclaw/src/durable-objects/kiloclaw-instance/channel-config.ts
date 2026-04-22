@@ -1,6 +1,6 @@
 import type { KiloClawEnv } from '../../types';
 import type { PersistedState } from '../../schemas/instance-config';
-import { decryptChannelTokens } from '../../utils/encryption';
+import { decryptChannelTokens, EncryptionConfigurationError } from '../../utils/encryption';
 
 export type ChannelConfigPatch = {
   channels: {
@@ -40,7 +40,11 @@ export function buildChannelConfigPatch(
   channels: PersistedState['channels']
 ): ChannelConfigPatch | null {
   if (!channels) return null;
-  if (!env.AGENT_ENV_VARS_PRIVATE_KEY) return null;
+  if (!env.AGENT_ENV_VARS_PRIVATE_KEY) {
+    throw new EncryptionConfigurationError(
+      'AGENT_ENV_VARS_PRIVATE_KEY is required to build live channel config patch'
+    );
+  }
 
   const channelEnv = decryptChannelTokens(channels, env.AGENT_ENV_VARS_PRIVATE_KEY);
   const patch: ChannelConfigPatch = {

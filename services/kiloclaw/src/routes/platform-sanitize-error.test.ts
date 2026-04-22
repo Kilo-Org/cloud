@@ -429,9 +429,7 @@ describe('sanitizeError: explicit provider support errors', () => {
 
 describe('openclaw import platform route', () => {
   function envWithImportOpenclawWorkspace(
-    importOpenclawWorkspace: (
-      files: Array<{ path: string; content: string }>
-    ) => Promise<unknown> | unknown,
+    importOpenclawWorkspace: (files: Array<{ path: string; content: string }>) => Promise<unknown>,
     getStatus: () => Promise<{ status: string }> | { status: string } = async () => ({
       status: 'running',
     })

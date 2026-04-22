@@ -14,7 +14,6 @@ const OPENCLAW_IMPORT_ROOT_FILES = new Map([
 
 const OPENCLAW_IMPORT_MEMORY_PREFIX = 'memory/';
 const OPENCLAW_IMPORT_TARGET_MEMORY_PREFIX = 'workspace/memory/';
-const NON_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 
 export type OpenclawImportOs = 'windows' | 'macos' | 'linux';
 
@@ -59,6 +58,19 @@ const OPENCLAW_ZIP_COMMANDS: Record<OpenclawImportOs, OpenclawZipCommand> = {
 };
 
 const textDecoder = new TextDecoder('utf-8', { fatal: true });
+
+function hasDisallowedControlChars(content: string): boolean {
+  for (const char of content) {
+    const code = char.codePointAt(0);
+    if (code === undefined) continue;
+    if (code === 0x09 || code === 0x0a || code === 0x0d) continue;
+    if ((code >= 0x00 && code <= 0x1f) || code === 0x7f) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 function normalizeArchivePath(path: string): string {
   const withForwardSlashes = path.replaceAll('\\', '/').replace(/^\.\//, '');
@@ -139,7 +151,7 @@ function decodeMarkdown(path: string, bytes: Uint8Array): string {
     );
   }
 
-  if (NON_TEXT_CONTROL_CHARS.test(decoded)) {
+  if (hasDisallowedControlChars(decoded)) {
     throw new OpenclawWorkspaceZipError(
       'openclaw_import_invalid_markdown',
       `File contains non-text content: ${path}`

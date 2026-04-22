@@ -3,9 +3,9 @@ import { zipSync, strToU8 } from 'fflate';
 import {
   detectOpenclawImportOs,
   getOpenclawZipCommandForOs,
-  OpenclawWorkspaceZipError,
   parseOpenclawWorkspaceZipBytes,
 } from '@/app/(app)/claw/components/openclaw-import-zip';
+import type { OpenclawWorkspaceZipError } from '@/app/(app)/claw/components/openclaw-import-zip';
 
 function makeZip(entries: Record<string, string | Uint8Array>): Uint8Array {
   const payload: Record<string, Uint8Array> = {};

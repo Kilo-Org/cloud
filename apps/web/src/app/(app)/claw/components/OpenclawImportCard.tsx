@@ -29,7 +29,6 @@ import { Input } from '@/components/ui/input';
 import {
   detectOpenclawImportOs,
   getOpenclawZipCommandForOs,
-  OPENCLAW_IMPORT_MAX_ZIP_BYTES,
   OpenclawWorkspaceZipError,
   parseOpenclawWorkspaceZipFile,
   type ParsedOpenclawWorkspaceZip,

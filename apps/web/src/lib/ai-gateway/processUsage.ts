@@ -144,10 +144,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
  * Any sanitized field names are appended to `dirtyFields` so the caller can
  * report them to Sentry for source attribution.
  */
-export function stripNulBytesInPlace(
-  obj: Record<string, unknown>,
-  dirtyFields: string[]
-): void {
+export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: string[]): void {
   for (const key of Object.keys(obj)) {
     const value = obj[key];
     if (typeof value === 'string' && value.indexOf('\u0000') >= 0) {

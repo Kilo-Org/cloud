@@ -52,7 +52,10 @@ export async function backfillBlockedAtBatch(): Promise<BlockedAtBackfillRespons
 
     const updated = await db
       .update(kilocode_users)
-      .set({ blocked_at: sql`${kilocode_users.updated_at}` })
+      .set({
+        blocked_at: sql`${kilocode_users.updated_at}`,
+        updated_at: sql`${kilocode_users.updated_at}`,
+      })
       .where(
         and(
           inArray(

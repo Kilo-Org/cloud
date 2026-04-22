@@ -52,11 +52,13 @@ describe('backfillBlockedAtBatch', () => {
       .select({
         blocked_at: kilocode_users.blocked_at,
         blocked_by_kilo_user_id: kilocode_users.blocked_by_kilo_user_id,
+        updated_at: kilocode_users.updated_at,
       })
       .from(kilocode_users)
       .where(eq(kilocode_users.id, user.id));
 
     expect(new Date(row.blocked_at ?? '').toISOString()).toBe(updatedAt);
+    expect(new Date(row.updated_at).toISOString()).toBe(updatedAt);
     expect(row.blocked_by_kilo_user_id).toBeNull();
 
     const matches = await missingBlockedAtUserIds();

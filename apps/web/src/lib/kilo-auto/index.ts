@@ -144,14 +144,9 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   input_cache_read_price: '0.000000175',
   input_cache_write_price: undefined,
   supports_images: true,
-  roocode_settings: {
-    included_tools: ['apply_patch'],
-    excluded_tools: ['apply_diff', 'edit_file'],
-  },
+  roocode_settings: undefined,
   opencode_settings: {
-    ai_sdk_provider: 'openai',
-    family: 'gpt',
-    prompt: 'codex',
+    ai_sdk_provider: 'openai-compatible',
   },
 };
 

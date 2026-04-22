@@ -392,6 +392,7 @@ const BeadUpdateBody = z
     metadata: z.record(z.string(), z.unknown()).optional(),
     rig_id: z.string().min(1).nullable().optional(),
     parent_bead_id: z.string().min(1).nullable().optional(),
+    depends_on: z.array(z.string().uuid()).optional(),
   })
   .refine(
     data =>
@@ -402,7 +403,8 @@ const BeadUpdateBody = z
       data.status !== undefined ||
       data.metadata !== undefined ||
       data.rig_id !== undefined ||
-      data.parent_bead_id !== undefined,
+      data.parent_bead_id !== undefined ||
+      data.depends_on !== undefined,
     { message: 'At least one field must be provided' }
   );
 
@@ -745,6 +747,69 @@ export async function handleMayorConvoyStart(
     `${HANDLER_LOG} handleMayorConvoyStart: completed, convoy=${result.convoy.id} beads=${result.beads.length}`
   );
 
+  return c.json(resSuccess(result));
+}
+
+const ConvoyAddBeadBody = z.object({
+  bead_id: z.string().uuid(),
+  depends_on: z.array(z.string().uuid()).optional(),
+});
+
+/**
+ * POST /api/mayor/:townId/tools/convoys/:convoyId/add-bead
+ * Add an existing bead to a convoy's tracking.
+ */
+export async function handleMayorConvoyAddBead(
+  c: Context<GastownEnv>,
+  params: { townId: string; convoyId: string }
+) {
+  const parsed = ConvoyAddBeadBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorConvoyAddBead: townId=${params.townId} convoyId=${params.convoyId} beadId=${parsed.data.bead_id}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const result = await town.convoyAddBead(
+    params.convoyId,
+    parsed.data.bead_id,
+    parsed.data.depends_on
+  );
+  return c.json(resSuccess(result));
+}
+
+const ConvoyRemoveBeadBody = z.object({
+  bead_id: z.string().uuid(),
+});
+
+/**
+ * POST /api/mayor/:townId/tools/convoys/:convoyId/remove-bead
+ * Remove a bead from a convoy's tracking.
+ */
+export async function handleMayorConvoyRemoveBead(
+  c: Context<GastownEnv>,
+  params: { townId: string; convoyId: string }
+) {
+  const parsed = ConvoyRemoveBeadBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorConvoyRemoveBead: townId=${params.townId} convoyId=${params.convoyId} beadId=${parsed.data.bead_id}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const result = await town.convoyRemoveBead(params.convoyId, parsed.data.bead_id);
   return c.json(resSuccess(result));
 }
 

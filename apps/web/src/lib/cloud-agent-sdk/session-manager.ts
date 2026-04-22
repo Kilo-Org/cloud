@@ -19,6 +19,8 @@ import type {
   CloudStatus,
   QuestionState,
   PermissionState,
+  SuggestionAction,
+  SuggestionState,
   MessageInfo,
   Part,
   TextPart,
@@ -52,6 +54,13 @@ type StandalonePermission = {
   patterns: string[];
   metadata: Record<string, unknown>;
   always: string[];
+};
+type StandaloneSuggestion = {
+  requestId: string;
+  text: string;
+  actions: SuggestionAction[];
+  /** Tool call ID that emitted this suggestion, when available. */
+  callId?: string;
 };
 
 type FetchedSessionData = {
@@ -127,6 +136,7 @@ type SessionManagerAtoms = {
   question: W<QuestionState | null>;
   activeQuestion: W<StandaloneQuestion | null>;
   activePermission: W<StandalonePermission | null>;
+  activeSuggestion: W<StandaloneSuggestion | null>;
   sessionInfo: W<SessionInfo | null>;
   sessionId: W<CloudAgentSessionId | null>;
   activity: W<SessionActivity>;
@@ -135,6 +145,7 @@ type SessionManagerAtoms = {
   sessionConfig: W<SessionConfig | null>;
   chatUI: W<{ shouldAutoScroll: boolean }>;
   permission: W<PermissionState | null>;
+  suggestion: W<SuggestionState | null>;
   failedPrompt: W<string | null>;
   fetchedSessionData: W<FetchedSessionData | null>;
   messagesList: Atom<StoredMessage[]>;
@@ -157,6 +168,8 @@ type SessionManager = {
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
   respondToPermission(requestId: string, response: 'once' | 'always' | 'reject'): Promise<void>;
+  acceptSuggestion(requestId: string, index: number): Promise<void>;
+  dismissSuggestion(requestId: string): Promise<void>;
   createAndStart(input: PrepareInput): Promise<void>;
   clearError(): void;
   destroy(): void;
@@ -265,6 +278,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const activeQuestionAtom = atom<StandaloneQuestion | null>(null);
   const permissionAtom = atom<PermissionState | null>(null);
   const activePermissionAtom = atom<StandalonePermission | null>(null);
+  const suggestionAtom = atom<SuggestionState | null>(null);
+  const activeSuggestionAtom = atom<StandaloneSuggestion | null>(null);
   const failedPromptAtom = atom<string | null>(null);
   const fetchedSessionDataAtom = atom<FetchedSessionData | null>(null);
 
@@ -354,6 +369,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(activeQuestionAtom, null);
     store.set(permissionAtom, null);
     store.set(activePermissionAtom, null);
+    store.set(suggestionAtom, null);
+    store.set(activeSuggestionAtom, null);
     store.set(failedPromptAtom, null);
     store.set(fetchedSessionDataAtom, null);
     store.set(chatUIAtom, { shouldAutoScroll: true });
@@ -415,6 +432,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(isStreamingAtom, act.type === 'busy');
       store.set(questionAtom, session.state.getQuestion());
       store.set(permissionAtom, session.state.getPermission());
+      store.set(suggestionAtom, session.state.getSuggestion());
       store.set(sessionInfoAtom, session.state.getSessionInfo());
 
       // canSend factors in cloud status: preparing/finalizing blocks input
@@ -561,6 +579,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onPermissionResolved: requestId => {
         const ap = store.get(activePermissionAtom);
         if (ap?.requestId === requestId) store.set(activePermissionAtom, null);
+      },
+      onSuggestionAsked: (requestId, text, actions, callId) => {
+        store.set(activeSuggestionAtom, { requestId, text, actions, callId });
+      },
+      onSuggestionResolved: requestId => {
+        const as = store.get(activeSuggestionAtom);
+        if (as?.requestId === requestId) store.set(activeSuggestionAtom, null);
       },
       onResolved: resolved => {
         if (resolved.type === 'cloud-agent') activeSessionType = 'cloud-agent';
@@ -722,6 +747,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (currentSession) await currentSession.respondToPermission({ requestId, response });
   }
 
+  async function acceptSuggestion(requestId: string, index: number): Promise<void> {
+    if (currentSession) await currentSession.acceptSuggestion({ requestId, index });
+  }
+
+  async function dismissSuggestion(requestId: string): Promise<void> {
+    if (currentSession) await currentSession.dismissSuggestion({ requestId });
+  }
+
   async function createAndStart(input: PrepareInput): Promise<void> {
     try {
       const { cloudAgentSessionId, kiloSessionId } = await config.prepare(input);
@@ -754,6 +787,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     answerQuestion,
     rejectQuestion,
     respondToPermission,
+    acceptSuggestion,
+    dismissSuggestion,
     createAndStart,
     clearError: () => {
       store.set(errorAtom, null);
@@ -779,6 +814,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       activeQuestion: activeQuestionAtom,
       permission: permissionAtom,
       activePermission: activePermissionAtom,
+      suggestion: suggestionAtom,
+      activeSuggestion: activeSuggestionAtom,
       failedPrompt: failedPromptAtom,
       fetchedSessionData: fetchedSessionDataAtom,
       messagesList: messagesListAtom,
@@ -799,6 +836,7 @@ export type {
   SessionConfig,
   StandalonePermission,
   StandaloneQuestion,
+  StandaloneSuggestion,
   StoredMessage,
   FetchedSessionData,
   PrepareInput,

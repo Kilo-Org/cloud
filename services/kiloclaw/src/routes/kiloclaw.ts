@@ -61,6 +61,9 @@ kiloclaw.get('/config', c =>
         ? Object.keys(config.encryptedSecrets).filter(isCustomSecretEnvVar)
         : [],
       customSecretMeta: config.customSecretMeta ?? {},
+      vectorMemoryEnabled: config.vectorMemoryEnabled ?? false,
+      vectorMemoryModel: config.vectorMemoryModel ?? null,
+      dreamingEnabled: config.dreamingEnabled ?? false,
     });
   })
 );

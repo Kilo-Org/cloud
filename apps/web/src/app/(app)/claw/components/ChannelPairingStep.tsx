@@ -24,11 +24,15 @@ const CHANNEL_META: Record<PairingChannelId, { label: string; instruction: strin
 };
 
 export function ChannelPairingStep({
+  currentStep,
+  totalSteps,
   channelId,
   mutations,
   onComplete,
   onSkip,
 }: {
+  currentStep: number;
+  totalSteps: number;
   channelId: PairingChannelId;
   mutations: ClawMutations;
   onComplete: () => void;
@@ -96,6 +100,8 @@ export function ChannelPairingStep({
 
   return (
     <ChannelPairingStepView
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       channelId={channelId}
       matchingRequest={displayedRequest ?? null}
       isApproving={isApproving}
@@ -106,6 +112,8 @@ export function ChannelPairingStep({
 }
 
 type ChannelPairingStepViewProps = {
+  currentStep: number;
+  totalSteps: number;
   channelId: PairingChannelId;
   matchingRequest: { code: string; channel: string; id: string } | null;
   isApproving?: boolean;
@@ -114,6 +122,8 @@ type ChannelPairingStepViewProps = {
 };
 
 export function ChannelPairingStepView({
+  currentStep,
+  totalSteps,
   channelId,
   matchingRequest,
   isApproving = false,
@@ -125,8 +135,8 @@ export function ChannelPairingStepView({
   if (matchingRequest) {
     return (
       <OnboardingStepView
-        currentStep={5}
-        totalSteps={5}
+        currentStep={currentStep}
+        totalSteps={totalSteps}
         title={`Pair your ${meta.label} bot`}
         description={meta.instruction}
         contentClassName="gap-6"
@@ -186,8 +196,8 @@ export function ChannelPairingStepView({
 
   return (
     <OnboardingStepView
-      currentStep={5}
-      totalSteps={5}
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       title={`Pair your ${meta.label} bot`}
       description={meta.instruction}
       contentClassName="gap-8"

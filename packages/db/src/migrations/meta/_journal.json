@@ -698,8 +698,22 @@
     {
       "idx": 99,
       "version": "7",
-      "when": 1776811887960,
-      "tag": "0099_credit_campaigns",
+      "when": 1776849044702,
+      "tag": "0099_abandoned_sugar_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1776859218609,
+      "tag": "0100_yellow_eternity",
+      "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1776868549631,
+      "tag": "0101_credit_campaigns",
       "breakpoints": true
     }
   ]

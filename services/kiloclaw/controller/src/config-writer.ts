@@ -495,6 +495,68 @@ export function generateBaseConfig(
     console.log('Hooks enabled with inbound email mapping (dedicated token)');
   }
 
+  // Vector memory configuration — configures OpenClaw's builtin memory search
+  // to use the Kilo Gateway embeddings endpoint via the OpenAI-compatible adapter.
+  // Only introduce the memorySearch schema when the feature is being enabled, or
+  // when an existing config already contains it (so we can flip it off / clean up
+  // stale remote blocks). Older OpenClaw versions (< 2026.4.5) don't recognize
+  // this schema and will reject it during `doctor` validation before the user
+  // has a chance to upgrade.
+  if (env.KILOCLAW_VECTOR_MEMORY_ENABLED === 'true') {
+    // Source of truth for the default: worker
+    // `services/kiloclaw/src/schemas/instance-config.ts` → DEFAULT_VECTOR_MEMORY_MODEL.
+    // Duplicated here because the controller bundle is built from an isolated
+    // COPY of `controller/` and cannot import from the worker tree.
+    const model = env.KILOCLAW_VECTOR_MEMORY_MODEL || 'mistralai/mistral-embed-2312';
+    const baseUrl = env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
+
+    config.agents = config.agents ?? {};
+    config.agents.defaults = config.agents.defaults ?? {};
+    config.agents.defaults.memorySearch = config.agents.defaults.memorySearch ?? {};
+    config.agents.defaults.memorySearch.enabled = true;
+    config.agents.defaults.memorySearch.provider = 'openai';
+    config.agents.defaults.memorySearch.model = model;
+    config.agents.defaults.memorySearch.remote = {
+      baseUrl,
+      apiKey: env.KILOCODE_API_KEY || '',
+      headers: {
+        // Feature attribution for embedding calls — mirrors FEATURE_VALUES in
+        // apps/web/src/lib/feature-detection.ts. Hardcoded because the controller
+        // bundle is built from an isolated COPY and cannot import from the worker tree.
+        'x-kilocode-feature': 'kiloclaw-embedding',
+        ...(env.KILOCODE_ORGANIZATION_ID
+          ? { 'X-KiloCode-OrganizationId': env.KILOCODE_ORGANIZATION_ID }
+          : {}),
+      },
+    };
+    console.log(`Vector memory enabled: provider=openai model=${model}`);
+  } else if (config.agents?.defaults?.memorySearch) {
+    config.agents.defaults.memorySearch.enabled = false;
+    // Clean up stale remote config from previous boots where memory was enabled.
+    delete config.agents.defaults.memorySearch.provider;
+    delete config.agents.defaults.memorySearch.model;
+    delete config.agents.defaults.memorySearch.remote;
+  }
+
+  // Dreaming configuration — enables OpenClaw's background memory consolidation
+  // (moves strong short-term signals into durable long-term memory automatically).
+  // Only introduce the dreaming schema when the feature is being enabled, or when
+  // an existing config already contains it. Older OpenClaw versions don't
+  // recognize this schema (same upgrade gate as memorySearch above).
+  if (env.KILOCLAW_DREAMING_ENABLED === 'true') {
+    config.plugins = config.plugins ?? {};
+    config.plugins.entries = config.plugins.entries ?? {};
+    config.plugins.entries['memory-core'] = config.plugins.entries['memory-core'] ?? {};
+    config.plugins.entries['memory-core'].config =
+      config.plugins.entries['memory-core'].config ?? {};
+    config.plugins.entries['memory-core'].config.dreaming =
+      config.plugins.entries['memory-core'].config.dreaming ?? {};
+    config.plugins.entries['memory-core'].config.dreaming.enabled = true;
+    console.log('Dreaming enabled');
+  } else if (config.plugins?.entries?.['memory-core']?.config?.dreaming) {
+    config.plugins.entries['memory-core'].config.dreaming.enabled = false;
+  }
+
   // Custom secret config path patching — set decrypted secret values at
   // user-specified JSON dot-notation paths in openclaw.json.
   if (env.KILOCLAW_SECRET_CONFIG_PATHS) {

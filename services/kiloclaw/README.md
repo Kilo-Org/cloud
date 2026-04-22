@@ -73,9 +73,9 @@ pnpm format           # oxfmt
 pnpm start            # wrangler dev
 ```
 
-## Docker-Local Provider
+## Docker-Local Provider (Default)
 
-`docker-local` is a development-only provider that lets `wrangler dev` provision one or more KiloClaw instances as Docker containers on your machine. It uses the same controller image and injects the same runtime env vars as Fly, but routes through a host port instead of the Fly proxy.
+`docker-local` is the default provider for local development. It lets `wrangler dev` provision KiloClaw instances as Docker containers on your machine — no Fly.io access required. It uses the same controller image and injects the same runtime env vars as Fly, but routes through a host port instead of the Fly proxy.
 
 1. Expose the local Docker socket over loopback for Wrangler:
 
@@ -96,7 +96,7 @@ pnpm start            # wrangler dev
    ./scripts/build-local-image.sh --local
    ```
 
-3. Update `services/kiloclaw/.dev.vars` after it has been created by `pnpm dev:env` or `./scripts/dev-start.sh`:
+3. Run `pnpm dev:env` to create `.dev.vars`. The default configuration already sets `KILOCLAW_DEFAULT_PROVIDER=docker-local` with the correct Docker settings:
 
    ```bash
    WORKER_ENV=development
@@ -114,18 +114,26 @@ pnpm start            # wrangler dev
    pnpm start
    ```
 
-   New provisions without an explicit provider use `KILOCLAW_DEFAULT_PROVIDER`. You can also pass `provider: "docker-local"` to the platform provision endpoint when you want Fly to remain the default.
+   New provisions without an explicit provider use `KILOCLAW_DEFAULT_PROVIDER`. You can also pass `provider: "fly"` to the platform provision endpoint if you need Fly for a specific test.
 
 Rebuild the image after controller or Dockerfile changes, then restart or redeploy the instance so the container is recreated with the new image/env/config. A plain `start` leaves an already-running docker-local container intact.
+
+## Fly Provider
+
+To use Fly.io instead of docker-local (requires access to the `kilo-dev` org on Fly.io):
+
+1. Set `KILOCLAW_DEFAULT_PROVIDER=fly` in `services/kiloclaw/.dev.vars`
+2. Run `pnpm dev:env` — this will auto-create `FLY_API_TOKEN` via `fly tokens create org kilo-dev`
+3. Push a dev image with `./scripts/push-dev.sh` (or ask a team member for `FLY_IMAGE_TAG` / `FLY_IMAGE_DIGEST` values)
 
 ## Environment
 
 See `.dev.vars.example` for required environment variables. Key ones:
 
-- `FLY_API_TOKEN` — Bearer token for Fly Machines API
-- `FLY_APP_NAME` — Fly App hosting all user machines
+- `KILOCLAW_DEFAULT_PROVIDER` — Local default provider (`docker-local` or `fly`; default: `docker-local`)
+- `FLY_API_TOKEN` — Bearer token for Fly Machines API (only needed when using the `fly` provider)
+- `FLY_APP_NAME` — Fly App hosting all user machines (only needed when using the `fly` provider)
 - `FLY_REGION` — Default region (comma-separated priority list, e.g., `us,eu`)
-- `KILOCLAW_DEFAULT_PROVIDER` — Local default provider (`fly` or `docker-local`)
 - `DOCKER_LOCAL_API_BASE` — Loopback Docker HTTP bridge for `docker-local`
 - `DOCKER_LOCAL_IMAGE` — Local image tag used by `docker-local`
 - `NEXTAUTH_SECRET` — JWT verification (shared with Next.js)

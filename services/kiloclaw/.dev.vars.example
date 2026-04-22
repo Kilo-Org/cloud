@@ -7,7 +7,7 @@
 #   GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET,
 #   GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY            (synced from Vercel)
 #   KILOCLAW_CHECKIN_URL                                     (set from tunnel URL)
-#   FLY_API_TOKEN                                            (auto-created once in .env.local)
+#   FLY_API_TOKEN                                            (auto-created when provider=fly)
 #   KILOCODE_API_BASE_URL                                    (set from tunnel URL)
 #
 # Values you may need to set manually:
@@ -27,8 +27,10 @@ KILOCLAW_INTERNAL_API_SECRET=dev-internal-secret
 # Auth (static defaults — these work as-is for local dev)
 # HMAC secret for deriving per-sandbox gateway tokens (machine authentication)
 GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw
-# Default provider for new provisions in local dev. Use "fly" or "docker-local".
-KILOCLAW_DEFAULT_PROVIDER=fly
+# Default provider for new provisions in local dev. Use "docker-local" or "fly".
+# docker-local runs containers on your machine (no Fly.io access needed).
+# fly requires access to the kilo-dev org on Fly.io.
+KILOCLAW_DEFAULT_PROVIDER=docker-local
 # Override WORKER_ENV to "development" for local development.
 # Production default is set in wrangler.jsonc. This selects the development
 # Fly app naming prefix ("dev-") for per-user app creation.
@@ -70,9 +72,9 @@ GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET=
 # @from GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY
 GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY=
 
-# Fly.io Machines API
-# Token is auto-created once in .env.local by `pnpm dev:env` using
-# `fly tokens create org <FLY_ORG_SLUG>`, then synced here.
+# Fly.io Machines API (only needed when KILOCLAW_DEFAULT_PROVIDER=fly)
+# Token is auto-created in .env.local by `pnpm dev:env` when the provider is "fly",
+# using `fly tokens create org <FLY_ORG_SLUG>`. Skipped for docker-local.
 # @from FLY_API_TOKEN
 FLY_API_TOKEN=
 # Fly org slug. The dev-start script reads this value for token creation.

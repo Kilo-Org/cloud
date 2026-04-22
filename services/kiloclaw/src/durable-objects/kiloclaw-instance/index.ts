@@ -22,7 +22,11 @@ import type {
   ProviderState,
   KiloExaSearchMode,
 } from '../../schemas/instance-config';
-import { DEFAULT_INSTANCE_FEATURES, ProviderStateSchema } from '../../schemas/instance-config';
+import {
+  DEFAULT_INSTANCE_FEATURES,
+  DEFAULT_VECTOR_MEMORY_MODEL,
+  ProviderStateSchema,
+} from '../../schemas/instance-config';
 import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
 import * as fly from '../../fly/client';
 import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '../../auth/sandbox-id';
@@ -808,10 +812,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     kilocodeApiKey?: string | null;
     kilocodeApiKeyExpiresAt?: string | null;
     kilocodeDefaultModel?: string | null;
+    vectorMemoryEnabled?: boolean;
+    vectorMemoryModel?: string | null;
+    dreamingEnabled?: boolean;
   }): Promise<{
     kilocodeApiKey: string | null;
     kilocodeApiKeyExpiresAt: string | null;
     kilocodeDefaultModel: string | null;
+    vectorMemoryEnabled: boolean;
+    vectorMemoryModel: string | null;
+    dreamingEnabled: boolean;
   }> {
     await this.loadState();
 
@@ -829,6 +839,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.kilocodeDefaultModel = patch.kilocodeDefaultModel;
       pending.kilocodeDefaultModel = this.s.kilocodeDefaultModel;
     }
+    if (patch.vectorMemoryEnabled !== undefined) {
+      this.s.vectorMemoryEnabled = patch.vectorMemoryEnabled;
+      pending.vectorMemoryEnabled = this.s.vectorMemoryEnabled;
+    }
+    if (patch.vectorMemoryModel !== undefined) {
+      this.s.vectorMemoryModel = patch.vectorMemoryModel;
+      pending.vectorMemoryModel = this.s.vectorMemoryModel;
+    }
+    if (patch.dreamingEnabled !== undefined) {
+      this.s.dreamingEnabled = patch.dreamingEnabled;
+      pending.dreamingEnabled = this.s.dreamingEnabled;
+    }
 
     if (Object.keys(pending).length > 0) {
       await this.ctx.storage.put(pending);
@@ -841,10 +863,78 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       });
     }
 
+    // Live-patch vector memory config on the running machine when toggled or model changed.
+    // Must include the full `remote` block (baseUrl, apiKey, headers) so OpenClaw routes
+    // embedding requests through the Kilo Gateway instead of the default OpenAI endpoint.
+    if (patch.vectorMemoryEnabled !== undefined || patch.vectorMemoryModel !== undefined) {
+      if (this.s.vectorMemoryEnabled) {
+        const model = this.s.vectorMemoryModel ?? DEFAULT_VECTOR_MEMORY_MODEL;
+        const baseUrl = this.env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
+        // Feature attribution for embedding calls — matches FEATURE_HEADER /
+        // FEATURE_VALUES in apps/web/src/lib/feature-detection.ts so that
+        // microdollar_usage_metadata.feature_id records 'kiloclaw-embedding'.
+        const headers: Record<string, string> = {
+          'x-kilocode-feature': 'kiloclaw-embedding',
+        };
+        if (this.s.orgId) {
+          headers['X-KiloCode-OrganizationId'] = this.s.orgId;
+        }
+        await gateway.patchConfigOnMachine(this.s, this.env, {
+          agents: {
+            defaults: {
+              memorySearch: {
+                enabled: true,
+                provider: 'openai',
+                model,
+                remote: {
+                  baseUrl,
+                  apiKey: this.s.kilocodeApiKey ?? '',
+                  headers,
+                },
+              },
+            },
+          },
+        });
+      } else {
+        // Send explicit nulls so deepMerge overwrites (rather than preserves)
+        // the stale remote block — the boot-time writer deletes these keys.
+        await gateway.patchConfigOnMachine(this.s, this.env, {
+          agents: {
+            defaults: {
+              memorySearch: {
+                enabled: false,
+                provider: null,
+                model: null,
+                remote: null,
+              },
+            },
+          },
+        });
+      }
+    }
+
+    // Live-patch dreaming config on the running machine when toggled.
+    if (patch.dreamingEnabled !== undefined) {
+      await gateway.patchConfigOnMachine(this.s, this.env, {
+        plugins: {
+          entries: {
+            'memory-core': {
+              config: {
+                dreaming: { enabled: this.s.dreamingEnabled },
+              },
+            },
+          },
+        },
+      });
+    }
+
     return {
       kilocodeApiKey: this.s.kilocodeApiKey,
       kilocodeApiKeyExpiresAt: this.s.kilocodeApiKeyExpiresAt,
       kilocodeDefaultModel: this.s.kilocodeDefaultModel,
+      vectorMemoryEnabled: this.s.vectorMemoryEnabled,
+      vectorMemoryModel: this.s.vectorMemoryModel,
+      dreamingEnabled: this.s.dreamingEnabled,
     };
   }
 
@@ -2259,7 +2349,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
-  async getConfig(): Promise<InstanceConfig> {
+  async getConfig(): Promise<
+    InstanceConfig & {
+      vectorMemoryEnabled: boolean;
+      vectorMemoryModel: string | null;
+      dreamingEnabled: boolean;
+    }
+  > {
     await this.loadState();
     return {
       envVars: this.s.envVars ?? undefined,
@@ -2276,6 +2372,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       channels: this.s.channels ?? undefined,
       machineSize: this.s.machineSize ?? undefined,
       customSecretMeta: this.s.customSecretMeta ?? undefined,
+      vectorMemoryEnabled: this.s.vectorMemoryEnabled,
+      vectorMemoryModel: this.s.vectorMemoryModel,
+      dreamingEnabled: this.s.dreamingEnabled,
     };
   }
 

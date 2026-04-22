@@ -33,6 +33,7 @@ export const preferredModels = [
   KILO_AUTO_FRONTIER_MODEL.id,
   KILO_AUTO_BALANCED_MODEL.id,
   KILO_AUTO_FREE_MODEL.id,
+  'inclusionai/ling-2.6-flash:free',
   seed_20_pro_free_model.status === 'public' ? seed_20_pro_free_model.public_id : null,
   grok_code_fast_1_optimized_free_model.status === 'public'
     ? grok_code_fast_1_optimized_free_model.public_id
@@ -45,6 +46,7 @@ export const preferredModels = [
   'openai/gpt-5.4',
   'google/gemini-3.1-pro-preview',
   MINIMAX_CURRENT_MODEL_ID,
+  qwen36_plus_model.public_id,
   'z-ai/glm-5.1',
 ].filter(m => m !== null);
 

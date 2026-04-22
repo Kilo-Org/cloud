@@ -193,6 +193,30 @@ describe('CloudAgentTransport event routing', () => {
 
     transport.destroy();
   });
+
+  it('drops suggestion events since cloud-agent has no accept/dismiss command path', async () => {
+    const { transport, chatEvents, serviceEvents } = createTransportWithSinks();
+
+    transport.connect();
+    await flushPromises();
+
+    const serviceCountBefore = serviceEvents.length;
+
+    sendRaw(
+      kilocode('suggestion.shown', {
+        id: 'sug-1',
+        text: 'review your changes',
+        actions: [{ label: 'review', prompt: '/review' }],
+      })
+    );
+    sendRaw(kilocode('suggestion.accepted', { requestID: 'sug-1', index: 0 }));
+    sendRaw(kilocode('suggestion.dismissed', { requestID: 'sug-1' }));
+
+    expect(serviceEvents).toHaveLength(serviceCountBefore);
+    expect(chatEvents).toHaveLength(0);
+
+    transport.destroy();
+  });
 });
 
 describe('CloudAgentTransport unexpected disconnect', () => {

@@ -161,6 +161,15 @@ export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;
 export type EncryptedEnvelope = z.infer<typeof EncryptedEnvelopeSchema>;
 export type EncryptedChannelTokens = NonNullable<InstanceConfig['channels']>;
 
+/**
+ * Default embedding model for vector memory when no model is explicitly
+ * selected. The controller (`controller/src/config-writer.ts`) and the UI
+ * (`apps/web/src/app/(app)/claw/components/embeddingModels.ts`) keep their
+ * own copies of this literal because they are bundled separately from the
+ * worker — when changing this constant, update all three locations.
+ */
+export const DEFAULT_VECTOR_MEMORY_MODEL = 'mistralai/mistral-embed-2312';
+
 // TODO: Legacy — no UI callers remain. Remove alongside patchChannels tRPC
 // mutation and PATCH /api/platform/channels worker route.
 export const ChannelsPatchSchema = z.object({
@@ -373,6 +382,12 @@ export const PersistedStateSchema = z.object({
   streamChatBotUserId: z.string().nullable().default(null),
   streamChatBotUserToken: z.string().nullable().default(null),
   streamChatChannelId: z.string().nullable().default(null),
+  // Vector memory: whether the builtin embedding-backed memory search is enabled.
+  vectorMemoryEnabled: z.boolean().default(false),
+  // Vector memory: embedding model ID (e.g. "mistralai/mistral-embed-2312").
+  vectorMemoryModel: z.string().nullable().default(null),
+  // Dreaming: whether background memory consolidation is enabled.
+  dreamingEnabled: z.boolean().default(false),
 });
 
 export type PersistedState = z.infer<typeof PersistedStateSchema>;

@@ -1,5 +1,5 @@
 {
-  "id": "89bfc4b6-ccb0-4260-81b2-ba2559861821",
+  "id": "fe932bc1-4a8b-40d5-8bef-8582513b3228",
   "prevId": "33b84f22-2bd6-4a25-8f99-e8a944b8ad8f",
   "version": "7",
   "dialect": "postgresql",
@@ -2590,6 +2590,213 @@
           "value": "\"auto_triage_tickets\".\"action_taken\" IN ('pr_created', 'comment_posted', 'closed_duplicate', 'needs_clarification')"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.bot_request_cloud_agent_sessions": {
+      "name": "bot_request_cloud_agent_sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "bot_request_id": {
+          "name": "bot_request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "spawn_group_id": {
+          "name": "spawn_group_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cloud_agent_session_id": {
+          "name": "cloud_agent_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_session_id": {
+          "name": "kilo_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "execution_id": {
+          "name": "execution_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'running'"
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "github_repo": {
+          "name": "github_repo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gitlab_project": {
+          "name": "gitlab_project",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "callback_step": {
+          "name": "callback_step",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "terminal_at": {
+          "name": "terminal_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "continuation_started_at": {
+          "name": "continuation_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_bot_request_cas_cloud_agent_session_id": {
+          "name": "UQ_bot_request_cas_cloud_agent_session_id",
+          "columns": [
+            {
+              "expression": "cloud_agent_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bot_request_cas_bot_request_id": {
+          "name": "IDX_bot_request_cas_bot_request_id",
+          "columns": [
+            {
+              "expression": "bot_request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bot_request_cas_bot_request_id_spawn_group_id": {
+          "name": "IDX_bot_request_cas_bot_request_id_spawn_group_id",
+          "columns": [
+            {
+              "expression": "bot_request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "spawn_group_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bot_request_cas_bot_request_id_spawn_group_id_status": {
+          "name": "IDX_bot_request_cas_bot_request_id_spawn_group_id_status",
+          "columns": [
+            {
+              "expression": "bot_request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "spawn_group_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "bot_request_cloud_agent_sessions_bot_request_id_bot_requests_id_fk": {
+          "name": "bot_request_cloud_agent_sessions_bot_request_id_bot_requests_id_fk",
+          "tableFrom": "bot_request_cloud_agent_sessions",
+          "tableTo": "bot_requests",
+          "columnsFrom": [
+            "bot_request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.bot_requests": {
@@ -5226,142 +5433,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.credit_campaigns": {
-      "name": "credit_campaigns",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "credit_category": {
-          "name": "credit_category",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount_microdollars": {
-          "name": "amount_microdollars",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "credit_expiry_hours": {
-          "name": "credit_expiry_hours",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "campaign_ends_at": {
-          "name": "campaign_ends_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "total_redemptions_allowed": {
-          "name": "total_redemptions_allowed",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "active": {
-          "name": "active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by_kilo_user_id": {
-          "name": "created_by_kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_credit_campaigns_slug": {
-          "name": "UQ_credit_campaigns_slug",
-          "columns": [
-            {
-              "expression": "slug",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_credit_campaigns_credit_category": {
-          "name": "UQ_credit_campaigns_credit_category",
-          "columns": [
-            {
-              "expression": "credit_category",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "credit_campaigns_slug_format_check": {
-          "name": "credit_campaigns_slug_format_check",
-          "value": "\"credit_campaigns\".\"slug\" ~ '^[a-z0-9-]{5,40}$'"
-        },
-        "credit_campaigns_amount_positive_check": {
-          "name": "credit_campaigns_amount_positive_check",
-          "value": "\"credit_campaigns\".\"amount_microdollars\" > 0"
-        },
-        "credit_campaigns_credit_expiry_hours_positive_check": {
-          "name": "credit_campaigns_credit_expiry_hours_positive_check",
-          "value": "\"credit_campaigns\".\"credit_expiry_hours\" IS NULL OR \"credit_campaigns\".\"credit_expiry_hours\" > 0"
-        },
-        "credit_campaigns_total_redemptions_allowed_positive_check": {
-          "name": "credit_campaigns_total_redemptions_allowed_positive_check",
-          "value": "\"credit_campaigns\".\"total_redemptions_allowed\" > 0"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.credit_transactions": {

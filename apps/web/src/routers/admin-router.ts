@@ -16,6 +16,7 @@ import {
   kiloclaw_subscription_change_log,
   kiloclaw_email_log,
   kiloclaw_instances,
+  organizations,
 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
@@ -39,6 +40,7 @@ import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router'
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
+import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminSecurityAdvisorContentRouter } from '@/routers/admin/security-advisor-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
@@ -260,7 +262,7 @@ const ResetToMagicLinkLoginSchema = z.object({
 
 const UpdateUserBlockStatusSchema = z.object({
   userId: z.string(),
-  blocked_reason: z.string().nullable(),
+  blocked_reason: z.string().trim().min(1).nullable(),
 });
 
 const GetStytchFingerprintsSchema = z.object({
@@ -477,10 +479,22 @@ export const adminRouter = createTRPCRouter({
 
     updateBlockStatus: adminProcedure
       .input(UpdateUserBlockStatusSchema)
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        const blockMetadata = input.blocked_reason
+          ? {
+              blocked_reason: input.blocked_reason,
+              blocked_at: new Date().toISOString(),
+              blocked_by_kilo_user_id: ctx.user.id,
+            }
+          : {
+              blocked_reason: null,
+              blocked_at: null,
+              blocked_by_kilo_user_id: null,
+            };
+
         await db
           .update(kilocode_users)
-          .set({ blocked_reason: input.blocked_reason })
+          .set(blockMetadata)
           .where(eq(kilocode_users.id, input.userId));
 
         return successResult();
@@ -680,8 +694,11 @@ export const adminRouter = createTRPCRouter({
             name: kiloclaw_instances.name,
             sandbox_id: kiloclaw_instances.sandbox_id,
             destroyed_at: kiloclaw_instances.destroyed_at,
+            organization_id: kiloclaw_instances.organization_id,
+            organization_name: organizations.name,
           })
           .from(kiloclaw_instances)
+          .leftJoin(organizations, eq(organizations.id, kiloclaw_instances.organization_id))
           .where(eq(kiloclaw_instances.user_id, input.userId)),
       ]);
 
@@ -1396,7 +1413,11 @@ export const adminRouter = createTRPCRouter({
           if (!user.blocked_reason) {
             await tx
               .update(kilocode_users)
-              .set({ blocked_reason: input.reason })
+              .set({
+                blocked_reason: input.reason,
+                blocked_at: new Date().toISOString(),
+                blocked_by_kilo_user_id: ctx.user.id,
+              })
               .where(eq(kilocode_users.id, input.userId));
           }
 
@@ -1910,6 +1931,7 @@ export const adminRouter = createTRPCRouter({
   customLlm: adminCustomLlmRouter,
   gatewayConfig: adminGatewayConfigRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
+  bulkBlock: adminBulkBlockRouter,
   securityAdvisorContent: adminSecurityAdvisorContentRouter,
   freeModelUsage: adminFreeModelUsageRouter,
 });

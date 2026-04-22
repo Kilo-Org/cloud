@@ -82,6 +82,32 @@ function getAliveCurrentRows(rows: PersonalSubscriptionRow[]): PersonalSubscript
   return getCurrentRows(rows).filter(row => row.instance.destroyedAt === null);
 }
 
+function isAccessGrantingSubscription(
+  row: Pick<KiloClawSubscription, 'status' | 'suspended_at' | 'trial_ends_at'>,
+  now: Date
+): boolean {
+  if (row.status === 'active') return true;
+  if (row.status === 'past_due' && !row.suspended_at) return true;
+  if (row.status === 'trialing' && row.trial_ends_at) {
+    return new Date(row.trial_ends_at).getTime() > now.getTime();
+  }
+  return false;
+}
+
+function shouldCancelSingleDestroyedCurrentAccessRow(row: KiloClawSubscription): boolean {
+  if (row.stripe_subscription_id !== null) {
+    return false;
+  }
+  if (row.plan === 'trial' && row.status === 'trialing' && row.payment_source === null) {
+    return true;
+  }
+  return (
+    (row.plan === 'standard' || row.plan === 'commit') &&
+    row.status === 'active' &&
+    row.payment_source === 'credits'
+  );
+}
+
 type TransferUpdate = {
   before: KiloClawSubscription;
   transferredToSubscriptionId: string | null;
@@ -98,6 +124,7 @@ type ChangeLogFailureContext = {
 
 type CollapseOptions = {
   changeLogFailurePolicy?: ChangeLogFailurePolicy;
+  cancelSingleCurrentAccessRow?: boolean;
   onChangeLogFailure?: (context: ChangeLogFailureContext) => Promise<void> | void;
 };
 
@@ -118,6 +145,53 @@ function buildTransferUpdates(rows: PersonalSubscriptionRow[]): TransferUpdate[]
   }
 
   return updates;
+}
+
+async function cancelSingleDestroyedCurrentAccessRow(params: {
+  actor: KiloClawSubscriptionChangeActor;
+  executor: PersonalSubscriptionCollapseWriter;
+  reason: string;
+  row: KiloClawSubscription;
+}): Promise<string | null> {
+  if (!isAccessGrantingSubscription(params.row, new Date())) {
+    return null;
+  }
+  if (!shouldCancelSingleDestroyedCurrentAccessRow(params.row)) {
+    return null;
+  }
+
+  const [after] = await params.executor
+    .update(kiloclaw_subscriptions)
+    .set({
+      status: 'canceled',
+      suspended_at: null,
+      destruction_deadline: null,
+      auto_resume_requested_at: null,
+      auto_resume_retry_after: null,
+      auto_resume_attempt_count: 0,
+      auto_top_up_triggered_for_period: null,
+      cancel_at_period_end: false,
+      pending_conversion: false,
+      scheduled_plan: null,
+      scheduled_by: null,
+    })
+    .where(eq(kiloclaw_subscriptions.id, params.row.id))
+    .returning();
+
+  if (!after) {
+    throw new Error(`Failed to cancel destroyed current subscription ${params.row.id}`);
+  }
+
+  await insertKiloClawSubscriptionChangeLog(params.executor, {
+    subscriptionId: after.id,
+    actor: params.actor,
+    action: 'canceled',
+    reason: params.reason,
+    before: params.row,
+    after,
+  });
+
+  return after.id;
 }
 
 async function applyTransferUpdates(
@@ -183,6 +257,7 @@ export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
   destroyedInstanceId: string;
   executor: PersonalSubscriptionCollapseWriter;
   onChangeLogFailure?: (context: ChangeLogFailureContext) => Promise<void> | void;
+  cancelSingleCurrentAccessRow?: boolean;
   reason: string;
   userId: string;
 }): Promise<{ updatedSubscriptionIds: string[] }> {
@@ -202,8 +277,27 @@ export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
     row => row.instance.id !== params.destroyedInstanceId
   );
 
-  if (currentRows.length <= 1 || aliveRowsAfterDestroy.length > 0) {
+  if (aliveRowsAfterDestroy.length > 0) {
     return { updatedSubscriptionIds: [] };
+  }
+
+  if (currentRows.length === 1) {
+    if (!params.cancelSingleCurrentAccessRow) {
+      return { updatedSubscriptionIds: [] };
+    }
+
+    const [currentRow] = currentRows;
+    if (currentRow?.instance.id !== params.destroyedInstanceId) {
+      return { updatedSubscriptionIds: [] };
+    }
+
+    const canceledSubscriptionId = await cancelSingleDestroyedCurrentAccessRow({
+      actor: params.actor,
+      executor: params.executor,
+      reason: 'destroy_path_cancel_single_current_access_row',
+      row: currentRow.subscription,
+    });
+    return { updatedSubscriptionIds: canceledSubscriptionId ? [canceledSubscriptionId] : [] };
   }
 
   const updates = buildTransferUpdates(personalRows);
@@ -300,6 +394,7 @@ export async function markInstanceDestroyedWithPersonalSubscriptionCollapse(para
       changeLogFailurePolicy: params.changeLogFailurePolicy,
       destroyedInstanceId: destroyedInstance.id,
       executor: params.executor,
+      cancelSingleCurrentAccessRow: true,
       onChangeLogFailure: params.onChangeLogFailure,
       reason: params.reason,
       userId: params.userId,

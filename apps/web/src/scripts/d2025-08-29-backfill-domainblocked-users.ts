@@ -78,7 +78,11 @@ async function backfillDomainBlockedUsers() {
       if (!isDryRun) {
         await db
           .update(kilocode_users)
-          .set({ blocked_reason: 'domainblocked' })
+          .set({
+            blocked_reason: 'domainblocked',
+            blocked_at: new Date().toISOString(),
+            blocked_by_kilo_user_id: null,
+          })
           .where(
             sql`${kilocode_users.id} IN (${sql.join(
               userIds.map(id => sql`${id}`),

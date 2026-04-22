@@ -1,15 +1,39 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import Link from 'next/link';
+import { toast } from 'sonner';
 import type { BulkBlockResponse } from '@/lib/abuse/bulkBlock';
 
-export function AbuseBulkBlock() {
+function BulkBlockTab() {
   const [rawIds, setRawIds] = useState('');
   const [reason, setReason] = useState('');
   const [result, setResult] = useState<BulkBlockResponse | null>(null);
@@ -98,5 +122,203 @@ export function AbuseBulkBlock() {
         </div>
       </div>
     </div>
+  );
+}
+
+type RecentBlockRow = {
+  blocked_reason: string;
+  date: string;
+  blocked_by_kilo_user_id: string | null;
+  blocked_by_email: string | null;
+  blocked_count: number;
+};
+
+function formatBlockedBy(
+  row: Pick<RecentBlockRow, 'blocked_by_email' | 'blocked_by_kilo_user_id'>
+) {
+  return row.blocked_by_email ?? row.blocked_by_kilo_user_id ?? 'Unknown';
+}
+
+function RecentBlocksTab() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [unblockTarget, setUnblockTarget] = useState<RecentBlockRow | null>(null);
+
+  const { data, isLoading } = useQuery(trpc.admin.bulkBlock.recentBlocks.queryOptions());
+
+  const unblockMutation = useMutation(
+    trpc.admin.bulkBlock.unblockRecentBlock.mutationOptions({
+      onSuccess: result => {
+        setUnblockTarget(null);
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.bulkBlock.recentBlocks.queryKey(),
+        });
+        toast.success(`Unblocked ${result.updatedCount.toLocaleString()} users`);
+      },
+      onError: error => {
+        toast.error(error.message || 'Failed to unblock users');
+      },
+    })
+  );
+
+  const rows = data ?? [];
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Bulk Blocks</CardTitle>
+          <CardDescription>
+            Blocked accounts grouped by reason, block date, and admin.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+          ) : rows.length === 0 ? (
+            <div className="text-muted-foreground py-8 text-center">No blocked accounts found</div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Block Reason</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Blocked By</TableHead>
+                    <TableHead className="text-right">Accounts Blocked</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map(row => (
+                    <TableRow
+                      key={`${row.blocked_reason}-${row.date}-${row.blocked_by_kilo_user_id ?? 'unknown'}`}
+                    >
+                      <TableCell className="font-medium">
+                        <code className="bg-muted rounded px-2 py-1 text-sm">
+                          {row.blocked_reason}
+                        </code>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{row.date}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {row.blocked_by_kilo_user_id ? (
+                          <Link
+                            href={`/admin/users/${encodeURIComponent(row.blocked_by_kilo_user_id)}`}
+                            className="text-primary hover:underline"
+                          >
+                            {formatBlockedBy(row)}
+                          </Link>
+                        ) : (
+                          'Unknown'
+                        )}
+                      </TableCell>
+                      <TableCell className="p-0 text-right">
+                        <Link
+                          href={`/admin/users?${new URLSearchParams({ notesSearch: row.blocked_reason, sortBy: 'blocked_at', sortOrder: 'desc', blockedStatus: 'blocked' })}`}
+                          className="text-primary hover:underline block px-4 py-2"
+                        >
+                          {row.blocked_count.toLocaleString()} users
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setUnblockTarget(row)}
+                          disabled={unblockMutation.isPending}
+                        >
+                          Unblock
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      <AlertDialog
+        open={unblockTarget !== null}
+        onOpenChange={open => {
+          if (!open && !unblockMutation.isPending) {
+            setUnblockTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unblock this bulk block?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {unblockTarget && (
+                <>
+                  This will unblock {unblockTarget.blocked_count.toLocaleString()} users with reason
+                  &ldquo;{unblockTarget.blocked_reason}&rdquo; from {unblockTarget.date}, blocked by{' '}
+                  {formatBlockedBy(unblockTarget)}. This cannot be undone automatically.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={unblockMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={!unblockTarget || unblockMutation.isPending}
+              onClick={() => {
+                if (!unblockTarget) return;
+                unblockMutation.mutate({
+                  blocked_reason: unblockTarget.blocked_reason,
+                  date: unblockTarget.date,
+                  blocked_by_kilo_user_id: unblockTarget.blocked_by_kilo_user_id,
+                });
+              }}
+            >
+              {unblockMutation.isPending ? 'Unblocking...' : 'Confirm unblock'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+const tabTriggerClass =
+  'text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
+
+const DEFAULT_TAB = 'bulk-block';
+
+export function AbuseBulkBlock() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab') || DEFAULT_TAB;
+
+  function setActiveTab(tab: string) {
+    const params = new URLSearchParams(searchParams);
+    if (tab === DEFAULT_TAB) {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
+    }
+    const qs = params.toString();
+    router.push(qs ? `?${qs}` : window.location.pathname);
+  }
+
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
+        <TabsTrigger value="bulk-block" className={tabTriggerClass}>
+          Bulk Block
+        </TabsTrigger>
+        <TabsTrigger value="recent" className={tabTriggerClass}>
+          Recent Blocks
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="bulk-block" className="mt-4">
+        <BulkBlockTab />
+      </TabsContent>
+      <TabsContent value="recent" className="mt-4">
+        {activeTab === 'recent' && <RecentBlocksTab />}
+      </TabsContent>
+    </Tabs>
   );
 }

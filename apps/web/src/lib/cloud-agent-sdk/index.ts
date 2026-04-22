@@ -7,6 +7,7 @@ export type {
   SessionConfig,
   StandalonePermission,
   StandaloneQuestion,
+  StandaloneSuggestion,
   StoredMessage,
   FetchedSessionData,
   PrepareInput,
@@ -15,8 +16,10 @@ export type {
 export { createCloudAgentSession } from './session';
 export type {
   CloudAgentSession,
+  CloudAgentSessionAcceptSuggestionInput,
   CloudAgentSessionAnswerInput,
   CloudAgentSessionConfig,
+  CloudAgentSessionDismissSuggestionInput,
   CloudAgentSessionRejectInput,
   CloudAgentSessionRespondToPermissionInput,
   CloudAgentSessionSendInput,
@@ -83,6 +86,8 @@ export type {
   CloudStatus,
   QuestionState,
   PermissionState,
+  SuggestionAction,
+  SuggestionState,
   ServiceStateSnapshot,
   SessionInfo,
   KiloSessionId,

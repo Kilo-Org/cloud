@@ -85,6 +85,7 @@ export const sortableFields = [
   'google_user_email',
   'created_at',
   'updated_at',
+  'blocked_at',
   'microdollars_used',
   'total_microdollars_acquired',
 ] as const;

@@ -254,9 +254,9 @@ export function getCountryDisplayName(code: string): string {
 export function formatPrice(price: string): string {
   const num = parseFloat(price);
   if (num === 0) return 'Free';
-  if (num < 0.000001) return `$${(num * 1000000).toFixed(2)}/1M tokens`;
-  if (num < 0.001) return `$${(num * 1000).toFixed(2)}/1K tokens`;
-  return `$${num.toFixed(6)}/token`;
+  const perMillion = num * 1_000_000;
+  if (perMillion >= 0.01) return `$${perMillion.toFixed(2)}/1M tokens`;
+  return `$${perMillion.toFixed(6)}/1M tokens`;
 }
 
 export function formatContextLength(length: number | null | undefined): string {

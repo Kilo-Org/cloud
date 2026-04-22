@@ -83,7 +83,7 @@ When writing implementation plans, always save them to the `.plans/` directory a
 Follow the PR template in `.github/pull_request_template.md`. Every description must include four sections in order:
 
 1. **`## Summary`** — What changed and why. Outcome-focused, call out architectural changes.
-2. **`## Verification`** — Checks you actually ran. **Never fabricate verification steps.**
+2. **`## Verification`** — Manual verification only. Do not list automated checks such as `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm validate`, CI, or formatting commands here.
 3. **`## Visual Changes`** — Before/after screenshots, or `N/A`.
 4. **`## Reviewer Notes`** — Risk areas, tricky logic, rollout notes, or `N/A`.
 

@@ -123,6 +123,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // kiloclaw
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-stripe': { group: 'kiloclaw', dependsOn: [] },
+  'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
   kiloclaw: {
     group: 'kiloclaw',
     dependsOn: ['postgres', 'kiloclaw-tunnel'],
@@ -324,6 +325,23 @@ function buildServiceDefs(): ServiceDef[] {
         port: 0,
         dependsOn: meta.dependsOn,
         command: ['tsx', 'dev/local/scripts/start-stripe.ts'],
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'kiloclaw-docker-tcp') {
+      defs.push({
+        name,
+        type: 'process',
+        dir: '.',
+        port: 23750,
+        dependsOn: meta.dependsOn,
+        command: [
+          'socat',
+          'TCP-LISTEN:23750,bind=127.0.0.1,reuseaddr,fork',
+          'UNIX-CONNECT:/var/run/docker.sock',
+        ],
         group: meta.group,
       });
       continue;

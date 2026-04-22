@@ -332,7 +332,7 @@ export function OpenclawImportCard({
 
       <div className="space-y-2">
         <p className="text-muted-foreground text-xs">
-          Generate a zip file on {zipCommand.title} ({zipCommand.shell}) with this command. It saves
+          Extract your existing OpenClaw workspace with this command. It will save
           openclaw-workspace.zip to your Desktop folder.
         </p>
         <div className="relative">

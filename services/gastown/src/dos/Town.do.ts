@@ -1217,10 +1217,14 @@ export class TownDO extends DurableObject<Env> {
     beadId: string,
     dependsOn?: string[]
   ): Promise<{ total_beads: number }> {
-    const convoy = this.getConvoy(convoyId);
-    if (!convoy) throw new Error(`Bead ${convoyId} is not a convoy`);
+    const convoyRecord = this.getConvoyRecord(convoyId);
+    if (!convoyRecord) throw new Error(`Bead ${convoyId} is not a convoy`);
+    const convoy = toConvoy(convoyRecord);
     if (!convoy.staged) throw new Error(`Cannot add beads to a non-staged convoy: ${convoyId}`);
-    if (convoy.status === 'landed') throw new Error(`Cannot add beads to a closed convoy: ${convoyId}`);
+    if (convoy.status === 'landed')
+      throw new Error(`Cannot add beads to a closed convoy: ${convoyId}`);
+    if (convoyRecord.status === 'failed')
+      throw new Error(`Cannot add beads to a failed convoy: ${convoyId}`);
     beadOps.convoyAddBead(this.sql, convoyId, beadId);
     if (dependsOn !== undefined) {
       beadOps.setDependencies(this.sql, beadId, dependsOn);
@@ -3445,6 +3449,14 @@ export class TownDO extends DurableObject<Env> {
     ];
     if (rows.length === 0) return null;
     return toConvoy(ConvoyBeadRecord.parse(rows[0]));
+  }
+
+  private getConvoyRecord(convoyId: string): ConvoyBeadRecord | null {
+    const rows = [
+      ...query(this.sql, /* sql */ `${CONVOY_JOIN} WHERE ${beads.bead_id} = ?`, [convoyId]),
+    ];
+    if (rows.length === 0) return null;
+    return ConvoyBeadRecord.parse(rows[0]);
   }
 
   // ══════════════════════════════════════════════════════════════════

@@ -405,8 +405,8 @@ describe('estimateTokenCount', () => {
       ],
     });
 
-    // 'function' (8) + 'function' (8) + 'do_thing' (8) + 'x' * 100 = 124 / 4 = 31
-    expect(estimateTokenCount(request)).toBe(31);
+    // 'function' (8) + 'do_thing' (8) + 'x' * 100 = 116 / 4 = 29
+    expect(estimateTokenCount(request)).toBe(29);
   });
 });
 

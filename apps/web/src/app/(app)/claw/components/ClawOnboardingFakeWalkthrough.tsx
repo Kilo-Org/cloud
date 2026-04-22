@@ -181,7 +181,9 @@ function getFakeStepProgress(
   step: ClawOnboardingRenderStep,
   hasPairingStep: boolean
 ): StepProgress {
-  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), hasPairingStep);
+  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), hasPairingStep, {
+    includePermissionsStep: true,
+  });
 }
 
 function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {

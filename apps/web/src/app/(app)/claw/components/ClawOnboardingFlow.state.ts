@@ -17,6 +17,13 @@ export type OnboardingStep =
 
 export const CLAW_ONBOARDING_WIZARD_STEPS = [
   'identity',
+  'channels',
+  'provisioning',
+  'pairing',
+] as const satisfies OnboardingStep[];
+
+export const CLAW_ONBOARDING_PERMISSION_WALKTHROUGH_STEPS = [
+  'identity',
   'permissions',
   'channels',
   'provisioning',
@@ -111,17 +118,20 @@ export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status'
 
 export function getClawOnboardingStepProgress(
   step: OnboardingStep,
-  hasPairingStep: boolean
+  hasPairingStep: boolean,
+  { includePermissionsStep = false }: { includePermissionsStep?: boolean } = {}
 ): { currentStep: number; totalSteps: number } {
-  const totalSteps = hasPairingStep
-    ? CLAW_ONBOARDING_WIZARD_STEPS.length
-    : CLAW_ONBOARDING_WIZARD_STEPS.length - 1;
+  const wizardSteps: readonly OnboardingStep[] = includePermissionsStep
+    ? CLAW_ONBOARDING_PERMISSION_WALKTHROUGH_STEPS
+    : CLAW_ONBOARDING_WIZARD_STEPS;
+  const totalSteps = hasPairingStep ? wizardSteps.length : wizardSteps.length - 1;
 
   if (step === 'done') {
     return { currentStep: totalSteps, totalSteps };
   }
 
-  const index = CLAW_ONBOARDING_WIZARD_STEPS.indexOf(step);
+  const progressStep = !includePermissionsStep && step === 'permissions' ? 'channels' : step;
+  const index = wizardSteps.indexOf(progressStep);
   const currentStep = index === -1 ? 0 : index + 1;
 
   return { currentStep, totalSteps };
@@ -155,7 +165,6 @@ export function getClawOnboardingFlowState({
     instanceStatus,
     postProvisioningReady,
     onboardingStep,
-    selectedPreset,
     hasBotIdentity,
     hasPairingStep,
   });
@@ -200,12 +209,7 @@ export function getClawOnboardingFlowState({
 
 type RenderStepInput = Pick<
   ClawOnboardingFlowStateInput,
-  | 'mode'
-  | 'createSetupStarted'
-  | 'setupFailed'
-  | 'onboardingStep'
-  | 'selectedPreset'
-  | 'hasBotIdentity'
+  'mode' | 'createSetupStarted' | 'setupFailed' | 'onboardingStep' | 'hasBotIdentity'
 > & {
   instanceStatus: PopulatedClawStatus | null;
   postProvisioningReady: boolean;
@@ -247,7 +251,6 @@ function getRenderStepDecision({
   instanceStatus,
   postProvisioningReady,
   onboardingStep,
-  selectedPreset,
   hasBotIdentity,
   hasPairingStep,
 }: RenderStepInput): RenderStepDecision {
@@ -301,13 +304,11 @@ function getRenderStepDecision({
     };
   }
 
-  if (onboardingStep === 'permissions' || selectedPreset === null) {
+  if (onboardingStep === 'permissions') {
     return {
-      renderStep: 'permissions',
+      renderStep: 'channels',
       reason:
-        selectedPreset === null
-          ? 'exec preset is missing, so permissions is the earliest safe step'
-          : 'stored onboarding step is permissions',
+        'stored onboarding step is permissions, but live onboarding defaults to YOLO and skips ahead',
     };
   }
 

@@ -36,7 +36,7 @@ export async function handleKiloChatReadAction(
       )
       .map(b => b.text)
       .join('');
-    const updatedAtRaw = (msg as Record<string, unknown>).updatedAt;
+    const updatedAtRaw = msg.updatedAt;
     const timestamp =
       typeof updatedAtRaw === 'number' ? ` (${new Date(updatedAtRaw).toISOString()})` : '';
     return `[${id}] ${sender}${timestamp}: ${text}`;

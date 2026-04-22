@@ -737,9 +737,6 @@ const updateConfigSchema = z.object({
 
 const updateKiloCodeConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
-  vectorMemoryEnabled: z.boolean().optional(),
-  vectorMemoryModel: z.string().nullable().optional(),
-  dreamingEnabled: z.boolean().optional(),
 });
 
 const patchWebSearchConfigSchema = z.object({
@@ -798,11 +795,7 @@ function buildWorkerChannelsPatch(channels: z.infer<typeof patchChannelsSchema>)
 
 type KiloCodeConfigPublicResponse = Pick<
   KiloCodeConfigResponse,
-  | 'kilocodeApiKeyExpiresAt'
-  | 'kilocodeDefaultModel'
-  | 'vectorMemoryEnabled'
-  | 'vectorMemoryModel'
-  | 'dreamingEnabled'
+  'kilocodeApiKeyExpiresAt' | 'kilocodeDefaultModel'
 >;
 
 function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDashboardStatus {
@@ -855,9 +848,6 @@ function sanitizeKiloCodeConfigResponse(
   return {
     kilocodeApiKeyExpiresAt: response.kilocodeApiKeyExpiresAt,
     kilocodeDefaultModel: response.kilocodeDefaultModel,
-    vectorMemoryEnabled: response.vectorMemoryEnabled,
-    vectorMemoryModel: response.vectorMemoryModel,
-    dreamingEnabled: response.dreamingEnabled,
   };
 }
 

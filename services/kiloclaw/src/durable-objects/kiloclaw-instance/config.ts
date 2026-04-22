@@ -190,9 +190,6 @@ export async function buildUserEnvVars(
       botEmoji: state.botEmoji ?? undefined,
       orgId: state.orgId,
       customSecretMeta: state.customSecretMeta ?? undefined,
-      vectorMemoryEnabled: state.vectorMemoryEnabled,
-      vectorMemoryModel: state.vectorMemoryModel ?? undefined,
-      dreamingEnabled: state.dreamingEnabled,
     }
   );
 

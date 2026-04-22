@@ -78,9 +78,6 @@ const KiloCodeConfigPatchSchema = z.object({
     )
     .nullable()
     .optional(),
-  vectorMemoryEnabled: z.boolean().optional(),
-  vectorMemoryModel: z.string().nullable().optional(),
-  dreamingEnabled: z.boolean().optional(),
 });
 
 const WebSearchConfigPatchSchema = z.object({
@@ -1134,15 +1131,7 @@ platform.patch('/kilocode-config', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
-  const {
-    userId,
-    kilocodeApiKey,
-    kilocodeApiKeyExpiresAt,
-    kilocodeDefaultModel,
-    vectorMemoryEnabled,
-    vectorMemoryModel,
-    dreamingEnabled,
-  } = result.data;
+  const { userId, kilocodeApiKey, kilocodeApiKeyExpiresAt, kilocodeDefaultModel } = result.data;
 
   try {
     const updated = await withResolvedDORetry(
@@ -1154,9 +1143,6 @@ platform.patch('/kilocode-config', async c => {
           kilocodeApiKey,
           kilocodeApiKeyExpiresAt,
           kilocodeDefaultModel,
-          vectorMemoryEnabled,
-          vectorMemoryModel,
-          dreamingEnabled,
         }),
       'updateKiloCodeConfig'
     );

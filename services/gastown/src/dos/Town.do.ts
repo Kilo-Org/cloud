@@ -1217,6 +1217,14 @@ export class TownDO extends DurableObject<Env> {
     beadId: string,
     dependsOn?: string[]
   ): Promise<{ total_beads: number }> {
+    const convoyCheck = [
+      ...query(
+        this.sql,
+        /* sql */ `SELECT 1 FROM ${convoy_metadata} WHERE ${convoy_metadata.bead_id} = ?`,
+        [convoyId]
+      ),
+    ];
+    if (convoyCheck.length === 0) throw new Error(`Bead ${convoyId} is not a convoy`);
     beadOps.convoyAddBead(this.sql, convoyId, beadId);
     if (dependsOn !== undefined) {
       beadOps.setDependencies(this.sql, beadId, dependsOn);
@@ -1239,6 +1247,14 @@ export class TownDO extends DurableObject<Env> {
 
   /** Remove a bead from a convoy's tracking. Returns updated convoy metadata. */
   async convoyRemoveBead(convoyId: string, beadId: string): Promise<{ total_beads: number }> {
+    const convoyCheck = [
+      ...query(
+        this.sql,
+        /* sql */ `SELECT 1 FROM ${convoy_metadata} WHERE ${convoy_metadata.bead_id} = ?`,
+        [convoyId]
+      ),
+    ];
+    if (convoyCheck.length === 0) throw new Error(`Bead ${convoyId} is not a convoy`);
     beadOps.convoyRemoveBead(this.sql, convoyId, beadId);
     const rows = [
       ...query(

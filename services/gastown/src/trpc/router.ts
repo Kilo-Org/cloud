@@ -727,6 +727,7 @@ export const gastownRouter = router({
     )
     .output(z.object({ total_beads: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.convoyAddBead(input.convoyId, input.beadId, input.depends_on);
     }),
@@ -741,6 +742,7 @@ export const gastownRouter = router({
     )
     .output(z.object({ total_beads: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.convoyRemoveBead(input.convoyId, input.beadId);
     }),

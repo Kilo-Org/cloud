@@ -115,8 +115,8 @@
       },
       "top_provider": {
         "is_moderated": false,
-        "context_length": 204800,
-        "max_completion_tokens": 131072
+        "context_length": 256000,
+        "max_completion_tokens": 10000
       },
       "pricing": {
         "prompt": "0",
@@ -128,7 +128,7 @@
         "web_search": "0",
         "internal_reasoning": "0"
       },
-      "context_length": 204800,
+      "context_length": 256000,
       "supported_parameters": [
         "max_tokens",
         "temperature",

@@ -433,7 +433,7 @@ export function OpenclawImportCard({
               Cancel
             </Button>
             <Button onClick={handleImport} disabled={!canImport}>
-              {importPending ? 'Importing...' : 'Confirm Import'}
+              {importPending ? 'Importing...' : 'Confirm Import & Restart'}
             </Button>
           </DialogFooter>
         </DialogContent>

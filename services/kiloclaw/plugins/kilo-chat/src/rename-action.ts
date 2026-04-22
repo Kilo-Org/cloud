@@ -15,7 +15,9 @@ export async function handleKiloChatRenameAction(
   const parsed = renameActionParams.safeParse(args.params);
   const conversationId = resolveConversationId(parsed.success ? parsed.data : {}, args.toolContext);
 
-  const title = parsed.success ? parsed.data.title : undefined;
+  const title = parsed.success
+    ? (parsed.data.title ?? parsed.data.threadName ?? parsed.data.name ?? parsed.data.text)
+    : undefined;
   if (!title) {
     throw new Error('kilo-chat: title is required');
   }

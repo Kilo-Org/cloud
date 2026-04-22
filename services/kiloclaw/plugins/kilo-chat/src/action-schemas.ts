@@ -6,6 +6,8 @@ const nonEmptyString = z.string().min(1);
 export const conversationTargetParams = z
   .object({
     to: nonEmptyString.optional(),
+    // The message tool agent may pass the conversation ID as threadId.
+    threadId: nonEmptyString.optional(),
   })
   .passthrough();
 
@@ -22,7 +24,11 @@ export const paginationParams = z
   .passthrough();
 
 // Per-action schemas
-export const readActionParams = conversationTargetParams.merge(paginationParams);
+export const readActionParams = conversationTargetParams.extend({
+  limit: z.number().int().min(1).max(100).optional(),
+  offset: z.number().int().min(0).optional(),
+  before: nonEmptyString.optional(),
+});
 
 export const reactActionParams = messageTargetParams.extend({
   emoji: z.string().optional(),
@@ -31,6 +37,10 @@ export const reactActionParams = messageTargetParams.extend({
 
 export const renameActionParams = conversationTargetParams.extend({
   title: nonEmptyString.optional(),
+  // The message tool agent may use these aliases instead of `title`.
+  threadName: nonEmptyString.optional(),
+  name: nonEmptyString.optional(),
+  text: nonEmptyString.optional(),
 });
 
 export const editActionParams = messageTargetParams.extend({
@@ -60,11 +70,12 @@ export function stripPrefix(raw: string): string {
 }
 
 export function resolveConversationId(
-  parsed: { to?: string },
+  parsed: { to?: string; threadId?: string },
   toolContext?: { currentChannelId?: string | null }
 ): string {
   const raw =
     parsed.to ??
+    parsed.threadId ??
     (typeof toolContext?.currentChannelId === 'string' ? toolContext.currentChannelId : undefined);
   if (!raw) {
     throw new Error('kilo-chat: conversationId (or `to`) is required');

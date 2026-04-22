@@ -1,15 +1,26 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import type { BulkBlockResponse } from '@/lib/abuse/bulkBlock';
 
-export function AbuseBulkBlock() {
+function BulkBlockTab() {
   const [rawIds, setRawIds] = useState('');
   const [reason, setReason] = useState('');
   const [result, setResult] = useState<BulkBlockResponse | null>(null);
@@ -98,5 +109,84 @@ export function AbuseBulkBlock() {
         </div>
       </div>
     </div>
+  );
+}
+
+function RecentBlocksTab() {
+  const trpc = useTRPC();
+
+  const { data, isLoading } = useQuery(trpc.admin.bulkBlock.recentBlocks.queryOptions());
+
+  const rows = data ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Recent Bulk Blocks</CardTitle>
+        <CardDescription>
+          Blocked accounts grouped by reason and date (based on last update timestamp).
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+        ) : rows.length === 0 ? (
+          <div className="text-muted-foreground py-8 text-center">No blocked accounts found</div>
+        ) : (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Block Reason</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Accounts Blocked</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map(row => (
+                  <TableRow key={`${row.blocked_reason}-${row.date}`}>
+                    <TableCell className="font-medium">
+                      <code className="bg-muted rounded px-2 py-1 text-sm">
+                        {row.blocked_reason}
+                      </code>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{row.date}</TableCell>
+                    <TableCell className="text-right">
+                      {row.blocked_count.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const tabTriggerClass =
+  'text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
+
+export function AbuseBulkBlock() {
+  const [activeTab, setActiveTab] = useState('bulk-block');
+
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
+        <TabsTrigger value="bulk-block" className={tabTriggerClass}>
+          Bulk Block
+        </TabsTrigger>
+        <TabsTrigger value="recent" className={tabTriggerClass}>
+          Recent Blocks
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="bulk-block" className="mt-4">
+        <BulkBlockTab />
+      </TabsContent>
+      <TabsContent value="recent" className="mt-4">
+        {activeTab === 'recent' && <RecentBlocksTab />}
+      </TabsContent>
+    </Tabs>
   );
 }

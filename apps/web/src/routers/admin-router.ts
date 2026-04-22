@@ -39,6 +39,7 @@ import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router'
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
+import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminSecurityAdvisorContentRouter } from '@/routers/admin/security-advisor-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
@@ -1912,6 +1913,7 @@ export const adminRouter = createTRPCRouter({
   customLlm: adminCustomLlmRouter,
   gatewayConfig: adminGatewayConfigRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
+  bulkBlock: adminBulkBlockRouter,
   securityAdvisorContent: adminSecurityAdvisorContentRouter,
   freeModelUsage: adminFreeModelUsageRouter,
 });

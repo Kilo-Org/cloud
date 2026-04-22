@@ -2438,29 +2438,33 @@ export class TownDO extends DurableObject<Env> {
         }
       }
 
-      const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
-        townId,
-        rigId: `mayor-${townId}`,
-        userId: townConfig.owner_user_id ?? rigConfig?.userId ?? townId,
-        agentId: mayor.id,
-        agentName: 'mayor',
-        role: 'mayor',
-        identity: mayor.identity,
-        beadId: '',
-        beadTitle: combinedMessage,
-        beadBody: '',
-        checkpoint: agents.readCheckpoint(this.sql, mayor.id),
-        // conversationHistory is no longer needed — the mayor's kilo.db
-        // is persisted to KV and hydrated on boot, preserving the full
-        // session state across container evictions.
-        gitUrl: rigConfig?.gitUrl ?? '',
-        defaultBranch: rigConfig?.defaultBranch ?? 'main',
-        kilocodeToken,
-        townConfig,
-        rigs: await this.rigListForMayor(),
-      });
+      const { started: mayorStarted } = await dispatch.startAgentInContainer(
+        this.env,
+        this.ctx.storage,
+        {
+          townId,
+          rigId: `mayor-${townId}`,
+          userId: townConfig.owner_user_id ?? rigConfig?.userId ?? townId,
+          agentId: mayor.id,
+          agentName: 'mayor',
+          role: 'mayor',
+          identity: mayor.identity,
+          beadId: '',
+          beadTitle: combinedMessage,
+          beadBody: '',
+          checkpoint: agents.readCheckpoint(this.sql, mayor.id),
+          // conversationHistory is no longer needed — the mayor's kilo.db
+          // is persisted to KV and hydrated on boot, preserving the full
+          // session state across container evictions.
+          gitUrl: rigConfig?.gitUrl ?? '',
+          defaultBranch: rigConfig?.defaultBranch ?? 'main',
+          kilocodeToken,
+          townConfig,
+          rigs: await this.rigListForMayor(),
+        }
+      );
 
-      if (started) {
+      if (mayorStarted) {
         agents.updateAgentStatus(this.sql, mayor.id, 'working');
         this._mayorWorkingSince = Date.now();
         sessionStatus = 'starting';
@@ -2542,29 +2546,33 @@ export class TownDO extends DurableObject<Env> {
 
     // Start with an empty prompt — the mayor will be idle but its container
     // and SDK server will be running, ready for PTY connections.
-    const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
-      townId,
-      rigId: `mayor-${townId}`,
-      userId:
-        townConfig.owner_user_id ?? rigConfig?.userId ?? townConfig.created_by_user_id ?? townId,
-      agentId: mayor.id,
-      agentName: 'mayor',
-      role: 'mayor',
-      identity: mayor.identity,
-      beadId: '',
-      beadTitle: 'Mayor ready. Waiting for instructions.',
-      beadBody: '',
-      checkpoint: agents.readCheckpoint(this.sql, mayor.id),
-      // conversationHistory is no longer needed — kilo.db persistence
-      // handles session continuity across container evictions.
-      gitUrl: rigConfig?.gitUrl ?? '',
-      defaultBranch: rigConfig?.defaultBranch ?? 'main',
-      kilocodeToken,
-      townConfig,
-      rigs: await this.rigListForMayor(),
-    });
+    const { started: mayorStarted } = await dispatch.startAgentInContainer(
+      this.env,
+      this.ctx.storage,
+      {
+        townId,
+        rigId: `mayor-${townId}`,
+        userId:
+          townConfig.owner_user_id ?? rigConfig?.userId ?? townConfig.created_by_user_id ?? townId,
+        agentId: mayor.id,
+        agentName: 'mayor',
+        role: 'mayor',
+        identity: mayor.identity,
+        beadId: '',
+        beadTitle: 'Mayor ready. Waiting for instructions.',
+        beadBody: '',
+        checkpoint: agents.readCheckpoint(this.sql, mayor.id),
+        // conversationHistory is no longer needed — kilo.db persistence
+        // handles session continuity across container evictions.
+        gitUrl: rigConfig?.gitUrl ?? '',
+        defaultBranch: rigConfig?.defaultBranch ?? 'main',
+        kilocodeToken,
+        townConfig,
+        rigs: await this.rigListForMayor(),
+      }
+    );
 
-    if (started) {
+    if (mayorStarted) {
       agents.updateAgentStatus(this.sql, mayor.id, 'working');
       this._mayorWorkingSince = Date.now();
       return { agentId: mayor.id, sessionStatus: 'starting' };
@@ -4168,28 +4176,32 @@ export class TownDO extends DurableObject<Env> {
     // maybeDispatchTriageAgent with the correct triage system prompt.
     beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'in_progress', triageAgent.id);
 
-    const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
-      townId: this.townId,
-      rigId,
-      userId: rigConfig.userId,
-      agentId: triageAgent.id,
-      agentName: triageAgent.name,
-      role: 'polecat',
-      identity: triageAgent.identity,
-      beadId: triageBead.bead_id,
-      beadTitle: triageBead.title,
-      beadBody: triageBead.body ?? '',
-      checkpoint: null,
-      gitUrl: rigConfig.gitUrl,
-      defaultBranch: rigConfig.defaultBranch,
-      kilocodeToken,
-      townConfig,
-      systemPromptOverride: systemPrompt,
-      platformIntegrationId: rigConfig.platformIntegrationId,
-      lightweight: true,
-    });
+    const { started: triageStarted } = await dispatch.startAgentInContainer(
+      this.env,
+      this.ctx.storage,
+      {
+        townId: this.townId,
+        rigId,
+        userId: rigConfig.userId,
+        agentId: triageAgent.id,
+        agentName: triageAgent.name,
+        role: 'polecat',
+        identity: triageAgent.identity,
+        beadId: triageBead.bead_id,
+        beadTitle: triageBead.title,
+        beadBody: triageBead.body ?? '',
+        checkpoint: null,
+        gitUrl: rigConfig.gitUrl,
+        defaultBranch: rigConfig.defaultBranch,
+        kilocodeToken,
+        townConfig,
+        systemPromptOverride: systemPrompt,
+        platformIntegrationId: rigConfig.platformIntegrationId,
+        lightweight: true,
+      }
+    );
 
-    if (started) {
+    if (triageStarted) {
       // Mark the agent as working so the duplicate-guard on the next
       // alarm tick sees it and skips dispatch.
       agents.updateAgentStatus(this.sql, triageAgent.id, 'working');
@@ -4370,12 +4382,48 @@ export class TownDO extends DurableObject<Env> {
         headers['X-Drain-Nonce'] = this._drainNonce;
         headers['X-Town-Id'] = townId;
       }
-      await container.fetch('http://container/health', {
-        signal: AbortSignal.timeout(5_000),
-        headers,
-      });
+      const t0 = Date.now();
+      try {
+        const healthResp = await container.fetch('http://container/health', {
+          signal: AbortSignal.timeout(5_000),
+          headers,
+        });
+        const healthPingMs = Date.now() - t0;
+        writeEvent(this.env, {
+          event: 'container.health_ping',
+          townId,
+          healthPingMs,
+          healthPingStatus: 'ok',
+        });
+        if (healthResp.ok) {
+          const rawBody: unknown = await healthResp.json().catch(() => null);
+          const HealthBody = z
+            .object({ startedAt: z.string().optional(), uptime: z.number().optional() })
+            .passthrough();
+          const body = HealthBody.safeParse(rawBody);
+          if (body.success && body.data.startedAt) {
+            const containerStartedAt = new Date(body.data.startedAt).getTime();
+            writeEvent(this.env, {
+              event: 'container.ready_observed',
+              townId,
+              containerStartedAt: body.data.startedAt,
+              timeSinceContainerStartMs: Date.now() - containerStartedAt,
+              uptimeMs: body.data.uptime ?? 0,
+            });
+          }
+        }
+      } catch {
+        const healthPingMs = Date.now() - t0;
+        writeEvent(this.env, {
+          event: 'container.health_ping',
+          townId,
+          healthPingMs,
+          healthPingStatus: 'timeout',
+        });
+        // Container is starting up or unavailable — alarm will retry
+      }
     } catch {
-      // Container is starting up or unavailable — alarm will retry
+      // Outer try: buildContainerConfig or getTownContainerStub failed
     }
   }
 

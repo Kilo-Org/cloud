@@ -9,12 +9,14 @@ import {
   activeAgentCount,
   activeServerCount,
   getUptime,
+  getStartTime,
   stopAll,
   drainAll,
   isDraining,
   getAgentEvents,
   registerEventSink,
 } from './process-manager';
+import { log } from './logger';
 import { startHeartbeat, stopHeartbeat, notifyContainerReady } from './heartbeat';
 import { pushContext as pushDashboardContext } from './dashboard-context';
 import { mergeBranch, setupRigBrowseWorktree } from './git-manager';
@@ -218,6 +220,7 @@ app.get('/health', c => {
     servers: activeServerCount(),
     uptime: getUptime(),
     draining: isDraining() || undefined,
+    startedAt: getStartTime(),
   };
   return c.json(response);
 });
@@ -738,6 +741,15 @@ app.post('/agents/:agentId/pty', async c => {
         console.log(
           `[control-server] Reusing existing PTY session ${running.id} for agent ${agentId}`
         );
+        const reuseAgent = getAgentStatus(agentId);
+        if (reuseAgent) {
+          log.info('agent.pty_connected', {
+            agentId,
+            containerUptimeMs: getUptime(),
+            agentUptimeMs: Date.now() - new Date(reuseAgent.startedAt).getTime(),
+            reused: true,
+          });
+        }
         return c.json(running);
       }
     }
@@ -790,6 +802,14 @@ app.post('/agents/:agentId/pty', async c => {
   console.log(
     `[control-server] Created new PTY session for agent ${agentId}: ${data.slice(0, 200)}`
   );
+  if (createResp.ok) {
+    log.info('agent.pty_connected', {
+      agentId,
+      containerUptimeMs: getUptime(),
+      agentUptimeMs: Date.now() - new Date(agent.startedAt).getTime(),
+      reused: false,
+    });
+  }
   return new Response(data, {
     status: createResp.status,
     headers: { 'Content-Type': 'application/json' },

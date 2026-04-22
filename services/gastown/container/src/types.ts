@@ -164,6 +164,7 @@ export type HealthResponse = {
   servers: number;
   uptime: number;
   draining?: boolean;
+  startedAt?: string;
 };
 
 // ── Kilo serve instance ─────────────────────────────────────────────────

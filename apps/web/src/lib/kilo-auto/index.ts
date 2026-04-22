@@ -4,7 +4,6 @@ import {
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
@@ -122,8 +121,8 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Kilo Auto Free',
   description: 'Free with limited capability. No credits required.',
-  context_length: minimax_m25_free_model.context_length,
-  max_completion_tokens: minimax_m25_free_model.max_completion_tokens,
+  context_length: 256_000,
+  max_completion_tokens: 128_000,
   prompt_price: '0',
   completion_price: '0',
   input_cache_read_price: '0',

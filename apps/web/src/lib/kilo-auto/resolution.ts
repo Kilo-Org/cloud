@@ -1,5 +1,4 @@
 import type { FeatureValue } from '@/lib/feature-detection';
-import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
 import {
   gemma_4_26b_a4b_it_free_model,
   GEMMA_4_31B_IT_ID,
@@ -27,7 +26,7 @@ import {
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
-import { isFreeModel, preferredModels } from '@/lib/ai-gateway/models';
+import { isFreeModel, kiloExclusiveModels, preferredModels } from '@/lib/ai-gateway/models';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -49,6 +48,13 @@ function getAutoFreeCandidates() {
   const candidates = new Set<string>();
   for (const model of preferredModels) {
     if (!isKiloAutoModel(model) && isFreeModel(model)) {
+      const exclusiveModel = kiloExclusiveModels.find(m => m.public_id === model);
+      if (
+        exclusiveModel &&
+        exclusiveModel.max_completion_tokens < KILO_AUTO_FREE_MODEL.max_completion_tokens
+      ) {
+        continue;
+      }
       candidates.add(model);
     }
   }

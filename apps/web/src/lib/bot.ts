@@ -1,8 +1,9 @@
-import { Chat, emoji, type ActionEvent, type Message, type Thread } from 'chat';
+import { Chat, ThreadImpl, emoji, type ActionEvent, type Message, type Thread } from 'chat';
 import { createSlackAdapter } from '@chat-adapter/slack';
 import { captureException } from '@sentry/nextjs';
 import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
 import { getPlatformIdentity, getPlatformIntegration } from '@/lib/bot/platform-helpers';
+import { getSlackDmReplyThreadParams } from '@/lib/bot/helpers';
 import { LINK_ACCOUNT_ACTION_PREFIX, promptLinkAccount } from '@/lib/bot/link-account';
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { findUserById } from '@/lib/user';
@@ -24,13 +25,28 @@ export const bot = new Chat({
   state: createChatState(),
 });
 
+function getResponseThread(thread: Thread, message: Message): Thread {
+  const slackDmReplyThread = getSlackDmReplyThreadParams(thread, message);
+  if (!slackDmReplyThread) return thread;
+
+  return new ThreadImpl({
+    adapter: bot.getAdapter('slack'),
+    channelId: slackDmReplyThread.channelId,
+    currentMessage: message,
+    id: slackDmReplyThread.threadId,
+    isDM: slackDmReplyThread.isDM,
+    stateAdapter: bot.getState(),
+  });
+}
+
 bot.onNewMention(async function handleIncomingMessage(
   thread: Thread,
   message: Message
 ): Promise<void> {
-  const identity = getPlatformIdentity(thread, message);
+  const responseThread = getResponseThread(thread, message);
+  const identity = getPlatformIdentity(responseThread, message);
   const [platformIntegration, kiloUserId] = await Promise.all([
-    getPlatformIntegration(thread, message),
+    getPlatformIntegration(responseThread, message),
     resolveKiloUserId(bot.getState(), identity),
   ]);
 
@@ -42,7 +58,7 @@ bot.onNewMention(async function handleIncomingMessage(
   }
 
   if (!kiloUserId) {
-    await promptLinkAccount(thread, message, identity);
+    await promptLinkAccount(responseThread, message, identity);
     return;
   }
 
@@ -50,29 +66,35 @@ bot.onNewMention(async function handleIncomingMessage(
 
   if (!user) {
     await unlinkKiloUser(bot.getState(), identity);
-    await promptLinkAccount(thread, message, identity);
+    await promptLinkAccount(responseThread, message, identity);
     return;
   }
 
-  const platform = thread.id.split(':')[0];
+  const platform = responseThread.id.split(':')[0];
   const botRequestId = await createBotRequest({
     createdBy: user.id,
     organizationId: platformIntegration.owned_by_organization_id ?? null,
     platformIntegrationId: platformIntegration.id,
     platform,
-    platformThreadId: thread.id,
+    platformThreadId: responseThread.id,
     platformMessageId: message.id,
     userMessage: message.text,
     modelUsed: undefined,
   });
 
-  const received = thread.createSentMessageFromMessage(message);
+  const received = responseThread.createSentMessageFromMessage(message);
   await received.addReaction(emoji.eyes);
 
   await bot.registerSingleton();
 
   try {
-    await processMessage({ thread, message, platformIntegration, user, botRequestId });
+    await processMessage({
+      thread: responseThread,
+      message,
+      platformIntegration,
+      user,
+      botRequestId,
+    });
   } catch (error) {
     console.error('[Bot] Unhandled error in message handler:', error);
     if (botRequestId) {
@@ -82,7 +104,9 @@ bot.onNewMention(async function handleIncomingMessage(
         errorMessage: errMsg.slice(0, 2000),
       });
     }
-    await thread.post({ markdown: 'Sorry, something went wrong while processing your message.' });
+    await responseThread.post({
+      markdown: 'Sorry, something went wrong while processing your message.',
+    });
   }
 });
 

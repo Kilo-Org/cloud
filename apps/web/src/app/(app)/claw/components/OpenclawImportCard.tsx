@@ -45,21 +45,21 @@ function hasDraggedFiles(dataTransfer: DataTransfer | null): boolean {
 function getZipErrorMessage(error: OpenclawWorkspaceZipError): string {
   switch (error.code) {
     case 'openclaw_import_zip_too_large':
-      return 'ZIP file must be 5 MB or smaller.';
+      return 'zip file must be 5 MB or smaller.';
     case 'openclaw_import_too_many_files':
-      return 'ZIP contains too many files (max 500).';
+      return 'zip file contains too many files (max 500).';
     case 'openclaw_import_too_large':
       return 'Extracted Markdown content must be 5 MB or smaller.';
     case 'openclaw_import_no_files':
-      return 'ZIP contains no valid OpenClaw workspace files.';
+      return 'zip file contains no valid OpenClaw workspace files.';
     case 'openclaw_import_invalid_zip':
-      return 'Invalid ZIP file. Please upload a standard .zip archive.';
+      return 'Invalid zip file. Please upload a standard .zip archive.';
     case 'openclaw_import_invalid_path':
     case 'openclaw_import_path_case_conflict':
     case 'openclaw_import_invalid_markdown':
       return error.message;
     default:
-      return 'Failed to parse ZIP file.';
+      return 'Failed to parse zip file.';
   }
 }
 
@@ -159,7 +159,7 @@ export function OpenclawImportCard({
           instance_status: instanceStatus,
         });
       } else {
-        setImportError('Failed to parse ZIP file.');
+        setImportError('Failed to parse zip file.');
       }
     } finally {
       setIsParsing(false);
@@ -288,7 +288,7 @@ export function OpenclawImportCard({
             <p className="text-sm font-medium">OpenClaw Import</p>
             <p className="text-muted-foreground text-xs">
               Import USER.md, SOUL.md, IDENTITY.md, MEMORY.md, and memory/* from an OpenClaw
-              workspace ZIP.
+              workspace zip file.
             </p>
           </div>
         </div>
@@ -324,15 +324,15 @@ export function OpenclawImportCard({
               </Button>
             )}
           </div>
-          <p className="text-muted-foreground text-xs">
-            File: {selectedZipName ?? 'None selected'}
-          </p>
+          {selectedZipName && (
+            <p className="text-muted-foreground text-xs">File: {selectedZipName}</p>
+          )}
         </div>
       </div>
 
       <div className="space-y-2">
         <p className="text-muted-foreground text-xs">
-          Generate a ZIP on {zipCommand.title} ({zipCommand.shell}) with this command. It saves
+          Generate a zip file on {zipCommand.title} ({zipCommand.shell}) with this command. It saves
           openclaw-workspace.zip to your Desktop folder.
         </p>
         <div className="relative">
@@ -352,19 +352,9 @@ export function OpenclawImportCard({
             )}
           </Button>
         </div>
-
-        <p className="text-muted-foreground text-xs">
-          Drag and drop openclaw-workspace.zip anywhere in this card.
-        </p>
-
-        {dropZoneActive && (
-          <p className="border-primary/30 bg-primary/10 text-primary rounded-md border px-3 py-2 text-xs">
-            Drop your ZIP file to upload it.
-          </p>
-        )}
       </div>
 
-      {isParsing && <p className="text-muted-foreground mt-2 text-xs">Parsing ZIP...</p>}
+      {isParsing && <p className="text-muted-foreground mt-2 text-xs">Parsing zip file...</p>}
 
       {importError && (
         <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
@@ -377,6 +367,9 @@ export function OpenclawImportCard({
           <p className="text-sm font-medium">
             Preview ({selectedImport.previewPaths.length} files)
           </p>
+          {selectedZipName && (
+            <p className="text-muted-foreground text-xs">zip file: {selectedZipName}</p>
+          )}
           <div className="max-h-40 overflow-auto rounded-md border p-2">
             <ul className="space-y-1 text-xs">
               {selectedImport.previewPaths.map(path => (

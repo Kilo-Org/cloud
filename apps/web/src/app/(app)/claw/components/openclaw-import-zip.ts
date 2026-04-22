@@ -74,7 +74,7 @@ function normalizeArchivePath(path: string): string {
   if (segments.some(segment => segment.length === 0 || segment === '.' || segment === '..')) {
     throw new OpenclawWorkspaceZipError(
       'openclaw_import_invalid_path',
-      `Unsupported ZIP path: ${path}`
+      `Unsupported zip file path: ${path}`
     );
   }
   return segments.join('/');
@@ -114,7 +114,7 @@ function mapArchivePathToImportPath(archivePath: string): string {
   if (!archivePath.startsWith(OPENCLAW_IMPORT_MEMORY_PREFIX)) {
     throw new OpenclawWorkspaceZipError(
       'openclaw_import_invalid_path',
-      `Unsupported ZIP path: ${archivePath}`
+      `Unsupported zip file path: ${archivePath}`
     );
   }
 
@@ -122,7 +122,7 @@ function mapArchivePathToImportPath(archivePath: string): string {
   if (!memoryRelativePath || memoryRelativePath.endsWith('/')) {
     throw new OpenclawWorkspaceZipError(
       'openclaw_import_invalid_path',
-      `Unsupported ZIP path: ${archivePath}`
+      `Unsupported zip file path: ${archivePath}`
     );
   }
 
@@ -179,7 +179,7 @@ function parseZipBytes(buffer: Uint8Array): ParsedOpenclawWorkspaceZip {
         if (expectedFileCount > OPENCLAW_IMPORT_MAX_FILES) {
           throw new OpenclawWorkspaceZipError(
             'openclaw_import_too_many_files',
-            `ZIP contains more than ${OPENCLAW_IMPORT_MAX_FILES} files`
+            `zip file contains more than ${OPENCLAW_IMPORT_MAX_FILES} files`
           );
         }
 
@@ -207,7 +207,7 @@ function parseZipBytes(buffer: Uint8Array): ParsedOpenclawWorkspaceZip {
     if (error instanceof OpenclawWorkspaceZipError) {
       throw error;
     }
-    throw new OpenclawWorkspaceZipError('openclaw_import_invalid_zip', 'Failed to read ZIP file');
+    throw new OpenclawWorkspaceZipError('openclaw_import_invalid_zip', 'Failed to read zip file');
   }
 
   const entries = normalizeZipEntries(zipEntries);
@@ -224,7 +224,7 @@ function parseZipBytes(buffer: Uint8Array): ParsedOpenclawWorkspaceZip {
     if (existing) {
       throw new OpenclawWorkspaceZipError(
         'openclaw_import_path_case_conflict',
-        `ZIP contains conflicting paths: ${existing} and ${importPath}`
+        `zip file contains conflicting paths: ${existing} and ${importPath}`
       );
     }
 
@@ -252,14 +252,14 @@ function parseZipBytes(buffer: Uint8Array): ParsedOpenclawWorkspaceZip {
   if (files.length === 0) {
     throw new OpenclawWorkspaceZipError(
       'openclaw_import_no_files',
-      'ZIP contains no valid OpenClaw workspace files'
+      'zip file contains no valid OpenClaw workspace files'
     );
   }
 
   if (files.length > OPENCLAW_IMPORT_MAX_FILES) {
     throw new OpenclawWorkspaceZipError(
       'openclaw_import_too_many_files',
-      `ZIP contains more than ${OPENCLAW_IMPORT_MAX_FILES} files`
+      `zip file contains more than ${OPENCLAW_IMPORT_MAX_FILES} files`
     );
   }
 
@@ -280,7 +280,7 @@ export async function parseOpenclawWorkspaceZipFile(
   if (file.size > OPENCLAW_IMPORT_MAX_ZIP_BYTES) {
     throw new OpenclawWorkspaceZipError(
       'openclaw_import_zip_too_large',
-      `ZIP exceeds ${OPENCLAW_IMPORT_MAX_ZIP_BYTES} bytes`
+      `zip file exceeds ${OPENCLAW_IMPORT_MAX_ZIP_BYTES} bytes`
     );
   }
 
@@ -292,7 +292,7 @@ export function parseOpenclawWorkspaceZipBytes(bytes: Uint8Array): ParsedOpencla
   if (bytes.byteLength > OPENCLAW_IMPORT_MAX_ZIP_BYTES) {
     throw new OpenclawWorkspaceZipError(
       'openclaw_import_zip_too_large',
-      `ZIP exceeds ${OPENCLAW_IMPORT_MAX_ZIP_BYTES} bytes`
+      `zip file exceeds ${OPENCLAW_IMPORT_MAX_ZIP_BYTES} bytes`
     );
   }
   return parseZipBytes(bytes);

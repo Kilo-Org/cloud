@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePostHog } from 'posthog-js/react';
+import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { Check, Sparkles, TriangleAlert, X } from 'lucide-react';
 import { KILO_AUTO_BALANCED_MODEL } from '@/lib/kilo-auto';
@@ -155,11 +155,13 @@ function ClawOnboardingFlowInner({
   });
 
   const { data: isServiceDegraded } = useClawServiceDegraded();
+  useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
 
   useEffect(() => {
     if (flowState.renderStep !== 'identity' || hasCapturedIdentityView.current) return;
     hasCapturedIdentityView.current = true;
+    posthog?.capture('claw_page_viewed');
     posthog?.capture('claw_setup_identity_viewed');
   }, [flowState.renderStep, posthog]);
 

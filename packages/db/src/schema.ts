@@ -4622,7 +4622,10 @@ export const rule_materializations = pgTable(
     user_id: text().notNull(),
     materialized_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
-  table => [primaryKey({ columns: [table.rule_id, table.user_id] })]
+  table => [
+    primaryKey({ columns: [table.rule_id, table.user_id] }),
+    index('idx_rule_materializations_rule_id').on(table.rule_id),
+  ]
 );
 
 export type RuleMaterialization = typeof rule_materializations.$inferSelect;

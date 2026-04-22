@@ -20,4 +20,5 @@ CREATE TABLE "rule_materializations" (
 	CONSTRAINT "rule_materializations_rule_id_user_id_pk" PRIMARY KEY("rule_id","user_id")
 );
 --> statement-breakpoint
-ALTER TABLE "rule_materializations" ADD CONSTRAINT "rule_materializations_rule_id_classification_rules_id_fk" FOREIGN KEY ("rule_id") REFERENCES "public"."classification_rules"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "rule_materializations" ADD CONSTRAINT "rule_materializations_rule_id_classification_rules_id_fk" FOREIGN KEY ("rule_id") REFERENCES "public"."classification_rules"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "idx_rule_materializations_rule_id" ON "rule_materializations" USING btree ("rule_id");

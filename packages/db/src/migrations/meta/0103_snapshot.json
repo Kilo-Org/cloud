@@ -1,5 +1,5 @@
 {
-  "id": "80df84f2-38da-40cf-836a-58e0e9eb649a",
+  "id": "9d966e32-fa06-4c8c-ac1a-af7f68c2dab3",
   "prevId": "8f5f5bda-55f8-44f9-bb16-e594ca826d4f",
   "version": "7",
   "dialect": "postgresql",
@@ -13822,7 +13822,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_rule_materializations_rule_id": {
+          "name": "idx_rule_materializations_rule_id",
+          "columns": [
+            {
+              "expression": "rule_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "rule_materializations_rule_id_classification_rules_id_fk": {
           "name": "rule_materializations_rule_id_classification_rules_id_fk",

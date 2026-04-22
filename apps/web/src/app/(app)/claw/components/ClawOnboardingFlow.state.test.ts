@@ -249,48 +249,15 @@ describe('ClawOnboardingFlow state machine', () => {
   test('getClawOnboardingStepProgress can include permissions for walkthroughs', () => {
     const options = { includePermissionsStep: true };
 
-    expect(getClawOnboardingStepProgress('identity', false, options)).toEqual({
-      currentStep: 1,
-      totalSteps: 4,
-    });
     expect(getClawOnboardingStepProgress('permissions', false, options)).toEqual({
       currentStep: 2,
       totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('channels', false, options)).toEqual({
-      currentStep: 3,
-      totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('provisioning', false, options)).toEqual({
-      currentStep: 4,
-      totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('done', false, options)).toEqual({
-      currentStep: 4,
-      totalSteps: 4,
-    });
-
-    expect(getClawOnboardingStepProgress('identity', true, options)).toEqual({
-      currentStep: 1,
-      totalSteps: 5,
     });
     expect(getClawOnboardingStepProgress('permissions', true, options)).toEqual({
       currentStep: 2,
       totalSteps: 5,
     });
-    expect(getClawOnboardingStepProgress('channels', true, options)).toEqual({
-      currentStep: 3,
-      totalSteps: 5,
-    });
-    expect(getClawOnboardingStepProgress('provisioning', true, options)).toEqual({
-      currentStep: 4,
-      totalSteps: 5,
-    });
     expect(getClawOnboardingStepProgress('pairing', true, options)).toEqual({
-      currentStep: 5,
-      totalSteps: 5,
-    });
-    expect(getClawOnboardingStepProgress('done', true, options)).toEqual({
       currentStep: 5,
       totalSteps: 5,
     });

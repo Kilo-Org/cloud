@@ -8,6 +8,7 @@ import {
   type ClawOnboardingRenderStep,
   getClawOnboardingStepProgress,
   isPairingChannel,
+  type OnboardingStep,
   type PairingChannelId,
 } from './ClawOnboardingFlow.state';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -96,6 +97,7 @@ export function ClawOnboardingFakeWalkthrough({
     ? selectedChannelId
     : 'telegram';
   const hasPairingStep = isPairingChannel(selectedChannelId);
+  const stepProgress = getFakeStepProgress(step, hasPairingStep);
 
   return (
     <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -124,7 +126,7 @@ export function ClawOnboardingFakeWalkthrough({
         selectedChannelId,
         setSelectedChannelId,
         pairingChannelId,
-        hasPairingStep,
+        stepProgress,
         basePath,
       })}
     </div>
@@ -165,15 +167,40 @@ function FakeWalkthroughControls({ currentStep, onStepChange }: FakeWalkthroughC
   );
 }
 
+type StepProgress = ReturnType<typeof getClawOnboardingStepProgress>;
+
 type RenderFakeStepInput = {
   step: ClawOnboardingRenderStep;
   setStep: (step: ClawOnboardingRenderStep) => void;
   selectedChannelId: string | null;
   setSelectedChannelId: (channelId: string | null) => void;
   pairingChannelId: PairingChannelId;
-  hasPairingStep: boolean;
+  stepProgress: StepProgress;
   basePath: string;
 };
+
+function getFakeStepProgress(
+  step: ClawOnboardingRenderStep,
+  hasPairingStep: boolean
+): StepProgress {
+  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), hasPairingStep);
+}
+
+function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
+  switch (step) {
+    case 'identity':
+    case 'permissions':
+    case 'channels':
+    case 'provisioning':
+    case 'pairing':
+      return step;
+    case 'create-instance':
+      return 'identity';
+    case 'complete':
+    case 'error':
+      return 'done';
+  }
+}
 
 function renderFakeStep({
   step,
@@ -181,43 +208,34 @@ function renderFakeStep({
   selectedChannelId,
   setSelectedChannelId,
   pairingChannelId,
-  hasPairingStep,
+  stepProgress,
   basePath,
 }: RenderFakeStepInput) {
   switch (step) {
     case 'create-instance':
       return <CreateInstanceCardView onCreate={() => setStep('identity')} />;
     case 'identity': {
-      const { currentStep, totalSteps } = getClawOnboardingStepProgress('identity', hasPairingStep);
       return (
         <BotIdentityStep
-          currentStep={currentStep}
-          totalSteps={totalSteps}
+          {...stepProgress}
           instanceRunning={false}
           onContinue={() => setStep('permissions')}
         />
       );
     }
     case 'permissions': {
-      const { currentStep, totalSteps } = getClawOnboardingStepProgress(
-        'permissions',
-        hasPairingStep
-      );
       return (
         <PermissionStep
-          currentStep={currentStep}
-          totalSteps={totalSteps}
+          {...stepProgress}
           instanceRunning={false}
           onSelect={() => setStep('channels')}
         />
       );
     }
     case 'channels': {
-      const { currentStep, totalSteps } = getClawOnboardingStepProgress('channels', hasPairingStep);
       return (
         <ChannelSelectionStepView
-          currentStep={currentStep}
-          totalSteps={totalSteps}
+          {...stepProgress}
           instanceRunning={false}
           defaultSelected={isPairingChannel(selectedChannelId) ? selectedChannelId : null}
           onSelect={channelId => {
@@ -232,13 +250,9 @@ function renderFakeStep({
       );
     }
     case 'provisioning': {
-      const { currentStep, totalSteps } = getClawOnboardingStepProgress(
-        'provisioning',
-        hasPairingStep
-      );
       return (
         <div className="flex flex-col gap-4">
-          <ProvisioningStepView currentStep={currentStep} totalSteps={totalSteps} />
+          <ProvisioningStepView {...stepProgress} />
           <Card>
             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-muted-foreground text-sm">
@@ -264,11 +278,9 @@ function renderFakeStep({
       );
     }
     case 'pairing': {
-      const { currentStep, totalSteps } = getClawOnboardingStepProgress('pairing', hasPairingStep);
       return (
         <ChannelPairingStepView
-          currentStep={currentStep}
-          totalSteps={totalSteps}
+          {...stepProgress}
           channelId={pairingChannelId}
           matchingRequest={{
             channel: pairingChannelId,

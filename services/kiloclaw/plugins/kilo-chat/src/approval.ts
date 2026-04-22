@@ -49,24 +49,25 @@ function makeClient() {
 function buildMetadataText(
   view: PendingApprovalView | ResolvedApprovalView | ExpiredApprovalView
 ): string {
-  const lines: string[] = [];
-  lines.push(`**${view.title}**`);
-  if (view.description) lines.push(view.description);
+  // The kilo-chat frontend renders text with react-markdown, so we need
+  // double newlines for paragraph breaks and trailing double-space for
+  // line breaks within a section.
+  const sections: string[] = [];
+  sections.push(`**${view.title}**`);
+  if (view.description) sections.push(view.description);
   // Show the command being approved for exec approvals.
   if (view.approvalKind === 'exec') {
-    lines.push('');
-    lines.push(`\`${view.commandText}\``);
+    sections.push(`\`\`\`\n${view.commandText}\n\`\`\``);
     if (view.commandPreview && view.commandPreview !== view.commandText) {
-      lines.push(`_${view.commandPreview}_`);
+      sections.push(`_${view.commandPreview}_`);
     }
   }
   if (view.metadata.length > 0) {
-    lines.push('');
-    for (const m of view.metadata) {
-      lines.push(`${m.label}: ${m.value}`);
-    }
+    // Trailing double-space forces a <br> in markdown for each metadata line.
+    const metaLines = view.metadata.map(m => `**${m.label}:** ${m.value}`);
+    sections.push(metaLines.join('  \n'));
   }
-  return lines.join('\n');
+  return sections.join('\n\n');
 }
 
 function buildPendingBlocks(view: PendingApprovalView): ContentBlock[] {

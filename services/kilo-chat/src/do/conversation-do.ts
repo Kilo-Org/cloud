@@ -378,6 +378,9 @@ export class ConversationDO extends DurableObject<Env> {
     if (actionsBlock.resolved) {
       return { ok: false, code: 'already_resolved', error: 'Action already resolved' };
     }
+    if (!actionsBlock.actions.some(a => a.value === params.value)) {
+      return { ok: false, code: 'invalid_value', error: 'Value does not match any offered action' };
+    }
 
     actionsBlock.resolved = {
       value: params.value,

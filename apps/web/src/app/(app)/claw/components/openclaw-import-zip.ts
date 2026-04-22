@@ -1,19 +1,20 @@
 import { unzipSync } from 'fflate';
+import {
+  OPENCLAW_IMPORT_MAX_EXTRACTED_UTF8_BYTES,
+  OPENCLAW_IMPORT_MAX_FILES,
+  OPENCLAW_IMPORT_MAX_FILE_UTF8_BYTES,
+  OPENCLAW_IMPORT_MAX_ZIP_BYTES,
+  mapOpenclawZipPathToImportPath,
+  normalizeOpenclawImportPath,
+  isOpenclawMarkdownContent,
+} from '@kilocode/worker-utils/openclaw-import';
 
-export const OPENCLAW_IMPORT_MAX_ZIP_BYTES = 5 * 1024 * 1024;
-export const OPENCLAW_IMPORT_MAX_FILES = 500;
-export const OPENCLAW_IMPORT_MAX_EXTRACTED_UTF8_BYTES = 5 * 1024 * 1024;
-export const OPENCLAW_IMPORT_MAX_FILE_UTF8_BYTES = 5 * 1024 * 1024;
-
-const OPENCLAW_IMPORT_ROOT_FILES = new Map([
-  ['USER.md', 'workspace/USER.md'],
-  ['SOUL.md', 'workspace/SOUL.md'],
-  ['IDENTITY.md', 'workspace/IDENTITY.md'],
-  ['MEMORY.md', 'workspace/MEMORY.md'],
-]);
-
-const OPENCLAW_IMPORT_MEMORY_PREFIX = 'memory/';
-const OPENCLAW_IMPORT_TARGET_MEMORY_PREFIX = 'workspace/memory/';
+export {
+  OPENCLAW_IMPORT_MAX_EXTRACTED_UTF8_BYTES,
+  OPENCLAW_IMPORT_MAX_FILES,
+  OPENCLAW_IMPORT_MAX_FILE_UTF8_BYTES,
+  OPENCLAW_IMPORT_MAX_ZIP_BYTES,
+};
 
 export type OpenclawImportOs = 'windows' | 'macos' | 'linux';
 
@@ -59,29 +60,15 @@ const OPENCLAW_ZIP_COMMANDS: Record<OpenclawImportOs, OpenclawZipCommand> = {
 
 const textDecoder = new TextDecoder('utf-8', { fatal: true });
 
-function hasDisallowedControlChars(content: string): boolean {
-  for (const char of content) {
-    const code = char.codePointAt(0);
-    if (code === undefined) continue;
-    if (code === 0x09 || code === 0x0a || code === 0x0d) continue;
-    if ((code >= 0x00 && code <= 0x1f) || code === 0x7f) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 function normalizeArchivePath(path: string): string {
-  const withForwardSlashes = path.replaceAll('\\', '/').replace(/^\.\//, '');
-  const segments = withForwardSlashes.split('/');
-  if (segments.some(segment => segment.length === 0 || segment === '.' || segment === '..')) {
+  try {
+    return normalizeOpenclawImportPath(path);
+  } catch {
     throw new OpenclawWorkspaceZipError(
       'openclaw_import_invalid_path',
       `Unsupported zip file path: ${path}`
     );
   }
-  return segments.join('/');
 }
 
 function isSystemArchivePath(path: string): boolean {
@@ -110,34 +97,15 @@ function normalizeZipEntries(zipEntries: Record<string, Uint8Array>): Array<[str
 }
 
 function mapArchivePathToImportPath(archivePath: string): string {
-  const rootTarget = OPENCLAW_IMPORT_ROOT_FILES.get(archivePath);
-  if (rootTarget) {
-    return rootTarget;
-  }
-
-  if (!archivePath.startsWith(OPENCLAW_IMPORT_MEMORY_PREFIX)) {
+  const mapped = mapOpenclawZipPathToImportPath(archivePath);
+  if (!mapped) {
     throw new OpenclawWorkspaceZipError(
       'openclaw_import_invalid_path',
       `Unsupported zip file path: ${archivePath}`
     );
   }
 
-  const memoryRelativePath = archivePath.slice(OPENCLAW_IMPORT_MEMORY_PREFIX.length);
-  if (!memoryRelativePath || memoryRelativePath.endsWith('/')) {
-    throw new OpenclawWorkspaceZipError(
-      'openclaw_import_invalid_path',
-      `Unsupported zip file path: ${archivePath}`
-    );
-  }
-
-  if (!memoryRelativePath.toLowerCase().endsWith('.md')) {
-    throw new OpenclawWorkspaceZipError(
-      'openclaw_import_invalid_path',
-      `Only Markdown files are allowed under memory/: ${archivePath}`
-    );
-  }
-
-  return `${OPENCLAW_IMPORT_TARGET_MEMORY_PREFIX}${memoryRelativePath}`;
+  return mapped;
 }
 
 function decodeMarkdown(path: string, bytes: Uint8Array): string {
@@ -151,7 +119,7 @@ function decodeMarkdown(path: string, bytes: Uint8Array): string {
     );
   }
 
-  if (hasDisallowedControlChars(decoded)) {
+  if (!isOpenclawMarkdownContent(decoded)) {
     throw new OpenclawWorkspaceZipError(
       'openclaw_import_invalid_markdown',
       `File contains non-text content: ${path}`

@@ -237,12 +237,6 @@ function ClawOnboardingFlowInner({
             posthog?.capture('claw_weather_location_skipped');
           }
 
-          // Advance wizard state first so the state machine sees the new
-          // step and identity before any cross-component re-renders.
-          setBotIdentity(identity);
-          setOnboardingStep('permissions');
-          posthog?.capture('claw_setup_permissions_viewed');
-
           if (flowState.instanceStatus) {
             if (weatherLocation) {
               mutations.updateConfig.mutate(
@@ -251,11 +245,11 @@ function ClawOnboardingFlowInner({
               );
             }
           } else {
-            // Start provisioning after the wizard state is set. This calls
-            // handleCreateFlowStarted, which updates the parent and triggers
-            // a re-render after onboardingStep and botIdentity are set.
             provisionInstance(weatherLocation?.location);
           }
+          posthog?.capture('claw_setup_permissions_viewed');
+          setBotIdentity(identity);
+          setOnboardingStep('permissions');
         }}
       />
     );

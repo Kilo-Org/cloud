@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useClawServiceDegraded } from '../hooks/useClawHooks';
+import { useOnboardingSaves } from '../hooks/useOnboardingSaves';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { BotIdentityStep } from './BotIdentityStep';
@@ -120,6 +121,7 @@ function ClawOnboardingFlowInner({
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
+  const [onboardingSaveSession, setOnboardingSaveSession] = useState(0);
   const hasCapturedIdentityView = useRef(false);
   const hasCapturedDoneView = useRef(false);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
@@ -158,6 +160,21 @@ function ClawOnboardingFlowInner({
   useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
 
+  // Save bot identity, exec preset, and channel tokens as soon as the instance
+  // row exists. This closes the tab-close window where customizations entered
+  // during the provisioning spinner could otherwise be lost with the unmounted
+  // ProvisioningStep.
+  const onboardingSaves = useOnboardingSaves({
+    hasInstance: flowState.instanceStatus !== null,
+    botIdentity,
+    selectedPreset,
+    channelTokens,
+    resetKey: `${onboardingSaveSession}:${
+      flowState.instanceStatus?.instanceId ?? flowState.instanceStatus?.sandboxId ?? 'pending'
+    }`,
+    mutations,
+  });
+
   useEffect(() => {
     if (flowState.renderStep !== 'identity' || hasCapturedIdentityView.current) return;
     hasCapturedIdentityView.current = true;
@@ -187,8 +204,10 @@ function ClawOnboardingFlowInner({
 
   const handleCreateFlowStarted = useCallback(() => {
     setLocalCreateSetupStarted(true);
+    setOnboardingSaveSession(value => value + 1);
+    resetWizardSelections();
     onCreateFlowStarted?.();
-  }, [onCreateFlowStarted]);
+  }, [onCreateFlowStarted, resetWizardSelections]);
 
   const handleCreateFlowFailed = useCallback(() => {
     setLocalCreateSetupStarted(false);
@@ -319,11 +338,8 @@ function ClawOnboardingFlowInner({
       <ProvisioningStep
         currentStep={flowState.currentStep}
         totalSteps={flowState.totalSteps}
-        preset={selectedPreset}
-        channelTokens={channelTokens}
-        botIdentity={botIdentity}
+        onboardingSavesReady={onboardingSaves.ready}
         instanceRunning={flowState.instanceRunning}
-        mutations={mutations}
         onComplete={() => {
           posthog?.capture('claw_setup_provisioned');
           posthog?.capture(

@@ -5,6 +5,10 @@
     "moduleResolution": "bundler",
     "strict": true,
     "skipLibCheck": true,
+    "paths": {
+      "@kilocode/worker-utils": ["../../../packages/worker-utils/src/index.ts"],
+      "@kilocode/worker-utils/*": ["../../../packages/worker-utils/src/*"]
+    },
     "types": ["node"],
     "noEmit": true
   },

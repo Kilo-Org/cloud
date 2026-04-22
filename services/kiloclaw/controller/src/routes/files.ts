@@ -3,6 +3,14 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import {
+  OPENCLAW_IMPORT_MAX_EXTRACTED_UTF8_BYTES,
+  OPENCLAW_IMPORT_MAX_FILES,
+  OPENCLAW_IMPORT_MEMORY_PREFIX,
+  isOpenclawImportPathAllowed,
+  isOpenclawMarkdownContent,
+  normalizeOpenclawImportPath,
+} from '@kilocode/worker-utils/openclaw-import';
 import { getBearerToken } from './gateway';
 import { timingSafeTokenEqual } from '../auth';
 import { resolveSafePath, verifyCanonicalized, SafePathError } from '../safe-path';
@@ -17,20 +25,6 @@ import {
   setUserMdLocation,
   setUserMdTimezone,
 } from '../bootstrap';
-
-const OPENCLAW_IMPORT_MAX_FILES = 500;
-const OPENCLAW_IMPORT_MAX_UTF8_BYTES = 5 * 1024 * 1024;
-
-const OPENCLAW_IMPORT_ROOT_FILES = new Set([
-  'workspace/USER.md',
-  'workspace/SOUL.md',
-  'workspace/IDENTITY.md',
-  'workspace/MEMORY.md',
-]);
-
-const OPENCLAW_IMPORT_MEMORY_PREFIX = 'workspace/memory/';
-
-const NON_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 
 const OpenclawWorkspaceImportFileSchema = z.object({
   path: z.string().min(1),
@@ -84,39 +78,6 @@ type OpenclawWorkspaceImportValidation =
       status: 400;
     };
 
-function normalizeImportPath(rawPath: string): string {
-  const withForwardSlashes = rawPath.replaceAll('\\', '/').replace(/^\.\//, '');
-  const segments = withForwardSlashes.split('/');
-  if (segments.some(segment => segment.length === 0 || segment === '.' || segment === '..')) {
-    throw new SafePathError('Import path contains invalid segments');
-  }
-  if (/^[A-Za-z]:$/.test(segments[0] ?? '')) {
-    throw new SafePathError('Import path must not include drive letters');
-  }
-  return segments.join('/');
-}
-
-function isAllowedImportPath(importPath: string): boolean {
-  if (OPENCLAW_IMPORT_ROOT_FILES.has(importPath)) {
-    return true;
-  }
-
-  if (!importPath.startsWith(OPENCLAW_IMPORT_MEMORY_PREFIX)) {
-    return false;
-  }
-
-  const memoryRelativePath = importPath.slice(OPENCLAW_IMPORT_MEMORY_PREFIX.length);
-  if (!memoryRelativePath || memoryRelativePath.endsWith('/')) {
-    return false;
-  }
-
-  return memoryRelativePath.toLowerCase().endsWith('.md');
-}
-
-function isMarkdownContent(content: string): boolean {
-  return !NON_TEXT_CONTROL_CHARS.test(content);
-}
-
 function validateOpenclawWorkspaceImport(
   files: OpenclawWorkspaceImportFile[]
 ): OpenclawWorkspaceImportValidation {
@@ -128,7 +89,7 @@ function validateOpenclawWorkspaceImport(
   for (const file of files) {
     let normalizedPath: string;
     try {
-      normalizedPath = normalizeImportPath(file.path);
+      normalizedPath = normalizeOpenclawImportPath(file.path);
     } catch {
       return {
         ok: false,
@@ -138,7 +99,7 @@ function validateOpenclawWorkspaceImport(
       };
     }
 
-    if (!isAllowedImportPath(normalizedPath)) {
+    if (!isOpenclawImportPathAllowed(normalizedPath)) {
       return {
         ok: false,
         error: `Unsupported import path: ${file.path}`,
@@ -159,7 +120,7 @@ function validateOpenclawWorkspaceImport(
     }
     seenCaseInsensitivePaths.set(caseInsensitivePath, normalizedPath);
 
-    if (!isMarkdownContent(file.content)) {
+    if (!isOpenclawMarkdownContent(file.content)) {
       return {
         ok: false,
         error: `File content appears to be non-text markdown: ${normalizedPath}`,
@@ -170,10 +131,10 @@ function validateOpenclawWorkspaceImport(
 
     const utf8Bytes = Buffer.byteLength(file.content, 'utf8');
     totalUtf8Bytes += utf8Bytes;
-    if (totalUtf8Bytes > OPENCLAW_IMPORT_MAX_UTF8_BYTES) {
+    if (totalUtf8Bytes > OPENCLAW_IMPORT_MAX_EXTRACTED_UTF8_BYTES) {
       return {
         ok: false,
-        error: `Import exceeds ${OPENCLAW_IMPORT_MAX_UTF8_BYTES} UTF-8 bytes`,
+        error: `Import exceeds ${OPENCLAW_IMPORT_MAX_EXTRACTED_UTF8_BYTES} UTF-8 bytes`,
         code: 'openclaw_import_too_large',
         status: 400,
       };

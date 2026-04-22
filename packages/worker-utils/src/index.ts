@@ -63,3 +63,17 @@ export {
   readBillingCorrelationHeaders,
 } from './kiloclaw-billing-observability.js';
 export type { BillingCorrelationContext } from './kiloclaw-billing-observability.js';
+
+export {
+  OPENCLAW_IMPORT_MAX_ZIP_BYTES,
+  OPENCLAW_IMPORT_MAX_FILES,
+  OPENCLAW_IMPORT_MAX_EXTRACTED_UTF8_BYTES,
+  OPENCLAW_IMPORT_MAX_FILE_UTF8_BYTES,
+  OPENCLAW_IMPORT_ROOT_FILE_NAMES,
+  OPENCLAW_IMPORT_MEMORY_PREFIX,
+  OPENCLAW_IMPORT_ZIP_MEMORY_PREFIX,
+  normalizeOpenclawImportPath,
+  isOpenclawImportPathAllowed,
+  mapOpenclawZipPathToImportPath,
+  isOpenclawMarkdownContent,
+} from './openclaw-import.js';

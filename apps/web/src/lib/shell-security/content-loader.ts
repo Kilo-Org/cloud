@@ -155,6 +155,12 @@ export function invalidateShellSecurityContentCache(): void {
   cacheVersion++;
 }
 
+// The `security_advisor_*` DB tables deliberately keep their pre-rename names.
+// The shell-security rebrand covers server code and public surfaces, but
+// renaming the tables would require a migration with zero functional payoff —
+// and would break existing PostHog/Metabase dashboards keyed on the table
+// names. Expect this naming asymmetry between the module and the tables to
+// remain permanent unless a future migration retires `security_advisor_*`.
 async function loadFromDb(): Promise<LoadedShellSecurityContent> {
   const [catalogRows, coverageRows, contentRows] = await Promise.all([
     readDb

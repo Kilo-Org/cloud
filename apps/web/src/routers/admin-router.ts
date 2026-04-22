@@ -1932,6 +1932,10 @@ export const adminRouter = createTRPCRouter({
   gatewayConfig: adminGatewayConfigRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   bulkBlock: adminBulkBlockRouter,
+  // Key kept as `securityAdvisorContent` for tRPC client compatibility —
+  // admin UI consumers reference `trpc.admin.securityAdvisorContent.*`.
+  // Backing router renamed to `adminShellSecurityContentRouter` as part of
+  // the shell-security rebrand; the key/symbol asymmetry is intentional.
   securityAdvisorContent: adminShellSecurityContentRouter,
   freeModelUsage: adminFreeModelUsageRouter,
 });

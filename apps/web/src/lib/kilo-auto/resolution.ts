@@ -26,8 +26,14 @@ import {
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
-import { isFreeModel, isKiloExclusiveFreeModel, preferredModels } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  isFreeModel,
+  isKiloExclusiveFreeModel,
+  preferredModels,
+} from '@/lib/ai-gateway/models';
 import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -48,23 +54,38 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
 /**
  * Returns the candidate models for kilo-auto/free routing.
  *
- * Kilo-exclusive free models are always included (they are routed internally
- * and do not depend on OpenRouter availability). Non-kilo-exclusive free models
- * are only included when they appear in the supplied `openRouterModels` list,
- * which is sourced from the Redis OpenRouter models cache.
+ * Non-kilo-exclusive free models are only included when they appear in the
+ * supplied `openRouterModels` list (sourced from the Redis OpenRouter models
+ * cache). Kilo-exclusive free models are included when their gateway supports
+ * the current `apiKind`; when `apiKind` is null no API-kind filtering is applied.
  */
 export function getAutoFreeCandidates(
-  openRouterModels: ReadonlyArray<string>
+  openRouterModels: ReadonlyArray<string>,
+  apiKind: GatewayRequest['kind'] | null
 ): ReadonlyArray<string> {
   const candidates = new Set<string>();
   for (const model of preferredModels) {
     if (!isKiloAutoModel(model) && isFreeModel(model)) {
-      if (isKiloExclusiveFreeModel(model) || openRouterModels.includes(model)) {
+      if (isKiloExclusiveFreeModel(model)) {
+        const kiloModel = findKiloExclusiveModel(model);
+        if (kiloModel && gatewaySupportsApiKind(kiloModel.gateway, apiKind)) {
+          candidates.add(model);
+        }
+      } else if (openRouterModels.includes(model)) {
         candidates.add(model);
       }
     }
   }
   return [...candidates].toSorted();
+}
+
+function gatewaySupportsApiKind(
+  gateway: string,
+  apiKind: GatewayRequest['kind'] | null
+): boolean {
+  if (apiKind === null) return true;
+  const provider = Object.values(PROVIDERS).find(p => p.id === gateway);
+  return provider?.supportedChatApis.includes(apiKind) ?? false;
 }
 
 export async function resolveAutoModel(
@@ -75,7 +96,7 @@ export async function resolveAutoModel(
   const { model, modeHeader, featureHeader, sessionId, apiKind, clientIp } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
     const openRouterModels = await getOpenRouterModels();
-    const candidates = getAutoFreeCandidates(openRouterModels);
+    const candidates = getAutoFreeCandidates(openRouterModels, apiKind);
     const randomNumber = getRandomNumberLessThan100(
       'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp)
     );

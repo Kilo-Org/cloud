@@ -403,7 +403,7 @@ export async function startAgentInContainer(
         `${TOWN_LOG} startAgentInContainer: ABORTING — failed to mint any auth token for agent ${params.agentId}. ` +
           'The agent would start without credentials and be unable to call back to the worker.'
       );
-      return false;
+      return { started: false, containerFetchMs: 0 };
     }
 
     // Build env vars from town config
@@ -521,17 +521,7 @@ export async function startAgentInContainer(
       }),
     });
 
-    const containerFetchMs = Date.now() - fetchStart;
-    writeEvent(env, {
-      event: 'container.agent_start_fetch',
-      townId: params.townId,
-      rigId: params.rigId,
-      agentId: params.agentId,
-      containerFetchMs,
-      statusCode: response.status,
-      wasSuccess: response.ok,
-    });
-
+    const durationMs = Date.now() - fetchStart;
     if (!response.ok) {
       const text = await response.text().catch(() => '(unreadable)');
       // "Already running" means a previous dispatch succeeded — the agent
@@ -541,7 +531,15 @@ export async function startAgentInContainer(
         console.log(
           `${TOWN_LOG} startAgentInContainer: agent ${params.agentId} already running — treating as success`
         );
-        return { started: true, containerFetchMs };
+        writeEvent(env, {
+          event: 'container.agent_start_fetch',
+          townId: params.townId,
+          rigId: params.rigId,
+          agentId: params.agentId,
+          durationMs,
+          statusCode: response.status,
+        });
+        return { started: true, containerFetchMs: durationMs };
       }
       const errorMsg = `(${response.status}) ${text.slice(0, 300)}`;
       console.error(
@@ -549,8 +547,26 @@ export async function startAgentInContainer(
           `agent=${params.agentId} role=${params.role}: ${errorMsg}`
       );
       lastStartError = errorMsg;
+      writeEvent(env, {
+        event: 'container.agent_start_fetch',
+        townId: params.townId,
+        rigId: params.rigId,
+        agentId: params.agentId,
+        durationMs,
+        statusCode: response.status,
+        error: errorMsg,
+      });
+      return { started: false, containerFetchMs: durationMs };
     }
-    return { started: response.ok, containerFetchMs };
+    writeEvent(env, {
+      event: 'container.agent_start_fetch',
+      townId: params.townId,
+      rigId: params.rigId,
+      agentId: params.agentId,
+      durationMs,
+      statusCode: response.status,
+    });
+    return { started: true, containerFetchMs: durationMs };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`${TOWN_LOG} startAgentInContainer: EXCEPTION for agent ${params.agentId}:`, err);

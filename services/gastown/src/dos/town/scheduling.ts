@@ -176,7 +176,7 @@ export async function dispatchAgent(
         agentId: agent.id,
         beadId: bead.bead_id,
         role: agent.role,
-        containerFetchMs,
+        durationMs: containerFetchMs,
       });
     } else {
       // Container start returned false — but the container may have

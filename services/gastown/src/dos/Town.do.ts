@@ -4388,11 +4388,11 @@ export class TownDO extends DurableObject<Env> {
           signal: AbortSignal.timeout(5_000),
           headers,
         });
-        const healthPingMs = Date.now() - t0;
+        const durationMs = Date.now() - t0;
         writeEvent(this.env, {
           event: 'container.health_ping',
           townId,
-          healthPingMs,
+          durationMs,
           healthPingStatus: 'ok',
         });
         if (healthResp.ok) {
@@ -4407,18 +4407,18 @@ export class TownDO extends DurableObject<Env> {
               event: 'container.ready_observed',
               townId,
               containerStartedAt: body.data.startedAt,
-              timeSinceContainerStartMs: Date.now() - containerStartedAt,
-              uptimeMs: body.data.uptime ?? 0,
+              durationMs: Date.now() - containerStartedAt,
             });
           }
         }
       } catch {
-        const healthPingMs = Date.now() - t0;
+        const durationMs = Date.now() - t0;
         writeEvent(this.env, {
           event: 'container.health_ping',
           townId,
-          healthPingMs,
+          durationMs,
           healthPingStatus: 'timeout',
+          error: 'timeout',
         });
         // Container is starting up or unavailable — alarm will retry
       }

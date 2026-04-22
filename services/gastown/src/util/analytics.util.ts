@@ -44,13 +44,10 @@ export type GastownEventData = {
   durationMs?: number;
   value?: number;
   label?: string;
-  // Timing fields for container cold-start instrumentation
-  containerFetchMs?: number;
-  healthPingMs?: number;
-  timeSinceContainerStartMs?: number;
-  uptimeMs?: number;
+  // Container cold-start instrumentation fields.
+  // Use durationMs for all timing (event name disambiguates the metric).
+  // Use error (absence = success) instead of a wasSuccess boolean.
   statusCode?: number;
-  wasSuccess?: boolean;
   containerStartedAt?: string;
   healthPingStatus?: string;
   // Additional doubles for reconciler_tick events (double3–double10).
@@ -105,12 +102,7 @@ export function writeEvent(
         data.double8 ?? 0, // double8
         data.double9 ?? 0, // double9
         data.double10 ?? 0, // double10
-        data.containerFetchMs ?? 0, // double11
-        data.healthPingMs ?? 0, // double12
-        data.timeSinceContainerStartMs ?? 0, // double13
-        data.uptimeMs ?? 0, // double14
-        data.statusCode ?? 0, // double15
-        data.wasSuccess !== undefined ? (data.wasSuccess ? 1 : 0) : 0, // double16
+        data.statusCode ?? 0, // double11
       ],
       indexes: [data.event],
     });

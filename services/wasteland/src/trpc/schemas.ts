@@ -131,6 +131,62 @@ export const UpstreamRigOutput = z.object({
   last_seen_at: z.string().nullable(),
 });
 
+// Full rig detail — superset of UpstreamRigOutput with contact/metadata
+// fields that aren't surfaced in the flat rigs list.
+export const RigDetailOutput = z.object({
+  rig_handle: z.string(),
+  display_name: z.string().nullable(),
+  trust_level: z.number(),
+  dolthub_org: z.string().nullable(),
+  owner_email: z.string().nullable(),
+  hop_uri: z.string().nullable(),
+  gt_version: z.string().nullable(),
+  registered_at: z.string().nullable(),
+  last_seen_at: z.string().nullable(),
+});
+
+// A `completions` row joined with the wanted item title for display.
+export const CompletionOutput = z.object({
+  completion_id: z.string(),
+  wanted_id: z.string(),
+  wanted_title: z.string().nullable(),
+  completed_by: z.string().nullable(),
+  evidence: z.string().nullable(),
+  hop_uri: z.string().nullable(),
+  validated_by: z.string().nullable(),
+  stamp_id: z.string().nullable(),
+  completed_at: z.string().nullable(),
+});
+
+// A `stamps` row with context derived from the joined completion.
+export const StampOutput = z.object({
+  stamp_id: z.string(),
+  author: z.string(),
+  subject: z.string(),
+  valence: z.string().nullable(),
+  confidence: z.union([z.string(), z.number()]).nullable(),
+  severity: z.string().nullable(),
+  skill_tags: z.string().nullable(),
+  message: z.string().nullable(),
+  context_id: z.string().nullable(),
+  context_type: z.string().nullable(),
+  // The wanted item the stamp is about, resolved via the completion.
+  wanted_id: z.string().nullable(),
+  wanted_title: z.string().nullable(),
+});
+
+// Aggregated rig activity — each section is a list the RigPanel renders
+// as a clickable group that can push a detail drawer. Intentionally
+// coarse (not a flat chronological feed) so the panel can label each
+// group with the right relation (Posted / Claimed / Completed / etc.).
+export const RigActivityOutput = z.object({
+  posted: z.array(WantedBoardRowOutput),
+  claimed: z.array(WantedBoardRowOutput),
+  completions: z.array(CompletionOutput),
+  stamps_authored: z.array(StampOutput),
+  stamps_received: z.array(StampOutput),
+});
+
 // ── Admin: Review inbox items ──────────────────────────────────────────
 // Discriminated union matching the `InboxItem` type from
 // `../inbox/inbox-classifier`. Each kind renders as a distinct card in
@@ -233,3 +289,7 @@ export const RpcMergePullOutput = rpcSafe(MergePullOutput);
 export const RpcUpstreamAdminVerifyOutput = rpcSafe(UpstreamAdminVerifyOutput);
 export const RpcUpstreamRigOutput = rpcSafe(UpstreamRigOutput);
 export const RpcInboxItemOutput = rpcSafe(InboxItemOutput);
+export const RpcRigDetailOutput = rpcSafe(RigDetailOutput);
+export const RpcCompletionOutput = rpcSafe(CompletionOutput);
+export const RpcStampOutput = rpcSafe(StampOutput);
+export const RpcRigActivityOutput = rpcSafe(RigActivityOutput);

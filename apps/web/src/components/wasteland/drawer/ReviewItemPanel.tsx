@@ -17,18 +17,21 @@ import {
   UserPlus,
   XCircle,
 } from 'lucide-react';
-import type { InboxItem, ReviewPanelActions } from './types';
+import type { DrawerStackHelpers } from '@/components/drawer';
+import type { InboxItem, ReviewPanelActions, WastelandDrawerRef } from './types';
+import { RigLink, WantedItemLink } from './CrossRefs';
 
 type InboxKind = InboxItem['kind'];
 
-export function ReviewItemPanel({
-  item,
-  actions,
-}: {
+type PanelProps = {
+  wastelandId: string;
   item: InboxItem;
-  actions: ReviewPanelActions;
-}) {
-  const { upstream, busy, onMerge, onCloseAction, onComment } = actions;
+  /** `null` means the panel was pushed as a cross-reference — render read-only. */
+  actions: ReviewPanelActions | null;
+  push: DrawerStackHelpers<WastelandDrawerRef>['push'];
+};
+
+export function ReviewItemPanel({ wastelandId, item, actions, push }: PanelProps) {
   const Icon = iconFor(item.kind);
 
   return (
@@ -44,81 +47,104 @@ export function ReviewItemPanel({
         </Badge>
       </div>
 
-      <CardBody item={item} />
+      <CardBody item={item} wastelandId={wastelandId} push={push} />
 
       <div className="space-y-1.5 border-t border-white/[0.06] pt-3">
         {item.from_branch && <DetailRow label="Branch" value={item.from_branch} mono />}
+        {item.submitter && (
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="shrink-0 text-white/30">Submitter</span>
+            <RigLink handle={item.submitter} wastelandId={wastelandId} push={push} />
+          </div>
+        )}
         {item.creator_name && <DetailRow label="Creator" value={item.creator_name} />}
         <DetailRow label="Created" value={formatTimestamp(item.created_at)} />
         <DetailRow label="Updated" value={formatTimestamp(item.updated_at)} />
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-white/[0.06] pt-3">
-        <button
-          type="button"
-          onClick={() => onMerge(item)}
-          disabled={busy}
-          className="inline-flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
-        >
-          <GitMerge className="size-3.5" />
-          Merge PR
-        </button>
-        <button
-          type="button"
-          onClick={() => onCloseAction(item)}
-          disabled={busy}
-          className="inline-flex items-center justify-center gap-1.5 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50"
-        >
-          <XCircle className="size-3.5" />
-          Close (no merge)
-        </button>
-        <button
-          type="button"
-          onClick={() => onComment(item)}
+      {actions && <ActionButtons item={item} actions={actions} />}
+    </div>
+  );
+}
+
+function ActionButtons({ item, actions }: { item: InboxItem; actions: ReviewPanelActions }) {
+  const { upstream, busy, onMerge, onCloseAction, onComment } = actions;
+  return (
+    <div className="flex flex-col gap-2 border-t border-white/[0.06] pt-3">
+      <button
+        type="button"
+        onClick={() => onMerge(item)}
+        disabled={busy}
+        className="inline-flex items-center justify-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+      >
+        <GitMerge className="size-3.5" />
+        Merge PR
+      </button>
+      <button
+        type="button"
+        onClick={() => onCloseAction(item)}
+        disabled={busy}
+        className="inline-flex items-center justify-center gap-1.5 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+      >
+        <XCircle className="size-3.5" />
+        Close (no merge)
+      </button>
+      <button
+        type="button"
+        onClick={() => onComment(item)}
+        className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.06]"
+      >
+        <MessageSquare className="size-3.5" />
+        Comment on PR
+      </button>
+      {upstream && (
+        <a
+          href={`https://www.dolthub.com/repositories/${upstream}/pulls/${item.pull_id}`}
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.06]"
         >
-          <MessageSquare className="size-3.5" />
-          Comment on PR
-        </button>
-        {upstream && (
-          <a
-            href={`https://www.dolthub.com/repositories/${upstream}/pulls/${item.pull_id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.06]"
-          >
-            <ExternalLink className="size-3.5" />
-            Open on DoltHub
-          </a>
-        )}
-      </div>
+          <ExternalLink className="size-3.5" />
+          Open on DoltHub
+        </a>
+      )}
     </div>
   );
 }
 
 // ── Per-kind body ────────────────────────────────────────────────────────
 
-function CardBody({ item }: { item: InboxItem }) {
+type BodyProps = Pick<PanelProps, 'wastelandId' | 'push'>;
+
+function CardBody({ item, wastelandId, push }: { item: InboxItem } & BodyProps) {
   switch (item.kind) {
     case 'rig-registration':
-      return <RigRegistrationBody item={item} />;
+      return <RigRegistrationBody item={item} wastelandId={wastelandId} push={push} />;
     case 'wanted-post':
-      return <WantedPostBody item={item} />;
+      return <WantedPostBody item={item} wastelandId={wastelandId} push={push} />;
     case 'wanted-edit':
-      return <WantedEditBody item={item} />;
+      return <WantedEditBody item={item} wastelandId={wastelandId} push={push} />;
     case 'work-submission':
-      return <WorkSubmissionBody item={item} />;
+      return <WorkSubmissionBody item={item} wastelandId={wastelandId} push={push} />;
     case 'admin-action':
-      return <AdminActionBody item={item} />;
+      return <AdminActionBody item={item} wastelandId={wastelandId} push={push} />;
     case 'unknown':
       return <UnknownBody item={item} />;
   }
 }
 
-function RigRegistrationBody({ item }: { item: Extract<InboxItem, { kind: 'rig-registration' }> }) {
+function RigRegistrationBody({
+  item,
+  wastelandId,
+  push,
+}: { item: Extract<InboxItem, { kind: 'rig-registration' }> } & BodyProps) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={() => push({ type: 'rig', wastelandId, handle: item.handle })}
+        className="group/link flex w-full items-center gap-3 rounded-md border border-white/[0.04] bg-white/[0.02] px-3 py-2 text-left transition-colors hover:bg-white/[0.04]"
+      >
         <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
           <UserPlus className="size-4 text-emerald-400" />
         </div>
@@ -126,7 +152,8 @@ function RigRegistrationBody({ item }: { item: Extract<InboxItem, { kind: 'rig-r
           <p className="font-mono text-sm text-white/85">{item.handle}</p>
           {item.display_name && <p className="text-xs text-white/50">{item.display_name}</p>}
         </div>
-      </div>
+        <span className="text-[10px] text-white/30 group-hover/link:text-white/60">View rig →</span>
+      </button>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[11px]">
         {item.owner_email && (
           <MetaRow label="Owner">
@@ -154,12 +181,23 @@ function RigRegistrationBody({ item }: { item: Extract<InboxItem, { kind: 'rig-r
   );
 }
 
-function WantedPostBody({ item }: { item: Extract<InboxItem, { kind: 'wanted-post' }> }) {
+function WantedPostBody({
+  item,
+  wastelandId,
+  push,
+}: { item: Extract<InboxItem, { kind: 'wanted-post' }> } & BodyProps) {
   return (
     <div className="space-y-2">
       <div>
         <p className="text-sm font-medium text-white/85">{item.item_title}</p>
-        <p className="mt-0.5 font-mono text-[10px] text-white/30">{item.item_id}</p>
+        <div className="mt-0.5">
+          <WantedItemLink
+            itemId={item.item_id}
+            wastelandId={wastelandId}
+            push={push}
+            variant="mono"
+          />
+        </div>
       </div>
       {item.description && (
         <p className="line-clamp-6 text-xs whitespace-pre-wrap text-white/55">{item.description}</p>
@@ -168,8 +206,13 @@ function WantedPostBody({ item }: { item: Extract<InboxItem, { kind: 'wanted-pos
         {item.type && <TagPill>{`type: ${item.type}`}</TagPill>}
         {item.priority && <TagPill>{`priority: ${item.priority}`}</TagPill>}
         {item.effort_level && <TagPill>{`effort: ${item.effort_level}`}</TagPill>}
-        {item.posted_by && <TagPill>{`by: ${item.posted_by}`}</TagPill>}
       </div>
+      {item.posted_by && (
+        <div className="flex items-center gap-2 text-[11px] text-white/40">
+          <span>posted by</span>
+          <RigLink handle={item.posted_by} wastelandId={wastelandId} push={push} />
+        </div>
+      )}
       {item.tags && <p className="font-mono text-[10px] text-white/35">tags: {item.tags}</p>}
     </div>
   );
@@ -181,7 +224,11 @@ const EDIT_SUBKIND_LABEL: Record<'update' | 'delete' | 'unclaim', string> = {
   unclaim: 'Unclaim',
 };
 
-function WantedEditBody({ item }: { item: Extract<InboxItem, { kind: 'wanted-edit' }> }) {
+function WantedEditBody({
+  item,
+  wastelandId,
+  push,
+}: { item: Extract<InboxItem, { kind: 'wanted-edit' }> } & BodyProps) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
@@ -190,14 +237,14 @@ function WantedEditBody({ item }: { item: Extract<InboxItem, { kind: 'wanted-edi
         </span>
         <p className="truncate text-sm text-white/80">{item.item_title}</p>
       </div>
-      <p className="font-mono text-[10px] text-white/30">{item.item_id}</p>
+      <WantedItemLink itemId={item.item_id} wastelandId={wastelandId} push={push} variant="mono" />
       {item.status_transition && (
         <p className="font-mono text-[11px] text-white/50">{item.status_transition}</p>
       )}
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[11px]">
         {item.posted_by && (
           <MetaRow label="Posted by">
-            <span className="font-mono">{item.posted_by}</span>
+            <RigLink handle={item.posted_by} wastelandId={wastelandId} push={push} />
           </MetaRow>
         )}
         {item.submitter_is_poster !== null && (
@@ -219,12 +266,21 @@ function WantedEditBody({ item }: { item: Extract<InboxItem, { kind: 'wanted-edi
   );
 }
 
-function WorkSubmissionBody({ item }: { item: Extract<InboxItem, { kind: 'work-submission' }> }) {
+function WorkSubmissionBody({
+  item,
+  wastelandId,
+  push,
+}: { item: Extract<InboxItem, { kind: 'work-submission' }> } & BodyProps) {
   return (
     <div className="space-y-2">
       <div>
-        <p className="text-sm font-medium text-white/85">{item.item_title}</p>
-        <p className="mt-0.5 font-mono text-[10px] text-white/30">{item.item_id}</p>
+        <WantedItemLink
+          itemId={item.item_id}
+          label={item.item_title}
+          wastelandId={wastelandId}
+          push={push}
+          variant="row"
+        />
       </div>
       <div className="flex flex-wrap items-center gap-2 text-[11px]">
         <span className="inline-flex items-center gap-1 rounded border border-violet-500/20 bg-violet-500/10 px-1.5 py-0.5 text-violet-300">
@@ -241,8 +297,9 @@ function WorkSubmissionBody({ item }: { item: Extract<InboxItem, { kind: 'work-s
             Claim only — waiting on evidence
           </span>
         )}
-        <span className="text-white/40">
-          by <span className="font-mono text-white/70">{item.claimer}</span>
+        <span className="inline-flex items-center gap-1 text-white/40">
+          by
+          <RigLink handle={item.claimer} wastelandId={wastelandId} push={push} />
         </span>
       </div>
       {item.evidence_url && (
@@ -278,7 +335,11 @@ const ADMIN_SUBKIND_LABEL: Record<
   'close-upstream': { label: 'Close upstream (no stamp)', tone: 'white' },
 };
 
-function AdminActionBody({ item }: { item: Extract<InboxItem, { kind: 'admin-action' }> }) {
+function AdminActionBody({
+  item,
+  wastelandId,
+  push,
+}: { item: Extract<InboxItem, { kind: 'admin-action' }> } & BodyProps) {
   const { label, tone } = ADMIN_SUBKIND_LABEL[item.subkind];
   const toneClass =
     tone === 'emerald'
@@ -297,16 +358,16 @@ function AdminActionBody({ item }: { item: Extract<InboxItem, { kind: 'admin-act
         </span>
         <p className="truncate text-sm text-white/80">{item.item_title}</p>
       </div>
-      <p className="font-mono text-[10px] text-white/30">{item.item_id}</p>
+      <WantedItemLink itemId={item.item_id} wastelandId={wastelandId} push={push} variant="mono" />
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-[11px]">
         {item.worker && (
           <MetaRow label="Worker">
-            <span className="font-mono">{item.worker}</span>
+            <RigLink handle={item.worker} wastelandId={wastelandId} push={push} />
           </MetaRow>
         )}
         {item.acceptor && (
           <MetaRow label="Actor">
-            <span className="font-mono">{item.acceptor}</span>
+            <RigLink handle={item.acceptor} wastelandId={wastelandId} push={push} />
           </MetaRow>
         )}
       </dl>

@@ -578,6 +578,137 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    getRig: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+        handle: string;
+      };
+      output: {
+        rig_handle: string;
+        display_name: string | null;
+        trust_level: number;
+        dolthub_org: string | null;
+        owner_email: string | null;
+        hop_uri: string | null;
+        gt_version: string | null;
+        registered_at: string | null;
+        last_seen_at: string | null;
+      } | null;
+      meta: object;
+    }>;
+    getWantedItem: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+        itemId: string;
+      };
+      output: {
+        id: string;
+        title: string;
+        description: string | null;
+        project: string | null;
+        type: string | null;
+        priority: string | number | null;
+        tags: string | null;
+        posted_by: string | null;
+        claimed_by: string | null;
+        status: string;
+        effort_level: string | null;
+        evidence_url: string | null;
+        sandbox_required: string | number | null;
+        sandbox_scope: string | null;
+        sandbox_min_tier: string | null;
+        created_at: string | null;
+        updated_at: string | null;
+      } | null;
+      meta: object;
+    }>;
+    listRigActivity: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+        handle: string;
+        limit?: number | undefined;
+      };
+      output: {
+        posted: {
+          id: string;
+          title: string;
+          description: string | null;
+          project: string | null;
+          type: string | null;
+          priority: string | number | null;
+          tags: string | null;
+          posted_by: string | null;
+          claimed_by: string | null;
+          status: string;
+          effort_level: string | null;
+          evidence_url: string | null;
+          sandbox_required: string | number | null;
+          sandbox_scope: string | null;
+          sandbox_min_tier: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        }[];
+        claimed: {
+          id: string;
+          title: string;
+          description: string | null;
+          project: string | null;
+          type: string | null;
+          priority: string | number | null;
+          tags: string | null;
+          posted_by: string | null;
+          claimed_by: string | null;
+          status: string;
+          effort_level: string | null;
+          evidence_url: string | null;
+          sandbox_required: string | number | null;
+          sandbox_scope: string | null;
+          sandbox_min_tier: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        }[];
+        completions: {
+          completion_id: string;
+          wanted_id: string;
+          wanted_title: string | null;
+          completed_by: string | null;
+          evidence: string | null;
+          hop_uri: string | null;
+          validated_by: string | null;
+          stamp_id: string | null;
+          completed_at: string | null;
+        }[];
+        stamps_authored: {
+          stamp_id: string;
+          author: string;
+          subject: string;
+          valence: string | null;
+          confidence: string | number | null;
+          severity: string | null;
+          skill_tags: string | null;
+          message: string | null;
+          context_id: string | null;
+          context_type: string | null;
+          wanted_id: string | null;
+          wanted_title: string | null;
+        }[];
+        stamps_received: {
+          stamp_id: string;
+          author: string;
+          subject: string;
+          valence: string | null;
+          confidence: string | number | null;
+          severity: string | null;
+          skill_tags: string | null;
+          message: string | null;
+          context_id: string | null;
+          context_type: string | null;
+          wanted_id: string | null;
+          wanted_title: string | null;
+        }[];
+      };
+      meta: object;
+    }>;
     setUpstreamRigTrust: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         wastelandId: string;
@@ -1180,6 +1311,137 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
               trust_level: number;
               registered_at: string | null;
               last_seen_at: string | null;
+            }[];
+          };
+          meta: object;
+        }>;
+        getRig: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            wastelandId: string;
+            handle: string;
+          };
+          output: {
+            rig_handle: string;
+            display_name: string | null;
+            trust_level: number;
+            dolthub_org: string | null;
+            owner_email: string | null;
+            hop_uri: string | null;
+            gt_version: string | null;
+            registered_at: string | null;
+            last_seen_at: string | null;
+          } | null;
+          meta: object;
+        }>;
+        getWantedItem: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            wastelandId: string;
+            itemId: string;
+          };
+          output: {
+            id: string;
+            title: string;
+            description: string | null;
+            project: string | null;
+            type: string | null;
+            priority: string | number | null;
+            tags: string | null;
+            posted_by: string | null;
+            claimed_by: string | null;
+            status: string;
+            effort_level: string | null;
+            evidence_url: string | null;
+            sandbox_required: string | number | null;
+            sandbox_scope: string | null;
+            sandbox_min_tier: string | null;
+            created_at: string | null;
+            updated_at: string | null;
+          } | null;
+          meta: object;
+        }>;
+        listRigActivity: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            wastelandId: string;
+            handle: string;
+            limit?: number | undefined;
+          };
+          output: {
+            posted: {
+              id: string;
+              title: string;
+              description: string | null;
+              project: string | null;
+              type: string | null;
+              priority: string | number | null;
+              tags: string | null;
+              posted_by: string | null;
+              claimed_by: string | null;
+              status: string;
+              effort_level: string | null;
+              evidence_url: string | null;
+              sandbox_required: string | number | null;
+              sandbox_scope: string | null;
+              sandbox_min_tier: string | null;
+              created_at: string | null;
+              updated_at: string | null;
+            }[];
+            claimed: {
+              id: string;
+              title: string;
+              description: string | null;
+              project: string | null;
+              type: string | null;
+              priority: string | number | null;
+              tags: string | null;
+              posted_by: string | null;
+              claimed_by: string | null;
+              status: string;
+              effort_level: string | null;
+              evidence_url: string | null;
+              sandbox_required: string | number | null;
+              sandbox_scope: string | null;
+              sandbox_min_tier: string | null;
+              created_at: string | null;
+              updated_at: string | null;
+            }[];
+            completions: {
+              completion_id: string;
+              wanted_id: string;
+              wanted_title: string | null;
+              completed_by: string | null;
+              evidence: string | null;
+              hop_uri: string | null;
+              validated_by: string | null;
+              stamp_id: string | null;
+              completed_at: string | null;
+            }[];
+            stamps_authored: {
+              stamp_id: string;
+              author: string;
+              subject: string;
+              valence: string | null;
+              confidence: string | number | null;
+              severity: string | null;
+              skill_tags: string | null;
+              message: string | null;
+              context_id: string | null;
+              context_type: string | null;
+              wanted_id: string | null;
+              wanted_title: string | null;
+            }[];
+            stamps_received: {
+              stamp_id: string;
+              author: string;
+              subject: string;
+              valence: string | null;
+              confidence: string | number | null;
+              severity: string | null;
+              skill_tags: string | null;
+              message: string | null;
+              context_id: string | null;
+              context_type: string | null;
+              wanted_id: string | null;
+              wanted_title: string | null;
             }[];
           };
           meta: object;

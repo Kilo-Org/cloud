@@ -213,6 +213,7 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
     (item: WantedItem) => {
       openDrawer({
         type: 'wanted-item',
+        wastelandId,
         item,
         actions: {
           isAdmin,
@@ -225,7 +226,7 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
         },
       });
     },
-    [openDrawer, isAdmin]
+    [openDrawer, wastelandId, isAdmin]
   );
 
   // Contribute page title, item count, and CTAs into the wasteland navbar.

@@ -6,14 +6,16 @@ import { useUser } from '@/hooks/useUser';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Truck, Loader2, ShieldCheck } from 'lucide-react';
+import { Truck, Loader2, ShieldCheck, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useSetWastelandPageHeader } from '../WastelandPageHeaderContext';
+import { useDrawerStack } from '@/components/wasteland/drawer/WastelandDrawerStack';
 
 export function RigsClient({ wastelandId }: { wastelandId: string }) {
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
   const { data: currentUser } = useUser();
+  const { open: openDrawer } = useDrawerStack();
 
   const wastelandQuery = useQuery(trpc.wasteland.getWasteland.queryOptions({ wastelandId }));
   const credentialQuery = useQuery(
@@ -125,45 +127,54 @@ export function RigsClient({ wastelandId }: { wastelandId: string }) {
               {rigs.map(rig => (
                 <div
                   key={rig.rig_handle}
-                  className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3"
+                  className="group flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] transition-colors hover:border-white/[0.1] hover:bg-white/[0.03]"
                 >
-                  <Truck className="size-4 shrink-0 text-white/40" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-sm text-white/70">{rig.rig_handle}</p>
-                    <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-white/30">
-                      {rig.display_name && <span>{rig.display_name}</span>}
-                      {rig.registered_at && (
-                        <span>Joined {formatDistanceToNow(new Date(rig.registered_at))} ago</span>
-                      )}
-                      {rig.last_seen_at && (
-                        <span>Seen {formatDistanceToNow(new Date(rig.last_seen_at))} ago</span>
-                      )}
+                  <button
+                    type="button"
+                    onClick={() => openDrawer({ type: 'rig', wastelandId, handle: rig.rig_handle })}
+                    className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
+                  >
+                    <Truck className="size-4 shrink-0 text-white/40" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-mono text-sm text-white/70">{rig.rig_handle}</p>
+                      <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-white/30">
+                        {rig.display_name && <span>{rig.display_name}</span>}
+                        {rig.registered_at && (
+                          <span>Joined {formatDistanceToNow(new Date(rig.registered_at))} ago</span>
+                        )}
+                        {rig.last_seen_at && (
+                          <span>Seen {formatDistanceToNow(new Date(rig.last_seen_at))} ago</span>
+                        )}
+                      </div>
                     </div>
+                    <ChevronRight className="size-3.5 shrink-0 text-white/15 transition-colors group-hover:text-white/40" />
+                  </button>
+                  <div className="pr-4">
+                    {isUpstreamAdmin ? (
+                      <select
+                        value={rig.trust_level}
+                        disabled={setTrust.isPending}
+                        onChange={e =>
+                          setTrust.mutate({
+                            wastelandId,
+                            rigHandle: rig.rig_handle,
+                            trustLevel: Number(e.target.value),
+                          })
+                        }
+                        className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-xs text-white/80 outline-none focus:border-white/20 disabled:opacity-50"
+                      >
+                        {[0, 1, 2, 3].map(level => (
+                          <option key={level} value={level}>
+                            Trust {level}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Badge variant="outline" className="border-white/[0.08] text-white/50">
+                        Trust {rig.trust_level}
+                      </Badge>
+                    )}
                   </div>
-                  {isUpstreamAdmin ? (
-                    <select
-                      value={rig.trust_level}
-                      disabled={setTrust.isPending}
-                      onChange={e =>
-                        setTrust.mutate({
-                          wastelandId,
-                          rigHandle: rig.rig_handle,
-                          trustLevel: Number(e.target.value),
-                        })
-                      }
-                      className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-xs text-white/80 outline-none focus:border-white/20 disabled:opacity-50"
-                    >
-                      {[0, 1, 2, 3].map(level => (
-                        <option key={level} value={level}>
-                          Trust {level}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <Badge variant="outline" className="border-white/[0.08] text-white/50">
-                      Trust {rig.trust_level}
-                    </Badge>
-                  )}
                 </div>
               ))}
             </div>

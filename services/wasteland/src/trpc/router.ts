@@ -29,6 +29,9 @@ import {
   RpcUpstreamAdminVerifyOutput,
   RpcMergePullOutput,
   RpcUpstreamRigOutput,
+  RpcRigDetailOutput,
+  RpcRigActivityOutput,
+  WantedBoardRowOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
@@ -56,6 +59,42 @@ function verifyOrgAccess(ctx: TRPCContext, organizationId: string): JwtOrgMember
     });
   }
   return membership;
+}
+
+/**
+ * Parse raw DoltHub rows as WantedBoardRowOutput. Used by listRigActivity
+ * to validate per-row shape without throwing when an optional column is
+ * null (Zod defaults cover that).
+ */
+function parseWantedBoardRows(rows: unknown[]) {
+  const parsed = z.array(WantedBoardRowOutput).safeParse(rows);
+  return parsed.success ? parsed.data : [];
+}
+
+/**
+ * Parse a `stamps` JOIN result from DoltHub into the shape StampOutput
+ * expects. Shared by `listRigActivity`'s authored + received queries.
+ */
+function parseStampRows(rows: unknown[]) {
+  const parsed = z
+    .array(
+      z.object({
+        stamp_id: z.string(),
+        author: z.string(),
+        subject: z.string(),
+        valence: z.string().nullable().default(null),
+        confidence: z.union([z.string(), z.number()]).nullable().default(null),
+        severity: z.string().nullable().default(null),
+        skill_tags: z.string().nullable().default(null),
+        message: z.string().nullable().default(null),
+        context_id: z.string().nullable().default(null),
+        context_type: z.string().nullable().default(null),
+        wanted_id: z.string().nullable().default(null),
+        wanted_title: z.string().nullable().default(null),
+      })
+    )
+    .safeParse(rows);
+  return parsed.success ? parsed.data : [];
 }
 
 /** Translate a WantedBoardOpError into the matching TRPCError. */
@@ -1352,6 +1391,191 @@ export const wastelandRouter = router({
           last_seen_at: r.last_seen,
         }));
         return { rigs };
+      } catch (err) {
+        if (err instanceof doltApi.DoltHubApiError) {
+          throw new TRPCError({
+            code: err.status === 401 || err.status === 403 ? 'FORBIDDEN' : 'INTERNAL_SERVER_ERROR',
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+    }),
+
+  // ── Admin: Single-entity fetchers (for drawer graph navigation) ──────
+  // These are deliberately small, targeted reads against upstream `main`.
+  // Drawer panels use them when a user clicks a cross-reference (e.g. a
+  // rig handle in a PR drawer → push rig drawer) and we don't already
+  // have the full row loaded on the page.
+
+  getRig: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        handle: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[a-zA-Z0-9_-]+$/, 'handle must be alphanumeric with - or _ only'),
+      })
+    )
+    .output(RpcRigDetailOutput.nullable())
+    .query(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      const { token, upstream } = await loadAdminContext(ctx.env, input.wastelandId, ctx.userId);
+      try {
+        // `input.handle` is Zod-validated against /^[a-zA-Z0-9_-]+$/ and
+        // bounded at 64 chars, so the string CANNOT carry quotes, spaces,
+        // semicolons, comment markers, or any other injection vector.
+        const result = await doltApi.runUnsafeSql(
+          upstream,
+          token,
+          'main',
+          `SELECT handle, display_name, trust_level, dolthub_org, owner_email, hop_uri, gt_version, registered_at, last_seen FROM rigs WHERE handle = '${input.handle}' LIMIT 1`
+        );
+        const rigRow = z.object({
+          handle: z.string(),
+          display_name: z.string().nullable().default(null),
+          trust_level: z.union([z.string(), z.number()]).transform(v => Number(v)),
+          dolthub_org: z.string().nullable().default(null),
+          owner_email: z.string().nullable().default(null),
+          hop_uri: z.string().nullable().default(null),
+          gt_version: z.string().nullable().default(null),
+          registered_at: z.string().nullable().default(null),
+          last_seen: z.string().nullable().default(null),
+        });
+        const rows = z.array(rigRow).safeParse(result.rows ?? []);
+        if (!rows.success || rows.data.length === 0) return null;
+        const r = rows.data[0];
+        return {
+          rig_handle: r.handle,
+          display_name: r.display_name,
+          trust_level: r.trust_level,
+          dolthub_org: r.dolthub_org,
+          owner_email: r.owner_email,
+          hop_uri: r.hop_uri,
+          gt_version: r.gt_version,
+          registered_at: r.registered_at,
+          last_seen_at: r.last_seen,
+        };
+      } catch (err) {
+        if (err instanceof doltApi.DoltHubApiError) {
+          throw new TRPCError({
+            code: err.status === 401 || err.status === 403 ? 'FORBIDDEN' : 'INTERNAL_SERVER_ERROR',
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+    }),
+
+  getWantedItem: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        itemId: z
+          .string()
+          .regex(/^w-[a-f0-9]{10}$/, 'itemId must match the canonical w-<10 hex> shape'),
+      })
+    )
+    .output(RpcWantedBoardRowOutput.nullable())
+    .query(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      const { token, upstream } = await loadAdminContext(ctx.env, input.wastelandId, ctx.userId);
+      try {
+        // `input.itemId` matches /^w-[a-f0-9]{10}$/ so interpolation is safe.
+        const result = await doltApi.runUnsafeSql(
+          upstream,
+          token,
+          'main',
+          `SELECT id, title, description, project, type, priority, tags, posted_by, claimed_by, status, effort_level, evidence_url, sandbox_required, sandbox_scope, sandbox_min_tier, created_at, updated_at FROM wanted WHERE id = '${input.itemId}' LIMIT 1`
+        );
+        const rows = parseWantedBoardRows(result.rows ?? []);
+        return rows[0] ?? null;
+      } catch (err) {
+        if (err instanceof doltApi.DoltHubApiError) {
+          throw new TRPCError({
+            code: err.status === 401 || err.status === 403 ? 'FORBIDDEN' : 'INTERNAL_SERVER_ERROR',
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+    }),
+
+  listRigActivity: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        handle: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[a-zA-Z0-9_-]+$/, 'handle must be alphanumeric with - or _ only'),
+        limit: z.number().int().min(1).max(200).default(50),
+      })
+    )
+    .output(RpcRigActivityOutput)
+    .query(async ({ ctx, input }) => {
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+      const { token, upstream } = await loadAdminContext(ctx.env, input.wastelandId, ctx.userId);
+      const { handle, limit } = input;
+      // `handle` is Zod-validated against /^[a-zA-Z0-9_-]+$/; safe to interpolate.
+      // `limit` is a bounded integer; safe.
+      const wantedCols =
+        'id, title, description, project, type, priority, tags, posted_by, claimed_by, status, effort_level, evidence_url, sandbox_required, sandbox_scope, sandbox_min_tier, created_at, updated_at';
+      const postedSql = `SELECT ${wantedCols} FROM wanted WHERE posted_by = '${handle}' ORDER BY created_at DESC LIMIT ${limit}`;
+      const claimedSql = `SELECT ${wantedCols} FROM wanted WHERE claimed_by = '${handle}' ORDER BY updated_at DESC LIMIT ${limit}`;
+      const completionsSql = `SELECT c.id AS completion_id, c.wanted_id, c.completed_by, c.evidence, c.hop_uri, c.validated_by, c.stamp_id, c.completed_at, w.title AS wanted_title FROM completions c LEFT JOIN wanted w ON w.id = c.wanted_id WHERE c.completed_by = '${handle}' ORDER BY c.completed_at DESC LIMIT ${limit}`;
+      const stampsAuthoredSql = `SELECT s.id AS stamp_id, s.author, s.subject, s.valence, s.confidence, s.severity, s.skill_tags, s.message, s.context_id, s.context_type, c.wanted_id, w.title AS wanted_title FROM stamps s LEFT JOIN completions c ON c.id = s.context_id LEFT JOIN wanted w ON w.id = c.wanted_id WHERE s.author = '${handle}' ORDER BY s.id DESC LIMIT ${limit}`;
+      const stampsReceivedSql = `SELECT s.id AS stamp_id, s.author, s.subject, s.valence, s.confidence, s.severity, s.skill_tags, s.message, s.context_id, s.context_type, c.wanted_id, w.title AS wanted_title FROM stamps s LEFT JOIN completions c ON c.id = s.context_id LEFT JOIN wanted w ON w.id = c.wanted_id WHERE s.subject = '${handle}' ORDER BY s.id DESC LIMIT ${limit}`;
+
+      async function runOrEmpty<T>(sql: string, parser: (rows: unknown[]) => T[]): Promise<T[]> {
+        try {
+          const result = await doltApi.runUnsafeSql(upstream, token, 'main', sql);
+          return parser(result.rows ?? []);
+        } catch (err) {
+          if (err instanceof doltApi.DoltHubApiError) {
+            // A missing table (e.g. no stamps yet on a new upstream) shouldn't
+            // nuke the whole response — log via status and return empty.
+            if (err.status === 404 || err.status === 400) return [];
+          }
+          throw err;
+        }
+      }
+
+      try {
+        const [posted, claimed, completions, stampsAuthored, stampsReceived] = await Promise.all([
+          runOrEmpty(postedSql, parseWantedBoardRows),
+          runOrEmpty(claimedSql, parseWantedBoardRows),
+          runOrEmpty(completionsSql, rows => {
+            const parsed = z
+              .array(
+                z.object({
+                  completion_id: z.string(),
+                  wanted_id: z.string(),
+                  wanted_title: z.string().nullable().default(null),
+                  completed_by: z.string().nullable().default(null),
+                  evidence: z.string().nullable().default(null),
+                  hop_uri: z.string().nullable().default(null),
+                  validated_by: z.string().nullable().default(null),
+                  stamp_id: z.string().nullable().default(null),
+                  completed_at: z.string().nullable().default(null),
+                })
+              )
+              .safeParse(rows);
+            return parsed.success ? parsed.data : [];
+          }),
+          runOrEmpty(stampsAuthoredSql, rows => parseStampRows(rows)),
+          runOrEmpty(stampsReceivedSql, rows => parseStampRows(rows)),
+        ]);
+        return {
+          posted,
+          claimed,
+          completions,
+          stamps_authored: stampsAuthored,
+          stamps_received: stampsReceived,
+        };
       } catch (err) {
         if (err instanceof doltApi.DoltHubApiError) {
           throw new TRPCError({

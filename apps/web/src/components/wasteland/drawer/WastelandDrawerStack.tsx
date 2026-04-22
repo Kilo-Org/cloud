@@ -17,7 +17,7 @@ export function DrawerStackProvider({
   renderContent: DrawerStackRenderContent<WastelandDrawerRef>;
 }) {
   return (
-    <BaseProvider renderContent={renderContent} width={420}>
+    <BaseProvider renderContent={renderContent} width={620}>
       {children}
     </BaseProvider>
   );

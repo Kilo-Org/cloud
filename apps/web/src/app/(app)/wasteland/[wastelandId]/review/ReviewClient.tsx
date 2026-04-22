@@ -226,6 +226,7 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
   const handleOpenItem = (item: InboxItem) => {
     openDrawer({
       type: 'review-item',
+      wastelandId,
       item,
       actions: {
         upstream,

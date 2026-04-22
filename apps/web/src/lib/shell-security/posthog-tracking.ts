@@ -38,6 +38,12 @@ type ShellSecurityScanCompletedEvent = BaseShellSecurityEvent & {
  */
 export function trackShellSecurityScanCompleted(properties: ShellSecurityScanCompletedEvent): void {
   try {
+    // The PostHog `event` name and the `feature` property are intentionally
+    // kept as their pre-rename values (`security_advisor_*` / `security-advisor`)
+    // so existing dashboards, funnels, and trend queries keep producing an
+    // unbroken timeseries across the rename. Change only in coordination with
+    // a dashboard migration. The Sentry `source` tag below is a separate
+    // concern — it has no continuity requirement, so it tracks the module name.
     posthogClient.capture({
       distinctId: properties.distinctId,
       event: 'security_advisor_scan_completed',
@@ -49,7 +55,7 @@ export function trackShellSecurityScanCompleted(properties: ShellSecurityScanCom
     });
   } catch (error) {
     captureException(error, {
-      tags: { source: 'posthog_security_advisor_scan_completed' },
+      tags: { source: 'posthog_shell_security_scan_completed' },
       extra: { properties },
     });
   }

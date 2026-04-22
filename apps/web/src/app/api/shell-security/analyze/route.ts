@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
         publicIp: payload.publicIp,
       });
     } catch (err) {
-      captureException(err, { tags: { source: 'security_advisor_posthog' } });
+      captureException(err, { tags: { source: 'shell_security_posthog' } });
     }
   });
 

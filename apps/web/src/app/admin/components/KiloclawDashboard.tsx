@@ -40,6 +40,12 @@ const LEGACY_TAB_REDIRECTS: Readonly<Record<string, Tab>> = {
   'security-advisor-content': 'shell-security-content',
 };
 
+function resolveTab(tabParam: string | null): Tab {
+  if (tabParam === null) return 'instances';
+  if (isValidTab(tabParam)) return tabParam;
+  return LEGACY_TAB_REDIRECTS[tabParam] ?? 'instances';
+}
+
 const tabTriggerClass =
   'text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none';
 
@@ -49,22 +55,19 @@ export function KiloclawDashboard() {
   const pathname = usePathname();
 
   const tabParam = searchParams.get('tab');
+  const activeTab = resolveTab(tabParam);
 
-  // Rewrite a deprecated tab value to its current name so bookmarks to
-  // ?tab=security-advisor-content keep landing on the ShellSecurity tab.
+  // Rewrite a deprecated tab value in the URL so bookmarks to
+  // ?tab=security-advisor-content persist as the new name on navigation.
+  // `resolveTab` already handles the first-render state so the tab content
+  // doesn't flash while the effect fires.
   useEffect(() => {
-    if (tabParam !== null && tabParam in LEGACY_TAB_REDIRECTS) {
+    if (tabParam !== null && !isValidTab(tabParam) && tabParam in LEGACY_TAB_REDIRECTS) {
       const params = new URLSearchParams(searchParams.toString());
-      params.set('tab', LEGACY_TAB_REDIRECTS[tabParam] as string);
+      params.set('tab', LEGACY_TAB_REDIRECTS[tabParam]);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     }
   }, [tabParam, searchParams, router, pathname]);
-
-  const activeTab: Tab = isValidTab(tabParam)
-    ? tabParam
-    : tabParam !== null && tabParam in LEGACY_TAB_REDIRECTS
-      ? (LEGACY_TAB_REDIRECTS[tabParam] as Tab)
-      : 'instances';
 
   const onTabChange = useCallback(
     (value: string) => {

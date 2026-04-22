@@ -81,14 +81,21 @@ export function parseCommitSubject(subject: string): ParsedCommit {
 // ── Branch-tip SQL enrichment ───────────────────────────────────────────
 
 /**
- * Canonical wanted-item id shape. Produced by `GenerateWantedID` in the
- * wl CLI (`internal/commons/commons.go`): `w-<10 lowercase hex>`. Enforce
- * this at every interpolation point because `runUnsafeSql` sends raw SQL
- * to DoltHub — a mismatched id either means an attacker-controlled value
- * or a malformed branch name, and in both cases the safe default is to
- * return null rather than interpolate.
+ * Permissive wanted-item id guard. The `wanted` table declares `id` as
+ * `VARCHAR(64)` with no structural check (see `wasteland/schema/commons.sql`)
+ * so in practice ids are anything up to 64 characters. The `wl` CLI's
+ * `GenerateWantedID` produces `w-<10 hex>` as a convention, but older
+ * entries and hand-rolled inserts can be anything, so we can't gate on that
+ * shape without silently dropping real rows.
+ *
+ * The pattern below lets through every character the upstream mysql column
+ * will accept in practice (letters, digits, `-`, `_`, `.`, `:`) while
+ * blocking anything that could break out of a single-quoted SQL literal —
+ * quotes, backslashes, semicolons, whitespace, SQL comment markers, etc.
+ * Combined with the 64-char length bound, this is safe to interpolate into
+ * `runUnsafeSql`.
  */
-const WANTED_ID_PATTERN = /^w-[a-f0-9]{10}$/;
+const WANTED_ID_PATTERN = /^[A-Za-z0-9_.:-]{1,64}$/;
 
 /** Rig handles are free-form identifiers. Bound the length to stop absurd inputs. */
 const RIG_HANDLE_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;

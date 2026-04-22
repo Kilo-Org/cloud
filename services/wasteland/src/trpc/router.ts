@@ -1473,9 +1473,17 @@ export const wastelandRouter = router({
     .input(
       z.object({
         wastelandId: z.string().uuid(),
+        // The `wanted` table declares `id` as VARCHAR(64) with no structural
+        // check — in practice ids range from the `wl` CLI's `w-<10 hex>`
+        // convention to hand-rolled values. Enforce a permissive character
+        // class that blocks SQL-injection metacharacters (quotes, backslash,
+        // semicolons, whitespace, comment markers) while letting through
+        // anything the column will actually hold.
         itemId: z
           .string()
-          .regex(/^w-[a-f0-9]{10}$/, 'itemId must match the canonical w-<10 hex> shape'),
+          .min(1)
+          .max(64)
+          .regex(/^[A-Za-z0-9_.:-]+$/, 'itemId must be 1-64 chars, letters/digits/_-.:'),
       })
     )
     .output(RpcWantedBoardRowOutput.nullable())
@@ -1483,7 +1491,7 @@ export const wastelandRouter = router({
       await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
       const { token, upstream } = await loadAdminContext(ctx.env, input.wastelandId, ctx.userId);
       try {
-        // `input.itemId` matches /^w-[a-f0-9]{10}$/ so interpolation is safe.
+        // `input.itemId` passed the regex above — safe to interpolate.
         const result = await doltApi.runUnsafeSql(
           upstream,
           token,

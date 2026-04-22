@@ -70,31 +70,13 @@ async function extractUpstreamContextOverflowMessage(response: Response): Promis
   return null;
 }
 
-// Builds a context-overflow error message: pass upstream's own wording through
-// verbatim when it is already appropriate; otherwise fall back to our own
-// message and only include our token estimate when it actually exceeds the
-// known window (to avoid a self-contradictory "about N tokens" number).
-function contextOverflowMessage({
-  upstreamMessage,
-  contextLength,
-  estimatedTokenCount,
-}: {
-  upstreamMessage: string | null;
-  contextLength: number | null;
-  estimatedTokenCount: number;
-}): string {
-  if (upstreamMessage) return upstreamMessage;
-  if (contextLength !== null && estimatedTokenCount >= contextLength) {
-    return `The maximum context length is ${contextLength} tokens. However, about ${estimatedTokenCount} tokens were requested.`;
-  }
-  return 'The maximum context length was exceeded. Please reduce the size of your request.';
-}
-
 // Detects and responds to context-overflow situations in two cases:
-//   1. Upstream's body explicitly says the context length was exceeded.
-//   2. Upstream returns a generic 500 ("Internal Server Error",
-//      "No allowed providers are available for the selected model", etc.) and
-//      our own conservative token estimate already exceeds the model's window.
+//   1. Upstream's body explicitly says the context length was exceeded — we
+//      pass that message through verbatim.
+//   2. Upstream returns a generic 500 ("Internal Server Error", "No allowed
+//      providers are available for the selected model", etc.) and our own
+//      conservative token estimate already exceeds the model's window — we
+//      build a message from our own numbers.
 // Returns `null` when no context overflow is detected.
 export async function detectContextOverflow({
   requestedModel,
@@ -105,23 +87,27 @@ export async function detectContextOverflow({
   request: GatewayRequest;
   response: Response;
 }): Promise<NextResponse | null> {
-  const model = kiloExclusiveModels.find(m => m.public_id === requestedModel);
-  const estimatedTokenCount = estimateTokenCount(request);
-  const estimateExceedsContext = !!model && estimatedTokenCount >= model.context_length;
   const upstreamMessage = await extractUpstreamContextOverflowMessage(response);
-
-  if (!upstreamMessage && !(response.status === 500 && estimateExceedsContext)) {
-    return null;
+  if (upstreamMessage) {
+    return contextOverflowResponse(upstreamMessage, response.status);
   }
 
-  const error = contextOverflowMessage({
-    upstreamMessage,
-    contextLength: model?.context_length ?? null,
-    estimatedTokenCount,
-  });
-  warnExceptInTest(`Responding with ${response.status} ${error}`);
+  if (response.status !== 500) return null;
+  const model = kiloExclusiveModels.find(m => m.public_id === requestedModel);
+  if (!model) return null;
+  const estimatedTokenCount = estimateTokenCount(request);
+  if (estimatedTokenCount < model.context_length) return null;
+
+  return contextOverflowResponse(
+    `The maximum context length is ${model.context_length} tokens. However, about ${estimatedTokenCount} tokens were requested.`,
+    response.status
+  );
+}
+
+function contextOverflowResponse(error: string, status: number): NextResponse {
+  warnExceptInTest(`Responding with ${status} ${error}`);
   return NextResponse.json(
     { error, error_type: ProxyErrorType.context_length_exceeded, message: error },
-    { status: response.status }
+    { status }
   );
 }

@@ -7,7 +7,7 @@ import {
   mapOpenclawZipPathToImportPath,
   normalizeOpenclawImportPath,
   isOpenclawMarkdownContent,
-} from '@kilocode/worker-utils/openclaw-import';
+} from '../../../../../../../services/kiloclaw/controller/src/openclaw-import';
 
 export {
   OPENCLAW_IMPORT_MAX_EXTRACTED_UTF8_BYTES,

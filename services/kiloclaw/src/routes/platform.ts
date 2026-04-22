@@ -1977,7 +1977,8 @@ const OpenclawWorkspaceImportSchema = z.object({
         content: z.string(),
       })
     )
-    .min(1),
+    .min(1)
+    .max(500),
 });
 
 // POST /api/platform/files/write

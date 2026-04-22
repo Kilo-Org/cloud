@@ -469,6 +469,32 @@ describe('openclaw import platform route', () => {
     );
   });
 
+  it('returns 400 when files exceeds max count', async () => {
+    const importOpenclawWorkspace = vi.fn().mockResolvedValue({ ok: true });
+    const env = envWithImportOpenclawWorkspace(importOpenclawWorkspace);
+
+    const files = Array.from({ length: 501 }, (_, idx) => ({
+      path: `workspace/memory/note-${idx}.md`,
+      content: '# note',
+    }));
+
+    const resp = await platform.request(
+      '/files/import-openclaw-workspace',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1', files }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(400);
+    await expect(jsonBody(resp)).resolves.toEqual(
+      expect.objectContaining({ error: 'Invalid request' })
+    );
+    expect(importOpenclawWorkspace).not.toHaveBeenCalled();
+  });
+
   it('forwards import payload to DO and returns the response', async () => {
     const importOpenclawWorkspace = vi.fn().mockResolvedValue({
       ok: true,

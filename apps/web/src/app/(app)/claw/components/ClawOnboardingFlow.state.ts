@@ -26,7 +26,6 @@ export const CLAW_ONBOARDING_WIZARD_STEPS = [
 export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[number];
 
 export type ClawOnboardingRenderStep =
-  | 'create-instance'
   | 'identity'
   | 'permissions'
   | 'channels'
@@ -40,7 +39,6 @@ export type PairingChannelId = 'telegram' | 'discord';
 export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
 
 export const CLAW_ONBOARDING_FAKE_STEPS = [
-  'create-instance',
   'identity',
   'permissions',
   'channels',

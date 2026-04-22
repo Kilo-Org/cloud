@@ -378,8 +378,6 @@ function ClawOnboardingFlowInner({
     const renderStep = flowState.renderStep;
 
     switch (renderStep) {
-      case 'create-instance':
-        return renderIdentityStep();
       case 'identity':
         return renderIdentityStep();
       case 'permissions':

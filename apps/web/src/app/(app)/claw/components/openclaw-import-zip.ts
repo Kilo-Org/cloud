@@ -49,11 +49,11 @@ const OPENCLAW_ZIP_COMMANDS: Record<OpenclawImportOs, OpenclawZipCommand> = {
   },
   macos: {
     command:
-      'w="$HOME/.openclaw/workspace";[ -d "$w" ] || { echo "Error: OpenClaw workspace folder not found at $w (expected ~/.openclaw/workspace)." >&2; exit 1; };cd "$w" || exit 1;set --;for f in USER.md SOUL.md IDENTITY.md MEMORY.md memory; do [ -e "$f" ] && set -- "$@" "$f"; done;[ "$#" -gt 0 ] || { echo "Error: No OpenClaw workspace files found at $w." >&2; exit 1; };zip -r "$HOME/Desktop/openclaw-workspace.zip" "$@"',
+      'w="$HOME/.openclaw/workspace";[ -d "$w" ] || { echo "Error: OpenClaw workspace folder not found at $w (expected ~/.openclaw/workspace)." >&2; exit 1; };cd "$w" || exit 1;set --;for f in USER.md SOUL.md IDENTITY.md MEMORY.md memory; do [ -e "$f" ] && set -- "$@" "$f"; done;[ "$#" -gt 0 ] || { echo "Error: No OpenClaw workspace files found at $w." >&2; exit 1; };o="$HOME/Desktop/openclaw-workspace.zip";rm -f "$o";zip -r "$o" "$@"',
   },
   linux: {
     command:
-      'w="$HOME/.openclaw/workspace";[ -d "$w" ] || { echo "Error: OpenClaw workspace folder not found at $w (expected ~/.openclaw/workspace)." >&2; exit 1; };cd "$w" || exit 1;set --;for f in USER.md SOUL.md IDENTITY.md MEMORY.md memory; do [ -e "$f" ] && set -- "$@" "$f"; done;[ "$#" -gt 0 ] || { echo "Error: No OpenClaw workspace files found at $w." >&2; exit 1; };zip -r "$HOME/Desktop/openclaw-workspace.zip" "$@"',
+      'w="$HOME/.openclaw/workspace";[ -d "$w" ] || { echo "Error: OpenClaw workspace folder not found at $w (expected ~/.openclaw/workspace)." >&2; exit 1; };cd "$w" || exit 1;set --;for f in USER.md SOUL.md IDENTITY.md MEMORY.md memory; do [ -e "$f" ] && set -- "$@" "$f"; done;[ "$#" -gt 0 ] || { echo "Error: No OpenClaw workspace files found at $w." >&2; exit 1; };o="$HOME/Desktop/openclaw-workspace.zip";rm -f "$o";zip -r "$o" "$@"',
   },
 };
 

@@ -177,7 +177,8 @@ describe('getOpenclawZipCommandForOs', () => {
   test('returns commands for each OS', () => {
     expect(getOpenclawZipCommandForOs('windows').command).toContain('Compress-Archive');
 
-    const unixCommandSuffix = 'zip -r "$HOME/Desktop/openclaw-workspace.zip" "$@"';
+    const unixCommandSuffix =
+      'o="$HOME/Desktop/openclaw-workspace.zip";rm -f "$o";zip -r "$o" "$@"';
     expect(getOpenclawZipCommandForOs('macos').command).toContain(unixCommandSuffix);
     expect(getOpenclawZipCommandForOs('linux').command).toContain(unixCommandSuffix);
   });

@@ -32,7 +32,7 @@ if [ -n "$base" ]; then
 fi
 
 # Read workspace dirs using pnpm (handles glob expansion in pnpm-workspace.yaml)
-workspace_dirs=$(pnpm ls --json -r --depth -1 2>/dev/null | node -e "
+workspace_dirs=$(pnpm ls --json -r --depth -1 | node -e "
   const pkgs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
   for (const p of pkgs) {
     if (!p.path) continue;
@@ -59,8 +59,9 @@ for dir in $workspace_dirs; do
   has_test=$(node -e "const p=require('./$dir/package.json'); console.log(p.scripts?.test ? '1' : '')" 2>/dev/null)
   [ -n "$has_test" ] || continue
 
-  # Skip workspaces whose test script exists but has no test files
-  test_file_count=$(find "$dir" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) -not -path '*/node_modules/*' 2>/dev/null | head -1)
+  # Skip workspaces whose test script exists but has no test files.
+  # Use -print -quit to avoid SIGPIPE failures from find|head under pipefail.
+  test_file_count=$(find "$dir" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) -not -path '*/node_modules/*' -print -quit 2>/dev/null)
   [ -n "$test_file_count" ] || continue
 
   # Check for file changes (if we have a merge base)

@@ -18,6 +18,313 @@ import {
   setUserMdTimezone,
 } from '../bootstrap';
 
+const OPENCLAW_IMPORT_MAX_FILES = 500;
+const OPENCLAW_IMPORT_MAX_UTF8_BYTES = 5 * 1024 * 1024;
+
+const OPENCLAW_IMPORT_ROOT_FILES = new Set([
+  'workspace/USER.md',
+  'workspace/SOUL.md',
+  'workspace/IDENTITY.md',
+  'workspace/MEMORY.md',
+]);
+
+const OPENCLAW_IMPORT_MEMORY_PREFIX = 'workspace/memory/';
+
+const NON_TEXT_CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+
+const OpenclawWorkspaceImportFileSchema = z.object({
+  path: z.string().min(1),
+  content: z.string(),
+});
+
+const OpenclawWorkspaceImportBodySchema = z.object({
+  files: z.array(OpenclawWorkspaceImportFileSchema).min(1).max(OPENCLAW_IMPORT_MAX_FILES),
+});
+
+const OpenclawWorkspaceImportFailureSchema = z.object({
+  path: z.string(),
+  operation: z.enum(['write', 'delete']),
+  error: z.string(),
+  code: z.string().optional(),
+});
+
+const OpenclawWorkspaceImportResponseSchema = z.object({
+  ok: z.boolean(),
+  attemptedWriteCount: z.number().int().min(0),
+  writtenCount: z.number().int().min(0),
+  attemptedDeleteCount: z.number().int().min(0),
+  deletedCount: z.number().int().min(0),
+  failedCount: z.number().int().min(0),
+  totalUtf8Bytes: z.number().int().min(0),
+  failures: z.array(OpenclawWorkspaceImportFailureSchema),
+});
+
+type OpenclawWorkspaceImportFile = z.infer<typeof OpenclawWorkspaceImportFileSchema>;
+
+type OpenclawWorkspacePreparedFile = {
+  path: string;
+  content: string;
+  utf8Bytes: number;
+};
+
+type OpenclawImportFailure = z.infer<typeof OpenclawWorkspaceImportFailureSchema>;
+
+type OpenclawWorkspaceImportValidation =
+  | {
+      ok: true;
+      files: OpenclawWorkspacePreparedFile[];
+      hasMemoryMd: boolean;
+      importedMemoryPaths: Set<string>;
+      totalUtf8Bytes: number;
+    }
+  | {
+      ok: false;
+      error: string;
+      code: string;
+      status: 400;
+    };
+
+function normalizeImportPath(rawPath: string): string {
+  const withForwardSlashes = rawPath.replaceAll('\\', '/').replace(/^\.\//, '');
+  const segments = withForwardSlashes.split('/');
+  if (segments.some(segment => segment.length === 0 || segment === '.' || segment === '..')) {
+    throw new SafePathError('Import path contains invalid segments');
+  }
+  if (/^[A-Za-z]:$/.test(segments[0] ?? '')) {
+    throw new SafePathError('Import path must not include drive letters');
+  }
+  return segments.join('/');
+}
+
+function isAllowedImportPath(importPath: string): boolean {
+  if (OPENCLAW_IMPORT_ROOT_FILES.has(importPath)) {
+    return true;
+  }
+
+  if (!importPath.startsWith(OPENCLAW_IMPORT_MEMORY_PREFIX)) {
+    return false;
+  }
+
+  const memoryRelativePath = importPath.slice(OPENCLAW_IMPORT_MEMORY_PREFIX.length);
+  if (!memoryRelativePath || memoryRelativePath.endsWith('/')) {
+    return false;
+  }
+
+  return memoryRelativePath.toLowerCase().endsWith('.md');
+}
+
+function isMarkdownContent(content: string): boolean {
+  return !NON_TEXT_CONTROL_CHARS.test(content);
+}
+
+function validateOpenclawWorkspaceImport(
+  files: OpenclawWorkspaceImportFile[]
+): OpenclawWorkspaceImportValidation {
+  const preparedFiles: OpenclawWorkspacePreparedFile[] = [];
+  const importedMemoryPaths = new Set<string>();
+  const seenCaseInsensitivePaths = new Map<string, string>();
+  let totalUtf8Bytes = 0;
+
+  for (const file of files) {
+    let normalizedPath: string;
+    try {
+      normalizedPath = normalizeImportPath(file.path);
+    } catch {
+      return {
+        ok: false,
+        error: `Unsupported import path: ${file.path}`,
+        code: 'openclaw_import_invalid_path',
+        status: 400,
+      };
+    }
+
+    if (!isAllowedImportPath(normalizedPath)) {
+      return {
+        ok: false,
+        error: `Unsupported import path: ${file.path}`,
+        code: 'openclaw_import_invalid_path',
+        status: 400,
+      };
+    }
+
+    const caseInsensitivePath = normalizedPath.toLowerCase();
+    const existing = seenCaseInsensitivePaths.get(caseInsensitivePath);
+    if (existing) {
+      return {
+        ok: false,
+        error: `Import contains conflicting paths: ${existing} and ${normalizedPath}`,
+        code: 'openclaw_import_path_case_conflict',
+        status: 400,
+      };
+    }
+    seenCaseInsensitivePaths.set(caseInsensitivePath, normalizedPath);
+
+    if (!isMarkdownContent(file.content)) {
+      return {
+        ok: false,
+        error: `File content appears to be non-text markdown: ${normalizedPath}`,
+        code: 'openclaw_import_invalid_markdown',
+        status: 400,
+      };
+    }
+
+    const utf8Bytes = Buffer.byteLength(file.content, 'utf8');
+    totalUtf8Bytes += utf8Bytes;
+    if (totalUtf8Bytes > OPENCLAW_IMPORT_MAX_UTF8_BYTES) {
+      return {
+        ok: false,
+        error: `Import exceeds ${OPENCLAW_IMPORT_MAX_UTF8_BYTES} UTF-8 bytes`,
+        code: 'openclaw_import_too_large',
+        status: 400,
+      };
+    }
+
+    preparedFiles.push({ path: normalizedPath, content: file.content, utf8Bytes });
+
+    if (normalizedPath.startsWith(OPENCLAW_IMPORT_MEMORY_PREFIX)) {
+      importedMemoryPaths.add(normalizedPath);
+    }
+  }
+
+  if (preparedFiles.length === 0) {
+    return {
+      ok: false,
+      error: 'ZIP contains no valid OpenClaw import files',
+      code: 'openclaw_import_no_files',
+      status: 400,
+    };
+  }
+
+  return {
+    ok: true,
+    files: preparedFiles,
+    hasMemoryMd: preparedFiles.some(file => file.path === 'workspace/MEMORY.md'),
+    importedMemoryPaths,
+    totalUtf8Bytes,
+  };
+}
+
+function findClosestExistingAncestor(targetPath: string, rootDir: string): string {
+  let currentPath = path.dirname(targetPath);
+  while (currentPath !== rootDir && !fs.existsSync(currentPath)) {
+    currentPath = path.dirname(currentPath);
+  }
+  return currentPath;
+}
+
+function collectWorkspaceMemoryFiles(rootDir: string): string[] {
+  let workspaceMemoryDir: string;
+  try {
+    workspaceMemoryDir = resolveSafePath(OPENCLAW_IMPORT_MEMORY_PREFIX.slice(0, -1), rootDir);
+  } catch {
+    return [];
+  }
+
+  if (!fs.existsSync(workspaceMemoryDir)) {
+    return [];
+  }
+
+  try {
+    const memoryDirStat = fs.lstatSync(workspaceMemoryDir);
+    if (memoryDirStat.isSymbolicLink() || !memoryDirStat.isDirectory()) {
+      return [];
+    }
+    verifyCanonicalized(fs.realpathSync(workspaceMemoryDir), rootDir);
+  } catch {
+    return [];
+  }
+
+  const files: string[] = [];
+  const pendingDirs = [workspaceMemoryDir];
+
+  while (pendingDirs.length > 0) {
+    const currentDir = pendingDirs.pop();
+    if (!currentDir) continue;
+
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue;
+
+      const absolutePath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        pendingDirs.push(absolutePath);
+        continue;
+      }
+
+      if (!entry.isFile()) continue;
+
+      const relativePath = path.relative(rootDir, absolutePath).split(path.sep).join('/');
+      files.push(relativePath);
+    }
+  }
+
+  return files;
+}
+
+function resolveAndValidateImportTarget(
+  relativePath: string,
+  rootDir: string
+): { ok: true; resolvedPath: string } | { ok: false; error: string; code: string } {
+  let resolvedPath: string;
+  try {
+    resolvedPath = resolveSafePath(relativePath, rootDir);
+  } catch (error) {
+    if (error instanceof SafePathError) {
+      return { ok: false, error: error.message, code: 'openclaw_import_invalid_path' };
+    }
+    throw error;
+  }
+
+  try {
+    const ancestorPath = findClosestExistingAncestor(resolvedPath, rootDir);
+    verifyCanonicalized(fs.realpathSync(ancestorPath), rootDir);
+  } catch {
+    return {
+      ok: false,
+      error: 'Import target escapes workspace root via symlink',
+      code: 'openclaw_import_symlink_escape',
+    };
+  }
+
+  if (!fs.existsSync(resolvedPath)) {
+    return { ok: true, resolvedPath };
+  }
+
+  try {
+    verifyCanonicalized(fs.realpathSync(resolvedPath), rootDir);
+  } catch {
+    return {
+      ok: false,
+      error: 'Import target escapes workspace root via symlink',
+      code: 'openclaw_import_symlink_escape',
+    };
+  }
+
+  const targetStat = fs.lstatSync(resolvedPath);
+  if (targetStat.isSymbolicLink()) {
+    return {
+      ok: false,
+      error: 'Import target is a symbolic link',
+      code: 'openclaw_import_symlink_target',
+    };
+  }
+  if (!targetStat.isFile()) {
+    return {
+      ok: false,
+      error: 'Import target is not a regular file',
+      code: 'openclaw_import_target_not_file',
+    };
+  }
+
+  return { ok: true, resolvedPath };
+}
+
 function computeEtag(content: string): string {
   return crypto.createHash('md5').update(content).digest('hex');
 }
@@ -290,6 +597,118 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
 
     const content = fs.readFileSync(result, 'utf-8');
     return c.json({ content, etag: computeEtag(content) });
+  });
+
+  app.post('/_kilo/files/import-openclaw-workspace', async c => {
+    let rawBody: unknown;
+    try {
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body', code: 'invalid_json_body' }, 400);
+    }
+
+    const parsed = OpenclawWorkspaceImportBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: 'Missing or invalid import files',
+          code: 'invalid_request_body',
+          details: parsed.error.flatten().fieldErrors,
+        },
+        400
+      );
+    }
+
+    const validation = validateOpenclawWorkspaceImport(parsed.data.files);
+    if (!validation.ok) {
+      return c.json({ error: validation.error, code: validation.code }, validation.status);
+    }
+
+    const resolvedFiles: Array<OpenclawWorkspacePreparedFile & { resolvedPath: string }> = [];
+    for (const file of validation.files) {
+      const target = resolveAndValidateImportTarget(file.path, rootDir);
+      if (!target.ok) {
+        return c.json({ error: target.error, code: target.code }, 400);
+      }
+      resolvedFiles.push({ ...file, resolvedPath: target.resolvedPath });
+    }
+
+    const failures: OpenclawImportFailure[] = [];
+    let writtenCount = 0;
+
+    for (const file of resolvedFiles) {
+      try {
+        fs.mkdirSync(path.dirname(file.resolvedPath), { recursive: true });
+        if (fs.existsSync(file.resolvedPath)) {
+          try {
+            backupFile(file.resolvedPath, rootDir);
+          } catch (error) {
+            console.warn('[files] Failed to backup import file, proceeding with write:', {
+              path: file.path,
+              error,
+            });
+          }
+        }
+        atomicWrite(file.resolvedPath, file.content);
+        writtenCount += 1;
+      } catch (error) {
+        failures.push({
+          path: file.path,
+          operation: 'write',
+          error: error instanceof Error ? error.message : 'Failed to write file',
+        });
+      }
+    }
+
+    const deletedPaths: string[] = [];
+    let attemptedDeleteCount = 0;
+    const hasWriteFailure = failures.some(failure => failure.operation === 'write');
+    if (validation.hasMemoryMd && !hasWriteFailure) {
+      const existingMemoryFiles = collectWorkspaceMemoryFiles(rootDir);
+      for (const existingPath of existingMemoryFiles) {
+        if (validation.importedMemoryPaths.has(existingPath)) {
+          continue;
+        }
+
+        attemptedDeleteCount += 1;
+
+        const deletionTarget = resolveAndValidateImportTarget(existingPath, rootDir);
+        if (!deletionTarget.ok) {
+          failures.push({
+            path: existingPath,
+            operation: 'delete',
+            error: deletionTarget.error,
+            code: deletionTarget.code,
+          });
+          continue;
+        }
+
+        try {
+          fs.unlinkSync(deletionTarget.resolvedPath);
+          deletedPaths.push(existingPath);
+        } catch (error) {
+          failures.push({
+            path: existingPath,
+            operation: 'delete',
+            error: error instanceof Error ? error.message : 'Failed to delete file',
+          });
+        }
+      }
+    }
+
+    const response = {
+      ok: failures.length === 0,
+      attemptedWriteCount: resolvedFiles.length,
+      writtenCount,
+      attemptedDeleteCount,
+      deletedCount: deletedPaths.length,
+      failedCount: failures.length,
+      totalUtf8Bytes: validation.totalUtf8Bytes,
+      failures,
+    };
+
+    const validatedResponse = OpenclawWorkspaceImportResponseSchema.parse(response);
+    return c.json(validatedResponse);
   });
 
   const WriteBodySchema = z.object({

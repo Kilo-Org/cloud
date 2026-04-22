@@ -4584,3 +4584,46 @@ export const channel_badge_counts = pgTable(
 
 export type ChannelBadgeCount = typeof channel_badge_counts.$inferSelect;
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;
+
+// ============ CLASSIFICATION RULES ============
+// Admin-managed abuse classification rules. Owned by the abuse service
+// (Kilo-Org/abuse), which has read+write access via Hyperdrive. Rules are
+// evaluated in priority order (lower priority number = evaluated earlier).
+// Rules with AE-based filters (IP, JA4, etc.) are materialized into
+// rule_materializations rows so the classify hot path can do O(1) lookups
+// against a pre-resolved set of user IDs.
+
+export const classification_rules = pgTable('classification_rules', {
+  id: uuid().notNull().defaultRandom().primaryKey(),
+  name: text().notNull(),
+  description: text(),
+  enabled: boolean().notNull().default(true),
+  priority: integer().notNull(),
+  filters: jsonb().notNull(),
+  action: jsonb().notNull(),
+  excluded_user_ids: jsonb()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  created_by: text(),
+  archived_at: timestamp({ withTimezone: true, mode: 'string' }),
+  created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+export type ClassificationRule = typeof classification_rules.$inferSelect;
+export type NewClassificationRule = typeof classification_rules.$inferInsert;
+
+export const rule_materializations = pgTable(
+  'rule_materializations',
+  {
+    rule_id: uuid()
+      .notNull()
+      .references(() => classification_rules.id, { onDelete: 'cascade' }),
+    user_id: text().notNull(),
+    materialized_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [primaryKey({ columns: [table.rule_id, table.user_id] })]
+);
+
+export type RuleMaterialization = typeof rule_materializations.$inferSelect;
+export type NewRuleMaterialization = typeof rule_materializations.$inferInsert;

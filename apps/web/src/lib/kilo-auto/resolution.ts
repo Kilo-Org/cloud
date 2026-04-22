@@ -52,20 +52,6 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
   return null;
 }
 
-// Keyed on the openRouterModels array reference, which is stable for the duration of
-// getOpenRouterModels()'s in-process TTL (60 s). Old entries become GC-eligible once
-// the reference is replaced.
-const preferredOnOpenRouterCache = new WeakMap<ReadonlyArray<string>, Set<string>>();
-
-function getPreferredModelsOnOpenRouter(openRouterModels: ReadonlyArray<string>): Set<string> {
-  let cached = preferredOnOpenRouterCache.get(openRouterModels);
-  if (!cached) {
-    cached = new Set(preferredModels.filter(m => openRouterModels.includes(m)));
-    preferredOnOpenRouterCache.set(openRouterModels, cached);
-  }
-  return cached;
-}
-
 /**
  * Returns the candidate models for kilo-auto/free routing.
  *
@@ -78,7 +64,6 @@ export function getAutoFreeCandidates(
   openRouterModels: ReadonlyArray<string>,
   apiKind: GatewayRequest['kind'] | null
 ): ReadonlyArray<string> {
-  const onOpenRouter = getPreferredModelsOnOpenRouter(openRouterModels);
   const candidates = new Set<string>();
   for (const model of preferredModels) {
     if (!isKiloAutoModel(model) && isFreeModel(model)) {
@@ -87,7 +72,7 @@ export function getAutoFreeCandidates(
         if (kiloModel && gatewaySupportsApiKind(kiloModel.gateway, apiKind)) {
           candidates.add(model);
         }
-      } else if (onOpenRouter.has(model)) {
+      } else if (openRouterModels.includes(model)) {
         candidates.add(model);
       }
     }

@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import Link from 'next/link';
 import type { BulkBlockResponse } from '@/lib/abuse/bulkBlock';
 
 function BulkBlockTab() {
@@ -152,7 +153,12 @@ function RecentBlocksTab() {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">{row.date}</TableCell>
                     <TableCell className="text-right">
-                      {row.blocked_count.toLocaleString()}
+                      <Link
+                        href={`/admin/users?${new URLSearchParams({ notesSearch: row.blocked_reason, sortBy: 'updated_at', sortOrder: 'desc', blockedStatus: 'blocked' })}`}
+                        className="text-primary hover:underline"
+                      >
+                        {row.blocked_count.toLocaleString()}
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}

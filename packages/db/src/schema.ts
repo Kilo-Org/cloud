@@ -4285,6 +4285,9 @@ export const bot_request_cloud_agent_sessions = pgTable(
 
     callback_step: integer().notNull().default(0),
     error_message: text(),
+    final_message: text(),
+    final_message_fetched_at: timestamp({ withTimezone: true, mode: 'string' }),
+    final_message_error: text(),
 
     terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
     continuation_started_at: timestamp({ withTimezone: true, mode: 'string' }),

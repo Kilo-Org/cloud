@@ -1,6 +1,6 @@
 {
-  "id": "40498da5-d2a5-4081-9b38-b0815d1c4917",
-  "prevId": "877508fe-8981-43e5-a123-d12915095a88",
+  "id": "8f5f5bda-55f8-44f9-bb16-e594ca826d4f",
+  "prevId": "40498da5-d2a5-4081-9b38-b0815d1c4917",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5451,6 +5451,142 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.credit_campaigns": {
+      "name": "credit_campaigns",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "credit_category": {
+          "name": "credit_category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_microdollars": {
+          "name": "amount_microdollars",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "credit_expiry_hours": {
+          "name": "credit_expiry_hours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_ends_at": {
+          "name": "campaign_ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_redemptions_allowed": {
+          "name": "total_redemptions_allowed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by_kilo_user_id": {
+          "name": "created_by_kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_credit_campaigns_slug": {
+          "name": "UQ_credit_campaigns_slug",
+          "columns": [
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_credit_campaigns_credit_category": {
+          "name": "UQ_credit_campaigns_credit_category",
+          "columns": [
+            {
+              "expression": "credit_category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "credit_campaigns_slug_format_check": {
+          "name": "credit_campaigns_slug_format_check",
+          "value": "\"credit_campaigns\".\"slug\" ~ '^[a-z0-9-]{5,40}$'"
+        },
+        "credit_campaigns_amount_positive_check": {
+          "name": "credit_campaigns_amount_positive_check",
+          "value": "\"credit_campaigns\".\"amount_microdollars\" > 0"
+        },
+        "credit_campaigns_credit_expiry_hours_positive_check": {
+          "name": "credit_campaigns_credit_expiry_hours_positive_check",
+          "value": "\"credit_campaigns\".\"credit_expiry_hours\" IS NULL OR \"credit_campaigns\".\"credit_expiry_hours\" > 0"
+        },
+        "credit_campaigns_total_redemptions_allowed_positive_check": {
+          "name": "credit_campaigns_total_redemptions_allowed_positive_check",
+          "value": "\"credit_campaigns\".\"total_redemptions_allowed\" > 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.credit_transactions": {

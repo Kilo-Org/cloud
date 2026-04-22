@@ -244,6 +244,9 @@ function ClawOnboardingFlowInner({
               );
             }
           } else {
+            posthog?.capture('claw_create_instance_clicked', {
+              selected_model: KILO_AUTO_BALANCED_MODEL.id,
+            });
             provisionInstance(weatherLocation?.location);
           }
           posthog?.capture('claw_setup_permissions_viewed');

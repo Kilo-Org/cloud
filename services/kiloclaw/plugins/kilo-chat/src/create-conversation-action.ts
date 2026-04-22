@@ -1,5 +1,5 @@
+import { readStringParam } from 'openclaw/plugin-sdk/agent-runtime';
 import type { KiloChatClient } from './client.js';
-import { createConversationActionParams } from './action-schemas.js';
 
 export type HandleKiloChatCreateConversationActionParams = {
   params: Record<string, unknown>;
@@ -9,9 +9,8 @@ export type HandleKiloChatCreateConversationActionParams = {
 export async function handleKiloChatCreateConversationAction(
   args: HandleKiloChatCreateConversationActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-  const parsed = createConversationActionParams.safeParse(args.params);
-  const title = parsed.success ? parsed.data.title : undefined;
-  const membersRaw = parsed.success ? parsed.data.members : undefined;
+  const name = readStringParam(args.params, 'name');
+  const membersRaw = readStringParam(args.params, 'additionalMembers');
   const additionalMembers = membersRaw
     ? membersRaw
         .split(',')
@@ -20,12 +19,12 @@ export async function handleKiloChatCreateConversationAction(
     : undefined;
 
   const { conversationId } = await args.client.createConversation({
-    title,
+    title: name,
     additionalMembers,
   });
 
-  const text = title
-    ? `Created conversation "${title}" (${conversationId})`
+  const text = name
+    ? `Created conversation "${name}" (${conversationId})`
     : `Created conversation ${conversationId}`;
 
   return { content: [{ type: 'text', text }] };

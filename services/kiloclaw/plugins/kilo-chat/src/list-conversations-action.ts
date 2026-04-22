@@ -1,5 +1,5 @@
+import { readNumberParam } from 'openclaw/plugin-sdk/agent-runtime';
 import type { KiloChatClient } from './client.js';
-import { listConversationsActionParams } from './action-schemas.js';
 
 export type HandleKiloChatListConversationsActionParams = {
   params: Record<string, unknown>;
@@ -20,10 +20,8 @@ function relativeTime(timestamp: number): string {
 export async function handleKiloChatListConversationsAction(
   args: HandleKiloChatListConversationsActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-  const parsed = listConversationsActionParams.safeParse(args.params);
-  const limit = parsed.success ? parsed.data.limit : undefined;
-  const offset = parsed.success ? parsed.data.offset : undefined;
-  const { conversations, total } = await args.client.listConversations({ limit, offset });
+  const limit = readNumberParam(args.params, 'limit');
+  const { conversations, total } = await args.client.listConversations({ limit });
 
   if (conversations.length === 0) {
     return { content: [{ type: 'text', text: 'No conversations found.' }] };

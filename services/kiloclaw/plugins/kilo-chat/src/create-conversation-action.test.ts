@@ -21,11 +21,11 @@ function mockClient(overrides: Partial<KiloChatClient> = {}): KiloChatClient {
 }
 
 describe('handleKiloChatCreateConversationAction', () => {
-  it('creates conversation with title and returns formatted result', async () => {
+  it('creates conversation with name and returns formatted result', async () => {
     const client = mockClient();
 
     const result = await handleKiloChatCreateConversationAction({
-      params: { title: 'Project Discussion' },
+      params: { name: 'Project Discussion' },
       client,
     });
 
@@ -36,7 +36,7 @@ describe('handleKiloChatCreateConversationAction', () => {
     expect(result.content[0].text).toBe('Created conversation "Project Discussion" (01NEWCONV)');
   });
 
-  it('creates conversation without title', async () => {
+  it('creates conversation without name', async () => {
     const client = mockClient();
 
     const result = await handleKiloChatCreateConversationAction({
@@ -51,11 +51,11 @@ describe('handleKiloChatCreateConversationAction', () => {
     expect(result.content[0].text).toBe('Created conversation 01NEWCONV');
   });
 
-  it('parses comma-separated member IDs', async () => {
+  it('parses comma-separated additionalMembers IDs', async () => {
     const client = mockClient();
 
     await handleKiloChatCreateConversationAction({
-      params: { title: 'Group', members: 'user_1, user_2, user_3' },
+      params: { name: 'Group', additionalMembers: 'user_1, user_2, user_3' },
       client,
     });
 

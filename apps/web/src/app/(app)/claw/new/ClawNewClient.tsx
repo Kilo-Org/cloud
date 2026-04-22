@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
@@ -16,6 +16,11 @@ import { WelcomePage } from '../components/billing/WelcomePage';
 import { getClawNewStatusQueryForBoundary } from './ClawNewClient.state';
 
 const ClawOnboardingWithBoundary = withStatusQueryBoundary(ClawOnboardingFlow);
+
+// Memoize the flow component so that background refetches of
+// useKiloClawStatus (every 10 s) inside ClawNewLoader don't cascade
+// re-renders into the full onboarding tree when all props are stable.
+const StableClawOnboardingFlow = memo(ClawOnboardingFlow);
 
 function LoadingState() {
   return (
@@ -52,7 +57,7 @@ function ClawNewLoader({
         : undefined;
 
     return (
-      <ClawOnboardingFlow
+      <StableClawOnboardingFlow
         status={status}
         mode={mode}
         createFlowStarted={createFlowStartedAt !== null}

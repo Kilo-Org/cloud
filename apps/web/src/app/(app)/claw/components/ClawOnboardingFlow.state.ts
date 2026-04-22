@@ -276,11 +276,12 @@ function getRenderStepDecision({
     }
     // DB row + subscription exist but no DO provisioned yet (e.g. credit
     // enrollment created the billing records without triggering provision).
-    // Show the onboarding entry point so the user can kick off provisioning.
+    // Show the identity step so the user can kick off provisioning.
     if (!instanceStatus) {
       return {
-        renderStep: 'create-instance',
-        reason: 'post-provisioning mode has no populated instance status yet',
+        renderStep: 'identity',
+        reason:
+          'post-provisioning mode has no populated instance status yet, so identity is the entry point',
       };
     }
     return {
@@ -291,8 +292,8 @@ function getRenderStepDecision({
 
   if (instanceStatus === null && !createSetupStarted) {
     return {
-      renderStep: 'create-instance',
-      reason: 'create-first mode has no instance status and setup has not started',
+      renderStep: 'identity',
+      reason: 'create-first mode starts with bot identity before setup is requested',
     };
   }
 

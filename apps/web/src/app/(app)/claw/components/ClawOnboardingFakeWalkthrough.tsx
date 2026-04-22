@@ -218,7 +218,7 @@ function renderFakeStep({
       return (
         <BotIdentityStep
           {...stepProgress}
-          instanceRunning={false}
+          showProvisioningBanner={false}
           onContinue={() => setStep('permissions')}
         />
       );

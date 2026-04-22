@@ -21,12 +21,12 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    instanceRunning: true,
+    showProvisioningBanner: false,
   },
 };
 
 export const WithProvisioningBanner: Story = {
   args: {
-    instanceRunning: false,
+    showProvisioningBanner: true,
   },
 };

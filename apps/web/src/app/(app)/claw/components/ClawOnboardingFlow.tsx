@@ -21,7 +21,6 @@ import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
-import { CreateInstanceCard } from './CreateInstanceCard';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep, ProvisioningStepView } from './ProvisioningStep';
 import type { BotIdentity, ExecPreset } from './claw.types';
@@ -159,10 +158,10 @@ function ClawOnboardingFlowInner({
   const posthog = usePostHog();
 
   useEffect(() => {
-    if (!flowState.createSetupActive || hasCapturedIdentityView.current) return;
+    if (flowState.renderStep !== 'identity' || hasCapturedIdentityView.current) return;
     hasCapturedIdentityView.current = true;
     posthog?.capture('claw_setup_identity_viewed');
-  }, [flowState.createSetupActive, posthog]);
+  }, [flowState.renderStep, posthog]);
 
   useEffect(() => {
     if (
@@ -221,21 +220,12 @@ function ClawOnboardingFlowInner({
     );
   }
 
-  function renderCreateInstanceStep() {
-    return (
-      <CreateInstanceCard
-        isPending={mutations.provision.isPending}
-        onCreate={handleCreateFlowStarted}
-      />
-    );
-  }
-
   function renderIdentityStep() {
     return (
       <BotIdentityStep
         currentStep={flowState.currentStep}
         totalSteps={flowState.totalSteps}
-        instanceRunning={flowState.instanceRunning}
+        showProvisioningBanner={flowState.createSetupActive && !flowState.instanceRunning}
         onContinue={({ identity, weatherLocation }) => {
           posthog?.capture('claw_setup_identity_completed', {
             bot_name_is_custom: identity.botName !== 'KiloClaw',
@@ -389,7 +379,7 @@ function ClawOnboardingFlowInner({
 
     switch (renderStep) {
       case 'create-instance':
-        return renderCreateInstanceStep();
+        return renderIdentityStep();
       case 'identity':
         return renderIdentityStep();
       case 'permissions':

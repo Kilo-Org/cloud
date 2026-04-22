@@ -68,12 +68,7 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
     })
   );
 
-  if (!billing) {
-    return <>{children}</>;
-  }
-
-  const lockReason = deriveLockReason(billing);
-  const bannerState = deriveBannerState(billing);
+  const lockReason = billing ? deriveLockReason(billing) : null;
 
   function handleSubscribe() {
     setShowPlanDialog(true);
@@ -119,11 +114,15 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
     );
   }
 
+  // Always render a stable fragment structure so that {children} stays at
+  // a fixed position in the React tree. Without this, the transition from
+  // !billing (children at index 0) to billing loaded (children at index 2)
+  // causes React to unmount and remount children, producing a layout flash.
   return (
     <>
       {/* Banner — or earlybird card in the banner position */}
-      {!hideBanners &&
-        (bannerState === 'earlybird_active' && billing.earlybird ? (
+      {!hideBanners && billing ? (
+        deriveBannerState(billing) === 'earlybird_active' && billing.earlybird ? (
           <EarlybirdActiveCard
             expiresAt={billing.earlybird.expiresAt}
             onSubscribeClick={handleSubscribe}
@@ -136,22 +135,25 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
             onUpdatePaymentClick={handleUpdatePayment}
             isReactivating={reactivate.isPending}
           />
-        ))}
+        )
+      ) : null}
 
       {/* Lock dialog — blocks interaction when access is revoked */}
-      <AccessLockedDialog
-        reason={lockReason}
-        billing={billing}
-        onSubscribeClick={handleSubscribe}
-        onUpdatePaymentClick={handleUpdatePayment}
-        onDestroyClick={() =>
-          destroy.mutate(undefined, {
-            onSuccess: () => toast.success('Instance destroyed'),
-            onError: err => toast.error(err.message),
-          })
-        }
-        isDestroying={destroy.isPending}
-      />
+      {billing ? (
+        <AccessLockedDialog
+          reason={lockReason}
+          billing={billing}
+          onSubscribeClick={handleSubscribe}
+          onUpdatePaymentClick={handleUpdatePayment}
+          onDestroyClick={() =>
+            destroy.mutate(undefined, {
+              onSuccess: () => toast.success('Instance destroyed'),
+              onError: err => toast.error(err.message),
+            })
+          }
+          isDestroying={destroy.isPending}
+        />
+      ) : null}
 
       {/* Dashboard content */}
       {children}

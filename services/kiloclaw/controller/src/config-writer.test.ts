@@ -169,6 +169,19 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
   });
 
+  it('does not auto-assign kilo-exa when provider is missing and Brave is configured', () => {
+    const existing = JSON.stringify({ tools: { web: { search: {} } } });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBeUndefined();
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBeUndefined();
+  });
+
   it('auto-assigns kilo-exa even when web search was explicitly disabled but provider is missing', () => {
     const existing = JSON.stringify({
       tools: {
@@ -1373,6 +1386,20 @@ describe('writeBaseConfig', () => {
     const config = JSON.parse(written[0].data);
     expect(config.tools?.web?.search?.provider).toBe('kilo-exa');
     expect(config.tools?.web?.search?.enabled).toBe(true);
+  });
+
+  it('does not auto-assign Exa on restore path when Brave is configured', () => {
+    const { deps, written } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      ...minimalEnv(),
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    delete env.KILOCLAW_FRESH_INSTALL;
+
+    writeBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    const config = JSON.parse(written[0].data);
+    expect(config.tools?.web?.search?.provider).toBeUndefined();
   });
 
   it('throws if KILOCODE_API_KEY is missing', () => {

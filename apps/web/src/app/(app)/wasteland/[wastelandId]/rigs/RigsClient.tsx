@@ -1,21 +1,27 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import { useUser } from '@/hooks/useUser';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Truck, Loader2, ShieldCheck, ChevronRight } from 'lucide-react';
+import { Truck, Loader2, ShieldCheck, ChevronRight, Search } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useSetWastelandPageHeader } from '../WastelandPageHeaderContext';
 import { useDrawerStack } from '@/components/wasteland/drawer/WastelandDrawerStack';
+
+type TrustFilter = number | null;
 
 export function RigsClient({ wastelandId }: { wastelandId: string }) {
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
   const { data: currentUser } = useUser();
   const { open: openDrawer } = useDrawerStack();
+
+  const [search, setSearch] = useState('');
+  const [trustFilter, setTrustFilter] = useState<TrustFilter>(null);
 
   const wastelandQuery = useQuery(trpc.wasteland.getWasteland.queryOptions({ wastelandId }));
   const credentialQuery = useQuery(
@@ -45,6 +51,30 @@ export function RigsClient({ wastelandId }: { wastelandId: string }) {
   });
 
   const rigs = rigsQuery.data?.rigs ?? [];
+
+  const trustCounts = useMemo(() => {
+    const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+    for (const rig of rigs) {
+      counts[rig.trust_level] = (counts[rig.trust_level] ?? 0) + 1;
+    }
+    return counts;
+  }, [rigs]);
+
+  const filteredRigs = useMemo(() => {
+    let result = rigs;
+    if (trustFilter !== null) {
+      result = result.filter(r => r.trust_level === trustFilter);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        r =>
+          r.rig_handle.toLowerCase().includes(q) ||
+          (r.display_name?.toLowerCase().includes(q) ?? false)
+      );
+    }
+    return result;
+  }, [rigs, trustFilter, search]);
 
   // Register a page header on every render path (including loading / denied)
   // so the navbar shows the right title immediately. Count is `null` when
@@ -89,6 +119,50 @@ export function RigsClient({ wastelandId }: { wastelandId: string }) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
+      {/* Toolbar — only visible once we have rigs to filter. */}
+      {rigs.length > 0 && (
+        <div className="flex items-center gap-3 border-b border-white/[0.06] px-6 py-2">
+          <div className="flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5">
+            <Search className="size-3 text-white/30" />
+            <input
+              type="text"
+              placeholder="Search handle or name..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-56 bg-transparent text-xs text-white/80 outline-none placeholder:text-white/25"
+            />
+          </div>
+
+          <div className="flex items-center gap-1">
+            <TrustChip
+              label="All"
+              count={rigs.length}
+              active={trustFilter === null}
+              onClick={() => setTrustFilter(null)}
+            />
+            {[3, 2, 1, 0].map(level => {
+              const count = trustCounts[level] ?? 0;
+              if (count === 0) return null;
+              return (
+                <TrustChip
+                  key={level}
+                  label={`Trust ${level}`}
+                  count={count}
+                  active={trustFilter === level}
+                  onClick={() => setTrustFilter(trustFilter === level ? null : level)}
+                />
+              );
+            })}
+          </div>
+
+          {(search || trustFilter !== null) && (
+            <span className="ml-auto text-[11px] text-white/30">
+              {filteredRigs.length} of {rigs.length}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl space-y-4 p-6">
@@ -122,9 +196,18 @@ export function RigsClient({ wastelandId }: { wastelandId: string }) {
               title="No rigs registered yet"
               description="When contributors join this wasteland, their rigs show up here."
             />
+          ) : filteredRigs.length === 0 ? (
+            <EmptyState
+              title="No rigs match"
+              description={
+                search
+                  ? `No rigs match "${search}".`
+                  : 'No rigs at this trust level. Clear the filter to see all rigs.'
+              }
+            />
           ) : (
             <div className="space-y-2">
-              {rigs.map(rig => (
+              {filteredRigs.map(rig => (
                 <div
                   key={rig.rig_handle}
                   className="group flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] transition-colors hover:border-white/[0.1] hover:bg-white/[0.03]"
@@ -192,5 +275,32 @@ function EmptyState({ title, description }: { title: string; description: string
       <p className="text-sm text-white/70">{title}</p>
       <p className="mt-1 text-xs text-white/40">{description}</p>
     </div>
+  );
+}
+
+function TrustChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-medium transition-colors ${
+        active
+          ? 'bg-white/[0.08] text-white/70'
+          : 'text-white/30 hover:bg-white/[0.04] hover:text-white/50'
+      }`}
+    >
+      {label}
+      <span className="font-mono text-[9px] opacity-60">{count}</span>
+    </button>
   );
 }

@@ -185,9 +185,7 @@ export const MessageBubble = memo(function MessageBubble({
         }
       }}
     >
-      <div
-        className={`flex max-w-[75%] min-w-0 overflow-hidden flex-col ${isOwn ? 'items-end' : 'items-start'}`}
-      >
+      <div className={`flex max-w-[75%] min-w-0 flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
         {isBot && !isOwn && (
           <span className="text-muted-foreground mb-0.5 px-1 text-xs font-medium">
             {assistantName ?? 'KiloClaw'}

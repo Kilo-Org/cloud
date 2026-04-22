@@ -6,10 +6,10 @@ import { after } from 'next/server';
 import {
   bot_request_cloud_agent_sessions,
   bot_requests,
-  type BotRequestCloudAgentSessionStatus,
   type BotRequestStatus,
   type BotRequestStep,
 } from '@kilocode/db/schema';
+import type { TerminalBotRequestCloudAgentSessionStatus } from '@/lib/bot/cloud-agent-session-groups';
 
 type CreateBotRequestParams = {
   createdBy: string;
@@ -72,11 +72,6 @@ type RecordBotRequestCloudAgentSessionParams = {
   callbackStep?: number;
 };
 
-type TerminalBotRequestCloudAgentSessionStatus = Extract<
-  BotRequestCloudAgentSessionStatus,
-  'completed' | 'failed' | 'interrupted'
->;
-
 type MarkBotRequestCloudAgentSessionTerminalParams = {
   botRequestId: string;
   cloudAgentSessionId: string;
@@ -86,6 +81,29 @@ type MarkBotRequestCloudAgentSessionTerminalParams = {
   errorMessage?: string;
   terminalAt?: string;
 };
+
+type RecordBotRequestCloudAgentSessionResultParams = {
+  botRequestId: string;
+  cloudAgentSessionId: string;
+  finalMessage: string;
+  fetchedAt?: string;
+};
+
+type RecordBotRequestCloudAgentSessionResultErrorParams = {
+  botRequestId: string;
+  cloudAgentSessionId: string;
+  errorMessage: string;
+};
+
+const MAX_FINAL_MESSAGE_ERROR_LENGTH = 4000;
+
+function truncateFinalMessageError(errorMessage: string): string {
+  if (errorMessage.length <= MAX_FINAL_MESSAGE_ERROR_LENGTH) {
+    return errorMessage;
+  }
+
+  return errorMessage.slice(0, MAX_FINAL_MESSAGE_ERROR_LENGTH);
+}
 
 async function performUpdate(id: string, params: UpdateBotRequestParams): Promise<void> {
   try {
@@ -178,6 +196,62 @@ export async function markBotRequestCloudAgentSessionTerminal(
         botRequestId: params.botRequestId,
         cloudAgentSessionId: params.cloudAgentSessionId,
         status: params.status,
+      },
+    });
+  }
+}
+
+export async function recordBotRequestCloudAgentSessionResult(
+  params: RecordBotRequestCloudAgentSessionResultParams
+): Promise<void> {
+  try {
+    await db
+      .update(bot_request_cloud_agent_sessions)
+      .set({
+        final_message: params.finalMessage,
+        final_message_fetched_at: params.fetchedAt ?? new Date().toISOString(),
+        final_message_error: null,
+      })
+      .where(
+        and(
+          eq(bot_request_cloud_agent_sessions.bot_request_id, params.botRequestId),
+          eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, params.cloudAgentSessionId)
+        )
+      );
+  } catch (error) {
+    captureException(error, {
+      tags: { component: 'bot-request-log', op: 'record-child-session-result' },
+      extra: {
+        botRequestId: params.botRequestId,
+        cloudAgentSessionId: params.cloudAgentSessionId,
+      },
+    });
+  }
+}
+
+export async function recordBotRequestCloudAgentSessionResultError(
+  params: RecordBotRequestCloudAgentSessionResultErrorParams
+): Promise<void> {
+  try {
+    await db
+      .update(bot_request_cloud_agent_sessions)
+      .set({
+        final_message: null,
+        final_message_fetched_at: null,
+        final_message_error: truncateFinalMessageError(params.errorMessage),
+      })
+      .where(
+        and(
+          eq(bot_request_cloud_agent_sessions.bot_request_id, params.botRequestId),
+          eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, params.cloudAgentSessionId)
+        )
+      );
+  } catch (error) {
+    captureException(error, {
+      tags: { component: 'bot-request-log', op: 'record-child-session-result-error' },
+      extra: {
+        botRequestId: params.botRequestId,
+        cloudAgentSessionId: params.cloudAgentSessionId,
       },
     });
   }

@@ -708,6 +708,13 @@
       "when": 1776859218609,
       "tag": "0100_yellow_eternity",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1776867593205,
+      "tag": "0101_spotty_sinister_six",
+      "breakpoints": true
     }
   ]
 }

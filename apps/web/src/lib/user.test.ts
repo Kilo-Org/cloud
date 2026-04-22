@@ -830,6 +830,9 @@ describe('User', () => {
         bot_request_id: br1.id,
         cloud_agent_session_id: 'cas-gdpr-test-session',
         status: 'completed',
+        final_message: 'PII-like final result should cascade with the bot request',
+        final_message_fetched_at: new Date('2026-01-05T06:07:08.000Z').toISOString(),
+        final_message_error: 'PII-like result fetch error should cascade with the bot request',
       });
 
       await softDeleteUser(user1.id);

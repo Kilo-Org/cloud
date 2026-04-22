@@ -1,8 +1,13 @@
 import { db } from '@/lib/drizzle';
 import {
+  claimBotRequestCloudAgentSessionGroupContinuation,
+  getBotRequestCloudAgentSessionGroup,
+  getBotRequestCloudAgentSessionGroupReadiness,
   linkBotRequestToSession,
   markBotRequestCloudAgentSessionTerminal,
   recordBotRequestCloudAgentSession,
+  recordBotRequestCloudAgentSessionResult,
+  recordBotRequestCloudAgentSessionResultError,
 } from '@/lib/bot/request-logging';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -119,6 +124,7 @@ describe('bot request logging', () => {
     const cloudAgentSessionId = `cas-child-upsert-${randomUUID()}`;
     const kiloSessionId = `kilo-child-upsert-${randomUUID()}`;
     const terminalAt = new Date('2026-01-02T03:04:05.000Z').toISOString();
+    const finalMessageFetchedAt = new Date('2026-01-02T03:04:06.000Z').toISOString();
     const continuationStartedAt = new Date('2026-01-02T03:05:06.000Z').toISOString();
     createdCloudAgentSessionIds.add(cloudAgentSessionId);
 
@@ -133,6 +139,9 @@ describe('bot request logging', () => {
       .set({
         status: 'completed',
         error_message: 'kept terminal error',
+        final_message: 'kept final message',
+        final_message_fetched_at: finalMessageFetchedAt,
+        final_message_error: null,
         terminal_at: terminalAt,
         continuation_started_at: continuationStartedAt,
       })
@@ -171,6 +180,9 @@ describe('bot request logging', () => {
     expect(row.callback_step).toBe(7);
     expect(row.status).toBe('completed');
     expect(row.error_message).toBe('kept terminal error');
+    expect(row.final_message).toBe('kept final message');
+    expect(new Date(row.final_message_fetched_at ?? '').toISOString()).toBe(finalMessageFetchedAt);
+    expect(row.final_message_error).toBeNull();
     expect(new Date(row.terminal_at ?? '').toISOString()).toBe(terminalAt);
     expect(new Date(row.continuation_started_at ?? '').toISOString()).toBe(continuationStartedAt);
   });
@@ -211,6 +223,248 @@ describe('bot request logging', () => {
     expect(row.kilo_session_id).toBe(kiloSessionId);
     expect(row.error_message).toBe('session failed');
     expect(new Date(row.terminal_at ?? '').toISOString()).toBe(terminalAt);
+  });
+
+  it('records a child Cloud Agent session final message and clears result errors', async () => {
+    const botRequestId = await createBotRequest();
+    const spawnGroupId = randomUUID();
+    const cloudAgentSessionId = `cas-child-result-${randomUUID()}`;
+    const fetchedAt = new Date('2026-01-04T05:06:07.000Z').toISOString();
+    createdCloudAgentSessionIds.add(cloudAgentSessionId);
+
+    await recordBotRequestCloudAgentSession({
+      botRequestId,
+      spawnGroupId,
+      cloudAgentSessionId,
+    });
+    await recordBotRequestCloudAgentSessionResultError({
+      botRequestId,
+      cloudAgentSessionId,
+      errorMessage: 'previous fetch error',
+    });
+
+    await recordBotRequestCloudAgentSessionResult({
+      botRequestId,
+      cloudAgentSessionId,
+      finalMessage: 'final assistant message',
+      fetchedAt,
+    });
+
+    const row = expectSingleRow(
+      await db
+        .select()
+        .from(bot_request_cloud_agent_sessions)
+        .where(eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
+    );
+
+    expect(row.final_message).toBe('final assistant message');
+    expect(new Date(row.final_message_fetched_at ?? '').toISOString()).toBe(fetchedAt);
+    expect(row.final_message_error).toBeNull();
+  });
+
+  it('records a bounded child Cloud Agent session result error', async () => {
+    const botRequestId = await createBotRequest();
+    const spawnGroupId = randomUUID();
+    const cloudAgentSessionId = `cas-child-result-error-${randomUUID()}`;
+    createdCloudAgentSessionIds.add(cloudAgentSessionId);
+
+    await recordBotRequestCloudAgentSession({
+      botRequestId,
+      spawnGroupId,
+      cloudAgentSessionId,
+    });
+    await recordBotRequestCloudAgentSessionResult({
+      botRequestId,
+      cloudAgentSessionId,
+      finalMessage: 'stale final message',
+    });
+
+    await recordBotRequestCloudAgentSessionResultError({
+      botRequestId,
+      cloudAgentSessionId,
+      errorMessage: 'x'.repeat(4100),
+    });
+
+    const row = expectSingleRow(
+      await db
+        .select()
+        .from(bot_request_cloud_agent_sessions)
+        .where(eq(bot_request_cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
+    );
+
+    expect(row.final_message).toBeNull();
+    expect(row.final_message_fetched_at).toBeNull();
+    expect(row.final_message_error).toHaveLength(4000);
+  });
+
+  it('waits to claim a child session group until all siblings are terminal with stored results', async () => {
+    const botRequestId = await createBotRequest();
+    const spawnGroupId = randomUUID();
+    const firstCloudAgentSessionId = `cas-child-group-first-${randomUUID()}`;
+    const secondCloudAgentSessionId = `cas-child-group-second-${randomUUID()}`;
+    createdCloudAgentSessionIds.add(firstCloudAgentSessionId);
+    createdCloudAgentSessionIds.add(secondCloudAgentSessionId);
+
+    await recordBotRequestCloudAgentSession({
+      botRequestId,
+      spawnGroupId,
+      cloudAgentSessionId: firstCloudAgentSessionId,
+      callbackStep: 2,
+    });
+    await recordBotRequestCloudAgentSession({
+      botRequestId,
+      spawnGroupId,
+      cloudAgentSessionId: secondCloudAgentSessionId,
+      callbackStep: 2,
+    });
+
+    await markBotRequestCloudAgentSessionTerminal({
+      botRequestId,
+      cloudAgentSessionId: firstCloudAgentSessionId,
+      status: 'completed',
+      kiloSessionId: `kilo-first-${randomUUID()}`,
+    });
+
+    const partiallyCompleteGroup = await getBotRequestCloudAgentSessionGroup({
+      botRequestId,
+      cloudAgentSessionId: firstCloudAgentSessionId,
+    });
+    expect(partiallyCompleteGroup.sessions.map(session => session.status).sort()).toEqual([
+      'completed',
+      'running',
+    ]);
+    await expect(
+      claimBotRequestCloudAgentSessionGroupContinuation({
+        botRequestId,
+        cloudAgentSessionId: firstCloudAgentSessionId,
+      })
+    ).resolves.toBe(false);
+
+    await markBotRequestCloudAgentSessionTerminal({
+      botRequestId,
+      cloudAgentSessionId: secondCloudAgentSessionId,
+      status: 'completed',
+      kiloSessionId: `kilo-second-${randomUUID()}`,
+    });
+
+    await expect(
+      getBotRequestCloudAgentSessionGroupReadiness({
+        botRequestId,
+        cloudAgentSessionId: secondCloudAgentSessionId,
+      })
+    ).resolves.toMatchObject({ status: 'waiting-for-result' });
+    await expect(
+      claimBotRequestCloudAgentSessionGroupContinuation({
+        botRequestId,
+        cloudAgentSessionId: secondCloudAgentSessionId,
+      })
+    ).resolves.toBe(false);
+
+    await recordBotRequestCloudAgentSessionResult({
+      botRequestId,
+      cloudAgentSessionId: firstCloudAgentSessionId,
+      finalMessage: 'first final message',
+    });
+    await recordBotRequestCloudAgentSessionResult({
+      botRequestId,
+      cloudAgentSessionId: secondCloudAgentSessionId,
+      finalMessage: 'second final message',
+    });
+
+    await expect(
+      getBotRequestCloudAgentSessionGroupReadiness({
+        botRequestId,
+        cloudAgentSessionId: secondCloudAgentSessionId,
+      })
+    ).resolves.toMatchObject({ status: 'ready' });
+    await expect(
+      claimBotRequestCloudAgentSessionGroupContinuation({
+        botRequestId,
+        cloudAgentSessionId: secondCloudAgentSessionId,
+      })
+    ).resolves.toBe(true);
+    await expect(
+      claimBotRequestCloudAgentSessionGroupContinuation({
+        botRequestId,
+        cloudAgentSessionId: firstCloudAgentSessionId,
+      })
+    ).resolves.toBe(false);
+
+    const claimedGroup = await getBotRequestCloudAgentSessionGroup({
+      botRequestId,
+      cloudAgentSessionId: firstCloudAgentSessionId,
+    });
+    expect(claimedGroup.sessions).toHaveLength(2);
+    expect(claimedGroup.sessions.every(session => session.continuation_started_at)).toBe(true);
+  });
+
+  it('reports result errors and still claims the terminal group once', async () => {
+    const botRequestId = await createBotRequest();
+    const spawnGroupId = randomUUID();
+    const cloudAgentSessionId = `cas-child-group-result-error-${randomUUID()}`;
+    createdCloudAgentSessionIds.add(cloudAgentSessionId);
+
+    await recordBotRequestCloudAgentSession({
+      botRequestId,
+      spawnGroupId,
+      cloudAgentSessionId,
+    });
+    await markBotRequestCloudAgentSessionTerminal({
+      botRequestId,
+      cloudAgentSessionId,
+      status: 'completed',
+      kiloSessionId: `kilo-result-error-${randomUUID()}`,
+    });
+    await recordBotRequestCloudAgentSessionResultError({
+      botRequestId,
+      cloudAgentSessionId,
+      errorMessage: 'ingest returned no final assistant text',
+    });
+
+    await expect(
+      getBotRequestCloudAgentSessionGroupReadiness({
+        botRequestId,
+        cloudAgentSessionId,
+      })
+    ).resolves.toMatchObject({ status: 'result-error' });
+    await expect(
+      claimBotRequestCloudAgentSessionGroupContinuation({
+        botRequestId,
+        cloudAgentSessionId,
+      })
+    ).resolves.toBe(true);
+  });
+
+  it('orders child session groups by callback step, creation time, and session id', async () => {
+    const botRequestId = await createBotRequest();
+    const spawnGroupId = randomUUID();
+    const firstCloudAgentSessionId = `cas-child-order-first-${randomUUID()}`;
+    const secondCloudAgentSessionId = `cas-child-order-second-${randomUUID()}`;
+    createdCloudAgentSessionIds.add(firstCloudAgentSessionId);
+    createdCloudAgentSessionIds.add(secondCloudAgentSessionId);
+
+    await recordBotRequestCloudAgentSession({
+      botRequestId,
+      spawnGroupId,
+      cloudAgentSessionId: firstCloudAgentSessionId,
+      callbackStep: 3,
+    });
+    await recordBotRequestCloudAgentSession({
+      botRequestId,
+      spawnGroupId,
+      cloudAgentSessionId: secondCloudAgentSessionId,
+      callbackStep: 2,
+    });
+
+    const group = await getBotRequestCloudAgentSessionGroup({
+      botRequestId,
+      cloudAgentSessionId: firstCloudAgentSessionId,
+    });
+
+    expect(group.sessions.map(session => session.cloud_agent_session_id)).toEqual([
+      secondCloudAgentSessionId,
+      firstCloudAgentSessionId,
+    ]);
   });
 
   it('continues linking the legacy Cloud Agent session column', async () => {

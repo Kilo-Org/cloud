@@ -60,6 +60,7 @@ type RunBotAgentParams = {
   user: User;
   botRequestId: string | undefined;
   prompt: string;
+  requestSource?: 'message' | 'cloud-agent-callback';
   completedStepCount?: number;
   initialSteps?: BotRequestStep[];
   onSessionReady?: (params: {
@@ -75,6 +76,29 @@ export type BotAgentMessageLike = {
   text: string;
 };
 
+function stringifyForLog(value: unknown): string {
+  if (typeof value === 'string') return value;
+
+  try {
+    const serialized = JSON.stringify(value, null, 2);
+    return serialized ?? String(value);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `[Unable to serialize log value: ${message}]`;
+  }
+}
+
+function buildStepResponseLogValue(step: StepResult<ToolSet>): unknown {
+  return (
+    step.response.body ?? {
+      text: step.text,
+      content: step.content,
+      toolCalls: step.staticToolCalls.map(tc => ({ name: tc.toolName, args: tc.input })),
+      toolResults: step.staticToolResults.map(tr => ({ name: tr.toolName, result: tr.output })),
+    }
+  );
+}
+
 function serializeStep(step: StepResult<ToolSet>, stepNumberOffset: number): BotRequestStep {
   return {
     stepNumber: step.stepNumber + stepNumberOffset,
@@ -86,7 +110,29 @@ function serializeStep(step: StepResult<ToolSet>, stepNumberOffset: number): Bot
       outputTokens: step.usage.outputTokens ?? undefined,
       totalTokens: step.usage.totalTokens ?? undefined,
     },
+    llm: {
+      prompt: stringifyForLog(step.request.body),
+      response: stringifyForLog(buildStepResponseLogValue(step)),
+    },
   };
+}
+
+function logLlmRequest(params: {
+  botRequestId: string | undefined;
+  source: string;
+  modelSlug: string;
+  stepNumber?: number;
+  prompt: string;
+  response: string;
+}): void {
+  console.log('[KiloBot] LLM request completed', {
+    botRequestId: params.botRequestId,
+    source: params.source,
+    modelSlug: params.modelSlug,
+    stepNumber: params.stepNumber,
+    prompt: params.prompt,
+    response: params.response,
+  });
 }
 
 async function buildSystemPrompt(
@@ -140,13 +186,23 @@ function pickSummaryModel(modelSlug: string): string {
 async function summarizePrompt(
   provider: ReturnType<typeof createOpenAICompatible>,
   modelSlug: string,
-  prompt: string
+  prompt: string,
+  botRequestId: string | undefined
 ): Promise<string> {
+  const summaryPrompt = `Summarize the following task in at most 10 words. Output only the summary, nothing else.\n\n${prompt}`;
   const result = await generateText({
     model: provider.chatModel(pickSummaryModel(modelSlug)),
-    prompt: `Summarize the following task in at most 10 words. Output only the summary, nothing else.\n\n${prompt}`,
+    prompt: summaryPrompt,
   });
-  return result.text.trim();
+  const summary = result.text.trim();
+  logLlmRequest({
+    botRequestId,
+    source: 'session-link-summary',
+    modelSlug: pickSummaryModel(modelSlug),
+    prompt: summaryPrompt,
+    response: summary,
+  });
+  return summary;
 }
 
 export async function postSessionLinkEphemeral(params: {
@@ -156,10 +212,16 @@ export async function postSessionLinkEphemeral(params: {
   prompt: string;
   provider: ReturnType<typeof createOpenAICompatible>;
   modelSlug: string;
+  botRequestId: string | undefined;
 }): Promise<void> {
   let description = 'A Cloud Agent session has been started for this task.';
   try {
-    const summary = await summarizePrompt(params.provider, params.modelSlug, params.prompt);
+    const summary = await summarizePrompt(
+      params.provider,
+      params.modelSlug,
+      params.prompt,
+      params.botRequestId
+    );
     if (summary) description = `Cloud Agent session started: ${summary}`;
   } catch (error) {
     captureException(error, { tags: { component: 'kilo-bot', op: 'summarize-prompt' } });
@@ -211,6 +273,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
     DEFAULT_BOT_MODEL;
   const owner = ownerFromIntegration(params.platformIntegration);
   const chatPlatform = params.thread.id.split(':')[0];
+  const requestSource = params.requestSource ?? 'message';
 
   // Build PR signature from requester info (display name + message permalink)
   let prSignature: string | undefined;
@@ -292,6 +355,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
                 prompt: args.prompt,
                 provider,
                 modelSlug,
+                botRequestId: params.botRequestId,
               });
             },
             {
@@ -325,7 +389,19 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
       }),
     },
     onStepFinish: step => {
-      collectedSteps.push(serializeStep(step, completedStepCount));
+      const serializedStep = serializeStep(step, completedStepCount);
+      const llmLog = serializedStep.llm;
+      if (llmLog) {
+        logLlmRequest({
+          botRequestId: params.botRequestId,
+          source: requestSource,
+          modelSlug,
+          stepNumber: serializedStep.stepNumber,
+          prompt: llmLog.prompt,
+          response: llmLog.response,
+        });
+      }
+      collectedSteps.push(serializedStep);
       if (params.botRequestId) {
         updateBotRequest(params.botRequestId, { steps: [...initialSteps, ...collectedSteps] });
       }

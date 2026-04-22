@@ -4152,6 +4152,7 @@ export type BotRequestStep = {
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
   toolResults?: Array<{ name: string; result: unknown }>;
   usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+  llm?: { prompt: string; response: string };
 };
 
 export const bot_requests = pgTable(
@@ -4246,6 +4247,9 @@ export const bot_request_cloud_agent_sessions = pgTable(
 
     callback_step: integer().notNull().default(0),
     error_message: text(),
+    final_message: text(),
+    final_message_fetched_at: timestamp({ withTimezone: true, mode: 'string' }),
+    final_message_error: text(),
 
     terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
     continuation_started_at: timestamp({ withTimezone: true, mode: 'string' }),

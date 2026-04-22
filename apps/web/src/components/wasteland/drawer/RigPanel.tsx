@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'motion/react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   ChevronRight,
@@ -308,20 +309,35 @@ function ActivitySection({
       <button
         type="button"
         onClick={() => setExpanded(e => !e)}
-        className="mb-2 flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors hover:bg-white/[0.03]"
+        className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors hover:bg-white/[0.03]"
       >
         <Icon className="size-3 text-white/25" />
         <span className="text-[10px] font-medium tracking-wide text-white/30 uppercase">
           {title}
         </span>
         <span className="text-[10px] text-white/20">· {count}</span>
-        <ChevronRight
-          className={`ml-auto size-3 text-white/25 transition-transform duration-150 ${
-            expanded ? '' : 'rotate-90'
-          }`}
-        />
+        <motion.div
+          animate={{ rotate: expanded ? 0 : 90 }}
+          transition={{ duration: 0.18, ease: 'easeInOut' }}
+          className="ml-auto"
+        >
+          <ChevronRight className="size-3 text-white/25" />
+        </motion.div>
       </button>
-      {expanded && children}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="pt-2">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

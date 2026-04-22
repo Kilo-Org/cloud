@@ -204,12 +204,19 @@ function validateOpenclawWorkspaceImport(
   };
 }
 
-function findClosestExistingAncestor(targetPath: string, rootDir: string): string {
+function assertNoSymlinkAncestors(targetPath: string, rootDir: string): void {
   let currentPath = path.dirname(targetPath);
-  while (currentPath !== rootDir && !fs.existsSync(currentPath)) {
+
+  while (currentPath !== rootDir) {
+    if (fs.existsSync(currentPath)) {
+      const stat = fs.lstatSync(currentPath);
+      if (stat.isSymbolicLink()) {
+        throw new SafePathError('Import target contains symbolic-link ancestor');
+      }
+    }
+
     currentPath = path.dirname(currentPath);
   }
-  return currentPath;
 }
 
 function collectWorkspaceMemoryFiles(rootDir: string): string[] {
@@ -282,13 +289,12 @@ function resolveAndValidateImportTarget(
   }
 
   try {
-    const ancestorPath = findClosestExistingAncestor(resolvedPath, rootDir);
-    verifyCanonicalized(fs.realpathSync(ancestorPath), rootDir);
+    assertNoSymlinkAncestors(resolvedPath, rootDir);
   } catch {
     return {
       ok: false,
-      error: 'Import target escapes workspace root via symlink',
-      code: 'openclaw_import_symlink_escape',
+      error: 'Import target contains symbolic-link ancestor',
+      code: 'openclaw_import_symlink_ancestor',
     };
   }
 

@@ -600,6 +600,40 @@ describe('file routes', () => {
       expect(body.failures.some((failure: any) => failure.operation === 'write')).toBe(true);
     });
 
+    it('rejects import when an ancestor directory is a symlink', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: any) => {
+        if (typeof p !== 'string') return false;
+        return p === `${ROOT}/workspace`;
+      });
+      vi.mocked(fs.lstatSync).mockImplementation((p: any) => {
+        if (p === `${ROOT}/workspace`) {
+          return {
+            isSymbolicLink: () => true,
+            isDirectory: () => false,
+            isFile: () => false,
+          } as any;
+        }
+        return {
+          isSymbolicLink: () => false,
+          isDirectory: () => false,
+          isFile: () => true,
+        } as any;
+      });
+
+      const res = await app.request('/_kilo/files/import-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          files: [{ path: 'workspace/USER.md', content: '# User\n' }],
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.code).toBe('openclaw_import_symlink_ancestor');
+      expect(atomicWrite).not.toHaveBeenCalled();
+    });
+
     it('returns 400 for malformed request body', async () => {
       const res = await app.request('/_kilo/files/import-openclaw-workspace', {
         method: 'POST',

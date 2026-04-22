@@ -675,6 +675,9 @@ importers:
       eventsource-parser:
         specifier: ^3.0.6
         version: 3.0.6
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.2
       form-data:
         specifier: ^4.0.5
         version: 4.0.5

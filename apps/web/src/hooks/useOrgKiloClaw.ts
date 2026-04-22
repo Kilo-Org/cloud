@@ -368,6 +368,18 @@ export function useOrgKiloClawMutations(
       },
     })
   );
+  const rawImportOpenclawWorkspace = useMutation(
+    trpc.organizations.kiloclaw.importOpenclawWorkspace.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.fileTree.queryKey(),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.readFile.queryKey(),
+        });
+      },
+    })
+  );
   const rawPatchExecPreset = useMutation(
     trpc.organizations.kiloclaw.patchExecPreset.mutationOptions({ onSuccess: invalidateStatus })
   );
@@ -432,6 +444,7 @@ export function useOrgKiloClawMutations(
     setMyPin: bind(rawSetMyPin),
     removeMyPin: bindVoid(rawRemoveMyPin),
     writeFile: bind(rawWriteFile),
+    importOpenclawWorkspace: bind(rawImportOpenclawWorkspace),
     patchExecPreset: bind(rawPatchExecPreset),
     patchWebSearchConfig: bind(rawPatchWebSearchConfig),
     patchBotIdentity: bind(rawPatchBotIdentity),

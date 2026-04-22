@@ -2821,6 +2821,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.writeFile(this.s, this.env, filePath, content, etag);
   }
 
+  async importOpenclawWorkspace(files: Array<{ path: string; content: string }>) {
+    await this.loadState();
+    return gateway.importOpenclawWorkspace(this.s, this.env, files);
+  }
+
   // ── Restart machine (user-facing) ──────────────────────────────────
 
   async restartMachine(options?: {

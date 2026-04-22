@@ -13,6 +13,7 @@ import {
   EnvPatchResponseSchema,
   ToolsMdSectionSyncResponseSchema,
   OpenclawConfigResponseSchema,
+  OpenclawWorkspaceImportResponseSchema,
   GatewayControllerError,
 } from '../gateway-controller-types';
 import { HEALTH_PROBE_TIMEOUT_SECONDS, HEALTH_PROBE_INTERVAL_MS } from '../../config';
@@ -440,6 +441,26 @@ export async function writeFile(
       'POST',
       FileWriteResponseSchema,
       { path: filePath, content, etag }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function importOpenclawWorkspace(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  files: Array<{ path: string; content: string }>
+): Promise<z.infer<typeof OpenclawWorkspaceImportResponseSchema> | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/files/import-openclaw-workspace',
+      'POST',
+      OpenclawWorkspaceImportResponseSchema,
+      { files }
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

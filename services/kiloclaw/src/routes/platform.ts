@@ -777,6 +777,10 @@ const OPENCLAW_CONFIG_ERROR_CODES = new Set([
   'invalid_request_body',
 ]);
 
+function isSafeOpenclawConfigCode(code: string): boolean {
+  return OPENCLAW_CONFIG_ERROR_CODES.has(code) || code.startsWith('openclaw_import_');
+}
+
 function sanitizeOpenclawConfigError(
   err: unknown,
   operation: string
@@ -788,7 +792,7 @@ function sanitizeOpenclawConfigError(
 
   console.error(`[platform] ${operation} failed:`, raw);
 
-  if (code && OPENCLAW_CONFIG_ERROR_CODES.has(code)) {
+  if (code && isSafeOpenclawConfigCode(code)) {
     return { message: normalized, status, code };
   }
 
@@ -1978,6 +1982,19 @@ const WriteFileSchema = z.object({
   etag: z.string().optional(),
 });
 
+const OpenclawWorkspaceImportSchema = z.object({
+  userId: z.string().min(1),
+  files: z
+    .array(
+      z.object({
+        path: z.string().min(1),
+        content: z.string(),
+      })
+    )
+    .min(1)
+    .max(500),
+});
+
 // POST /api/platform/files/write
 platform.post('/files/write', async c => {
   const result = await parseBody(c, WriteFileSchema);
@@ -2005,6 +2022,53 @@ platform.post('/files/write', async c => {
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'files/write');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/files/import-openclaw-workspace
+platform.post('/files/import-openclaw-workspace', async c => {
+  const result = await parseBody(c, OpenclawWorkspaceImportSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, files } = result.data;
+
+  try {
+    const status = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getStatus(),
+      'getStatus'
+    );
+
+    if (status.status !== 'running') {
+      return jsonError('Instance is not running', 503, 'instance_not_running');
+    }
+
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.importOpenclawWorkspace(files),
+      'importOpenclawWorkspace'
+    );
+    if (!response) {
+      return jsonError(
+        'OpenClaw import not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'files/import-openclaw-workspace'
+    );
     return jsonError(message, status, code);
   }
 });

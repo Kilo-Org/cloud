@@ -44,7 +44,7 @@
   },
   "pnpm": {
     "overrides": {
-      "@sentry/cli": "^3.3.4",
+      "@sentry/cli": "2.58.5",
       "mdast-util-to-hast": "^13.2.1",
       "storybook": "^9.1.17",
       "next": "^16.1.6",

@@ -92,6 +92,12 @@ import {
   KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/credit-billing';
 import {
+  logCreditEnrollmentAttempted,
+  logCreditEnrollmentFailed,
+  logCreditEnrollmentSucceeded,
+  type CreditEnrollmentFailureReason,
+} from '@/lib/kiloclaw/credit-enrollment-observability';
+import {
   CurrentPersonalSubscriptionResolutionError,
   resolveCurrentPersonalSubscriptionRow,
 } from '@/lib/kiloclaw/current-personal-subscription';
@@ -3816,21 +3822,40 @@ export const kiloclawRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { anchorInstance } = await resolvePersonalBillingAnchor({
+      const startedAt = Date.now();
+      logCreditEnrollmentAttempted({
         userId: ctx.user.id,
+        plan: input.plan,
         instanceId: input.instanceId,
       });
-      if (!anchorInstance) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Provision KiloClaw first before enrolling hosting with credits.',
-        });
-      }
 
-      // Intro pricing eligibility (spec Credit Enrollment rule 3).
-      const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
+      // Track the resolved instance id so the outer catch can include it
+      // on failures that happen after anchor resolution.
+      let resolvedInstanceId: string | undefined = input.instanceId;
 
       try {
+        const { anchorInstance } = await resolvePersonalBillingAnchor({
+          userId: ctx.user.id,
+          instanceId: input.instanceId,
+        });
+        if (!anchorInstance) {
+          logCreditEnrollmentFailed({
+            userId: ctx.user.id,
+            plan: input.plan,
+            instanceId: input.instanceId,
+            failureReason: 'no_instance',
+            durationMs: Date.now() - startedAt,
+          });
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Provision KiloClaw first before enrolling hosting with credits.',
+          });
+        }
+        resolvedInstanceId = anchorInstance.id;
+
+        // Intro pricing eligibility (spec Credit Enrollment rule 3).
+        const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
+
         await enrollWithCreditsImpl({
           userId: ctx.user.id,
           instanceId: anchorInstance.id,
@@ -3841,20 +3866,47 @@ export const kiloclawRouter = createTRPCRouter({
             actorId: ctx.user.id,
           },
         });
+
+        logCreditEnrollmentSucceeded({
+          userId: ctx.user.id,
+          plan: input.plan,
+          instanceId: anchorInstance.id,
+          durationMs: Date.now() - startedAt,
+        });
+
+        return { success: true };
       } catch (error) {
+        // TRPCErrors surfaced from this block (including the no_instance guard above)
+        // have already been logged at their throw site, or come from upstream utilities
+        // that handle their own error semantics; re-throw as-is to preserve the HTTP
+        // response and avoid double-logging.
         if (error instanceof TRPCError) throw error;
         const message = error instanceof Error ? error.message : 'Credit enrollment failed';
-        const code = message.includes('not found')
-          ? 'NOT_FOUND'
-          : message.includes('already exists') || message.includes('already processed')
-            ? 'CONFLICT'
-            : message.includes('Insufficient credit balance')
-              ? 'BAD_REQUEST'
-              : 'INTERNAL_SERVER_ERROR';
+        const {
+          code,
+          failureReason,
+        }: {
+          code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST' | 'INTERNAL_SERVER_ERROR';
+          failureReason: CreditEnrollmentFailureReason;
+        } = message.includes('not found')
+          ? { code: 'NOT_FOUND', failureReason: 'user_not_found' }
+          : message.includes('already processed')
+            ? { code: 'CONFLICT', failureReason: 'duplicate_enrollment' }
+            : message.includes('already exists')
+              ? { code: 'CONFLICT', failureReason: 'active_subscription_exists' }
+              : message.includes('Insufficient credit balance')
+                ? { code: 'BAD_REQUEST', failureReason: 'insufficient_credits' }
+                : { code: 'INTERNAL_SERVER_ERROR', failureReason: 'internal_error' };
+        logCreditEnrollmentFailed({
+          userId: ctx.user.id,
+          plan: input.plan,
+          instanceId: resolvedInstanceId,
+          failureReason,
+          durationMs: Date.now() - startedAt,
+          error: message,
+        });
         throw new TRPCError({ code, message, cause: error });
       }
-
-      return { success: true };
     }),
 
   createKiloPassUpsellCheckout: baseProcedure

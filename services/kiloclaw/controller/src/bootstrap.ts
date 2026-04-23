@@ -675,7 +675,7 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   // directly thanks to --secret-input-mode ref) and on instances already
   // migrated. Running unconditionally also covers the case where an older
   // auth-profiles.json somehow reappears (e.g., legacy auth.json migration
-  // on first load). See `.plans/kiloclaw-kilocode-key-secretref.md`.
+  // on first load).
   const migrationReport = migrateKilocodeAuthProfilesToKeyRef(
     CONFIG_DIR,
     toAuthProfilesMigrationDeps(deps)

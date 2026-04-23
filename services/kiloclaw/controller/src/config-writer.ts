@@ -45,10 +45,11 @@ function pruneOldConfigBackups(dir: string, base: string, deps: ConfigWriterDeps
  * `--secret-input-mode ref` stores the kilocode credential in
  * `agents/<id>/agent/auth-profiles.json` as an env-backed SecretRef
  * (`keyRef: { source: "env", provider: "default", id: "KILOCODE_API_KEY" }`)
- * instead of embedding the literal key. This lets the controller rotate the
- * key by updating the env var and calling `openclaw secrets reload`, without
- * the stale literal on disk shadowing the env var and without restarting the
- * gateway. See `.plans/kiloclaw-kilocode-key-secretref.md`.
+ * instead of embedding the literal key. No plaintext on disk means the
+ * auth resolver can't shadow env-based rotation with a stale file value;
+ * rotation itself is driven by `supervisor.restart()` in
+ * `routes/env.ts` so the respawned gateway inherits the controller's
+ * current env.
  *
  * Works because the gateway process env has `KILOCODE_API_KEY` set before
  * we spawn onboard (via `decryptEnvVars`), and `resolveNonInteractiveApiKey`

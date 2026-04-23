@@ -98,6 +98,9 @@ export async function resolveAutoModel(
   if (model === KILO_AUTO_FREE_MODEL.id) {
     const openRouterModels = await getOpenRouterModels();
     const candidates = getAutoFreeCandidates(openRouterModels, apiKind);
+    if (candidates.length === 0) {
+      throw new Error('No free model candidates available');
+    }
     const randomNumber = getRandomNumber(
       'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp),
       candidates.length

@@ -12,12 +12,8 @@ export function cloneRequestWithBody(request: Request, body: BodyInit): Request 
   });
 }
 
-function handleWebhook(
-  chatBot: typeof bot,
-  platform: string,
-  request: Request
-): Response | Promise<Response> {
-  const handler = chatBot.webhooks[platform as Platform];
+export function handleWebhook(platform: string, request: Request): Response | Promise<Response> {
+  const handler = bot.webhooks[platform as Platform];
   if (!handler) {
     return new Response('Unknown platform', { status: 404 });
   }
@@ -25,11 +21,4 @@ function handleWebhook(
   return handler(request, {
     waitUntil: task => after(() => task),
   });
-}
-
-export function handleBotWebhookRequest(
-  platform: string,
-  request: Request
-): Response | Promise<Response> {
-  return handleWebhook(bot, platform, request);
 }

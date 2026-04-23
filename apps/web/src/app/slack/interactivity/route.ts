@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { cloneRequestWithBody, handleBotWebhookRequest } from '@/lib/bot/webhook-handler';
+import { cloneRequestWithBody, handleWebhook } from '@/lib/bot/webhook-handler';
 import { verifySlackRequest } from '@/lib/slack/verify-request';
 
 /**
@@ -18,5 +18,5 @@ export async function POST(request: NextRequest) {
     return new NextResponse('Invalid signature', { status: 401 });
   }
 
-  return handleBotWebhookRequest('slack', cloneRequestWithBody(request, rawBody));
+  return handleWebhook('slack', cloneRequestWithBody(request, rawBody));
 }

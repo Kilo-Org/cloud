@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { cloneRequestWithBody, handleBotWebhookRequest } from '@/lib/bot/webhook-handler';
+import { cloneRequestWithBody, handleWebhook } from '@/lib/bot/webhook-handler';
 import { verifySlackRequest } from '@/lib/slack/verify-request';
 
 export const maxDuration = 800;
@@ -24,5 +24,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ challenge: body.challenge });
   }
 
-  return handleBotWebhookRequest('slack', cloneRequestWithBody(request, rawBody));
+  return handleWebhook('slack', cloneRequestWithBody(request, rawBody));
 }

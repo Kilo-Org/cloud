@@ -1,4 +1,4 @@
-import { handleBotWebhookRequest } from '@/lib/bot/webhook-handler';
+import { handleWebhook } from '@/lib/bot/webhook-handler';
 
 export const maxDuration = 800;
 
@@ -8,5 +8,5 @@ type RouteContext = {
 
 export async function POST(request: Request, context: RouteContext) {
   const { platform } = await context.params;
-  return handleBotWebhookRequest(platform, request);
+  return handleWebhook(platform, request);
 }

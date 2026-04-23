@@ -1,0 +1,23 @@
+{
+  "name": "kilo-ops",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Kilo Operations Dashboard: Grafana OSS behind auth proxy",
+  "scripts": {
+    "dev": "wrangler dev --env dev",
+    "deploy:prod": "wrangler deploy",
+    "typecheck": "tsgo --noEmit",
+    "types": "wrangler types --include-runtime=false"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.2",
+    "hono": "catalog:",
+    "jose": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

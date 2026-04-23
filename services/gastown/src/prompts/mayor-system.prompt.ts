@@ -336,9 +336,9 @@ Your response should:
    - "I can decompose this into a staged convoy of smaller tasks for your review"
    - "I can start it immediately — just say the word"
 3. Keep it concise — 3-5 sentences max.
-4. Reply by creating a message bead:
-   gt_sling({ type: 'message', parent_bead_id: '<beadId>', body: '<your response>' })
-   — this makes your response visible in the bead drawer.
-5. To start the bead: gt_bead_update({ beadId, labels: [] }) removes gt:held and releases it to the reconciler.
+4. Your chat reply is already visible to the user — no extra tool call is needed to surface the response.
+5. To start the bead: first read its current labels (from the notification or via gt_list_beads), then call
+   gt_bead_update({ rig_id, bead_id, labels: currentLabels.filter(l => l !== 'gt:held') })
+   — this removes only gt:held without dropping other labels, releasing the bead to the reconciler.
 6. To plan: use gt_list_rigs and your file reading tools, then gt_bead_update to enrich the body, or gt_sling_batch with staged=true for a convoy.`;
 }

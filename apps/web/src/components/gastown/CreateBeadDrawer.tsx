@@ -37,6 +37,9 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
   const [isEnriching, setIsEnriching] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the sequence number of the most recently fired enrichment request.
+  // When a response arrives we compare against this to discard stale results.
+  const enrichSeqRef = useRef(0);
 
   const createBead = useMutation(
     trpc.gastown.createBead.mutationOptions({
@@ -66,6 +69,8 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
+      // Advance the sequence so any in-flight enrichment response is discarded
+      enrichSeqRef.current++;
     }
   }, [isOpen]);
 
@@ -77,11 +82,15 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
 
     if (body.length > 20) {
       debounceRef.current = setTimeout(() => {
+        const seq = ++enrichSeqRef.current;
         setIsEnriching(true);
         enrichBead.mutate(
           { body, townId },
           {
             onSuccess: result => {
+              // Discard the response if a newer request has since been fired
+              // or if the drawer has been closed and state has been reset.
+              if (seq !== enrichSeqRef.current) return;
               setIsEnriching(false);
               if (result) {
                 if (!userEditedTitle) {
@@ -91,6 +100,7 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
               }
             },
             onError: () => {
+              if (seq !== enrichSeqRef.current) return;
               setIsEnriching(false);
             },
           }

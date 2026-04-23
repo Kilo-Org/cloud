@@ -8,7 +8,7 @@ export const messageCreatedWebhookSchema = z.object({
   messageId: z.string().min(1),
   from: z.string().min(1),
   text: z.string().min(1),
-  sentAt: z.string().min(1),
+  sentAt: z.string().datetime(),
   inReplyToMessageId: z.string().min(1).optional(),
   inReplyToBody: z.string().min(1).optional(),
   inReplyToSender: z.string().min(1).optional(),

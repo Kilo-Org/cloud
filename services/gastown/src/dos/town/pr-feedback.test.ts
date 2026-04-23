@@ -16,12 +16,12 @@ describe('TownConfigSchema refinery extensions', () => {
     expect(config.refinery?.code_review).toBe(false);
   });
 
-  it('defaults auto_resolve_pr_feedback to false', () => {
+  it('defaults auto_resolve_pr_feedback to true', () => {
     const config = TownConfigSchema.parse({});
-    expect(config.refinery).toBeUndefined();
+    expect(config.refinery?.auto_resolve_pr_feedback).toBe(true);
 
     const configWithRefinery = TownConfigSchema.parse({ refinery: {} });
-    expect(configWithRefinery.refinery?.auto_resolve_pr_feedback).toBe(false);
+    expect(configWithRefinery.refinery?.auto_resolve_pr_feedback).toBe(true);
   });
 
   it('defaults auto_merge_delay_minutes to null', () => {

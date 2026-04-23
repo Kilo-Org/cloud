@@ -264,7 +264,7 @@ export const TownConfigSchema = z.object({
    * - 'direct': Refinery pushes directly to main (no PR)
    * - 'pr': Refinery creates a GitHub PR / GitLab MR for human review
    */
-  merge_strategy: MergeStrategy.default('direct'),
+  merge_strategy: MergeStrategy.default('pr'),
 
   /** Refinery configuration */
   refinery: z
@@ -279,19 +279,19 @@ export const TownConfigSchema = z.object({
       /** Controls how the refinery communicates review findings:
        *  - 'rework': creates internal rework beads via gt_request_changes (default)
        *  - 'comments': posts GitHub review comments on the PR (requires merge_strategy: 'pr') */
-      review_mode: z.enum(['rework', 'comments']).default('rework'),
+      review_mode: z.enum(['rework', 'comments']).default('comments'),
       /** When enabled, a polecat is automatically dispatched to address
        *  unresolved review comments and failing CI checks on open PRs. */
-      auto_resolve_pr_feedback: z.boolean().default(false),
+      auto_resolve_pr_feedback: z.boolean().default(true),
       /** When enabled, a polecat is automatically dispatched to rebase and
        *  resolve merge conflicts on open PRs. */
       auto_resolve_merge_conflicts: z.boolean().default(true).optional(),
       /** After all CI checks pass and all review threads are resolved,
        *  automatically merge the PR after this many minutes.
        *  0 = immediate, null = disabled (require manual merge). */
-      auto_merge_delay_minutes: z.number().int().min(0).nullable().default(null),
+      auto_merge_delay_minutes: z.number().int().min(0).nullable().default(5),
     })
-    .optional(),
+    .default({}),
 
   /** Alarm interval when agents are active (seconds) */
   alarm_interval_active: z.number().int().min(5).max(600).optional(),
@@ -307,7 +307,7 @@ export const TownConfigSchema = z.object({
     .optional(),
 
   /** When true, all convoys are created as staged by default (agents not dispatched until started). */
-  staged_convoys_default: z.boolean().default(false),
+  staged_convoys_default: z.boolean().default(true),
 
   /** Default merge mode for new convoys.
    *  - 'review-then-land': beads merge into a convoy feature branch, then a single landing PR is created (default)

@@ -5,7 +5,8 @@ import { db } from '@/lib/drizzle';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
 import { platform_integrations } from '@kilocode/db';
-import { and, eq, inArray } from 'drizzle-orm';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { and, eq } from 'drizzle-orm';
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -35,7 +36,7 @@ async function verifyIntegrationAccess(
     .from(platform_integrations)
     .where(
       and(
-        inArray(platform_integrations.platform, ['slack', 'slack-next']),
+        eq(platform_integrations.platform, PLATFORM.SLACK),
         eq(platform_integrations.platform_installation_id, teamId)
       )
     )

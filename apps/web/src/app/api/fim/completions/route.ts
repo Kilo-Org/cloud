@@ -173,6 +173,7 @@ export async function POST(request: NextRequest) {
     session_id: taskId ?? null,
     mode: null,
     auto_model: null,
+    ttfb_ms: null,
   };
 
   setTag('ui.ai_model', requestBody.model);
@@ -246,6 +247,7 @@ export async function POST(request: NextRequest) {
     },
     body: JSON.stringify(bodyForUpstream),
   });
+  usageContext.ttfb_ms = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.status_code = proxyRes.status;
 
   if (!proxyRes.body) {

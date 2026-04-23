@@ -32,8 +32,13 @@ export default {
     // Prompt caching is not supported on the responses API for Bytedance; enabling it is therefore dangerous.
     supportedChatApis: ['chat_completions' /*, 'responses'*/],
     transformRequest(context) {
-      if (context.request.kind === 'chat_completions' || context.request.kind === 'responses') {
+      if (!isReasoningExplicitlyDisabled(context.request)) {
         context.request.body.thinking = { type: 'enabled' };
+        if (context.request.kind === 'chat_completions') {
+          context.request.body.reasoning_effort ??= context.request.body.reasoning?.effort;
+        }
+      } else {
+        context.request.body.thinking = { type: 'disabled' };
       }
       if (context.request.kind === 'responses') {
         delete context.request.body.prompt_cache_key;

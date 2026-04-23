@@ -27,7 +27,7 @@
     "promo": "pnpm -s script src/scripts/encrypt-promo-codes.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.58",
+    "@ai-sdk/anthropic": "^3.0.71",
     "@ai-sdk/gateway": "^3.0.66",
     "@ai-sdk/mistral": "^3.0.24",
     "@ai-sdk/openai": "^3.0.41",

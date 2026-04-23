@@ -124,6 +124,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     session_id: usageContext.session_id,
     mode: usageContext.mode,
     auto_model: usageContext.auto_model,
+    ttfb_ms: usageContext.ttfb_ms,
   };
 }
 
@@ -134,7 +135,7 @@ export function toInsertableDbUsageRecord(
   const id = randomUUID();
   const created_at = new Date().toISOString();
 
-  const { kilo_user_id, organization_id, project_id, provider, ...metadataFromContext } =
+  const { kilo_user_id, organization_id, project_id, provider, ttfb_ms, ...metadataFromContext } =
     usageContextInfo;
 
   const core: MicrodollarUsage = {
@@ -164,7 +165,7 @@ export function toInsertableDbUsageRecord(
     message_id: usageStats.messageId ?? '<missing>',
     upstream_id: usageStats.upstream_id,
     finish_reason: usageStats.finish_reason,
-    latency: usageStats.latency,
+    latency: ttfb_ms,
     moderation_latency: usageStats.moderation_latency,
     generation_time: usageStats.generation_time,
     is_byok: usageStats.is_byok,

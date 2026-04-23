@@ -314,10 +314,10 @@ function CustomModelPicker({
 export function OnboardingStepModel() {
   const { state, setModelPreset, setCustomModels } = useOnboarding();
 
-  const [customDefault, setCustomDefault] = useState('');
-  const [customMayor, setCustomMayor] = useState('');
-  const [customRefinery, setCustomRefinery] = useState('');
-  const [customPolecat, setCustomPolecat] = useState('');
+  const [customDefault, setCustomDefault] = useState(state.customModels.defaultModel ?? '');
+  const [customMayor, setCustomMayor] = useState(state.customModels.mayor ?? '');
+  const [customRefinery, setCustomRefinery] = useState(state.customModels.refinery ?? '');
+  const [customPolecat, setCustomPolecat] = useState(state.customModels.polecat ?? '');
 
   // Fetch available models for the Custom picker (no org context during onboarding)
   const {

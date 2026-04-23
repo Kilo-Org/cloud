@@ -112,12 +112,13 @@ export const PRESETS: PresetConfig[] = [
 /** Derive the config shape stored in OnboardingState from a preset. */
 export function presetToConfig(preset: ModelPreset, customModels: CustomModels) {
   if (preset === 'custom') {
+    const fallback = 'kilo-auto/balanced';
     return {
-      default_model: customModels.defaultModel || undefined,
+      default_model: customModels.defaultModel || fallback,
       role_models: {
-        mayor: customModels.mayor || undefined,
-        refinery: customModels.refinery || undefined,
-        polecat: customModels.polecat || undefined,
+        mayor: customModels.mayor || fallback,
+        refinery: customModels.refinery || fallback,
+        polecat: customModels.polecat || fallback,
       },
       small_model: customModels.smallModel || undefined,
     };

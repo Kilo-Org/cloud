@@ -291,7 +291,7 @@ export const TownConfigSchema = z.object({
        *  0 = immediate, null = disabled (require manual merge). */
       auto_merge_delay_minutes: z.number().int().min(0).nullable().default(5),
     })
-    .optional(),
+    .default({}),
 
   /** Alarm interval when agents are active (seconds) */
   alarm_interval_active: z.number().int().min(5).max(600).optional(),

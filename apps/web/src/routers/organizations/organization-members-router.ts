@@ -189,7 +189,9 @@ export const organizationsMembersRouter = createTRPCRouter({
         if (destroyedInstances.length > 0) {
           const client = new KiloClawInternalClient();
           const results = await Promise.allSettled(
-            destroyedInstances.map(({ instanceId }) => client.destroy(memberId, instanceId))
+            destroyedInstances.map(({ instanceId }) =>
+              client.destroy(memberId, instanceId, { reason: 'org_member_cleanup' })
+            )
           );
           for (const [i, result] of results.entries()) {
             if (result.status === 'rejected') {

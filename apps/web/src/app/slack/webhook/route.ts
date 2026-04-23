@@ -2,6 +2,14 @@ import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
 import type { AppMentionEvent, GenericMessageEvent } from '@slack/types';
 import { WebClient } from '@slack/web-api';
+import {
+  cloneRequestWithBody,
+  handleLegacySlackBotWebhookRequest,
+} from '@/lib/bot/webhook-handler';
+import {
+  getSlackTeamIdFromEventsApiBody,
+  shouldRouteSlackEventsApiBodyToNewBotInfra,
+} from '@/lib/bot/slack-rollout';
 import { processKiloBotMessage } from '@/lib/slack-bot';
 import { markdownToSlackMrkdwn } from '@/lib/slack/markdownToSlackMrkdwn';
 import { logSlackBotRequest } from '@/lib/slack-bot-logging';
@@ -123,10 +131,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ challenge: body.challenge });
   }
 
+  if (await shouldRouteSlackEventsApiBodyToNewBotInfra(body)) {
+    return handleLegacySlackBotWebhookRequest(cloneRequestWithBody(request, rawBody));
+  }
+
   // Handle event callbacks
   if (body.type === 'event_callback') {
     const event = body.event;
-    const teamId = body.team_id as string;
+    const teamId = getSlackTeamIdFromEventsApiBody(body);
     console.log('[SlackBot:Webhook] Event received:', event?.type, 'from team:', teamId);
 
     if (isExternalWorkspaceEvent(event)) {

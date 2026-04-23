@@ -1,6 +1,7 @@
 import type { PlatformIdentity } from '@/lib/bot-identity';
+import { isSlackBotNewInfraIntegrationIdAllowed } from '@/lib/bot/slack-rollout';
 import { db } from '@/lib/drizzle';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { type SlackEvent } from '@chat-adapter/slack';
 import { platform_integrations } from '@kilocode/db';
@@ -29,19 +30,25 @@ export function getPlatformIdentity(thread: Thread, message: Message): PlatformI
   }
 }
 
-async function getSlackNextInstallation(teamId: string) {
-  const [integration] = await db
+async function getSlackPlatformIntegration(teamId: string) {
+  const integrations = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
-        eq(platform_integrations.platform, PLATFORM.SLACK_NEXT),
+        inArray(platform_integrations.platform, [PLATFORM.SLACK_NEXT, PLATFORM.SLACK]),
         eq(platform_integrations.platform_installation_id, teamId)
       )
-    )
-    .limit(1);
+    );
 
-  return integration;
+  const legacyIntegration = integrations.find(
+    integration =>
+      integration.platform === PLATFORM.SLACK &&
+      isSlackBotNewInfraIntegrationIdAllowed(integration.id)
+  );
+  if (legacyIntegration) return legacyIntegration;
+
+  return integrations.find(integration => integration.platform === PLATFORM.SLACK_NEXT) ?? null;
 }
 
 export async function getPlatformIntegration(thread: Thread, message: Message) {
@@ -49,7 +56,7 @@ export async function getPlatformIntegration(thread: Thread, message: Message) {
 
   switch (platform) {
     case 'slack':
-      return await getSlackNextInstallation(getSlackTeamId(message as Message<SlackEvent>));
+      return await getSlackPlatformIntegration(getSlackTeamId(message as Message<SlackEvent>));
     default:
       throw new Error(`PlatformNotSupported: ${platform}`);
   }

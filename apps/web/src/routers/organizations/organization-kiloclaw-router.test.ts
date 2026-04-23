@@ -149,6 +149,9 @@ describe('organization kiloclaw destroy', () => {
     });
 
     expect(result).toEqual({ ok: true });
+    expect(kiloclawClientMock.__destroyMock).toHaveBeenCalledWith(user.id, instanceId, {
+      reason: 'manual_user_request',
+    });
 
     const [subscription] = await db
       .select()

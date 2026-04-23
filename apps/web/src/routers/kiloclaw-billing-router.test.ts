@@ -2276,6 +2276,10 @@ describe('handleKiloClawSubscriptionCreated', () => {
 
   it('upgrades a trial row to a paid subscription', async () => {
     const instance = await createWebhookAnchor();
+    await db
+      .update(kiloclaw_instances)
+      .set({ inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, instance.id));
 
     const subscription = makeStripeSubscription({
       id: 'sub_paid',
@@ -2303,6 +2307,14 @@ describe('handleKiloClawSubscriptionCreated', () => {
     expect(row.stripe_subscription_id).toBe('sub_paid');
     expect(row.plan).toBe('standard');
     expect(row.status).toBe('active');
+
+    const [updatedInstance] = await db
+      .select({ inactive: kiloclaw_instances.inactive_trial_stopped_at })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instance.id))
+      .limit(1);
+
+    expect(updatedInstance?.inactive).toBeNull();
   });
 
   it('attaches pre-deploy subscription.created without instanceId metadata to current personal row', async () => {
@@ -5140,6 +5152,10 @@ describe('enrollWithCredits', () => {
   it('allows enrollment when subscription is trialing', async () => {
     const instance = await createInstance(user.id);
     await giveUserCredits(user.id, 50_000_000);
+    await db
+      .update(kiloclaw_instances)
+      .set({ inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, instance.id));
 
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -5166,6 +5182,14 @@ describe('enrollWithCredits', () => {
     // Trial dates are preserved for historical visibility
     expect(sub.trial_started_at).not.toBeNull();
     expect(sub.trial_ends_at).not.toBeNull();
+
+    const [updatedInstance] = await db
+      .select({ inactive: kiloclaw_instances.inactive_trial_stopped_at })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instance.id))
+      .limit(1);
+
+    expect(updatedInstance?.inactive).toBeNull();
   });
 
   it('enqueues trial_end and sale affiliate events for attributed trial-to-credit conversion', async () => {

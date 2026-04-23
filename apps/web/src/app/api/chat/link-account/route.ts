@@ -5,7 +5,7 @@ import { db } from '@/lib/drizzle';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
 import { platform_integrations } from '@kilocode/db';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -27,7 +27,6 @@ function errorPage(title: string, message: string, status: number): Response {
  * an org member; for user-owned integrations only the owner may link.
  */
 async function verifyIntegrationAccess(
-  platform: string,
   teamId: string,
   kiloUserId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -36,7 +35,7 @@ async function verifyIntegrationAccess(
     .from(platform_integrations)
     .where(
       and(
-        eq(platform_integrations.platform, platform),
+        inArray(platform_integrations.platform, ['slack', 'slack-next']),
         eq(platform_integrations.platform_installation_id, teamId)
       )
     )
@@ -97,10 +96,6 @@ export async function GET(request: Request) {
     );
   }
 
-  // TODO(remon): Remove this hack once we've replaced the old slack integration
-  let platform = identity.platform;
-  if (identity.platform === 'slack') platform = 'slack-next';
-
   // Authenticate — redirect to sign-in if no session, then back here
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse) {
@@ -110,7 +105,7 @@ export async function GET(request: Request) {
   }
 
   // Verify the user is allowed to link to this integration
-  const access = await verifyIntegrationAccess(platform, identity.teamId, user.id);
+  const access = await verifyIntegrationAccess(identity.teamId, user.id);
   if (!access.ok) {
     return errorPage('Access Denied', access.error, 403);
   }

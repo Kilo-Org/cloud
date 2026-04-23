@@ -27,7 +27,11 @@ import {
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { flattenError, z } from 'zod';
-import { withDORetry } from '@kilocode/worker-utils';
+import {
+  KiloclawStartReasonSchema,
+  KiloclawStopReasonSchema,
+  withDORetry,
+} from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
@@ -777,6 +781,10 @@ const OPENCLAW_CONFIG_ERROR_CODES = new Set([
   'invalid_request_body',
 ]);
 
+function isSafeOpenclawConfigCode(code: string): boolean {
+  return OPENCLAW_CONFIG_ERROR_CODES.has(code) || code.startsWith('openclaw_import_');
+}
+
 function sanitizeOpenclawConfigError(
   err: unknown,
   operation: string
@@ -788,7 +796,7 @@ function sanitizeOpenclawConfigError(
 
   console.error(`[platform] ${operation} failed:`, raw);
 
-  if (code && OPENCLAW_CONFIG_ERROR_CODES.has(code)) {
+  if (code && isSafeOpenclawConfigCode(code)) {
     return { message: normalized, status, code };
   }
 
@@ -972,7 +980,7 @@ platform.post('/provision', async c => {
         c.env,
         userId,
         provisionedInstanceId,
-        stub => stub.destroy(),
+        stub => stub.destroy({ reason: 'bootstrap_cleanup_failure' }),
         'destroy'
       ).catch(destroyErr => {
         console.error(
@@ -1978,6 +1986,19 @@ const WriteFileSchema = z.object({
   etag: z.string().optional(),
 });
 
+const OpenclawWorkspaceImportSchema = z.object({
+  userId: z.string().min(1),
+  files: z
+    .array(
+      z.object({
+        path: z.string().min(1),
+        content: z.string(),
+      })
+    )
+    .min(1)
+    .max(500),
+});
+
 // POST /api/platform/files/write
 platform.post('/files/write', async c => {
   const result = await parseBody(c, WriteFileSchema);
@@ -2005,6 +2026,53 @@ platform.post('/files/write', async c => {
     return c.json(response, 200);
   } catch (err) {
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'files/write');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/files/import-openclaw-workspace
+platform.post('/files/import-openclaw-workspace', async c => {
+  const result = await parseBody(c, OpenclawWorkspaceImportSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, files } = result.data;
+
+  try {
+    const status = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getStatus(),
+      'getStatus'
+    );
+
+    if (status.status !== 'running') {
+      return jsonError('Instance is not running', 503, 'instance_not_running');
+    }
+
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.importOpenclawWorkspace(files),
+      'importOpenclawWorkspace'
+    );
+    if (!response) {
+      return jsonError(
+        'OpenClaw import not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'files/import-openclaw-workspace'
+    );
     return jsonError(message, status, code);
   }
 });
@@ -2125,6 +2193,7 @@ platform.post('/kilo-cli-run/cancel', async c => {
 // POST /api/platform/start
 const StartRequestSchema = UserIdRequestSchema.extend({
   skipCooldown: z.boolean().optional(),
+  reason: KiloclawStartReasonSchema.optional(),
 });
 
 async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
@@ -2138,39 +2207,55 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
 
   try {
     const route = mode === 'async' ? '/api/platform/start-async' : '/api/platform/start';
-    const eventBase =
-      mode === 'async' ? 'instance.async_start_requested' : 'instance.manual_start_succeeded';
-    const options = result.data.skipCooldown ? { skipCooldown: true } : undefined;
+    const startOptions =
+      result.data.skipCooldown || result.data.reason
+        ? {
+            ...(result.data.skipCooldown ? { skipCooldown: true } : {}),
+            ...(result.data.reason ? { reason: result.data.reason } : {}),
+          }
+        : undefined;
+    const asyncStartOptions = result.data.reason ? { reason: result.data.reason } : undefined;
 
     if (mode === 'async') {
       await withResolvedDORetry(
         c.env,
         result.data.userId,
         instanceId,
-        stub => stub.startAsync(result.data.userId),
+        stub => stub.startAsync(result.data.userId, asyncStartOptions),
         'startAsync'
       );
-    } else {
-      const { started } = await withResolvedDORetry(
-        c.env,
-        result.data.userId,
-        instanceId,
-        stub => stub.start(result.data.userId, options),
-        'start'
-      );
-      if (!started) {
-        return c.json({ ok: true });
-      }
+
+      writeEvent(c.env, {
+        event: 'instance.async_start_requested',
+        delivery: 'http',
+        route,
+        userId: result.data.userId,
+        label: result.data.reason,
+        durationMs: performance.now() - startedAt,
+      });
+      return c.json({ ok: true });
     }
 
-    writeEvent(c.env, {
-      event: eventBase,
-      delivery: 'http',
-      route,
-      userId: result.data.userId,
-      durationMs: performance.now() - startedAt,
-    });
-    return c.json({ ok: true });
+    const startResult = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      instanceId,
+      stub => stub.start(result.data.userId, startOptions),
+      'start'
+    );
+
+    if (startResult.currentStatus === 'running') {
+      writeEvent(c.env, {
+        event: 'instance.manual_start_succeeded',
+        delivery: 'http',
+        route,
+        userId: result.data.userId,
+        label: result.data.reason,
+        durationMs: performance.now() - startedAt,
+      });
+    }
+
+    return c.json({ ok: true, ...startResult });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'start');
     writeEvent(c.env, {
@@ -2179,6 +2264,7 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
       delivery: 'http',
       route: mode === 'async' ? '/api/platform/start-async' : '/api/platform/start',
       userId: result.data.userId,
+      label: result.data.reason,
       error: message,
       durationMs: performance.now() - startedAt,
     });
@@ -2257,9 +2343,13 @@ platform.post('/cleanup-recovery-previous-volume', async c => {
   }
 });
 
+const StopRequestSchema = UserIdRequestSchema.extend({
+  reason: KiloclawStopReasonSchema.optional(),
+});
+
 // POST /api/platform/stop
 platform.post('/stop', async c => {
-  const result = await parseBody(c, UserIdRequestSchema);
+  const result = await parseBody(c, StopRequestSchema);
   if ('error' in result) return result.error;
 
   const iidResult = parseInstanceIdQuery(c);
@@ -2267,8 +2357,15 @@ platform.post('/stop', async c => {
   const { instanceId } = iidResult;
 
   try {
-    await withResolvedDORetry(c.env, result.data.userId, instanceId, stub => stub.stop(), 'stop');
-    return c.json({ ok: true });
+    const stopOptions = result.data.reason ? { reason: result.data.reason } : undefined;
+    const stopResult = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      instanceId,
+      stub => stub.stop(stopOptions),
+      'stop'
+    );
+    return c.json({ ok: true, ...stopResult });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'stop');
     return jsonError(message, status);
@@ -2305,7 +2402,14 @@ platform.post('/destroy', async c => {
   }
 
   try {
-    await withResolvedDORetry(c.env, userId, instanceId, stub => stub.destroy(), 'destroy');
+    const destroyOptions = result.data.reason ? { reason: result.data.reason } : undefined;
+    await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.destroy(destroyOptions),
+      'destroy'
+    );
 
     // Remove the instance from the registry (best-effort).
     // When instanceId is provided, destroy by instanceId directly.

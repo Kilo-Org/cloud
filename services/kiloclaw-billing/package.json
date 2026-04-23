@@ -15,6 +15,7 @@
     "@kilocode/worker-utils": "workspace:*",
     "date-fns": "^4.1.0",
     "drizzle-orm": "catalog:",
+    "jose": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   },

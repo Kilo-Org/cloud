@@ -1,7 +1,12 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { insertTestUser } from '../tests/helpers/user.helper';
 import { db } from './drizzle';
-import { kilocode_users, stytch_fingerprints, credit_transactions } from '@kilocode/db/schema';
+import {
+  credit_campaigns,
+  credit_transactions,
+  kilocode_users,
+  stytch_fingerprints,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { FraudFingerprintLookupResponse } from 'stytch';
 import { OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS } from './constants';
@@ -311,7 +316,7 @@ describe('Stytch Fingerprint Functions', () => {
         google_user_email: 'osa-bonus-pass@example.com',
       });
 
-      await handleSignupPromotion(user, true, 'openclaw-security-advisor');
+      await handleSignupPromotion(user, true, { kind: 'openclaw-security-advisor' });
 
       const grants = await db.query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
@@ -349,7 +354,7 @@ describe('Stytch Fingerprint Functions', () => {
         google_user_email: 'osa-bonus-stytchfail@example.com',
       });
 
-      await handleSignupPromotion(user, false, 'openclaw-security-advisor');
+      await handleSignupPromotion(user, false, { kind: 'openclaw-security-advisor' });
 
       const grants = await db.query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
@@ -363,8 +368,8 @@ describe('Stytch Fingerprint Functions', () => {
         google_user_email: 'osa-bonus-idempotent@example.com',
       });
 
-      await handleSignupPromotion(user, true, 'openclaw-security-advisor');
-      await handleSignupPromotion(user, true, 'openclaw-security-advisor');
+      await handleSignupPromotion(user, true, { kind: 'openclaw-security-advisor' });
+      await handleSignupPromotion(user, true, { kind: 'openclaw-security-advisor' });
 
       const bonusRows = await db.query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
@@ -374,6 +379,176 @@ describe('Stytch Fingerprint Functions', () => {
         g => g.credit_category === 'openclaw-security-advisor-signup-bonus'
       );
       expect(bonusOnly).toHaveLength(1);
+    });
+  });
+
+  describe('handleSignupPromotion with credit-campaign signupSource', () => {
+    // Each test uses a unique slug so the shared test DB state doesn't
+    // require a cleanup hook, and the (kilo_user_id, credit_category)
+    // idempotency guard never crosses tests.
+    async function insertCampaign(input: {
+      slug: string;
+      amount_microdollars: number;
+      credit_expiry_hours?: number | null;
+      campaign_ends_at?: string | null;
+      total_redemptions_allowed?: number;
+      active?: boolean;
+    }) {
+      const [row] = await db
+        .insert(credit_campaigns)
+        .values({
+          slug: input.slug,
+          credit_category: `c-${input.slug}`,
+          amount_microdollars: input.amount_microdollars,
+          credit_expiry_hours: input.credit_expiry_hours ?? null,
+          campaign_ends_at: input.campaign_ends_at ?? null,
+          // Default high cap so tests that don't pin this don't hit the
+          // "capped" branch. The one test that exercises cap behavior
+          // passes its own value (typically 1).
+          total_redemptions_allowed: input.total_redemptions_allowed ?? 10_000,
+          active: input.active ?? true,
+          description: `test campaign ${input.slug}`,
+          created_by_kilo_user_id: 'test-admin',
+        })
+        .returning();
+      return row;
+    }
+
+    test('grants welcome + campaign bonus when campaign is active', async () => {
+      const slug = `cc-active-${Date.now()}`;
+      await insertCampaign({ slug, amount_microdollars: 5_000_000, credit_expiry_hours: 48 });
+      const user = await insertTestUser({
+        google_user_email: `${slug}@example.com`,
+      });
+
+      await handleSignupPromotion(user, true, { kind: 'credit-campaign', slug });
+
+      const grants = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      });
+      const byCategory = new Map(grants.map(g => [g.credit_category, g]));
+      // Welcome subsidy was reduced from $2.50 to $1.25 on main (commit
+      // 0f43aeb92, merged into this branch). Campaign grant amount is
+      // independent of the welcome amount and is set per-campaign in the
+      // admin UI.
+      expect(byCategory.get('automatic-welcome-credits')?.amount_microdollars).toBe(1_250_000);
+
+      const campaignGrant = byCategory.get(`c-${slug}`);
+      expect(campaignGrant?.amount_microdollars).toBe(5_000_000);
+
+      if (!campaignGrant?.expiry_date) throw new Error('expiry_date should be set');
+      const expiryMs = new Date(campaignGrant.expiry_date).getTime();
+      const expectedMs = Date.now() + 48 * 60 * 60 * 1000;
+      expect(Math.abs(expiryMs - expectedMs)).toBeLessThan(2 * 60 * 1000);
+    });
+
+    test('grants welcome only when campaign slug is not in DB', async () => {
+      const user = await insertTestUser({
+        google_user_email: `cc-missing-${Date.now()}@example.com`,
+      });
+
+      await handleSignupPromotion(user, true, {
+        kind: 'credit-campaign',
+        slug: `never-created-${Date.now()}`,
+      });
+
+      const grants = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      });
+      expect(grants.map(g => g.credit_category).sort()).toEqual(['automatic-welcome-credits']);
+    });
+
+    test('grants welcome only when campaign is inactive', async () => {
+      const slug = `cc-inactive-${Date.now()}`;
+      await insertCampaign({ slug, amount_microdollars: 5_000_000, active: false });
+      const user = await insertTestUser({
+        google_user_email: `${slug}@example.com`,
+      });
+
+      await handleSignupPromotion(user, true, { kind: 'credit-campaign', slug });
+
+      const grants = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      });
+      expect(grants.map(g => g.credit_category).sort()).toEqual(['automatic-welcome-credits']);
+    });
+
+    test('grants welcome only when campaign end date has passed', async () => {
+      const slug = `cc-ended-${Date.now()}`;
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      await insertCampaign({
+        slug,
+        amount_microdollars: 5_000_000,
+        campaign_ends_at: yesterday,
+      });
+      const user = await insertTestUser({
+        google_user_email: `${slug}@example.com`,
+      });
+
+      await handleSignupPromotion(user, true, { kind: 'credit-campaign', slug });
+
+      const grants = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      });
+      expect(grants.map(g => g.credit_category).sort()).toEqual(['automatic-welcome-credits']);
+    });
+
+    test('grants welcome only when redemption cap is reached', async () => {
+      const slug = `cc-capped-${Date.now()}`;
+      await insertCampaign({
+        slug,
+        amount_microdollars: 5_000_000,
+        total_redemptions_allowed: 1,
+      });
+
+      const firstUser = await insertTestUser({
+        google_user_email: `${slug}-first@example.com`,
+      });
+      await handleSignupPromotion(firstUser, true, { kind: 'credit-campaign', slug });
+
+      const secondUser = await insertTestUser({
+        google_user_email: `${slug}-second@example.com`,
+      });
+      await handleSignupPromotion(secondUser, true, { kind: 'credit-campaign', slug });
+
+      const secondGrants = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, secondUser.id),
+      });
+      expect(secondGrants.map(g => g.credit_category).sort()).toEqual([
+        'automatic-welcome-credits',
+      ]);
+    });
+
+    test('credit-campaign bonus is idempotent per user', async () => {
+      const slug = `cc-idempotent-${Date.now()}`;
+      await insertCampaign({ slug, amount_microdollars: 5_000_000 });
+      const user = await insertTestUser({
+        google_user_email: `${slug}@example.com`,
+      });
+
+      await handleSignupPromotion(user, true, { kind: 'credit-campaign', slug });
+      await handleSignupPromotion(user, true, { kind: 'credit-campaign', slug });
+
+      const rows = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      });
+      const campaignOnly = rows.filter(g => g.credit_category === `c-${slug}`);
+      expect(campaignOnly).toHaveLength(1);
+    });
+
+    test('grants nothing when Stytch validation fails even with credit-campaign source', async () => {
+      const slug = `cc-stytchfail-${Date.now()}`;
+      await insertCampaign({ slug, amount_microdollars: 5_000_000 });
+      const user = await insertTestUser({
+        google_user_email: `${slug}@example.com`,
+      });
+
+      await handleSignupPromotion(user, false, { kind: 'credit-campaign', slug });
+
+      const grants = await db.query.credit_transactions.findMany({
+        where: eq(credit_transactions.kilo_user_id, user.id),
+      });
+      expect(grants).toHaveLength(0);
     });
   });
 

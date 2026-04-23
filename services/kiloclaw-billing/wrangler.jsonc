@@ -19,7 +19,7 @@
     "cpu_ms": 120000,
   },
   "triggers": {
-    "crons": ["0 * * * *"],
+    "crons": ["0 * * * *", "0 8 * * *"],
   },
   "vars": {
     "KILOCODE_BACKEND_BASE_URL": "https://app.kilo.ai",
@@ -37,6 +37,10 @@
         "binding": "LIFECYCLE_QUEUE",
         "queue": "kiloclaw-billing-lifecycle",
       },
+      {
+        "binding": "TRIAL_INACTIVITY_QUEUE",
+        "queue": "kiloclaw-billing-trial-inactivity",
+      },
     ],
     "consumers": [
       {
@@ -46,6 +50,14 @@
         "max_retries": 3,
         "max_concurrency": 1,
         "dead_letter_queue": "kiloclaw-billing-lifecycle-dlq",
+      },
+      {
+        "queue": "kiloclaw-billing-trial-inactivity",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "max_concurrency": 5,
+        "dead_letter_queue": "kiloclaw-billing-trial-inactivity-dlq",
       },
     ],
   },

@@ -62,6 +62,7 @@ import {
   contributor_champion_events,
   contributor_champion_memberships,
   contributor_champion_contributors,
+  credit_campaigns,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from './constants';
@@ -582,6 +583,7 @@ export class SoftDeletePreconditionError extends Error {
  * - organization_user_limits/usage
  * - organization_audit_logs (actor PII nulled)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
+ * - credit_campaigns (created_by_kilo_user_id anonymized)
  * - payment_methods (soft-deleted, address/name/IP fields nulled)
  * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
@@ -818,6 +820,15 @@ export async function softDeleteUser(userId: string) {
       .update(kiloclaw_admin_audit_logs)
       .set({ target_user_id: 'deleted-user' })
       .where(eq(kiloclaw_admin_audit_logs.target_user_id, userId));
+
+    // Credit campaigns: strip the creator-admin reference. The campaigns
+    // themselves are retained (they represent ongoing marketing relationships
+    // and audit of granted credits), but the link back to the deleted user
+    // is anonymized to match the other actor-column patterns above.
+    await tx
+      .update(credit_campaigns)
+      .set({ created_by_kilo_user_id: 'deleted-user' })
+      .where(eq(credit_campaigns.created_by_kilo_user_id, userId));
 
     // Payment methods: soft-delete and strip address/name/IP fields
     await tx

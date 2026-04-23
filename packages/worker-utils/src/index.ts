@@ -63,3 +63,17 @@ export {
   readBillingCorrelationHeaders,
 } from './kiloclaw-billing-observability.js';
 export type { BillingCorrelationContext } from './kiloclaw-billing-observability.js';
+
+export {
+  KILOCLAW_START_REASONS,
+  KILOCLAW_STOP_REASONS,
+  KILOCLAW_DESTROY_REASONS,
+  KiloclawStartReasonSchema,
+  KiloclawStopReasonSchema,
+  KiloclawDestroyReasonSchema,
+} from './kiloclaw-lifecycle-reasons.js';
+export type {
+  KiloclawStartReason,
+  KiloclawStopReason,
+  KiloclawDestroyReason,
+} from './kiloclaw-lifecycle-reasons.js';

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync, type SpawnSyncReturns } from 'node:child_process';
 
 type GogAuthListJson = {
   accounts?: Array<{
@@ -64,6 +64,68 @@ function runGogJson(args: string[], env: NodeJS.ProcessEnv): Record<string, unkn
   }).toString();
 
   return JSON.parse(output) as Record<string, unknown>;
+}
+
+function combinedCommandOutput(result: SpawnSyncReturns<string>): string {
+  return [result.stdout, result.stderr, result.error?.message]
+    .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+    .join('\n');
+}
+
+function runGogExport(args: string[], env: NodeJS.ProcessEnv): string {
+  const result = spawnSync('/usr/local/bin/gog.real', args, {
+    env,
+    encoding: 'utf8',
+  });
+
+  return combinedCommandOutput(result);
+}
+
+function hasFile(pathToCheck: string): boolean {
+  try {
+    return fs.statSync(pathToCheck).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function isUnsupportedFlag(output: string, flagName: '--out' | '--overwrite'): boolean {
+  const normalized = output.toLowerCase();
+  if (!normalized.includes(flagName)) return false;
+
+  return (
+    normalized.includes('unknown flag') ||
+    normalized.includes('unknown option') ||
+    normalized.includes('unrecognized option') ||
+    normalized.includes('flag provided but not defined')
+  );
+}
+
+function exportTokenToFile(email: string, outPath: string, env: NodeJS.ProcessEnv): boolean {
+  const firstAttemptOutput = runGogExport(
+    ['auth', 'tokens', 'export', email, '--out', outPath, '--overwrite'],
+    env
+  );
+  if (hasFile(outPath)) {
+    return true;
+  }
+
+  if (!isUnsupportedFlag(firstAttemptOutput, '--out')) return false;
+
+  // Backward-compatible fallback for older gog.real versions that still accept
+  // positional output-path arguments.
+  const secondAttemptOutput = runGogExport(
+    ['auth', 'tokens', 'export', email, outPath, '--overwrite'],
+    env
+  );
+  if (hasFile(outPath)) {
+    return true;
+  }
+
+  if (!isUnsupportedFlag(secondAttemptOutput, '--overwrite')) return false;
+
+  runGogExport(['auth', 'tokens', 'export', email, outPath, '--force'], env);
+  return hasFile(outPath);
 }
 
 function mapServicesToCapabilities(services: readonly string[]): string[] {
@@ -159,23 +221,15 @@ export async function migrateLegacyGoogleCredentialsToBroker(
   const tmpPath = path.join(tmpDir, 'token.json');
 
   try {
-    try {
-      execFileSync(
-        '/usr/local/bin/gog.real',
-        ['auth', 'tokens', 'export', email, tmpPath, '--overwrite'],
-        {
-          env: gogEnv,
-          encoding: 'utf8',
-        }
-      );
-
-      try {
-        fs.chmodSync(tmpPath, 0o600);
-      } catch {
-        // best effort: continue migration even if chmod is unsupported
-      }
-    } catch {
+    const exported = exportTokenToFile(email, tmpPath, gogEnv);
+    if (!exported) {
       return { attempted: true, migrated: false, reason: 'token_export_failed' };
+    }
+
+    try {
+      fs.chmodSync(tmpPath, 0o600);
+    } catch {
+      // best effort: continue migration even if chmod is unsupported
     }
 
     const exportPayload = JSON.parse(fs.readFileSync(tmpPath, 'utf8')) as GogTokenExportJson;

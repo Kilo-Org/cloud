@@ -65,7 +65,7 @@ async function extractUpstreamContextOverflowMessage(response: Response): Promis
     return jsonMessage;
   }
   if (UPSTREAM_CONTEXT_OVERFLOW_PATTERN.test(rawBody)) {
-    return rawBody.slice(0, 2000);
+    return rawBody;
   }
   return null;
 }

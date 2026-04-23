@@ -96,6 +96,7 @@ describe('detectContextOverflow', () => {
 
     if (!result) throw new Error('expected a response');
     const json = await result.json();
+    expect(json.error_type).toBe(ProxyErrorType.context_length_exceeded);
     expect(json.message).toBe(upstreamMessage);
   });
 

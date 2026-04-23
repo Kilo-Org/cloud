@@ -45,10 +45,7 @@ export async function handleRequestLogging(params: {
     let response: string | undefined;
     try {
       response = await clonedResponse.text();
-      const error =
-        request.kind === 'chat_completions'
-          ? detectToolCallArgumentErrors(response, request.body.tools)
-          : null;
+      const error = detectToolCallArgumentErrors(response, request);
       const apiRequestLogId = await db
         .insert(api_request_log)
         .values({

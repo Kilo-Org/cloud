@@ -3,8 +3,6 @@ import { timingSafeTokenEqual } from '../auth';
 import type { Supervisor } from '../supervisor';
 import { migrateKilocodeAuthProfilesToKeyRef } from '../auth-profiles-migration';
 import type { AuthProfilesMigrationReport } from '../auth-profiles-migration';
-import { reloadGatewaySecrets } from '../gateway-rpc';
-import type { ReloadGatewaySecretsResult } from '../gateway-rpc';
 import { getBearerToken } from './gateway';
 
 const PATCHABLE_KEYS = new Set(['KILOCODE_API_KEY']);
@@ -12,28 +10,33 @@ const OPENCLAW_STATE_DIR = '/root/.openclaw';
 
 export type EnvRoutesDeps = {
   migrate: (rootDir: string) => AuthProfilesMigrationReport;
-  reload: (token: string) => ReloadGatewaySecretsResult;
 };
 
 const defaultDeps: EnvRoutesDeps = {
   migrate: rootDir => migrateKilocodeAuthProfilesToKeyRef(rootDir),
-  reload: token => reloadGatewaySecrets({ token }),
 };
 
 /**
  * Rotate the KiloCode API key in the live gateway.
  *
- * Preferred path: migrate any stale plaintext kilocode profile to a keyRef
- * (idempotent; only rewrites on legacy instances), then call
- * `openclaw secrets reload` so the gateway re-resolves the env-backed
- * keyRef against the new `process.env.KILOCODE_API_KEY` value without
- * restarting.
+ * The gateway runs in a child process with a frozen copy of the controller's
+ * environment — updating `process.env.KILOCODE_API_KEY` in the controller
+ * does not reach the child. Two openclaw mechanisms that look like they
+ * should help are both no-ops in our setup:
  *
- * Fallback: if the gateway is not reachable (degraded/not running yet)
- * the reload call fails — we then signal SIGUSR1 to the supervised
- * gateway process. SIGUSR1 is a full restart; it aborts in-flight agent
- * work and tears down channels, so it's a worse experience than reload
- * but guarantees the new env var is picked up on re-spawn.
+ *   1. `openclaw secrets reload` re-resolves SecretRefs against the
+ *      gateway's OWN `process.env` (frozen at spawn time), so it returns
+ *      "success" with the stale value and never picks up the new env.
+ *   2. SIGUSR1 (with `OPENCLAW_NO_RESPAWN=1`, which the bootstrap sets)
+ *      takes the "in-process restart" branch — the gateway process stays
+ *      alive and re-initializes against the same frozen env.
+ *
+ * The only thing that actually rotates the key is a full process exit so
+ * the controller's supervisor respawns the gateway, inheriting the
+ * controller's current `process.env`. `supervisor.restart()` (SIGTERM →
+ * child exit → respawn) does exactly that. After the respawn, the gateway
+ * reads the already-migrated `auth-profiles.json` (which now carries a
+ * `keyRef`) and resolves it against the fresh env.
  */
 export function registerEnvRoutes(
   app: Hono,
@@ -83,36 +86,28 @@ export function registerEnvRoutes(
 
     const migrationReport = deps.migrate(OPENCLAW_STATE_DIR);
 
-    let reloaded = false;
+    // Fire-and-forget the restart so the HTTP request doesn't block on
+    // gateway lifecycle (~5-10s). The old SIGUSR1 signal was also
+    // fire-and-forget; we keep the same request semantics here. Errors
+    // are logged; the supervisor will eventually reach a terminal state.
+    //
+    // The response field is named `signaled` for wire compatibility with
+    // the worker (`EnvPatchResponseSchema` in gateway-controller-types.ts
+    // and `reconcile.ts` which uses `result?.signaled` as the success
+    // bit for live env delivery). The semantics are unchanged — the
+    // controller delivered the env change to the running gateway — only
+    // the mechanism changed from SIGUSR1 to a full restart.
     let signaled = false;
     if (supervisor.getState() === 'running') {
-      const reloadResult = deps.reload(expectedToken);
-      if (reloadResult.ok) {
-        reloaded = true;
-      } else {
-        // `reloadResult.error` is already redacted in `reloadGatewaySecrets`,
-        // but strip the token again here as defense-in-depth: a future caller
-        // or a refactor must not be able to leak the gateway token into
-        // controller logs through this path (see AGENTS.md). The 8-char floor
-        // mirrors `gateway-rpc.ts` and avoids mangling unrelated text with
-        // coincidental substrings when tokens are abnormally short.
-        const safeReason =
-          expectedToken.length >= 8
-            ? reloadResult.error.split(expectedToken).join('<redacted-token>')
-            : reloadResult.error;
-        console.warn(
-          '[controller] openclaw secrets reload failed, falling back to SIGUSR1:',
-          safeReason
-        );
-        signaled = supervisor.signal('SIGUSR1');
-      }
+      signaled = true;
+      void supervisor.restart().catch(err => {
+        console.error('[controller] gateway restart failed during rotation:', err);
+      });
     }
 
     console.log(
       '[controller] Env patched:',
       entries.map(([k]) => k).join(', '),
-      'reloaded:',
-      reloaded,
       'signaled:',
       signaled,
       'migratedProfiles:',
@@ -120,7 +115,6 @@ export function registerEnvRoutes(
     );
     return c.json({
       ok: true,
-      reloaded,
       signaled,
       migratedProfiles: migrationReport.profilesMigrated,
     });

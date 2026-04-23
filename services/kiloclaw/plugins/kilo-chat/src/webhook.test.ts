@@ -20,6 +20,7 @@ describe('parseInboundPayload', () => {
       sentAt: '2026-01-01T00:00:00Z',
     });
     expect(parsed).toEqual({
+      type: 'message.created',
       conversationId: 'c1',
       from: 'u1',
       text: 'hi',

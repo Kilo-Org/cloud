@@ -22,11 +22,12 @@ export async function handleKiloChatReadAction(
   }
 
   const lines = messages.map(msg => {
-    const text = msg.content
+    const text = (msg.content ?? [])
       .filter(b => b.type === 'text')
       .map(b => b.text)
       .join('');
-    const timestamp = msg.updatedAt !== null ? ` (${new Date(msg.updatedAt).toISOString()})` : '';
+    const timestamp =
+      typeof msg.updatedAt === 'number' ? ` (${new Date(msg.updatedAt).toISOString()})` : '';
     return `[${msg.id}] ${msg.senderId}${timestamp}: ${text}`;
   });
 

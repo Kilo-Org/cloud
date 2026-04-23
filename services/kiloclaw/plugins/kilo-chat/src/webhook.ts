@@ -9,11 +9,7 @@ import { z } from 'zod';
 import { resolveApprovalOverGateway } from 'openclaw/plugin-sdk/approval-gateway-runtime';
 import type { ExecApprovalDecision } from 'openclaw/plugin-sdk/approval-runtime';
 
-import {
-  actionExecutedWebhookSchema,
-  chatWebhookSchema,
-  messageCreatedWebhookSchema,
-} from './shared/webhook-schemas.js';
+import { chatWebhookSchema, messageCreatedWebhookSchema } from './shared/webhook-schemas.js';
 import { createKiloChatClient, type KiloChatClient } from './client.js';
 import { resolveControllerUrl, resolveGatewayToken } from './env.js';
 import { DEFAULT_ACCOUNT_ID } from './channel.js';
@@ -75,10 +71,17 @@ export type ActionExecutedPayload = {
 
 // The shared webhook schema keeps `value` as a free-form string so non-approval
 // action producers can flow through. The plugin narrows it to the approval
-// decision enum at this boundary.
+// decision enum at this boundary, and only requires the fields it actually
+// consumes — conversationId/messageId/executedAt are forwarded by the Worker
+// but not needed to resolve the approval.
 const actionExecutedPluginSchema = z.preprocess(
   withDefaultType('action.executed'),
-  actionExecutedWebhookSchema.extend({ value: execApprovalDecisionSchema })
+  z.object({
+    type: z.literal('action.executed'),
+    groupId: z.string().min(1),
+    value: execApprovalDecisionSchema,
+    executedBy: z.string().min(1),
+  })
 );
 
 export function parseActionExecutedPayload(raw: unknown): ActionExecutedPayload | null {

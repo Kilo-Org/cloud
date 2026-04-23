@@ -392,7 +392,19 @@ describe('createKiloChatClient.removeReaction', () => {
 
 describe('listMessages', () => {
   it('GETs the correct URL and returns messages', async () => {
-    const messages = [{ id: 'm1', text: 'hello' }];
+    const messages = [
+      {
+        id: 'm1',
+        senderId: 'u1',
+        content: [{ type: 'text', text: 'hello' }],
+        inReplyToMessageId: null,
+        updatedAt: null,
+        clientUpdatedAt: null,
+        deleted: false,
+        deliveryFailed: false,
+        reactions: [],
+      },
+    ];
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
@@ -573,11 +585,13 @@ describe('listConversations', () => {
 });
 
 describe('createConversation', () => {
+  const TEST_ULID = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+
   it('POSTs to /_kilo/kilo-chat/conversations and returns conversationId', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
-      return new Response(JSON.stringify({ conversationId: 'conv-new' }), {
+      return new Response(JSON.stringify({ conversationId: TEST_ULID }), {
         status: 201,
         headers: { 'content-type': 'application/json' },
       });
@@ -590,7 +604,7 @@ describe('createConversation', () => {
     });
 
     const result = await client.createConversation({ title: 'My Chat' });
-    expect(result).toEqual({ conversationId: 'conv-new' });
+    expect(result).toEqual({ conversationId: TEST_ULID });
     expect(calls[0].url).toBe('http://ctrl/_kilo/kilo-chat/conversations');
     expect(calls[0].init.method).toBe('POST');
     const body = JSON.parse(String(calls[0].init.body));
@@ -601,7 +615,7 @@ describe('createConversation', () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
-      return new Response(JSON.stringify({ conversationId: 'conv-new' }), { status: 201 });
+      return new Response(JSON.stringify({ conversationId: TEST_ULID }), { status: 201 });
     }) as typeof fetch;
 
     const client = createKiloChatClient({

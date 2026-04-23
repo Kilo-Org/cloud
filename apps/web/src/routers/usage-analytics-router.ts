@@ -1,0 +1,978 @@
+import { TRPCError } from '@trpc/server';
+import * as z from 'zod';
+import { and, desc, eq, gte, inArray, isNull, lt, notInArray, sql } from 'drizzle-orm';
+import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { readDb } from '@/lib/drizzle';
+import { timedUsageQuery } from '@/lib/usage-query';
+import {
+  usage_rollup_hourly,
+  usage_rollup_daily,
+  usage_rollup_monthly,
+  usage_rollup_hourly_totals,
+  usage_rollup_daily_totals,
+  usage_rollup_monthly_totals,
+  kilocode_users,
+  organization_memberships,
+} from '@kilocode/db/schema';
+import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+
+export const GranularitySchema = z.enum(['hour', 'day', 'week', 'month']);
+export type Granularity = z.infer<typeof GranularitySchema>;
+
+export const DimensionSchema = z.enum(['feature', 'model', 'mode', 'user', 'provider', 'project']);
+export type Dimension = z.infer<typeof DimensionSchema>;
+
+export const MetricSchema = z.enum([
+  'cost',
+  'requests',
+  'tokens',
+  'inputTokens',
+  'outputTokens',
+  'errorRate',
+  'avgLatencyMs',
+  'avgGenerationTimeMs',
+  'costPerRequest',
+  'tokensPerRequest',
+  'cacheHitRatio',
+  'outputInputRatio',
+]);
+export type Metric = z.infer<typeof MetricSchema>;
+
+const FiltersShape = {
+  startDate: z.iso.datetime(),
+  endDate: z.iso.datetime(),
+  granularity: GranularitySchema,
+  organizationId: z.uuid().optional(),
+  /**
+   * Personal-scope narrowing:
+   * - 'personal-only' (default) → organization_id IS NULL
+   * - 'include-orgs'            → any organization (including personal)
+   * Ignored when `organizationId` is set (org scope always filters by that org).
+   */
+  personalScope: z.enum(['personal-only', 'include-orgs']).default('personal-only'),
+  /**
+   * Org-scope narrowing when `organizationId` is set:
+   * - 'self'     (default) → restricts to ctx.user.id within the organization
+   * - 'org-wide'           → all users in the org; requires owner/billing_manager
+   * Ignored when `organizationId` is not set.
+   */
+  viewAs: z.enum(['self', 'org-wide']).default('self'),
+  features: z.array(z.string()).optional(),
+  models: z.array(z.string()).optional(),
+  modes: z.array(z.string()).optional(),
+  userIds: z.array(z.string()).optional(),
+  providers: z.array(z.string()).optional(),
+  projects: z.array(z.string()).optional(),
+  excludedFeatures: z.array(z.string()).optional(),
+  excludedModels: z.array(z.string()).optional(),
+  excludedModes: z.array(z.string()).optional(),
+  excludedUserIds: z.array(z.string()).optional(),
+  excludedProviders: z.array(z.string()).optional(),
+  excludedProjects: z.array(z.string()).optional(),
+} as const;
+
+const UsageAnalyticsFiltersSchema = z.object(FiltersShape);
+export type UsageAnalyticsFilters = z.infer<typeof UsageAnalyticsFiltersSchema>;
+
+// ---------------------------------------------------------------------------
+// Table resolution
+// ---------------------------------------------------------------------------
+
+type GranularityTier = 'hourly' | 'daily' | 'monthly';
+
+type TableMeta = {
+  tier: GranularityTier;
+  /** Effective granularity after auto-downgrade (may differ from requested). */
+  effectiveGranularity: Granularity;
+};
+
+function resolveTier(granularity: Granularity, startDate: string): TableMeta {
+  const now = Date.now();
+  const startMs = new Date(startDate).getTime();
+  const ageDays = (now - startMs) / (24 * 60 * 60 * 1000);
+
+  if (granularity === 'hour') {
+    if (ageDays <= 7) {
+      return { tier: 'hourly', effectiveGranularity: 'hour' };
+    }
+    // Auto-downgrade: hourly retention is 7 days
+    return { tier: 'daily', effectiveGranularity: 'day' };
+  }
+
+  if (granularity === 'day' || granularity === 'week') {
+    if (ageDays <= 90) {
+      return { tier: 'daily', effectiveGranularity: granularity };
+    }
+    return { tier: 'monthly', effectiveGranularity: 'month' };
+  }
+
+  return { tier: 'monthly', effectiveGranularity: 'month' };
+}
+
+/**
+ * Returns true iff the query requires the wide rollup table (because it filters
+ * on a dimension that only exists in the wide table). User-scope filters
+ * (userIds / excludedUserIds) and organization filter work on both wide and
+ * totals tables, so they don't force the wide table.
+ */
+function hasDimensionFilters(filters: UsageAnalyticsFilters): boolean {
+  const nonEmpty = (a?: string[]) => !!a && a.length > 0;
+  return (
+    nonEmpty(filters.features) ||
+    nonEmpty(filters.models) ||
+    nonEmpty(filters.modes) ||
+    nonEmpty(filters.providers) ||
+    nonEmpty(filters.projects) ||
+    nonEmpty(filters.excludedFeatures) ||
+    nonEmpty(filters.excludedModels) ||
+    nonEmpty(filters.excludedModes) ||
+    nonEmpty(filters.excludedProviders) ||
+    nonEmpty(filters.excludedProjects)
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Authorization
+// ---------------------------------------------------------------------------
+
+async function ensureScopeAccess(
+  userId: string,
+  filters: UsageAnalyticsFilters,
+  ctxUser: { id: string; is_admin: boolean }
+): Promise<void> {
+  if (filters.organizationId) {
+    const requiredRoles =
+      filters.viewAs === 'org-wide' ? (['owner', 'billing_manager'] as const) : undefined;
+    await ensureOrganizationAccess(
+      { user: ctxUser } as Parameters<typeof ensureOrganizationAccess>[0],
+      filters.organizationId,
+      requiredRoles ? [...requiredRoles] : undefined
+    );
+
+    // In 'self' mode, explicit user filters must refer only to the caller.
+    // Prevents a member from crafting `userIds: [someoneElse]` in self scope.
+    if (filters.viewAs === 'self') {
+      const allUserFilterValues = [...(filters.userIds ?? []), ...(filters.excludedUserIds ?? [])];
+      if (allUserFilterValues.some(v => v !== userId)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Self-scope analytics can only filter to own user.',
+        });
+      }
+    }
+    return;
+  }
+
+  // Personal scope: user filters must refer only to the authenticated user.
+  const allUserFilterValues = [...(filters.userIds ?? []), ...(filters.excludedUserIds ?? [])];
+  if (allUserFilterValues.some(v => v !== userId)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Personal analytics can only filter to own user.',
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Column mapping
+// ---------------------------------------------------------------------------
+
+type WideTable =
+  | typeof usage_rollup_hourly
+  | typeof usage_rollup_daily
+  | typeof usage_rollup_monthly;
+
+type TotalsTable =
+  | typeof usage_rollup_hourly_totals
+  | typeof usage_rollup_daily_totals
+  | typeof usage_rollup_monthly_totals;
+
+function getWideTable(tier: GranularityTier): WideTable {
+  switch (tier) {
+    case 'hourly':
+      return usage_rollup_hourly;
+    case 'daily':
+      return usage_rollup_daily;
+    case 'monthly':
+      return usage_rollup_monthly;
+  }
+}
+
+function getTotalsTable(tier: GranularityTier): TotalsTable {
+  switch (tier) {
+    case 'hourly':
+      return usage_rollup_hourly_totals;
+    case 'daily':
+      return usage_rollup_daily_totals;
+    case 'monthly':
+      return usage_rollup_monthly_totals;
+  }
+}
+
+function getTimeColumn(tier: GranularityTier, table: WideTable | TotalsTable) {
+  if (tier === 'hourly') {
+    return (table as typeof usage_rollup_hourly).hour;
+  }
+  if (tier === 'daily') {
+    return (table as typeof usage_rollup_daily).day;
+  }
+  return (table as typeof usage_rollup_monthly).month;
+}
+
+// ---------------------------------------------------------------------------
+// Time bucketing for charts
+// ---------------------------------------------------------------------------
+
+function bucketExprForEffectiveGranularity(
+  granularity: Granularity,
+  tier: GranularityTier,
+  table: WideTable | TotalsTable
+) {
+  const timeCol = getTimeColumn(tier, table);
+  if (granularity === 'hour') return sql<string>`${timeCol}::text`;
+  if (granularity === 'week') return sql<string>`date_trunc('week', ${timeCol})::text`;
+  // 'day' and 'month' both match the column directly
+  return sql<string>`${timeCol}::text`;
+}
+
+// ---------------------------------------------------------------------------
+// Shared filters
+// ---------------------------------------------------------------------------
+
+type AnyPgTable = WideTable | TotalsTable;
+
+function buildWhereCommon(
+  filters: UsageAnalyticsFilters,
+  table: AnyPgTable,
+  ctxUserId: string,
+  tier: GranularityTier
+) {
+  const conditions = [];
+  const timeCol = getTimeColumn(tier, table);
+
+  if (tier === 'monthly') {
+    // For monthly, startDate/endDate are date strings — the time column is also a date.
+    const startDate = filters.startDate.slice(0, 10);
+    const endDate = filters.endDate.slice(0, 10);
+    conditions.push(gte(timeCol as unknown as (typeof usage_rollup_monthly)['month'], startDate));
+    conditions.push(lt(timeCol as unknown as (typeof usage_rollup_monthly)['month'], endDate));
+  } else if (tier === 'daily') {
+    const startDate = filters.startDate.slice(0, 10);
+    const endDate = filters.endDate.slice(0, 10);
+    conditions.push(gte(timeCol as unknown as (typeof usage_rollup_daily)['day'], startDate));
+    conditions.push(lt(timeCol as unknown as (typeof usage_rollup_daily)['day'], endDate));
+  } else {
+    conditions.push(
+      gte(timeCol as unknown as (typeof usage_rollup_hourly)['hour'], filters.startDate)
+    );
+    conditions.push(
+      lt(timeCol as unknown as (typeof usage_rollup_hourly)['hour'], filters.endDate)
+    );
+  }
+
+  // Scope filter: either org or personal user
+  const tableWithOrg = table as unknown as {
+    organization_id: typeof usage_rollup_hourly.organization_id;
+    kilo_user_id: typeof usage_rollup_hourly.kilo_user_id;
+  };
+  if (filters.organizationId) {
+    conditions.push(eq(tableWithOrg.organization_id, filters.organizationId));
+    // 'self' mode: unconditionally restrict to the caller. This is the server-side
+    // enforcement that prevents a member from seeing other members' usage.
+    if (filters.viewAs === 'self') {
+      conditions.push(eq(tableWithOrg.kilo_user_id, ctxUserId));
+    } else {
+      if (filters.userIds && filters.userIds.length > 0) {
+        conditions.push(inArray(tableWithOrg.kilo_user_id, filters.userIds));
+      }
+      if (filters.excludedUserIds && filters.excludedUserIds.length > 0) {
+        conditions.push(notInArray(tableWithOrg.kilo_user_id, filters.excludedUserIds));
+      }
+    }
+  } else {
+    conditions.push(eq(tableWithOrg.kilo_user_id, ctxUserId));
+    if (filters.personalScope === 'personal-only') {
+      conditions.push(isNull(tableWithOrg.organization_id));
+    }
+    // excludedUserIds in personal scope is already restricted to ctxUserId by
+    // ensureScopeAccess, so it would exclude the user's own data — no-op filter.
+  }
+
+  return conditions;
+}
+
+function buildWideFilters(filters: UsageAnalyticsFilters, table: WideTable) {
+  const conditions = [];
+  if (filters.features && filters.features.length > 0) {
+    conditions.push(inArray(table.feature, filters.features));
+  }
+  if (filters.models && filters.models.length > 0) {
+    conditions.push(inArray(table.model, filters.models));
+  }
+  if (filters.modes && filters.modes.length > 0) {
+    conditions.push(inArray(table.mode, filters.modes));
+  }
+  if (filters.providers && filters.providers.length > 0) {
+    conditions.push(inArray(table.provider, filters.providers));
+  }
+  if (filters.projects && filters.projects.length > 0) {
+    conditions.push(inArray(table.project_id, filters.projects));
+  }
+  if (filters.excludedFeatures && filters.excludedFeatures.length > 0) {
+    conditions.push(notInArray(table.feature, filters.excludedFeatures));
+  }
+  if (filters.excludedModels && filters.excludedModels.length > 0) {
+    conditions.push(notInArray(table.model, filters.excludedModels));
+  }
+  if (filters.excludedModes && filters.excludedModes.length > 0) {
+    conditions.push(notInArray(table.mode, filters.excludedModes));
+  }
+  if (filters.excludedProviders && filters.excludedProviders.length > 0) {
+    conditions.push(notInArray(table.provider, filters.excludedProviders));
+  }
+  if (filters.excludedProjects && filters.excludedProjects.length > 0) {
+    conditions.push(notInArray(table.project_id, filters.excludedProjects));
+  }
+  return conditions;
+}
+
+// ---------------------------------------------------------------------------
+// Metric expression helpers
+// ---------------------------------------------------------------------------
+
+function costSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).cost_microdollars}), 0)::bigint`;
+}
+function requestSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).request_count}), 0)::bigint`;
+}
+function inputSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).input_tokens}), 0)::bigint`;
+}
+function outputSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).output_tokens}), 0)::bigint`;
+}
+function cacheWriteSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).cache_write_tokens}), 0)::bigint`;
+}
+function cacheHitSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).cache_hit_tokens}), 0)::bigint`;
+}
+function errorSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).error_count}), 0)::bigint`;
+}
+function cancelledSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).cancelled_count}), 0)::bigint`;
+}
+function freeSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).free_request_count}), 0)::bigint`;
+}
+function byokSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).byok_request_count}), 0)::bigint`;
+}
+function totalLatencySum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).total_latency_ms}), 0)::bigint`;
+}
+function totalGenerationSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).total_generation_time_ms}), 0)::bigint`;
+}
+function latencyCountSum(table: AnyPgTable) {
+  return sql<number>`COALESCE(SUM(${(table as WideTable).latency_count}), 0)::bigint`;
+}
+function distinctUsersCount(table: AnyPgTable) {
+  return sql<number>`COUNT(DISTINCT ${(table as WideTable).kilo_user_id})::bigint`;
+}
+
+// ---------------------------------------------------------------------------
+// Dimension column resolver
+// ---------------------------------------------------------------------------
+
+function getDimensionColumn(table: WideTable, dimension: Dimension) {
+  switch (dimension) {
+    case 'feature':
+      return table.feature;
+    case 'model':
+      return table.model;
+    case 'mode':
+      return table.mode;
+    case 'user':
+      return table.kilo_user_id;
+    case 'provider':
+      return table.provider;
+    case 'project':
+      return table.project_id;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// getSummary
+// ---------------------------------------------------------------------------
+
+const SummaryOutputSchema = z.object({
+  costMicrodollars: z.number(),
+  requestCount: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cacheWriteTokens: z.number(),
+  cacheHitTokens: z.number(),
+  errorCount: z.number(),
+  cancelledCount: z.number(),
+  freeRequestCount: z.number(),
+  byokRequestCount: z.number(),
+  totalLatencyMs: z.number(),
+  totalGenerationTimeMs: z.number(),
+  latencyCount: z.number(),
+  distinctUsers: z.number(),
+  errorRate: z.number(),
+  avgLatencyMs: z.number(),
+  avgGenerationTimeMs: z.number(),
+  costPerRequest: z.number(),
+  tokensPerRequest: z.number(),
+  cacheHitRatio: z.number(),
+  outputInputRatio: z.number(),
+  effectiveGranularity: GranularitySchema,
+});
+
+type SummaryOutput = z.infer<typeof SummaryOutputSchema>;
+
+function ratioSafe(numerator: number, denominator: number): number {
+  if (denominator === 0) return 0;
+  return numerator / denominator;
+}
+
+// ---------------------------------------------------------------------------
+// Timeseries
+// ---------------------------------------------------------------------------
+
+const TimeseriesInputSchema = UsageAnalyticsFiltersSchema.extend({
+  metric: MetricSchema,
+  splitBy: DimensionSchema.optional(),
+});
+
+const TimeseriesPointSchema = z.object({
+  datetime: z.string(),
+  value: z.number(),
+  label: z.string().optional(),
+});
+
+const TimeseriesOutputSchema = z.object({
+  timeseries: z.array(TimeseriesPointSchema),
+  effectiveGranularity: GranularitySchema,
+  tableType: z.enum(['wide', 'totals']),
+});
+
+function metricExpression(metric: Metric, table: AnyPgTable) {
+  switch (metric) {
+    case 'cost':
+      return costSum(table);
+    case 'requests':
+      return requestSum(table);
+    case 'inputTokens':
+      return inputSum(table);
+    case 'outputTokens':
+      return outputSum(table);
+    case 'tokens':
+      return sql<number>`COALESCE(SUM(${(table as WideTable).input_tokens} + ${(table as WideTable).output_tokens}), 0)::bigint`;
+    case 'errorRate':
+      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).request_count}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).error_count}), 0)::float / SUM(${(table as WideTable).request_count})::float) END`;
+    case 'avgLatencyMs':
+      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).latency_count}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).total_latency_ms}), 0)::float / SUM(${(table as WideTable).latency_count})::float) END`;
+    case 'avgGenerationTimeMs':
+      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).latency_count}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).total_generation_time_ms}), 0)::float / SUM(${(table as WideTable).latency_count})::float) END`;
+    case 'costPerRequest':
+      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).request_count}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).cost_microdollars}), 0)::float / SUM(${(table as WideTable).request_count})::float) END`;
+    case 'tokensPerRequest':
+      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).request_count}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).input_tokens} + ${(table as WideTable).output_tokens}), 0)::float / SUM(${(table as WideTable).request_count})::float) END`;
+    case 'cacheHitRatio':
+      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).input_tokens} + ${(table as WideTable).cache_hit_tokens}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).cache_hit_tokens}), 0)::float / SUM(${(table as WideTable).input_tokens} + ${(table as WideTable).cache_hit_tokens})::float) END`;
+    case 'outputInputRatio':
+      return sql<number>`CASE WHEN COALESCE(SUM(${(table as WideTable).input_tokens}), 0) = 0 THEN 0 ELSE (COALESCE(SUM(${(table as WideTable).output_tokens}), 0)::float / SUM(${(table as WideTable).input_tokens})::float) END`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Breakdown
+// ---------------------------------------------------------------------------
+
+const BreakdownInputSchema = UsageAnalyticsFiltersSchema.extend({
+  dimension: DimensionSchema,
+  metric: z.enum(['cost', 'requests', 'tokens']),
+  limit: z.number().int().min(1).max(100).default(15),
+});
+
+const BreakdownItemSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  value: z.number(),
+  percentage: z.number(),
+});
+
+const BreakdownOutputSchema = z.object({
+  breakdown: z.array(BreakdownItemSchema),
+  totalValue: z.number(),
+  effectiveGranularity: GranularitySchema,
+});
+
+// ---------------------------------------------------------------------------
+// Table
+// ---------------------------------------------------------------------------
+
+const TableInputSchema = UsageAnalyticsFiltersSchema.extend({
+  groupBy: z.array(DimensionSchema).max(3),
+  limit: z.number().int().min(1).max(10_000).default(1000),
+});
+
+const TableRowSchema = z.object({
+  datetime: z.string(),
+  dimensions: z.record(z.string(), z.string()),
+  costMicrodollars: z.number(),
+  requestCount: z.number(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cacheWriteTokens: z.number(),
+  cacheHitTokens: z.number(),
+  errorCount: z.number(),
+});
+
+const TableOutputSchema = z.object({
+  rows: z.array(TableRowSchema),
+  effectiveGranularity: GranularitySchema,
+});
+
+// ---------------------------------------------------------------------------
+// User list (for org context)
+// ---------------------------------------------------------------------------
+
+const UserListInputSchema = z.object({
+  organizationId: z.uuid(),
+  userIds: z.array(z.string()).max(200),
+});
+
+const UserListOutputSchema = z.object({
+  users: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string().nullable(),
+      email: z.string().nullable(),
+    })
+  ),
+});
+
+// ---------------------------------------------------------------------------
+// Router definition
+// ---------------------------------------------------------------------------
+
+export const usageAnalyticsRouter = createTRPCRouter({
+  getSummary: baseProcedure
+    .input(UsageAnalyticsFiltersSchema)
+    .output(SummaryOutputSchema)
+    .query(async ({ input, ctx }): Promise<SummaryOutput> => {
+      await ensureScopeAccess(ctx.user.id, input, {
+        id: ctx.user.id,
+        is_admin: ctx.user.is_admin,
+      });
+
+      const meta = resolveTier(input.granularity, input.startDate);
+      const useWide = hasDimensionFilters(input);
+      const table = useWide ? getWideTable(meta.tier) : getTotalsTable(meta.tier);
+
+      const conditions = buildWhereCommon(input, table, ctx.user.id, meta.tier);
+      if (useWide) {
+        conditions.push(...buildWideFilters(input, table as WideTable));
+      }
+
+      const rows = await timedUsageQuery(
+        {
+          db: readDb,
+          route: 'usageAnalytics.getSummary',
+          queryLabel: `summary_${meta.tier}_${useWide ? 'wide' : 'totals'}`,
+          scope: input.organizationId ? 'org' : 'user',
+          period: `${input.startDate}/${input.endDate}`,
+        },
+        tx =>
+          tx
+            .select({
+              costMicrodollars: costSum(table),
+              requestCount: requestSum(table),
+              inputTokens: inputSum(table),
+              outputTokens: outputSum(table),
+              cacheWriteTokens: cacheWriteSum(table),
+              cacheHitTokens: cacheHitSum(table),
+              errorCount: errorSum(table),
+              cancelledCount: cancelledSum(table),
+              freeRequestCount: freeSum(table),
+              byokRequestCount: byokSum(table),
+              totalLatencyMs: totalLatencySum(table),
+              totalGenerationTimeMs: totalGenerationSum(table),
+              latencyCount: latencyCountSum(table),
+              distinctUsers: distinctUsersCount(table),
+            })
+            .from(table)
+            .where(and(...conditions))
+      );
+
+      const r = rows[0] ?? {
+        costMicrodollars: 0,
+        requestCount: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheWriteTokens: 0,
+        cacheHitTokens: 0,
+        errorCount: 0,
+        cancelledCount: 0,
+        freeRequestCount: 0,
+        byokRequestCount: 0,
+        totalLatencyMs: 0,
+        totalGenerationTimeMs: 0,
+        latencyCount: 0,
+        distinctUsers: 0,
+      };
+
+      const costMicrodollars = Number(r.costMicrodollars);
+      const requestCount = Number(r.requestCount);
+      const inputTokens = Number(r.inputTokens);
+      const outputTokens = Number(r.outputTokens);
+      const cacheWriteTokens = Number(r.cacheWriteTokens);
+      const cacheHitTokens = Number(r.cacheHitTokens);
+      const errorCount = Number(r.errorCount);
+      const cancelledCount = Number(r.cancelledCount);
+      const freeRequestCount = Number(r.freeRequestCount);
+      const byokRequestCount = Number(r.byokRequestCount);
+      const totalLatencyMs = Number(r.totalLatencyMs);
+      const totalGenerationTimeMs = Number(r.totalGenerationTimeMs);
+      const latencyCount = Number(r.latencyCount);
+      const distinctUsers = Number(r.distinctUsers);
+
+      return {
+        costMicrodollars,
+        requestCount,
+        inputTokens,
+        outputTokens,
+        cacheWriteTokens,
+        cacheHitTokens,
+        errorCount,
+        cancelledCount,
+        freeRequestCount,
+        byokRequestCount,
+        totalLatencyMs,
+        totalGenerationTimeMs,
+        latencyCount,
+        distinctUsers,
+        errorRate: ratioSafe(errorCount, requestCount),
+        avgLatencyMs: ratioSafe(totalLatencyMs, latencyCount),
+        avgGenerationTimeMs: ratioSafe(totalGenerationTimeMs, latencyCount),
+        costPerRequest: ratioSafe(costMicrodollars, requestCount),
+        tokensPerRequest: ratioSafe(inputTokens + outputTokens, requestCount),
+        cacheHitRatio: ratioSafe(cacheHitTokens, inputTokens + cacheHitTokens),
+        outputInputRatio: ratioSafe(outputTokens, inputTokens),
+        effectiveGranularity: meta.effectiveGranularity,
+      };
+    }),
+
+  getTimeseries: baseProcedure
+    .input(TimeseriesInputSchema)
+    .output(TimeseriesOutputSchema)
+    .query(async ({ input, ctx }) => {
+      await ensureScopeAccess(ctx.user.id, input, {
+        id: ctx.user.id,
+        is_admin: ctx.user.is_admin,
+      });
+
+      const meta = resolveTier(input.granularity, input.startDate);
+      const needsWide = !!input.splitBy || hasDimensionFilters(input);
+      const table = needsWide ? getWideTable(meta.tier) : getTotalsTable(meta.tier);
+      const bucketExpr = bucketExprForEffectiveGranularity(
+        meta.effectiveGranularity,
+        meta.tier,
+        table
+      );
+
+      const conditions = buildWhereCommon(input, table, ctx.user.id, meta.tier);
+      if (needsWide) {
+        conditions.push(...buildWideFilters(input, table as WideTable));
+      }
+
+      type Row = { bucket: string; value: number; label: string | null };
+
+      let rows: Row[];
+      if (input.splitBy) {
+        if (!needsWide) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'splitBy requires wide table',
+          });
+        }
+        const wideTable = table as WideTable;
+        const splitCol = getDimensionColumn(wideTable, input.splitBy);
+        const valueExpr = metricExpression(input.metric, wideTable);
+        rows = await timedUsageQuery(
+          {
+            db: readDb,
+            route: 'usageAnalytics.getTimeseries',
+            queryLabel: `timeseries_${meta.tier}_wide_split_${input.splitBy}`,
+            scope: input.organizationId ? 'org' : 'user',
+            period: `${input.startDate}/${input.endDate}`,
+          },
+          tx =>
+            tx
+              .select({
+                bucket: bucketExpr,
+                value: valueExpr,
+                label: splitCol,
+              })
+              .from(wideTable)
+              .where(and(...conditions))
+              .groupBy(bucketExpr, splitCol)
+              .orderBy(bucketExpr)
+        );
+      } else {
+        const valueExpr = metricExpression(input.metric, table);
+        rows = await timedUsageQuery(
+          {
+            db: readDb,
+            route: 'usageAnalytics.getTimeseries',
+            queryLabel: `timeseries_${meta.tier}_${needsWide ? 'wide' : 'totals'}`,
+            scope: input.organizationId ? 'org' : 'user',
+            period: `${input.startDate}/${input.endDate}`,
+          },
+          tx =>
+            tx
+              .select({
+                bucket: bucketExpr,
+                value: valueExpr,
+                label: sql<string | null>`NULL::text`,
+              })
+              .from(table)
+              .where(and(...conditions))
+              .groupBy(bucketExpr)
+              .orderBy(bucketExpr)
+        );
+      }
+
+      return {
+        timeseries: rows.map(r => ({
+          datetime: r.bucket,
+          value: Number(r.value) || 0,
+          label: r.label ?? undefined,
+        })),
+        effectiveGranularity: meta.effectiveGranularity,
+        tableType: needsWide ? ('wide' as const) : ('totals' as const),
+      };
+    }),
+
+  getBreakdown: baseProcedure
+    .input(BreakdownInputSchema)
+    .output(BreakdownOutputSchema)
+    .query(async ({ input, ctx }) => {
+      await ensureScopeAccess(ctx.user.id, input, {
+        id: ctx.user.id,
+        is_admin: ctx.user.is_admin,
+      });
+
+      const meta = resolveTier(input.granularity, input.startDate);
+      const table = getWideTable(meta.tier);
+      const conditions = buildWhereCommon(input, table, ctx.user.id, meta.tier);
+      conditions.push(...buildWideFilters(input, table));
+
+      const dimCol = getDimensionColumn(table, input.dimension);
+      const valueExpr = metricExpression(input.metric, table);
+
+      const rows = await timedUsageQuery(
+        {
+          db: readDb,
+          route: 'usageAnalytics.getBreakdown',
+          queryLabel: `breakdown_${meta.tier}_by_${input.dimension}`,
+          scope: input.organizationId ? 'org' : 'user',
+          period: `${input.startDate}/${input.endDate}`,
+        },
+        tx =>
+          tx
+            .select({
+              key: dimCol,
+              value: valueExpr,
+            })
+            .from(table)
+            .where(and(...conditions))
+            .groupBy(dimCol)
+            .orderBy(desc(valueExpr))
+            .limit(input.limit)
+      );
+
+      const values = rows.map(r => ({ key: r.key ?? '', value: Number(r.value) || 0 }));
+      const totalValue = values.reduce((s, r) => s + r.value, 0);
+
+      return {
+        breakdown: values.map(r => ({
+          key: r.key,
+          label: r.key,
+          value: r.value,
+          percentage: totalValue > 0 ? (r.value / totalValue) * 100 : 0,
+        })),
+        totalValue,
+        effectiveGranularity: meta.effectiveGranularity,
+      };
+    }),
+
+  getTable: baseProcedure
+    .input(TableInputSchema)
+    .output(TableOutputSchema)
+    .query(async ({ input, ctx }) => {
+      await ensureScopeAccess(ctx.user.id, input, {
+        id: ctx.user.id,
+        is_admin: ctx.user.is_admin,
+      });
+
+      const meta = resolveTier(input.granularity, input.startDate);
+      const table = getWideTable(meta.tier);
+      const conditions = buildWhereCommon(input, table, ctx.user.id, meta.tier);
+      conditions.push(...buildWideFilters(input, table));
+
+      const bucketExpr = bucketExprForEffectiveGranularity(
+        meta.effectiveGranularity,
+        meta.tier,
+        table
+      );
+
+      // Always select all 6 dimension columns; we return only the ones in
+      // input.groupBy to the client. We GROUP BY only the requested dimensions
+      // plus the time bucket.
+      const dimAliases = {
+        dim_feature: table.feature,
+        dim_model: table.model,
+        dim_mode: table.mode,
+        dim_user: table.kilo_user_id,
+        dim_provider: table.provider,
+        dim_project: table.project_id,
+      } as const;
+
+      const requestedDims = input.groupBy;
+      const groupByCols = [bucketExpr, ...requestedDims.map(d => getDimensionColumn(table, d))];
+
+      // Use NULL::text for dimension columns not being grouped by (so their
+      // values fold into the aggregation).
+      const feat = requestedDims.includes('feature') ? dimAliases.dim_feature : sql<string>`''`;
+      const model = requestedDims.includes('model') ? dimAliases.dim_model : sql<string>`''`;
+      const mode = requestedDims.includes('mode') ? dimAliases.dim_mode : sql<string>`''`;
+      const user = requestedDims.includes('user') ? dimAliases.dim_user : sql<string>`''`;
+      const provider = requestedDims.includes('provider')
+        ? dimAliases.dim_provider
+        : sql<string>`''`;
+      const project = requestedDims.includes('project') ? dimAliases.dim_project : sql<string>`''`;
+
+      const rows = await timedUsageQuery(
+        {
+          db: readDb,
+          route: 'usageAnalytics.getTable',
+          queryLabel: `table_${meta.tier}_groupby_${input.groupBy.join('+') || 'none'}`,
+          scope: input.organizationId ? 'org' : 'user',
+          period: `${input.startDate}/${input.endDate}`,
+        },
+        tx =>
+          tx
+            .select({
+              datetime: bucketExpr,
+              dim_feature: feat,
+              dim_model: model,
+              dim_mode: mode,
+              dim_user: user,
+              dim_provider: provider,
+              dim_project: project,
+              costMicrodollars: costSum(table),
+              requestCount: requestSum(table),
+              inputTokens: inputSum(table),
+              outputTokens: outputSum(table),
+              cacheWriteTokens: cacheWriteSum(table),
+              cacheHitTokens: cacheHitSum(table),
+              errorCount: errorSum(table),
+            })
+            .from(table)
+            .where(and(...conditions))
+            .groupBy(...groupByCols)
+            .orderBy(desc(bucketExpr))
+            .limit(input.limit)
+      );
+
+      const dimKeyMap: Record<Dimension, keyof (typeof rows)[number]> = {
+        feature: 'dim_feature',
+        model: 'dim_model',
+        mode: 'dim_mode',
+        user: 'dim_user',
+        provider: 'dim_provider',
+        project: 'dim_project',
+      };
+
+      return {
+        rows: rows.map(r => {
+          const dimensions: Record<string, string> = {};
+          for (const d of requestedDims) {
+            const raw = r[dimKeyMap[d]];
+            dimensions[d] = typeof raw === 'string' ? raw : '';
+          }
+          return {
+            datetime: r.datetime,
+            dimensions,
+            costMicrodollars: Number(r.costMicrodollars) || 0,
+            requestCount: Number(r.requestCount) || 0,
+            inputTokens: Number(r.inputTokens) || 0,
+            outputTokens: Number(r.outputTokens) || 0,
+            cacheWriteTokens: Number(r.cacheWriteTokens) || 0,
+            cacheHitTokens: Number(r.cacheHitTokens) || 0,
+            errorCount: Number(r.errorCount) || 0,
+          };
+        }),
+        effectiveGranularity: meta.effectiveGranularity,
+      };
+    }),
+
+  /**
+   * Look up user names and emails for a set of user IDs that belong to an org.
+   * Used by the UI to decorate per-user breakdowns.
+   *
+   * Only returns users that are active or invited members of `organizationId`
+   * to prevent callers from enumerating arbitrary kilocode_users PII.
+   *
+   * Members (role != 'owner' | 'billing_manager') can only resolve their own
+   * id — they have no legitimate need to see other members' name/email from
+   * this endpoint.
+   */
+  resolveOrgUsers: baseProcedure
+    .input(UserListInputSchema)
+    .output(UserListOutputSchema)
+    .query(async ({ input, ctx }) => {
+      const role = await ensureOrganizationAccess(
+        { user: { ...ctx.user } } as Parameters<typeof ensureOrganizationAccess>[0],
+        input.organizationId
+      );
+
+      const canSeeAllMembers = role === 'owner' || role === 'billing_manager';
+      const allowedIds = canSeeAllMembers
+        ? input.userIds
+        : input.userIds.filter(id => id === ctx.user.id);
+
+      if (allowedIds.length === 0) return { users: [] };
+
+      const rows = await readDb
+        .select({
+          id: kilocode_users.id,
+          name: kilocode_users.google_user_name,
+          email: kilocode_users.google_user_email,
+        })
+        .from(kilocode_users)
+        .innerJoin(
+          organization_memberships,
+          and(
+            eq(organization_memberships.kilo_user_id, kilocode_users.id),
+            eq(organization_memberships.organization_id, input.organizationId)
+          )
+        )
+        .where(inArray(kilocode_users.id, allowedIds));
+
+      return {
+        users: rows.map(r => ({
+          id: r.id,
+          name: r.name,
+          email: r.email,
+        })),
+      };
+    }),
+});

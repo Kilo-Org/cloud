@@ -1405,6 +1405,326 @@ export const microdollar_usage_metadata = pgTable(
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
 );
 
+// =============================================================================
+// Usage Rollup Tables
+// =============================================================================
+// Precomputed aggregations from microdollar_usage + microdollar_usage_metadata.
+// Each granularity (hourly/daily/monthly) has two tables:
+//   - Wide table: all dimensions (model/feature/mode/provider/project) for
+//     breakdowns, split-by charts, and cross-dimension filtering.
+//   - Totals table: no optional dimensions (just time+user+org) for instant
+//     summary cards and unsplit timeseries queries.
+//
+// Retention:
+//   - hourly: 7 days
+//   - daily: 90 days
+//   - monthly: forever
+//
+// Sentinel values for NOT NULL dimension columns:
+//   - model: COALESCE(requested_model, model, 'unknown')
+//   - feature: COALESCE(feature.feature, 'unattributed')
+//   - mode: COALESCE(mode.mode, 'unknown')
+//   - provider: COALESCE(provider, 'unknown')
+//   - project_id: COALESCE(project_id, 'none')
+// =============================================================================
+
+export const usage_rollup_hourly = pgTable(
+  'usage_rollup_hourly',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    hour: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    model: text().notNull(),
+    feature: text().notNull(),
+    mode: text().notNull(),
+    provider: text().notNull(),
+    project_id: text().notNull(),
+    // Core metrics
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    input_tokens: bigint({ mode: 'number' }).notNull(),
+    output_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_write_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
+    request_count: integer().notNull(),
+    // Derived aggregate metrics
+    error_count: integer().notNull().default(0),
+    cancelled_count: integer().notNull().default(0),
+    free_request_count: integer().notNull().default(0),
+    byok_request_count: integer().notNull().default(0),
+    total_latency_ms: bigint({ mode: 'number' }).notNull().default(0),
+    total_generation_time_ms: bigint({ mode: 'number' }).notNull().default(0),
+    latency_count: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_rollup_hourly_hour').on(table.hour),
+    index('idx_rollup_hourly_user_hour').on(table.kilo_user_id, sql`${table.hour} DESC`),
+    index('idx_rollup_hourly_org_hour')
+      .on(table.organization_id, sql`${table.hour} DESC`)
+      .where(isNotNull(table.organization_id)),
+    unique('uq_rollup_hourly_dims')
+      .on(
+        table.hour,
+        table.kilo_user_id,
+        table.organization_id,
+        table.model,
+        table.feature,
+        table.mode,
+        table.provider,
+        table.project_id
+      )
+      .nullsNotDistinct(),
+  ]
+);
+
+export type UsageRollupHourly = typeof usage_rollup_hourly.$inferSelect;
+
+export const usage_rollup_daily = pgTable(
+  'usage_rollup_daily',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    day: date({ mode: 'string' }).notNull(),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    model: text().notNull(),
+    feature: text().notNull(),
+    mode: text().notNull(),
+    provider: text().notNull(),
+    project_id: text().notNull(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    input_tokens: bigint({ mode: 'number' }).notNull(),
+    output_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_write_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
+    request_count: integer().notNull(),
+    error_count: integer().notNull().default(0),
+    cancelled_count: integer().notNull().default(0),
+    free_request_count: integer().notNull().default(0),
+    byok_request_count: integer().notNull().default(0),
+    total_latency_ms: bigint({ mode: 'number' }).notNull().default(0),
+    total_generation_time_ms: bigint({ mode: 'number' }).notNull().default(0),
+    latency_count: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_rollup_daily_day').on(table.day),
+    index('idx_rollup_daily_user_day').on(table.kilo_user_id, sql`${table.day} DESC`),
+    index('idx_rollup_daily_org_day')
+      .on(table.organization_id, sql`${table.day} DESC`)
+      .where(isNotNull(table.organization_id)),
+    unique('uq_rollup_daily_dims')
+      .on(
+        table.day,
+        table.kilo_user_id,
+        table.organization_id,
+        table.model,
+        table.feature,
+        table.mode,
+        table.provider,
+        table.project_id
+      )
+      .nullsNotDistinct(),
+  ]
+);
+
+export type UsageRollupDaily = typeof usage_rollup_daily.$inferSelect;
+
+export const usage_rollup_monthly = pgTable(
+  'usage_rollup_monthly',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    month: date({ mode: 'string' }).notNull(),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    model: text().notNull(),
+    feature: text().notNull(),
+    mode: text().notNull(),
+    provider: text().notNull(),
+    project_id: text().notNull(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    input_tokens: bigint({ mode: 'number' }).notNull(),
+    output_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_write_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
+    request_count: integer().notNull(),
+    error_count: integer().notNull().default(0),
+    cancelled_count: integer().notNull().default(0),
+    free_request_count: integer().notNull().default(0),
+    byok_request_count: integer().notNull().default(0),
+    total_latency_ms: bigint({ mode: 'number' }).notNull().default(0),
+    total_generation_time_ms: bigint({ mode: 'number' }).notNull().default(0),
+    latency_count: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_rollup_monthly_month').on(table.month),
+    index('idx_rollup_monthly_user_month').on(table.kilo_user_id, sql`${table.month} DESC`),
+    index('idx_rollup_monthly_org_month')
+      .on(table.organization_id, sql`${table.month} DESC`)
+      .where(isNotNull(table.organization_id)),
+    unique('uq_rollup_monthly_dims')
+      .on(
+        table.month,
+        table.kilo_user_id,
+        table.organization_id,
+        table.model,
+        table.feature,
+        table.mode,
+        table.provider,
+        table.project_id
+      )
+      .nullsNotDistinct(),
+  ]
+);
+
+export type UsageRollupMonthly = typeof usage_rollup_monthly.$inferSelect;
+
+export const usage_rollup_hourly_totals = pgTable(
+  'usage_rollup_hourly_totals',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    hour: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    input_tokens: bigint({ mode: 'number' }).notNull(),
+    output_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_write_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
+    request_count: integer().notNull(),
+    error_count: integer().notNull().default(0),
+    cancelled_count: integer().notNull().default(0),
+    free_request_count: integer().notNull().default(0),
+    byok_request_count: integer().notNull().default(0),
+    total_latency_ms: bigint({ mode: 'number' }).notNull().default(0),
+    total_generation_time_ms: bigint({ mode: 'number' }).notNull().default(0),
+    latency_count: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_rollup_hourly_totals_hour').on(table.hour),
+    index('idx_rollup_hourly_totals_user').on(table.kilo_user_id, sql`${table.hour} DESC`),
+    index('idx_rollup_hourly_totals_org')
+      .on(table.organization_id, sql`${table.hour} DESC`)
+      .where(isNotNull(table.organization_id)),
+    unique('uq_rollup_hourly_totals_dims')
+      .on(table.hour, table.kilo_user_id, table.organization_id)
+      .nullsNotDistinct(),
+  ]
+);
+
+export type UsageRollupHourlyTotals = typeof usage_rollup_hourly_totals.$inferSelect;
+
+export const usage_rollup_daily_totals = pgTable(
+  'usage_rollup_daily_totals',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    day: date({ mode: 'string' }).notNull(),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    input_tokens: bigint({ mode: 'number' }).notNull(),
+    output_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_write_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
+    request_count: integer().notNull(),
+    error_count: integer().notNull().default(0),
+    cancelled_count: integer().notNull().default(0),
+    free_request_count: integer().notNull().default(0),
+    byok_request_count: integer().notNull().default(0),
+    total_latency_ms: bigint({ mode: 'number' }).notNull().default(0),
+    total_generation_time_ms: bigint({ mode: 'number' }).notNull().default(0),
+    latency_count: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_rollup_daily_totals_day').on(table.day),
+    index('idx_rollup_daily_totals_user').on(table.kilo_user_id, sql`${table.day} DESC`),
+    index('idx_rollup_daily_totals_org')
+      .on(table.organization_id, sql`${table.day} DESC`)
+      .where(isNotNull(table.organization_id)),
+    unique('uq_rollup_daily_totals_dims')
+      .on(table.day, table.kilo_user_id, table.organization_id)
+      .nullsNotDistinct(),
+  ]
+);
+
+export type UsageRollupDailyTotals = typeof usage_rollup_daily_totals.$inferSelect;
+
+export const usage_rollup_monthly_totals = pgTable(
+  'usage_rollup_monthly_totals',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    month: date({ mode: 'string' }).notNull(),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    input_tokens: bigint({ mode: 'number' }).notNull(),
+    output_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_write_tokens: bigint({ mode: 'number' }).notNull(),
+    cache_hit_tokens: bigint({ mode: 'number' }).notNull(),
+    request_count: integer().notNull(),
+    error_count: integer().notNull().default(0),
+    cancelled_count: integer().notNull().default(0),
+    free_request_count: integer().notNull().default(0),
+    byok_request_count: integer().notNull().default(0),
+    total_latency_ms: bigint({ mode: 'number' }).notNull().default(0),
+    total_generation_time_ms: bigint({ mode: 'number' }).notNull().default(0),
+    latency_count: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_rollup_monthly_totals_month').on(table.month),
+    index('idx_rollup_monthly_totals_user').on(table.kilo_user_id, sql`${table.month} DESC`),
+    index('idx_rollup_monthly_totals_org')
+      .on(table.organization_id, sql`${table.month} DESC`)
+      .where(isNotNull(table.organization_id)),
+    unique('uq_rollup_monthly_totals_dims')
+      .on(table.month, table.kilo_user_id, table.organization_id)
+      .nullsNotDistinct(),
+  ]
+);
+
+export type UsageRollupMonthlyTotals = typeof usage_rollup_monthly_totals.$inferSelect;
+
+export const usage_rollup_watermark = pgTable(
+  'usage_rollup_watermark',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    granularity: text().notNull(),
+    last_completed: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [unique('uq_usage_rollup_watermark_granularity').on(table.granularity)]
+);
+
+export type UsageRollupWatermark = typeof usage_rollup_watermark.$inferSelect;
+
 export const api_request_log = pgTable(
   'api_request_log',
   {

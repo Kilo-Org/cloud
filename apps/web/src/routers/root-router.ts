@@ -38,6 +38,7 @@ import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { modelsRouter } from '@/routers/models-router';
 import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
+import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -77,6 +78,7 @@ export const rootRouter = createTRPCRouter({
   models: modelsRouter,
   unifiedSessions: unifiedSessionsRouter,
   activeSessions: activeSessionsRouter,
+  usageAnalytics: usageAnalyticsRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

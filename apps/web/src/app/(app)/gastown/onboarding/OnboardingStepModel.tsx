@@ -351,22 +351,42 @@ export function OnboardingStepModel() {
   // Sync custom model state up to context whenever any field changes
   function handleSetCustomDefault(value: string) {
     setCustomDefault(value);
-    setCustomModels({ defaultModel: value, mayor: customMayor, refinery: customRefinery, polecat: customPolecat });
+    setCustomModels({
+      defaultModel: value,
+      mayor: customMayor,
+      refinery: customRefinery,
+      polecat: customPolecat,
+    });
   }
 
   function handleSetCustomMayor(value: string) {
     setCustomMayor(value);
-    setCustomModels({ defaultModel: customDefault, mayor: value, refinery: customRefinery, polecat: customPolecat });
+    setCustomModels({
+      defaultModel: customDefault,
+      mayor: value,
+      refinery: customRefinery,
+      polecat: customPolecat,
+    });
   }
 
   function handleSetCustomRefinery(value: string) {
     setCustomRefinery(value);
-    setCustomModels({ defaultModel: customDefault, mayor: customMayor, refinery: value, polecat: customPolecat });
+    setCustomModels({
+      defaultModel: customDefault,
+      mayor: customMayor,
+      refinery: value,
+      polecat: customPolecat,
+    });
   }
 
   function handleSetCustomPolecat(value: string) {
     setCustomPolecat(value);
-    setCustomModels({ defaultModel: customDefault, mayor: customMayor, refinery: customRefinery, polecat: value });
+    setCustomModels({
+      defaultModel: customDefault,
+      mayor: customMayor,
+      refinery: customRefinery,
+      polecat: value,
+    });
   }
 
   return (

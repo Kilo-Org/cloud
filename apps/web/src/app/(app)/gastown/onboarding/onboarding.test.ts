@@ -218,7 +218,10 @@ describe('presetToConfig', () => {
   });
 
   test('uses defaultModel as fallback for unset role overrides', () => {
-    const config = presetToConfig('custom', { defaultModel: 'openai/gpt-4.1', mayor: 'openai/gpt-4.1' });
+    const config = presetToConfig('custom', {
+      defaultModel: 'openai/gpt-4.1',
+      mayor: 'openai/gpt-4.1',
+    });
     expect(config.default_model).toBe('openai/gpt-4.1');
     expect(config.role_models).toEqual({
       mayor: 'openai/gpt-4.1',

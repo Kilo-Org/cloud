@@ -36,7 +36,7 @@ Do NOT call gt_done until all gates pass (or you have escalated a failure you ca
 `
       : '';
 
-  return `You are ${params.agentName}, a polecat agent in Gastown rig "${params.rigId}" (town "${params.townId}").
+  return /* md */ `You are ${params.agentName}, a polecat agent in Gastown rig "${params.rigId}" (town "${params.townId}").
 Your identity: ${params.identity}
 
 ## GUPP Principle

@@ -27,6 +27,30 @@ import {
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
 import { isFreeModel, preferredModels } from '@/lib/ai-gateway/models';
+import { redisGet, redisSet } from '@/lib/redis';
+import { stickyAutoFreeModelRedisKey } from '@/lib/redis-keys';
+import { captureException } from '@sentry/nextjs';
+
+// Sticky routing: once kilo-auto/free has picked a model for a session, keep
+// using it even if the candidate list changes, so long as the previously
+// chosen model is still in the list. If it's been removed, re-pick.
+const STICKY_AUTO_FREE_TTL_SECONDS = 24 * 60 * 60;
+
+async function readStickyAutoFreeModel(seed: string): Promise<string | null> {
+  try {
+    return await redisGet(stickyAutoFreeModelRedisKey(seed));
+  } catch {
+    return null;
+  }
+}
+
+async function writeStickyAutoFreeModel(seed: string, model: string): Promise<void> {
+  try {
+    await redisSet(stickyAutoFreeModelRedisKey(seed), model, STICKY_AUTO_FREE_TTL_SECONDS);
+  } catch (err) {
+    captureException(err, { tags: { service: 'redis', operation: 'sticky-auto-free-model' } });
+  }
+}
 
 type ResolveAutoModelParams = {
   model: string;
@@ -63,9 +87,20 @@ export async function resolveAutoModel(
 ): Promise<ResolvedAutoModel> {
   const { model, modeHeader, featureHeader, sessionId, apiKind, clientIp } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
-    const randomNumber = getRandomNumberLessThan100(
-      'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp)
-    );
+    const seed = sessionId ?? (await userPromise)?.id ?? clientIp;
+    if (seed) {
+      const cached = await readStickyAutoFreeModel(seed);
+      if (cached && AUTO_FREE_CANDIDATES.includes(cached)) {
+        return { model: cached };
+      }
+      const randomNumber = getRandomNumberLessThan100('free_routing_' + seed);
+      const picked = AUTO_FREE_CANDIDATES[randomNumber % AUTO_FREE_CANDIDATES.length];
+      await writeStickyAutoFreeModel(seed, picked);
+      return { model: picked };
+    }
+    // No seed available (e.g. monitored-models enumeration) — pick deterministically
+    // from the empty-string seed without persisting.
+    const randomNumber = getRandomNumberLessThan100('free_routing_');
     return { model: AUTO_FREE_CANDIDATES[randomNumber % AUTO_FREE_CANDIDATES.length] };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {

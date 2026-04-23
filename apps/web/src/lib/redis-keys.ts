@@ -30,3 +30,9 @@ export const requestLogRedisKey = (hash: string) => redisKey(`ai-gateway.request
 
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
+
+export const stickyVercelRoutingRedisKey = (seed: string) =>
+  redisKey(`ai-gateway.sticky:vercel-routing:${seed}`);
+
+export const stickyAutoFreeModelRedisKey = (seed: string) =>
+  redisKey(`ai-gateway.sticky:auto-free-model:${seed}`);

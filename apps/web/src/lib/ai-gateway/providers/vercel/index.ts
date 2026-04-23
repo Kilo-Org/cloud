@@ -16,11 +16,41 @@ import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openro
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { StoredModelSchema } from '@kilocode/db';
 import * as z from 'zod';
-import { redisGet } from '@/lib/redis';
+import { redisGet, redisSet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { GatewayPercentageSchema, DEFAULT_VERCEL_PERCENTAGE } from '@/lib/gateway-config';
-import { GATEWAY_METADATA_REDIS_KEYS, VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
+import {
+  GATEWAY_METADATA_REDIS_KEYS,
+  VERCEL_ROUTING_REDIS_KEY,
+  stickyVercelRoutingRedisKey,
+} from '@/lib/redis-keys';
 import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
+import { captureException } from '@sentry/nextjs';
+
+// Sticky routing: once a session has been assigned to vercel or openrouter, keep
+// serving it from the same gateway so percentage/model-list changes don't flip
+// the decision mid-session. Only re-evaluate if the old choice becomes invalid
+// (i.e. vercel was chosen but no longer supports the requested model).
+const STICKY_ROUTING_TTL_SECONDS = 24 * 60 * 60;
+type StickyRouting = 'vercel' | 'openrouter';
+
+async function readStickyRouting(seed: string): Promise<StickyRouting | null> {
+  try {
+    const value = await redisGet(stickyVercelRoutingRedisKey(seed));
+    if (value === 'vercel' || value === 'openrouter') return value;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeStickyRouting(seed: string, routing: StickyRouting): Promise<void> {
+  try {
+    await redisSet(stickyVercelRoutingRedisKey(seed), routing, STICKY_ROUTING_TTL_SECONDS);
+  } catch (err) {
+    captureException(err, { tags: { service: 'redis', operation: 'sticky-vercel-routing' } });
+  }
+}
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -64,18 +94,44 @@ export async function shouldRouteToVercel(
     return false;
   }
 
+  const vercelModels = await getVercelModels();
+  const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
+  const modelSupportedByVercel = vercelModels.includes(vercelModelId);
+
+  const sticky = await readStickyRouting(randomSeed);
+  if (sticky === 'openrouter') {
+    console.debug('[shouldRouteToVercel] sticky routing: OpenRouter');
+    return false;
+  }
+  if (sticky === 'vercel') {
+    if (!modelSupportedByVercel) {
+      console.debug(
+        '[shouldRouteToVercel] sticky routing: Vercel, but model not supported — falling back to OpenRouter for this request'
+      );
+      return false;
+    }
+    console.debug('[shouldRouteToVercel] sticky routing: Vercel');
+    return true;
+  }
+
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
   const passedRandomization =
     getRandomNumberLessThan100('vercel_routing_' + randomSeed) <
     (await getVercelRoutingPercentage());
 
   if (!passedRandomization) {
+    await writeStickyRouting(randomSeed, 'openrouter');
     return false;
   }
 
-  const vercelModels = await getVercelModels();
-  const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
-  if (!vercelModels.includes(vercelModelId)) {
+  // Persist the sticky vercel decision regardless of whether the *current*
+  // request's model is supported by vercel. Model support is a per-request
+  // filter applied on top of the session-level decision, so a later request
+  // with a supported model can still be served by Vercel, and percentage
+  // changes will no longer flip this session.
+  await writeStickyRouting(randomSeed, 'vercel');
+
+  if (!modelSupportedByVercel) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
   }

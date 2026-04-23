@@ -1084,10 +1084,6 @@ export function SettingsTab({
   const exaSearchDisplayMode =
     kiloExaSearchMode ?? (activeWebSearchProvider === 'kilo-exa' ? 'kilo-proxy' : 'disabled');
   const braveSearchEnabled = braveSearchConfigured && activeWebSearchProvider === 'brave';
-  const hasCustomActiveSearchProvider =
-    activeWebSearchProvider !== null &&
-    activeWebSearchProvider !== 'brave' &&
-    activeWebSearchProvider !== 'kilo-exa';
   const toolEntries = getEntriesByCategory('tool');
   const googleCalendarConnectHref = useMemo(() => {
     const params = new URLSearchParams({ capabilities: 'calendar_read' });
@@ -1385,17 +1381,6 @@ export function SettingsTab({
         <div>
           <h2 className="text-foreground mb-3 text-base font-semibold">Search</h2>
           <div className="space-y-3">
-            {hasCustomActiveSearchProvider && (
-              <div className="text-muted-foreground rounded-md border px-3 py-2 text-xs">
-                Active provider: <code>{activeWebSearchProvider}</code>. This provider is managed
-                directly in OpenClaw config.
-              </div>
-            )}
-            {activeWebSearchProvider === null && (
-              <div className="text-muted-foreground rounded-md border px-3 py-2 text-xs">
-                Active provider unavailable. Start the instance to read live OpenClaw config.
-              </div>
-            )}
             {toolEntries
               .filter(e => e.id === 'brave-search')
               .map(entry => (

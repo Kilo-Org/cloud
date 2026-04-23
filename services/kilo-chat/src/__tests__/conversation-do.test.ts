@@ -489,6 +489,49 @@ describe('ConversationDO', () => {
     expect(msg!.content).toEqual([]);
   });
 
+  describe('executeAction', () => {
+    it('returns messageSenderId so caller can target just the author bot', async () => {
+      const stub = getStub('conv-execaction-sender');
+      await stub.initialize({
+        id: 'conv-execaction-sender',
+        title: 'Action Chat',
+        createdBy: 'user-alice',
+        createdAt: 1000,
+        members: [
+          { id: 'user-alice', kind: 'user' as const },
+          { id: 'bot-primary', kind: 'bot' as const },
+          { id: 'bot-other', kind: 'bot' as const },
+        ],
+      });
+      const create = await stub.createMessage({
+        senderId: 'bot-primary',
+        content: [
+          { type: 'text' as const, text: 'approve?' },
+          {
+            type: 'actions' as const,
+            groupId: 'g1',
+            actions: [
+              { value: 'allow-once', label: 'Allow', style: 'primary' as const },
+              { value: 'deny', label: 'Deny', style: 'danger' as const },
+            ],
+          },
+        ],
+      });
+      expect(create.ok).toBe(true);
+      if (!create.ok) return;
+
+      const result = await stub.executeAction({
+        messageId: create.messageId,
+        memberId: 'user-alice',
+        groupId: 'g1',
+        value: 'allow-once',
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.messageSenderId).toBe('bot-primary');
+    });
+  });
+
   describe('schema constraints', () => {
     it('rejects a reply that points at a non-existent parent message (FK)', async () => {
       const stub = getStub('conv-fk-reply');

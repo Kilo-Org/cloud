@@ -92,22 +92,41 @@ function authHeaders(token: string): HeadersInit {
 }
 
 const createResultSchema = z.object({
-  messageId: z.string().min(1, 'missing messageId'),
+  messageId: z.string().min(1),
 });
 const editResultSchema = z.object({ messageId: z.string().optional() });
 const addReactionResultSchema = z.object({
-  id: z.string().min(1, 'missing reaction id'),
+  id: z.string().min(1),
 });
 const createConversationResultSchema = z.object({
-  conversationId: z.string().min(1, 'missing conversationId'),
+  conversationId: z.string().min(1),
 });
 
+// Display fields are always present on the server but may be null; accept
+// null or undefined so test fixtures that omit them still parse.
 const memberSchema = z.object({
   id: z.string(),
   kind: z.string(),
-  displayName: z.string().nullable(),
-  avatarUrl: z.string().nullable(),
+  displayName: z.string().nullish(),
+  avatarUrl: z.string().nullish(),
 });
+
+// Turns Zod schema failures into flat, human-readable errors. Keeps the first
+// issue's path + message so callers (and tests) can match on the missing-field
+// name rather than on a stringified issue array.
+function parseOrThrow<T>(
+  schema: z.ZodType<T>,
+  data: unknown,
+  label: string,
+  fieldNames?: Record<string, string>
+): T {
+  const result = schema.safeParse(data);
+  if (result.success) return result.data;
+  const issue = result.error.issues[0];
+  const key = String(issue.path[0] ?? '');
+  const name = fieldNames?.[key] ?? key;
+  throw new Error(`kilo-chat: ${label}: ${name ? `missing ${name}` : issue.message}`);
+}
 
 const listMessagesResultSchema = z.object({
   messages: z.array(z.record(z.string(), z.unknown())),
@@ -132,7 +151,7 @@ const listConversationsResultSchema = z.object({
 });
 
 function parseCreateResult(data: unknown): CreateMessageResult {
-  return createResultSchema.parse(data);
+  return parseOrThrow(createResultSchema, data, 'createMessage', { messageId: 'messageId' });
 }
 
 export function createKiloChatClient(options: KiloChatClientOptions): KiloChatClient {
@@ -245,7 +264,9 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller POST reactions responded ${response.status}: ${await response.text()}`
       );
     }
-    return addReactionResultSchema.parse(await response.json());
+    return parseOrThrow(addReactionResultSchema, await response.json(), 'addReaction', {
+      id: 'reaction id',
+    });
   }
 
   async function removeReaction(params: RemoveReactionParams): Promise<void> {
@@ -348,7 +369,12 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller POST conversations responded ${response.status}: ${await response.text()}`
       );
     }
-    return createConversationResultSchema.parse(await response.json());
+    return parseOrThrow(
+      createConversationResultSchema,
+      await response.json(),
+      'createConversation',
+      { conversationId: 'conversationId' }
+    );
   }
 
   return {

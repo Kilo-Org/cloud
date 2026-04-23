@@ -8,7 +8,7 @@
   "observability": { "enabled": true },
   "logpush": true,
   "placement": { "mode": "smart" },
-  "dev": { "port": 8802 },
+  "dev": { "port": 8808 },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "routes": [
     {

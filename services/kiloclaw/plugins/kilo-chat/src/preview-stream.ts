@@ -133,6 +133,10 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
         if (!messageId) throw new Error('kilo-chat preview: finalize on aborted stream');
         return { messageId };
       }
+      // Latch terminal phase synchronously so any concurrent update() call
+      // observes isDone() and does not schedule further flushes during the
+      // awaits below.
+      phase = 'finalized';
       if (timer) {
         clearTimeout(timer);
         timer = undefined;
@@ -152,7 +156,6 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
         });
         messageId = res.messageId;
         lastSentText = finalText;
-        phase = 'finalized';
         return { messageId };
       }
       if (finalText !== lastSentText) {
@@ -173,11 +176,13 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
           throw err;
         }
       }
-      phase = 'finalized';
       return { messageId };
     },
     async abort(): Promise<void> {
       if (isDone()) return;
+      // Latch terminal phase synchronously (see finalize for rationale).
+      const prevPhase = phase;
+      phase = 'aborted';
       if (timer) {
         clearTimeout(timer);
         timer = undefined;
@@ -189,8 +194,6 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
           /* best-effort */
         }
       }
-      const prevPhase = phase;
-      phase = 'aborted';
       if (messageId !== undefined) {
         try {
           await opts.client.deleteMessage({

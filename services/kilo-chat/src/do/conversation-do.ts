@@ -96,7 +96,7 @@ export type ExecuteActionParams = {
 };
 
 export type ExecuteActionResult =
-  | { ok: true; content: ContentBlock[] }
+  | { ok: true; content: ContentBlock[]; messageSenderId: string }
   | {
       ok: false;
       code: 'not_found' | 'forbidden' | 'already_resolved' | 'invalid_value';
@@ -403,7 +403,7 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(messages.id, params.messageId))
       .run();
 
-    return { ok: true, content };
+    return { ok: true, content, messageSenderId: row.sender_id };
   }
 
   addReaction(params: AddReactionParams): AddReactionResult {

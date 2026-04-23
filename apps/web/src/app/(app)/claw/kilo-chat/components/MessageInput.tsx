@@ -10,7 +10,6 @@ type MessageInputProps = {
   onTyping: () => void;
   replyingTo: Message | null;
   onCancelReply: () => void;
-  disabled?: boolean;
   assistantName?: string;
   currentUserId: string;
 };
@@ -20,7 +19,6 @@ export function MessageInput({
   onTyping,
   replyingTo,
   onCancelReply,
-  disabled,
   assistantName,
   currentUserId,
 }: MessageInputProps) {
@@ -75,13 +73,12 @@ export function MessageInput({
             onTyping();
           }}
           onKeyDown={handleKeyDown}
-          disabled={disabled}
           rows={1}
           autoFocus
         />
         <button
           onClick={handleSubmit}
-          disabled={disabled || !text.trim()}
+          disabled={!text.trim()}
           className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg p-2 disabled:opacity-50 cursor-pointer transition-colors"
           title="Send"
         >

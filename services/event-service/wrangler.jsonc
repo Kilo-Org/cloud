@@ -8,7 +8,7 @@
   "observability": { "enabled": true },
   "logpush": true,
   "placement": { "mode": "smart" },
-  "dev": { "port": 8803 },
+  "dev": { "port": 8809 },
   "routes": [
     {
       "pattern": "events.kiloapps.io",

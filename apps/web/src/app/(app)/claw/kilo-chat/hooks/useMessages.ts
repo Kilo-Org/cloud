@@ -12,7 +12,6 @@ import type {
   MessageDeliveryFailedEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
-  ActionsBlock,
 } from '@kilocode/kilo-chat';
 import { useCallback } from 'react';
 
@@ -295,10 +294,9 @@ export function useExecuteAction(
                 ...msg,
                 content: msg.content.map(block => {
                   if (block.type !== 'actions') return block;
-                  const actionsBlock = block as ActionsBlock;
-                  if (actionsBlock.groupId !== variables.groupId) return block;
+                  if (block.groupId !== variables.groupId) return block;
                   return {
-                    ...actionsBlock,
+                    ...block,
                     resolved: {
                       value: variables.value,
                       resolvedBy: currentUserId,

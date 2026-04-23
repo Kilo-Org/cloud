@@ -7,7 +7,7 @@ import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile, Copy } from 'lucid
 import { EmojiQuickPick } from './EmojiQuickPick';
 import { EmojiPicker } from './EmojiPicker';
 import { ReactionPills } from './ReactionPills';
-import type { Message, ContentBlock, ActionsBlock } from '@kilocode/kilo-chat';
+import type { Message, ContentBlock } from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './KiloChatLayout';
 import { toast } from 'sonner';
@@ -300,7 +300,7 @@ export const MessageBubble = memo(function MessageBubble({
                 .filter(b => b.type === 'actions')
                 .map(block => {
                   if (block.type !== 'actions') return null;
-                  const actionsBlock = block as ActionsBlock;
+                  const actionsBlock = block;
 
                   if (actionsBlock.resolved) {
                     const resolvedAction = actionsBlock.actions.find(

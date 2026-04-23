@@ -379,23 +379,22 @@ export async function executeActionFor(
         { messageId, content: result.content, clientUpdatedAt: null }
       );
 
-      // Deliver action.executed webhook to bot members
-      const botMembers = info.members.filter(m => m.kind === 'bot');
-      if (botMembers.length > 0) {
-        const deliverPromise = Promise.all(
-          botMembers.map(bot =>
-            deliverActionExecutedToBot(env, {
-              type: 'action.executed',
-              targetBotId: bot.id,
-              conversationId,
-              messageId,
-              groupId,
-              value,
-              executedBy: callerId,
-              executedAt: new Date().toISOString(),
-            })
-          )
-        );
+      // Deliver action.executed webhook only to the bot that authored the
+      // message holding the resolved actions block. Other bots in the
+      // conversation did not present these buttons and must not see the user's
+      // decision.
+      const author = info.members.find(m => m.id === result.messageSenderId && m.kind === 'bot');
+      if (author) {
+        const deliverPromise = deliverActionExecutedToBot(env, {
+          type: 'action.executed',
+          targetBotId: author.id,
+          conversationId,
+          messageId,
+          groupId,
+          value,
+          executedBy: callerId,
+          executedAt: new Date().toISOString(),
+        });
         if (ctx) ctx.waitUntil(deliverPromise);
       }
     }

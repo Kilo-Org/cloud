@@ -19,7 +19,7 @@ const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('presence.ping') }),
 ]);
 
-type SerializedState = { contexts: string[]; userId: string };
+type SerializedState = { contexts: string[] };
 
 export class UserSessionDO extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
@@ -28,14 +28,11 @@ export class UserSessionDO extends DurableObject<Env> {
       return new Response('Expected WebSocket upgrade', { status: 426 });
     }
 
-    const url = new URL(request.url);
-    const userId = url.searchParams.get('userId') ?? '';
-
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
 
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ contexts: [], userId } satisfies SerializedState);
+    server.serializeAttachment({ contexts: [] } satisfies SerializedState);
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -79,14 +76,10 @@ export class UserSessionDO extends DurableObject<Env> {
     }
   }
 
-  async webSocketClose(
-    _ws: WebSocket,
-    _code: number,
-    _reason: string,
-    _wasClean: boolean
-  ): Promise<void> {
-    // Hibernation API handles cleanup automatically
-  }
+  // Required by the hibernation API: workerd calls webSocketClose on any
+  // accepted WebSocket. The hibernation runtime handles attachment cleanup,
+  // so there is nothing to do here.
+  async webSocketClose(): Promise<void> {}
 
   async webSocketError(ws: WebSocket): Promise<void> {
     ws.close(1011, 'WebSocket error');
@@ -123,15 +116,14 @@ export class UserSessionDO extends DurableObject<Env> {
 
   // ── Helpers ────────────────────────────────────────────────────────
 
-  private getState(ws: WebSocket): { contexts: Set<string>; userId: string } {
+  private getState(ws: WebSocket): { contexts: Set<string> } {
     const raw = ws.deserializeAttachment() as SerializedState | null;
-    return { contexts: new Set(raw?.contexts ?? []), userId: raw?.userId ?? '' };
+    return { contexts: new Set(raw?.contexts ?? []) };
   }
 
-  private saveState(ws: WebSocket, state: { contexts: Set<string>; userId: string }): void {
+  private saveState(ws: WebSocket, state: { contexts: Set<string> }): void {
     ws.serializeAttachment({
       contexts: [...state.contexts],
-      userId: state.userId,
     } satisfies SerializedState);
   }
 }

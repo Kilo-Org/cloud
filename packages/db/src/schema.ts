@@ -899,6 +899,7 @@ export const api_request_log = pgTable(
     status_code: integer(),
     request: jsonb(),
     response: text(),
+    error: jsonb(),
   },
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );

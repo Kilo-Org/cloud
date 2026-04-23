@@ -41,6 +41,12 @@ RUN apt-get update \
     && node --version \
     && npm --version
 
+# Route npm's git-backed deps (GitHub refs, ssh:// transitive deps like
+# baileys → libsignal-node) through https so we don't need an ssh client in
+# the image. --system writes to /etc/gitconfig, which the Fly Volume at /root
+# doesn't shadow, so it persists at runtime too.
+RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.com/"
+
 # Install pnpm globally
 RUN npm install -g pnpm
 
@@ -64,8 +70,7 @@ RUN npm install -g openclaw@2026.4.9 \
     && openclaw --version
 
 # Bake bundled plugin runtime deps into the image so first boot is pure
-# startup — no 30-90s npm install from `openclaw doctor` on shared-cpu Fly
-# machines.
+# startup — no npm install from `openclaw doctor` on shared-cpu Fly machines.
 RUN cd /usr/local/lib/node_modules/openclaw \
     && jq -r '((.dependencies // {}) + (.optionalDependencies // {})) | to_entries[] | "\(.key)@\(.value)"' \
          dist/extensions/*/package.json \

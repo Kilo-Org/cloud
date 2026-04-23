@@ -36,8 +36,6 @@ export function parseSlackBotNewInfraIntegrationIds(value: string | undefined): 
 export function getSlackBotNewInfraIntegrationIds(): string[] {
   const ids = parseSlackBotNewInfraIntegrationIds(process.env[ROUTED_INTEGRATION_IDS_ENV]);
 
-  console.info(ids);
-
   if (ids.length > MAX_ROUTED_INTEGRATIONS) {
     console.error(
       `[SlackBot:Routing] ${ROUTED_INTEGRATION_IDS_ENV} contains ${ids.length} IDs; refusing to route more than ${MAX_ROUTED_INTEGRATIONS} integrations to the new bot infra`
@@ -70,7 +68,6 @@ export function getSlackTeamIdFromInteractivityRawBody(rawBody: string): string 
 export async function findSlackIntegrationRoutedToNewInfra(teamId: string) {
   const allowedIntegrationIds = getSlackBotNewInfraIntegrationIds();
 
-  console.info(allowedIntegrationIds);
   if (allowedIntegrationIds.length === 0) return null;
 
   const [integration] = await db

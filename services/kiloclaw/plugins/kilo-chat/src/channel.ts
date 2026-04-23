@@ -190,13 +190,16 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
             client,
           });
         }
-        return handleKiloChatReactAction({
-          action: ctx.action,
-          cfg: ctx.cfg,
-          params: ctx.params,
-          toolContext: ctx.toolContext,
-          client,
-        });
+        if (ctx.action === 'react') {
+          return handleKiloChatReactAction({
+            action: ctx.action,
+            cfg: ctx.cfg,
+            params: ctx.params,
+            toolContext: ctx.toolContext,
+            client,
+          });
+        }
+        throw new Error(`kilo-chat: unsupported action "${ctx.action}"`);
       },
     },
   },

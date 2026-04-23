@@ -31,7 +31,14 @@ export class EventServiceClient {
   async connect(): Promise<void> {
     this.destroyed = false;
     this.reconnectAttempts = 0;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    return this.connectOnce();
+  }
 
+  private async connectOnce(): Promise<void> {
     // Close any existing socket to avoid leaking connections
     if (this.ws) {
       const oldWs = this.ws;
@@ -208,9 +215,9 @@ export class EventServiceClient {
     this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.connect().catch(() => {
-        // connect() may fail before a WebSocket is created (e.g. ticket fetch
-        // failure), so onclose won't fire. Schedule another reconnect manually.
+      this.connectOnce().catch(() => {
+        // connectOnce() may fail before a WebSocket is created (e.g. ticket
+        // fetch failure), so onclose won't fire. Schedule another reconnect.
         if (!this.destroyed) {
           this.scheduleReconnect();
         }

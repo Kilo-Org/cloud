@@ -129,7 +129,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
         el.scrollTop = el.scrollHeight;
       }
     });
-    observer.observe(el, { childList: true, subtree: true, characterData: true });
+    observer.observe(el, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
 
@@ -264,6 +264,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       }
       setIsRenamingTitle(false);
     } else if (e.key === 'Escape') {
+      setRenameText('');
       setIsRenamingTitle(false);
     }
   }

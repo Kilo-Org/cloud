@@ -110,6 +110,7 @@ function routeParam(c: Context, name: string): string {
 /** Pass through an upstream response verbatim (status + body + content-type). */
 function relay(upstream: Response): Response {
   if (upstream.status === 204 || upstream.status === 205) {
+    void upstream.body?.cancel().catch(() => {});
     return new Response(null, { status: upstream.status });
   }
   return new Response(upstream.body, {

@@ -32,5 +32,5 @@ export default function KiloChatConversationPage() {
     return null;
   }
 
-  return <MessageArea conversationId={params.conversationId} />;
+  return <MessageArea key={params.conversationId} conversationId={params.conversationId} />;
 }

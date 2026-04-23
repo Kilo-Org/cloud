@@ -24,7 +24,7 @@ app.use(
       const allowed = envOrigins
         ? envOrigins.split(',').map(o => o.trim())
         : DEFAULT_ALLOWED_ORIGINS;
-      return allowed.includes(origin) ? origin : '';
+      return allowed.includes(origin) ? origin : null;
     },
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     // Bots reach the Worker via RPC; HTTP is humans-only with a JWT bearer.

@@ -11,6 +11,8 @@ type MessageInputProps = {
   replyingTo: Message | null;
   onCancelReply: () => void;
   disabled?: boolean;
+  assistantName?: string;
+  currentUserId: string;
 };
 
 export function MessageInput({
@@ -19,6 +21,8 @@ export function MessageInput({
   replyingTo,
   onCancelReply,
   disabled,
+  assistantName,
+  currentUserId,
 }: MessageInputProps) {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -52,7 +56,14 @@ export function MessageInput({
 
   return (
     <div className="border-border border-t">
-      {replyingTo && <ReplyPreview message={replyingTo} onCancel={onCancelReply} />}
+      {replyingTo && (
+        <ReplyPreview
+          message={replyingTo}
+          onCancel={onCancelReply}
+          assistantName={assistantName}
+          currentUserId={currentUserId}
+        />
+      )}
       <div className="flex items-end gap-2 p-4">
         <textarea
           ref={textareaRef}

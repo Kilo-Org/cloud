@@ -353,7 +353,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       </div>
 
       {/* Typing indicator — fixed height to prevent layout shift */}
-      <TypingIndicator typingMembers={typingMembers} />
+      <TypingIndicator typingMembers={typingMembers} assistantName={assistantName ?? undefined} />
 
       {/* Input */}
       <MessageInput
@@ -362,6 +362,8 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
         onTyping={sendTyping}
         replyingTo={replyingTo}
         onCancelReply={() => setReplyingTo(null)}
+        assistantName={assistantName ?? undefined}
+        currentUserId={currentUserId}
       />
     </div>
   );

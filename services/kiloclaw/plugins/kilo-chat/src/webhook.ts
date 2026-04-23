@@ -330,11 +330,9 @@ export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
       res.end(JSON.stringify({ error: 'Payload too large' }));
       return true;
     }
-    const rawBody = body;
-
     let parsed: unknown;
     try {
-      parsed = JSON.parse(rawBody);
+      parsed = JSON.parse(body);
     } catch {
       res.statusCode = 400;
       res.setHeader('content-type', 'application/json');

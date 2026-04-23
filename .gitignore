@@ -65,6 +65,7 @@ yarn-error.log*
 /plans/
 /prototypes/
 .plan/
+.plans/
 .kilo/plans
 .superpowers/
 docs/superpowers/

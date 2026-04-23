@@ -33,8 +33,9 @@ export class EventServiceClient {
 
     // Close any existing socket to avoid leaking connections
     if (this.ws) {
-      this.ws.close();
+      const oldWs = this.ws;
       this.ws = null;
+      oldWs.close();
     }
 
     // Step 1: Exchange JWT for a single-use connection ticket
@@ -76,6 +77,7 @@ export class EventServiceClient {
       });
 
       ws.addEventListener('close', () => {
+        if (this.ws !== ws) return;
         this.connected = false;
         this.stopPing();
         if (!this.destroyed) {
@@ -84,6 +86,7 @@ export class EventServiceClient {
       });
 
       ws.addEventListener('error', () => {
+        if (this.ws !== ws) return;
         // error is always followed by close, so we only need to reject the
         // connect promise here if we never opened.
         if (!this.connected) {

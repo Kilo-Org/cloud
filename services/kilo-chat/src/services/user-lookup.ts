@@ -2,10 +2,10 @@ import { getWorkerDb } from '@kilocode/db';
 import { kilocode_users, user_auth_provider } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
-export interface UserDisplayInfo {
+export type UserDisplayInfo = {
   displayName: string | null;
   avatarUrl: string | null;
-}
+};
 
 /**
  * Resolves display name and avatar URL for a batch of user IDs.

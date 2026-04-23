@@ -2,11 +2,12 @@
 
 type TypingIndicatorProps = {
   typingMembers: Map<string, number>;
+  assistantName?: string;
 };
 
-export function TypingIndicator({ typingMembers }: TypingIndicatorProps) {
+export function TypingIndicator({ typingMembers, assistantName }: TypingIndicatorProps) {
   const names = Array.from(typingMembers.keys()).map(id =>
-    id.startsWith('bot:') ? 'KiloClaw' : id
+    id.startsWith('bot:') ? (assistantName ?? 'KiloClaw') : 'Someone'
   );
 
   const text =

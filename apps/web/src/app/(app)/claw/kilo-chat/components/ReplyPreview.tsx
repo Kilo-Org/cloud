@@ -7,9 +7,16 @@ import { contentBlocksToText } from '@kilocode/kilo-chat';
 type ReplyPreviewProps = {
   message: Message;
   onCancel: () => void;
+  assistantName?: string;
+  currentUserId: string;
 };
 
-export function ReplyPreview({ message, onCancel }: ReplyPreviewProps) {
+export function ReplyPreview({
+  message,
+  onCancel,
+  assistantName,
+  currentUserId,
+}: ReplyPreviewProps) {
   const text = contentBlocksToText(message.content).slice(0, 100);
 
   return (
@@ -17,7 +24,12 @@ export function ReplyPreview({ message, onCancel }: ReplyPreviewProps) {
       <div className="bg-primary h-full w-0.5 rounded" />
       <div className="min-w-0 flex-1">
         <p className="text-muted-foreground text-xs font-medium">
-          Replying to {message.senderId.startsWith('bot:') ? 'KiloClaw' : 'yourself'}
+          Replying to{' '}
+          {message.senderId.startsWith('bot:')
+            ? (assistantName ?? 'KiloClaw')
+            : message.senderId === currentUserId
+              ? 'yourself'
+              : 'someone'}
         </p>
         <p className="text-muted-foreground truncate text-xs">{text}</p>
       </div>

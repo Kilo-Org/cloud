@@ -81,6 +81,7 @@ const pluginBase = createChannelPluginBase({
 export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
   base: {
     ...pluginBase,
+    capabilities: { chatTypes: ['direct'] },
     messaging: {
       normalizeTarget: raw => stripPrefix(raw) || undefined,
       parseExplicitTarget: ({ raw }) => {

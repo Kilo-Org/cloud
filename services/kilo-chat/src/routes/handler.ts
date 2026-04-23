@@ -346,33 +346,41 @@ export async function handleListBotConversations(c: HonoCtx) {
   const membershipStub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(botCallerId));
   const { conversations, total } = await membershipStub.listConversations(sandboxId, limit, offset);
 
-  // Enrich each conversation with member info
-  const enriched = await Promise.all(
+  // Step 1: Fetch info for all conversations in parallel
+  const conversationsWithInfo = await Promise.all(
     conversations.map(async conv => {
       const convStub = c.env.CONVERSATION_DO.get(
         c.env.CONVERSATION_DO.idFromName(conv.conversationId)
       );
       const info = await convStub.getInfo();
-      const members = info?.members ?? [];
-
-      const userIds = members.filter(m => m.kind === 'user').map(m => m.id);
-      const displayInfo =
-        userIds.length > 0
-          ? await resolveUserDisplayInfo(c.env.HYPERDRIVE.connectionString, userIds)
-          : new Map<string, UserDisplayInfo>();
-
-      return {
-        conversationId: conv.conversationId,
-        title: conv.conversationTitle,
-        lastActivityAt: conv.lastActivityAt,
-        members: members.map(m => ({
-          ...m,
-          displayName: displayInfo.get(m.id)?.displayName ?? null,
-          avatarUrl: displayInfo.get(m.id)?.avatarUrl ?? null,
-        })),
-      };
+      return { conv, members: info?.members ?? [] };
     })
   );
+
+  // Step 2: Batch-resolve all user display info
+  const allUserIds = [
+    ...new Set(
+      conversationsWithInfo.flatMap(({ members }) =>
+        members.filter(m => m.kind === 'user').map(m => m.id)
+      )
+    ),
+  ];
+  const displayInfo =
+    allUserIds.length > 0
+      ? await resolveUserDisplayInfo(c.env.HYPERDRIVE.connectionString, allUserIds)
+      : new Map<string, UserDisplayInfo>();
+
+  // Step 3: Build enriched response
+  const enriched = conversationsWithInfo.map(({ conv, members }) => ({
+    conversationId: conv.conversationId,
+    title: conv.conversationTitle,
+    lastActivityAt: conv.lastActivityAt,
+    members: members.map(m => ({
+      ...m,
+      displayName: displayInfo.get(m.id)?.displayName ?? null,
+      avatarUrl: displayInfo.get(m.id)?.avatarUrl ?? null,
+    })),
+  }));
 
   return c.json({ conversations: enriched, total, limit, offset });
 }

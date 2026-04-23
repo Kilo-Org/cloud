@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
 import type {
   Message,
@@ -91,23 +92,21 @@ export function useSendMessage(
         deliveryFailed: false,
         reactions: [],
       };
-      queryClient.setQueryData(queryKey, (old: unknown) => {
-        if (!old || typeof old !== 'object') return old;
-        const data = old as { pages: Message[][]; pageParams: unknown[] };
-        const firstPage = data.pages[0] ?? [];
-        return { ...data, pages: [[optimisticMessage, ...firstPage], ...data.pages.slice(1)] };
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        const firstPage = old.pages[0] ?? [];
+        return { ...old, pages: [[optimisticMessage, ...firstPage], ...old.pages.slice(1)] };
       });
       return { previous, queryKey, clientId: variables.clientId };
     },
     onSuccess: (response, _variables, context) => {
       if (!context?.queryKey) return;
       const pendingId = `pending-${context.clientId}`;
-      queryClient.setQueryData(context.queryKey, (old: unknown) => {
-        if (!old || typeof old !== 'object') return old;
-        const data = old as { pages: Message[][]; pageParams: unknown[] };
+      queryClient.setQueryData<InfiniteData<Message[]>>(context.queryKey, old => {
+        if (!old) return old;
         return {
-          ...data,
-          pages: data.pages.map(page =>
+          ...old,
+          pages: old.pages.map(page =>
             page.map(msg => (msg.id === pendingId ? { ...msg, id: response.messageId } : msg))
           ),
         };
@@ -131,12 +130,11 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
       const queryKey = ['kilo-chat', 'messages', conversationId];
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData(queryKey);
-      queryClient.setQueryData(queryKey, (old: unknown) => {
-        if (!old || typeof old !== 'object') return old;
-        const data = old as { pages: Message[][]; pageParams: unknown[] };
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
         return {
-          ...data,
-          pages: data.pages.map(page =>
+          ...old,
+          pages: old.pages.map(page =>
             page.map(msg =>
               msg.id === variables.messageId
                 ? { ...msg, content: variables.content, clientUpdatedAt: variables.timestamp }
@@ -165,12 +163,11 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
       const queryKey = ['kilo-chat', 'messages', conversationId];
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData(queryKey);
-      queryClient.setQueryData(queryKey, (old: unknown) => {
-        if (!old || typeof old !== 'object') return old;
-        const data = old as { pages: Message[][]; pageParams: unknown[] };
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
         return {
-          ...data,
-          pages: data.pages.map(page =>
+          ...old,
+          pages: old.pages.map(page =>
             page.map(msg => (msg.id === variables.messageId ? { ...msg, deleted: true } : msg))
           ),
         };
@@ -199,12 +196,11 @@ export function useAddReaction(
       const queryKey = ['kilo-chat', 'messages', conversationId];
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData(queryKey);
-      queryClient.setQueryData(queryKey, (old: unknown) => {
-        if (!old || typeof old !== 'object') return old;
-        const data = old as { pages: Message[][]; pageParams: unknown[] };
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
         return {
-          ...data,
-          pages: data.pages.map(page =>
+          ...old,
+          pages: old.pages.map(page =>
             page.map(msg =>
               msg.id !== variables.messageId
                 ? msg
@@ -240,12 +236,11 @@ export function useRemoveReaction(
       const queryKey = ['kilo-chat', 'messages', conversationId];
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData(queryKey);
-      queryClient.setQueryData(queryKey, (old: unknown) => {
-        if (!old || typeof old !== 'object') return old;
-        const data = old as { pages: Message[][]; pageParams: unknown[] };
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
         return {
-          ...data,
-          pages: data.pages.map(page =>
+          ...old,
+          pages: old.pages.map(page =>
             page.map(msg =>
               msg.id !== variables.messageId
                 ? msg
@@ -289,12 +284,11 @@ export function useExecuteAction(
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData(queryKey);
       // Optimistically mark the action as resolved
-      queryClient.setQueryData(queryKey, (old: unknown) => {
-        if (!old || typeof old !== 'object') return old;
-        const data = old as { pages: Message[][]; pageParams: unknown[] };
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
         return {
-          ...data,
-          pages: data.pages.map(page =>
+          ...old,
+          pages: old.pages.map(page =>
             page.map(msg => {
               if (msg.id !== variables.messageId) return msg;
               return {
@@ -350,40 +344,38 @@ export function useMessageCacheUpdater(conversationId: string | null) {
             deliveryFailed: false,
             reactions: [],
           };
-          queryClient.setQueryData(queryKey, (old: unknown) => {
-            if (!old || typeof old !== 'object') return old;
-            const data = old as { pages: Message[][]; pageParams: unknown[] };
+          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+            if (!old) return old;
             // Skip if this messageId already exists
-            for (const page of data.pages) {
-              if (page.some(msg => msg.id === e.messageId)) return data;
+            for (const page of old.pages) {
+              if (page.some(msg => msg.id === e.messageId)) return old;
             }
             // Replace the matching pending optimistic message if clientId correlates
             if (e.clientId) {
               const pendingId = `pending-${e.clientId}`;
-              for (const page of data.pages) {
+              for (const page of old.pages) {
                 if (page.some(msg => msg.id === pendingId)) {
                   return {
-                    ...data,
-                    pages: data.pages.map(p =>
+                    ...old,
+                    pages: old.pages.map(p =>
                       p.map(msg => (msg.id === pendingId ? newMessage : msg))
                     ),
                   };
                 }
               }
             }
-            const firstPage = data.pages[0] ?? [];
-            return { ...data, pages: [[newMessage, ...firstPage], ...data.pages.slice(1)] };
+            const firstPage = old.pages[0] ?? [];
+            return { ...old, pages: [[newMessage, ...firstPage], ...old.pages.slice(1)] };
           });
           break;
         }
         case 'message.updated': {
           const e = event.data as MessageUpdatedEvent;
-          queryClient.setQueryData(queryKey, (old: unknown) => {
-            if (!old || typeof old !== 'object') return old;
-            const data = old as { pages: Message[][]; pageParams: unknown[] };
+          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+            if (!old) return old;
             return {
-              ...data,
-              pages: data.pages.map(page =>
+              ...old,
+              pages: old.pages.map(page =>
                 page.map(msg =>
                   msg.id === e.messageId
                     ? {
@@ -400,12 +392,11 @@ export function useMessageCacheUpdater(conversationId: string | null) {
         }
         case 'message.deleted': {
           const e = event.data as MessageDeletedEvent;
-          queryClient.setQueryData(queryKey, (old: unknown) => {
-            if (!old || typeof old !== 'object') return old;
-            const data = old as { pages: Message[][]; pageParams: unknown[] };
+          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+            if (!old) return old;
             return {
-              ...data,
-              pages: data.pages.map(page =>
+              ...old,
+              pages: old.pages.map(page =>
                 page.map(msg => (msg.id === e.messageId ? { ...msg, deleted: true } : msg))
               ),
             };
@@ -414,12 +405,11 @@ export function useMessageCacheUpdater(conversationId: string | null) {
         }
         case 'message.delivery_failed': {
           const e = event.data as MessageDeliveryFailedEvent;
-          queryClient.setQueryData(queryKey, (old: unknown) => {
-            if (!old || typeof old !== 'object') return old;
-            const data = old as { pages: Message[][]; pageParams: unknown[] };
+          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+            if (!old) return old;
             return {
-              ...data,
-              pages: data.pages.map(page =>
+              ...old,
+              pages: old.pages.map(page =>
                 page.map(msg => (msg.id === e.messageId ? { ...msg, deliveryFailed: true } : msg))
               ),
             };
@@ -428,12 +418,11 @@ export function useMessageCacheUpdater(conversationId: string | null) {
         }
         case 'reaction.added': {
           const e = event.data as ReactionAddedEvent;
-          queryClient.setQueryData(queryKey, (old: unknown) => {
-            if (!old || typeof old !== 'object') return old;
-            const data = old as { pages: Message[][]; pageParams: unknown[] };
+          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+            if (!old) return old;
             return {
-              ...data,
-              pages: data.pages.map(page =>
+              ...old,
+              pages: old.pages.map(page =>
                 page.map(msg =>
                   msg.id !== e.messageId
                     ? msg
@@ -446,12 +435,11 @@ export function useMessageCacheUpdater(conversationId: string | null) {
         }
         case 'reaction.removed': {
           const e = event.data as ReactionRemovedEvent;
-          queryClient.setQueryData(queryKey, (old: unknown) => {
-            if (!old || typeof old !== 'object') return old;
-            const data = old as { pages: Message[][]; pageParams: unknown[] };
+          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+            if (!old) return old;
             return {
-              ...data,
-              pages: data.pages.map(page =>
+              ...old,
+              pages: old.pages.map(page =>
                 page.map(msg =>
                   msg.id !== e.messageId
                     ? msg

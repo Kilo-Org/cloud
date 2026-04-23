@@ -415,6 +415,11 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     registerKiloChatRenameRoute(honoApp, kiloChatOpts);
     registerKiloChatListConversationsRoute(honoApp, kiloChatOpts);
     registerKiloChatCreateConversationRoute(honoApp, kiloChatOpts);
+  } else {
+    console.warn(
+      '[kilo-chat] Routes not registered:',
+      !env.KILOCLAW_SANDBOX_ID ? 'KILOCLAW_SANDBOX_ID missing' : 'KILOCHAT_BASE_URL missing'
+    );
   }
 
   registerHealthRoute(

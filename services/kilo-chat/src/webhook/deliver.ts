@@ -84,6 +84,9 @@ export async function deliverToBot(
       return;
     } catch (err) {
       console.error(`Webhook delivery attempt ${attempt + 1} failed:`, err);
+      if (attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
+      }
     }
   }
 
@@ -128,6 +131,9 @@ export async function deliverActionExecutedToBot(
       return;
     } catch (err) {
       console.error(`Action webhook delivery attempt ${attempt + 1} failed:`, err);
+      if (attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
+      }
     }
   }
   console.error(`Action webhook permanently failed for message ${msg.messageId}`);

@@ -109,6 +109,9 @@ function routeParam(c: Context, name: string): string {
 
 /** Pass through an upstream response verbatim (status + body + content-type). */
 async function relay(upstream: Response): Promise<Response> {
+  if (upstream.status === 204 || upstream.status === 205) {
+    return new Response(null, { status: upstream.status });
+  }
   const body = await upstream.text();
   return new Response(body || null, {
     status: upstream.status,

@@ -357,8 +357,6 @@ describe('logMicrodollarUsage', () => {
       session_id: null,
       mode: null,
       auto_model: null,
-      requestStartedAt: performance.now(),
-      ttfbMs: 0,
     }) satisfies MicrodollarUsageContext;
 
   test('stores usage data and increments user microdollars for positive cost', async () => {

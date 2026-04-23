@@ -295,11 +295,15 @@ export function wrapInSafeNextResponse(response: Response) {
 export function accountForMicrodollarUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  requestStartedAt: number,
+  ttfbMs: number
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  after(countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan));
+  after(
+    countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan, requestStartedAt, ttfbMs)
+  );
 }
 
 export async function captureProxyError(params: {

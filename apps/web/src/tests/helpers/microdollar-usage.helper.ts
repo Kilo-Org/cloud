@@ -117,8 +117,6 @@ export function createMockUsageContext(
     session_id: null,
     mode: null,
     auto_model: null,
-    requestStartedAt: performance.now(),
-    ttfbMs: 0,
   };
 }
 

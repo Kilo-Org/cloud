@@ -540,7 +540,9 @@ async function insertUsageAndMetadataWithBalanceUpdate(
 export function countAndStoreUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  requestStartedAt: number,
+  ttfbMs: number
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
 
@@ -596,7 +598,9 @@ export function countAndStoreUsage(
     }
   }
 
-  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
+  return usageStatsPromise.then(usageStats =>
+    processTokenData(usageStats, usageContext, requestStartedAt, ttfbMs)
+  );
 }
 
 export function processOpenRouterUsage(
@@ -809,7 +813,9 @@ export function calculateKiloExclusiveCost_mUsd(
 
 async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
-  usageContext: MicrodollarUsageContext
+  usageContext: MicrodollarUsageContext,
+  requestStartedAt: number,
+  ttfbMs: number
 ) {
   if (!usageStats) {
     captureMessage('SUSPICIOUS: No usage information', {
@@ -859,16 +865,13 @@ async function processTokenData(
   }
 
   // Override OpenRouter-reported timing with locally measured values for accuracy.
-  // ttfbMs was set on usageContext right after the upstream response headers were received,
+  // ttfbMs was measured right after the upstream response headers were received,
   // so it represents the latency experienced by the caller.
   // completeRequestMs is measured here, after the response body has been fully drained
   // by the parsers above, so it captures the full generation time.
   // moderation_latency is OpenRouter-specific and is retained from the /generation response.
-  const completeRequestMs = Math.max(
-    0,
-    Math.round(performance.now() - usageContext.requestStartedAt)
-  );
-  usageStats.latency = usageContext.ttfbMs;
+  const completeRequestMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
+  usageStats.latency = ttfbMs;
   usageStats.generation_time = completeRequestMs;
 
   if (usageStats.inputTokens - usageStats.cacheHitTokens > 100000)

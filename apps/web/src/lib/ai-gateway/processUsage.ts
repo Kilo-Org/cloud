@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { db } from '../drizzle';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
-import { createTimer, type Timer } from '@/lib/timer';
+import type { Timer } from '@/lib/timer';
 import type { OpenAI } from 'openai';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import type {

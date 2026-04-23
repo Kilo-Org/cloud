@@ -14,13 +14,17 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { StoredModelSchema } from '@kilocode/db';
-import * as z from 'zod';
 import { redisGet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { GatewayPercentageSchema, DEFAULT_VERCEL_PERCENTAGE } from '@/lib/gateway-config';
+<<<<<<< HEAD
 import { GATEWAY_METADATA_REDIS_KEYS, VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
+=======
+import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
+import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
+import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+>>>>>>> origin/main
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -29,20 +33,6 @@ const getVercelRoutingPercentage = createCachedFetch(
   },
   10_000,
   DEFAULT_VERCEL_PERCENTAGE
-);
-
-const getVercelModels = createCachedFetch(
-  async function () {
-    const result = JSON.parse((await redisGet(GATEWAY_METADATA_REDIS_KEYS.vercelModels)) ?? 'null');
-    if (Object.keys(result).length === 0) {
-      console.debug('[getVercelModels] no Vercel models found in Redis');
-    }
-    return Object.values(z.record(z.string(), StoredModelSchema).parse(result))
-      .filter(model => model.type === 'language' && model.endpoints.length > 0)
-      .map(model => model.id);
-  },
-  60_000,
-  []
 );
 
 export async function shouldRouteToVercel(
@@ -74,7 +64,7 @@ export async function shouldRouteToVercel(
 
   const vercelModels = await getVercelModels();
   const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
-  if (!vercelModels.includes(vercelModelId)) {
+  if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
   }

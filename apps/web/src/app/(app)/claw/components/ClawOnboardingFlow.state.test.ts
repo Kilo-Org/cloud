@@ -62,7 +62,6 @@ function createInput(
     mode: 'create-first',
     createSetupStarted: false,
     onboardingStep: 'identity',
-    selectedPreset: null,
     hasBotIdentity: false,
     selectedChannelId: null,
     gatewayState: null,
@@ -124,18 +123,8 @@ describe('ClawOnboardingFlow state machine', () => {
       getClawOnboardingFlowState(
         createInput({
           createSetupStarted: true,
-          onboardingStep: 'permissions',
-          hasBotIdentity: true,
-        })
-      ).renderStep
-    ).toBe('permissions');
-    expect(
-      getClawOnboardingFlowState(
-        createInput({
-          createSetupStarted: true,
           onboardingStep: 'channels',
           hasBotIdentity: true,
-          selectedPreset: 'always-ask',
         })
       ).renderStep
     ).toBe('channels');
@@ -145,7 +134,6 @@ describe('ClawOnboardingFlow state machine', () => {
           createSetupStarted: true,
           onboardingStep: 'provisioning',
           hasBotIdentity: true,
-          selectedPreset: 'always-ask',
         })
       ).renderStep
     ).toBe('provisioning');
@@ -155,7 +143,6 @@ describe('ClawOnboardingFlow state machine', () => {
           createSetupStarted: true,
           onboardingStep: 'pairing',
           hasBotIdentity: true,
-          selectedPreset: 'always-ask',
           selectedChannelId: 'telegram',
         })
       ).renderStep
@@ -170,68 +157,60 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('complete');
   });
 
-  test('uses five steps only when the selected channel requires pairing', () => {
+  test('uses four steps only when the selected channel requires pairing', () => {
     const pairingTelegram = getClawOnboardingFlowState(
       createInput({ selectedChannelId: 'telegram' })
     );
-    expect(pairingTelegram.totalSteps).toBe(5);
+    expect(pairingTelegram.totalSteps).toBe(4);
     expect(pairingTelegram.currentStep).toBe(1);
 
     const pairingDiscord = getClawOnboardingFlowState(
       createInput({ selectedChannelId: 'discord' })
     );
-    expect(pairingDiscord.totalSteps).toBe(5);
+    expect(pairingDiscord.totalSteps).toBe(4);
     expect(pairingDiscord.currentStep).toBe(1);
 
     const noPairingSlack = getClawOnboardingFlowState(createInput({ selectedChannelId: 'slack' }));
-    expect(noPairingSlack.totalSteps).toBe(4);
+    expect(noPairingSlack.totalSteps).toBe(3);
     expect(noPairingSlack.currentStep).toBe(1);
 
     const defaultState = getClawOnboardingFlowState(createInput());
-    expect(defaultState.totalSteps).toBe(4);
+    expect(defaultState.totalSteps).toBe(3);
     expect(defaultState.currentStep).toBe(1);
   });
 
-  test('getClawOnboardingStepProgress returns correct current and total steps', () => {
+  test('getClawOnboardingStepProgress returns correct live current and total steps', () => {
     expect(getClawOnboardingStepProgress('identity', false)).toEqual({
       currentStep: 1,
-      totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('permissions', false)).toEqual({
-      currentStep: 2,
-      totalSteps: 4,
+      totalSteps: 3,
     });
     expect(getClawOnboardingStepProgress('channels', false)).toEqual({
-      currentStep: 3,
-      totalSteps: 4,
+      currentStep: 2,
+      totalSteps: 3,
     });
     expect(getClawOnboardingStepProgress('provisioning', false)).toEqual({
-      currentStep: 4,
-      totalSteps: 4,
+      currentStep: 3,
+      totalSteps: 3,
     });
-    expect(getClawOnboardingStepProgress('done', false)).toEqual({ currentStep: 4, totalSteps: 4 });
+    expect(getClawOnboardingStepProgress('done', false)).toEqual({ currentStep: 3, totalSteps: 3 });
 
     expect(getClawOnboardingStepProgress('identity', true)).toEqual({
       currentStep: 1,
-      totalSteps: 5,
-    });
-    expect(getClawOnboardingStepProgress('permissions', true)).toEqual({
-      currentStep: 2,
-      totalSteps: 5,
+      totalSteps: 4,
     });
     expect(getClawOnboardingStepProgress('channels', true)).toEqual({
-      currentStep: 3,
-      totalSteps: 5,
+      currentStep: 2,
+      totalSteps: 4,
     });
     expect(getClawOnboardingStepProgress('provisioning', true)).toEqual({
-      currentStep: 4,
-      totalSteps: 5,
+      currentStep: 3,
+      totalSteps: 4,
     });
     expect(getClawOnboardingStepProgress('pairing', true)).toEqual({
-      currentStep: 5,
-      totalSteps: 5,
+      currentStep: 4,
+      totalSteps: 4,
     });
-    expect(getClawOnboardingStepProgress('done', true)).toEqual({ currentStep: 5, totalSteps: 5 });
+    expect(getClawOnboardingStepProgress('done', true)).toEqual({ currentStep: 4, totalSteps: 4 });
   });
 
   test.each(CLAW_ONBOARDING_PROVISIONING_STATUSES)(
@@ -257,7 +236,6 @@ describe('ClawOnboardingFlow state machine', () => {
           setupFailed: true,
           onboardingStep: 'provisioning',
           hasBotIdentity: true,
-          selectedPreset: 'always-ask',
           status: undefined,
         })
       ).renderStep
@@ -312,7 +290,6 @@ describe('ClawOnboardingFlow state machine', () => {
             createSetupStarted: true,
             onboardingStep: 'provisioning',
             hasBotIdentity: true,
-            selectedPreset: 'always-ask',
             status: createStatus(status),
           })
         ).renderStep
@@ -378,38 +355,26 @@ describe('ClawOnboardingFlow state machine', () => {
       getClawOnboardingFlowState(
         createInput({
           createSetupStarted: true,
-          onboardingStep: 'permissions',
-          hasBotIdentity: false,
-        })
-      ).renderStep
-    ).toBe('identity');
-    expect(
-      getClawOnboardingFlowState(
-        createInput({
-          createSetupStarted: true,
           onboardingStep: 'channels',
           hasBotIdentity: true,
-          selectedPreset: null,
         })
       ).renderStep
-    ).toBe('permissions');
+    ).toBe('channels');
     expect(
       getClawOnboardingFlowState(
         createInput({
           createSetupStarted: true,
           onboardingStep: 'provisioning',
           hasBotIdentity: true,
-          selectedPreset: null,
         })
       ).renderStep
-    ).toBe('permissions');
+    ).toBe('provisioning');
     expect(
       getClawOnboardingFlowState(
         createInput({
           createSetupStarted: true,
           onboardingStep: 'pairing',
           hasBotIdentity: true,
-          selectedPreset: 'always-ask',
           selectedChannelId: 'slack',
         })
       ).renderStep

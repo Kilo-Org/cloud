@@ -73,6 +73,19 @@ export const actionExecutedEventSchema = z.object({
   executedBy: z.string(),
 });
 
+export const botStatusEventSchema = z.object({
+  sandboxId: z.string(),
+  online: z.boolean(),
+  at: z.number(),
+  conversationId: z.string().optional(),
+  model: z.string().nullish(),
+  provider: z.string().nullish(),
+  /** Current usage for this conversation's session, in tokens. */
+  contextTokens: z.number().nullish(),
+  /** Effective capacity (context-window cap) for this conversation's session. */
+  contextWindow: z.number().nullish(),
+});
+
 // ── Discriminated union keyed on `event` literal ────────────────────
 
 export const kiloChatEventSchema = z.discriminatedUnion('event', [
@@ -93,6 +106,7 @@ export const kiloChatEventSchema = z.discriminatedUnion('event', [
   z.object({ event: z.literal('conversation.read'), payload: conversationReadEventSchema }),
   z.object({ event: z.literal('conversation.activity'), payload: conversationActivityEventSchema }),
   z.object({ event: z.literal('action.executed'), payload: actionExecutedEventSchema }),
+  z.object({ event: z.literal('bot.status'), payload: botStatusEventSchema }),
 ]);
 
 export type KiloChatEvent = z.infer<typeof kiloChatEventSchema>;
@@ -120,6 +134,7 @@ const payloadSchemaRegistry: { [K in KiloChatEventName]: z.ZodType<KiloChatEvent
   'conversation.read': conversationReadEventSchema,
   'conversation.activity': conversationActivityEventSchema,
   'action.executed': actionExecutedEventSchema,
+  'bot.status': botStatusEventSchema,
 };
 
 export function getKiloChatEventPayloadSchema<N extends KiloChatEventName>(

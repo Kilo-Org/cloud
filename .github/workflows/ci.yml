@@ -92,6 +92,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Plugin shared-schemas sync check
+        run: bash scripts/sync-plugin-shared.sh --check
+
       - name: Typecheck
         run: scripts/typecheck-all.sh
 
@@ -149,9 +152,6 @@ jobs:
             echo "::error::oxfmt formatting check failed. Please run 'pnpm run format' locally and commit the changes before pushing."
             exit 1
           }
-
-      - name: Plugin shared-schemas sync check
-        run: bash scripts/sync-plugin-shared.sh --check
 
   drizzle-check:
     needs: changes

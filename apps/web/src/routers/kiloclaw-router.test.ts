@@ -101,6 +101,7 @@ let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) =>
   validateWeatherLocation: (input: { location: string }) => Promise<{
     location: string;
     currentWeatherText: string;
+    status: 'validated' | 'service_unavailable';
   }>;
   cycleInboundEmailAddress: () => Promise<{ inboundEmailAddress: string }>;
   destroy: () => Promise<{ ok: true }>;
@@ -117,6 +118,9 @@ beforeAll(async () => {
 function wttrFormat3Response(text: string, status = 200): Response {
   return new Response(text, { status, headers: { 'Content-Type': 'text/plain' } });
 }
+
+const WTTR_SERVICE_UNAVAILABLE_MESSAGE =
+  "wttr.in is down right now. We'll store your location as entered.";
 
 function wttrLocationResponse(params: {
   areaName: string;
@@ -186,6 +190,7 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     expect(result).toEqual({
       location: 'Amsterdam, The Netherlands',
       currentWeatherText: '☁️   +7°C',
+      status: 'validated',
     });
   });
 
@@ -217,6 +222,7 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     expect(result).toEqual({
       location: 'Groningen, The Netherlands',
       currentWeatherText: '☀️   +9°C',
+      status: 'validated',
     });
   });
 
@@ -232,19 +238,21 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     );
   });
 
-  it('rejects malformed wttr format=3 responses', async () => {
+  it('stores the typed location when wttr returns a malformed service response', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-malformed-test-${Math.random()}@example.com`,
     });
     fetchSpy.mockResolvedValue(wttrFormat3Response('☁️   +7°C'));
     const caller = createCaller({ user });
 
-    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).rejects.toThrow(
-      'Weather location could not be found.'
-    );
+    await expect(caller.validateWeatherLocation({ location: ' Amsterdam ' })).resolves.toEqual({
+      location: 'Amsterdam',
+      currentWeatherText: WTTR_SERVICE_UNAVAILABLE_MESSAGE,
+      status: 'service_unavailable',
+    });
   });
 
-  it('returns a timeout error when wttr validation times out', async () => {
+  it('stores the typed location when wttr validation times out', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-timeout-test-${Math.random()}@example.com`,
     });
@@ -252,20 +260,50 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     fetchSpy.mockRejectedValue(timeoutError);
     const caller = createCaller({ user });
 
-    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).rejects.toThrow(
-      'Weather location validation timed out.'
-    );
+    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).resolves.toEqual({
+      location: 'Amsterdam',
+      currentWeatherText: WTTR_SERVICE_UNAVAILABLE_MESSAGE,
+      status: 'service_unavailable',
+    });
   });
 
-  it('returns an unavailable error when wttr validation fails upstream', async () => {
+  it('stores the typed location when wttr validation fails upstream', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-upstream-test-${Math.random()}@example.com`,
     });
     fetchSpy.mockRejectedValue(new Error('network down'));
     const caller = createCaller({ user });
 
-    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).rejects.toThrow(
-      'Weather location validation is unavailable.'
+    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).resolves.toEqual({
+      location: 'Amsterdam',
+      currentWeatherText: WTTR_SERVICE_UNAVAILABLE_MESSAGE,
+      status: 'service_unavailable',
+    });
+  });
+
+  it('stores the typed location when wttr returns a service error', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-service-error-test-${Math.random()}@example.com`,
+    });
+    fetchSpy.mockResolvedValue(wttrFormat3Response('Bad Gateway', 502));
+    const caller = createCaller({ user });
+
+    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).resolves.toEqual({
+      location: 'Amsterdam',
+      currentWeatherText: WTTR_SERVICE_UNAVAILABLE_MESSAGE,
+      status: 'service_unavailable',
+    });
+  });
+
+  it('rejects non-service wttr errors as unknown locations', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-not-found-status-test-${Math.random()}@example.com`,
+    });
+    fetchSpy.mockResolvedValue(wttrFormat3Response('Not Found', 404));
+    const caller = createCaller({ user });
+
+    await expect(caller.validateWeatherLocation({ location: 'not-a-real-place' })).rejects.toThrow(
+      'Weather location could not be found.'
     );
   });
 });

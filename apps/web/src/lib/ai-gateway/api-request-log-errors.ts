@@ -90,18 +90,17 @@ function detectChatCompletionSseErrors(
     }
   }
 
-  // Accumulate tool call arguments by index across chunks
+  // Accumulate tool call arguments by index across chunks (choice 0 only)
   const byIndex = new Map<number, ToolAccumulator>();
   for (const line of lines) {
     const chunk: OpenAI.Chat.Completions.ChatCompletionChunk = JSON.parse(line);
-    for (const choice of chunk.choices) {
-      for (const toolCall of choice.delta.tool_calls ?? []) {
-        const acc = byIndex.get(toolCall.index) ?? { id: '', name: '', arguments: '' };
-        if (toolCall.id) acc.id = toolCall.id;
-        if (toolCall.function?.name) acc.name = toolCall.function.name;
-        acc.arguments += toolCall.function?.arguments ?? '';
-        byIndex.set(toolCall.index, acc);
-      }
+    const choice = chunk.choices.find(c => c.index === 0);
+    for (const toolCall of choice?.delta.tool_calls ?? []) {
+      const acc = byIndex.get(toolCall.index) ?? { id: '', name: '', arguments: '' };
+      if (toolCall.id) acc.id = toolCall.id;
+      if (toolCall.function?.name) acc.name = toolCall.function.name;
+      acc.arguments += toolCall.function?.arguments ?? '';
+      byIndex.set(toolCall.index, acc);
     }
   }
 

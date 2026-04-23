@@ -57,13 +57,15 @@ async function testCodestralApiKey(apiKey: string): Promise<{ success: boolean; 
         stream: false,
       }),
     });
+    // Always drain the body so the underlying Undici connection is released,
+    // regardless of whether we care about the response payload.
+    const bodyText = await res.text().catch(() => '');
     if (res.ok) {
       return {
         success: true,
         message: `API key test success. Provider: codestral. Model: ${CODESTRAL_TEST_MODEL}.`,
       };
     }
-    const bodyText = await res.text().catch(() => '');
     return {
       success: false,
       message: `API key (codestral) test failed with status ${res.status}${

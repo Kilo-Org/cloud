@@ -51,7 +51,9 @@ export function EmojiPicker({ onSelect, onClose, anchorRef }: EmojiPickerProps) 
         onEmojiSelect={(emoji: { native: string }) => {
           onSelect(emoji.native);
         }}
-        theme="auto"
+        // Intentionally hardcoded to "dark" — the chat UI is dark-themed and
+        // "auto" causes a jarring white picker when the OS is in light mode.
+        theme="dark"
         previewPosition="none"
         skinTonePosition="none"
         maxFrequentRows={1}

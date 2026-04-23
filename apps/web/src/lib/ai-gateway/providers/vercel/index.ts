@@ -155,14 +155,17 @@ export function applyVercelSettings(
           ? requestToMutate.body.text?.verbosity
           : undefined;
     if (verbosity) {
-      // On Claude Opus 4.7+, thinking `display` defaults to `"omitted"`, which returns
-      // empty thinking blocks. Request `"summarized"` so reasoning content is surfaced
-      // to the user. `display` is only valid with adaptive thinking, which is also what
-      // `effort` drives.
-      requestToMutate.body.providerOptions.anthropic = {
-        effort: verbosity,
-        thinking: { type: 'adaptive', display: 'summarized' },
-      };
+      requestToMutate.body.providerOptions.anthropic = { effort: verbosity };
+      if (/claude-opus-4-[7-9]|claude-opus-[5-9]/.test(requestToMutate.body.model)) {
+        // On Claude Opus 4.7+, thinking `display` defaults to `"omitted"`, which returns
+        // empty thinking blocks. Request `"summarized"` so reasoning content is surfaced
+        // to the user. `display` is only valid with adaptive thinking, which is what
+        // `effort` drives on these models.
+        requestToMutate.body.providerOptions.anthropic.thinking = {
+          type: 'adaptive',
+          display: 'summarized',
+        };
+      }
     }
   }
 

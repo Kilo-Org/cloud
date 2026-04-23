@@ -1,10 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { cloneRequestWithBody, handleBotWebhookRequest } from '@/lib/bot/webhook-handler';
-import {
-  ensureSlackIntegrationSyncedForNewBotInfra,
-  getSlackTeamIdFromInteractivityRawBody,
-} from '@/lib/bot/slack-rollout';
+import { ensureSlackInstallationSyncedForTeam } from '@/lib/bot/slack-installation-sync';
+import { getSlackTeamIdFromInteractivityRawBody } from '@/lib/slack/request-payload';
 import { verifySlackRequest } from '@/lib/slack/verify-request';
 
 /**
@@ -24,7 +22,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const teamId = getSlackTeamIdFromInteractivityRawBody(rawBody);
-    await ensureSlackIntegrationSyncedForNewBotInfra(teamId);
+    await ensureSlackInstallationSyncedForTeam(teamId);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('[Slack:Interactivity] Failed to sync Slack installation before forwarding', {

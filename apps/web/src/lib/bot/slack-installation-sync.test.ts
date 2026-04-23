@@ -1,6 +1,7 @@
 const mockInitialize = jest.fn();
 const mockSetInstallation = jest.fn();
 const mockGetAdapter = jest.fn((_name: string) => ({ setInstallation: mockSetInstallation }));
+const mockLimit = jest.fn();
 
 jest.mock('@/lib/bot', () => ({
   bot: {
@@ -9,12 +10,27 @@ jest.mock('@/lib/bot', () => ({
   },
 }));
 
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    select: jest.fn(() => ({
+      from: jest.fn(() => ({
+        where: jest.fn(() => ({
+          limit: mockLimit,
+        })),
+      })),
+    })),
+  },
+}));
+
 import type { OAuthV2Response } from '@slack/oauth';
 import {
+  ensureSlackInstallationSyncedForTeam,
   extractSdkInstallationData,
   syncOldSlackInstallationToSdk,
   syncSlackPlatformIntegrationToSdk,
 } from './slack-installation-sync';
+
+const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
 function makeOAuthResponse(overrides: Partial<OAuthV2Response> = {}): OAuthV2Response {
   return {
@@ -35,6 +51,12 @@ describe('extractSdkInstallationData', () => {
     mockInitialize.mockReset();
     mockSetInstallation.mockReset();
     mockGetAdapter.mockClear();
+    mockLimit.mockReset();
+    consoleErrorSpy.mockClear();
+  });
+
+  afterAll(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   it('stores team.id as teamId', () => {
@@ -137,5 +159,51 @@ describe('extractSdkInstallationData', () => {
 
     expect(mockInitialize).not.toHaveBeenCalled();
     expect(mockSetInstallation).not.toHaveBeenCalled();
+  });
+
+  it('syncs canonical Slack integrations to Chat SDK state by team ID', async () => {
+    const integration = {
+      id: 'pi_123',
+      platform: 'slack',
+      platform_installation_id: 'T123',
+      platform_account_login: 'Workspace Name',
+      metadata: { access_token: 'xoxb-test' },
+    } as Parameters<typeof syncSlackPlatformIntegrationToSdk>[0];
+    mockLimit.mockResolvedValue([integration]);
+
+    await ensureSlackInstallationSyncedForTeam('T123');
+
+    expect(mockSetInstallation).toHaveBeenCalledWith('T123', {
+      botToken: 'xoxb-test',
+      botUserId: undefined,
+      teamName: 'Workspace Name',
+    });
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when no canonical Slack integration exists for a team ID', async () => {
+    mockLimit.mockResolvedValue([]);
+
+    await ensureSlackInstallationSyncedForTeam('T404');
+
+    expect(mockSetInstallation).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs and does not throw when a Slack integration cannot be synced by team ID', async () => {
+    const integration = {
+      id: 'pi_missing_token',
+      platform: 'slack',
+      platform_installation_id: 'T123',
+      metadata: {},
+    } as Parameters<typeof syncSlackPlatformIntegrationToSdk>[0];
+    mockLimit.mockResolvedValue([integration]);
+
+    await expect(ensureSlackInstallationSyncedForTeam('T123')).resolves.toBeUndefined();
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[SlackBot:Sync] Could not sync Slack integration to Chat SDK installation',
+      { integrationId: 'pi_missing_token', teamId: 'T123' }
+    );
   });
 });

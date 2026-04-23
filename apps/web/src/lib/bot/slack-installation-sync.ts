@@ -1,7 +1,11 @@
 import 'server-only';
 import type { OAuthV2Response } from '@slack/oauth';
 import type { PlatformIntegration } from '@kilocode/db/schema';
+import { platform_integrations } from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
 import { bot } from '@/lib/bot';
+import { db } from '@/lib/drizzle';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import { extractSdkInstallationData } from './slack-installation-sync-mapping';
 
 export {
@@ -64,4 +68,40 @@ export async function syncSlackPlatformIntegrationToSdk(
   });
 
   return true;
+}
+
+export async function ensureSlackInstallationSyncedForTeam(teamId: string): Promise<void> {
+  let integrationId: string | undefined;
+
+  try {
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.SLACK),
+          eq(platform_integrations.platform_installation_id, teamId)
+        )
+      )
+      .limit(1);
+
+    if (!integration) return;
+    integrationId = integration.id;
+
+    const synced = await syncSlackPlatformIntegrationToSdk(integration);
+
+    if (!synced) {
+      console.error('[SlackBot:Sync] Could not sync Slack integration to Chat SDK installation', {
+        integrationId,
+        teamId,
+      });
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('[SlackBot:Sync] Failed to sync Slack integration to Chat SDK installation', {
+      errorMessage,
+      integrationId,
+      teamId,
+    });
+  }
 }

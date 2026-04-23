@@ -1,4 +1,4 @@
-import * as WebBrowser from 'expo-web-browser';
+import { type Href, useRouter } from 'expo-router';
 import { ArrowRight, MessageSquare } from 'lucide-react-native';
 import { View } from 'react-native';
 
@@ -8,6 +8,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function KiloClawPromoCard() {
   const colors = useThemeColors();
+  const router = useRouter();
 
   return (
     <View className="mx-4 rounded-xl border border-border bg-card p-4 gap-3">
@@ -28,7 +29,7 @@ export function KiloClawPromoCard() {
       <Button
         variant="outline"
         onPress={() => {
-          void WebBrowser.openBrowserAsync('https://app.kilo.ai/claw');
+          router.push('/(app)/onboarding' as Href);
         }}
       >
         <Text>Create your agent</Text>

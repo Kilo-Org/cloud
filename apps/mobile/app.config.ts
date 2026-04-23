@@ -109,6 +109,16 @@ const config: ExpoConfig = {
         iCloudContainerEnvironment: 'Production',
       },
     ],
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'Allow $(PRODUCT_NAME) to use your location to set up local weather.',
+        isIosBackgroundLocationEnabled: false,
+        isAndroidBackgroundLocationEnabled: false,
+        isAndroidForegroundServiceEnabled: false,
+      },
+    ],
     'expo-apple-authentication',
     'expo-audio',
     'expo-sharing',

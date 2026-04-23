@@ -13,6 +13,7 @@ type ScreenHeaderProps = {
   showBackButton?: boolean;
   onBack?: () => void;
   onTitlePress?: () => void;
+  backIcon?: 'back' | 'close';
 };
 
 export function ScreenHeader({
@@ -22,6 +23,7 @@ export function ScreenHeader({
   showBackButton,
   onBack,
   onTitlePress,
+  backIcon,
 }: Readonly<ScreenHeaderProps>) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -30,6 +32,10 @@ export function ScreenHeader({
 
   // iOS modals are presented as cards already inset from the status bar
   const paddingTop = modal && Platform.OS === 'ios' ? 32 : insets.top + 8;
+
+  // When `backIcon` isn't specified, fall back to the historical behaviour
+  // where iOS modals get a ChevronDown and everything else gets a ChevronLeft.
+  const resolvedBackIcon = backIcon ?? (modal && Platform.OS === 'ios' ? 'close' : 'back');
 
   return (
     <View className="bg-background px-4 pb-3" style={{ paddingTop }}>
@@ -48,7 +54,7 @@ export function ScreenHeader({
               accessibilityLabel="Go back"
               className="-ml-1 mr-1 active:opacity-70"
             >
-              {modal && Platform.OS === 'ios' ? (
+              {resolvedBackIcon === 'close' ? (
                 <ChevronDown size={24} color={colors.foreground} />
               ) : (
                 <ChevronLeft size={24} color={colors.foreground} />

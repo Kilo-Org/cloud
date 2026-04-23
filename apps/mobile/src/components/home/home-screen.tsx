@@ -39,8 +39,8 @@ export function HomeScreen() {
 
   const isLoading = instancesPending || sessionsLoading;
 
-  const hasInstance = (instances?.length ?? 0) > 0;
   const hasAnySession = storedSessions.length > 0 || activeSessions.length > 0;
+  const hasInstance = (instances?.length ?? 0) > 0;
   const isFirstTime = !hasInstance && !hasAnySession && !instancesError;
 
   const title = isFirstTime ? 'Welcome to Kilo' : buildTimedGreeting(null);
@@ -78,11 +78,10 @@ export function HomeScreen() {
 
             {renderSessionsOrPromo({
               hasAnySession,
-              hasInstance,
               organizationId,
             })}
 
-            <NewTaskButton organizationId={organizationId} />
+            {hasAnySession ? <NewTaskButton organizationId={organizationId} /> : null}
           </Animated.View>
         )}
       </ScrollView>
@@ -110,16 +109,9 @@ function renderKiloClawSlot(params: { instances: ClawInstance[]; instancesError:
   return <KiloClawPromoCard />;
 }
 
-function renderSessionsOrPromo(params: {
-  hasAnySession: boolean;
-  hasInstance: boolean;
-  organizationId: string | null;
-}) {
+function renderSessionsOrPromo(params: { hasAnySession: boolean; organizationId: string | null }) {
   if (params.hasAnySession) {
     return <AgentSessionsSection organizationId={params.organizationId} />;
   }
-  if (params.hasInstance) {
-    return <AgentsPromoCard />;
-  }
-  return null;
+  return <AgentsPromoCard organizationId={params.organizationId} />;
 }

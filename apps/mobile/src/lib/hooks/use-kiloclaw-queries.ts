@@ -1,5 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
+import {
+  deriveMobileOnboardingStateFromBilling,
+  MOBILE_ONBOARDING_STATE_QUERY_KEY,
+} from '@/lib/derive-mobile-onboarding-state';
 import { resolveContext } from '@/lib/hooks/use-context-query';
 import { useTRPC } from '@/lib/trpc';
 
@@ -38,6 +43,28 @@ export function useKiloClawBillingStatus(enabled = true) {
   );
 }
 
+/**
+ * Mobile KiloClaw onboarding state, derived client-side from
+ * `getBillingStatus`. See `lib/derive-mobile-onboarding-state.ts` for scope
+ * and limitations.
+ */
+export function useKiloClawMobileOnboardingState(enabled = true) {
+  const billing = useKiloClawBillingStatus(enabled);
+  const data = useMemo(() => {
+    if (!billing.data) {
+      return undefined;
+    }
+    return deriveMobileOnboardingStateFromBilling(billing.data);
+  }, [billing.data]);
+  return {
+    data,
+    isPending: billing.isPending,
+    isError: billing.isError,
+    refetch: billing.refetch,
+    queryKey: MOBILE_ONBOARDING_STATE_QUERY_KEY,
+  };
+}
+
 export function useKiloClawGatewayStatus(organizationId?: string | null, enabled = true) {
   const trpc = useTRPC();
   const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId, enabled);
@@ -56,6 +83,26 @@ export function useKiloClawGatewayStatus(organizationId?: string | null, enabled
   return isOrg ? org : personal;
 }
 
+export function useKiloClawGatewayReady(organizationId?: string | null, enabled = true) {
+  const trpc = useTRPC();
+  const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId, enabled);
+  const personal = useQuery(
+    trpc.kiloclaw.gatewayReady.queryOptions(undefined, {
+      enabled: personalEnabled,
+      refetchInterval: personalEnabled ? 5000 : false,
+      refetchIntervalInBackground: true,
+    })
+  );
+  const org = useQuery(
+    trpc.organizations.kiloclaw.gatewayReady.queryOptions(orgInput, {
+      enabled: orgEnabled,
+      refetchInterval: orgEnabled ? 5000 : false,
+      refetchIntervalInBackground: true,
+    })
+  );
+  return isOrg ? org : personal;
+}
+
 export function useKiloClawServiceDegraded() {
   const trpc = useTRPC();
   return useQuery(
@@ -66,19 +113,23 @@ export function useKiloClawServiceDegraded() {
   );
 }
 
-export function useKiloClawPairing(organizationId?: string | null, enabled = true) {
+export function useKiloClawPairing(
+  organizationId?: string | null,
+  enabled = true,
+  pollIntervalMs = 120_000
+) {
   const trpc = useTRPC();
   const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId, enabled);
   const personal = useQuery(
     trpc.kiloclaw.listPairingRequests.queryOptions(undefined, {
       enabled: personalEnabled,
-      refetchInterval: personalEnabled ? 120_000 : false,
+      refetchInterval: personalEnabled ? pollIntervalMs : false,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.listPairingRequests.queryOptions(orgInput, {
       enabled: orgEnabled,
-      refetchInterval: orgEnabled ? 120_000 : false,
+      refetchInterval: orgEnabled ? pollIntervalMs : false,
     })
   );
   return isOrg ? org : personal;

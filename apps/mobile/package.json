@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start --dev-client",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "build": "pnpx eas-cli@latest build --profile development",
     "build:ios": "pnpx eas-cli@latest build -p ios --profile development",
     "build:android": "pnpx eas-cli@latest build -p android --profile development",
@@ -16,7 +16,9 @@
     "lint": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json apps/mobile/src",
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
-    "check:unused": "knip"
+    "check:unused": "knip",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@expo/react-native-action-sheet": "^4.1.1",
@@ -48,6 +50,7 @@
     "expo-image-picker": "~55.0.17",
     "expo-insights": "55.0.15",
     "expo-linking": "~55.0.11",
+    "expo-location": "~55.1.8",
     "expo-notifications": "~55.0.17",
     "expo-router": "~55.0.11",
     "expo-secure-store": "~55.0.12",
@@ -83,7 +86,8 @@
     "@typescript/native-preview": "catalog:",
     "eslint-plugin-sonarjs": "^4.0.2",
     "knip": "^6.0.6",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.1.0"
   },
   "private": true
 }

@@ -6,7 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-export function AgentsPromoCard() {
+type AgentsPromoCardProps = {
+  organizationId: string | null;
+};
+
+export function AgentsPromoCard({ organizationId }: Readonly<AgentsPromoCardProps>) {
   const router = useRouter();
   const colors = useThemeColors();
 
@@ -29,7 +33,10 @@ export function AgentsPromoCard() {
       <Button
         variant="outline"
         onPress={() => {
-          router.push('/(app)/(tabs)/(2_agents)' as Href);
+          const path = organizationId
+            ? `/(app)/agent-chat/new?organizationId=${organizationId}`
+            : '/(app)/agent-chat/new';
+          router.push(path as Href);
         }}
       >
         <Text>Get started</Text>

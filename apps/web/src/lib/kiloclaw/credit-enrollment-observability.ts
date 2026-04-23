@@ -9,6 +9,7 @@ export type CreditEnrollmentFailureReason =
   | 'active_subscription_exists'
   | 'no_instance'
   | 'user_not_found'
+  | 'precondition_failed'
   | 'internal_error';
 
 type BaseFields = {

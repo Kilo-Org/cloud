@@ -3839,13 +3839,6 @@ export const kiloclawRouter = createTRPCRouter({
           instanceId: input.instanceId,
         });
         if (!anchorInstance) {
-          logCreditEnrollmentFailed({
-            userId: ctx.user.id,
-            plan: input.plan,
-            instanceId: input.instanceId,
-            failureReason: 'no_instance',
-            durationMs: Date.now() - startedAt,
-          });
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Provision KiloClaw first before enrolling hosting with credits.',
@@ -3876,11 +3869,26 @@ export const kiloclawRouter = createTRPCRouter({
 
         return { success: true };
       } catch (error) {
-        // TRPCErrors surfaced from this block (including the no_instance guard above)
-        // have already been logged at their throw site, or come from upstream utilities
-        // that handle their own error semantics; re-throw as-is to preserve the HTTP
-        // response and avoid double-logging.
-        if (error instanceof TRPCError) throw error;
+        const durationMs = Date.now() - startedAt;
+
+        if (error instanceof TRPCError) {
+          // TRPCErrors surface from this flow's own no_instance guard (BAD_REQUEST)
+          // or from upstream helpers like resolvePersonalBillingAnchor (CONFLICT).
+          // Log before re-throwing so the funnel invariant holds; preserve the
+          // original error code for the HTTP response.
+          const failureReason: CreditEnrollmentFailureReason =
+            error.code === 'BAD_REQUEST' ? 'no_instance' : 'precondition_failed';
+          logCreditEnrollmentFailed({
+            userId: ctx.user.id,
+            plan: input.plan,
+            instanceId: resolvedInstanceId,
+            failureReason,
+            durationMs,
+            error: error.message,
+          });
+          throw error;
+        }
+
         const message = error instanceof Error ? error.message : 'Credit enrollment failed';
         const {
           code,
@@ -3902,7 +3910,7 @@ export const kiloclawRouter = createTRPCRouter({
           plan: input.plan,
           instanceId: resolvedInstanceId,
           failureReason,
-          durationMs: Date.now() - startedAt,
+          durationMs,
           error: message,
         });
         throw new TRPCError({ code, message, cause: error });

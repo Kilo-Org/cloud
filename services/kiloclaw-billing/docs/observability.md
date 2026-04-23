@@ -140,17 +140,17 @@ Base filter:
 
 Dimensions:
 
-| Field              | Meaning                                                                                                                                |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `billingComponent` | `web_trpc` (the enrollWithCredits TRPC mutation)                                                                                       |
-| `event`            | `credit_enrollment.attempted`, `credit_enrollment.succeeded`, `credit_enrollment.failed`                                               |
-| `outcome`          | `started`, `completed`, `failed`                                                                                                       |
-| `failureReason`    | `insufficient_credits`, `duplicate_enrollment`, `active_subscription_exists`, `no_instance`, `user_not_found`, `internal_error`        |
-| `plan`             | `commit` or `standard`                                                                                                                 |
-| `userId`           | KiloCode user id                                                                                                                       |
-| `instanceId`       | KiloClaw instance id (omitted on `no_instance` failures when the user never resolved to an instance)                                   |
-| `durationMs`       | Time from mutation entry to success/failure                                                                                            |
-| `error`            | Error message on failures (truncated to 500 chars; may include upstream ORM/driver text on `internal_error` — treat as semi-sensitive) |
+| Field              | Meaning                                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `billingComponent` | `web_trpc` (the enrollWithCredits TRPC mutation)                                                                                                       |
+| `event`            | `credit_enrollment.attempted`, `credit_enrollment.succeeded`, `credit_enrollment.failed`                                                               |
+| `outcome`          | `started`, `completed`, `failed`                                                                                                                       |
+| `failureReason`    | `insufficient_credits`, `duplicate_enrollment`, `active_subscription_exists`, `no_instance`, `user_not_found`, `precondition_failed`, `internal_error` |
+| `plan`             | `commit` or `standard`                                                                                                                                 |
+| `userId`           | KiloCode user id                                                                                                                                       |
+| `instanceId`       | KiloClaw instance id (omitted on `no_instance` failures when the user never resolved to an instance)                                                   |
+| `durationMs`       | Time from mutation entry to success/failure                                                                                                            |
+| `error`            | Error message on failures (truncated to 500 chars; may include upstream ORM/driver text on `internal_error` — treat as semi-sensitive)                 |
 
 Funnel shape: every attempt emits exactly one `credit_enrollment.attempted`, followed by exactly one of `credit_enrollment.succeeded` or `credit_enrollment.failed` (with a `failureReason`). The enclosing try/catch guarantees this even if upstream helpers (anchor resolution, prior-subscription lookup) throw.
 

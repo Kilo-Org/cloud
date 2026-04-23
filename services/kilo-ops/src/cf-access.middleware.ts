@@ -49,8 +49,16 @@ export function withCloudflareAccess({
         audience,
       });
 
-      // User tokens have 'email', service tokens have 'common_name'
-      const identity = (payload.email as string) ?? (payload.common_name as string) ?? 'unknown';
+      // User tokens carry 'email', service tokens carry 'common_name'. Reject
+      // any token that lacks both — falling back to a shared identity would
+      // grant that token Grafana's auto-signup Admin role.
+      const email = typeof payload.email === 'string' ? payload.email : null;
+      const commonName = typeof payload.common_name === 'string' ? payload.common_name : null;
+      const identity = email?.trim() || commonName?.trim();
+      if (!identity) {
+        console.warn('CF Access JWT validated but contains no email or common_name');
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
       c.set('userIdentity', identity);
     } catch (e) {
       console.warn(

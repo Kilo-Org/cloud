@@ -115,6 +115,13 @@ app.use('/*', async (c, next) => {
   return mw(c as Parameters<typeof mw>[0], next);
 });
 
+const STRIPPED_REQUEST_HEADERS = new Set([
+  'x-webauth-user',
+  'authorization',
+  'cf-access-jwt-assertion',
+  'cookie',
+]);
+
 app.all('/*', async c => {
   const userIdentity = c.get('userIdentity');
 
@@ -122,33 +129,14 @@ app.all('/*', async c => {
   const country = (c.req.header('cf-ipcountry') ?? DEFAULT_COUNTRY).toUpperCase();
   const container = getGrafanaContainerStub(c.env, country);
 
-  const STRIPPED_HEADERS = new Set([
-    'x-webauth-user',
-    'authorization',
-    'cf-access-jwt-assertion',
-    'cookie',
-  ]);
-  const headers = new Headers();
-  for (const [key, value] of c.req.raw.headers.entries()) {
-    if (STRIPPED_HEADERS.has(key.toLowerCase())) continue;
-    headers.set(key, value);
-  }
-  headers.set('X-WEBAUTH-USER', userIdentity);
-
-  const init: RequestInit = {
-    method: c.req.method,
-    headers,
-  };
-
-  if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
-    const body = await c.req.raw.arrayBuffer();
-    if (body.byteLength > 0) {
-      init.body = body;
-    }
-  }
-
+  // Forward the raw request so the body streams to the container instead of
+  // being buffered into Worker memory. Dashboard imports and plugin uploads
+  // can be multi-MB — buffering would risk the 128 MB isolate limit.
   const containerUrl = `http://container${url.pathname}${url.search}`;
-  const response = await container.fetch(containerUrl, init);
+  const forwarded = new Request(containerUrl, c.req.raw);
+  for (const name of STRIPPED_REQUEST_HEADERS) forwarded.headers.delete(name);
+  forwarded.headers.set('X-WEBAUTH-USER', userIdentity);
+  const response = await container.fetch(forwarded);
 
   if (response.status === 101) return response;
 

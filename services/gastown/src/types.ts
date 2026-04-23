@@ -263,8 +263,12 @@ export const TownConfigSchema = z.object({
    * Town-level merge strategy. Rigs inherit this when they don't set their own.
    * - 'direct': Refinery pushes directly to main (no PR)
    * - 'pr': Refinery creates a GitHub PR / GitLab MR for human review
+   *
+   * NOTE: new towns are seeded with 'pr' by seedNewTownConfig(); the schema
+   * default below is preserved at 'direct' so existing persisted configs
+   * that never specified a merge_strategy keep their historical behavior.
    */
-  merge_strategy: MergeStrategy.default('pr'),
+  merge_strategy: MergeStrategy.default('direct'),
 
   /** Refinery configuration */
   refinery: z
@@ -279,27 +283,19 @@ export const TownConfigSchema = z.object({
       /** Controls how the refinery communicates review findings:
        *  - 'rework': creates internal rework beads via gt_request_changes (default)
        *  - 'comments': posts GitHub review comments on the PR (requires merge_strategy: 'pr') */
-      review_mode: z.enum(['rework', 'comments']).default('comments'),
+      review_mode: z.enum(['rework', 'comments']).default('rework'),
       /** When enabled, a polecat is automatically dispatched to address
        *  unresolved review comments and failing CI checks on open PRs. */
-      auto_resolve_pr_feedback: z.boolean().default(true),
+      auto_resolve_pr_feedback: z.boolean().default(false),
       /** When enabled, a polecat is automatically dispatched to rebase and
        *  resolve merge conflicts on open PRs. */
       auto_resolve_merge_conflicts: z.boolean().default(true).optional(),
       /** After all CI checks pass and all review threads are resolved,
        *  automatically merge the PR after this many minutes.
        *  0 = immediate, null = disabled (require manual merge). */
-      auto_merge_delay_minutes: z.number().int().min(0).nullable().default(5),
+      auto_merge_delay_minutes: z.number().int().min(0).nullable().default(null),
     })
-    .default({
-      gates: [],
-      auto_merge: true,
-      require_clean_merge: true,
-      code_review: true,
-      review_mode: 'comments',
-      auto_resolve_pr_feedback: true,
-      auto_merge_delay_minutes: 5,
-    }),
+    .optional(),
 
   /** Alarm interval when agents are active (seconds) */
   alarm_interval_active: z.number().int().min(5).max(600).optional(),
@@ -314,8 +310,10 @@ export const TownConfigSchema = z.object({
     })
     .optional(),
 
-  /** When true, all convoys are created as staged by default (agents not dispatched until started). */
-  staged_convoys_default: z.boolean().default(true),
+  /** When true, all convoys are created as staged by default (agents not dispatched until started).
+   *  New towns are seeded with `true` via seedNewTownConfig(); existing
+   *  persisted configs that never specified this key fall back to `false`. */
+  staged_convoys_default: z.boolean().default(false),
 
   /** Default merge mode for new convoys.
    *  - 'review-then-land': beads merge into a convoy feature branch, then a single landing PR is created (default)

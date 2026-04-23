@@ -60,18 +60,15 @@ export function useMarkConversationRead(client: KiloChatClient) {
       const now = Date.now();
       const queryKey = ['kilo-chat', 'conversations'];
       const previous = queryClient.getQueriesData<ConversationListResponse>({ queryKey });
-      queryClient.setQueriesData<ConversationListResponse>(
-        { queryKey },
-        (old: ConversationListResponse | undefined) => {
-          if (!old) return old;
-          return {
-            ...old,
-            conversations: old.conversations.map(c =>
-              c.conversationId === conversationId ? { ...c, lastReadAt: now } : c
-            ),
-          };
-        }
-      );
+      queryClient.setQueriesData<ConversationListResponse>({ queryKey }, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          conversations: old.conversations.map(c =>
+            c.conversationId === conversationId ? { ...c, lastReadAt: now } : c
+          ),
+        };
+      });
       return { previous };
     },
     onError: (_err, _variables, context) => {

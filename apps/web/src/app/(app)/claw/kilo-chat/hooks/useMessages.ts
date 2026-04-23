@@ -12,7 +12,6 @@ import type {
   MessageDeliveryFailedEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
-  ContentBlock,
 } from '@kilocode/kilo-chat';
 import { useCallback } from 'react';
 
@@ -41,7 +40,7 @@ function applyReactionRemoved(
   return reactions
     .map(r => {
       if (r.emoji !== emoji) return r;
-      const memberIds = r.memberIds.filter((id: string) => id !== memberId);
+      const memberIds = r.memberIds.filter(id => id !== memberId);
       return { ...r, count: memberIds.length, memberIds };
     })
     .filter(r => r.count > 0);
@@ -293,7 +292,7 @@ export function useExecuteAction(
               if (msg.id !== variables.messageId) return msg;
               return {
                 ...msg,
-                content: msg.content.map((block: ContentBlock) => {
+                content: msg.content.map(block => {
                   if (block.type !== 'actions') return block;
                   if (block.groupId !== variables.groupId) return block;
                   return {

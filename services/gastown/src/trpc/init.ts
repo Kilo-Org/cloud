@@ -5,6 +5,7 @@ import type { JwtOrgMembership } from '../middleware/auth.middleware';
 
 export type TRPCContext = {
   env: Env;
+  executionCtx: ExecutionContext;
   userId: string;
   isAdmin: boolean;
   apiTokenPepper: string | null;

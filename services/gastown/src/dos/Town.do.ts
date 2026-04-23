@@ -2436,21 +2436,19 @@ export class TownDO extends DurableObject<Env> {
     title: string,
     body?: string
   ): Promise<void> {
-    const descriptionLine = body
-      ? `Description: ${body.slice(0, 500)}${body.length > 500 ? '...' : ''}`
-      : '';
-    const messageParts = [
+    const message = [
       `A user just created a new bead in rig ${rigId}:`,
       `ID: ${beadId}`,
       `Title: "${title}"`,
-      descriptionLine,
+      body ? `Description: ${body.slice(0, 500)}${body.length > 500 ? '...' : ''}` : '',
       ``,
       `The bead is currently held (tagged gt:held) and will not be dispatched until started.`,
       `Would you like to explore the codebase and flesh out a detailed plan, decompose it into a staged convoy, or start it immediately?`,
-      `When you reply, create a message bead with parent_bead_id: "${beadId}" so it appears in the bead drawer.`,
+      `When you reply, create a message bead with parent_bead_id: "${beadId}" so your response appears in the bead drawer.`,
       `To start the bead immediately, remove the gt:held label via gt_bead_update.`,
-    ];
-    const message = messageParts.filter(Boolean).join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
     await this.sendMayorMessage(message);
   }
 

@@ -1217,11 +1217,19 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
     const { targetBotId: _, ...webhookPayload } = parsed;
     const body = JSON.stringify(webhookPayload);
 
-    const response = await fetch(targetUrl, {
-      method: 'POST',
-      headers: forwardHeaders,
-      body,
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    let response: Response;
+    try {
+      response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: forwardHeaders,
+        body,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!response.ok) {
       const responseText = await response.text().catch(() => '(could not read body)');

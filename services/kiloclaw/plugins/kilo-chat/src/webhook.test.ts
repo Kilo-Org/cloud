@@ -29,6 +29,18 @@ describe('parseInboundPayload', () => {
     });
   });
 
+  it('returns null when sentAt is not a parseable timestamp', () => {
+    expect(
+      parseInboundPayload({
+        conversationId: 'c1',
+        messageId: 'm1',
+        from: 'u1',
+        text: 'hi',
+        sentAt: 'not a date',
+      })
+    ).toBeNull();
+  });
+
   it('returns null on missing required fields', () => {
     expect(parseInboundPayload({ conversationId: 'c1', text: 'hi' })).toBeNull();
   });

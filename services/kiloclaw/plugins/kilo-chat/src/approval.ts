@@ -213,6 +213,15 @@ const nativeRuntime: ChannelApprovalNativeRuntimeAdapter<
 
 export function createKiloChatApprovalCapability(): ChannelApprovalCapability {
   return createChannelApprovalCapability({
+    // Authorization is enforced by the kilo-chat Worker's execute-action
+    // endpoint: callerId is derived from the JWT and the DO checks membership.
+    // This callback is intentionally permissive because the Worker is the trust
+    // boundary.
+    //
+    // IMPORTANT: the Worker currently checks *membership*, not *session
+    // ownership*. If multi-party conversations ship (additionalMembers), any
+    // member could approve exec actions running on the conversation-owner's Fly
+    // machine. Gate on session ownership before enabling multi-party.
     authorizeActorAction: () => ({ authorized: true }),
     getActionAvailabilityState: () => ({ kind: 'enabled' as const }),
 

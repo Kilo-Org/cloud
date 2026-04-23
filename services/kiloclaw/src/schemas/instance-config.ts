@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { KiloclawDestroyReasonSchema, KiloclawStartReasonSchema } from '@kilocode/worker-utils';
 import {
   ALL_SECRET_FIELD_KEYS,
   isValidCustomSecretKey,
@@ -231,6 +232,7 @@ export const UserIdRequestSchema = z.object({
 
 export const DestroyRequestSchema = z.object({
   userId: z.string().min(1),
+  reason: KiloclawDestroyReasonSchema.optional(),
 });
 
 /**
@@ -288,6 +290,7 @@ export const PersistedStateSchema = z.object({
   restartingAt: z.number().nullable().default(null),
   recoveryStartedAt: z.number().nullable().default(null),
   restartUpdateSent: z.boolean().default(false),
+  pendingStartReason: KiloclawStartReasonSchema.nullable().default(null),
   lastStartedAt: z.number().nullable().default(null),
   lastStoppedAt: z.number().nullable().default(null),
   // Fly.io app/machine/volume identifiers

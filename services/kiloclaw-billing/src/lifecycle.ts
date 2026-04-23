@@ -8,6 +8,11 @@ import {
   insertKiloClawSubscriptionChangeLog,
   type KiloClawSubscription,
 } from '@kilocode/db';
+import type {
+  KiloclawDestroyReason,
+  KiloclawStartReason,
+  KiloclawStopReason,
+} from '@kilocode/worker-utils';
 import {
   BILLING_FLOW,
   createBillingCorrelationHeaders,
@@ -742,7 +747,8 @@ async function startInstanceAsync(
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
   userId: string,
-  instanceId?: string
+  instanceId?: string,
+  reason?: KiloclawStartReason
 ): Promise<void> {
   const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
   await requestKiloClaw<{ ok: true }>(
@@ -751,7 +757,7 @@ async function startInstanceAsync(
     `/api/platform/start-async${params}`,
     {
       method: 'POST',
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, ...(reason ? { reason } : {}) }),
     },
     { userId, instanceId }
   );
@@ -761,7 +767,8 @@ async function stopInstance(
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
   userId: string,
-  instanceId?: string
+  instanceId?: string,
+  reason?: KiloclawStopReason
 ): Promise<StopInstanceResponse> {
   const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
   return await requestKiloClaw<StopInstanceResponse>(
@@ -770,7 +777,7 @@ async function stopInstance(
     `/api/platform/stop${params}`,
     {
       method: 'POST',
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, ...(reason ? { reason } : {}) }),
     },
     { userId, instanceId },
     { handledErrorStatuses: [404] }
@@ -781,7 +788,8 @@ async function destroyInstance(
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
   userId: string,
-  instanceId?: string
+  instanceId?: string,
+  reason?: KiloclawDestroyReason
 ): Promise<void> {
   const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
   const path = `/api/platform/destroy${params}`;
@@ -792,7 +800,7 @@ async function destroyInstance(
       path,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(reason ? { reason } : {}) }),
       },
       { userId, instanceId },
       { handledErrorStatuses: [404] }
@@ -1060,7 +1068,13 @@ async function autoResumeIfSuspended(
   }
 
   try {
-    await startInstanceAsync(env, context, row.user_id, workerInstanceId(targetInstance));
+    await startInstanceAsync(
+      env,
+      context,
+      row.user_id,
+      workerInstanceId(targetInstance),
+      'interrupted_auto_resume'
+    );
   } catch (error) {
     await markAutoResumeRequested(database, {
       subscriptionId: row.id,
@@ -1567,7 +1581,8 @@ async function stopInstanceForEnforcement(
     user_id: string;
     instance_id: string | null;
     sandbox_id: string | null;
-  }
+  },
+  reason: KiloclawStopReason
 ): Promise<void> {
   if (!row.instance_id) return;
 
@@ -1576,7 +1591,8 @@ async function stopInstanceForEnforcement(
       env,
       context,
       row.user_id,
-      workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id })
+      workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id }),
+      reason
     );
   } catch (error) {
     const isExpected =
@@ -1606,7 +1622,8 @@ async function destroyInstanceForEnforcement(
       env,
       context,
       row.user_id,
-      workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id })
+      workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id }),
+      'destruction_deadline_elapsed'
     );
   } catch (error) {
     const isExpected = error instanceof KiloClawApiError && error.statusCode === 409;
@@ -1686,7 +1703,7 @@ async function runTrialExpirySweep(
         continue;
       }
 
-      await stopInstanceForEnforcement(env, context, row);
+      await stopInstanceForEnforcement(env, context, row, 'trial_expiry');
 
       const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
       const before = await getSubscriptionById(database, row.id);
@@ -1831,7 +1848,7 @@ async function runSubscriptionExpirySweep(
 
       const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
 
-      await stopInstanceForEnforcement(env, context, row);
+      await stopInstanceForEnforcement(env, context, row, 'subscription_expiry');
       const before = await getSubscriptionById(database, row.id);
       const [updated] = await database
         .update(kiloclaw_subscriptions)
@@ -2113,7 +2130,7 @@ async function runPastDueCleanupSweep(
 
       const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
 
-      await stopInstanceForEnforcement(env, context, row);
+      await stopInstanceForEnforcement(env, context, row, 'past_due_cleanup');
       const before = await getSubscriptionById(database, row.id);
       const [updated] = await database
         .update(kiloclaw_subscriptions)
@@ -2632,7 +2649,13 @@ async function stopInstanceForTrialInactivity(
       return;
     }
 
-    const stopResult = await stopInstance(env, context, row.user_id, row.instance_id);
+    const stopResult = await stopInstance(
+      env,
+      context,
+      row.user_id,
+      row.instance_id,
+      'trial_inactivity'
+    );
     if (!stopResult.stopped) {
       logSkippedSubscriptionRow(
         'Skipping trial inactivity stop because instance is not running',

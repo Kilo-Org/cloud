@@ -979,7 +979,10 @@ export const adminRouter = createTRPCRouter({
               const client = new KiloClawInternalClient();
               const startResult = await client.start(
                 input.userId,
-                workerInstanceId(activeInstance)
+                workerInstanceId(activeInstance),
+                {
+                  reason: 'admin_request',
+                }
               );
               if (startResult.currentStatus === 'running') {
                 await clearTrialInactivityStopAfterStart({

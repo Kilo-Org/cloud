@@ -266,7 +266,9 @@ export async function autoResumeIfSuspended(
 
   try {
     const client = new KiloClawInternalClient();
-    await client.startAsync(kiloUserId, workerInstanceId(targetInstance));
+    await client.startAsync(kiloUserId, workerInstanceId(targetInstance), {
+      reason: 'interrupted_auto_resume',
+    });
   } catch (startError) {
     if (recordRetryState) {
       await db
@@ -378,6 +380,35 @@ export async function completeAutoResumeIfReady(
   return { instanceId: targetInstance.id, resumeCompleted: true };
 }
 
+async function clearInactiveTrialStopMarkerForPersonalInstance(params: {
+  kiloUserId: string;
+  instanceId: string;
+  logMessage: string;
+}): Promise<boolean> {
+  const [updatedInstance] = await db
+    .update(kiloclaw_instances)
+    .set({ inactive_trial_stopped_at: null })
+    .where(
+      and(
+        eq(kiloclaw_instances.id, params.instanceId),
+        eq(kiloclaw_instances.user_id, params.kiloUserId),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .returning({ id: kiloclaw_instances.id });
+
+  if (!updatedInstance) {
+    return false;
+  }
+
+  logInfo(params.logMessage, {
+    user_id: params.kiloUserId,
+    instance_id: params.instanceId,
+  });
+  return true;
+}
+
 export async function clearTrialInactivityStopAfterStart(params: {
   kiloUserId: string;
   instanceId: string;
@@ -398,26 +429,18 @@ export async function clearTrialInactivityStopAfterStart(params: {
     return false;
   }
 
-  const [updatedInstance] = await db
-    .update(kiloclaw_instances)
-    .set({ inactive_trial_stopped_at: null })
-    .where(
-      and(
-        eq(kiloclaw_instances.id, params.instanceId),
-        eq(kiloclaw_instances.user_id, params.kiloUserId),
-        isNull(kiloclaw_instances.organization_id),
-        isNull(kiloclaw_instances.destroyed_at)
-      )
-    )
-    .returning({ id: kiloclaw_instances.id });
-
-  if (!updatedInstance) {
-    return false;
-  }
-
-  logInfo('Cleared trial inactivity stop marker after explicit start', {
-    user_id: params.kiloUserId,
-    instance_id: params.instanceId,
+  return await clearInactiveTrialStopMarkerForPersonalInstance({
+    ...params,
+    logMessage: 'Cleared trial inactivity stop marker after explicit start',
   });
-  return true;
+}
+
+export async function clearTrialInactivityStopAfterTrialTransition(params: {
+  kiloUserId: string;
+  instanceId: string;
+}): Promise<boolean> {
+  return await clearInactiveTrialStopMarkerForPersonalInstance({
+    ...params,
+    logMessage: 'Cleared trial inactivity stop marker after trial transition',
+  });
 }

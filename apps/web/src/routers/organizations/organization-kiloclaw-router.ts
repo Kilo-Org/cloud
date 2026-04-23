@@ -511,7 +511,9 @@ export const organizationKiloclawRouter = createTRPCRouter({
   start: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const client = new KiloClawInternalClient();
-    const result = await client.start(ctx.user.id, workerInstanceId(instance));
+    const result = await client.start(ctx.user.id, workerInstanceId(instance), {
+      reason: 'manual_user_request',
+    });
     PostHogClient().capture({
       distinctId: ctx.user.google_user_email,
       event: 'claw_org_instance_started',
@@ -523,7 +525,9 @@ export const organizationKiloclawRouter = createTRPCRouter({
   stop: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const client = new KiloClawInternalClient();
-    return client.stop(ctx.user.id, workerInstanceId(instance));
+    return client.stop(ctx.user.id, workerInstanceId(instance), {
+      reason: 'manual_user_request',
+    });
   }),
 
   destroy: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
@@ -532,7 +536,9 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     let result: Awaited<ReturnType<KiloClawInternalClient['destroy']>>;
     try {
-      result = await client.destroy(ctx.user.id, workerInstanceId(instance));
+      result = await client.destroy(ctx.user.id, workerInstanceId(instance), {
+        reason: 'manual_user_request',
+      });
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);

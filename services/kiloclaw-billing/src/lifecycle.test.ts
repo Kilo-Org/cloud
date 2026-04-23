@@ -232,6 +232,12 @@ describe('interrupted auto-resume sweep', () => {
     const fetch = vi.fn(async (request: RequestInfo | URL) => {
       const url = request instanceof Request ? request.url : String(request);
       expect(url).toContain(`/api/platform/start-async?instanceId=${instanceId}`);
+      if (request instanceof Request) {
+        await expect(request.json()).resolves.toEqual({
+          userId: 'user-1',
+          reason: 'interrupted_auto_resume',
+        });
+      }
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -431,6 +437,99 @@ describe('interrupted auto-resume sweep', () => {
     expect(updates).toHaveLength(0);
     expect(txUpdates).toHaveLength(0);
     expect(txDeletes).toHaveLength(0);
+  });
+});
+
+describe('trial expiry sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+  });
+
+  it('clears the inactivity marker when an expired trial leaves trialing state', async () => {
+    const instanceId = '21212121-2121-4212-8212-212121212121';
+    const { db, updates } = createMockDb([
+      [
+        {
+          id: 'sub-trial-expired',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          sandbox_id: 'ki_21212121212142128212212121212121',
+          instance_destroyed_at: null,
+          organization_id: null,
+          email: 'user-1@example.com',
+        },
+      ],
+      [
+        {
+          id: 'sub-trial-expired',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          plan: 'trial',
+          status: 'trialing',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn(async (request: RequestInfo | URL) => {
+      const url = request instanceof Request ? request.url : String(request);
+      if (!url.includes('/api/platform/stop')) {
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          stopped: true,
+          previousStatus: 'running',
+          currentStatus: 'stopped',
+          stoppedAt: Date.parse('2026-04-22T00:00:00.000Z'),
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }
+      );
+    });
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '21212121-2121-4212-8212-212121212120',
+        sweep: 'trial_expiry',
+      },
+      1
+    );
+
+    expect(summary.sweep1_trial_expiry).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const stopRequest = fetch.mock.calls[0]?.[0];
+    expect(stopRequest).toBeInstanceOf(Request);
+    if (!(stopRequest instanceof Request)) {
+      throw new Error('expected Request');
+    }
+    expect(await stopRequest.json()).toEqual({
+      userId: 'user-1',
+      reason: 'trial_expiry',
+    });
+    const cancellationUpdate = updates.find(
+      update =>
+        update.status === 'canceled' &&
+        typeof update.suspended_at === 'string' &&
+        typeof update.destruction_deadline === 'string'
+    );
+    expect(cancellationUpdate).toBeDefined();
+    expect(updates).toContainEqual({ inactive_trial_stopped_at: null });
   });
 });
 
@@ -708,13 +807,18 @@ describe('instance destruction sweep', () => {
       [{ id: 'sub-1', user_id: 'user-1', instance_id: instanceId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
-    const fetch = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ ok: true }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-    );
+    const fetch = vi.fn(async (request: RequestInfo | URL) => {
+      if (request instanceof Request) {
+        await expect(request.json()).resolves.toEqual({
+          userId: 'user-1',
+          reason: 'destruction_deadline_elapsed',
+        });
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
 
     const summary = await runSweep(
       createEnv(fetch),
@@ -1918,6 +2022,15 @@ describe('trial inactivity stop sweep', () => {
         ? fetch.mock.calls[0][0].url
         : String(fetch.mock.calls[0]?.[0])
     ).toContain('/api/platform/stop');
+    const stopRequest = fetch.mock.calls[0]?.[0];
+    expect(stopRequest).toBeInstanceOf(Request);
+    if (!(stopRequest instanceof Request)) {
+      throw new Error('expected Request');
+    }
+    expect(await stopRequest.json()).toEqual({
+      userId: 'user-stop',
+      reason: 'trial_inactivity',
+    });
     expect(updates).toContainEqual(
       expect.objectContaining({ inactive_trial_stopped_at: '2026-04-22T00:00:00.000Z' })
     );

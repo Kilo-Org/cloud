@@ -406,6 +406,9 @@ describe('kiloclawRouter start', () => {
       currentStatus: 'running',
       startedAt: 1_776_885_000_000,
     });
+    expect(kiloclawClientMock.__startMock).toHaveBeenCalledWith(user.id, instanceId, {
+      reason: 'manual_user_request',
+    });
 
     const [updatedInstance] = await db
       .select()
@@ -501,6 +504,9 @@ describe('kiloclawRouter destroy', () => {
     const result = await caller.destroy();
 
     expect(result).toEqual({ ok: true });
+    expect(kiloclawClientMock.__destroyMock).toHaveBeenCalledWith(user.id, instanceId, {
+      reason: 'manual_user_request',
+    });
 
     const [subscription] = await db
       .select()

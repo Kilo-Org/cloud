@@ -27,7 +27,11 @@ import {
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { flattenError, z } from 'zod';
-import { withDORetry } from '@kilocode/worker-utils';
+import {
+  KiloclawStartReasonSchema,
+  KiloclawStopReasonSchema,
+  withDORetry,
+} from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
@@ -976,7 +980,7 @@ platform.post('/provision', async c => {
         c.env,
         userId,
         provisionedInstanceId,
-        stub => stub.destroy(),
+        stub => stub.destroy({ reason: 'bootstrap_cleanup_failure' }),
         'destroy'
       ).catch(destroyErr => {
         console.error(
@@ -2189,6 +2193,7 @@ platform.post('/kilo-cli-run/cancel', async c => {
 // POST /api/platform/start
 const StartRequestSchema = UserIdRequestSchema.extend({
   skipCooldown: z.boolean().optional(),
+  reason: KiloclawStartReasonSchema.optional(),
 });
 
 async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
@@ -2202,14 +2207,21 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
 
   try {
     const route = mode === 'async' ? '/api/platform/start-async' : '/api/platform/start';
-    const options = result.data.skipCooldown ? { skipCooldown: true } : undefined;
+    const startOptions =
+      result.data.skipCooldown || result.data.reason
+        ? {
+            ...(result.data.skipCooldown ? { skipCooldown: true } : {}),
+            ...(result.data.reason ? { reason: result.data.reason } : {}),
+          }
+        : undefined;
+    const asyncStartOptions = result.data.reason ? { reason: result.data.reason } : undefined;
 
     if (mode === 'async') {
       await withResolvedDORetry(
         c.env,
         result.data.userId,
         instanceId,
-        stub => stub.startAsync(result.data.userId),
+        stub => stub.startAsync(result.data.userId, asyncStartOptions),
         'startAsync'
       );
 
@@ -2218,6 +2230,7 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
         delivery: 'http',
         route,
         userId: result.data.userId,
+        label: result.data.reason,
         durationMs: performance.now() - startedAt,
       });
       return c.json({ ok: true });
@@ -2227,7 +2240,7 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
       c.env,
       result.data.userId,
       instanceId,
-      stub => stub.start(result.data.userId, options),
+      stub => stub.start(result.data.userId, startOptions),
       'start'
     );
 
@@ -2237,6 +2250,7 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
         delivery: 'http',
         route,
         userId: result.data.userId,
+        label: result.data.reason,
         durationMs: performance.now() - startedAt,
       });
     }
@@ -2250,6 +2264,7 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
       delivery: 'http',
       route: mode === 'async' ? '/api/platform/start-async' : '/api/platform/start',
       userId: result.data.userId,
+      label: result.data.reason,
       error: message,
       durationMs: performance.now() - startedAt,
     });
@@ -2328,9 +2343,13 @@ platform.post('/cleanup-recovery-previous-volume', async c => {
   }
 });
 
+const StopRequestSchema = UserIdRequestSchema.extend({
+  reason: KiloclawStopReasonSchema.optional(),
+});
+
 // POST /api/platform/stop
 platform.post('/stop', async c => {
-  const result = await parseBody(c, UserIdRequestSchema);
+  const result = await parseBody(c, StopRequestSchema);
   if ('error' in result) return result.error;
 
   const iidResult = parseInstanceIdQuery(c);
@@ -2338,11 +2357,12 @@ platform.post('/stop', async c => {
   const { instanceId } = iidResult;
 
   try {
+    const stopOptions = result.data.reason ? { reason: result.data.reason } : undefined;
     const stopResult = await withResolvedDORetry(
       c.env,
       result.data.userId,
       instanceId,
-      stub => stub.stop(),
+      stub => stub.stop(stopOptions),
       'stop'
     );
     return c.json({ ok: true, ...stopResult });
@@ -2382,7 +2402,14 @@ platform.post('/destroy', async c => {
   }
 
   try {
-    await withResolvedDORetry(c.env, userId, instanceId, stub => stub.destroy(), 'destroy');
+    const destroyOptions = result.data.reason ? { reason: result.data.reason } : undefined;
+    await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.destroy(destroyOptions),
+      'destroy'
+    );
 
     // Remove the instance from the registry (best-effort).
     // When instanceId is provided, destroy by instanceId directly.

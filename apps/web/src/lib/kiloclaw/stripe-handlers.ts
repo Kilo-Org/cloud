@@ -15,7 +15,10 @@ import {
   isIntroPriceId,
 } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { applyStripeFundedKiloClawPeriod } from '@/lib/kiloclaw/credit-billing';
-import { autoResumeIfSuspended } from '@/lib/kiloclaw/instance-lifecycle';
+import {
+  autoResumeIfSuspended,
+  clearTrialInactivityStopAfterTrialTransition,
+} from '@/lib/kiloclaw/instance-lifecycle';
 import { sentryLogger } from '@/lib/utils.server';
 import PostHogClient from '@/lib/posthog';
 import { after } from 'next/server';
@@ -122,6 +125,36 @@ async function insertStripeSubscriptionChangeLog(
       subscription_id: params.subscriptionId,
       action: params.action,
       reason: params.reason,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function clearTrialInactivityStopAfterStripeTrialTransition(params: {
+  userId: string;
+  before: KiloClawSubscription | null;
+  after: KiloClawSubscription | null;
+}) {
+  const before = params.before;
+  const after = params.after;
+
+  if (!before || before.plan !== 'trial' || before.status !== 'trialing' || !after?.instance_id) {
+    return;
+  }
+
+  if (after.plan === 'trial' && after.status === 'trialing') {
+    return;
+  }
+
+  try {
+    await clearTrialInactivityStopAfterTrialTransition({
+      kiloUserId: params.userId,
+      instanceId: after.instance_id,
+    });
+  } catch (error) {
+    logWarning('Failed to clear trial inactivity marker after Stripe trial transition', {
+      user_id: params.userId,
+      instance_id: after.instance_id,
       error: error instanceof Error ? error.message : String(error),
     });
   }
@@ -703,6 +736,8 @@ export async function handleKiloClawSubscriptionCreated(params: {
   let didProcess = false;
   let resolvedInstanceId: string | undefined;
   let convertedFromTrial = false;
+  let beforeSubscriptionForMarkerClear: KiloClawSubscription | null = null;
+  let afterSubscriptionForMarkerClear: KiloClawSubscription | null = null;
   const trialEndEventDate =
     typeof subscription.created === 'number' ? new Date(subscription.created * 1000) : new Date();
 
@@ -859,7 +894,15 @@ export async function handleKiloClawSubscriptionCreated(params: {
       after: afterSubscription ?? null,
     });
 
+    beforeSubscriptionForMarkerClear = beforeSubscription ?? null;
+    afterSubscriptionForMarkerClear = afterSubscription ?? null;
     didProcess = true;
+  });
+
+  await clearTrialInactivityStopAfterStripeTrialTransition({
+    userId: kiloUserId,
+    before: beforeSubscriptionForMarkerClear,
+    after: afterSubscriptionForMarkerClear,
   });
 
   if (wasSuspended) {
@@ -1060,6 +1103,12 @@ export async function handleKiloClawSubscriptionUpdated(params: {
       bestEffort: true,
     });
 
+    await clearTrialInactivityStopAfterStripeTrialTransition({
+      userId: preRead.user_id,
+      before: before ?? null,
+      after: after ?? null,
+    });
+
     if (wasSuspended) {
       await autoResumeIfSuspended(preRead.user_id, preRead.instance_id ?? undefined);
     }
@@ -1157,6 +1206,12 @@ export async function handleKiloClawSubscriptionDeleted(params: {
       bestEffort: true,
     });
 
+    await clearTrialInactivityStopAfterStripeTrialTransition({
+      userId: preRead.user_id,
+      before: before ?? null,
+      after: after ?? null,
+    });
+
     logInfo('KiloClaw subscription.deleted: converted to pure credit', {
       stripe_event_id: eventId,
       user_id: preRead.user_id,
@@ -1188,6 +1243,12 @@ export async function handleKiloClawSubscriptionDeleted(params: {
       before: before ?? null,
       after: after ?? null,
       bestEffort: true,
+    });
+
+    await clearTrialInactivityStopAfterStripeTrialTransition({
+      userId: preRead.user_id,
+      before: before ?? null,
+      after: after ?? null,
     });
 
     logInfo('KiloClaw subscription.deleted processed', {

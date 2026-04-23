@@ -16,7 +16,10 @@ import {
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { processTopUp } from '@/lib/credits';
-import { autoResumeIfSuspended } from '@/lib/kiloclaw/instance-lifecycle';
+import {
+  autoResumeIfSuspended,
+  clearTrialInactivityStopAfterTrialTransition,
+} from '@/lib/kiloclaw/instance-lifecycle';
 import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 import {
   computeUsageTriggeredMonthlyBonusDecision,
@@ -697,6 +700,7 @@ export async function enrollWithCredits(params: {
   const [existingSub] = await db
     .select({
       id: kiloclaw_subscriptions.id,
+      plan: kiloclaw_subscriptions.plan,
       status: kiloclaw_subscriptions.status,
       suspended_at: kiloclaw_subscriptions.suspended_at,
     })
@@ -916,6 +920,21 @@ export async function enrollWithCredits(params: {
   }
 
   // Step 5: Auto-resume if suspended (spec rule 7)
+  if (existingSub?.plan === 'trial' && existingSub.status === 'trialing') {
+    try {
+      await clearTrialInactivityStopAfterTrialTransition({
+        kiloUserId: userId,
+        instanceId,
+      });
+    } catch (error) {
+      logWarning('Failed to clear trial inactivity marker after credit enrollment', {
+        user_id: userId,
+        instanceId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   if (wasSuspended && instanceId) {
     await autoResumeIfSuspended(userId, instanceId);
   }

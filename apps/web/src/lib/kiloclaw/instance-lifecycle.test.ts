@@ -142,7 +142,9 @@ describe('instance lifecycle async resume', () => {
 
     await autoResumeIfSuspended('user-1', instanceId);
 
-    expect(startAsyncMock).toHaveBeenCalledWith('user-1', instanceId);
+    expect(startAsyncMock).toHaveBeenCalledWith('user-1', instanceId, {
+      reason: 'interrupted_auto_resume',
+    });
     expect(updateSetCalls).toHaveLength(1);
     expect(updateSetCalls[0]).toEqual(
       expect.objectContaining({

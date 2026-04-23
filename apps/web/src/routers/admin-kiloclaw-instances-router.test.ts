@@ -328,7 +328,10 @@ describe('admin.kiloclawInstances.machineStart', () => {
     });
 
     expect(result).toEqual(startedResponse);
-    expect(mockStart).toHaveBeenCalledWith(regularUser.id, instance.id, { skipCooldown: true });
+    expect(mockStart).toHaveBeenCalledWith(regularUser.id, instance.id, {
+      skipCooldown: true,
+      reason: 'admin_request',
+    });
 
     const updatedInstance = await db.query.kiloclaw_instances.findFirst({
       where: eq(kiloclaw_instances.id, instance.id),

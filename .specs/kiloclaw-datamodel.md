@@ -158,6 +158,8 @@ Instance records MAY store operational lifecycle markers that do not
 by themselves grant or revoke billing entitlement. These markers are
 runtime metadata on the instance record, not a substitute for
 subscription status, suspension, or destruction fields.
+Markers MAY be cleared when the lifecycle condition they represent no
+longer applies.
 
 ### Record Lookup
 

@@ -1,5 +1,10 @@
 import 'server-only';
 
+import type {
+  KiloclawDestroyReason,
+  KiloclawStartReason,
+  KiloclawStopReason,
+} from '@kilocode/worker-utils';
 import { KILOCLAW_API_URL, KILOCLAW_INTERNAL_API_SECRET } from '@/lib/config.server';
 import type {
   ImageVersionEntry,
@@ -153,7 +158,7 @@ export class KiloClawInternalClient {
   async start(
     userId: string,
     instanceId?: string,
-    options?: { skipCooldown?: boolean }
+    options?: { skipCooldown?: boolean; reason?: KiloclawStartReason }
   ): Promise<{
     ok: true;
     started: boolean;
@@ -166,19 +171,27 @@ export class KiloClawInternalClient {
       `/api/platform/start${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, ...options }),
+        body: JSON.stringify({
+          userId,
+          ...(options?.skipCooldown ? { skipCooldown: true } : {}),
+          ...(options?.reason ? { reason: options.reason } : {}),
+        }),
       },
       { userId }
     );
   }
 
-  async startAsync(userId: string, instanceId?: string): Promise<{ ok: true }> {
+  async startAsync(
+    userId: string,
+    instanceId?: string,
+    options?: { reason?: KiloclawStartReason }
+  ): Promise<{ ok: true }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/start-async${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );
@@ -186,7 +199,8 @@ export class KiloClawInternalClient {
 
   async stop(
     userId: string,
-    instanceId?: string
+    instanceId?: string,
+    options?: { reason?: KiloclawStopReason }
   ): Promise<{
     ok: true;
     stopped: boolean;
@@ -199,19 +213,23 @@ export class KiloClawInternalClient {
       `/api/platform/stop${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );
   }
 
-  async destroy(userId: string, instanceId?: string): Promise<{ ok: true }> {
+  async destroy(
+    userId: string,
+    instanceId?: string,
+    options?: { reason?: KiloclawDestroyReason }
+  ): Promise<{ ok: true }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/destroy${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );

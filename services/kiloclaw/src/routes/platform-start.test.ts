@@ -87,6 +87,26 @@ describe('POST /start', () => {
     expect(start).toHaveBeenCalledWith('user-1', undefined);
   });
 
+  it('passes an optional start reason through to the DO', async () => {
+    const { env, start } = makeEnv();
+    const { path, init } = postJson('/start?instanceId=11111111-1111-4111-8111-111111111111', {
+      userId: 'user-1',
+      reason: 'manual_user_request',
+    });
+
+    const response = await platform.request(path, init, env);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ok: true,
+      started: true,
+      previousStatus: 'stopped',
+      currentStatus: 'running',
+      startedAt: 1_776_885_000_000,
+    });
+    expect(start).toHaveBeenCalledWith('user-1', { reason: 'manual_user_request' });
+  });
+
   it('returns a structured no-op result when the instance is still stopped', async () => {
     const { env, start } = makeEnv();
     start.mockResolvedValueOnce({
@@ -109,6 +129,19 @@ describe('POST /start', () => {
       currentStatus: 'stopped',
       startedAt: null,
     });
+  });
+
+  it('rejects unknown start reasons', async () => {
+    const { env, start } = makeEnv();
+    const { path, init } = postJson('/start', {
+      userId: 'user-1',
+      reason: 'typoed_reason',
+    });
+
+    const response = await platform.request(path, init, env);
+
+    expect(response.status).toBe(400);
+    expect(start).not.toHaveBeenCalled();
   });
 
   it('logs billing-correlated start requests with propagated context', async () => {

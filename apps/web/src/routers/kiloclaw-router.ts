@@ -2406,7 +2406,9 @@ export const kiloclawRouter = createTRPCRouter({
   start: clawAccessProcedure.mutation(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    const result = await client.start(ctx.user.id, workerInstanceId(instance));
+    const result = await client.start(ctx.user.id, workerInstanceId(instance), {
+      reason: 'manual_user_request',
+    });
     if (instance && result.currentStatus === 'running') {
       try {
         await clearTrialInactivityStopAfterStart({
@@ -2428,7 +2430,9 @@ export const kiloclawRouter = createTRPCRouter({
   stop: clawAccessProcedure.mutation(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.stop(ctx.user.id, workerInstanceId(instance));
+    return client.stop(ctx.user.id, workerInstanceId(instance), {
+      reason: 'manual_user_request',
+    });
   }),
 
   destroy: baseProcedure.mutation(async ({ ctx }) => {
@@ -2436,7 +2440,9 @@ export const kiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     let result: Awaited<ReturnType<KiloClawInternalClient['destroy']>>;
     try {
-      result = await client.destroy(ctx.user.id, workerInstanceId(destroyedRow));
+      result = await client.destroy(ctx.user.id, workerInstanceId(destroyedRow), {
+        reason: 'manual_user_request',
+      });
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);

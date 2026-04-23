@@ -1106,6 +1106,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       const client = new KiloClawInternalClient();
       const result = await client.start(input.userId, workerInstanceId(instance), {
         skipCooldown: true,
+        reason: 'admin_request',
       });
       if (instance && result.currentStatus === 'running') {
         try {
@@ -1178,7 +1179,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await resolveInstance(input.userId, input.instanceId);
       const client = new KiloClawInternalClient();
-      return await client.stop(input.userId, workerInstanceId(instance));
+      return await client.stop(input.userId, workerInstanceId(instance), {
+        reason: 'admin_request',
+      });
     } catch (err) {
       console.error('Failed to stop machine for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -1418,7 +1421,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
     const client = new KiloClawInternalClient();
     try {
-      await client.destroy(instance.user_id, workerInstanceId(instance));
+      await client.destroy(instance.user_id, workerInstanceId(instance), {
+        reason: 'admin_request',
+      });
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);
@@ -1534,7 +1539,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     for (const instance of activeInstances) {
       const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
       try {
-        await client.destroy(instance.user_id, workerInstanceId(instance));
+        await client.destroy(instance.user_id, workerInstanceId(instance), {
+          reason: 'admin_request',
+        });
         destroyed++;
       } catch (err) {
         if (destroyedRow) {

@@ -127,7 +127,13 @@ function detectMessagesErrors(
   for (const block of response.content ?? []) {
     if (block.type !== 'tool_use') continue;
     // block.input is already a parsed object, not a JSON string
-    validateAgainstSchema(block.input, toolSchemaByName.get(block.name), block.id, block.name, errors);
+    validateAgainstSchema(
+      block.input,
+      toolSchemaByName.get(block.name),
+      block.id,
+      block.name,
+      errors,
+    );
   }
   return errors;
 }

@@ -42,9 +42,9 @@ RUN apt-get update \
     && npm --version
 
 # Route npm's git-backed deps (GitHub refs, ssh:// transitive deps like
-# baileys → libsignal-node) through https so we don't need an ssh client in
-# the image. --system writes to /etc/gitconfig, which the Fly Volume at /root
-# doesn't shadow, so it persists at runtime too.
+# baileys → libsignal-node) through https during the build so we don't need
+# an ssh client in the image. The final stage removes /etc/gitconfig so this
+# build-only config does not ship in the runtime image.
 RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.com/"
 
 # Install pnpm globally
@@ -167,9 +167,12 @@ RUN cd /tmp/controller-build \
 FROM runtime AS final
 
 # Install prebuilt customizer plugin package from builder stage.
+# Also drop /etc/gitconfig (set earlier for the build's ssh→https rewrite) so
+# it doesn't persist in the runtime image.
 COPY --from=customizer-builder /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-customizer.tgz
 RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz \
     && rm -f /tmp/kiloclaw-customizer.tgz \
+    && rm -f /etc/gitconfig \
     && rm -rf /root/.npm
 
 # Copy the compiled controller from the builder stage

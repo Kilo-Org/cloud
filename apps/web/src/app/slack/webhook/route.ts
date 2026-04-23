@@ -2,6 +2,11 @@ import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
 import type { AppMentionEvent, GenericMessageEvent } from '@slack/types';
 import { WebClient } from '@slack/web-api';
+import {
+  cloneRequestWithBody,
+  handleLegacySlackBotWebhookRequest,
+} from '@/lib/bot/webhook-handler';
+import { shouldRouteSlackEventsApiBodyToNewBotInfra } from '@/lib/bot/slack-rollout';
 import { processKiloBotMessage } from '@/lib/slack-bot';
 import { markdownToSlackMrkdwn } from '@/lib/slack/markdownToSlackMrkdwn';
 import { logSlackBotRequest } from '@/lib/slack-bot-logging';
@@ -115,6 +120,10 @@ export async function POST(request: NextRequest) {
   }
 
   const body = JSON.parse(rawBody);
+
+  if (await shouldRouteSlackEventsApiBodyToNewBotInfra(body)) {
+    return handleLegacySlackBotWebhookRequest(cloneRequestWithBody(request, rawBody));
+  }
 
   // Handle Slack URL verification challenge
   // This is required when first setting up the Events API

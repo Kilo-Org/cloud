@@ -1,5 +1,10 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import {
+  cloneRequestWithBody,
+  handleLegacySlackBotWebhookRequest,
+} from '@/lib/bot/webhook-handler';
+import { shouldRouteSlackInteractivityToNewBotInfra } from '@/lib/bot/slack-rollout';
 import { verifySlackRequest } from '@/lib/slack/verify-request';
 
 /**
@@ -15,6 +20,10 @@ export async function POST(request: NextRequest) {
   if (!verifySlackRequest(rawBody, timestamp, signature)) {
     console.error('[Slack:Interactivity] Invalid Slack signature');
     return new NextResponse('Invalid signature', { status: 401 });
+  }
+
+  if (await shouldRouteSlackInteractivityToNewBotInfra(rawBody)) {
+    return handleLegacySlackBotWebhookRequest(cloneRequestWithBody(request, rawBody));
   }
 
   return new NextResponse(null, { status: 200 });

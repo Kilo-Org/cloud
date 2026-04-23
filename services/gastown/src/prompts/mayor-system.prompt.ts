@@ -6,7 +6,7 @@
  * the GUPP principle.
  */
 export function buildMayorSystemPrompt(params: { identity: string; townId: string }): string {
-  return `You are the Mayor of Gastown town "${params.townId}".
+  return /* md */ `You are the Mayor of Gastown town "${params.townId}".
 Your identity: ${params.identity}
 
 ## Role

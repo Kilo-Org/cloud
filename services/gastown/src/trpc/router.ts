@@ -878,12 +878,15 @@ export const gastownRouter = router({
       });
 
       if (input.startImmediately) {
-        await townStub.startHeldBead(bead.bead_id);
+        await townStub.startHeldBead(bead.bead_id, rig.id);
       } else {
-        // Fire-and-forget mayor notification — don't block the response
-        townStub
-          .notifyMayorOfNewBead(bead.bead_id, rig.id, input.title, input.body)
-          .catch(err => console.warn('[gastown-trpc] createBead: mayor notification failed', err));
+        // Mayor notification can start a container — use waitUntil so the Worker
+        // stays alive until the RPC completes without blocking the HTTP response.
+        ctx.executionCtx.waitUntil(
+          townStub
+            .notifyMayorOfNewBead(bead.bead_id, rig.id, input.title, input.body)
+            .catch(err => console.warn('[gastown-trpc] createBead: mayor notification failed', err))
+        );
       }
 
       return bead;
@@ -901,7 +904,7 @@ export const gastownRouter = router({
     .mutation(async ({ ctx, input }) => {
       const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
-      return townStub.startHeldBead(input.beadId);
+      return townStub.startHeldBead(input.beadId, rig.id);
     }),
 
   enrichBead: gastownProcedure

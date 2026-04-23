@@ -2457,10 +2457,16 @@ export class TownDO extends DurableObject<Env> {
   /**
    * Remove the `gt:held` label from a bead and arm the reconciler alarm so the
    * bead is picked up on the next tick.
+   *
+   * @param rigId - The rig the caller has verified ownership of. The bead must
+   *   belong to this rig to prevent cross-rig label removal within the same town.
    */
-  async startHeldBead(beadId: string): Promise<Bead> {
+  async startHeldBead(beadId: string, rigId: string): Promise<Bead> {
     const bead = beadOps.getBead(this.sql, beadId);
     if (!bead) throw new Error(`Bead ${beadId} not found`);
+    if (bead.rig_id !== rigId) {
+      throw new Error(`Bead ${beadId} does not belong to rig ${rigId}`);
+    }
 
     const updatedLabels = (bead.labels ?? []).filter(l => l !== patrol.HELD_LABEL);
     const updated = beadOps.updateBeadFields(this.sql, beadId, { labels: updatedLabels }, 'system');

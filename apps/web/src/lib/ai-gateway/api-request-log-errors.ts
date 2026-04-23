@@ -18,6 +18,25 @@ export type ApiRequestLogError = z.infer<typeof apiRequestLogErrorSchema>;
 
 type ToolCallError = z.infer<typeof toolCallArgumentErrorSchema>;
 
+// Inline types for SSE event shapes we care about in the Responses API
+type ResponsesOutputItemDoneEvent = {
+  type: 'response.output_item.done';
+  item: OpenAI.Responses.ResponseFunctionToolCall | { type: string };
+};
+
+// Inline types for Anthropic Messages API streaming events
+type MessagesContentBlockStartEvent = {
+  type: 'content_block_start';
+  index: number;
+  content_block: { type: 'tool_use'; id: string; name: string } | { type: string };
+};
+
+type MessagesContentBlockDeltaEvent = {
+  type: 'content_block_delta';
+  index: number;
+  delta: { type: 'input_json_delta'; partial_json: string } | { type: string };
+};
+
 function validateAgainstSchema(
   parsedArgs: unknown,
   parameters: unknown,
@@ -63,8 +82,24 @@ function parseArgsString(
   }
 }
 
-function detectChatCompletionErrors(
-  response: OpenAI.Chat.ChatCompletion,
+/**
+ * Returns the JSON payload strings from `data: <payload>` lines, excluding `[DONE]`.
+ * Returns an empty array if the text does not look like an SSE stream.
+ */
+function parseSseDataLines(text: string): string[] {
+  const lines: string[] = [];
+  for (const line of text.split('\n')) {
+    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+      lines.push(line.slice(6));
+    }
+  }
+  return lines;
+}
+
+type ToolAccumulator = { id: string; name: string; arguments: string };
+
+function detectChatCompletionSseErrors(
+  lines: string[],
   tools: OpenAI.Chat.ChatCompletionTool[] | null | undefined
 ): ToolCallError[] {
   const toolSchemaByName = new Map<string, unknown>();
@@ -74,22 +109,40 @@ function detectChatCompletionErrors(
     }
   }
 
-  const errors: ToolCallError[] = [];
-  for (const choice of response.choices ?? []) {
-    for (const toolCall of choice.message.tool_calls ?? []) {
-      if (toolCall.type !== 'function') continue;
-      const { name, arguments: argsStr } = toolCall.function;
-      const result = parseArgsString(argsStr, toolCall.id, name, errors);
-      if (result.ok) {
-        validateAgainstSchema(result.parsed, toolSchemaByName.get(name), toolCall.id, name, errors);
+  // Accumulate tool call arguments by index across chunks
+  const byIndex = new Map<number, ToolAccumulator>();
+  for (const line of lines) {
+    const chunk: OpenAI.Chat.Completions.ChatCompletionChunk = JSON.parse(line);
+    for (const choice of chunk.choices) {
+      for (const toolCall of choice.delta.tool_calls ?? []) {
+        const acc = byIndex.get(toolCall.index) ?? { id: '', name: '', arguments: '' };
+        if (toolCall.id) acc.id = toolCall.id;
+        if (toolCall.function?.name) acc.name = toolCall.function.name;
+        acc.arguments += toolCall.function?.arguments ?? '';
+        byIndex.set(toolCall.index, acc);
       }
+    }
+  }
+
+  const errors: ToolCallError[] = [];
+  for (const [, acc] of byIndex) {
+    if (!acc.name) continue;
+    const result = parseArgsString(acc.arguments, acc.id, acc.name, errors);
+    if (result.ok) {
+      validateAgainstSchema(
+        result.parsed,
+        toolSchemaByName.get(acc.name),
+        acc.id,
+        acc.name,
+        errors
+      );
     }
   }
   return errors;
 }
 
-function detectResponsesErrors(
-  response: OpenAI.Responses.Response,
+function detectResponsesSseErrors(
+  lines: string[],
   tools: OpenAI.Responses.ResponseCreateParams['tools']
 ): ToolCallError[] {
   const toolSchemaByName = new Map<string, unknown>();
@@ -99,10 +152,13 @@ function detectResponsesErrors(
     }
   }
 
+  // response.output_item.done carries the fully assembled function_call item
   const errors: ToolCallError[] = [];
-  for (const item of response.output ?? []) {
-    if (item.type !== 'function_call') continue;
-    const { call_id, name, arguments: argsStr } = item;
+  for (const line of lines) {
+    const event: ResponsesOutputItemDoneEvent = JSON.parse(line);
+    if (event.type !== 'response.output_item.done') continue;
+    if (event.item.type !== 'function_call') continue;
+    const { call_id, name, arguments: argsStr } = event.item;
     const result = parseArgsString(argsStr, call_id, name, errors);
     if (result.ok) {
       validateAgainstSchema(result.parsed, toolSchemaByName.get(name), call_id, name, errors);
@@ -111,8 +167,8 @@ function detectResponsesErrors(
   return errors;
 }
 
-function detectMessagesErrors(
-  response: Anthropic.Messages.Message,
+function detectMessagesSseErrors(
+  lines: string[],
   tools: Anthropic.MessageCreateParams['tools']
 ): ToolCallError[] {
   const toolSchemaByName = new Map<string, unknown>();
@@ -123,43 +179,60 @@ function detectMessagesErrors(
     }
   }
 
+  // Accumulate partial_json fragments by content block index
+  const byIndex = new Map<number, ToolAccumulator>();
+  for (const line of lines) {
+    const event: MessagesContentBlockStartEvent | MessagesContentBlockDeltaEvent = JSON.parse(line);
+    if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
+      const { id, name } = event.content_block;
+      byIndex.set(event.index, { id, name, arguments: '' });
+    } else if (event.type === 'content_block_delta' && event.delta.type === 'input_json_delta') {
+      const acc = byIndex.get(event.index);
+      if (acc) acc.arguments += event.delta.partial_json;
+    }
+  }
+
   const errors: ToolCallError[] = [];
-  for (const block of response.content ?? []) {
-    if (block.type !== 'tool_use') continue;
-    // block.input is already a parsed object, not a JSON string
-    validateAgainstSchema(
-      block.input,
-      toolSchemaByName.get(block.name),
-      block.id,
-      block.name,
-      errors
-    );
+  for (const [, acc] of byIndex) {
+    const result = parseArgsString(acc.arguments, acc.id, acc.name, errors);
+    if (result.ok) {
+      // acc.arguments is accumulated JSON — validate against tool schema
+      validateAgainstSchema(
+        result.parsed,
+        toolSchemaByName.get(acc.name),
+        acc.id,
+        acc.name,
+        errors
+      );
+    }
   }
   return errors;
 }
 
 /**
- * Checks response tool call arguments for JSON parse errors or schema mismatches.
- * Returns null if there are no errors or the response body is not parseable JSON.
+ * Checks SSE-streamed response tool call arguments for JSON parse errors or schema mismatches.
+ * Returns null if the response is not an SSE stream or if no errors are found.
  */
 export function detectToolCallArgumentErrors(
   responseText: string,
   request: GatewayRequest
 ): ApiRequestLogError | null {
+  const lines = parseSseDataLines(responseText);
+  if (lines.length === 0) return null;
+
+  let errors: ToolCallError[];
   try {
-    // JSON.parse returns `any`; the detector functions handle unexpected shapes defensively
-    const parsed = JSON.parse(responseText);
-    let errors: ToolCallError[];
     if (request.kind === 'chat_completions') {
-      errors = detectChatCompletionErrors(parsed, request.body.tools);
+      errors = detectChatCompletionSseErrors(lines, request.body.tools);
     } else if (request.kind === 'responses') {
-      errors = detectResponsesErrors(parsed, request.body.tools);
+      errors = detectResponsesSseErrors(lines, request.body.tools);
     } else {
-      errors = detectMessagesErrors(parsed, request.body.tools);
+      errors = detectMessagesSseErrors(lines, request.body.tools);
     }
-    if (errors.length === 0) return null;
-    return { invalid_tool_call_arguments: errors };
   } catch {
     return null;
   }
+
+  if (errors.length === 0) return null;
+  return { invalid_tool_call_arguments: errors };
 }

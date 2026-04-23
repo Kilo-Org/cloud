@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { isFreeModel, kiloExclusiveModels } from './models';
+import { autoFreeModels, isFreeModel, kiloExclusiveModels } from './models';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -77,6 +77,13 @@ describe('isFreeModel', () => {
       // Disabled models without :free suffix should NOT be detected as free
       for (const model of disabledModels) {
         expect(isFreeModel(model.public_id)).toBe(false);
+      }
+    });
+
+    test('all autoFreeModels should pass isFreeModel', () => {
+      expect(autoFreeModels.length).toBeGreaterThan(0);
+      for (const model of autoFreeModels) {
+        expect(isFreeModel(model)).toBe(true);
       }
     });
 

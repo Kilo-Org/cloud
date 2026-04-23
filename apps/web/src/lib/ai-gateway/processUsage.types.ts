@@ -120,6 +120,8 @@ export type MicrodollarUsageContext = {
   mode: string | null;
   /** The auto model ID when one was requested (e.g. 'kilo-auto/free'). */
   auto_model: string | null;
+  /** Time to first byte from the upstream provider, in milliseconds. Set after the upstream request returns. */
+  ttfb_ms: number | null;
 };
 
 export type CoreUsageWithMetaData = {

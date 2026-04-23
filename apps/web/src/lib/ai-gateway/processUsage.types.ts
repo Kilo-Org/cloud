@@ -120,6 +120,10 @@ export type MicrodollarUsageContext = {
   mode: string | null;
   /** The auto model ID when one was requested (e.g. 'kilo-auto/free'). */
   auto_model: string | null;
+  /** performance.now() timestamp at the start of the upstream request, used to compute completeRequestMs. */
+  requestStartedAt: number;
+  /** Time from request start to first byte received from upstream, in milliseconds. */
+  ttfbMs: number;
 };
 
 export type CoreUsageWithMetaData = {

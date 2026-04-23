@@ -858,6 +858,18 @@ async function processTokenData(
     usageStats = genStats;
   }
 
+  // Override OpenRouter-reported timing with locally measured values for accuracy.
+  // completeRequestMs is measured here, after the response body has been fully drained
+  // by the parsers above. ttfbMs was set on usageContext right after the upstream response
+  // headers were received in the route handler.
+  const completeRequestMs = Math.max(
+    0,
+    Math.round(performance.now() - usageContext.requestStartedAt)
+  );
+  usageStats.latency = completeRequestMs;
+  usageStats.generation_time = usageContext.ttfbMs;
+  usageStats.moderation_latency = null;
+
   if (usageStats.inputTokens - usageStats.cacheHitTokens > 100000)
     console.warn(`Abuse?: Large uncached token request detected:`, usageStats);
 

@@ -94,6 +94,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       session_id: null,
       mode: null,
       auto_model: null,
+      requestStartedAt: performance.now(),
+      ttfbMs: 0,
     };
 
     // Use the existing countAndStoreUsage function

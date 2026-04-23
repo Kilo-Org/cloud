@@ -447,6 +447,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     posthog_distinct_id: isAnonymousContext(user) ? undefined : user.google_user_email,
     project_id: projectId,
     status_code: null,
+    requestStartedAt,
+    ttfbMs: 0, // filled in after the upstream response is received
     editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
     machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
@@ -551,6 +553,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
   }
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
+  usageContext.ttfbMs = ttfbMs;
 
   emitApiMetricsForResponse(
     {

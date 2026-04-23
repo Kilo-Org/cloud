@@ -113,12 +113,13 @@ export const PRESETS: PresetConfig[] = [
 export function presetToConfig(preset: ModelPreset, customModels: CustomModels) {
   if (preset === 'custom') {
     const fallback = 'kilo-auto/balanced';
+    const defaultModel = customModels.defaultModel || fallback;
     return {
-      default_model: customModels.defaultModel || fallback,
+      default_model: defaultModel,
       role_models: {
-        mayor: customModels.mayor || fallback,
-        refinery: customModels.refinery || fallback,
-        polecat: customModels.polecat || fallback,
+        mayor: customModels.mayor || defaultModel,
+        refinery: customModels.refinery || defaultModel,
+        polecat: customModels.polecat || defaultModel,
       },
       small_model: customModels.smallModel || undefined,
     };

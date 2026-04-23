@@ -7,6 +7,7 @@ import {
   createCodeReview,
   findExistingReview,
   findActiveReviewsForPR,
+  updateReviewHeadShaAndCheckRun,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -171,6 +172,23 @@ export async function handlePullRequestCodeReview(
         repo: repository.full_name,
         head_sha: pull_request.head.sha,
       });
+
+      // The preserved review's check run still sits on the prior SHA, so
+      // branch protection that requires the Kilo check would stay blocked
+      // on the merge-commit head. Drop a fresh check run on the new HEAD
+      // and repoint the review at it so its eventual completion callback
+      // updates the gate on the commit GitHub actually evaluates.
+      await migrateInFlightReviewsToMergeCommitHead({
+        repoFullName: repository.full_name,
+        prNumber: pull_request.number,
+        newHeadSha: pull_request.head.sha,
+        installationId: integration.platform_installation_id as string,
+        headOwner,
+        headRepoName,
+        appType,
+        userIdForFlag: owner.userId,
+      });
+
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
     }
 
@@ -387,6 +405,90 @@ export async function shouldSkipSynchronizeForMergeCommit(args: {
   if (args.action !== GITHUB_ACTION.SYNCHRONIZE) return false;
   const check = args.isMergeCommitFn ?? isMergeCommit;
   return check(args.installationId, args.headOwner, args.headRepoName, args.headSha, args.appType);
+}
+
+/**
+ * When a merge-commit synchronize arrives and we bail out to preserve the
+ * in-flight review, the review is still pinned to the previous SHA's check
+ * run. GitHub branch protection evaluates against the current HEAD, so the
+ * required Kilo check would never appear on the merge commit. This helper
+ * creates a fresh check run on the new HEAD and moves the review record
+ * onto it, so the completion callback updates the visible gate. Best-effort:
+ * any failure is logged but does not fail the webhook.
+ */
+async function migrateInFlightReviewsToMergeCommitHead(args: {
+  repoFullName: string;
+  prNumber: number;
+  newHeadSha: string;
+  installationId: string;
+  headOwner: string;
+  headRepoName: string;
+  appType: GitHubAppType;
+  userIdForFlag: string;
+}) {
+  if (args.appType === 'lite') return;
+
+  const isPrGateEnabled =
+    process.env.NODE_ENV === 'development' ||
+    (await isFeatureFlagEnabled('code-review-pr-gate', args.userIdForFlag));
+  if (!isPrGateEnabled) return;
+
+  try {
+    const activeReviewIds = await findActiveReviewsForPR(
+      args.repoFullName,
+      args.prNumber,
+      args.newHeadSha
+    );
+    if (activeReviewIds.length === 0) return;
+
+    // In practice a PR has at most one active review at a time; migrate the
+    // first one to the new SHA. Any extras stay pinned to their old SHAs
+    // and will be cancelled on the next non-merge push.
+    const [reviewId] = activeReviewIds;
+    const detailsUrl = `${APP_URL}/code-reviews/${reviewId}`;
+
+    let newCheckRunId: number | undefined;
+    try {
+      newCheckRunId = await createCheckRun(
+        args.installationId,
+        args.headOwner,
+        args.headRepoName,
+        args.newHeadSha,
+        {
+          detailsUrl,
+          output: {
+            title: 'Kilo Code Review in progress',
+            summary: 'Continuing the review from the previous commit.',
+          },
+        },
+        args.appType
+      );
+      await updateReviewHeadShaAndCheckRun(reviewId, args.newHeadSha, newCheckRunId);
+      logExceptInTest(
+        `Migrated review ${reviewId} to merge-commit head ${args.newHeadSha} (check run ${newCheckRunId})`
+      );
+    } catch (migrateError) {
+      logExceptInTest('Failed to migrate in-flight review onto merge commit head:', migrateError);
+      // If we created the new check run on GitHub but could not persist
+      // the migration, cancel the new run so it does not stay 'queued'
+      // forever and block branch-protection gating.
+      if (newCheckRunId !== undefined) {
+        try {
+          await updateCheckRun(
+            args.installationId,
+            args.headOwner,
+            args.headRepoName,
+            newCheckRunId,
+            { status: 'completed', conclusion: 'cancelled' }
+          );
+        } catch (cancelError) {
+          logExceptInTest('Failed to cancel orphaned merge-commit check run:', cancelError);
+        }
+      }
+    }
+  } catch (lookupError) {
+    logExceptInTest('Failed to find active reviews for merge-commit migration:', lookupError);
+  }
 }
 
 /**

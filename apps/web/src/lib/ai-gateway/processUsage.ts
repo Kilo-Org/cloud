@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { db } from '../drizzle';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
-import { createTimer } from '@/lib/timer';
+import { createTimer, type Timer } from '@/lib/timer';
 import type { OpenAI } from 'openai';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import type {
@@ -541,7 +541,7 @@ export function countAndStoreUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
   openrouterRequestSpan: Span | undefined,
-  requestStartedAt: number,
+  requestTimer: Timer,
   ttfbMs: number
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
@@ -599,7 +599,7 @@ export function countAndStoreUsage(
   }
 
   return usageStatsPromise.then(usageStats =>
-    processTokenData(usageStats, usageContext, requestStartedAt, ttfbMs)
+    processTokenData(usageStats, usageContext, requestTimer, ttfbMs)
   );
 }
 
@@ -814,7 +814,7 @@ export function calculateKiloExclusiveCost_mUsd(
 async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext,
-  requestStartedAt: number,
+  requestTimer: Timer,
   ttfbMs: number
 ) {
   if (!usageStats) {
@@ -826,7 +826,7 @@ async function processTokenData(
     return;
   }
 
-  const timer = createTimer();
+  const timer = requestTimer;
   const provider = Object.values(PROVIDERS).find(p => p.id === usageContext.provider);
   const generation =
     provider &&
@@ -867,12 +867,11 @@ async function processTokenData(
   // Override OpenRouter-reported timing with locally measured values for accuracy.
   // ttfbMs was measured right after the upstream response headers were received,
   // so it represents the latency experienced by the caller.
-  // completeRequestMs is measured here, after the response body has been fully drained
+  // timer.elapsedMS() is measured here, after the response body has been fully drained
   // by the parsers above, so it captures the full generation time.
   // moderation_latency is OpenRouter-specific and is retained from the /generation response.
-  const completeRequestMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageStats.latency = ttfbMs;
-  usageStats.generation_time = completeRequestMs;
+  usageStats.generation_time = Math.max(0, Math.round(timer.elapsedMS()));
 
   if (usageStats.inputTokens - usageStats.cacheHitTokens > 100000)
     console.warn(`Abuse?: Large uncached token request detected:`, usageStats);

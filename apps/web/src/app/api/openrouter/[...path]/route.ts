@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server';
 import { isOpenCodeBasedClient, isRooCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/ai-gateway/processUsage';
+import { createTimer } from '@/lib/timer';
 import {
   validateFeatureHeader,
   FEATURE_HEADER,
@@ -165,6 +166,7 @@ async function resolveRateLimit(
 
 export async function POST(request: NextRequest): Promise<NextResponseType<unknown>> {
   const requestStartedAt = performance.now();
+  const requestTimer = createTimer(requestStartedAt);
 
   const url = new URL(request.url);
 
@@ -630,7 +632,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     clonedReponse,
     usageContext,
     openrouterRequestSpan,
-    requestStartedAt,
+    requestTimer,
     ttfbMs
   );
 

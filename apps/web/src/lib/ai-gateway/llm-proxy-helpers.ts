@@ -1,6 +1,7 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { FEATURE_HEADER, type FeatureValue } from '@/lib/feature-detection';
 import { countAndStoreUsage, logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
+import type { Timer } from '@/lib/timer';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
@@ -296,13 +297,13 @@ export function accountForMicrodollarUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
   openrouterRequestSpan: Span | undefined,
-  requestStartedAt: number,
+  requestTimer: Timer,
   ttfbMs: number
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
   after(
-    countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan, requestStartedAt, ttfbMs)
+    countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan, requestTimer, ttfbMs)
   );
 }
 

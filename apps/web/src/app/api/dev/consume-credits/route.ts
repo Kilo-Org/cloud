@@ -7,6 +7,7 @@ import { countAndStoreUsage } from '@/lib/ai-gateway/processUsage';
 import { captureException } from '@sentry/nextjs';
 import { getFraudDetectionHeaders } from '@/lib/utils';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
+import { createTimer } from '@/lib/timer';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Check if we're in development mode
@@ -97,8 +98,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     };
 
     // Use the existing countAndStoreUsage function
-    const requestStartedAt = performance.now();
-    await countAndStoreUsage(mockResponse, usageContext, undefined, requestStartedAt, 0);
+    await countAndStoreUsage(mockResponse, usageContext, undefined, createTimer(), 0);
 
     // Reset the balance cache using the proper function
     await forceImmediateExpirationRecomputation(kiloUserId);

@@ -31,18 +31,23 @@ export const actionItemSchema = z.object({
   value: z.string().min(1).max(200),
 });
 
-export const actionsBlockSchema = z.object({
-  type: z.literal('actions'),
-  groupId: z.string().min(1).max(200),
-  actions: z.array(actionItemSchema).min(1).max(10),
-  resolved: z
-    .object({
-      value: z.string(),
-      resolvedBy: z.string(),
-      resolvedAt: z.number(),
-    })
-    .optional(),
-});
+export const actionsBlockSchema = z
+  .object({
+    type: z.literal('actions'),
+    groupId: z.string().min(1).max(200),
+    actions: z.array(actionItemSchema).max(10),
+    resolved: z
+      .object({
+        value: z.string(),
+        resolvedBy: z.string(),
+        resolvedAt: z.number(),
+      })
+      .optional(),
+  })
+  .refine(block => block.resolved !== undefined || block.actions.length >= 1, {
+    message: 'actions must contain at least one item unless the block is resolved',
+    path: ['actions'],
+  });
 
 export const textBlockSchema = z.object({
   type: z.literal('text'),

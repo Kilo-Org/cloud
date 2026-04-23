@@ -6,13 +6,7 @@ export type PopulatedClawStatus = KiloClawDashboardStatus & {
 
 export type ClawOnboardingMode = 'create-first' | 'post-provisioning';
 
-export type OnboardingStep =
-  | 'identity'
-  | 'permissions'
-  | 'channels'
-  | 'provisioning'
-  | 'pairing'
-  | 'done';
+export type OnboardingStep = 'identity' | 'channels' | 'provisioning' | 'pairing' | 'done';
 
 export const CLAW_ONBOARDING_WIZARD_STEPS = [
   'identity',
@@ -115,8 +109,7 @@ export function getClawOnboardingStepProgress(
     return { currentStep: totalSteps, totalSteps };
   }
 
-  const progressStep = step === 'permissions' ? 'channels' : step;
-  const index = wizardSteps.indexOf(progressStep);
+  const index = wizardSteps.indexOf(step);
   const currentStep = index === -1 ? 0 : index + 1;
 
   return { currentStep, totalSteps };
@@ -284,14 +277,6 @@ function getRenderStepDecision({
       reason: !hasBotIdentity
         ? 'bot identity is missing, so identity is the earliest safe step'
         : 'stored onboarding step is identity',
-    };
-  }
-
-  if (onboardingStep === 'permissions') {
-    return {
-      renderStep: 'channels',
-      reason:
-        'stored onboarding step is permissions, but live onboarding defaults to YOLO and skips ahead',
     };
   }
 

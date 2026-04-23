@@ -123,15 +123,6 @@ describe('ClawOnboardingFlow state machine', () => {
       getClawOnboardingFlowState(
         createInput({
           createSetupStarted: true,
-          onboardingStep: 'permissions',
-          hasBotIdentity: true,
-        })
-      ).renderStep
-    ).toBe('channels');
-    expect(
-      getClawOnboardingFlowState(
-        createInput({
-          createSetupStarted: true,
           onboardingStep: 'channels',
           hasBotIdentity: true,
         })
@@ -193,10 +184,6 @@ describe('ClawOnboardingFlow state machine', () => {
       currentStep: 1,
       totalSteps: 3,
     });
-    expect(getClawOnboardingStepProgress('permissions', false)).toEqual({
-      currentStep: 2,
-      totalSteps: 3,
-    });
     expect(getClawOnboardingStepProgress('channels', false)).toEqual({
       currentStep: 2,
       totalSteps: 3,
@@ -209,10 +196,6 @@ describe('ClawOnboardingFlow state machine', () => {
 
     expect(getClawOnboardingStepProgress('identity', true)).toEqual({
       currentStep: 1,
-      totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('permissions', true)).toEqual({
-      currentStep: 2,
       totalSteps: 4,
     });
     expect(getClawOnboardingStepProgress('channels', true)).toEqual({
@@ -368,24 +351,6 @@ describe('ClawOnboardingFlow state machine', () => {
   });
 
   test('normalizes impossible local wizard states to the earliest safe prerequisite', () => {
-    expect(
-      getClawOnboardingFlowState(
-        createInput({
-          createSetupStarted: true,
-          onboardingStep: 'permissions',
-          hasBotIdentity: false,
-        })
-      ).renderStep
-    ).toBe('identity');
-    expect(
-      getClawOnboardingFlowState(
-        createInput({
-          createSetupStarted: true,
-          onboardingStep: 'permissions',
-          hasBotIdentity: true,
-        })
-      ).renderStep
-    ).toBe('channels');
     expect(
       getClawOnboardingFlowState(
         createInput({

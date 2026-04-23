@@ -18,25 +18,6 @@ export type ApiRequestLogError = z.infer<typeof apiRequestLogErrorSchema>;
 
 type ToolCallError = z.infer<typeof toolCallArgumentErrorSchema>;
 
-// Inline types for SSE event shapes we care about in the Responses API
-type ResponsesOutputItemDoneEvent = {
-  type: 'response.output_item.done';
-  item: OpenAI.Responses.ResponseFunctionToolCall | { type: string };
-};
-
-// Inline types for Anthropic Messages API streaming events
-type MessagesContentBlockStartEvent = {
-  type: 'content_block_start';
-  index: number;
-  content_block: { type: 'tool_use'; id: string; name: string } | { type: string };
-};
-
-type MessagesContentBlockDeltaEvent = {
-  type: 'content_block_delta';
-  index: number;
-  delta: { type: 'input_json_delta'; partial_json: string } | { type: string };
-};
-
 function validateAgainstSchema(
   parsedArgs: unknown,
   parameters: unknown,
@@ -155,13 +136,15 @@ function detectResponsesSseErrors(
   // response.output_item.done carries the fully assembled function_call item
   const errors: ToolCallError[] = [];
   for (const line of lines) {
-    const event: ResponsesOutputItemDoneEvent = JSON.parse(line);
-    if (event.type !== 'response.output_item.done') continue;
-    if (event.item.type !== 'function_call') continue;
-    const { call_id, name, arguments: argsStr } = event.item;
-    const result = parseArgsString(argsStr, call_id, name, errors);
+    const event = JSON.parse(line);
+    if (event.type !== 'response.output_item.done' || event.item?.type !== 'function_call')
+      continue;
+    const callId: string = event.item.call_id;
+    const name: string = event.item.name;
+    const argsStr: string = event.item.arguments;
+    const result = parseArgsString(argsStr, callId, name, errors);
     if (result.ok) {
-      validateAgainstSchema(result.parsed, toolSchemaByName.get(name), call_id, name, errors);
+      validateAgainstSchema(result.parsed, toolSchemaByName.get(name), callId, name, errors);
     }
   }
   return errors;
@@ -182,11 +165,12 @@ function detectMessagesSseErrors(
   // Accumulate partial_json fragments by content block index
   const byIndex = new Map<number, ToolAccumulator>();
   for (const line of lines) {
-    const event: MessagesContentBlockStartEvent | MessagesContentBlockDeltaEvent = JSON.parse(line);
-    if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
-      const { id, name } = event.content_block;
+    const event = JSON.parse(line);
+    if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+      const id: string = event.content_block.id;
+      const name: string = event.content_block.name;
       byIndex.set(event.index, { id, name, arguments: '' });
-    } else if (event.type === 'content_block_delta' && event.delta.type === 'input_json_delta') {
+    } else if (event.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
       const acc = byIndex.get(event.index);
       if (acc) acc.arguments += event.delta.partial_json;
     }

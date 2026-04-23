@@ -78,7 +78,7 @@
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
-    "@sentry/cli": "^3.3.4",
+    "@sentry/cli": "catalog:",
     "@types/react": "~19.2.14",
     "@typescript/native-preview": "catalog:",
     "eslint-plugin-sonarjs": "^4.0.2",

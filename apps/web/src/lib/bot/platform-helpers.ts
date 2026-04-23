@@ -1,7 +1,6 @@
 import type { PlatformIdentity } from '@/lib/bot-identity';
-import { isSlackBotNewInfraIntegrationIdAllowed } from '@/lib/bot/slack-rollout';
 import { db } from '@/lib/drizzle';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { type SlackEvent } from '@chat-adapter/slack';
 import { platform_integrations } from '@kilocode/db';
@@ -18,7 +17,7 @@ export function getSlackTeamId(message: Message<SlackEvent>): string {
  * Extend the switch for Discord / Teams / Google Chat / etc.
  */
 export function getPlatformIdentity(thread: Thread, message: Message): PlatformIdentity {
-  const platform = thread.id.split(':')[0]; // "slack", "discord", "gchat", "teams", …
+  const platform = thread.id.split(':')[0]; // "slack", "discord", "gchat", "teams", ...
 
   switch (platform) {
     case 'slack': {
@@ -31,24 +30,18 @@ export function getPlatformIdentity(thread: Thread, message: Message): PlatformI
 }
 
 async function getSlackPlatformIntegration(teamId: string) {
-  const integrations = await db
+  const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
-        inArray(platform_integrations.platform, [PLATFORM.SLACK_NEXT, PLATFORM.SLACK]),
+        eq(platform_integrations.platform, PLATFORM.SLACK),
         eq(platform_integrations.platform_installation_id, teamId)
       )
-    );
+    )
+    .limit(1);
 
-  const legacyIntegration = integrations.find(
-    integration =>
-      integration.platform === PLATFORM.SLACK &&
-      isSlackBotNewInfraIntegrationIdAllowed(integration.id)
-  );
-  if (legacyIntegration) return legacyIntegration;
-
-  return integrations.find(integration => integration.platform === PLATFORM.SLACK_NEXT) ?? null;
+  return integration ?? null;
 }
 
 export async function getPlatformIntegration(thread: Thread, message: Message) {

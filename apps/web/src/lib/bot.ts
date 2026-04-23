@@ -102,14 +102,7 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
 }
 
 const slackAdapter = createSlackAdapter({
-  clientId: process.env.SLACK_NEXT_CLIENT_ID,
-  clientSecret: process.env.SLACK_NEXT_CLIENT_SECRET,
-  signingSecret: process.env.SLACK_NEXT_SIGNING_SECRET,
-});
-
-const legacySlackAdapter = createSlackAdapter({
   signingSecret: SLACK_SIGNING_SECRET,
 });
 
 export const bot = createKiloBot(slackAdapter);
-export const legacySlackBot = createKiloBot(legacySlackAdapter);

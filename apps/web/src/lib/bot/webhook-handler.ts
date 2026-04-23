@@ -1,6 +1,6 @@
 import 'server-only';
 import { after } from 'next/server';
-import { bot, legacySlackBot } from '@/lib/bot';
+import { bot } from '@/lib/bot';
 
 type Platform = keyof typeof bot.webhooks;
 
@@ -32,8 +32,4 @@ export function handleBotWebhookRequest(
   request: Request
 ): Response | Promise<Response> {
   return handleWebhook(bot, platform, request);
-}
-
-export function handleLegacySlackBotWebhookRequest(request: Request): Response | Promise<Response> {
-  return handleWebhook(legacySlackBot, 'slack', request);
 }

@@ -1,26 +1,13 @@
 import 'server-only';
-import { Chat } from 'chat';
-import { createSlackAdapter } from '@chat-adapter/slack';
 import type { OAuthV2Response } from '@slack/oauth';
 import type { PlatformIntegration } from '@kilocode/db/schema';
-import { SLACK_SIGNING_SECRET } from '@/lib/config.server';
-import { createChatState } from './state';
+import { bot } from '@/lib/bot';
 import { extractSdkInstallationData } from './slack-installation-sync-mapping';
 
 export {
   extractSdkInstallationData,
   type SdkInstallationData,
 } from './slack-installation-sync-mapping';
-
-const syncSlackAdapter = createSlackAdapter({
-  signingSecret: SLACK_SIGNING_SECRET,
-});
-
-const syncBot = new Chat({
-  userName: 'Kilo Sync Bot',
-  adapters: { slack: syncSlackAdapter },
-  state: createChatState(),
-});
 
 type SlackInstallationMetadata = {
   accessToken?: string;
@@ -45,8 +32,8 @@ async function syncSdkInstallation(params: {
   botUserId?: string;
   teamName?: string;
 }): Promise<void> {
-  await syncBot.initialize();
-  const adapter = syncBot.getAdapter('slack');
+  await bot.initialize();
+  const adapter = bot.getAdapter('slack');
   await adapter.setInstallation(params.teamId, {
     botToken: params.botToken,
     botUserId: params.botUserId,

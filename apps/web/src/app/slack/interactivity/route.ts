@@ -1,14 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { cloneRequestWithBody, handleBotWebhookRequest } from '@/lib/bot/webhook-handler';
 import {
-  cloneRequestWithBody,
-  handleLegacySlackBotWebhookRequest,
-} from '@/lib/bot/webhook-handler';
-import { shouldRouteSlackInteractivityToNewBotInfra } from '@/lib/bot/slack-rollout';
+  ensureSlackIntegrationSyncedForNewBotInfra,
+  getSlackTeamIdFromInteractivityRawBody,
+} from '@/lib/bot/slack-rollout';
 import { verifySlackRequest } from '@/lib/slack/verify-request';
 
 /**
- * Slack Interactivity endpoint handler
+ * Slack Interactivity endpoint handler.
  * Handles interactive components like buttons, modals, shortcuts, etc.
  * @see https://api.slack.com/interactivity/handling
  */
@@ -22,9 +22,15 @@ export async function POST(request: NextRequest) {
     return new NextResponse('Invalid signature', { status: 401 });
   }
 
-  if (await shouldRouteSlackInteractivityToNewBotInfra(rawBody)) {
-    return handleLegacySlackBotWebhookRequest(cloneRequestWithBody(request, rawBody));
+  try {
+    const teamId = getSlackTeamIdFromInteractivityRawBody(rawBody);
+    await ensureSlackIntegrationSyncedForNewBotInfra(teamId);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('[Slack:Interactivity] Failed to sync Slack installation before forwarding', {
+      errorMessage,
+    });
   }
 
-  return new NextResponse(null, { status: 200 });
+  return handleBotWebhookRequest('slack', cloneRequestWithBody(request, rawBody));
 }

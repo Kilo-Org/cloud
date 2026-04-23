@@ -1,5 +1,20 @@
-import { extractSdkInstallationData } from './slack-installation-sync-mapping';
+const mockInitialize = jest.fn();
+const mockSetInstallation = jest.fn();
+const mockGetAdapter = jest.fn((_name: string) => ({ setInstallation: mockSetInstallation }));
+
+jest.mock('@/lib/bot', () => ({
+  bot: {
+    initialize: () => mockInitialize(),
+    getAdapter: (name: string) => mockGetAdapter(name),
+  },
+}));
+
 import type { OAuthV2Response } from '@slack/oauth';
+import {
+  extractSdkInstallationData,
+  syncOldSlackInstallationToSdk,
+  syncSlackPlatformIntegrationToSdk,
+} from './slack-installation-sync';
 
 function makeOAuthResponse(overrides: Partial<OAuthV2Response> = {}): OAuthV2Response {
   return {
@@ -16,6 +31,12 @@ function makeOAuthResponse(overrides: Partial<OAuthV2Response> = {}): OAuthV2Res
 }
 
 describe('extractSdkInstallationData', () => {
+  beforeEach(() => {
+    mockInitialize.mockReset();
+    mockSetInstallation.mockReset();
+    mockGetAdapter.mockClear();
+  });
+
   it('stores team.id as teamId', () => {
     const result = extractSdkInstallationData(
       makeOAuthResponse({ team: { id: 'T456', name: 'Team Name' } })
@@ -65,5 +86,56 @@ describe('extractSdkInstallationData', () => {
     expect(() =>
       extractSdkInstallationData(makeOAuthResponse({ access_token: undefined }))
     ).toThrow('Missing access_token in Slack OAuth response');
+  });
+
+  it('syncs OAuth responses through the canonical bot state', async () => {
+    await syncOldSlackInstallationToSdk(
+      makeOAuthResponse({
+        team: { id: 'T456', name: 'Canonical Team' },
+        access_token: 'xoxb-canonical',
+        bot_user_id: 'B456',
+      })
+    );
+
+    expect(mockInitialize).toHaveBeenCalledTimes(1);
+    expect(mockGetAdapter).toHaveBeenCalledWith('slack');
+    expect(mockSetInstallation).toHaveBeenCalledWith('T456', {
+      botToken: 'xoxb-canonical',
+      botUserId: 'B456',
+      teamName: 'Canonical Team',
+    });
+  });
+
+  it('syncs Slack platform integrations through the canonical bot state', async () => {
+    const integration = {
+      platform_installation_id: 'T789',
+      platform_account_login: 'Workspace Name',
+      metadata: {
+        access_token: 'xoxb-from-db',
+        bot_user_id: 'B789',
+      },
+    } as Parameters<typeof syncSlackPlatformIntegrationToSdk>[0];
+
+    await expect(syncSlackPlatformIntegrationToSdk(integration)).resolves.toBe(true);
+
+    expect(mockInitialize).toHaveBeenCalledTimes(1);
+    expect(mockSetInstallation).toHaveBeenCalledWith('T789', {
+      botToken: 'xoxb-from-db',
+      botUserId: 'B789',
+      teamName: 'Workspace Name',
+    });
+  });
+
+  it('does not sync Slack platform integrations missing access tokens', async () => {
+    const integration = {
+      platform_installation_id: 'T789',
+      platform_account_login: 'Workspace Name',
+      metadata: {},
+    } as Parameters<typeof syncSlackPlatformIntegrationToSdk>[0];
+
+    await expect(syncSlackPlatformIntegrationToSdk(integration)).resolves.toBe(false);
+
+    expect(mockInitialize).not.toHaveBeenCalled();
+    expect(mockSetInstallation).not.toHaveBeenCalled();
   });
 });

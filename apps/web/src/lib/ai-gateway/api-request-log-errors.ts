@@ -23,7 +23,7 @@ function validateAgainstSchema(
   parameters: unknown,
   toolCallId: string,
   toolName: string,
-  errors: ToolCallError[],
+  errors: ToolCallError[]
 ): void {
   if (parameters == null) return;
   let zodSchema: ReturnType<typeof z.fromJSONSchema>;
@@ -48,7 +48,7 @@ function parseArgsString(
   argsStr: string,
   toolCallId: string,
   toolName: string,
-  errors: ToolCallError[],
+  errors: ToolCallError[]
 ): { parsed: unknown; ok: true } | { ok: false } {
   try {
     return { parsed: JSON.parse(argsStr), ok: true };
@@ -65,7 +65,7 @@ function parseArgsString(
 
 function detectChatCompletionErrors(
   response: OpenAI.Chat.ChatCompletion,
-  tools: OpenAI.Chat.ChatCompletionTool[] | null | undefined,
+  tools: OpenAI.Chat.ChatCompletionTool[] | null | undefined
 ): ToolCallError[] {
   const toolSchemaByName = new Map<string, unknown>();
   for (const tool of tools ?? []) {
@@ -90,7 +90,7 @@ function detectChatCompletionErrors(
 
 function detectResponsesErrors(
   response: OpenAI.Responses.Response,
-  tools: OpenAI.Responses.ResponseCreateParams['tools'],
+  tools: OpenAI.Responses.ResponseCreateParams['tools']
 ): ToolCallError[] {
   const toolSchemaByName = new Map<string, unknown>();
   for (const tool of tools ?? []) {
@@ -113,7 +113,7 @@ function detectResponsesErrors(
 
 function detectMessagesErrors(
   response: Anthropic.Messages.Message,
-  tools: Anthropic.MessageCreateParams['tools'],
+  tools: Anthropic.MessageCreateParams['tools']
 ): ToolCallError[] {
   const toolSchemaByName = new Map<string, unknown>();
   for (const tool of tools ?? []) {
@@ -132,7 +132,7 @@ function detectMessagesErrors(
       toolSchemaByName.get(block.name),
       block.id,
       block.name,
-      errors,
+      errors
     );
   }
   return errors;
@@ -144,7 +144,7 @@ function detectMessagesErrors(
  */
 export function detectToolCallArgumentErrors(
   responseText: string,
-  request: GatewayRequest,
+  request: GatewayRequest
 ): ApiRequestLogError | null {
   try {
     // JSON.parse returns `any`; the detector functions handle unexpected shapes defensively

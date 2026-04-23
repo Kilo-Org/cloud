@@ -11,8 +11,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function getString(value: unknown): string | null {
-  return typeof value === 'string' && value.length > 0 ? value : null;
+function requireRecord(value: unknown, description: string): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error(`Expected ${description}`);
+  return value;
+}
+
+function requireString(value: unknown, description: string): string {
+  if (typeof value === 'string' && value.length > 0) return value;
+  throw new Error(`Expected ${description}`);
 }
 
 export function parseSlackBotNewInfraIntegrationIds(value: string | undefined): string[] {
@@ -46,36 +52,19 @@ export function isSlackBotNewInfraIntegrationIdAllowed(integrationId: string): b
   return getSlackBotNewInfraIntegrationIds().includes(integrationId);
 }
 
-export function getSlackTeamIdFromEventsApiBody(body: unknown): string | null {
-  if (!isRecord(body)) return null;
-
-  const topLevelTeamId = getString(body.team_id);
-  if (topLevelTeamId) return topLevelTeamId;
-
-  const event = body.event;
-  if (!isRecord(event)) return null;
-
-  return getString(event.team);
+export function getSlackTeamIdFromEventsApiBody(body: unknown): string {
+  const parsedBody = requireRecord(body, 'Slack Events API body');
+  return requireString(parsedBody.team_id, 'Slack Events API body.team_id');
 }
 
-export function getSlackTeamIdFromInteractivityRawBody(rawBody: string): string | null {
+export function getSlackTeamIdFromInteractivityRawBody(rawBody: string): string {
   const payload = new URLSearchParams(rawBody).get('payload');
-  if (!payload) return null;
+  if (!payload) throw new Error('Expected Slack interactivity payload');
 
-  try {
-    const parsed: unknown = JSON.parse(payload);
-    if (!isRecord(parsed)) return null;
-
-    const team = parsed.team;
-    if (isRecord(team)) {
-      const teamId = getString(team.id);
-      if (teamId) return teamId;
-    }
-
-    return getString(parsed.team_id);
-  } catch {
-    return null;
-  }
+  const parsed: unknown = JSON.parse(payload);
+  const parsedPayload = requireRecord(parsed, 'Slack interactivity payload');
+  const team = requireRecord(parsedPayload.team, 'Slack interactivity payload.team');
+  return requireString(team.id, 'Slack interactivity payload.team.id');
 }
 
 export async function findSlackIntegrationRoutedToNewInfra(teamId: string) {
@@ -123,8 +112,6 @@ export async function findSlackIntegrationRoutedToNewInfra(teamId: string) {
 
 export async function shouldRouteSlackEventsApiBodyToNewBotInfra(body: unknown): Promise<boolean> {
   const teamId = getSlackTeamIdFromEventsApiBody(body);
-  if (!teamId) return false;
-
   return Boolean(await findSlackIntegrationRoutedToNewInfra(teamId));
 }
 
@@ -132,7 +119,5 @@ export async function shouldRouteSlackInteractivityToNewBotInfra(
   rawBody: string
 ): Promise<boolean> {
   const teamId = getSlackTeamIdFromInteractivityRawBody(rawBody);
-  if (!teamId) return false;
-
   return Boolean(await findSlackIntegrationRoutedToNewInfra(teamId));
 }

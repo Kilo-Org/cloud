@@ -11,8 +11,12 @@ describe('Slack bot rollout routing helpers', () => {
 
   it('extracts team IDs from Events API envelopes', () => {
     expect(getSlackTeamIdFromEventsApiBody({ team_id: 'T123' })).toBe('T123');
-    expect(getSlackTeamIdFromEventsApiBody({ event: { team: 'T456' } })).toBe('T456');
-    expect(getSlackTeamIdFromEventsApiBody({ event: {} })).toBeNull();
+    expect(() => getSlackTeamIdFromEventsApiBody({ event: { team: 'T456' } })).toThrow(
+      'Expected Slack Events API body.team_id'
+    );
+    expect(() => getSlackTeamIdFromEventsApiBody({ event: {} })).toThrow(
+      'Expected Slack Events API body.team_id'
+    );
   });
 
   it('extracts team IDs from interactivity payloads', () => {
@@ -21,6 +25,11 @@ describe('Slack bot rollout routing helpers', () => {
     }).toString();
 
     expect(getSlackTeamIdFromInteractivityRawBody(rawBody)).toBe('T789');
-    expect(getSlackTeamIdFromInteractivityRawBody('payload=not-json')).toBeNull();
+    expect(() => getSlackTeamIdFromInteractivityRawBody('payload=not-json')).toThrow();
+    expect(() =>
+      getSlackTeamIdFromInteractivityRawBody(
+        new URLSearchParams({ payload: JSON.stringify({ team_id: 'T999' }) }).toString()
+      )
+    ).toThrow('Expected Slack interactivity payload.team');
   });
 });

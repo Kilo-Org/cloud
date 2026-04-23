@@ -6,7 +6,10 @@ import {
   cloneRequestWithBody,
   handleLegacySlackBotWebhookRequest,
 } from '@/lib/bot/webhook-handler';
-import { shouldRouteSlackEventsApiBodyToNewBotInfra } from '@/lib/bot/slack-rollout';
+import {
+  getSlackTeamIdFromEventsApiBody,
+  shouldRouteSlackEventsApiBodyToNewBotInfra,
+} from '@/lib/bot/slack-rollout';
 import { processKiloBotMessage } from '@/lib/slack-bot';
 import { markdownToSlackMrkdwn } from '@/lib/slack/markdownToSlackMrkdwn';
 import { logSlackBotRequest } from '@/lib/slack-bot-logging';
@@ -121,10 +124,6 @@ export async function POST(request: NextRequest) {
 
   const body = JSON.parse(rawBody);
 
-  if (await shouldRouteSlackEventsApiBodyToNewBotInfra(body)) {
-    return handleLegacySlackBotWebhookRequest(cloneRequestWithBody(request, rawBody));
-  }
-
   // Handle Slack URL verification challenge
   // This is required when first setting up the Events API
   if (body.type === 'url_verification') {
@@ -132,10 +131,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ challenge: body.challenge });
   }
 
+  if (await shouldRouteSlackEventsApiBodyToNewBotInfra(body)) {
+    return handleLegacySlackBotWebhookRequest(cloneRequestWithBody(request, rawBody));
+  }
+
   // Handle event callbacks
   if (body.type === 'event_callback') {
     const event = body.event;
-    const teamId = body.team_id as string;
+    const teamId = getSlackTeamIdFromEventsApiBody(body);
     console.log('[SlackBot:Webhook] Event received:', event?.type, 'from team:', teamId);
 
     if (isExternalWorkspaceEvent(event)) {

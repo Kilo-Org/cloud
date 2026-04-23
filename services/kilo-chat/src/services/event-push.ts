@@ -1,24 +1,20 @@
-type EventServiceBinding = {
-  pushEvent: (userId: string, context: string, event: string, payload: unknown) => Promise<void>;
-  isUserInContext: (userId: string, context: string) => Promise<boolean>;
-};
+import type { KiloChatEventName, KiloChatEventOf } from '@kilocode/kilo-chat';
 
-function getEventService(env: Env): EventServiceBinding | null {
-  if (!env.EVENT_SERVICE) return null;
-  return env.EVENT_SERVICE as unknown as EventServiceBinding;
+function getEventService(env: Env): Env['EVENT_SERVICE'] | null {
+  return env.EVENT_SERVICE ?? null;
 }
 
 /**
  * Pushes an event to the event-service for each human member of a conversation.
  * Fire-and-forget: failures are logged but don't block the caller.
  */
-export async function pushEventToHumanMembers(
+export async function pushEventToHumanMembers<N extends KiloChatEventName>(
   env: Env,
   conversationId: string,
   sandboxId: string,
   humanMemberIds: string[],
-  event: string,
-  payload: unknown
+  event: N,
+  payload: KiloChatEventOf<N>
 ): Promise<void> {
   const es = getEventService(env);
   if (!es) return;
@@ -33,12 +29,12 @@ export async function pushEventToHumanMembers(
  * Pushes an event on the instance-level context (`/kiloclaw/{sandboxId}`).
  * Used for cross-conversation notifications (e.g. new activity in a conversation).
  */
-export async function pushInstanceEvent(
+export async function pushInstanceEvent<N extends KiloChatEventName>(
   env: Env,
   sandboxId: string,
   humanMemberIds: string[],
-  event: string,
-  payload: unknown
+  event: N,
+  payload: KiloChatEventOf<N>
 ): Promise<void> {
   const es = getEventService(env);
   if (!es) return;

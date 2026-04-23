@@ -150,6 +150,9 @@ jobs:
             exit 1
           }
 
+      - name: Plugin shared-schemas sync check
+        run: bash scripts/sync-plugin-shared.sh --check
+
   drizzle-check:
     needs: changes
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

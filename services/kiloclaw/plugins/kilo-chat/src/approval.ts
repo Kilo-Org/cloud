@@ -6,7 +6,11 @@ import type {
   ResolvedApprovalView,
   ExpiredApprovalView,
 } from 'openclaw/plugin-sdk/approval-handler-runtime';
-import type { ContentBlock, ActionsBlock } from '@kilocode/kilo-chat';
+import type { z } from 'zod';
+import type { actionsBlockSchema, contentBlockSchema } from './shared/schemas.js';
+
+type ContentBlock = z.infer<typeof contentBlockSchema>;
+type ActionsBlock = z.infer<typeof actionsBlockSchema>;
 import { createKiloChatClient } from './client.js';
 import { resolveControllerUrl, resolveGatewayToken } from './env.js';
 
@@ -87,8 +91,10 @@ function buildPendingBlocks(view: PendingApprovalView): ContentBlock[] {
 function buildResolvedBlocks(view: ResolvedApprovalView): ContentBlock[] {
   const textBlock: ContentBlock = { type: 'text', text: buildMetadataText(view) };
   const resolvedBy = view.resolvedBy ?? 'unknown';
-  const actionsBlock: ActionsBlock = {
-    type: 'actions',
+  // Actions must have at least one entry per the schema; for resolved blocks
+  // we carry through a zero-action placeholder describing the resolution.
+  const actionsBlock = {
+    type: 'actions' as const,
     groupId: view.approvalId,
     actions: [],
     resolved: {
@@ -96,7 +102,7 @@ function buildResolvedBlocks(view: ResolvedApprovalView): ContentBlock[] {
       resolvedBy,
       resolvedAt: Date.now(),
     },
-  };
+  } satisfies ActionsBlock;
   return [textBlock, actionsBlock];
 }
 

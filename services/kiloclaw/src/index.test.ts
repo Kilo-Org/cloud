@@ -272,6 +272,7 @@ describe('kilo-chat webhook delivery', () => {
     );
 
     await worker.deliverChatWebhook({
+      type: 'message.created',
       targetBotId: `bot:kiloclaw:${sandboxId}`,
       conversationId: '01KP8R0VX4HK4ZSVQR5ZBVKHQH',
       messageId: '01KP8R0VX4HK4ZSVQR5ZBVKHQJ',
@@ -291,6 +292,7 @@ describe('kilo-chat webhook delivery', () => {
     expect(init?.method).toBe('POST');
     expect(init?.body).toBe(
       JSON.stringify({
+        type: 'message.created',
         conversationId: '01KP8R0VX4HK4ZSVQR5ZBVKHQH',
         messageId: '01KP8R0VX4HK4ZSVQR5ZBVKHQJ',
         from: 'user-1',

@@ -16,6 +16,7 @@ import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import { getCookie, deleteCookie } from 'hono/cookie';
 
+import { chatWebhookRpcSchema } from '@kilocode/kilo-chat';
 import type { AppEnv, KiloClawEnv, ChatWebhookPayload } from './types';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform, controller } from './routes';
@@ -1176,11 +1177,12 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
    * See resolveChatWebhookDoKey for the two supported sandboxId formats.
    */
   async deliverChatWebhook(payload: ChatWebhookPayload): Promise<void> {
+    const parsed = chatWebhookRpcSchema.parse(payload);
     const botPrefix = 'bot:kiloclaw:';
-    if (!payload.targetBotId.startsWith(botPrefix)) {
-      throw new Error(`Invalid targetBotId: ${payload.targetBotId}`);
+    if (!parsed.targetBotId.startsWith(botPrefix)) {
+      throw new Error(`Invalid targetBotId: ${parsed.targetBotId}`);
     }
-    const sandboxId = payload.targetBotId.slice(botPrefix.length);
+    const sandboxId = parsed.targetBotId.slice(botPrefix.length);
 
     const { doKey, label } = await this.resolveChatWebhookDoKey(sandboxId);
     const stub = this.env.KILOCLAW_INSTANCE.get(this.env.KILOCLAW_INSTANCE.idFromName(doKey));
@@ -1212,7 +1214,7 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
     );
 
     // Forward the webhook payload (without targetBotId) to the controller
-    const { targetBotId: _, ...webhookPayload } = payload;
+    const { targetBotId: _, ...webhookPayload } = parsed;
     const body = JSON.stringify(webhookPayload);
 
     const response = await fetch(targetUrl, {

@@ -1,13 +1,30 @@
-import type { ContentBlock } from '@kilocode/kilo-chat';
-import { z } from 'zod';
+import type { z } from 'zod';
+import {
+  addReactionResponseSchema,
+  botGetMembersResponseSchema,
+  botListConversationsResponseSchema,
+  botListMessagesResponseSchema,
+  createConversationResponseSchema,
+  createMessageResponseSchema,
+  editMessageResponseSchema,
+  type botConversationSummarySchema,
+  type contentBlockSchema,
+  type enrichedConversationMemberSchema,
+  type messageSchema,
+} from './shared/schemas.js';
+
+export type ContentBlock = z.infer<typeof contentBlockSchema>;
+export type Message = z.infer<typeof messageSchema>;
+export type BotConversationSummary = z.infer<typeof botConversationSummarySchema>;
+export type EnrichedConversationMember = z.infer<typeof enrichedConversationMemberSchema>;
+export type BotListConversationsResponse = z.infer<typeof botListConversationsResponseSchema>;
+export type BotGetMembersResponse = z.infer<typeof botGetMembersResponseSchema>;
 
 export type KiloChatClientOptions = {
   controllerBaseUrl: string;
   gatewayToken: string;
   fetchImpl?: typeof fetch;
 };
-
-export type { ContentBlock };
 
 export type CreateMessageParams = {
   conversationId: string;
@@ -29,38 +46,16 @@ export type DeleteMessageParams = { conversationId: string; messageId: string };
 export type SendTypingParams = { conversationId: string };
 
 export type ListMessagesParams = { conversationId: string; before?: string; limit?: number };
-export type ListMessagesResult = { messages: Array<Record<string, unknown>> };
+export type ListMessagesResult = { messages: Message[] };
 export type GetMembersParams = { conversationId: string };
-export type GetMembersResult = {
-  members: Array<{
-    id: string;
-    kind: string;
-    displayName: string | null;
-    avatarUrl: string | null;
-  }>;
-};
+export type GetMembersResult = BotGetMembersResponse;
 
 export type RenameConversationParams = { conversationId: string; title: string };
 
 export type ListConversationsParams = { limit?: number; offset?: number };
-export type ConversationMember = {
-  id: string;
-  kind: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-};
-export type ConversationSummary = {
-  conversationId: string;
-  title: string | null;
-  lastActivityAt: number | null;
-  members: ConversationMember[];
-};
-export type ListConversationsResult = {
-  conversations: ConversationSummary[];
-  total: number;
-  limit: number;
-  offset: number;
-};
+export type ConversationMember = EnrichedConversationMember;
+export type ConversationSummary = BotConversationSummary;
+export type ListConversationsResult = BotListConversationsResponse;
 
 export type AddReactionParams = { conversationId: string; messageId: string; emoji: string };
 export type AddReactionResult = { id: string };
@@ -91,26 +86,6 @@ function authHeaders(token: string): HeadersInit {
   };
 }
 
-const createResultSchema = z.object({
-  messageId: z.string().min(1),
-});
-const editResultSchema = z.object({ messageId: z.string().optional() });
-const addReactionResultSchema = z.object({
-  id: z.string().min(1),
-});
-const createConversationResultSchema = z.object({
-  conversationId: z.string().min(1),
-});
-
-// Display fields are always present on the server but may be null; accept
-// null or undefined so test fixtures that omit them still parse.
-const memberSchema = z.object({
-  id: z.string(),
-  kind: z.string(),
-  displayName: z.string().nullish(),
-  avatarUrl: z.string().nullish(),
-});
-
 // Turns Zod schema failures into flat, human-readable errors. Keeps the first
 // issue's path + message so callers (and tests) can match on the missing-field
 // name rather than on a stringified issue array.
@@ -128,30 +103,10 @@ function parseOrThrow<T>(
   throw new Error(`kilo-chat: ${label}: ${name ? `missing ${name}` : issue.message}`);
 }
 
-const listMessagesResultSchema = z.object({
-  messages: z.array(z.record(z.string(), z.unknown())),
-});
-
-const getMembersResultSchema = z.object({
-  members: z.array(memberSchema),
-});
-
-const conversationSummarySchema = z.object({
-  conversationId: z.string(),
-  title: z.string().nullable(),
-  lastActivityAt: z.number().nullable(),
-  members: z.array(memberSchema),
-});
-
-const listConversationsResultSchema = z.object({
-  conversations: z.array(conversationSummarySchema),
-  total: z.number(),
-  limit: z.number(),
-  offset: z.number(),
-});
-
 function parseCreateResult(data: unknown): CreateMessageResult {
-  return parseOrThrow(createResultSchema, data, 'createMessage', { messageId: 'messageId' });
+  return parseOrThrow(createMessageResponseSchema, data, 'createMessage', {
+    messageId: 'messageId',
+  });
 }
 
 export function createKiloChatClient(options: KiloChatClientOptions): KiloChatClient {
@@ -200,7 +155,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller PATCH responded ${response.status}: ${await response.text()}`
       );
     }
-    const body = editResultSchema.parse(await response.json());
+    const body = editMessageResponseSchema.parse(await response.json());
     return {
       messageId: body.messageId ?? params.messageId,
       stale: false,
@@ -264,7 +219,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller POST reactions responded ${response.status}: ${await response.text()}`
       );
     }
-    return parseOrThrow(addReactionResultSchema, await response.json(), 'addReaction', {
+    return parseOrThrow(addReactionResponseSchema, await response.json(), 'addReaction', {
       id: 'reaction id',
     });
   }
@@ -301,7 +256,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller GET messages responded ${response.status}: ${await response.text()}`
       );
     }
-    return listMessagesResultSchema.parse(await response.json());
+    return botListMessagesResponseSchema.parse(await response.json());
   }
 
   async function getMembers(params: GetMembersParams): Promise<GetMembersResult> {
@@ -314,7 +269,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller GET members responded ${response.status}: ${await response.text()}`
       );
     }
-    return getMembersResultSchema.parse(await response.json());
+    return botGetMembersResponseSchema.parse(await response.json());
   }
 
   async function renameConversation(params: RenameConversationParams): Promise<void> {
@@ -348,7 +303,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller GET conversations responded ${response.status}: ${await response.text()}`
       );
     }
-    return listConversationsResultSchema.parse(await response.json());
+    return botListConversationsResponseSchema.parse(await response.json());
   }
 
   async function createConversation(
@@ -370,7 +325,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
       );
     }
     return parseOrThrow(
-      createConversationResultSchema,
+      createConversationResponseSchema,
       await response.json(),
       'createConversation',
       { conversationId: 'conversationId' }

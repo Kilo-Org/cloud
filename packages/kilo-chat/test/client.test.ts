@@ -23,7 +23,12 @@ function mockFetch(status: number, body: unknown): typeof globalThis.fetch {
 describe('KiloChatClient', () => {
   describe('listConversations', () => {
     it('sends GET /v1/conversations with auth header', async () => {
-      const fetch = mockFetch(200, { conversations: [] });
+      const fetch = mockFetch(200, {
+        conversations: [],
+        total: 0,
+        limit: 50,
+        offset: 0,
+      });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.listConversations();
       expect(fetch).toHaveBeenCalledWith(
@@ -33,7 +38,7 @@ describe('KiloChatClient', () => {
           headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
         })
       );
-      expect(res).toEqual({ conversations: [] });
+      expect(res).toEqual({ conversations: [], total: 0, limit: 50, offset: 0 });
     });
   });
 
@@ -53,7 +58,8 @@ describe('KiloChatClient', () => {
 
   describe('createConversation', () => {
     it('sends POST /v1/conversations with body', async () => {
-      const fetch = mockFetch(201, { conversationId: 'new-id' });
+      const newUlid = '01HXYZ00000ABCDEFGHJKMNPQR';
+      const fetch = mockFetch(201, { conversationId: newUlid });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.createConversation({ sandboxId: 'sb-1' });
       expect(fetch).toHaveBeenCalledWith(
@@ -64,7 +70,7 @@ describe('KiloChatClient', () => {
           headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
         })
       );
-      expect(res).toEqual({ conversationId: 'new-id' });
+      expect(res).toEqual({ conversationId: newUlid });
     });
   });
 
@@ -102,13 +108,13 @@ describe('KiloChatClient', () => {
 
   describe('sendMessage', () => {
     it('sends POST /v1/messages', async () => {
-      const fetch = mockFetch(201, { messageId: 'm1', version: 1 });
+      const fetch = mockFetch(201, { messageId: 'm1' });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.sendMessage({
         conversationId: 'c1',
         content: [{ type: 'text', text: 'hi' }],
       });
-      expect(res).toEqual({ messageId: 'm1', version: 1 });
+      expect(res).toEqual({ messageId: 'm1' });
     });
   });
 
@@ -168,12 +174,18 @@ describe('KiloChatClient', () => {
     });
 
     it('calls getToken before each request', async () => {
-      const fetch = mockFetch(200, { conversations: [] });
+      const fetch = mockFetch(200, { conversations: [], total: 0, limit: 50, offset: 0 });
       const config = createMockConfig(fetch);
       const client = new KiloChatClient(config);
       await client.listConversations();
       await client.listConversations();
       expect(config.getToken).toHaveBeenCalledTimes(2);
+    });
+
+    it('rejects malformed response bodies', async () => {
+      const fetch = mockFetch(200, { conversations: 'not-an-array' });
+      const client = new KiloChatClient(createMockConfig(fetch));
+      await expect(client.listConversations()).rejects.toThrow();
     });
   });
 });

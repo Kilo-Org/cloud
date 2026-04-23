@@ -1,4 +1,47 @@
+import type { z } from 'zod';
 import type { EventServiceClient } from '@kilocode/event-service';
+import type {
+  actionItemSchema,
+  actionsBlockSchema,
+  textBlockSchema,
+  contentBlockSchema,
+  reactionSummarySchema,
+  messageSchema,
+  conversationListItemSchema,
+  conversationDetailSchema,
+  conversationMemberSchema,
+  enrichedConversationMemberSchema,
+  createConversationRequestSchema,
+  createConversationResponseSchema,
+  createMessageRequestSchema,
+  createMessageResponseSchema,
+  editMessageRequestSchema,
+  editMessageResponseSchema,
+  deleteMessageRequestSchema,
+  renameConversationRequestSchema,
+  conversationListResponseSchema,
+  messageListResponseSchema,
+  conversationDetailResponseSchema,
+  botListConversationsResponseSchema,
+  botListMessagesResponseSchema,
+  botGetMembersResponseSchema,
+  botConversationSummarySchema,
+} from './schemas';
+import type {
+  messageCreatedEventSchema,
+  messageUpdatedEventSchema,
+  messageDeletedEventSchema,
+  messageDeliveryFailedEventSchema,
+  typingEventSchema,
+  reactionAddedEventSchema,
+  reactionRemovedEventSchema,
+  conversationCreatedEventSchema,
+  conversationRenamedEventSchema,
+  conversationLeftEventSchema,
+  conversationReadEventSchema,
+  conversationActivityEventSchema,
+  actionExecutedEventSchema,
+} from './events';
 
 // ── Configuration ───────────────────────────────────────────────────
 export type KiloChatClientConfig = {
@@ -9,184 +52,53 @@ export type KiloChatClientConfig = {
 };
 
 // ── Content blocks ──────────────────────────────────────────────────
-export type TextBlock = { type: 'text'; text: string };
-
-export type ActionItem = {
-  label: string;
-  style: 'primary' | 'danger' | 'secondary';
-  value: string;
-};
-
-export type ActionsBlock = {
-  type: 'actions';
-  groupId: string;
-  actions: ActionItem[];
-  resolved?: {
-    value: string;
-    resolvedBy: string;
-    resolvedAt: number;
-  };
-};
-
-export type ContentBlock = TextBlock | ActionsBlock;
+export type TextBlock = z.infer<typeof textBlockSchema>;
+export type ActionItem = z.infer<typeof actionItemSchema>;
+export type ActionsBlock = z.infer<typeof actionsBlockSchema>;
+export type ContentBlock = z.infer<typeof contentBlockSchema>;
 
 // ── Reactions ───────────────────────────────────────────────────────
-export type ReactionSummary = {
-  emoji: string;
-  count: number;
-  memberIds: string[];
-};
+export type ReactionSummary = z.infer<typeof reactionSummarySchema>;
 
 // ── Conversations ───────────────────────────────────────────────────
-export type ConversationListItem = {
-  conversationId: string;
-  conversationTitle: string | null;
-  lastActivityAt: number | null;
-  lastReadAt: number | null;
-  joinedAt: number;
-};
-
-export type ConversationDetail = {
-  id: string;
-  title: string | null;
-  createdBy: string;
-  createdAt: number;
-  members: Array<{ id: string; kind: 'user' | 'bot' }>;
-};
+export type ConversationListItem = z.infer<typeof conversationListItemSchema>;
+export type ConversationDetail = z.infer<typeof conversationDetailSchema>;
+export type ConversationMember = z.infer<typeof conversationMemberSchema>;
+export type EnrichedConversationMember = z.infer<typeof enrichedConversationMemberSchema>;
+export type BotConversationSummary = z.infer<typeof botConversationSummarySchema>;
 
 // ── Messages ────────────────────────────────────────────────────────
-export type Message = {
-  id: string;
-  senderId: string;
-  content: ContentBlock[];
-  inReplyToMessageId: string | null;
-  updatedAt: number | null;
-  clientUpdatedAt: number | null;
-  deleted: boolean;
-  deliveryFailed: boolean;
-  reactions: ReactionSummary[];
-};
+export type Message = z.infer<typeof messageSchema>;
 
 // ── Events ──────────────────────────────────────────────────────────
-export type MessageCreatedEvent = {
-  messageId: string;
-  senderId: string;
-  content: ContentBlock[];
-  inReplyToMessageId: string | null;
-  clientId: string | null;
-};
-
-export type MessageUpdatedEvent = {
-  messageId: string;
-  content: ContentBlock[];
-  clientUpdatedAt: number | null;
-};
-
-export type MessageDeletedEvent = {
-  messageId: string;
-};
-
-export type MessageDeliveryFailedEvent = {
-  messageId: string;
-};
-
-export type TypingEvent = {
-  memberId: string;
-};
-
-export type ReactionAddedEvent = {
-  messageId: string;
-  memberId: string;
-  emoji: string;
-};
-
-export type ReactionRemovedEvent = {
-  messageId: string;
-  memberId: string;
-  emoji: string;
-};
-
-export type ConversationCreatedEvent = {
-  conversationId: string;
-};
-
-export type ConversationRenamedEvent = {
-  conversationId: string;
-  title: string;
-};
-
-export type ConversationLeftEvent = {
-  conversationId: string;
-};
-
-export type ConversationReadEvent = {
-  conversationId: string;
-  memberId: string;
-  lastReadAt: number;
-};
-
-export type ConversationActivityEvent = {
-  conversationId: string;
-  lastActivityAt: number;
-};
-
-export type ActionExecutedEvent = {
-  conversationId: string;
-  messageId: string;
-  groupId: string;
-  value: string;
-  executedBy: string;
-};
+export type MessageCreatedEvent = z.infer<typeof messageCreatedEventSchema>;
+export type MessageUpdatedEvent = z.infer<typeof messageUpdatedEventSchema>;
+export type MessageDeletedEvent = z.infer<typeof messageDeletedEventSchema>;
+export type MessageDeliveryFailedEvent = z.infer<typeof messageDeliveryFailedEventSchema>;
+export type TypingEvent = z.infer<typeof typingEventSchema>;
+export type ReactionAddedEvent = z.infer<typeof reactionAddedEventSchema>;
+export type ReactionRemovedEvent = z.infer<typeof reactionRemovedEventSchema>;
+export type ConversationCreatedEvent = z.infer<typeof conversationCreatedEventSchema>;
+export type ConversationRenamedEvent = z.infer<typeof conversationRenamedEventSchema>;
+export type ConversationLeftEvent = z.infer<typeof conversationLeftEventSchema>;
+export type ConversationReadEvent = z.infer<typeof conversationReadEventSchema>;
+export type ConversationActivityEvent = z.infer<typeof conversationActivityEventSchema>;
+export type ActionExecutedEvent = z.infer<typeof actionExecutedEventSchema>;
 
 // ── API request/response types ──────────────────────────────────────
-export type CreateConversationRequest = {
-  sandboxId: string;
-  title?: string;
-};
+export type CreateConversationRequest = z.infer<typeof createConversationRequestSchema>;
+export type CreateConversationResponse = z.infer<typeof createConversationResponseSchema>;
+export type CreateMessageRequest = z.infer<typeof createMessageRequestSchema>;
+export type CreateMessageResponse = z.infer<typeof createMessageResponseSchema>;
+export type EditMessageRequest = z.infer<typeof editMessageRequestSchema>;
+export type EditMessageResponse = z.infer<typeof editMessageResponseSchema>;
+export type DeleteMessageRequest = z.infer<typeof deleteMessageRequestSchema>;
+export type RenameConversationRequest = z.infer<typeof renameConversationRequestSchema>;
+export type ConversationListResponse = z.infer<typeof conversationListResponseSchema>;
+export type MessageListResponse = z.infer<typeof messageListResponseSchema>;
+export type ConversationDetailResponse = z.infer<typeof conversationDetailResponseSchema>;
 
-export type CreateConversationResponse = {
-  conversationId: string;
-};
-
-export type CreateMessageRequest = {
-  conversationId: string;
-  content: ContentBlock[];
-  inReplyToMessageId?: string;
-  clientId?: string;
-};
-
-export type CreateMessageResponse = {
-  messageId: string;
-  clientId?: string;
-};
-
-export type EditMessageRequest = {
-  conversationId: string;
-  content: ContentBlock[];
-  timestamp: number;
-};
-
-export type EditMessageResponse = {
-  messageId: string;
-};
-
-export type DeleteMessageRequest = {
-  conversationId: string;
-};
-
-export type RenameConversationRequest = {
-  title: string;
-};
-
-export type ConversationListResponse = {
-  conversations: ConversationListItem[];
-  total: number;
-  limit: number;
-  offset: number;
-};
-
-export type MessageListResponse = {
-  messages: Message[];
-};
-
-export type ConversationDetailResponse = ConversationDetail;
+// Response types for the bot/plugin HTTP client (controller-proxied)
+export type BotListConversationsResponse = z.infer<typeof botListConversationsResponseSchema>;
+export type BotListMessagesResponse = z.infer<typeof botListMessagesResponseSchema>;
+export type BotGetMembersResponse = z.infer<typeof botGetMembersResponseSchema>;

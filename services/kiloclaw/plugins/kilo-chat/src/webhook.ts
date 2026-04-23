@@ -9,47 +9,54 @@ import { z } from 'zod';
 import { resolveApprovalOverGateway } from 'openclaw/plugin-sdk/approval-gateway-runtime';
 import type { ExecApprovalDecision } from 'openclaw/plugin-sdk/approval-runtime';
 
+import {
+  actionExecutedWebhookSchema,
+  chatWebhookSchema,
+  messageCreatedWebhookSchema,
+} from './shared/webhook-schemas.js';
 import { createKiloChatClient, type KiloChatClient } from './client.js';
 import { resolveControllerUrl, resolveGatewayToken } from './env.js';
 import { DEFAULT_ACCOUNT_ID } from './channel.js';
 import { createPreviewStream } from './preview-stream.js';
 
+// Historical callers sent `message.created` payloads without a `type` field;
+// the preprocess step injects the default so the discriminated union always
+// matches.
+const rawObjectSchema = z.record(z.string(), z.unknown());
+
+function withDefaultType(defaultType: string) {
+  return (raw: unknown): unknown => {
+    const obj = rawObjectSchema.safeParse(raw);
+    if (!obj.success) return raw;
+    return 'type' in obj.data ? obj.data : { ...obj.data, type: defaultType };
+  };
+}
+
+const messageCreatedInboundSchema = z.preprocess(
+  withDefaultType('message.created'),
+  messageCreatedWebhookSchema
+);
+const chatWebhookInboundSchema = z.preprocess(
+  withDefaultType('message.created'),
+  chatWebhookSchema
+);
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type KiloChatInboundPayload = {
-  conversationId: string;
-  from: string;
-  text: string;
-  messageId: string;
-  sentAt: string;
-  inReplyToMessageId?: string;
-  inReplyToBody?: string;
-  inReplyToSender?: string;
-};
+export type KiloChatInboundPayload = z.infer<typeof messageCreatedWebhookSchema>;
 
 export type KiloChatWebhookDeps = {
   api: OpenClawPluginApi;
 };
 
 // ---------------------------------------------------------------------------
-// Payload parsing
+// Payload parsing (wraps the shared messageCreated schema for plugin callers)
 // ---------------------------------------------------------------------------
 
-const inboundPayloadSchema = z.object({
-  conversationId: z.string().min(1),
-  from: z.string().min(1),
-  text: z.string().min(1),
-  messageId: z.string().min(1),
-  sentAt: z.string().min(1),
-  inReplyToMessageId: z.string().min(1).optional(),
-  inReplyToBody: z.string().min(1).optional(),
-  inReplyToSender: z.string().min(1).optional(),
-});
-
 export function parseInboundPayload(raw: unknown): KiloChatInboundPayload | null {
-  const result = inboundPayloadSchema.safeParse(raw);
+  const result = messageCreatedInboundSchema.safeParse(raw);
   return result.success ? result.data : null;
 }
 
@@ -65,15 +72,22 @@ export type ActionExecutedPayload = {
   executedBy: string;
 };
 
-const actionExecutedPayloadSchema = z.object({
-  groupId: z.string().min(1),
-  value: execApprovalDecisionSchema,
-  executedBy: z.string().min(1),
-});
+// The shared webhook schema keeps `value` as a free-form string so non-approval
+// action producers can flow through. The plugin narrows it to the approval
+// decision enum at this boundary.
+const actionExecutedPluginSchema = z.preprocess(
+  withDefaultType('action.executed'),
+  actionExecutedWebhookSchema.extend({ value: execApprovalDecisionSchema })
+);
 
 export function parseActionExecutedPayload(raw: unknown): ActionExecutedPayload | null {
-  const result = actionExecutedPayloadSchema.safeParse(raw);
-  return result.success ? result.data : null;
+  const result = actionExecutedPluginSchema.safeParse(raw);
+  if (!result.success) return null;
+  return {
+    groupId: result.data.groupId,
+    value: result.data.value,
+    executedBy: result.data.executedBy,
+  };
 }
 
 async function handleActionExecuted(
@@ -129,9 +143,7 @@ export function buildDeliverWiring(params: {
   return {
     replyOptions: {
       onPartialReply: async payload => {
-        if (typeof payload.text === 'string' && payload.text.length > 0) {
-          stream.update(payload.text);
-        }
+        if (payload.text) stream.update(payload.text);
       },
     },
     deliver: async payload => {
@@ -341,7 +353,13 @@ export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
       return true;
     }
 
-    const type = (parsed as { type?: string }).type;
+    const envelope = chatWebhookInboundSchema.safeParse(parsed);
+    const rawType = z.object({ type: z.string() }).partial().safeParse(parsed);
+    const type = envelope.success
+      ? envelope.data.type
+      : rawType.success
+        ? rawType.data.type
+        : undefined;
 
     if (type === 'action.executed') {
       // Resolve an approval via a button click in kilo-chat.

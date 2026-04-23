@@ -82,32 +82,14 @@ export type KiloClawEnv = {
   PROACTIVE_REFRESH_THRESHOLD_HOURS?: string;
 };
 
+import type { z } from 'zod';
+import type { chatWebhookRpcSchema } from '@kilocode/kilo-chat';
+
 /**
  * Payload for kilo-chat webhook delivery via service binding RPC.
+ * The shared schema lives in `@kilocode/kilo-chat/webhook-schemas`.
  */
-export type ChatWebhookPayload =
-  | {
-      targetBotId: string;
-      type?: 'message.created';
-      conversationId: string;
-      messageId: string;
-      from: string;
-      text: string;
-      sentAt: string;
-      inReplyToMessageId?: string;
-      inReplyToBody?: string;
-      inReplyToSender?: string;
-    }
-  | {
-      targetBotId: string;
-      type: 'action.executed';
-      conversationId: string;
-      messageId: string;
-      groupId: string;
-      value: string;
-      executedBy: string;
-      executedAt: string;
-    };
+export type ChatWebhookPayload = z.infer<typeof chatWebhookRpcSchema>;
 
 /**
  * Hono app environment type

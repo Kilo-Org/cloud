@@ -22,23 +22,12 @@ export async function handleKiloChatReadAction(
   }
 
   const lines = messages.map(msg => {
-    const id = typeof msg.id === 'string' ? msg.id : String(msg.id ?? '');
-    const sender = typeof msg.senderId === 'string' ? msg.senderId : String(msg.senderId ?? '');
-    const blocks = Array.isArray(msg.content) ? msg.content : [];
-    const text = blocks
-      .filter(
-        (b: unknown): b is { type: string; text: string } =>
-          typeof b === 'object' &&
-          b !== null &&
-          'text' in b &&
-          typeof (b as Record<string, unknown>).text === 'string'
-      )
+    const text = msg.content
+      .filter(b => b.type === 'text')
       .map(b => b.text)
       .join('');
-    const updatedAtRaw = msg.updatedAt;
-    const timestamp =
-      typeof updatedAtRaw === 'number' ? ` (${new Date(updatedAtRaw).toISOString()})` : '';
-    return `[${id}] ${sender}${timestamp}: ${text}`;
+    const timestamp = msg.updatedAt !== null ? ` (${new Date(msg.updatedAt).toISOString()})` : '';
+    return `[${msg.id}] ${msg.senderId}${timestamp}: ${text}`;
   });
 
   return { content: [{ type: 'text', text: lines.join('\n') }] };

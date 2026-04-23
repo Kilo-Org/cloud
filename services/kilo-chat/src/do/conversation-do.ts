@@ -1,5 +1,23 @@
-import type { ContentBlock, ActionsBlock } from '@kilocode/kilo-chat';
+import {
+  contentBlockSchema,
+  type ContentBlock,
+  type ActionsBlock,
+  type Message,
+  type ReactionSummary,
+} from '@kilocode/kilo-chat';
 import { DurableObject } from 'cloudflare:workers';
+
+function parseStoredContent(rawContent: string, messageId: string): ContentBlock[] {
+  try {
+    const parsed: unknown = JSON.parse(rawContent);
+    const result = contentBlockSchema.array().safeParse(parsed);
+    if (result.success) return result.data;
+    console.warn(`ConversationDO: invalid content for message ${messageId}`, result.error.issues);
+  } catch (err) {
+    console.warn(`ConversationDO: unparseable content for message ${messageId}`, err);
+  }
+  return [];
+}
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, lt, desc, and, sql, inArray } from 'drizzle-orm';
@@ -38,11 +56,7 @@ export type ListMessagesParams = {
   before?: string;
 };
 
-export type MessageReactionSummary = {
-  emoji: string;
-  count: number;
-  memberIds: string[];
-};
+export type MessageReactionSummary = ReactionSummary;
 
 export type GetMessageResult = {
   id: string;
@@ -51,17 +65,7 @@ export type GetMessageResult = {
   deleted: boolean;
 } | null;
 
-export type MessageRow = {
-  id: string;
-  senderId: string;
-  content: ContentBlock[];
-  inReplyToMessageId: string | null;
-  updatedAt: number | null;
-  clientUpdatedAt: number | null;
-  deleted: boolean;
-  deliveryFailed: boolean;
-  reactions: MessageReactionSummary[];
-};
+export type MessageRow = Message;
 
 export type ListMessagesResult = {
   messages: MessageRow[];
@@ -229,7 +233,7 @@ export class ConversationDO extends DurableObject<Env> {
     return {
       id: row.id,
       senderId: row.sender_id,
-      content: row.deleted === 1 ? [] : (JSON.parse(row.content) as ContentBlock[]),
+      content: row.deleted === 1 ? [] : parseStoredContent(row.content, row.id),
       deleted: row.deleted === 1,
     };
   }
@@ -273,7 +277,7 @@ export class ConversationDO extends DurableObject<Env> {
       messages: rows.map(row => ({
         id: row.id,
         senderId: row.sender_id,
-        content: row.deleted === 1 ? [] : (JSON.parse(row.content) as ContentBlock[]),
+        content: row.deleted === 1 ? [] : parseStoredContent(row.content, row.id),
         inReplyToMessageId: row.in_reply_to_message_id,
         updatedAt: row.updated_at,
         clientUpdatedAt: row.client_updated_at,
@@ -372,7 +376,7 @@ export class ConversationDO extends DurableObject<Env> {
       return { ok: false, code: 'not_found', error: 'Message not found' };
     }
 
-    const content = JSON.parse(row.content) as ContentBlock[];
+    const content = parseStoredContent(row.content, row.id);
     const actionsBlock = content.find(
       (b): b is ActionsBlock => b.type === 'actions' && b.groupId === params.groupId
     );

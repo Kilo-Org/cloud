@@ -69,7 +69,9 @@ function detectChatCompletionErrors(
 ): ToolCallError[] {
   const toolSchemaByName = new Map<string, unknown>();
   for (const tool of tools ?? []) {
-    toolSchemaByName.set(tool.function.name, tool.function.parameters);
+    if (tool.type === 'function') {
+      toolSchemaByName.set(tool.function.name, tool.function.parameters);
+    }
   }
 
   const errors: ToolCallError[] = [];
@@ -138,23 +140,20 @@ export function detectToolCallArgumentErrors(
   responseText: string,
   request: GatewayRequest,
 ): ApiRequestLogError | null {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let parsed: any;
   try {
-    parsed = JSON.parse(responseText);
+    // JSON.parse returns `any`; the detector functions handle unexpected shapes defensively
+    const parsed = JSON.parse(responseText);
+    let errors: ToolCallError[];
+    if (request.kind === 'chat_completions') {
+      errors = detectChatCompletionErrors(parsed, request.body.tools);
+    } else if (request.kind === 'responses') {
+      errors = detectResponsesErrors(parsed, request.body.tools);
+    } else {
+      errors = detectMessagesErrors(parsed, request.body.tools);
+    }
+    if (errors.length === 0) return null;
+    return { invalid_tool_call_arguments: errors };
   } catch {
     return null;
   }
-
-  let errors: ToolCallError[];
-  if (request.kind === 'chat_completions') {
-    errors = detectChatCompletionErrors(parsed, request.body.tools);
-  } else if (request.kind === 'responses') {
-    errors = detectResponsesErrors(parsed, request.body.tools);
-  } else {
-    errors = detectMessagesErrors(parsed, request.body.tools);
-  }
-
-  if (errors.length === 0) return null;
-  return { invalid_tool_call_arguments: errors };
 }

@@ -71,14 +71,20 @@ RUN npm install -g openclaw@2026.4.9 \
 
 # Bake bundled plugin runtime deps into the image so first boot is pure
 # startup — no npm install from `openclaw doctor` on shared-cpu Fly machines.
-RUN cd /usr/local/lib/node_modules/openclaw \
+# pipefail + materialized spec list so a failed manifest discovery breaks
+# the build instead of silently shipping an image with no bundled deps.
+RUN set -eo pipefail \
+    && cd /usr/local/lib/node_modules/openclaw \
     && jq -r '((.dependencies // {}) + (.optionalDependencies // {})) | to_entries[] | "\(.key)@\(.value)"' \
          dist/extensions/*/package.json \
        | grep -v '@workspace:' \
-       | sort -u \
-       | xargs -r npm install --omit=dev --no-save --package-lock=false \
-                              --ignore-scripts --legacy-peer-deps \
-                              --no-fund --no-audit \
+       | sort -u > /tmp/bundled-plugin-specs.txt \
+    && test -s /tmp/bundled-plugin-specs.txt \
+    && xargs -a /tmp/bundled-plugin-specs.txt npm install \
+           --omit=dev --no-save --package-lock=false \
+           --ignore-scripts --legacy-peer-deps \
+           --no-fund --no-audit \
+    && rm -f /tmp/bundled-plugin-specs.txt \
     && rm -rf /root/.npm
 
 # Install ClawHub CLI

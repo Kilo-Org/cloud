@@ -20,3 +20,24 @@
 - The `enrichBead` procedure calls Workers AI (`@cf/meta/llama-3.1-8b-instruct`) to suggest title + labels. It returns `null` if the AI response is unparseable.
 - All three new tRPC procedures follow the `gastownProcedure` pattern with `verifyRigOwnership` (createBead, startBead) or `verifyTownOwnership` (enrichBead) for authorization.
 - The mayor is notified via `townStub.notifyMayorOfNewBead()` when `startImmediately=false`.
+
+---
+
+## Bead 2: UI (CreateBeadDrawer + MDXEditor)
+
+### Status: in progress
+
+### Deviations from plan
+
+- The `createBead`, `startBead`, and `enrichBead` procedures from bead 0/1 were NOT yet reflected in `apps/web/src/lib/gastown/types/router.d.ts`. Added them manually to the declaration file (both the top-level `gastawnRouter` section and the nested `wrappedGastawnRouter` section).
+- Used `@mdxeditor/editor` with a dynamic import wrapper. The MDXEditor CSS import must be in the non-SSR wrapper file (not the parent component) to avoid Next.js SSR issues.
+- MDXEditor dark theme: overriding via CSS variables on the container element is the cleanest approach since the library doesn't natively support dark mode out of the box.
+- Debounce for AI enrichment is implemented with `useEffect` + `setTimeout`/`clearTimeout` rather than a library like `use-debounce`, since that would be a new dependency.
+
+### Notes for future implementors
+
+- MDXEditor requires `ssr: false` dynamic import in Next.js. The `MarkdownEditor.tsx` wrapper imports the CSS and renders MDXEditor directly; the parent uses `dynamic(() => import('./MarkdownEditor'), { ssr: false })`.
+- The `CreateBeadDrawer` uses `vaul` `Drawer.Root` (same pattern as `BeadDetailDrawer`) for the right-side slide-in.
+- AI enrichment fires on body text > 20 chars after a 1500ms debounce. `userEditedTitle` state prevents AI overwriting manual title changes.
+- Labels from `enrichBead` are shown as `✨` chips. The user can remove them. Custom label entry via a text input "+ add" pattern.
+- `startImmediately=false` (default): bead gets `gt:held` label and mayor is notified. `startImmediately=true`: bead is created and dispatched immediately.

@@ -17,14 +17,9 @@ import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelId
 import { redisGet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { GatewayPercentageSchema, DEFAULT_VERCEL_PERCENTAGE } from '@/lib/gateway-config';
-<<<<<<< HEAD
-import { GATEWAY_METADATA_REDIS_KEYS, VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
-import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
-=======
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
-import { getRandomNumberLessThan100 } from '@/lib/ai-gateway/getRandomNumberLessThan100';
+import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
->>>>>>> origin/main
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {

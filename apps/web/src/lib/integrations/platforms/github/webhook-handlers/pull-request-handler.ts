@@ -177,14 +177,17 @@ export async function handlePullRequestCodeReview(
       // branch protection that requires the Kilo check would stay blocked
       // on the merge-commit head. Drop a fresh check run on the new HEAD
       // and repoint the review at it so its eventual completion callback
-      // updates the gate on the commit GitHub actually evaluates.
+      // updates the gate on the commit GitHub actually evaluates. Note
+      // the check run goes on the *base* repo (where branch protection
+      // lives and where the app is installed), not the head/fork repo.
+      const [baseOwner, baseRepoName] = repository.full_name.split('/');
       await migrateInFlightReviewsToMergeCommitHead({
         repoFullName: repository.full_name,
         prNumber: pull_request.number,
         newHeadSha: pull_request.head.sha,
         installationId: integration.platform_installation_id as string,
-        headOwner,
-        headRepoName,
+        baseOwner,
+        baseRepoName,
         appType,
         userIdForFlag: owner.userId,
       });
@@ -421,8 +424,12 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
   prNumber: number;
   newHeadSha: string;
   installationId: string;
-  headOwner: string;
-  headRepoName: string;
+  // Owner/name of the *base* repo (where branch protection lives and the
+  // GitHub App is installed). Fork PRs must not create check runs in the
+  // contributor's fork — that repo often has no app installation, and
+  // branch protection on the base wouldn't see the run anyway.
+  baseOwner: string;
+  baseRepoName: string;
   appType: GitHubAppType;
   userIdForFlag: string;
 }) {
@@ -451,8 +458,8 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
     try {
       newCheckRunId = await createCheckRun(
         args.installationId,
-        args.headOwner,
-        args.headRepoName,
+        args.baseOwner,
+        args.baseRepoName,
         args.newHeadSha,
         {
           detailsUrl,
@@ -476,8 +483,8 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
         try {
           await updateCheckRun(
             args.installationId,
-            args.headOwner,
-            args.headRepoName,
+            args.baseOwner,
+            args.baseRepoName,
             newCheckRunId,
             { status: 'completed', conclusion: 'cancelled' }
           );

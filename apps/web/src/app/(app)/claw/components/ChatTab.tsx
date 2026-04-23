@@ -131,7 +131,11 @@ function StreamChatUI({
     <BotUserIdContext value={botUserId}>
       <div className="claw-chat-wrapper h-[560px]">
         <Chat client={client} theme="str-chat__theme-dark">
-          <Channel channel={channel} Message={ClawMessage}>
+          <Channel
+            channel={channel}
+            Message={ClawMessage}
+            AttachmentSelector={HiddenAttachmentSelector}
+          >
             <Window>
               <BotStatusBar botUserId={botUserId} />
               <MessageList />
@@ -143,6 +147,10 @@ function StreamChatUI({
       </div>
     </BotUserIdContext>
   );
+}
+
+function HiddenAttachmentSelector() {
+  return null;
 }
 
 function ClawMessage() {

@@ -35,6 +35,7 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
   'inclusionai/ling-2.6-flash:free',
   'nvidia/nemotron-3-super-120b-a12b:free',
+  'tencent/hy3-preview:free',
   grok_code_fast_1_optimized_free_model.status === 'public'
     ? grok_code_fast_1_optimized_free_model.public_id
     : null,

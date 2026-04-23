@@ -930,10 +930,11 @@ export const gastownRouter = router({
         max_tokens: 100,
       });
 
-      const responseText =
+      const responseValue =
         result && typeof result === 'object' && 'response' in result
-          ? (result as { response?: string }).response
-          : null;
+          ? (result as Record<'response', unknown>).response
+          : undefined;
+      const responseText = typeof responseValue === 'string' ? responseValue : null;
 
       if (!responseText) return null;
 

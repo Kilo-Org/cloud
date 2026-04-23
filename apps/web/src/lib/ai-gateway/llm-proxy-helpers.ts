@@ -21,7 +21,7 @@ import type {
 import {
   type FraudDetectionHeaders,
   getFraudDetectionHeaders,
-  isRooCodeBasedClient,
+  isKiloCodeBasedClient,
   toMicrodollars,
 } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
@@ -132,7 +132,7 @@ export function apiKindNotSupportedResponse(
   supportedApiKinds: ReadonlyArray<GatewayChatApiKind>,
   fraudHeaders: FraudDetectionHeaders
 ) {
-  const error = isRooCodeBasedClient(fraudHeaders)
+  const error = isKiloCodeBasedClient(fraudHeaders)
     ? 'This model requires Kilo v7 or newer. Please upgrade Kilo and try again.'
     : `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
   return NextResponse.json(
@@ -230,7 +230,7 @@ export function modelNotAllowedResponse() {
 
 export function forbiddenFreeModelResponse(header: FraudDetectionHeaders) {
   const errorType = ProxyErrorType.discontinued_free_model;
-  if (isRooCodeBasedClient(header)) {
+  if (isKiloCodeBasedClient(header)) {
     // https://github.com/Kilo-Org/kilocode/blob/50d6bd482bec6fae7d1c80b14ffb064de3761507/src/shared/kilocode/errorUtils.ts#L13
     const error = `The alpha period for this model has ended.`;
     return NextResponse.json(

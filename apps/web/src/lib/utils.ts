@@ -36,7 +36,7 @@ export function getFraudDetectionHeaders(headers: Headers) {
   };
 }
 
-export function isRooCodeBasedClient(headers: FraudDetectionHeaders) {
+export function isKiloCodeBasedClient(headers: FraudDetectionHeaders) {
   return !!headers.http_user_agent?.startsWith('Kilo-Code/');
 }
 

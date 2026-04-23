@@ -1,6 +1,6 @@
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { isOpenCodeBasedClient, isRooCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
+import { isOpenCodeBasedClient, isKiloCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/ai-gateway/processUsage';
 import {
@@ -537,7 +537,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (requestBodyParsed.kind === 'chat_completions' && provider.id === 'martian') {
     response = await grokCodeFastOptimizedRequest(
       requestBodyParsed.body,
-      isRooCodeBasedClient(fraudHeaders)
+      isKiloCodeBasedClient(fraudHeaders)
     );
   } else {
     response = await openRouterRequest({

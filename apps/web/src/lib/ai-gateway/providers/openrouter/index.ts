@@ -48,7 +48,7 @@ function buildAutoModels(): OpenRouterModel[] {
     },
     context_length: m.context_length,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
-    settings: m.roocode_settings,
+    settings: m.settings,
     opencode: m.opencode_settings,
   }));
 }

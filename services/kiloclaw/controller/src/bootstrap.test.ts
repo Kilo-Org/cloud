@@ -1019,6 +1019,12 @@ describe('TOOLS.md section configs', () => {
     // it), but a duplicate top-level bullet would mean the agent sees it
     // twice in workspace context.
     expect(section).not.toContain('- **`gateway.control_ui.insecure_auth`**');
+    // Plugin is ShellSecurity as of the rename from
+    // @kilocode/openclaw-security-advisor → @kilocode/shell-security.
+    // Pin the new name so a drive-by edit can't silently regress to the
+    // old "OpenClaw Security Advisor" copy.
+    expect(section).toContain('ShellSecurity plugin bundled with KiloClaw');
+    expect(section).not.toContain('OpenClaw Security Advisor');
   });
 
   it('Plugin Install: references the CLI command and plugins.allow field', () => {

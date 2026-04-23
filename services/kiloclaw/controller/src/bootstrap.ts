@@ -790,7 +790,7 @@ You can interact with the \`Linear\` MCP server using your \`mcporter\` skill.
 
 // Additional KiloClaw-mitigated OpenClaw audit findings beyond the
 // gateway.control_ui.insecure_auth one already documented in the base
-// TOOLS.md. Mirrors the list in apps/web/src/lib/security-advisor/
+// TOOLS.md. Mirrors the list in apps/web/src/lib/shell-security/
 // kiloclaw-mitigations.ts — the server-side /security-checkup path
 // suppresses these before grading, but when a user runs `openclaw doctor`
 // directly the findings still show and the agent needs the same context
@@ -816,7 +816,7 @@ When running \`openclaw doctor\` or \`openclaw security audit\`, the following f
 
 1. Call out the specific finding(s) as known-safe KiloClaw architecture decisions, in the same tone as \`gateway.control_ui.insecure_auth\` above.
 2. Explain WHY each is safe using the per-finding rationale above.
-3. Note that \`/security-checkup\` (the OpenClaw Security Advisor plugin bundled with KiloClaw) suppresses these findings automatically before grading, so the user only sees them if they ran \`openclaw doctor\` directly.
+3. Note that \`/security-checkup\` (the ShellSecurity plugin bundled with KiloClaw) suppresses these findings automatically before grading, so the user only sees them if they ran \`openclaw doctor\` directly.
 <!-- END:kiloclaw-mitigations -->`,
 };
 

@@ -130,7 +130,6 @@ function ClawOnboardingFlowInner({
     createSetupStarted,
     setupFailed,
     onboardingStep,
-    selectedPreset,
     hasBotIdentity: botIdentity !== null,
     selectedChannelId,
   };
@@ -370,7 +369,6 @@ function ClawOnboardingFlowInner({
     switch (renderStep) {
       case 'identity':
         return renderIdentityStep();
-      case 'permissions':
       case 'channels':
         return renderChannelsStep();
       case 'provisioning':

@@ -1,5 +1,4 @@
 import type { GatewayProcessStatusResponse, KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
-import type { ExecPreset } from './claw.types';
 
 export type PopulatedClawStatus = KiloClawDashboardStatus & {
   status: NonNullable<KiloClawDashboardStatus['status']>;
@@ -22,19 +21,10 @@ export const CLAW_ONBOARDING_WIZARD_STEPS = [
   'pairing',
 ] as const satisfies OnboardingStep[];
 
-export const CLAW_ONBOARDING_PERMISSION_WALKTHROUGH_STEPS = [
-  'identity',
-  'permissions',
-  'channels',
-  'provisioning',
-  'pairing',
-] as const satisfies OnboardingStep[];
-
 export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[number];
 
 export type ClawOnboardingRenderStep =
   | 'identity'
-  | 'permissions'
   | 'channels'
   | 'provisioning'
   | 'pairing'
@@ -47,7 +37,6 @@ export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
 
 export const CLAW_ONBOARDING_FAKE_STEPS = [
   'identity',
-  'permissions',
   'channels',
   'provisioning',
   'pairing',
@@ -79,7 +68,6 @@ export type ClawOnboardingFlowStateInput = {
   createSetupStarted: boolean;
   setupFailed?: boolean;
   onboardingStep: OnboardingStep;
-  selectedPreset: ExecPreset | null;
   hasBotIdentity: boolean;
   selectedChannelId: string | null;
   gatewayState?: GatewayProcessStatusResponse['state'] | null;
@@ -118,19 +106,16 @@ export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status'
 
 export function getClawOnboardingStepProgress(
   step: OnboardingStep,
-  hasPairingStep: boolean,
-  { includePermissionsStep = false }: { includePermissionsStep?: boolean } = {}
+  hasPairingStep: boolean
 ): { currentStep: number; totalSteps: number } {
-  const wizardSteps: readonly OnboardingStep[] = includePermissionsStep
-    ? CLAW_ONBOARDING_PERMISSION_WALKTHROUGH_STEPS
-    : CLAW_ONBOARDING_WIZARD_STEPS;
+  const wizardSteps: readonly OnboardingStep[] = CLAW_ONBOARDING_WIZARD_STEPS;
   const totalSteps = hasPairingStep ? wizardSteps.length : wizardSteps.length - 1;
 
   if (step === 'done') {
     return { currentStep: totalSteps, totalSteps };
   }
 
-  const progressStep = !includePermissionsStep && step === 'permissions' ? 'channels' : step;
+  const progressStep = step === 'permissions' ? 'channels' : step;
   const index = wizardSteps.indexOf(progressStep);
   const currentStep = index === -1 ? 0 : index + 1;
 
@@ -143,7 +128,6 @@ export function getClawOnboardingFlowState({
   createSetupStarted,
   setupFailed = false,
   onboardingStep,
-  selectedPreset,
   hasBotIdentity,
   selectedChannelId,
   gatewayState,
@@ -187,7 +171,6 @@ export function getClawOnboardingFlowState({
     createSetupStarted,
     setupFailed,
     onboardingStep,
-    selectedPreset,
     hasBotIdentity,
     selectedChannelId,
     gatewayState,
@@ -345,7 +328,6 @@ function logClawOnboardingFlowStateDecision({
   createSetupStarted,
   setupFailed,
   onboardingStep,
-  selectedPreset,
   hasBotIdentity,
   selectedChannelId,
   gatewayState,
@@ -369,7 +351,6 @@ function logClawOnboardingFlowStateDecision({
       createSetupStarted,
       setupFailed,
       onboardingStep,
-      selectedPreset,
       hasBotIdentity,
       selectedChannelId,
       gatewayState: gatewayState ?? null,

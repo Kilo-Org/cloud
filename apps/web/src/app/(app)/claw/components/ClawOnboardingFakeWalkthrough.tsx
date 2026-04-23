@@ -20,12 +20,10 @@ import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { ClawSetupCompleteStep, ClawSetupErrorStep } from './ClawOnboardingFlow';
-import { PermissionStep } from './PermissionStep';
 import { ProvisioningStepView } from './ProvisioningStep';
 
 const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
   identity: 'Identity',
-  permissions: 'Permissions',
   channels: 'Channels',
   provisioning: 'Provisioning',
   pairing: 'Pairing',
@@ -62,8 +60,8 @@ const fakeStatus = {
   googleOAuthAccountEmail: null,
   googleOAuthCapabilities: [],
   gmailNotificationsEnabled: false,
-  execSecurity: 'allowlist',
-  execAsk: 'on-miss',
+  execSecurity: 'full',
+  execAsk: 'off',
   botName: 'KiloClaw',
   botNature: 'AI assistant',
   botVibe: 'Helpful, capable, professional',
@@ -181,15 +179,12 @@ function getFakeStepProgress(
   step: ClawOnboardingRenderStep,
   hasPairingStep: boolean
 ): StepProgress {
-  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), hasPairingStep, {
-    includePermissionsStep: true,
-  });
+  return getClawOnboardingStepProgress(getFakeOnboardingStep(step), hasPairingStep);
 }
 
 function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
   switch (step) {
     case 'identity':
-    case 'permissions':
     case 'channels':
     case 'provisioning':
     case 'pairing':
@@ -211,16 +206,7 @@ function renderFakeStep({
 }: RenderFakeStepInput) {
   switch (step) {
     case 'identity': {
-      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('permissions')} />;
-    }
-    case 'permissions': {
-      return (
-        <PermissionStep
-          {...stepProgress}
-          instanceRunning={false}
-          onSelect={() => setStep('channels')}
-        />
-      );
+      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('channels')} />;
     }
     case 'channels': {
       return (

@@ -62,7 +62,6 @@ function createInput(
     mode: 'create-first',
     createSetupStarted: false,
     onboardingStep: 'identity',
-    selectedPreset: 'never-ask',
     hasBotIdentity: false,
     selectedChannelId: null,
     gatewayState: null,
@@ -254,7 +253,6 @@ describe('ClawOnboardingFlow state machine', () => {
           setupFailed: true,
           onboardingStep: 'provisioning',
           hasBotIdentity: true,
-          selectedPreset: 'always-ask',
           status: undefined,
         })
       ).renderStep
@@ -309,7 +307,6 @@ describe('ClawOnboardingFlow state machine', () => {
             createSetupStarted: true,
             onboardingStep: 'provisioning',
             hasBotIdentity: true,
-            selectedPreset: 'always-ask',
             status: createStatus(status),
           })
         ).renderStep
@@ -386,7 +383,6 @@ describe('ClawOnboardingFlow state machine', () => {
           createSetupStarted: true,
           onboardingStep: 'permissions',
           hasBotIdentity: true,
-          selectedPreset: null,
         })
       ).renderStep
     ).toBe('channels');
@@ -396,7 +392,6 @@ describe('ClawOnboardingFlow state machine', () => {
           createSetupStarted: true,
           onboardingStep: 'channels',
           hasBotIdentity: true,
-          selectedPreset: null,
         })
       ).renderStep
     ).toBe('channels');
@@ -406,7 +401,6 @@ describe('ClawOnboardingFlow state machine', () => {
           createSetupStarted: true,
           onboardingStep: 'provisioning',
           hasBotIdentity: true,
-          selectedPreset: null,
         })
       ).renderStep
     ).toBe('provisioning');

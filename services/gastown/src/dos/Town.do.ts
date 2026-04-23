@@ -72,6 +72,7 @@ import type {
   BeadFilter,
   Bead,
   BeadStatus,
+  BeadType as BeadTypeType,
   BeadPriority as BeadPriorityType,
   RegisterAgentInput,
   AgentFilter,
@@ -80,7 +81,6 @@ import type {
   SendMailInput,
   Mail,
   ReviewQueueInput,
-  ReviewQueueEntry,
   AgentDoneInput,
   PrimeContext,
   Molecule,
@@ -343,6 +343,17 @@ export class TownDO extends DurableObject<Env> {
           });
         }
 
+        // Option B (defense-in-depth): If the reconciler re-dispatches an
+        // open triage batch bead (gt:triage, created_by='patrol') — e.g.
+        // because Option A's in_progress transition was somehow bypassed —
+        // inject the triage system prompt so the polecat gets the correct
+        // tools and instructions instead of the generic polecat prompt.
+        if (bead.labels.includes(patrol.TRIAGE_BATCH_LABEL) && bead.created_by === 'patrol') {
+          const pendingRequests = patrol.listPendingTriageRequests(this.sql);
+          const { buildTriageSystemPrompt } = await import('../prompts/triage-system.prompt');
+          systemPromptOverride = buildTriageSystemPrompt(pendingRequests);
+        }
+
         return scheduling.dispatchAgent(schedulingCtx, agent, bead, {
           systemPromptOverride,
         });
@@ -598,6 +609,18 @@ export class TownDO extends DurableObject<Env> {
     // Reconciler event log
     events.initTownEventsTable(this.sql);
 
+    // One-shot cleanup: older versions of this DO stored a separate
+    // `mayor:ready_reported_for:<startedAt>` key per container instance,
+    // which grew unbounded over a town's lifetime. We now store a single
+    // `mayor:ready_reported_for` key instead. Delete the legacy entries
+    // on next init so long-lived towns don't leak durable storage.
+    const legacyReadyKeys = await this.ctx.storage.list<unknown>({
+      prefix: 'mayor:ready_reported_for:',
+    });
+    if (legacyReadyKeys.size > 0) {
+      await this.ctx.storage.delete([...legacyReadyKeys.keys()]);
+    }
+
     // Ensure the alarm loop is running. After a deploy/restart, the
     // Cloudflare runtime normally delivers missed alarms, but if the alarm
     // was never set or was deleted by destroy(), the loop is dead. Re-arm
@@ -785,6 +808,53 @@ export class TownDO extends DurableObject<Env> {
         console.warn(`[Town.do] syncConfigToContainer: ${key} sync failed:`, err);
       }
     }
+
+    // Persist custom env_vars to DO storage so they survive container restarts.
+    // Compare against the previously-persisted set of keys to clear removed ones.
+    // Reserved infra keys are never overwritten or deleted — infra values always win.
+    const RESERVED_ENV_KEYS = new Set([
+      'KILOCODE_TOKEN',
+      'GIT_TOKEN',
+      'GITHUB_TOKEN',
+      'GITLAB_TOKEN',
+      'GITLAB_INSTANCE_URL',
+      'GITHUB_CLI_PAT',
+      'GH_TOKEN',
+      'GASTOWN_GIT_AUTHOR_NAME',
+      'GASTOWN_GIT_AUTHOR_EMAIL',
+      'GASTOWN_DISABLE_AI_COAUTHOR',
+      'GASTOWN_ORGANIZATION_ID',
+      'GASTOWN_CONTAINER_TOKEN',
+      'GASTOWN_SESSION_TOKEN',
+      'GASTOWN_API_URL',
+    ]);
+    const CUSTOM_ENV_KEYS_STORAGE_KEY = 'container:custom_env_var_keys';
+    const prevCustomKeys: string[] =
+      (await this.ctx.storage.get<string[]>(CUSTOM_ENV_KEYS_STORAGE_KEY)) ?? [];
+    const newCustomKeys = Object.keys(townConfig.env_vars).filter(
+      key => !RESERVED_ENV_KEYS.has(key)
+    );
+    const newCustomKeySet = new Set(newCustomKeys);
+
+    for (const key of prevCustomKeys) {
+      if (RESERVED_ENV_KEYS.has(key)) continue;
+      if (!newCustomKeySet.has(key)) {
+        try {
+          await container.deleteEnvVar(key);
+        } catch (err) {
+          console.warn(`[Town.do] syncConfigToContainer: delete custom ${key} failed:`, err);
+        }
+      }
+    }
+    for (const [key, value] of Object.entries(townConfig.env_vars)) {
+      if (RESERVED_ENV_KEYS.has(key)) continue;
+      try {
+        await container.setEnvVar(key, value);
+      } catch (err) {
+        console.warn(`[Town.do] syncConfigToContainer: set custom ${key} failed:`, err);
+      }
+    }
+    await this.ctx.storage.put(CUSTOM_ENV_KEYS_STORAGE_KEY, newCustomKeys);
 
     // Phase 2: Push to the running container's process.env via the
     // /sync-config endpoint. The X-Town-Config header delivers the
@@ -1072,8 +1142,35 @@ export class TownDO extends DurableObject<Env> {
     return this.updateBeadStatus(beadId, 'closed', agentId);
   }
 
-  async deleteBead(beadId: string): Promise<void> {
-    beadOps.deleteBead(this.sql, beadId);
+  async deleteBead(beadId: string, rigId?: string): Promise<boolean> {
+    return beadOps.deleteBead(this.sql, beadId, rigId);
+  }
+
+  async deleteBeads(beadIds: string[], rigId?: string): Promise<number> {
+    return beadOps.deleteBeads(this.sql, beadIds, rigId);
+  }
+
+  async deleteBeadsByStatus(
+    status: BeadStatus,
+    type?: BeadTypeType,
+    rigId?: string
+  ): Promise<number> {
+    if (rigId) {
+      const rigBeads = BeadRecord.pick({ bead_id: true })
+        .array()
+        .parse([
+          ...this.sql.exec(
+            /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.rig_id} = ? AND ${beads.status} = ?${type ? ` AND ${beads.type} = ?` : ''}`,
+            ...(type ? [rigId, status, type] : [rigId, status])
+          ),
+        ]);
+      if (rigBeads.length === 0) return 0;
+      return beadOps.deleteBeads(
+        this.sql,
+        rigBeads.map(r => r.bead_id)
+      );
+    }
+    return beadOps.deleteBeadsByStatus(this.sql, status, type);
   }
 
   async listBeadEvents(options: {
@@ -1098,6 +1195,7 @@ export class TownDO extends DurableObject<Env> {
       labels: string[];
       status: BeadStatus;
       metadata: Record<string, unknown>;
+      depends_on: string[];
     }>,
     actorId: string
   ): Promise<Bead> {
@@ -1110,7 +1208,12 @@ export class TownDO extends DurableObject<Env> {
       });
     }
 
-    const bead = beadOps.updateBeadFields(this.sql, beadId, fields, actorId);
+    const { depends_on, ...beadFields } = fields;
+    const bead = beadOps.updateBeadFields(this.sql, beadId, beadFields, actorId);
+
+    if (depends_on !== undefined) {
+      beadOps.setDependencies(this.sql, beadId, depends_on);
+    }
 
     // When a bead closes via field update, check for newly unblocked beads
     if (fields.status === 'closed' || fields.status === 'failed') {
@@ -1118,6 +1221,67 @@ export class TownDO extends DurableObject<Env> {
     }
 
     return bead;
+  }
+
+  /** Add an existing bead to a convoy's tracking. Returns updated convoy metadata. */
+  async convoyAddBead(
+    convoyId: string,
+    beadId: string,
+    dependsOn?: string[]
+  ): Promise<{ total_beads: number }> {
+    const convoyCheck = [
+      ...query(
+        this.sql,
+        /* sql */ `SELECT 1 FROM ${convoy_metadata} WHERE ${convoy_metadata.bead_id} = ?`,
+        [convoyId]
+      ),
+    ];
+    if (convoyCheck.length === 0) throw new Error(`Bead ${convoyId} is not a convoy`);
+    beadOps.convoyAddBead(this.sql, convoyId, beadId);
+    if (dependsOn !== undefined) {
+      beadOps.setDependencies(this.sql, beadId, dependsOn);
+    }
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${convoy_metadata.total_beads}
+          FROM ${convoy_metadata}
+          WHERE ${convoy_metadata.bead_id} = ?
+        `,
+        [convoyId]
+      ),
+    ];
+    const parsed = z.object({ total_beads: z.number() }).array().parse(rows);
+    const total = parsed[0]?.total_beads ?? 0;
+    return { total_beads: total };
+  }
+
+  /** Remove a bead from a convoy's tracking. Returns updated convoy metadata. */
+  async convoyRemoveBead(convoyId: string, beadId: string): Promise<{ total_beads: number }> {
+    const convoyCheck = [
+      ...query(
+        this.sql,
+        /* sql */ `SELECT 1 FROM ${convoy_metadata} WHERE ${convoy_metadata.bead_id} = ?`,
+        [convoyId]
+      ),
+    ];
+    if (convoyCheck.length === 0) throw new Error(`Bead ${convoyId} is not a convoy`);
+    beadOps.convoyRemoveBead(this.sql, convoyId, beadId);
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${convoy_metadata.total_beads}
+          FROM ${convoy_metadata}
+          WHERE ${convoy_metadata.bead_id} = ?
+        `,
+        [convoyId]
+      ),
+    ];
+    const parsed = z.object({ total_beads: z.number() }).array().parse(rows);
+    const total = parsed[0]?.total_beads ?? 0;
+    return { total_beads: total };
   }
 
   /**
@@ -1670,14 +1834,6 @@ export class TownDO extends DurableObject<Env> {
     await this.escalateToActiveCadence();
   }
 
-  async popReviewQueue(): Promise<ReviewQueueEntry | null> {
-    return reviewQueue.popReviewQueue(this.sql);
-  }
-
-  async completeReview(entryId: string, status: 'merged' | 'failed'): Promise<void> {
-    reviewQueue.completeReview(this.sql, entryId, status);
-  }
-
   async completeReviewWithResult(input: {
     entry_id: string;
     status: 'merged' | 'failed' | 'conflict';
@@ -1712,10 +1868,9 @@ export class TownDO extends DurableObject<Env> {
       });
     }
 
-    // Rework is handled by the normal scheduling path: the failed/conflict
+    // Rework is handled by the reconciler's scheduling path: the failed/conflict
     // path in completeReviewWithResult sets the source bead to 'open' with
-    // assignee cleared. feedStrandedConvoys or rehookOrphanedBeads will
-    // hook a polecat, and schedulePendingWork will dispatch it.
+    // assignee cleared. The reconciler will hook a polecat and dispatch it.
   }
 
   async agentDone(agentId: string, input: AgentDoneInput): Promise<void> {
@@ -2362,29 +2517,33 @@ export class TownDO extends DurableObject<Env> {
         }
       }
 
-      const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
-        townId,
-        rigId: `mayor-${townId}`,
-        userId: townConfig.owner_user_id ?? rigConfig?.userId ?? townId,
-        agentId: mayor.id,
-        agentName: 'mayor',
-        role: 'mayor',
-        identity: mayor.identity,
-        beadId: '',
-        beadTitle: combinedMessage,
-        beadBody: '',
-        checkpoint: agents.readCheckpoint(this.sql, mayor.id),
-        // conversationHistory is no longer needed — the mayor's kilo.db
-        // is persisted to KV and hydrated on boot, preserving the full
-        // session state across container evictions.
-        gitUrl: rigConfig?.gitUrl ?? '',
-        defaultBranch: rigConfig?.defaultBranch ?? 'main',
-        kilocodeToken,
-        townConfig,
-        rigs: await this.rigListForMayor(),
-      });
+      const { started: mayorStarted } = await dispatch.startAgentInContainer(
+        this.env,
+        this.ctx.storage,
+        {
+          townId,
+          rigId: `mayor-${townId}`,
+          userId: townConfig.owner_user_id ?? rigConfig?.userId ?? townId,
+          agentId: mayor.id,
+          agentName: 'mayor',
+          role: 'mayor',
+          identity: mayor.identity,
+          beadId: '',
+          beadTitle: combinedMessage,
+          beadBody: '',
+          checkpoint: agents.readCheckpoint(this.sql, mayor.id),
+          // conversationHistory is no longer needed — the mayor's kilo.db
+          // is persisted to KV and hydrated on boot, preserving the full
+          // session state across container evictions.
+          gitUrl: rigConfig?.gitUrl ?? '',
+          defaultBranch: rigConfig?.defaultBranch ?? 'main',
+          kilocodeToken,
+          townConfig,
+          rigs: await this.rigListForMayor(),
+        }
+      );
 
-      if (started) {
+      if (mayorStarted) {
         agents.updateAgentStatus(this.sql, mayor.id, 'working');
         this._mayorWorkingSince = Date.now();
         sessionStatus = 'starting';
@@ -2466,29 +2625,33 @@ export class TownDO extends DurableObject<Env> {
 
     // Start with an empty prompt — the mayor will be idle but its container
     // and SDK server will be running, ready for PTY connections.
-    const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
-      townId,
-      rigId: `mayor-${townId}`,
-      userId:
-        townConfig.owner_user_id ?? rigConfig?.userId ?? townConfig.created_by_user_id ?? townId,
-      agentId: mayor.id,
-      agentName: 'mayor',
-      role: 'mayor',
-      identity: mayor.identity,
-      beadId: '',
-      beadTitle: 'Mayor ready. Waiting for instructions.',
-      beadBody: '',
-      checkpoint: agents.readCheckpoint(this.sql, mayor.id),
-      // conversationHistory is no longer needed — kilo.db persistence
-      // handles session continuity across container evictions.
-      gitUrl: rigConfig?.gitUrl ?? '',
-      defaultBranch: rigConfig?.defaultBranch ?? 'main',
-      kilocodeToken,
-      townConfig,
-      rigs: await this.rigListForMayor(),
-    });
+    const { started: mayorStarted } = await dispatch.startAgentInContainer(
+      this.env,
+      this.ctx.storage,
+      {
+        townId,
+        rigId: `mayor-${townId}`,
+        userId:
+          townConfig.owner_user_id ?? rigConfig?.userId ?? townConfig.created_by_user_id ?? townId,
+        agentId: mayor.id,
+        agentName: 'mayor',
+        role: 'mayor',
+        identity: mayor.identity,
+        beadId: '',
+        beadTitle: 'Mayor ready. Waiting for instructions.',
+        beadBody: '',
+        checkpoint: agents.readCheckpoint(this.sql, mayor.id),
+        // conversationHistory is no longer needed — kilo.db persistence
+        // handles session continuity across container evictions.
+        gitUrl: rigConfig?.gitUrl ?? '',
+        defaultBranch: rigConfig?.defaultBranch ?? 'main',
+        kilocodeToken,
+        townConfig,
+        rigs: await this.rigListForMayor(),
+      }
+    );
 
-    if (started) {
+    if (mayorStarted) {
       agents.updateAgentStatus(this.sql, mayor.id, 'working');
       this._mayorWorkingSince = Date.now();
       return { agentId: mayor.id, sessionStatus: 'starting' };
@@ -3558,9 +3721,9 @@ export class TownDO extends DurableObject<Env> {
     }
 
     // ── Pre-phase: Observe container status for working agents ────────
-    // Replaces witnessPatrol's zombie detection. Poll the container for
-    // each working/stalled agent and emit container_status events. These
-    // are drained in Phase 0 and applied before reconciliation.
+    // Poll the container for each working/stalled agent and emit
+    // container_status events. These are drained in Phase 0 and applied
+    // before reconciliation.
     try {
       const workingAgentRows = z
         .object({ bead_id: z.string() })
@@ -3624,6 +3787,11 @@ export class TownDO extends DurableObject<Env> {
       pendingEventCount: 0,
     };
 
+    // Fetch town config once and share across Phase 0 and Phase 1 so that
+    // applyEvent can use the full fallback chain (rig → town → default) for
+    // settings like auto_resolve_merge_conflicts.
+    const townConfig = await this.getTownConfig();
+
     // Phase 0: Drain events and apply state transitions
     try {
       const pending = events.drainEvents(this.sql);
@@ -3633,7 +3801,7 @@ export class TownDO extends DurableObject<Env> {
       }
       for (const event of pending) {
         try {
-          reconciler.applyEvent(this.sql, event);
+          reconciler.applyEvent(this.sql, event, { townConfig });
           events.markProcessed(this.sql, event.event_id);
         } catch (err) {
           logger.error('reconciler: applyEvent failed', {
@@ -3674,7 +3842,6 @@ export class TownDO extends DurableObject<Env> {
     // Phase 1: Reconcile — compute desired state vs actual state
     const sideEffects: Array<() => Promise<void>> = [];
     try {
-      const townConfig = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
         draining: this._draining,
         townConfig,
@@ -4064,6 +4231,9 @@ export class TownDO extends DurableObject<Env> {
     const systemPrompt = buildTriageSystemPrompt(pendingRequests);
 
     // Only now create the synthetic bead — preconditions are verified.
+    // Set rig_id so that if Rule 3 resets this bead to 'open' after a
+    // dispatch timeout, Rule 1 of the reconciler can pick it up and
+    // re-dispatch it (with the correct triage system prompt via Option B).
     const triageBead = beadOps.createBead(this.sql, {
       type: 'issue',
       title: `Triage batch: ${pendingCount} request(s)`,
@@ -4071,33 +4241,46 @@ export class TownDO extends DurableObject<Env> {
       priority: 'high',
       labels: [patrol.TRIAGE_BATCH_LABEL],
       created_by: 'patrol',
+      rig_id: rigId,
     });
 
     const triageAgent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
     agents.hookBead(this.sql, triageAgent.id, triageBead.bead_id);
 
-    const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
-      townId: this.townId,
-      rigId,
-      userId: rigConfig.userId,
-      agentId: triageAgent.id,
-      agentName: triageAgent.name,
-      role: 'polecat',
-      identity: triageAgent.identity,
-      beadId: triageBead.bead_id,
-      beadTitle: triageBead.title,
-      beadBody: triageBead.body ?? '',
-      checkpoint: null,
-      gitUrl: rigConfig.gitUrl,
-      defaultBranch: rigConfig.defaultBranch,
-      kilocodeToken,
-      townConfig,
-      systemPromptOverride: systemPrompt,
-      platformIntegrationId: rigConfig.platformIntegrationId,
-      lightweight: true,
-    });
+    // Option A: Immediately mark the triage batch bead as in_progress so
+    // the reconciler's Rule 2 (idle agent + open hooked bead → dispatch_agent)
+    // does not re-fire on the next tick if the container start fails. Rule 3
+    // (stale in_progress bead + no working agent + 5-min timeout) will reset
+    // it back to open if the dispatch fails, allowing a clean retry via
+    // maybeDispatchTriageAgent with the correct triage system prompt.
+    beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'in_progress', triageAgent.id);
 
-    if (started) {
+    const { started: triageStarted } = await dispatch.startAgentInContainer(
+      this.env,
+      this.ctx.storage,
+      {
+        townId: this.townId,
+        rigId,
+        userId: rigConfig.userId,
+        agentId: triageAgent.id,
+        agentName: triageAgent.name,
+        role: 'polecat',
+        identity: triageAgent.identity,
+        beadId: triageBead.bead_id,
+        beadTitle: triageBead.title,
+        beadBody: triageBead.body ?? '',
+        checkpoint: null,
+        gitUrl: rigConfig.gitUrl,
+        defaultBranch: rigConfig.defaultBranch,
+        kilocodeToken,
+        townConfig,
+        systemPromptOverride: systemPrompt,
+        platformIntegrationId: rigConfig.platformIntegrationId,
+        lightweight: true,
+      }
+    );
+
+    if (triageStarted) {
       // Mark the agent as working so the duplicate-guard on the next
       // alarm tick sees it and skips dispatch.
       agents.updateAgentStatus(this.sql, triageAgent.id, 'working');
@@ -4252,6 +4435,30 @@ export class TownDO extends DurableObject<Env> {
 
     try {
       const container = getTownContainerStub(this.env, townId);
+
+      // Measure Cloudflare container cold-start latency from the worker's
+      // perspective: warmUp() invokes startAndWaitForPorts() directly, so the
+      // returned durationMs is the true time-to-ready without the arbitrary
+      // 5s truncation of a plain /health ping. For already-warm containers
+      // this is a cheap RPC that returns { coldStart: false }.
+      try {
+        const warm = await container.warmUp();
+        if (warm.coldStart) {
+          writeEvent(this.env, {
+            event: 'container.cold_start',
+            townId,
+            durationMs: warm.durationMs,
+          });
+        }
+      } catch (err) {
+        writeEvent(this.env, {
+          event: 'container.cold_start',
+          townId,
+          error: err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300),
+        });
+        // Fall through to /health ping anyway — the container may recover.
+      }
+
       // Always include X-Town-Config so the container populates
       // lastKnownTownConfig on startup — before any /agents/start arrives.
       // This ensures org context and credentials are available immediately
@@ -4278,12 +4485,80 @@ export class TownDO extends DurableObject<Env> {
         headers['X-Drain-Nonce'] = this._drainNonce;
         headers['X-Town-Id'] = townId;
       }
-      await container.fetch('http://container/health', {
-        signal: AbortSignal.timeout(5_000),
-        headers,
-      });
+      const t0 = Date.now();
+      try {
+        const healthResp = await container.fetch('http://container/health', {
+          signal: AbortSignal.timeout(5_000),
+          headers,
+        });
+        const durationMs = Date.now() - t0;
+        if (!healthResp.ok) {
+          writeEvent(this.env, {
+            event: 'container.health_ping',
+            townId,
+            durationMs,
+            statusCode: healthResp.status,
+            error: `non-ok status ${healthResp.status}`,
+          });
+        } else {
+          writeEvent(this.env, {
+            event: 'container.health_ping',
+            townId,
+            durationMs,
+            statusCode: healthResp.status,
+          });
+          const rawBody: unknown = await healthResp.json().catch(() => null);
+          const HealthBody = z
+            .object({
+              startedAt: z.string().optional(),
+              uptime: z.number().optional(),
+              mayorReadyAt: z.string().optional(),
+            })
+            .passthrough();
+          const body = HealthBody.safeParse(rawBody);
+          if (body.success && body.data.startedAt) {
+            const containerStartedAt = new Date(body.data.startedAt).getTime();
+            writeEvent(this.env, {
+              event: 'container.ready_observed',
+              townId,
+              containerStartedAt: body.data.startedAt,
+              durationMs: Date.now() - containerStartedAt,
+            });
+
+            // Emit mayor.session_ready exactly once per container instance.
+            // We store just the most recently reported startedAt in a single
+            // key — when a container restarts, startedAt changes and we
+            // re-emit, overwriting the previous value. This keeps storage
+            // at O(1) rather than accumulating a key per container lifetime.
+            if (body.data.mayorReadyAt) {
+              const lastReportedStartedAt = await this.ctx.storage.get<string>(
+                'mayor:ready_reported_for'
+              );
+              if (lastReportedStartedAt !== body.data.startedAt) {
+                await this.ctx.storage.put('mayor:ready_reported_for', body.data.startedAt);
+                const mayorReadyAt = new Date(body.data.mayorReadyAt).getTime();
+                writeEvent(this.env, {
+                  event: 'mayor.session_ready',
+                  townId,
+                  containerStartedAt: body.data.startedAt,
+                  durationMs: mayorReadyAt - containerStartedAt,
+                });
+              }
+            }
+          }
+        }
+      } catch {
+        const durationMs = Date.now() - t0;
+        writeEvent(this.env, {
+          event: 'container.health_ping',
+          townId,
+          durationMs,
+          error: 'timeout',
+        });
+        // Container is starting up or unavailable — alarm will retry
+      }
     } catch {
-      // Container is starting up or unavailable — alarm will retry
+      // Outer try: buildContainerConfig or getTownContainerStub failed
     }
   }
 
@@ -4487,8 +4762,8 @@ export class TownDO extends DurableObject<Env> {
 
     // Only count idle+hooked agents as orphaned if they've been idle for
     // longer than the dispatch cooldown. Agents that were just hooked by
-    // feedStrandedConvoys or restarted with backoff are legitimately
-    // waiting for the next scheduler tick.
+    // the reconciler or restarted with backoff are legitimately waiting
+    // for the next scheduler tick.
     const orphanedHooks = Number(
       [
         ...query(

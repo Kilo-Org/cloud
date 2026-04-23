@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, Fragment, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
@@ -15,7 +15,9 @@ import {
   Eye,
   GitBranch,
   GitMerge,
+  Loader2,
   RefreshCw,
+  X,
   XCircle,
   CheckCircle2,
   Clock,
@@ -113,6 +115,8 @@ export function NeedsAttention({
 }) {
   const session = useSession();
   const isAdmin = session?.data?.isAdmin ?? false;
+  const trpc = useGastownTRPC();
+  const queryClient = useQueryClient();
   const totalCount = data.openPRs.length + data.failedReviews.length + data.stalePRs.length;
 
   // Tag each item with its category for rendering
@@ -139,6 +143,41 @@ export function NeedsAttention({
     return map;
   }, [allItems]);
 
+  const failedItems = useMemo(
+    () => allItems.filter(({ category }) => category === 'failed').map(({ item }) => item),
+    [allItems]
+  );
+
+  const [isDismissingAll, setIsDismissingAll] = useState(false);
+  const updateBeadMutation = useMutation(trpc.gastown.updateBead.mutationOptions({}));
+
+  const dismissAllFailed = useCallback(async () => {
+    if (failedItems.length === 0) return;
+    setIsDismissingAll(true);
+    try {
+      await Promise.all(
+        failedItems.map(item =>
+          updateBeadMutation.mutateAsync({
+            rigId: item.mrBead.rig_id ?? '',
+            beadId: item.mrBead.bead_id,
+            status: 'closed',
+          })
+        )
+      );
+      void queryClient.invalidateQueries({
+        queryKey: trpc.gastown.getMergeQueueData.queryKey({ townId }),
+      });
+      toast.success(
+        `Dismissed ${failedItems.length} failed ${failedItems.length === 1 ? 'bead' : 'beads'}`
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to dismiss all: ${message}`);
+    } finally {
+      setIsDismissingAll(false);
+    }
+  }, [failedItems, updateBeadMutation, queryClient, trpc, townId]);
+
   if (totalCount === 0) {
     return (
       <div className="rounded-xl border border-dashed border-white/10 p-6 text-center">
@@ -150,6 +189,24 @@ export function NeedsAttention({
 
   return (
     <div className="space-y-3">
+      {/* Dismiss all failed button */}
+      {failedItems.length > 0 && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => void dismissAllFailed()}
+            disabled={isDismissingAll}
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-red-400/60 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:pointer-events-none disabled:opacity-40"
+          >
+            {isDismissingAll ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <X className="size-3" />
+            )}
+            Dismiss all failed ({failedItems.length})
+          </button>
+        </div>
+      )}
+
       {/* Convoy groups */}
       <AnimatePresence initial={false}>
         {convoyGroups.map(group => (
@@ -335,6 +392,18 @@ function AttentionItemRow({
     })
   );
 
+  const dismissMutation = useMutation(
+    trpc.gastown.updateBead.mutationOptions({
+      onSuccess: () => {
+        invalidateMergeQueue();
+        toast.success('Bead dismissed');
+      },
+      onError: (err: { message: string }) => {
+        toast.error(`Failed to dismiss: ${err.message}`);
+      },
+    })
+  );
+
   // Fail bead mutation: use adminForceFailBead
   const failMutation = useMutation(
     trpc.gastown.adminForceFailBead.mutationOptions({
@@ -349,7 +418,7 @@ function AttentionItemRow({
     })
   );
 
-  const isPending = retryMutation.isPending || failMutation.isPending;
+  const isPending = retryMutation.isPending || failMutation.isPending || dismissMutation.isPending;
 
   const handleConfirm = () => {
     if (!confirmAction) return;
@@ -388,13 +457,12 @@ function AttentionItemRow({
             </span>
             <button
               onClick={() => {
-                if (item.sourceBead) {
-                  openDrawer({
-                    type: 'bead',
-                    beadId: item.sourceBead.bead_id,
-                    rigId,
-                  });
-                }
+                const beadToOpen = item.sourceBead ?? item.mrBead;
+                openDrawer({
+                  type: 'bead',
+                  beadId: beadToOpen.bead_id,
+                  rigId,
+                });
               }}
               className="min-w-0 truncate text-sm text-white/75 transition-colors hover:text-white/90"
               title={sourceBeadTitle}
@@ -446,29 +514,45 @@ function AttentionItemRow({
             </a>
           )}
           {category === 'failed' && (
-            <button
-              onClick={() =>
-                setConfirmAction({
-                  beadId: item.mrBead.bead_id,
-                  title: sourceBeadTitle,
-                  action: 'retry',
-                })
-              }
-              className="rounded-md p-1.5 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60"
-              title="Retry Review"
-            >
-              <RefreshCw className="size-3.5" />
-            </button>
+            <>
+              <button
+                onClick={() =>
+                  setConfirmAction({
+                    beadId: item.mrBead.bead_id,
+                    title: sourceBeadTitle,
+                    action: 'retry',
+                  })
+                }
+                disabled={isPending}
+                className="rounded-md p-1.5 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60 disabled:pointer-events-none disabled:opacity-40"
+                title="Retry Review"
+              >
+                <RefreshCw className="size-3.5" />
+              </button>
+              <button
+                onClick={() =>
+                  dismissMutation.mutate({
+                    rigId,
+                    beadId: item.mrBead.bead_id,
+                    status: 'closed',
+                  })
+                }
+                disabled={isPending}
+                className="rounded-md p-1.5 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60 disabled:pointer-events-none disabled:opacity-40"
+                title="Dismiss"
+              >
+                <X className="size-3.5" />
+              </button>
+            </>
           )}
           <button
             onClick={() => {
-              if (item.sourceBead) {
-                openDrawer({
-                  type: 'bead',
-                  beadId: item.sourceBead.bead_id,
-                  rigId,
-                });
-              }
+              const beadToOpen = item.sourceBead ?? item.mrBead;
+              openDrawer({
+                type: 'bead',
+                beadId: beadToOpen.bead_id,
+                rigId,
+              });
             }}
             className="rounded-md p-1.5 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60"
             title="View Bead"

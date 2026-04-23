@@ -3173,6 +3173,1152 @@
       ],
       "title": "Pending Event Queue Depth",
       "type": "gauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 129
+      },
+      "id": 300,
+      "panels": [],
+      "title": "DO → Container RPC Latency",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "bffxugc31cnpcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 500
+              },
+              {
+                "color": "red",
+                "value": 2000
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 130
+      },
+      "id": 303,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_ms FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' AND blob5 = ''",
+          "rawSql": "SELECT SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_ms FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' AND blob5 = ''",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "timeFrom": "1h",
+      "title": "Avg /health RPC (1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "bffxugc31cnpcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "red",
+                "value": 5000
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 130
+      },
+      "id": 304,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_ms FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' AND blob5 = ''",
+          "rawSql": "SELECT SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_ms FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' AND blob5 = ''",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "timeFrom": "1h",
+      "title": "Avg /agents/start RPC (1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "bffxugc31cnpcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "timeout_rate"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 134
+      },
+      "id": 301,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.50)(double1, _sample_interval) AS p50 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.50)(double1, _sample_interval) AS p50 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        },
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.90)(double1, _sample_interval) AS p90 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.90)(double1, _sample_interval) AS p90 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "B",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        },
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.99)(double1, _sample_interval) AS p99 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.99)(double1, _sample_interval) AS p99 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "C",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        },
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, 'timeout_rate' AS label, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS timeout_rate FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'timeout_rate' AS label, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS timeout_rate FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' GROUP BY t ORDER BY t",
+          "refId": "D",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "/health RPC Latency (DO → container round-trip)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "bffxugc31cnpcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "failure_rate"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 134
+      },
+      "id": 302,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.50)(double1, _sample_interval) AS p50 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.50)(double1, _sample_interval) AS p50 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        },
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.90)(double1, _sample_interval) AS p90 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.90)(double1, _sample_interval) AS p90 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "B",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        },
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.99)(double1, _sample_interval) AS p99 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.99)(double1, _sample_interval) AS p99 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "C",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        },
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, 'failure_rate' AS label, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS failure_rate FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'failure_rate' AS label, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS failure_rate FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' GROUP BY t ORDER BY t",
+          "refId": "D",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Container Agent Start Latency (Town DO → container.fetch('/agents/start') round-trip)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "bffxugc31cnpcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 142
+      },
+      "id": 305,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, 'timeout_rate' AS label, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS rate FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'timeout_rate' AS label, SUM(IF(blob5 != '', _sample_interval, 0)) / SUM(_sample_interval) AS rate FROM gastown_events WHERE $timeFilter AND blob1 = 'container.health_ping' GROUP BY t ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "/health RPC Failure Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "bffxugc31cnpcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 0,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "success"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "failure"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 142
+      },
+      "id": 306,
+      "options": {
+        "legend": {
+          "calcs": ["sum"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, IF(blob5 = '', 'success', 'failure') AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, IF(blob5 = '', 'success', 'failure') AS label, SUM(_sample_interval) AS count FROM gastown_events WHERE $timeFilter AND blob1 = 'container.agent_start_fetch' GROUP BY t, label ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "/agents/start Attempts (success / failure)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 150
+      },
+      "id": 400,
+      "panels": [],
+      "title": "Container Cold Start & Mayor Ready",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "bffxugc31cnpcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 151
+      },
+      "id": 401,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.50)(double1, _sample_interval) AS p50 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.cold_start' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.50)(double1, _sample_interval) AS p50 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.cold_start' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        },
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.90)(double1, _sample_interval) AS p90 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.cold_start' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.90)(double1, _sample_interval) AS p90 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.cold_start' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "B",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        },
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.99)(double1, _sample_interval) AS p99 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.cold_start' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.99)(double1, _sample_interval) AS p99 FROM gastown_events WHERE $timeFilter AND blob1 = 'container.cold_start' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "C",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Container Cold Start Latency (startAndWaitForPorts, p50/p90/p99)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "bffxugc31cnpcc"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 151
+      },
+      "id": 402,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.50)(double1, _sample_interval) AS p50 FROM gastown_events WHERE $timeFilter AND blob1 = 'mayor.session_ready' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.50)(double1, _sample_interval) AS p50 FROM gastown_events WHERE $timeFilter AND blob1 = 'mayor.session_ready' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        },
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.90)(double1, _sample_interval) AS p90 FROM gastown_events WHERE $timeFilter AND blob1 = 'mayor.session_ready' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.90)(double1, _sample_interval) AS p90 FROM gastown_events WHERE $timeFilter AND blob1 = 'mayor.session_ready' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "B",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        },
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, quantileWeighted(0.99)(double1, _sample_interval) AS p99 FROM gastown_events WHERE $timeFilter AND blob1 = 'mayor.session_ready' AND blob5 = '' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, quantileWeighted(0.99)(double1, _sample_interval) AS p99 FROM gastown_events WHERE $timeFilter AND blob1 = 'mayor.session_ready' AND blob5 = '' GROUP BY t ORDER BY t",
+          "refId": "C",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "gastown_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Mayor Session Ready (container start → mayor running, p50/p90/p99)",
+      "type": "timeseries"
     }
   ],
   "preload": false,

@@ -102,8 +102,15 @@ const app = new Hono<KiloOpsEnv>();
 
 app.get('/healthz', c => c.json({ ok: true }));
 
+const LOCAL_DEV_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+
 app.use('/*', async (c, next) => {
-  if (c.env.ENVIRONMENT === 'development') {
+  // The dev-mode CF Access bypass requires BOTH ENVIRONMENT=development AND a
+  // localhost hostname. Guarding on ENVIRONMENT alone would make a single
+  // misconfigured `wrangler deploy --env dev` on the production route enough
+  // to turn every public visitor into a Grafana admin.
+  const hostname = new URL(c.req.url).hostname;
+  if (c.env.ENVIRONMENT === 'development' && LOCAL_DEV_HOSTNAMES.has(hostname)) {
     c.set('userIdentity', 'dev@kilo.dev');
     return next();
   }
@@ -125,15 +132,19 @@ const STRIPPED_REQUEST_HEADERS = new Set([
 app.all('/*', async c => {
   const userIdentity = c.get('userIdentity');
 
-  const url = new URL(c.req.url);
   const country = (c.req.header('cf-ipcountry') ?? DEFAULT_COUNTRY).toUpperCase();
   const container = getGrafanaContainerStub(c.env, country);
+
+  // Rewrite scheme+host so pathname, search, fragment, and any other URL
+  // components carry through to the container without string concatenation.
+  const target = new URL(c.req.url);
+  target.protocol = 'http:';
+  target.host = 'container';
 
   // Forward the raw request so the body streams to the container instead of
   // being buffered into Worker memory. Dashboard imports and plugin uploads
   // can be multi-MB — buffering would risk the 128 MB isolate limit.
-  const containerUrl = `http://container${url.pathname}${url.search}`;
-  const forwarded = new Request(containerUrl, c.req.raw);
+  const forwarded = new Request(target, c.req.raw);
   for (const name of STRIPPED_REQUEST_HEADERS) forwarded.headers.delete(name);
   forwarded.headers.set('X-WEBAUTH-USER', userIdentity);
   const response = await container.fetch(forwarded);

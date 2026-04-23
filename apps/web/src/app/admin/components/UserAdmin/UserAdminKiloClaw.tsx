@@ -516,6 +516,14 @@ function getRelevantFields(
       value: <DateWithRelative date={sub.suspended_at} severity="danger" withTime />,
     });
   }
+  // Destruction deadline is a top-signal field — always surface it when set
+  // unless the past-due banner (effective sub only) already owns it.
+  if (!options.pastDueBannerShown && sub.destruction_deadline) {
+    fields.push({
+      label: 'Destruction deadline',
+      value: <DateWithRelative date={sub.destruction_deadline} severity="warn" withTime />,
+    });
+  }
   if (sub.scheduled_plan) {
     fields.push({
       label: 'Scheduled plan',
@@ -578,13 +586,15 @@ function SubscriptionCard({
 
   const canEditTrial = sub.status === 'trialing' || sub.status === 'canceled';
 
-  // Cancel button visibility and label:
+  // Cancel button visibility mirrors the statuses the cancelKiloClawSubscription
+  // mutation accepts (active, past_due, trialing):
   //   - trialing: "Cancel Trial" (dialog forces immediate)
-  //   - active/past_due + already scheduled to cancel at period end: "Cancel Immediately"
-  //     (the only remaining escalation; dialog forces immediate)
+  //   - active/past_due + already scheduled to cancel at period end:
+  //     "Cancel Immediately" (the remaining escalation; dialog forces immediate)
   //   - active/past_due (not scheduled): "Cancel" (dialog offers period_end or immediate)
-  //   - canceled: no cancel button
-  const showCancel = sub.status !== 'canceled' && sub.plan !== 'trial';
+  //   - anything else (canceled, unpaid): no cancel button
+  const showCancel =
+    sub.status === 'active' || sub.status === 'past_due' || sub.status === 'trialing';
   const cancelAlreadyScheduled =
     sub.cancel_at_period_end && (sub.status === 'active' || sub.status === 'past_due');
   const cancelLabel =
@@ -901,10 +911,8 @@ function SubscriptionsSection({
   effectiveSubscriptionId,
   expandedHistory,
   toggleHistory,
-  showToggle,
   hideInactive,
   onHideInactiveChange,
-  hiddenCount,
   emptyMessage,
   pastDueBannerSubId,
   actions,
@@ -915,10 +923,8 @@ function SubscriptionsSection({
   effectiveSubscriptionId: string | null;
   expandedHistory: Set<string>;
   toggleHistory: (tailId: string) => void;
-  showToggle: boolean;
   hideInactive: boolean;
   onHideInactiveChange: (v: boolean) => void;
-  hiddenCount: number;
   emptyMessage: string;
   pastDueBannerSubId: string | null;
   actions: SubscriptionCardActions;
@@ -927,6 +933,14 @@ function SubscriptionsSection({
   const canceledChains = chains.filter(c => c.tail.status === 'canceled');
   const visibleCanceled = hideInactive ? [] : canceledChains;
 
+  // Always let admins reveal canceled chains when any exist, even if there
+  // are no active chains — otherwise 1-2 canceled rows would be orphaned.
+  const showToggle = canceledChains.length > 0;
+  const hiddenCount = hideInactive ? canceledChains.length : 0;
+
+  // Bulk-collapse only when there are many canceled chains to keep the
+  // inactive-only view compact, but remain useful even for small counts
+  // thanks to the always-visible toggle.
   const useBulkCollapse = activeChains.length === 0 && canceledChains.length >= 3;
 
   const renderChain = (chain: Chain) => {
@@ -1277,10 +1291,8 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                 effectiveSubscriptionId={data.effectiveSubscriptionId}
                 expandedHistory={expandedHistory}
                 toggleHistory={toggleHistory}
-                showToggle={personalCanceled > 0 && personalActive > 0}
                 hideInactive={hideInactivePersonal}
                 onHideInactiveChange={setHideInactivePersonal}
-                hiddenCount={hideInactivePersonal && personalActive > 0 ? personalCanceled : 0}
                 emptyMessage="No personal subscriptions."
                 pastDueBannerSubId={pastDueBannerSubId}
                 actions={actions}
@@ -1294,10 +1306,8 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                   effectiveSubscriptionId={data.effectiveSubscriptionId}
                   expandedHistory={expandedHistory}
                   toggleHistory={toggleHistory}
-                  showToggle={orgCanceled > 0 && orgActive > 0}
                   hideInactive={hideInactiveOrg}
                   onHideInactiveChange={setHideInactiveOrg}
-                  hiddenCount={hideInactiveOrg && orgActive > 0 ? orgCanceled : 0}
                   emptyMessage="No organization subscriptions."
                   pastDueBannerSubId={pastDueBannerSubId}
                   actions={actions}

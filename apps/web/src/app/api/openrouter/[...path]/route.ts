@@ -166,7 +166,7 @@ async function resolveRateLimit(
 
 export async function POST(request: NextRequest): Promise<NextResponseType<unknown>> {
   const requestTimer = createTimer();
-  const requestStartedAt = performance.now();
+  const requestStartedAt = requestTimer.startTime;
 
   const url = new URL(request.url);
 

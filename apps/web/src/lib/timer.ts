@@ -10,6 +10,7 @@ export function createTimer() {
   const startTime = performance.now();
   const elapsedMS = () => performance.now() - startTime;
   return {
+    startTime,
     elapsedMS,
     log: (description: string) =>
       logExceptInTest(`[Timer] ${description}: ${elapsedMS().toFixed(2)}ms`),

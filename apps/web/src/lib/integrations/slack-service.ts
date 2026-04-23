@@ -172,7 +172,7 @@ export async function upsertSlackInstallation({
       .set({
         platform_account_id: teamId,
         platform_account_login: teamName,
-        scopes: null,
+        scopes: SLACK_SCOPES,
         integration_status: INTEGRATION_STATUS.ACTIVE,
         metadata,
         updated_at: new Date().toISOString(),
@@ -193,7 +193,7 @@ export async function upsertSlackInstallation({
       platform_installation_id: teamId,
       platform_account_id: teamId,
       platform_account_login: teamName,
-      scopes: null,
+      scopes: SLACK_SCOPES,
       integration_status: INTEGRATION_STATUS.ACTIVE,
       metadata,
       installed_at: new Date().toISOString(),

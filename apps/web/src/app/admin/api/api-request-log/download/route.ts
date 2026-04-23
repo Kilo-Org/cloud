@@ -140,10 +140,16 @@ export async function GET(request: NextRequest) {
 
       cursor = rows[rows.length - 1].id;
 
-      // Wait for the archive stream to drain before fetching the next batch
-      // so we don't buffer unbounded data in memory.
-      if (archive.readableLength > (archive.readableHighWaterMark ?? 16 * 1024)) {
-        await new Promise<void>(resolve => archive.once('drain', resolve));
+      // Yield between batches while the archive's readable buffer is above
+      // its high-water mark, so we don't buffer unbounded data in memory.
+      // Polling via setImmediate rather than waiting on a single 'drain'
+      // event: archiver's internal queue pauses once it's out of entries, so
+      // after we stop appending its writable side may never go back above
+      // HWM and 'drain' would never fire again - listening for it would
+      // deadlock the stream.
+      const hwm = archive.readableHighWaterMark ?? 16 * 1024;
+      while (archive.readableLength > hwm) {
+        await new Promise<void>(resolve => setImmediate(resolve));
       }
     }
 

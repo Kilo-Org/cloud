@@ -64,7 +64,13 @@ import {
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { stripAnsi } from '@/lib/stripAnsi';
-import { DetailField, formatAbsoluteTime, formatRelativeTime, parseTimestamp } from './shared';
+import {
+  DetailField,
+  EventLabelCell,
+  formatAbsoluteTime,
+  formatRelativeTime,
+  parseTimestamp,
+} from './shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { AdminFileEditor } from './AdminFileEditor';
@@ -953,7 +959,7 @@ function EventsTable({ rows }: { rows: KiloclawEventRow[] }) {
             <th className="pr-4 pb-2">Event</th>
             <th className="pr-4 pb-2">Delivery</th>
             <th className="pr-4 pb-2">Status</th>
-            <th className="pr-4 pb-2">Label</th>
+            <th className="pr-4 pb-2">Attribution / Label</th>
             <th className="pr-4 pb-2">Duration</th>
             <th className="pb-2">Error</th>
           </tr>
@@ -983,7 +989,7 @@ function EventsTable({ rows }: { rows: KiloclawEventRow[] }) {
                   <span className="text-xs">{row.status || '—'}</span>
                 </td>
                 <td className="py-2 pr-4">
-                  <span className="text-xs">{row.label || '—'}</span>
+                  <EventLabelCell event={row.event} label={row.label} />
                 </td>
                 <td className="py-2 pr-4 whitespace-nowrap">
                   <span className="text-xs">{formatDuration(row.duration_ms)}</span>

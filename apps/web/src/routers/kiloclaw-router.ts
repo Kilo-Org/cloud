@@ -300,6 +300,25 @@ async function getLatestPersonalBillingInstance(
   return instance ?? null;
 }
 
+function classifyEnrollWithCreditsError(message: string): {
+  code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST' | 'INTERNAL_SERVER_ERROR';
+  failureReason: CreditEnrollmentFailureReason;
+} {
+  if (message.includes('not found')) {
+    return { code: 'NOT_FOUND', failureReason: 'user_not_found' };
+  }
+  if (message.includes('already processed')) {
+    return { code: 'CONFLICT', failureReason: 'duplicate_enrollment' };
+  }
+  if (message.includes('already exists')) {
+    return { code: 'CONFLICT', failureReason: 'active_subscription_exists' };
+  }
+  if (message.includes('Insufficient credit balance')) {
+    return { code: 'BAD_REQUEST', failureReason: 'insufficient_credits' };
+  }
+  return { code: 'INTERNAL_SERVER_ERROR', failureReason: 'internal_error' };
+}
+
 async function resolvePersonalBillingAnchor(params: {
   userId: string;
   instanceId?: string;
@@ -3890,21 +3909,7 @@ export const kiloclawRouter = createTRPCRouter({
         }
 
         const message = error instanceof Error ? error.message : 'Credit enrollment failed';
-        const {
-          code,
-          failureReason,
-        }: {
-          code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST' | 'INTERNAL_SERVER_ERROR';
-          failureReason: CreditEnrollmentFailureReason;
-        } = message.includes('not found')
-          ? { code: 'NOT_FOUND', failureReason: 'user_not_found' }
-          : message.includes('already processed')
-            ? { code: 'CONFLICT', failureReason: 'duplicate_enrollment' }
-            : message.includes('already exists')
-              ? { code: 'CONFLICT', failureReason: 'active_subscription_exists' }
-              : message.includes('Insufficient credit balance')
-                ? { code: 'BAD_REQUEST', failureReason: 'insufficient_credits' }
-                : { code: 'INTERNAL_SERVER_ERROR', failureReason: 'internal_error' };
+        const { code, failureReason } = classifyEnrollWithCreditsError(message);
         logCreditEnrollmentFailed({
           userId: ctx.user.id,
           plan: input.plan,

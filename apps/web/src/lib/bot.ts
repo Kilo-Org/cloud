@@ -8,7 +8,7 @@ import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { findUserById } from '@/lib/user';
 import { processMessage } from '@/lib/bot/run';
 import { createChatState } from '@/lib/bot/state';
-import { SLACK_SIGNING_SECRET } from '@/lib/config.server';
+import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET } from '@/lib/config.server';
 
 function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
   const chatBot = new Chat({
@@ -102,6 +102,8 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
 }
 
 const slackAdapter = createSlackAdapter({
+  clientId: SLACK_CLIENT_ID,
+  clientSecret: SLACK_CLIENT_SECRET,
   signingSecret: SLACK_SIGNING_SECRET,
 });
 

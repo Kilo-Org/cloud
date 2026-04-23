@@ -1773,17 +1773,17 @@ describe('SessionService', () => {
       expect(fakeSession.exec).toHaveBeenNthCalledWith(
         3,
         'npm install',
-        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` }),
+        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` })
       );
       expect(fakeSession.exec).toHaveBeenNthCalledWith(
         4,
         'npm run build',
-        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` }),
+        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` })
       );
       expect(fakeSession.exec).toHaveBeenNthCalledWith(
         5,
         'npm test',
-        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` }),
+        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` })
       );
     });
 
@@ -1844,8 +1844,6 @@ describe('SessionService', () => {
       expect(fakeSession.exec).toHaveBeenCalledTimes(3);
     });
 
-
-
     it('should execute commands in workspace directory', async () => {
       const fakeSession = {
         exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
@@ -1881,8 +1879,14 @@ describe('SessionService', () => {
         setupCommands: ['pwd', 'ls -la'],
       });
 
-      expect(fakeSession.exec).toHaveBeenCalledWith('pwd', expect.objectContaining({ cwd: workspacePath }));
-      expect(fakeSession.exec).toHaveBeenCalledWith('ls -la', expect.objectContaining({ cwd: workspacePath }));
+      expect(fakeSession.exec).toHaveBeenCalledWith(
+        'pwd',
+        expect.objectContaining({ cwd: workspacePath })
+      );
+      expect(fakeSession.exec).toHaveBeenCalledWith(
+        'ls -la',
+        expect.objectContaining({ cwd: workspacePath })
+      );
     });
 
     it('should handle empty setupCommands array gracefully', async () => {

@@ -22,6 +22,7 @@ export function fixOpenCodeDuplicateReasoning(
     }
     const encryptedDataSet = new Set<string>();
     const textSet = new Set<string>();
+    const signatureSet = new Set<string>();
     msgWithReasoning.reasoning_details = msgWithReasoning.reasoning_details.filter(rd => {
       if (rd.type === ReasoningDetailType.Encrypted && rd.data) {
         if (!encryptedDataSet.has(rd.data)) {
@@ -33,21 +34,32 @@ export function fixOpenCodeDuplicateReasoning(
         );
         return false;
       }
-      if (rd.type === ReasoningDetailType.Text && rd.text) {
+      if (rd.type === ReasoningDetailType.Text) {
         if (isAnthropicModel(requestedModel) && !rd.signature) {
           console.debug(
             `[fixOpenCodeDuplicateReasoning] removing reasoning text without signature, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
           );
           return false;
         }
-        if (!textSet.has(rd.text)) {
-          textSet.add(rd.text);
-          return true;
+        if (rd.signature) {
+          if (signatureSet.has(rd.signature)) {
+            console.debug(
+              `[fixOpenCodeDuplicateReasoning] removing duplicated reasoning signature, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
+            );
+            return false;
+          }
+          signatureSet.add(rd.signature);
         }
-        console.debug(
-          `[fixOpenCodeDuplicateReasoning] removing duplicated reasoning text, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
-        );
-        return false;
+        if (rd.text) {
+          if (textSet.has(rd.text)) {
+            console.debug(
+              `[fixOpenCodeDuplicateReasoning] removing duplicated reasoning text, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
+            );
+            return false;
+          }
+          textSet.add(rd.text);
+        }
+        return true;
       }
       return true;
     });

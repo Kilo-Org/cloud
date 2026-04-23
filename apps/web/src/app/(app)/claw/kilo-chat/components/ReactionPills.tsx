@@ -63,7 +63,7 @@ export function ReactionPills({
         ref={addButtonRef}
         onClick={() => setShowPicker(prev => !prev)}
         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-sm cursor-pointer transition-colors border bg-muted border-border hover:bg-accent text-muted-foreground ${
-          hasReactions ? '' : 'invisible'
+          hasReactions ? '' : 'hidden'
         }`}
         title="Add reaction"
       >

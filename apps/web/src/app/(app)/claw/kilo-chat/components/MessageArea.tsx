@@ -269,6 +269,13 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   }
 
   function handleRenameBlur() {
+    const trimmed = renameText.trim();
+    if (trimmed && trimmed !== title) {
+      renameConversation.mutate(
+        { conversationId, title: trimmed },
+        { onError: () => toast.error('Failed to rename conversation') }
+      );
+    }
     setIsRenamingTitle(false);
   }
 

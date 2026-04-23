@@ -58,18 +58,25 @@ export function useMarkConversationRead(client: KiloChatClient) {
     onMutate: conversationId => {
       // Optimistically set lastReadAt = now in all cached conversation lists
       const now = Date.now();
-      queryClient.setQueriesData<ConversationListResponse>(
-        { queryKey: ['kilo-chat', 'conversations'] },
-        old => {
-          if (!old) return old;
-          return {
-            ...old,
-            conversations: old.conversations.map(c =>
-              c.conversationId === conversationId ? { ...c, lastReadAt: now } : c
-            ),
-          };
+      const queryKey = ['kilo-chat', 'conversations'];
+      const previous = queryClient.getQueriesData<ConversationListResponse>({ queryKey });
+      queryClient.setQueriesData<ConversationListResponse>({ queryKey }, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          conversations: old.conversations.map(c =>
+            c.conversationId === conversationId ? { ...c, lastReadAt: now } : c
+          ),
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        for (const [key, data] of context.previous) {
+          queryClient.setQueryData(key, data);
         }
-      );
+      }
     },
   });
 }

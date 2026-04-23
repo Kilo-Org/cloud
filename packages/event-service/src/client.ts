@@ -30,6 +30,7 @@ export class EventServiceClient {
 
   async connect(): Promise<void> {
     this.destroyed = false;
+    this.reconnectAttempts = 0;
 
     // Close any existing socket to avoid leaking connections
     if (this.ws) {

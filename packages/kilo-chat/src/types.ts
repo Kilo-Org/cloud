@@ -67,8 +67,6 @@ export type Message = {
   reactions: ReactionSummary[];
 };
 
-export type MessageRow = Message;
-
 // ── Events ──────────────────────────────────────────────────────────
 export type MessageCreatedEvent = {
   messageId: string;
@@ -188,7 +186,7 @@ export type ConversationListResponse = {
 };
 
 export type MessageListResponse = {
-  messages: MessageRow[];
+  messages: Message[];
 };
 
 export type ConversationDetailResponse = ConversationDetail;

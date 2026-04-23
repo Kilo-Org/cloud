@@ -340,17 +340,17 @@ export class ConversationDO extends DurableObject<Env> {
       };
     }
 
-    // Already deleted — idempotent success
-    if (row.deleted === 1) {
-      return { ok: true };
-    }
-
     if (params.senderId !== row.sender_id) {
       return {
         ok: false,
         code: 'forbidden',
         error: `Sender ${params.senderId} is not the owner of message ${params.messageId}`,
       };
+    }
+
+    // Already deleted — idempotent success (only for the original sender)
+    if (row.deleted === 1) {
+      return { ok: true };
     }
 
     this.db

@@ -35,7 +35,7 @@ export function ReactionPills({
     [reactions, currentUserId, onAdd, onRemove]
   );
 
-  const hasReactions = reactions.length > 0;
+  if (reactions.length === 0) return null;
 
   return (
     <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
@@ -62,9 +62,7 @@ export function ReactionPills({
       <button
         ref={addButtonRef}
         onClick={() => setShowPicker(prev => !prev)}
-        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-sm cursor-pointer transition-colors border bg-muted border-border hover:bg-accent text-muted-foreground ${
-          hasReactions ? '' : 'hidden'
-        }`}
+        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-sm cursor-pointer transition-colors border bg-muted border-border hover:bg-accent text-muted-foreground"
         title="Add reaction"
       >
         +

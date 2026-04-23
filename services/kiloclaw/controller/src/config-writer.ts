@@ -343,10 +343,14 @@ export function generateBaseConfig(
   const searchProvider = config.tools?.web?.search?.provider;
   const hasExplicitSearchProvider =
     typeof searchProvider === 'string' && searchProvider.trim().length > 0;
+  const hasExplicitSearchDisabled = config.tools?.web?.search?.enabled === false;
+  const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
+  const hasExplicitSearchPreference =
+    hasExplicitSearchProvider || hasExplicitSearchDisabled || braveConfigured;
 
   const kiloExaSearchMode = resolveKiloExaSearchMode(env.KILO_EXA_SEARCH_MODE);
   const shouldForceExa = kiloExaSearchMode === 'kilo-proxy';
-  const shouldAutoAssignExa = kiloExaSearchMode === 'unset' && !hasExplicitSearchProvider;
+  const shouldAutoAssignExa = kiloExaSearchMode === 'unset' && !hasExplicitSearchPreference;
   if (shouldForceExa || shouldAutoAssignExa) {
     customizerWebSearchConfig.enabled = true;
     config.tools = config.tools ?? {};
@@ -360,7 +364,6 @@ export function generateBaseConfig(
   } else if (kiloExaSearchMode === 'disabled') {
     customizerWebSearchConfig.enabled = false;
 
-    const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
     if (
       braveConfigured &&
       (!hasExplicitSearchProvider || config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID)

@@ -896,6 +896,44 @@ describe('runOnboardOrDoctor', () => {
     expect(env.KILOCLAW_FRESH_INSTALL).toBe('false');
     expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/IDENTITY.md'))).toBe(true);
   });
+
+  it('does not auto-assign kilo-exa on doctor path when BRAVE_API_KEY is configured', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p.endsWith('openclaw.json')) return true;
+      return false;
+    });
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({
+        gateway: { port: 3001 },
+        tools: { web: { search: {} } },
+      })
+    );
+
+    const env: Record<string, string | undefined> = {
+      KILOCODE_API_KEY: 'test-key',
+      OPENCLAW_GATEWAY_TOKEN: 'test-token',
+      AUTO_APPROVE_DEVICES: 'true',
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+
+    runOnboardOrDoctor(env, harness.deps);
+
+    const doctorCall = harness.execCalls.find(
+      c => c.cmd === 'openclaw' && c.args.includes('doctor')
+    );
+    expect(doctorCall).toBeDefined();
+
+    const configWrite = harness.writeCalls.find(call => call.data.trim().startsWith('{'));
+    expect(configWrite).toBeDefined();
+    if (!configWrite) {
+      throw new Error('Expected openclaw config to be written on doctor path');
+    }
+    const config = JSON.parse(configWrite.data) as {
+      tools?: { web?: { search?: { provider?: string } } };
+    };
+    expect(config.tools?.web?.search?.provider).toBeUndefined();
+  });
 });
 
 // ---- updateToolsMdSection ----

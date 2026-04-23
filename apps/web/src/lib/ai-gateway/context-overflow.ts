@@ -37,12 +37,17 @@ const upstreamErrorBodySchema = z.object({
   error: z.union([z.string(), z.object({ message: z.string() })]),
 });
 
-function upstreamErrorMessage(rawBody: string): string | null {
+// Parses whatever string the upstream put in its error position (flattening
+// `{error: {message: "..."}}` and `{error: "..."}` shapes). Returns null when
+// the body isn't valid JSON, so the caller knows it's safe to fall back to
+// the raw text — which avoids embedding a foreign JSON blob as a string in
+// our own JSON response.
+function parseUpstreamErrorMessage(rawBody: string): string | null | undefined {
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(rawBody);
   } catch {
-    return null;
+    return undefined;
   }
   const parsed = upstreamErrorBodySchema.safeParse(parsedJson);
   if (!parsed.success) return null;
@@ -60,12 +65,10 @@ async function extractUpstreamContextOverflowMessage(response: Response): Promis
     .catch(() => null);
   if (rawBody === null) return null;
 
-  const jsonMessage = upstreamErrorMessage(rawBody);
-  if (jsonMessage && UPSTREAM_CONTEXT_OVERFLOW_PATTERN.test(jsonMessage)) {
-    return jsonMessage;
-  }
-  if (UPSTREAM_CONTEXT_OVERFLOW_PATTERN.test(rawBody)) {
-    return rawBody;
+  const parsedMessage = parseUpstreamErrorMessage(rawBody);
+  const candidate = parsedMessage === undefined ? rawBody : parsedMessage;
+  if (candidate && UPSTREAM_CONTEXT_OVERFLOW_PATTERN.test(candidate)) {
+    return candidate;
   }
   return null;
 }

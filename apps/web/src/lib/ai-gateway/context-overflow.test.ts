@@ -84,6 +84,39 @@ describe('detectContextOverflow', () => {
     expect(json.message).toBe(upstreamMessage);
   });
 
+  it('does not double-encode an unknown-shape JSON body into our response', async () => {
+    // The body is valid JSON but does not match our error schema. Even though
+    // the raw text contains the overflow phrase, we must not embed the JSON
+    // blob as a string in our own JSON response.
+    const response = new Response(
+      JSON.stringify({ detail: 'maximum context length is 128 tokens exceeded' }),
+      { status: 400 }
+    );
+
+    const result = await detectContextOverflow({
+      requestedModel: 'some-unknown-model',
+      request: emptyRequest,
+      response,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('uses a plain-text upstream body verbatim', async () => {
+    const rawMessage = 'Server says: maximum context length is 128 tokens exceeded.';
+    const response = new Response(rawMessage, { status: 400 });
+
+    const result = await detectContextOverflow({
+      requestedModel: 'some-unknown-model',
+      request: emptyRequest,
+      response,
+    });
+
+    if (!result) throw new Error('expected a response');
+    const json = await result.json();
+    expect(json.message).toBe(rawMessage);
+  });
+
   it('also recognizes overflow messages where upstream.error is a plain string', async () => {
     const upstreamMessage = 'This endpoint maximum context length is 128000 tokens. too much.';
     const response = new Response(JSON.stringify({ error: upstreamMessage }), { status: 400 });

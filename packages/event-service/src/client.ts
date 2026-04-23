@@ -35,7 +35,13 @@ export class EventServiceClient {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    return this.connectOnce();
+    try {
+      await this.connectOnce();
+    } catch {
+      if (!this.destroyed) {
+        this.scheduleReconnect();
+      }
+    }
   }
 
   private async connectOnce(): Promise<void> {

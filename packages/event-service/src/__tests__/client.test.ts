@@ -196,4 +196,30 @@ describe('EventServiceClient', () => {
     expect(ws1.readyState).toBe(3); // CLOSED — properly cleaned up
     expect(allMockWs).toHaveLength(2);
   });
+
+  it('schedules reconnect after initial ticket failure', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, status: 503 })
+        .mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ ticket: 'retry-ticket', userId: 'user-123' }),
+        });
+      vi.stubGlobal('fetch', fetchMock);
+      const client = makeClient();
+
+      await expect(client.connect()).resolves.toBeUndefined();
+      expect(allMockWs).toHaveLength(0);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(allMockWs).toHaveLength(1);
+      expect(lastMockWs.url).toBe(
+        'ws://localhost:8080/connect?ticket=retry-ticket&userId=user-123'
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

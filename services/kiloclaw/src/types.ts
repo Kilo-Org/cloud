@@ -85,17 +85,29 @@ export type KiloClawEnv = {
 /**
  * Payload for kilo-chat webhook delivery via service binding RPC.
  */
-export type ChatWebhookPayload = {
-  targetBotId: string;
-  conversationId: string;
-  messageId: string;
-  from: string;
-  text: string;
-  sentAt: string;
-  inReplyToMessageId?: string;
-  inReplyToBody?: string;
-  inReplyToSender?: string;
-};
+export type ChatWebhookPayload =
+  | {
+      targetBotId: string;
+      type?: 'message.created';
+      conversationId: string;
+      messageId: string;
+      from: string;
+      text: string;
+      sentAt: string;
+      inReplyToMessageId?: string;
+      inReplyToBody?: string;
+      inReplyToSender?: string;
+    }
+  | {
+      targetBotId: string;
+      type: 'action.executed';
+      conversationId: string;
+      messageId: string;
+      groupId: string;
+      value: string;
+      executedBy: string;
+      executedAt: string;
+    };
 
 /**
  * Hono app environment type

@@ -11,7 +11,7 @@ export default defineChannelPluginEntry({
     api.registerHttpRoute({
       path: '/plugins/kilo-chat/webhook',
       match: 'exact',
-      auth: 'plugin',
+      auth: 'gateway',
       handler: createKiloChatWebhookHandler({ api }),
     });
   },

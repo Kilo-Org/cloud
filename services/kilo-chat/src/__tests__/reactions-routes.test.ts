@@ -129,6 +129,27 @@ describe('POST /v1/messages/:id/reactions', () => {
     expect(res.status).toBe(403);
   });
 
+  it('404 when adding a reaction to a deleted message', async () => {
+    const { conversationId, messageId, userApp } = await setup('rx-post-deleted');
+    const del = await userApp.request(
+      `/v1/messages/${messageId}?${new URLSearchParams({ conversationId }).toString()}`,
+      { method: 'DELETE' },
+      env
+    );
+    expect(del.status).toBe(204);
+
+    const res = await userApp.request(
+      `/v1/messages/${messageId}/reactions`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, emoji: '👍' }),
+      },
+      env
+    );
+    expect(res.status).toBe(404);
+  });
+
   it('400 for invalid message ID (not a ULID)', async () => {
     const { conversationId, userApp } = await setup('rx-post-5');
     const res = await userApp.request(
@@ -174,6 +195,24 @@ describe('DELETE /v1/messages/:id/reactions', () => {
       env
     );
     expect(res.status).toBe(204);
+  });
+
+  it('404 when removing a reaction from a deleted message', async () => {
+    const { conversationId, messageId, userApp } = await setup('rx-del-deleted');
+    const deleteMessage = await userApp.request(
+      `/v1/messages/${messageId}?${new URLSearchParams({ conversationId }).toString()}`,
+      { method: 'DELETE' },
+      env
+    );
+    expect(deleteMessage.status).toBe(204);
+
+    const qs = new URLSearchParams({ conversationId, emoji: '👍' });
+    const res = await userApp.request(
+      `/v1/messages/${messageId}/reactions?${qs.toString()}`,
+      { method: 'DELETE' },
+      env
+    );
+    expect(res.status).toBe(404);
   });
 
   it('403 for non-member on DELETE', async () => {

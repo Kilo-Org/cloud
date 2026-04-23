@@ -22,6 +22,7 @@ import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform, controller 
 import { handleSnapshotRestoreQueue } from './queue/snapshot-restore';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
+import { deriveGatewayToken } from './auth/gateway-token';
 import { sandboxIdFromUserId, userIdFromSandboxId } from './auth/sandbox-id';
 import { InstanceIdParam } from './schemas/instance-config';
 import {
@@ -1205,6 +1206,10 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
       gatewayTokenSecret: this.env.GATEWAY_TOKEN_SECRET,
       providerHeaders: routingTarget.headers,
     });
+    forwardHeaders.set(
+      'authorization',
+      `Bearer ${await deriveGatewayToken(status.sandboxId, this.env.GATEWAY_TOKEN_SECRET)}`
+    );
 
     // Forward the webhook payload (without targetBotId) to the controller
     const { targetBotId: _, ...webhookPayload } = payload;

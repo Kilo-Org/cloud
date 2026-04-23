@@ -83,6 +83,17 @@ describe('parseActionExecutedPayload', () => {
     });
   });
 
+  it('rejects unknown approval decisions', () => {
+    expect(
+      parseActionExecutedPayload({
+        type: 'action.executed',
+        groupId: 'approval-123',
+        value: 'maybe',
+        executedBy: 'user-1',
+      })
+    ).toBeNull();
+  });
+
   it('returns null when groupId is missing', () => {
     expect(parseActionExecutedPayload({ value: 'deny', executedBy: 'u1' })).toBeNull();
   });

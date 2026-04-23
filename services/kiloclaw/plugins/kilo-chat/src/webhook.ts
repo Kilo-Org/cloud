@@ -57,15 +57,17 @@ export function parseInboundPayload(raw: unknown): KiloChatInboundPayload | null
 // Action-executed payload parsing
 // ---------------------------------------------------------------------------
 
+const execApprovalDecisionSchema = z.enum(['allow-once', 'allow-always', 'deny']);
+
 export type ActionExecutedPayload = {
   groupId: string;
-  value: string;
+  value: ExecApprovalDecision;
   executedBy: string;
 };
 
 const actionExecutedPayloadSchema = z.object({
   groupId: z.string().min(1),
-  value: z.string().min(1),
+  value: execApprovalDecisionSchema,
   executedBy: z.string().min(1),
 });
 
@@ -78,11 +80,10 @@ async function handleActionExecuted(
   api: OpenClawPluginApi,
   payload: ActionExecutedPayload
 ): Promise<void> {
-  const decision = payload.value as ExecApprovalDecision;
   await resolveApprovalOverGateway({
     cfg: api.config,
     approvalId: payload.groupId,
-    decision,
+    decision: payload.value,
     senderId: payload.executedBy,
     clientDisplayName: 'Kilo Chat',
   });

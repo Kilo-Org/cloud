@@ -356,7 +356,7 @@ describe('ConversationDO', () => {
       }
     });
 
-    it('rejects reactions on non-existent messages (FK)', async () => {
+    it('rejects reactions on non-existent messages as not found', async () => {
       const stub = getStub('conv-rx-bad-msg');
       await stub.initialize({ ...BASE_PARAMS, id: 'conv-rx-bad-msg' });
       const result = await stub.addReaction({
@@ -364,10 +364,7 @@ describe('ConversationDO', () => {
         memberId: 'user-alice',
         emoji: '👍',
       });
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toMatch(/constraint|foreign key/i);
-      }
+      expect(result).toEqual({ ok: false, code: 'not_found', error: 'Message not found' });
     });
 
     it('rejects reactions from non-member (FK)', async () => {

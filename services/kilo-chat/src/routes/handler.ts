@@ -210,6 +210,7 @@ export async function handleAddReaction(c: HonoCtx) {
   });
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    if (result.code === 'not_found') return c.json({ error: result.error }, 404);
     return c.json({ error: result.error }, 500);
   }
   return c.json({ id: result.id }, result.added ? 201 : 200);
@@ -237,6 +238,7 @@ export async function handleRemoveReaction(c: HonoCtx) {
   });
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
+    if (result.code === 'not_found') return c.json({ error: result.error }, 404);
     return c.json({ error: result.error }, 500);
   }
   return new Response(null, { status: 204 });

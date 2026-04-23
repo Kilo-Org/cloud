@@ -148,4 +148,16 @@ describe('UserSessionDO', () => {
 
     ws.close();
   });
+
+  it('closes sockets that exceed the per-socket context limit', async () => {
+    const userId = 'user-too-many-contexts';
+    const { ws, stub } = await connectWs(userId);
+    const contexts = Array.from({ length: 201 }, (_, idx) => `project:${idx}`);
+
+    ws.send(JSON.stringify({ type: 'context.subscribe', contexts }));
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(await stub.isUserInContext('project:200')).toBe(false);
+    ws.close();
+  });
 });

@@ -10,7 +10,7 @@ export type AddReactionParams = {
 
 export type AddReactionResult =
   | { ok: true; id: string; added: boolean }
-  | { ok: false; code: 'forbidden' | 'internal'; error: string };
+  | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
 export async function addReactionFor(
   env: Env,
@@ -27,7 +27,7 @@ export async function addReactionFor(
     emoji: params.emoji,
   });
   if (!result.ok) {
-    return { ok: false, code: 'internal', error: result.error };
+    return { ok: false, code: result.code, error: result.error };
   }
 
   if (result.added) {
@@ -55,7 +55,7 @@ export type RemoveReactionParams = {
 
 export type RemoveReactionResult =
   | { ok: true }
-  | { ok: false; code: 'forbidden' | 'internal'; error: string };
+  | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
 export async function removeReactionFor(
   env: Env,
@@ -72,7 +72,7 @@ export async function removeReactionFor(
     emoji: params.emoji,
   });
   if (!result.ok) {
-    return { ok: false, code: 'internal', error: result.error };
+    return { ok: false, code: result.code, error: result.error };
   }
 
   if (result.removed) {

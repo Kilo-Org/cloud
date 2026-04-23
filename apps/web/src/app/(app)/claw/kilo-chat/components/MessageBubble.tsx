@@ -285,8 +285,11 @@ export const MessageBubble = memo(function MessageBubble({
                 </button>
               </div>
             ) : (
+              // prose-invert is unconditional (not dark:prose-invert) because bot
+              // bubbles use bg-muted which is dark in the chat panel's dark theme.
+              // This is intentional — do not "fix" to dark:prose-invert.
               <div
-                className={`prose prose-sm max-w-none break-words [&_pre]:overflow-x-auto [&_code]:break-all [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 ${isOwn ? '' : 'dark:prose-invert'}`}
+                className={`prose prose-sm max-w-none break-words [&_pre]:overflow-x-auto [&_code]:break-all [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 ${isOwn ? '' : 'prose-invert'}`}
               >
                 <MemoizedMarkdown content={textContent} />
               </div>

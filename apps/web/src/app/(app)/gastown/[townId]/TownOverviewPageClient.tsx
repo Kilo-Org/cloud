@@ -29,6 +29,7 @@ import {
   ChevronDown,
   Layers,
   MessageSquare,
+  Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -228,6 +229,17 @@ export function TownOverviewPageClient({
             <span className="size-1.5 rounded-full bg-emerald-400" />
             Live
           </span>
+          <button
+            onClick={() => {
+              void navigator.clipboard.writeText(townId);
+              toast.success('Copied town ID');
+            }}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-xs text-white/30 hover:bg-white/[0.06] hover:text-white/60 transition-colors"
+            title={townId}
+          >
+            <Copy className="size-3" />
+            {townId.slice(0, 8)}…
+          </button>
         </div>
         <Button
           variant="primary"

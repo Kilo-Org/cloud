@@ -434,8 +434,8 @@ importers:
   apps/web:
     dependencies:
       '@ai-sdk/anthropic':
-        specifier: ^3.0.58
-        version: 3.0.58(zod@4.3.6)
+        specifier: ^3.0.71
+        version: 3.0.71(zod@4.3.6)
       '@ai-sdk/gateway':
         specifier: ^3.0.66
         version: 3.0.66(zod@4.3.6)
@@ -1555,11 +1555,11 @@ importers:
   services/gastown/container:
     dependencies:
       '@kilocode/plugin':
-        specifier: 7.1.23
-        version: 7.1.23
+        specifier: 7.2.14
+        version: 7.2.14
       '@kilocode/sdk':
-        specifier: 7.1.23
-        version: 7.1.23
+        specifier: 7.2.14
+        version: 7.2.14
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -2035,8 +2035,8 @@ packages:
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
 
-  '@ai-sdk/anthropic@3.0.58':
-    resolution: {integrity: sha512-/53SACgmVukO4bkms4dpxpRlYhW8Ct6QZRe6sj1Pi5H00hYhxIrqfiLbZBGxkdRvjsBQeP/4TVGsXgH5rQeb8Q==}
+  '@ai-sdk/anthropic@3.0.71':
+    resolution: {integrity: sha512-bUWOzrzR0gJKJO/PLGMR4uH2dqEgqGhrsCV+sSpk4KtOEnUQlfjZI/F7BFlqSvVpFbjdgYRRLysAeEZpJ6S1lg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -2067,6 +2067,12 @@ packages:
 
   '@ai-sdk/provider-utils@4.0.19':
     resolution: {integrity: sha512-3eG55CrSWCu2SXlqq2QCsFjo3+E7+Gmg7i/oRVoSZzIodTuDSfLb3MRje67xE9RFea73Zao7Lm4mADIfUETKGg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/provider-utils@4.0.23':
+    resolution: {integrity: sha512-z8GlDaCmRSDlqkMF2f4/RFgWxdarvIbyuk+m6WXT1LYgsnGiXRJGTD2Z1+SDl3LqtFuRtGX1aghYvQLoHL/9pg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -4152,11 +4158,22 @@ packages:
       react: '*'
       react-native: '*'
 
-  '@kilocode/plugin@7.1.23':
-    resolution: {integrity: sha512-sFI0rlgQg3mzYP05/gg09IE1mN4QyAXyOlJjM36CFoVKi1bPYz/dqEqr6ddmMNmB577A4gDu0D07hr0pGIFrBA==}
+  '@kilocode/plugin@7.2.14':
+    resolution: {integrity: sha512-mS+WA9HZIBH2qQ9ARA+v0q4MdQTSdfOvKbe4AOSkjP+P5hVA70OM/UVM9DVcvmjSOxU+wuUxmOy+j/EQIrgFmw==}
+    peerDependencies:
+      '@opentui/core': '>=0.1.97'
+      '@opentui/solid': '>=0.1.97'
+    peerDependenciesMeta:
+      '@opentui/core':
+        optional: true
+      '@opentui/solid':
+        optional: true
 
   '@kilocode/sdk@7.1.23':
     resolution: {integrity: sha512-moSKXqpwE+ozVbNE1aYIUb5Kd7fesOicRUn90WiMlp+8lRhqQc6ZTTIaIB9ZzD7Dak//4bSuo++bb+Jtw3U4Fg==}
+
+  '@kilocode/sdk@7.2.14':
+    resolution: {integrity: sha512-Naz83lFrsbavuDp6UwxRuglOaSNvRBsZfcRNvb7RpWYAwbuJP0dBdhpXj6uO3ta5qxeQ2JzxKNC9Ffz+LCLLDg==}
 
   '@lottiefiles/dotlottie-react@0.17.15':
     resolution: {integrity: sha512-4wYAjsJhM28eUvJ/gT3KRM6fcyT7EM9n7PDrP71LaBTacc6bSN43qFTSJc1Li3QxUiraz23p0Q8EJBzXo8DsRw==}
@@ -14791,10 +14808,10 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-sdk/anthropic@3.0.58(zod@4.3.6)':
+  '@ai-sdk/anthropic@3.0.71(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.6)
+      '@ai-sdk/provider-utils': 4.0.23(zod@4.3.6)
       zod: 4.3.6
 
   '@ai-sdk/gateway@3.0.66(zod@4.3.6)':
@@ -14823,6 +14840,13 @@ snapshots:
       zod: 4.3.6
 
   '@ai-sdk/provider-utils@4.0.19(zod@4.3.6)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.8
+      '@standard-schema/spec': 1.1.0
+      eventsource-parser: 3.0.6
+      zod: 4.3.6
+
+  '@ai-sdk/provider-utils@4.0.23(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
       '@standard-schema/spec': 1.1.0
@@ -17647,12 +17671,16 @@ snapshots:
       react: 19.2.0
       react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
 
-  '@kilocode/plugin@7.1.23':
+  '@kilocode/plugin@7.2.14':
     dependencies:
-      '@kilocode/sdk': 7.1.23
+      '@kilocode/sdk': 7.2.14
       zod: 4.1.8
 
   '@kilocode/sdk@7.1.23': {}
+
+  '@kilocode/sdk@7.2.14':
+    dependencies:
+      cross-spawn: 7.0.6
 
   '@lottiefiles/dotlottie-react@0.17.15(react@19.2.4)':
     dependencies:

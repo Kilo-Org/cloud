@@ -113,10 +113,14 @@ import {
   handleMayorConvoyClose,
   handleMayorConvoyUpdate,
   handleMayorBeadDelete,
+  handleMayorBulkDeleteBeads,
+  handleMayorDeleteBeadsByStatus,
   handleMayorEscalationAcknowledge,
   handleMayorConvoyStart,
   handleMayorUiAction,
   handleMayorGetPendingNudges,
+  handleMayorConvoyAddBead,
+  handleMayorConvoyRemoveBead,
 } from './handlers/mayor-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { townAuthMiddleware } from './middleware/town-auth.middleware';
@@ -631,6 +635,12 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c =
   return c.json({ success: true });
 });
 
+app.delete('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
+  const { agentId } = c.req.param();
+  await c.env.AGENT_DB_SNAPSHOTS_KV.delete(agentId);
+  return c.json({ success: true });
+});
+
 // ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for dashboard/user
 // routes. Container→worker routes use the agent JWT middleware instead
@@ -978,6 +988,16 @@ app.delete('/api/mayor/:townId/tools/rigs/:rigId/beads/:beadId', c =>
     handleMayorBeadDelete(c, c.req.param())
   )
 );
+app.post('/api/mayor/:townId/tools/rigs/:rigId/beads/bulk-delete', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/rigs/:rigId/beads/bulk-delete', () =>
+    handleMayorBulkDeleteBeads(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/rigs/:rigId/beads/delete-by-status', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/rigs/:rigId/beads/delete-by-status', () =>
+    handleMayorDeleteBeadsByStatus(c, c.req.param())
+  )
+);
 app.post('/api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/reset', c =>
   instrumented(c, 'POST /api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/reset', () =>
     handleMayorAgentReset(c, c.req.param())
@@ -1000,6 +1020,16 @@ app.post('/api/mayor/:townId/tools/escalations/:escalationId/acknowledge', c =>
 );
 app.post('/api/mayor/:townId/tools/convoys/:convoyId/start', c =>
   handleMayorConvoyStart(c, c.req.param())
+);
+app.post('/api/mayor/:townId/tools/convoys/:convoyId/add-bead', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/convoys/:convoyId/add-bead', () =>
+    handleMayorConvoyAddBead(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/convoys/:convoyId/remove-bead', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/convoys/:convoyId/remove-bead', () =>
+    handleMayorConvoyRemoveBead(c, c.req.param())
+  )
 );
 // ── tRPC ────────────────────────────────────────────────────────────────
 // Serve the gastown tRPC router directly. The frontend tRPC client

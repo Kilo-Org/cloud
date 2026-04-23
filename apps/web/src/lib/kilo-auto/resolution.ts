@@ -22,15 +22,13 @@ import {
   type ResolvedAutoModel,
   KILO_AUTO_LEGACY_MODEL,
   BALANCED_HAIKU_MODEL,
-  isKiloAutoModel,
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import {
+  autoFreeModels,
   findKiloExclusiveModel,
-  isFreeModel,
   isKiloExclusiveFreeModel,
-  preferredModels,
 } from '@/lib/ai-gateway/models';
 import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
@@ -65,16 +63,14 @@ export function getAutoFreeCandidates(
   apiKind: GatewayRequest['kind'] | null
 ): ReadonlyArray<string> {
   const candidates = new Set<string>();
-  for (const model of preferredModels) {
-    if (!isKiloAutoModel(model) && isFreeModel(model)) {
-      if (isKiloExclusiveFreeModel(model)) {
-        const kiloModel = findKiloExclusiveModel(model);
-        if (kiloModel && gatewaySupportsApiKind(kiloModel.gateway, apiKind)) {
-          candidates.add(model);
-        }
-      } else if (openRouterModels.has(model)) {
+  for (const model of autoFreeModels) {
+    if (isKiloExclusiveFreeModel(model)) {
+      const kiloModel = findKiloExclusiveModel(model);
+      if (kiloModel && gatewaySupportsApiKind(kiloModel.gateway, apiKind)) {
         candidates.add(model);
       }
+    } else if (openRouterModels.has(model)) {
+      candidates.add(model);
     }
   }
   return [...candidates].toSorted();

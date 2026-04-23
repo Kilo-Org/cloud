@@ -1,8 +1,8 @@
 import { startControlServer } from './control-server';
 import { log } from './logger';
-import { bootHydration } from './process-manager';
+import { bootHydration, getUptime } from './process-manager';
 
-log.info('container.cold_start', { uptime: 0, ts: new Date().toISOString() });
+log.info('container.cold_start', { uptime: getUptime(), ts: new Date().toISOString() });
 
 process.on('uncaughtException', err => {
   log.error('container.uncaught_exception', { error: err.message, stack: err.stack });

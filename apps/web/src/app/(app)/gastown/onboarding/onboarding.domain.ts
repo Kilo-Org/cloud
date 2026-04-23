@@ -43,9 +43,11 @@ export function resolveGitUrlFromRepo(
 export type ModelPreset = 'frontier' | 'balanced' | 'cost-effective' | 'free' | 'custom';
 
 export type CustomModels = {
+  defaultModel?: string;
   mayor?: string;
   refinery?: string;
   polecat?: string;
+  smallModel?: string;
 };
 
 export type PresetConfig = {
@@ -110,14 +112,16 @@ export const PRESETS: PresetConfig[] = [
 /** Derive the config shape stored in OnboardingState from a preset. */
 export function presetToConfig(preset: ModelPreset, customModels: CustomModels) {
   if (preset === 'custom') {
-    const mayorModel = customModels.mayor ?? 'kilo-auto/balanced';
+    const fallback = 'kilo-auto/balanced';
+    const defaultModel = customModels.defaultModel || fallback;
     return {
-      default_model: mayorModel,
+      default_model: defaultModel,
       role_models: {
-        mayor: mayorModel,
-        refinery: customModels.refinery ?? 'kilo-auto/balanced',
-        polecat: customModels.polecat ?? 'kilo-auto/balanced',
+        mayor: customModels.mayor || defaultModel,
+        refinery: customModels.refinery || defaultModel,
+        polecat: customModels.polecat || defaultModel,
       },
+      small_model: customModels.smallModel || undefined,
     };
   }
 
@@ -133,10 +137,21 @@ export function presetToConfig(preset: ModelPreset, customModels: CustomModels) 
   if (refinery !== mayor) role_models.refinery = refinery;
   if (polecat !== mayor) role_models.polecat = polecat;
 
-  return {
+  const config: {
+    default_model: string;
+    role_models: Record<string, string>;
+    small_model?: string;
+  } = {
     default_model: mayor,
     role_models,
   };
+
+  // When the free preset is selected, also set small_model to the same free model
+  if (mayor === 'kilo-auto/free') {
+    config.small_model = 'kilo-auto/free';
+  }
+
+  return config;
 }
 
 // ---------------------------------------------------------------------------

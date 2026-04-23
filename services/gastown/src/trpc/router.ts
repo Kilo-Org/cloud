@@ -659,11 +659,14 @@ export const gastownRouter = router({
       const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       const ids = Array.isArray(input.beadId) ? input.beadId : [input.beadId];
+      // Pass input.rigId so the DO filters to beads that actually belong
+      // to this rig — prevents cross-rig deletion when the caller has only
+      // authorized one rig.
       if (ids.length === 1) {
-        await townStub.deleteBead(ids[0]);
-        return { deleted: 1 };
+        const deleted = await townStub.deleteBead(ids[0], input.rigId);
+        return { deleted: deleted ? 1 : 0 };
       }
-      const count = await townStub.deleteBeads(ids);
+      const count = await townStub.deleteBeads(ids, input.rigId);
       return { deleted: count };
     }),
 

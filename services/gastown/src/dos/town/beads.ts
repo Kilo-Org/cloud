@@ -832,7 +832,26 @@ export function closeBead(sql: SqlStorage, beadId: string, agentId: string): Bea
   return updateBeadStatus(sql, beadId, 'closed', agentId);
 }
 
-export function deleteBead(sql: SqlStorage, beadId: string): void {
+/**
+ * Delete a bead (and its descendants). When `rigId` is supplied, the bead
+ * must belong to that rig — otherwise the function returns without deleting.
+ * This protects mutation endpoints that have only verified ownership of a
+ * rig, not of the specific bead being targeted.
+ */
+export function deleteBead(sql: SqlStorage, beadId: string, rigId?: string): boolean {
+  if (rigId) {
+    const row = BeadRecord.pick({ bead_id: true, rig_id: true })
+      .array()
+      .parse([
+        ...query(
+          sql,
+          /* sql */ `SELECT ${beads.bead_id}, ${beads.rig_id} FROM ${beads} WHERE ${beads.bead_id} = ?`,
+          [beadId]
+        ),
+      ]);
+    if (row.length === 0 || row[0].rig_id !== rigId) return false;
+  }
+
   // Recursively delete child beads (e.g. molecule steps) before the parent
   const children = BeadRecord.pick({ bead_id: true })
     .array()
@@ -885,21 +904,43 @@ export function deleteBead(sql: SqlStorage, beadId: string): void {
   ]);
 
   query(sql, /* sql */ `DELETE FROM ${beads} WHERE ${beads.bead_id} = ?`, [beadId]);
+  return true;
 }
 
-export function deleteBeads(sql: SqlStorage, beadIds: string[]): number {
+/**
+ * Delete many beads (and their descendants). When `rigId` is supplied, the
+ * input `beadIds` list is filtered in SQL to keep only beads actually
+ * belonging to that rig — any others are silently skipped. This prevents
+ * cross-rig deletion when the caller has only authorized one rig.
+ */
+export function deleteBeads(sql: SqlStorage, beadIds: string[], rigId?: string): number {
   if (beadIds.length === 0) return 0;
 
-  const allIds = new Set(beadIds);
-
-  // Expand with child beads (molecule steps, etc.)
   // Dynamic IN clauses use sql.exec directly — the type-safe query()
   // wrapper can't infer placeholder count from runtime-built strings.
   const ph = (ids: string[]) => ids.map(() => '?').join(',');
+
+  let rootIds = beadIds;
+  if (rigId) {
+    const ownedRows = BeadRecord.pick({ bead_id: true })
+      .array()
+      .parse([
+        ...sql.exec(
+          /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.rig_id} = ? AND ${beads.bead_id} IN (${ph(beadIds)})`,
+          rigId,
+          ...beadIds
+        ),
+      ]);
+    rootIds = ownedRows.map(r => r.bead_id);
+    if (rootIds.length === 0) return 0;
+  }
+
+  const allIds = new Set(rootIds);
+
   const childRows = [
     ...sql.exec(
-      /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.parent_bead_id} IN (${ph(beadIds)})`,
-      ...beadIds
+      /* sql */ `SELECT ${beads.bead_id} FROM ${beads} WHERE ${beads.parent_bead_id} IN (${ph(rootIds)})`,
+      ...rootIds
     ),
   ];
   const childIds = BeadRecord.pick({ bead_id: true })

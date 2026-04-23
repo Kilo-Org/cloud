@@ -632,7 +632,8 @@ export async function handleMayorBeadDelete(
     return c.json(resError('Bead does not belong to this rig'), 403);
   }
 
-  await town.deleteBead(params.beadId);
+  // Pass rigId as a defense-in-depth rig check in the DO delete path.
+  await town.deleteBead(params.beadId, params.rigId);
 
   return c.json(resSuccess({ deleted: true }));
 }
@@ -662,7 +663,10 @@ export async function handleMayorBulkDeleteBeads(
   );
 
   const town = getTownDOStub(c.env, params.townId);
-  const count = await town.deleteBeads(bead_ids);
+  // Pass rigId so the DO filters to beads actually belonging to this rig —
+  // prevents a mayor tool from deleting beads from a sibling rig by
+  // passing their IDs alongside an authorized rig.
+  const count = await town.deleteBeads(bead_ids, params.rigId);
 
   return c.json(resSuccess({ deleted: count }));
 }

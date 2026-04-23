@@ -609,6 +609,18 @@ export class TownDO extends DurableObject<Env> {
     // Reconciler event log
     events.initTownEventsTable(this.sql);
 
+    // One-shot cleanup: older versions of this DO stored a separate
+    // `mayor:ready_reported_for:<startedAt>` key per container instance,
+    // which grew unbounded over a town's lifetime. We now store a single
+    // `mayor:ready_reported_for` key instead. Delete the legacy entries
+    // on next init so long-lived towns don't leak durable storage.
+    const legacyReadyKeys = await this.ctx.storage.list<unknown>({
+      prefix: 'mayor:ready_reported_for:',
+    });
+    if (legacyReadyKeys.size > 0) {
+      await this.ctx.storage.delete([...legacyReadyKeys.keys()]);
+    }
+
     // Ensure the alarm loop is running. After a deploy/restart, the
     // Cloudflare runtime normally delivers missed alarms, but if the alarm
     // was never set or was deleted by destroy(), the loop is dead. Re-arm
@@ -1130,12 +1142,12 @@ export class TownDO extends DurableObject<Env> {
     return this.updateBeadStatus(beadId, 'closed', agentId);
   }
 
-  async deleteBead(beadId: string): Promise<void> {
-    beadOps.deleteBead(this.sql, beadId);
+  async deleteBead(beadId: string, rigId?: string): Promise<boolean> {
+    return beadOps.deleteBead(this.sql, beadId, rigId);
   }
 
-  async deleteBeads(beadIds: string[]): Promise<number> {
-    return beadOps.deleteBeads(this.sql, beadIds);
+  async deleteBeads(beadIds: string[], rigId?: string): Promise<number> {
+    return beadOps.deleteBeads(this.sql, beadIds, rigId);
   }
 
   async deleteBeadsByStatus(
@@ -4514,14 +4526,16 @@ export class TownDO extends DurableObject<Env> {
             });
 
             // Emit mayor.session_ready exactly once per container instance.
-            // Keyed by the container's startedAt so a restart re-arms the
-            // measurement. Stored durably so restarts of this DO don't cause
-            // duplicate emissions.
+            // We store just the most recently reported startedAt in a single
+            // key — when a container restarts, startedAt changes and we
+            // re-emit, overwriting the previous value. This keeps storage
+            // at O(1) rather than accumulating a key per container lifetime.
             if (body.data.mayorReadyAt) {
-              const key = `mayor:ready_reported_for:${body.data.startedAt}`;
-              const alreadyReported = await this.ctx.storage.get<boolean>(key);
-              if (!alreadyReported) {
-                await this.ctx.storage.put(key, true);
+              const lastReportedStartedAt = await this.ctx.storage.get<string>(
+                'mayor:ready_reported_for'
+              );
+              if (lastReportedStartedAt !== body.data.startedAt) {
+                await this.ctx.storage.put('mayor:ready_reported_for', body.data.startedAt);
                 const mayorReadyAt = new Date(body.data.mayorReadyAt).getTime();
                 writeEvent(this.env, {
                   event: 'mayor.session_ready',

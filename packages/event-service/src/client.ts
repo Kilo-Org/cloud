@@ -196,7 +196,7 @@ export class EventServiceClient {
     this.stopPing();
     this.pingTimer = setInterval(() => {
       this.send({ type: 'presence.ping' });
-    }, 5000);
+    }, 15000);
   }
 
   private stopPing(): void {

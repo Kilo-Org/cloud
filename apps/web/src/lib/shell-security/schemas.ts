@@ -11,7 +11,7 @@ export type SourcePlatform = z.infer<typeof SourcePlatform>;
 
 /** How the request was triggered */
 export const SourceMethod = z.enum([
-  'plugin', // @kiloclaw/security-advisor plugin
+  'plugin', // @kilocode/shell-security plugin
   'api', // Direct API call (curl, integration, etc.)
   'webhook', // Inbound webhook trigger
   'cloud-agent', // Cloud agent session
@@ -47,7 +47,7 @@ const SemverString = z
   .string()
   .regex(SEMVER_REGEX, 'Must be a semver version string (e.g. "1.2.3")');
 
-export const SecurityAdvisorRequestSchema = z
+export const ShellSecurityRequestSchema = z
   .object({
     apiVersion: z.literal('2026-04-01'),
 
@@ -92,7 +92,7 @@ export const SecurityAdvisorRequestSchema = z
       });
     }
   });
-export type SecurityAdvisorRequest = z.infer<typeof SecurityAdvisorRequestSchema>;
+export type ShellSecurityRequest = z.infer<typeof ShellSecurityRequestSchema>;
 
 // --- Response schemas ---
 
@@ -120,7 +120,7 @@ export const Recommendation = z.object({
 });
 export type Recommendation = z.infer<typeof Recommendation>;
 
-export const SecurityAdvisorResponseSchema = z.object({
+export const ShellSecurityResponseSchema = z.object({
   apiVersion: z.literal('2026-04-01'),
   status: z.literal('success'),
   report: z.object({
@@ -137,29 +137,29 @@ export const SecurityAdvisorResponseSchema = z.object({
     recommendations: z.array(Recommendation),
   }),
 });
-export type SecurityAdvisorResponse = z.infer<typeof SecurityAdvisorResponseSchema>;
+export type ShellSecurityResponse = z.infer<typeof ShellSecurityResponseSchema>;
 
 // --- Error schema ---
 
-export const SecurityAdvisorErrorCode = z.enum([
+export const ShellSecurityErrorCode = z.enum([
   'unauthorized',
   'rate_limited',
   'invalid_payload',
   'invalid_api_version',
   'internal_error',
 ]);
-export type SecurityAdvisorErrorCode = z.infer<typeof SecurityAdvisorErrorCode>;
+export type ShellSecurityErrorCode = z.infer<typeof ShellSecurityErrorCode>;
 
-export const SecurityAdvisorErrorSchema = z.object({
+export const ShellSecurityErrorSchema = z.object({
   apiVersion: z.literal('2026-04-01'),
   status: z.literal('error'),
   error: z.object({
-    code: SecurityAdvisorErrorCode,
+    code: ShellSecurityErrorCode,
     message: z.string(),
     retryAfter: z.number().optional(),
   }),
 });
-export type SecurityAdvisorError = z.infer<typeof SecurityAdvisorErrorSchema>;
+export type ShellSecurityError = z.infer<typeof ShellSecurityErrorSchema>;
 
 // --- Comparison schema ---
 

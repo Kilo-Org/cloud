@@ -73,6 +73,7 @@ import { nextAlarmTime, doLog, doError, doWarn, toLoggable, createReconcileConte
 import { attemptMetadataRecovery } from './reconcile';
 import { buildUserEnvVars, resolveImageTag, resolveRuntimeImageRef } from './config';
 import * as gateway from './gateway';
+import { buildChannelConfigPatch } from './channel-config';
 import * as pairing from './pairing';
 import * as kiloCliRun from './kilo-cli-run';
 import {
@@ -993,6 +994,87 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
   }
 
+  /**
+   * Flush DO-side config that was patched while the gateway wasn't reachable
+   * (status !== 'running') to the live gateway now.
+   *
+   * Called:
+   * - From _startInner after status transitions to 'running' (covers the
+   *   common onboarding path where a client patches during 'starting').
+   * - From the alarm retry block when flags stayed set because the inline
+   *   gateway call failed, or because the starting→running transition was
+   *   driven by reconcileStarting instead of _startInner.
+   *
+   * No-op when nothing is pending. On per-field failure the flag stays true
+   * so the next alarm retries.
+   */
+  private async flushPendingConfigToGateway(reason: string): Promise<void> {
+    if (this.s.status !== 'running' || !getRuntimeId(this.s)) return;
+
+    const pending: Partial<PersistedState> = {};
+
+    if (this.s.botIdentityApplyPending) {
+      try {
+        await gateway.writeBotIdentity(this.s, this.env, {
+          botName: this.s.botName,
+          botNature: this.s.botNature,
+          botVibe: this.s.botVibe,
+          botEmoji: this.s.botEmoji,
+        });
+        this.s.botIdentityApplyPending = false;
+        pending.botIdentityApplyPending = false;
+        doLog(this.s, 'flushPendingConfigToGateway: bot identity applied', { reason });
+      } catch (err) {
+        doWarn(this.s, 'flushPendingConfigToGateway: bot identity failed; will retry', {
+          reason,
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    if (this.s.execPresetApplyPending) {
+      try {
+        await gateway.patchOpenclawConfig(this.s, this.env, {
+          tools: {
+            exec: {
+              security: this.s.execSecurity,
+              ask: this.s.execAsk,
+            },
+          },
+        });
+        this.s.execPresetApplyPending = false;
+        pending.execPresetApplyPending = false;
+        doLog(this.s, 'flushPendingConfigToGateway: exec preset applied', { reason });
+      } catch (err) {
+        doWarn(this.s, 'flushPendingConfigToGateway: exec preset failed; will retry', {
+          reason,
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    if (this.s.channelsApplyPending) {
+      try {
+        const patch = buildChannelConfigPatch(this.env, this.s.channels);
+        if (patch) {
+          await gateway.patchOpenclawConfig(this.s, this.env, patch);
+        }
+        this.s.channelsApplyPending = false;
+        pending.channelsApplyPending = false;
+        doLog(this.s, 'flushPendingConfigToGateway: channels applied', { reason });
+      } catch (err) {
+        doWarn(this.s, 'flushPendingConfigToGateway: channels failed; will retry', {
+          reason,
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    if (Object.keys(pending).length > 0) {
+      await this.ctx.storage.put(pending);
+    }
+  }
+
   async updateExecPreset(patch: {
     security?: string;
     ask?: string;
@@ -1010,8 +1092,34 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       pending.execAsk = patch.ask;
     }
 
-    if (Object.keys(pending).length > 0) {
-      await this.ctx.storage.put(pending);
+    if (Object.keys(pending).length === 0) {
+      return {
+        execSecurity: this.s.execSecurity,
+        execAsk: this.s.execAsk,
+      };
+    }
+
+    this.s.execPresetApplyPending = true;
+    pending.execPresetApplyPending = true;
+    await this.ctx.storage.put(storageUpdate(pending));
+
+    if (this.s.status === 'running') {
+      try {
+        await gateway.patchOpenclawConfig(this.s, this.env, {
+          tools: {
+            exec: {
+              security: this.s.execSecurity,
+              ask: this.s.execAsk,
+            },
+          },
+        });
+        this.s.execPresetApplyPending = false;
+        await this.ctx.storage.put(storageUpdate({ execPresetApplyPending: false }));
+      } catch (err) {
+        doWarn(this.s, 'updateExecPreset: gateway patch failed; deferring to alarm', {
+          error: toLoggable(err),
+        });
+      }
     }
 
     return {
@@ -1073,17 +1181,36 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       pending.botEmoji = patch.botEmoji;
     }
 
-    if (Object.keys(pending).length > 0) {
-      await this.ctx.storage.put(pending);
-    }
-
-    if (this.s.status === 'running' && Object.keys(pending).length > 0) {
-      await gateway.writeBotIdentity(this.s, this.env, {
+    if (Object.keys(pending).length === 0) {
+      return {
         botName: this.s.botName,
         botNature: this.s.botNature,
         botVibe: this.s.botVibe,
         botEmoji: this.s.botEmoji,
-      });
+      };
+    }
+
+    this.s.botIdentityApplyPending = true;
+    pending.botIdentityApplyPending = true;
+    await this.ctx.storage.put(storageUpdate(pending));
+
+    if (this.s.status === 'running') {
+      try {
+        await gateway.writeBotIdentity(this.s, this.env, {
+          botName: this.s.botName,
+          botNature: this.s.botNature,
+          botVibe: this.s.botVibe,
+          botEmoji: this.s.botEmoji,
+        });
+        this.s.botIdentityApplyPending = false;
+        await this.ctx.storage.put(storageUpdate({ botIdentityApplyPending: false }));
+      } catch (err) {
+        // Gateway reachable only after flyMachineId + controller up; on
+        // transient failure, keep the alarm retry path queued.
+        doWarn(this.s, 'updateBotIdentity: gateway write failed; deferring to alarm', {
+          error: toLoggable(err),
+        });
+      }
     }
 
     return {
@@ -1106,13 +1233,52 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     slackApp: boolean;
   }> {
     const secretsPatch: Record<string, EncryptedEnvelope | null> = {};
+    let includesRemoval = false;
+    let includesAddition = false;
     for (const [key, value] of Object.entries(patch)) {
       if (value !== undefined) {
         secretsPatch[key] = value;
+        if (value === null) {
+          includesRemoval = true;
+        } else {
+          includesAddition = true;
+        }
       }
     }
 
     const { configured } = await this.updateSecrets(secretsPatch);
+
+    const pending: Partial<PersistedState> = {};
+    if (Object.keys(secretsPatch).length > 0) {
+      if (includesAddition && this.s.status === 'running' && getRuntimeId(this.s)) {
+        try {
+          const configPatch = buildChannelConfigPatch(this.env, this.s.channels);
+          if (configPatch) {
+            await gateway.patchOpenclawConfig(this.s, this.env, configPatch);
+          }
+          this.s.channelsApplyPending = false;
+          pending.channelsApplyPending = false;
+        } catch (err) {
+          doWarn(this.s, 'updateChannels: gateway patch failed; deferring to alarm', {
+            error: toLoggable(err),
+          });
+          this.s.channelsApplyPending = true;
+          pending.channelsApplyPending = true;
+        }
+      } else if (includesAddition) {
+        this.s.channelsApplyPending = true;
+        pending.channelsApplyPending = true;
+      } else if (includesRemoval && (!this.s.channelsApplyPending || !this.s.channels)) {
+        // Removals are not live-applied, but do not erase a pending additive replay
+        // while other channel config remains queued for the gateway.
+        this.s.channelsApplyPending = false;
+        pending.channelsApplyPending = false;
+      }
+    }
+
+    if (Object.keys(pending).length > 0) {
+      await this.ctx.storage.put(pending);
+    }
 
     return {
       telegram: configured.includes('telegramBotToken'),
@@ -1764,6 +1930,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
 
     await this.syncGoogleWorkspaceConfig('instance_started');
+    await this.flushPendingConfigToGateway('instance_started');
 
     this.emitEvent({
       event: 'instance.started',
@@ -3119,6 +3286,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     if (this.s.googleWorkspaceConfigSyncPending && this.s.status === 'running') {
       await this.syncGoogleWorkspaceConfig('alarm_retry');
+    }
+
+    // Flushes patches that landed in DO state while status was not 'running'
+    // (Window B of the onboarding timing analysis). Covers both the rare path
+    // where reconcileStarting — not _startInner — flipped status to 'running'
+    // in a prior alarm tick, and the case where an inline gateway call failed.
+    if (
+      (this.s.botIdentityApplyPending ||
+        this.s.execPresetApplyPending ||
+        this.s.channelsApplyPending) &&
+      this.s.status === 'running'
+    ) {
+      await this.flushPendingConfigToGateway('alarm_retry');
     }
 
     if (this.s.status !== 'recovering') {

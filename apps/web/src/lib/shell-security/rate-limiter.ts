@@ -2,7 +2,7 @@ import { db } from '@/lib/drizzle';
 import { security_advisor_scans } from '@kilocode/db/schema';
 import { and, count, eq, gte } from 'drizzle-orm';
 import { RATE_LIMIT_PER_DAY } from './schemas';
-import type { SecurityAdvisorRequest } from './schemas';
+import type { ShellSecurityRequest } from './schemas';
 
 const WINDOW_HOURS = 24;
 
@@ -15,7 +15,7 @@ export interface RateLimitResult {
  * Check whether a user has exceeded the daily scan limit.
  * Queries the security_advisor_scans table — survives restarts, shared across replicas.
  */
-export async function checkSecurityAdvisorRateLimit(userId: string): Promise<RateLimitResult> {
+export async function checkShellSecurityRateLimit(userId: string): Promise<RateLimitResult> {
   const windowStart = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000);
 
   const usage = await db
@@ -37,13 +37,13 @@ export async function checkSecurityAdvisorRateLimit(userId: string): Promise<Rat
 }
 
 /**
- * Record a security advisor scan. Called after the report is generated.
+ * Record a shell security scan. Called after the report is generated.
  * This row is both the rate-limit counter and the usage/analytics ledger.
  */
-export async function recordSecurityAdvisorScan(
+export async function recordShellSecurityScan(
   userId: string,
   organizationId: string | undefined,
-  payload: SecurityAdvisorRequest
+  payload: ShellSecurityRequest
 ): Promise<void> {
   await db.insert(security_advisor_scans).values({
     kilo_user_id: userId,

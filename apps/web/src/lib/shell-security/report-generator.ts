@@ -1,13 +1,13 @@
 import type {
   AuditFinding,
-  SecurityAdvisorRequest,
+  ShellSecurityRequest,
   ReportFinding,
   Recommendation,
   RecommendationPriority,
   FindingSeverity,
   ReportGrade,
 } from './schemas';
-import { findCoverageForCheckId, type LoadedSecurityAdvisorContent } from './content-loader';
+import { findCoverageForCheckId, type LoadedShellSecurityContent } from './content-loader';
 import { isKiloClawMitigated } from './kiloclaw-mitigations';
 
 // --- Grading ---
@@ -40,12 +40,12 @@ function computeGrade(
 // --- Report generation ---
 
 interface GenerateReportOptions {
-  audit: SecurityAdvisorRequest['audit'];
+  audit: ShellSecurityRequest['audit'];
   publicIp?: string;
   /** If true, omit KiloClaw comparison text (for KiloClaw-sourced requests) */
   isKiloClaw: boolean;
-  /** All customer-visible strings. Loaded via getSecurityAdvisorContent(). */
-  content: LoadedSecurityAdvisorContent;
+  /** All customer-visible strings. Loaded via getShellSecurityContent(). */
+  content: LoadedShellSecurityContent;
 }
 
 interface GeneratedReport {
@@ -110,7 +110,7 @@ export function generateSecurityReport(options: GenerateReportOptions): Generate
 function mapFinding(
   finding: AuditFinding,
   isKiloClaw: boolean,
-  content: LoadedSecurityAdvisorContent
+  content: LoadedShellSecurityContent
 ): ReportFinding {
   const catalogEntry = content.checkCatalog.get(finding.checkId);
   const coverage = findCoverageForCheckId(finding.checkId, content.kiloclawCoverage);
@@ -136,7 +136,7 @@ function mapFinding(
 function formatCoverage(
   coverage: { summary: string; detail: string } | null,
   isKiloClaw: boolean,
-  content: LoadedSecurityAdvisorContent
+  content: LoadedShellSecurityContent
 ): string | null {
   if (!coverage) return null;
 
@@ -156,7 +156,7 @@ function formatCoverage(
 
 function generateRecommendations(
   findings: ReportFinding[],
-  content: LoadedSecurityAdvisorContent
+  content: LoadedShellSecurityContent
 ): Recommendation[] {
   const recommendations: Recommendation[] = [];
   const seen = new Set<string>();
@@ -226,7 +226,7 @@ function priorityBadge(priority: RecommendationPriority): string {
       return 'INFO';
     case 'medium':
       throw new Error(
-        '[SecurityAdvisor] priorityBadge: "medium" priority has no defined label yet. Pick one in report-generator.ts before emitting medium-priority recommendations.'
+        '[ShellSecurity] priorityBadge: "medium" priority has no defined label yet. Pick one in report-generator.ts before emitting medium-priority recommendations.'
       );
   }
 }
@@ -243,7 +243,7 @@ interface RenderOptions {
   isKiloClaw: boolean;
   /** How many findings were dropped by KiloClaw-mitigation filtering. 0 on OpenClaw. */
   suppressedCount: number;
-  content: LoadedSecurityAdvisorContent;
+  content: LoadedShellSecurityContent;
 }
 
 function renderMarkdown(opts: RenderOptions): string {
@@ -398,7 +398,7 @@ function renderFinding(lines: string[], finding: ReportFinding): void {
 
 // --- Helpers ---
 
-function getContent(content: LoadedSecurityAdvisorContent, key: string, fallback: string): string {
+function getContent(content: LoadedShellSecurityContent, key: string, fallback: string): string {
   return content.content.get(key) ?? fallback;
 }
 

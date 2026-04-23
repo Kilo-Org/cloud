@@ -5,7 +5,7 @@ import {
   security_advisor_kiloclaw_coverage,
   security_advisor_content,
 } from '@kilocode/db/schema';
-import { invalidateSecurityAdvisorContentCache } from '@/lib/security-advisor/content-loader';
+import { invalidateShellSecurityContentCache } from '@/lib/shell-security/content-loader';
 import { and, arrayOverlaps, asc, eq, ne } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -44,7 +44,7 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-export const adminSecurityAdvisorContentRouter = createTRPCRouter({
+export const adminShellSecurityContentRouter = createTRPCRouter({
   // ---- Check catalog ----
   checkCatalog: createTRPCRouter({
     list: adminProcedure.query(async () => {
@@ -89,7 +89,7 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
         });
       }
 
-      invalidateSecurityAdvisorContentCache();
+      invalidateShellSecurityContentCache();
       return row;
     }),
 
@@ -102,7 +102,7 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Check not found' });
       }
 
-      invalidateSecurityAdvisorContentCache();
+      invalidateShellSecurityContentCache();
       return { success: true };
     }),
   }),
@@ -189,7 +189,7 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
         });
       }
 
-      invalidateSecurityAdvisorContentCache();
+      invalidateShellSecurityContentCache();
       return row;
     }),
 
@@ -202,7 +202,7 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'KiloClaw coverage entry not found' });
       }
 
-      invalidateSecurityAdvisorContentCache();
+      invalidateShellSecurityContentCache();
       return { success: true };
     }),
   }),
@@ -239,7 +239,7 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
         });
       }
 
-      invalidateSecurityAdvisorContentCache();
+      invalidateShellSecurityContentCache();
       return row;
     }),
 
@@ -252,7 +252,7 @@ export const adminSecurityAdvisorContentRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Content key not found' });
       }
 
-      invalidateSecurityAdvisorContentCache();
+      invalidateShellSecurityContentCache();
       return { success: true };
     }),
   }),

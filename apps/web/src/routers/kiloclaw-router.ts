@@ -567,7 +567,17 @@ const userTimezoneSchema = z
 const userLocationSchema = z.string().trim().min(1).max(200);
 const weatherLocationInputSchema = z.object({ location: userLocationSchema });
 const WTTR_LOCATION_TIMEOUT_MS = 4_000;
+const WTTR_SERVICE_UNAVAILABLE_MESSAGE =
+  "wttr.in is down right now. We'll store your location as entered.";
 const COORDINATE_LOCATION_PATTERN = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/;
+
+type WeatherLocationValidationResult = {
+  location: string;
+  currentWeatherText: string;
+  status: 'validated' | 'service_unavailable';
+};
+
+type WttrFetchResult = { ok: true; response: Response } | { ok: false };
 
 const wttrValueSchema = z.object({ value: z.string().trim().min(1) });
 const wttrNearestAreaSchema = z.object({
@@ -658,27 +668,44 @@ function isTimeoutError(error: unknown): boolean {
   return error.name === 'TimeoutError' || error.name === 'AbortError';
 }
 
-async function fetchWttr(location: string, query: string): Promise<Response> {
+function wttrServiceUnavailableResult(location: string): WeatherLocationValidationResult {
+  return {
+    location,
+    currentWeatherText: WTTR_SERVICE_UNAVAILABLE_MESSAGE,
+    status: 'service_unavailable',
+  };
+}
+
+function isWttrServiceUnavailableStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function weatherLocationNotFound(): never {
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message: 'Weather location could not be found.',
+  });
+}
+
+async function fetchWttr(location: string, query: string): Promise<WttrFetchResult> {
   try {
-    return await fetch(`https://wttr.in/${encodeURIComponent(location)}?${query}`, {
-      headers: {
-        Accept: 'text/plain, application/json;q=0.9, */*;q=0.8',
-        'User-Agent': 'curl/8.7.1',
-      },
-      signal: AbortSignal.timeout(WTTR_LOCATION_TIMEOUT_MS),
-    });
+    return {
+      ok: true,
+      response: await fetch(`https://wttr.in/${encodeURIComponent(location)}?${query}`, {
+        headers: {
+          Accept: 'text/plain, application/json;q=0.9, */*;q=0.8',
+          'User-Agent': 'curl/8.7.1',
+        },
+        signal: AbortSignal.timeout(WTTR_LOCATION_TIMEOUT_MS),
+      }),
+    };
   } catch (error) {
-    if (isTimeoutError(error)) {
-      throw new TRPCError({
-        code: 'TIMEOUT',
-        message: 'Weather location validation timed out. Please try again or skip weather setup.',
+    if (!isTimeoutError(error)) {
+      sentryLogger('kiloclaw-weather', 'warning')('wttr.in validation unavailable', {
+        location_query: query,
       });
     }
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message:
-        'Weather location validation is unavailable. Please try again or skip weather setup.',
-    });
+    return { ok: false };
   }
 }
 
@@ -687,36 +714,45 @@ async function fetchReadableLocationName(
   preferredAreaName: string
 ): Promise<string | null> {
   try {
-    const response = await fetchWttr(location, 'format=j1');
-    if (!response.ok) return null;
-    return normalizeWeatherLocation(await response.json(), preferredAreaName);
+    const result = await fetchWttr(location, 'format=j1');
+    if (!result.ok || !result.response.ok) return null;
+    return normalizeWeatherLocation(await result.response.json(), preferredAreaName);
   } catch {
     return null;
   }
 }
 
-async function validateWeatherLocation(
-  location: string
-): Promise<{ location: string; currentWeatherText: string }> {
-  const response = await fetchWttr(location, 'format=3');
+async function validateWeatherLocation(location: string): Promise<WeatherLocationValidationResult> {
+  const result = await fetchWttr(location, 'format=3');
+  if (!result.ok) return wttrServiceUnavailableResult(location);
 
+  const response = result.response;
   if (!response.ok) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Weather location could not be found.',
-    });
+    if (isWttrServiceUnavailableStatus(response.status)) {
+      return wttrServiceUnavailableResult(location);
+    }
+    weatherLocationNotFound();
   }
 
-  const parsed = parseWttrFormat3(await response.text());
+  let responseText: string;
+  try {
+    responseText = await response.text();
+  } catch {
+    return wttrServiceUnavailableResult(location);
+  }
+
+  const parsed = parseWttrFormat3(responseText);
   if (!parsed) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Weather location could not be found.',
-    });
+    if (hasUnknownLocationMarker(responseText)) weatherLocationNotFound();
+    return wttrServiceUnavailableResult(location);
   }
 
   const resolvedLocation = await fetchReadableLocationName(location, parsed.location);
-  return { ...parsed, ...(resolvedLocation ? { location: resolvedLocation } : undefined) };
+  return {
+    ...parsed,
+    status: 'validated',
+    ...(resolvedLocation ? { location: resolvedLocation } : undefined),
+  };
 }
 
 // TODO: Replace with catalog-driven schema. This hardcoded list must be kept

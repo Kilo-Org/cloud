@@ -40,7 +40,7 @@ jest.mock('drizzle-orm', () => ({
   gte: (a: unknown, b: unknown) => ({ gte: [a, b] }),
 }));
 
-describe('security advisor rate limiter (DB-backed)', () => {
+describe('shell security rate limiter (DB-backed)', () => {
   beforeEach(() => {
     jest.resetAllMocks();
   });
@@ -48,8 +48,8 @@ describe('security advisor rate limiter (DB-backed)', () => {
   it('allows requests when count is under the limit', async () => {
     mockWhere.mockResolvedValue([{ totalRequests: 2 }]);
 
-    const { checkSecurityAdvisorRateLimit } = await import('../rate-limiter');
-    const result = await checkSecurityAdvisorRateLimit('user-1');
+    const { checkShellSecurityRateLimit } = await import('../rate-limiter');
+    const result = await checkShellSecurityRateLimit('user-1');
 
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(RATE_LIMIT_PER_DAY - 2);
@@ -58,8 +58,8 @@ describe('security advisor rate limiter (DB-backed)', () => {
   it('blocks when count reaches the limit', async () => {
     mockWhere.mockResolvedValue([{ totalRequests: RATE_LIMIT_PER_DAY }]);
 
-    const { checkSecurityAdvisorRateLimit } = await import('../rate-limiter');
-    const result = await checkSecurityAdvisorRateLimit('user-1');
+    const { checkShellSecurityRateLimit } = await import('../rate-limiter');
+    const result = await checkShellSecurityRateLimit('user-1');
 
     expect(result.allowed).toBe(false);
     expect(result.remaining).toBe(0);
@@ -68,8 +68,8 @@ describe('security advisor rate limiter (DB-backed)', () => {
   it('handles empty result from DB', async () => {
     mockWhere.mockResolvedValue([{ totalRequests: 0 }]);
 
-    const { checkSecurityAdvisorRateLimit } = await import('../rate-limiter');
-    const result = await checkSecurityAdvisorRateLimit('user-1');
+    const { checkShellSecurityRateLimit } = await import('../rate-limiter');
+    const result = await checkShellSecurityRateLimit('user-1');
 
     expect(result.allowed).toBe(true);
     expect(result.remaining).toBe(RATE_LIMIT_PER_DAY);
@@ -78,8 +78,8 @@ describe('security advisor rate limiter (DB-backed)', () => {
   it('records a scan via DB insert', async () => {
     mockValues.mockResolvedValue(undefined);
 
-    const { recordSecurityAdvisorScan } = await import('../rate-limiter');
-    await recordSecurityAdvisorScan('user-1', 'org-1', {
+    const { recordShellSecurityScan } = await import('../rate-limiter');
+    await recordShellSecurityScan('user-1', 'org-1', {
       apiVersion: '2026-04-01',
       source: { platform: 'openclaw', method: 'plugin', pluginVersion: '1.0.0' },
       audit: {

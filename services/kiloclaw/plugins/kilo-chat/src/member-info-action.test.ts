@@ -56,6 +56,60 @@ describe('handleKiloChatMemberInfoAction', () => {
     expect(result.content[0].text).toBe('Members (1):\n- user-x (user)');
   });
 
+  it('returns single-member details when target matches', async () => {
+    const client = mockClient({
+      getMembers: vi.fn().mockResolvedValue({
+        members: [
+          { id: 'alice', kind: 'user', displayName: 'Alice Smith', avatarUrl: 'https://img/a' },
+          { id: 'bob', kind: 'user', displayName: 'Bob', avatarUrl: null },
+        ],
+      }),
+    });
+
+    const result = await handleKiloChatMemberInfoAction({
+      params: { target: 'alice' },
+      toolContext: { currentChannelId: 'CONV' },
+      client,
+    });
+
+    expect(result.content[0].text).toContain('Member: Alice Smith');
+    expect(result.content[0].text).toContain('- id: alice');
+    expect(result.content[0].text).toContain('- kind: user');
+    expect(result.content[0].text).toContain('- avatarUrl: https://img/a');
+    expect(result.content[0].text).not.toContain('Bob');
+  });
+
+  it('accepts kilo-chat: prefix on target', async () => {
+    const client = mockClient({
+      getMembers: vi.fn().mockResolvedValue({
+        members: [{ id: 'alice', kind: 'user', displayName: null, avatarUrl: null }],
+      }),
+    });
+
+    const result = await handleKiloChatMemberInfoAction({
+      params: { target: 'kilo-chat:alice' },
+      toolContext: { currentChannelId: 'CONV' },
+      client,
+    });
+    expect(result.content[0].text).toContain('- id: alice');
+  });
+
+  it('throws when target is not in the conversation', async () => {
+    const client = mockClient({
+      getMembers: vi.fn().mockResolvedValue({
+        members: [{ id: 'alice', kind: 'user', displayName: null, avatarUrl: null }],
+      }),
+    });
+
+    await expect(
+      handleKiloChatMemberInfoAction({
+        params: { target: 'nobody' },
+        toolContext: { currentChannelId: 'CONV' },
+        client,
+      })
+    ).rejects.toThrow(/member nobody is not in conversation CONV/);
+  });
+
   it('throws when conversationId cannot be resolved', async () => {
     const client = mockClient();
 

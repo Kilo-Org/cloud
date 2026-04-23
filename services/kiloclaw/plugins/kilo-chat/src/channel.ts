@@ -127,6 +127,17 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
                 description: 'Comma-separated member IDs to add when creating a conversation.',
               })
             ),
+            groupId: Type.Optional(
+              Type.String({
+                description:
+                  'Conversation/group id. Alias for `to`. Required for `renameGroup`; optional elsewhere (falls back to the current conversation).',
+              })
+            ),
+            target: Type.Optional(
+              Type.String({
+                description: 'Member id to inspect with `member-info`. Omit to list all members.',
+              })
+            ),
           },
           visibility: 'current-channel' as const,
         },

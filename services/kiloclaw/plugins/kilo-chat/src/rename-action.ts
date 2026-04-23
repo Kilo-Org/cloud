@@ -1,6 +1,6 @@
 import { readStringParam } from 'openclaw/plugin-sdk/agent-runtime';
 import type { KiloChatClient } from './client.js';
-import { resolveConversationId } from './action-schemas.js';
+import { stripPrefix } from './action-schemas.js';
 
 export type HandleKiloChatRenameActionParams = {
   params: Record<string, unknown>;
@@ -13,7 +13,14 @@ export type HandleKiloChatRenameActionParams = {
 export async function handleKiloChatRenameAction(
   args: HandleKiloChatRenameActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
-  const conversationId = resolveConversationId(args.params, args.toolContext);
+  const raw =
+    readStringParam(args.params, 'to') ??
+    readStringParam(args.params, 'conversationId') ??
+    readStringParam(args.params, 'groupId');
+  if (!raw) {
+    throw new Error('kilo-chat: groupId is required for renameGroup');
+  }
+  const conversationId = stripPrefix(raw);
 
   const name = readStringParam(args.params, 'name');
   if (!name) {

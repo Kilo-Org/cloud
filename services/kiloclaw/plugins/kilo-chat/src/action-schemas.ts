@@ -4,15 +4,27 @@ export function stripPrefix(raw: string): string {
   return raw.trim().replace(/^kilo-chat:/i, '');
 }
 
+export type ResolveConversationIdOptions = {
+  allowCurrentChannelFallback?: boolean;
+};
+
 export function resolveConversationId(
   params: Record<string, unknown>,
-  toolContext?: { currentChannelId?: string | null }
+  toolContext?: { currentChannelId?: string | null },
+  options: ResolveConversationIdOptions = {}
 ): string {
-  const raw =
+  const { allowCurrentChannelFallback = true } = options;
+  const fromParams =
     readStringParam(params, 'to') ??
-    (typeof toolContext?.currentChannelId === 'string' ? toolContext.currentChannelId : undefined);
+    readStringParam(params, 'conversationId') ??
+    readStringParam(params, 'groupId');
+  const fromContext =
+    allowCurrentChannelFallback && typeof toolContext?.currentChannelId === 'string'
+      ? toolContext.currentChannelId
+      : undefined;
+  const raw = fromParams ?? fromContext;
   if (!raw) {
-    throw new Error('kilo-chat: conversationId (or `to`) is required');
+    throw new Error('kilo-chat: conversationId (or `to`/`groupId`) is required');
   }
   return stripPrefix(raw);
 }

@@ -139,6 +139,8 @@ describe('kilo-chat actions adapter', () => {
     expect(discovery?.schema).toBeDefined();
     const schema = Array.isArray(discovery?.schema) ? discovery.schema[0] : discovery?.schema;
     expect(schema?.properties).toHaveProperty('additionalMembers');
+    expect(schema?.properties).toHaveProperty('groupId');
+    expect(schema?.properties).toHaveProperty('target');
     expect(schema?.visibility).toBe('current-channel');
   });
 

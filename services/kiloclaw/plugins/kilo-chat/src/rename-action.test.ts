@@ -43,17 +43,40 @@ describe('handleKiloChatRenameAction', () => {
     );
   });
 
-  it('falls back to toolContext for conversationId', async () => {
+  it('accepts groupId param', async () => {
     const client = mockClient();
     await handleKiloChatRenameAction({
-      params: { name: 'New Title' },
-      toolContext: { currentChannelId: 'CTX_CONV' },
+      params: { groupId: 'CONV1', name: 'New Title' },
       client,
     });
     expect(client.renameConversation).toHaveBeenCalledWith({
-      conversationId: 'CTX_CONV',
+      conversationId: 'CONV1',
       title: 'New Title',
     });
+  });
+
+  it('accepts conversationId param', async () => {
+    const client = mockClient();
+    await handleKiloChatRenameAction({
+      params: { conversationId: 'CONV2', name: 'New Title' },
+      client,
+    });
+    expect(client.renameConversation).toHaveBeenCalledWith({
+      conversationId: 'CONV2',
+      title: 'New Title',
+    });
+  });
+
+  it('throws when id missing even if toolContext.currentChannelId is set', async () => {
+    const client = mockClient();
+    await expect(
+      handleKiloChatRenameAction({
+        params: { name: 'New Title' },
+        toolContext: { currentChannelId: 'CTX_CONV' },
+        client,
+      })
+    ).rejects.toThrow(/groupId is required/i);
+    expect(client.renameConversation).not.toHaveBeenCalled();
   });
 
   it('throws when conversationId is missing', async () => {
@@ -63,7 +86,7 @@ describe('handleKiloChatRenameAction', () => {
         params: { name: 'New Title' },
         client,
       })
-    ).rejects.toThrow(/conversationId/i);
+    ).rejects.toThrow(/groupId is required/i);
   });
 
   it('throws when name is missing', async () => {

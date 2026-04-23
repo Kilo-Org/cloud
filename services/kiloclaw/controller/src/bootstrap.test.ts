@@ -99,6 +99,7 @@ function fakeDeps(): {
       }),
       unlinkSync: vi.fn(),
       readdirSync: vi.fn(() => [] as string[]),
+      statSync: vi.fn(() => ({ isDirectory: () => false })),
       execFileSync: vi.fn((cmd: string, args: string[], opts?: { input?: string }) => {
         execCalls.push({ cmd, args, input: opts?.input });
         return '';
@@ -895,6 +896,80 @@ describe('runOnboardOrDoctor', () => {
     expect(doctorCall?.args).toContain('--non-interactive');
     expect(env.KILOCLAW_FRESH_INSTALL).toBe('false');
     expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/IDENTITY.md'))).toBe(true);
+  });
+
+  it('migrates legacy plaintext kilocode key in auth-profiles.json to a keyRef', () => {
+    // Integration check: runOnboardOrDoctor must drive the auth-profiles
+    // migration. On a legacy doctor boot, a plaintext key in
+    // /root/.openclaw/agents/main/agent/auth-profiles.json should be
+    // rewritten to an env-backed keyRef on the same path.
+    const AGENTS_DIR = '/root/.openclaw/agents';
+    const AGENT_ROOT = '/root/.openclaw/agents/main';
+    const PROFILE_PATH = '/root/.openclaw/agents/main/agent/auth-profiles.json';
+
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p.endsWith('openclaw.json')) return true;
+      if (p === AGENTS_DIR) return true;
+      if (p === PROFILE_PATH) return true;
+      if (p.endsWith('TOOLS.md')) return true;
+      return false;
+    });
+    (harness.deps.readdirSync as ReturnType<typeof vi.fn>).mockImplementation((dir: string) => {
+      if (dir === AGENTS_DIR) return ['main'];
+      return [];
+    });
+    (harness.deps.statSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => ({
+      isDirectory: () => p === AGENT_ROOT,
+    }));
+
+    const plaintextStore = JSON.stringify({
+      version: 1,
+      profiles: {
+        'kilocode:default': {
+          type: 'api_key',
+          provider: 'kilocode',
+          key: 'legacy-plaintext-key',
+        },
+      },
+    });
+
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p === PROFILE_PATH) return plaintextStore;
+      if (p.endsWith('openclaw.json')) {
+        return JSON.stringify({ gateway: { port: 3001 } });
+      }
+      return '{}';
+    });
+
+    const env: Record<string, string | undefined> = {
+      KILOCODE_API_KEY: 'test-key',
+      OPENCLAW_GATEWAY_TOKEN: 'test-token',
+      AUTO_APPROVE_DEVICES: 'true',
+    };
+
+    runOnboardOrDoctor(env, harness.deps);
+
+    // The migration should have written the rewritten profile through the
+    // atomic-write path (temp file → rename into PROFILE_PATH).
+    const rewrite = harness.renameCalls.find(call => call.to === PROFILE_PATH);
+    if (!rewrite) throw new Error('expected a rename into the auth-profiles path');
+
+    const tempWrite = harness.writeCalls.find(call => call.path === rewrite.from);
+    if (!tempWrite) throw new Error('expected a write to the migration temp path');
+
+    const rewritten = JSON.parse(tempWrite.data) as {
+      profiles: Record<string, Record<string, unknown>>;
+    };
+    expect(rewritten.profiles['kilocode:default']).toEqual({
+      type: 'api_key',
+      provider: 'kilocode',
+      keyRef: { source: 'env', provider: 'default', id: 'KILOCODE_API_KEY' },
+    });
+    expect(rewritten.profiles['kilocode:default']).not.toHaveProperty('key');
+    expect(tempWrite.data).not.toContain('legacy-plaintext-key');
   });
 });
 

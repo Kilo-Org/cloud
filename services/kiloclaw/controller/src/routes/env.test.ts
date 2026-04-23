@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
-import { registerEnvRoutes } from './env';
+import { registerEnvRoutes, type EnvRoutesDeps } from './env';
+import type { ReloadGatewaySecretsResult } from '../gateway-rpc';
 import type { Supervisor } from '../supervisor';
 
 function createMockSupervisor(state: 'running' | 'stopped' = 'running'): Supervisor {
@@ -25,6 +26,14 @@ function authHeaders(token = 'test-token'): HeadersInit {
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 }
 
+function defaultSuccessDeps(): EnvRoutesDeps {
+  const okResult: ReloadGatewaySecretsResult = { ok: true };
+  return {
+    migrate: vi.fn(() => ({ filesScanned: 0, filesModified: 0, profilesMigrated: 0 })),
+    reload: vi.fn(() => okResult),
+  };
+}
+
 describe('/_kilo/env/patch', () => {
   const originalApiKey = process.env.KILOCODE_API_KEY;
 
@@ -33,7 +42,6 @@ describe('/_kilo/env/patch', () => {
   });
 
   afterEach(() => {
-    // Restore original env to avoid pollution between tests
     if (originalApiKey === undefined) {
       delete process.env.KILOCODE_API_KEY;
     } else {
@@ -43,7 +51,7 @@ describe('/_kilo/env/patch', () => {
 
   it('rejects requests without auth', async () => {
     const app = new Hono();
-    registerEnvRoutes(app, createMockSupervisor(), 'test-token');
+    registerEnvRoutes(app, createMockSupervisor(), 'test-token', defaultSuccessDeps());
 
     const resp = await app.request('/_kilo/env/patch', {
       method: 'POST',
@@ -55,7 +63,7 @@ describe('/_kilo/env/patch', () => {
 
   it('rejects requests with wrong token', async () => {
     const app = new Hono();
-    registerEnvRoutes(app, createMockSupervisor(), 'test-token');
+    registerEnvRoutes(app, createMockSupervisor(), 'test-token', defaultSuccessDeps());
 
     const resp = await app.request('/_kilo/env/patch', {
       method: 'POST',
@@ -67,7 +75,7 @@ describe('/_kilo/env/patch', () => {
 
   it('rejects invalid JSON body', async () => {
     const app = new Hono();
-    registerEnvRoutes(app, createMockSupervisor(), 'test-token');
+    registerEnvRoutes(app, createMockSupervisor(), 'test-token', defaultSuccessDeps());
 
     const resp = await app.request('/_kilo/env/patch', {
       method: 'POST',
@@ -80,7 +88,7 @@ describe('/_kilo/env/patch', () => {
 
   it('rejects non-object body (array)', async () => {
     const app = new Hono();
-    registerEnvRoutes(app, createMockSupervisor(), 'test-token');
+    registerEnvRoutes(app, createMockSupervisor(), 'test-token', defaultSuccessDeps());
 
     const resp = await app.request('/_kilo/env/patch', {
       method: 'POST',
@@ -93,7 +101,7 @@ describe('/_kilo/env/patch', () => {
 
   it('rejects empty object', async () => {
     const app = new Hono();
-    registerEnvRoutes(app, createMockSupervisor(), 'test-token');
+    registerEnvRoutes(app, createMockSupervisor(), 'test-token', defaultSuccessDeps());
 
     const resp = await app.request('/_kilo/env/patch', {
       method: 'POST',
@@ -106,7 +114,7 @@ describe('/_kilo/env/patch', () => {
 
   it('rejects keys not in the allowlist', async () => {
     const app = new Hono();
-    registerEnvRoutes(app, createMockSupervisor(), 'test-token');
+    registerEnvRoutes(app, createMockSupervisor(), 'test-token', defaultSuccessDeps());
 
     const resp = await app.request('/_kilo/env/patch', {
       method: 'POST',
@@ -120,7 +128,7 @@ describe('/_kilo/env/patch', () => {
 
   it('rejects non-string values', async () => {
     const app = new Hono();
-    registerEnvRoutes(app, createMockSupervisor(), 'test-token');
+    registerEnvRoutes(app, createMockSupervisor(), 'test-token', defaultSuccessDeps());
 
     const resp = await app.request('/_kilo/env/patch', {
       method: 'POST',
@@ -132,10 +140,15 @@ describe('/_kilo/env/patch', () => {
     expect(body.error).toContain("'KILOCODE_API_KEY' must be a string");
   });
 
-  it('updates process.env and signals SIGUSR1', async () => {
+  it('updates process.env, runs migration, and calls secrets reload when gateway is running', async () => {
     const app = new Hono();
     const supervisor = createMockSupervisor('running');
-    registerEnvRoutes(app, supervisor, 'test-token');
+    const okResult: ReloadGatewaySecretsResult = { ok: true };
+    const deps: EnvRoutesDeps = {
+      migrate: vi.fn(() => ({ filesScanned: 1, filesModified: 1, profilesMigrated: 2 })),
+      reload: vi.fn(() => okResult),
+    };
+    registerEnvRoutes(app, supervisor, 'test-token', deps);
 
     const resp = await app.request('/_kilo/env/patch', {
       method: 'POST',
@@ -144,16 +157,82 @@ describe('/_kilo/env/patch', () => {
     });
 
     expect(resp.status).toBe(200);
-    expect(await resp.json()).toEqual({ ok: true, signaled: true });
+    expect(await resp.json()).toEqual({
+      ok: true,
+      reloaded: true,
+      signaled: false,
+      migratedProfiles: 2,
+    });
 
     expect(process.env.KILOCODE_API_KEY).toBe('fresh-jwt-token');
+    expect(deps.migrate).toHaveBeenCalledWith('/root/.openclaw');
+    expect(deps.reload).toHaveBeenCalledWith('test-token');
+    expect(supervisor.signal).not.toHaveBeenCalled();
+  });
+
+  it('falls back to SIGUSR1 when secrets reload fails', async () => {
+    const app = new Hono();
+    const supervisor = createMockSupervisor('running');
+    const deps: EnvRoutesDeps = {
+      migrate: vi.fn(() => ({ filesScanned: 0, filesModified: 0, profilesMigrated: 0 })),
+      reload: vi.fn(() => ({ ok: false, error: 'connection refused' })),
+    };
+    registerEnvRoutes(app, supervisor, 'test-token', deps);
+
+    const resp = await app.request('/_kilo/env/patch', {
+      method: 'POST',
+      body: JSON.stringify({ KILOCODE_API_KEY: 'fresh-jwt-token' }),
+      headers: authHeaders(),
+    });
+
+    expect(resp.status).toBe(200);
+    expect(await resp.json()).toEqual({
+      ok: true,
+      reloaded: false,
+      signaled: true,
+      migratedProfiles: 0,
+    });
+
     expect(supervisor.signal).toHaveBeenCalledWith('SIGUSR1');
   });
 
-  it('returns signaled: false when gateway is not running', async () => {
+  it('does not log the gateway token when secrets reload fails with a tokenized error', async () => {
+    // Simulates a buggy or future caller whose `reloadResult.error` still
+    // embeds the gateway token (e.g., Node's execFileSync rejects with
+    // `Command failed: openclaw ... --token <TOKEN>`). The route must not
+    // leak that token to controller logs.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const app = new Hono();
+    const supervisor = createMockSupervisor('running');
+    const deps: EnvRoutesDeps = {
+      migrate: vi.fn(() => ({ filesScanned: 0, filesModified: 0, profilesMigrated: 0 })),
+      reload: vi.fn(() => ({
+        ok: false,
+        error: 'Command failed: openclaw secrets reload --token test-token --json',
+      })),
+    };
+    registerEnvRoutes(app, supervisor, 'test-token', deps);
+
+    await app.request('/_kilo/env/patch', {
+      method: 'POST',
+      body: JSON.stringify({ KILOCODE_API_KEY: 'fresh-jwt-token' }),
+      headers: authHeaders(),
+    });
+
+    for (const call of warnSpy.mock.calls) {
+      for (const arg of call) {
+        expect(String(arg)).not.toContain('test-token');
+      }
+    }
+
+    warnSpy.mockRestore();
+  });
+
+  it('skips reload and signal when gateway is not running', async () => {
     const app = new Hono();
     const supervisor = createMockSupervisor('stopped');
-    registerEnvRoutes(app, supervisor, 'test-token');
+    const deps = defaultSuccessDeps();
+    registerEnvRoutes(app, supervisor, 'test-token', deps);
 
     const resp = await app.request('/_kilo/env/patch', {
       method: 'POST',
@@ -162,22 +241,27 @@ describe('/_kilo/env/patch', () => {
     });
 
     expect(resp.status).toBe(200);
-    expect(await resp.json()).toEqual({ ok: true, signaled: false });
+    expect(await resp.json()).toEqual({
+      ok: true,
+      reloaded: false,
+      signaled: false,
+      migratedProfiles: 0,
+    });
 
-    // Env is still updated even if not signaled
     expect(process.env.KILOCODE_API_KEY).toBe('fresh-jwt-token');
+    expect(deps.migrate).toHaveBeenCalled();
+    expect(deps.reload).not.toHaveBeenCalled();
     expect(supervisor.signal).not.toHaveBeenCalled();
   });
 
   it('does not leak through to catch-all proxy', async () => {
     const app = new Hono();
-    registerEnvRoutes(app, createMockSupervisor(), 'test-token');
+    registerEnvRoutes(app, createMockSupervisor(), 'test-token', defaultSuccessDeps());
     app.all('*', c => c.json({ proxied: true }));
 
     const resp = await app.request('/_kilo/env/patch', {
       method: 'POST',
     });
-    // Should hit the auth middleware, not the proxy
     expect(resp.status).toBe(401);
     expect(await resp.json()).toEqual({ error: 'Unauthorized' });
   });

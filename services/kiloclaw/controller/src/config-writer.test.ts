@@ -1347,6 +1347,8 @@ describe('writeBaseConfig', () => {
     expect(args).toContain('--skip-channels');
     expect(args).toContain('--skip-skills');
     expect(args).toContain('--skip-health');
+    expect(args).toContain('--secret-input-mode');
+    expect(args[args.indexOf('--secret-input-mode') + 1]).toBe('ref');
   });
 
   it('forces tools.profile to full even without KILOCLAW_FRESH_INSTALL', () => {

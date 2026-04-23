@@ -39,7 +39,22 @@ function pruneOldConfigBackups(dir: string, base: string, deps: ConfigWriterDeps
   }
 }
 
-/** Flags passed to `openclaw onboard` for non-interactive first-boot setup. */
+/**
+ * Flags passed to `openclaw onboard` for non-interactive first-boot setup.
+ *
+ * `--secret-input-mode ref` stores the kilocode credential in
+ * `agents/<id>/agent/auth-profiles.json` as an env-backed SecretRef
+ * (`keyRef: { source: "env", provider: "default", id: "KILOCODE_API_KEY" }`)
+ * instead of embedding the literal key. This lets the controller rotate the
+ * key by updating the env var and calling `openclaw secrets reload`, without
+ * the stale literal on disk shadowing the env var and without restarting the
+ * gateway. See `.plans/kiloclaw-kilocode-key-secretref.md`.
+ *
+ * Works because the gateway process env has `KILOCODE_API_KEY` set before
+ * we spawn onboard (via `decryptEnvVars`), and `resolveNonInteractiveApiKey`
+ * in openclaw accepts `--kilocode-api-key` together with `--secret-input-mode
+ * ref` as long as the env var is present.
+ */
 const ONBOARD_FLAGS = [
   'onboard',
   '--non-interactive',
@@ -53,6 +68,8 @@ const ONBOARD_FLAGS = [
   '--skip-channels',
   '--skip-skills',
   '--skip-health',
+  '--secret-input-mode',
+  'ref',
 ] as const;
 
 const KILOCLAW_CUSTOMIZER_PLUGIN_ID = 'kiloclaw-customizer';

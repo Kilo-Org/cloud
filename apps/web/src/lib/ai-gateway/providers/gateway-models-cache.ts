@@ -14,7 +14,7 @@ function createGatewayModelsFetcher(redisKey: RedisKey, name: string) {
       }
       return new Set(
         Object.values(z.record(z.string(), StoredModelSchema).parse(result))
-          .filter(model => model.type === 'language' && model.endpoints.length > 0)
+          .filter(model => (model.type ?? 'language') === 'language' && model.endpoints.length > 0)
           .map(model => model.id)
       );
     },

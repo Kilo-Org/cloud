@@ -63,6 +63,19 @@ RUN npm install -g openclaw@2026.4.9 \
     && echo "OK: patched DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
     && openclaw --version
 
+# Bake bundled plugin runtime deps into the image so first boot is pure
+# startup — no 30-90s npm install from `openclaw doctor` on shared-cpu Fly
+# machines.
+RUN cd /usr/local/lib/node_modules/openclaw \
+    && jq -r '((.dependencies // {}) + (.optionalDependencies // {})) | to_entries[] | "\(.key)@\(.value)"' \
+         dist/extensions/*/package.json \
+       | grep -v '@workspace:' \
+       | sort -u \
+       | xargs -r npm install --omit=dev --no-save --package-lock=false \
+                              --ignore-scripts --legacy-peer-deps \
+                              --no-fund --no-audit \
+    && rm -rf /root/.npm
+
 # Install ClawHub CLI
 RUN npm install -g clawhub
 

@@ -1,9 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
-import data from '@emoji-mart/data';
-import Picker from '@emoji-mart/react';
+
+const LazyPicker = lazy(async () => {
+  const [{ default: data }, { default: Picker }] = await Promise.all([
+    import('@emoji-mart/data'),
+    import('@emoji-mart/react'),
+  ]);
+  // Wrap Picker in a component that pre-binds the data prop so the lazy
+  // boundary only needs to resolve once.
+  return {
+    default: (props: Record<string, unknown>) => <Picker data={data} {...props} />,
+  };
+});
 
 /** Approximate height of the emoji-mart picker. */
 const PICKER_HEIGHT = 435;
@@ -46,18 +56,21 @@ export function EmojiPicker({ onSelect, onClose, anchorRef }: EmojiPickerProps) 
 
   const picker = (
     <div ref={containerRef} className="z-[100]" style={style}>
-      <Picker
-        data={data}
-        onEmojiSelect={(emoji: { native: string }) => {
-          onSelect(emoji.native);
-        }}
-        // Intentionally hardcoded to "dark" — the chat UI is dark-themed and
-        // "auto" causes a jarring white picker when the OS is in light mode.
-        theme="dark"
-        previewPosition="none"
-        skinTonePosition="none"
-        maxFrequentRows={1}
-      />
+      <Suspense
+        fallback={<div className="bg-muted rounded-lg p-8 text-center text-sm">Loading...</div>}
+      >
+        <LazyPicker
+          onEmojiSelect={(emoji: { native: string }) => {
+            onSelect(emoji.native);
+          }}
+          // Intentionally hardcoded to "dark" — the chat UI is dark-themed and
+          // "auto" causes a jarring white picker when the OS is in light mode.
+          theme="dark"
+          previewPosition="none"
+          skinTonePosition="none"
+          maxFrequentRows={1}
+        />
+      </Suspense>
     </div>
   );
 

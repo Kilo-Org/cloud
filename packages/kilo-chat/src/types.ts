@@ -41,6 +41,7 @@ import type {
   conversationReadEventSchema,
   conversationActivityEventSchema,
   actionExecutedEventSchema,
+  botStatusEventSchema,
 } from './events';
 
 // ── Configuration ───────────────────────────────────────────────────
@@ -84,6 +85,7 @@ export type ConversationLeftEvent = z.infer<typeof conversationLeftEventSchema>;
 export type ConversationReadEvent = z.infer<typeof conversationReadEventSchema>;
 export type ConversationActivityEvent = z.infer<typeof conversationActivityEventSchema>;
 export type ActionExecutedEvent = z.infer<typeof actionExecutedEventSchema>;
+export type BotStatusEvent = z.infer<typeof botStatusEventSchema>;
 
 // ── API request/response types ──────────────────────────────────────
 export type CreateConversationRequest = z.infer<typeof createConversationRequestSchema>;

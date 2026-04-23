@@ -40,6 +40,7 @@ import type {
   ConversationLeftEvent,
   ConversationReadEvent,
   ConversationActivityEvent,
+  BotStatusEvent,
 } from './types';
 
 // Accept any response body for fire-and-forget endpoints. The server may
@@ -259,6 +260,10 @@ export class KiloChatClient {
 
   onConversationActivity(handler: (ctx: string, e: ConversationActivityEvent) => void): () => void {
     return this.on('conversation.activity', handler);
+  }
+
+  onBotStatus(handler: (ctx: string, e: BotStatusEvent) => void): () => void {
+    return this.on('bot.status', handler);
   }
 
   // ── Private HTTP helper ───────────────────────────────────────────────────

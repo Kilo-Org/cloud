@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useCallback, createContext, useContext, useEffect } from 'react';
+import { useState, useCallback, createContext, useContext, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import type { EventServiceClient } from '@kilocode/event-service';
 import type { KiloChatClient, ConversationListResponse } from '@kilocode/kilo-chat';
+import type { BotPresence } from './BotStatus';
 import { InstanceSwitcher } from './InstanceSwitcher';
 import { ConversationList } from './ConversationList';
 import { useEventService, useInstanceContext } from '../hooks/useEventService';
@@ -17,6 +18,12 @@ import {
 } from '../hooks/useConversations';
 
 // ── Context for child pages ─────────────────────────────────────────
+export type BotContextUsage = {
+  contextTokens: number;
+  contextWindow: number;
+  updatedAt: number;
+};
+
 type KiloChatContextValue = {
   getToken: () => Promise<string>;
   currentUserId: string;
@@ -26,6 +33,8 @@ type KiloChatContextValue = {
   sandboxId: string | null;
   eventService: EventServiceClient;
   kiloChatClient: KiloChatClient;
+  botPresence: (sandboxId: string) => BotPresence | undefined;
+  botContext: (conversationId: string) => BotContextUsage | undefined;
 };
 
 const KiloChatContext = createContext<KiloChatContextValue | null>(null);
@@ -69,6 +78,48 @@ export function KiloChatLayout({
 
   const { eventService, kiloChatClient } = useEventService(getToken);
   useInstanceContext(eventService, selectedSandboxId);
+
+  // Bot presence + per-conversation context usage, driven by `bot.status` events.
+  const presenceRef = useRef(new Map<string, BotPresence>());
+  const contextRef = useRef(new Map<string, BotContextUsage>());
+  const [, forceTick] = useState(0);
+  const bump = useCallback(() => forceTick(n => n + 1), []);
+
+  useEffect(() => {
+    const off = kiloChatClient.onBotStatus((_ctx, e) => {
+      presenceRef.current.set(e.sandboxId, {
+        online: e.online,
+        lastAt: e.at,
+        model: e.model ?? null,
+      });
+      if (
+        e.conversationId &&
+        typeof e.contextTokens === 'number' &&
+        typeof e.contextWindow === 'number' &&
+        e.contextWindow > 0
+      ) {
+        contextRef.current.set(e.conversationId, {
+          contextTokens: e.contextTokens,
+          contextWindow: e.contextWindow,
+          updatedAt: e.at,
+        });
+      }
+      bump();
+    });
+    return off;
+  }, [kiloChatClient, bump]);
+
+  // Staleness ticker: re-render every 10s so BotStatus re-evaluates elapsed time.
+  useEffect(() => {
+    const id = setInterval(bump, 10_000);
+    return () => clearInterval(id);
+  }, [bump]);
+
+  const botPresence = useCallback((sandboxId: string) => presenceRef.current.get(sandboxId), []);
+  const botContext = useCallback(
+    (conversationId: string) => contextRef.current.get(conversationId),
+    []
+  );
 
   const queryClient = useQueryClient();
   const params = useParams<{ conversationId?: string }>();
@@ -206,6 +257,8 @@ export function KiloChatLayout({
         sandboxId: selectedSandboxId,
         eventService,
         kiloChatClient,
+        botPresence,
+        botContext,
       }}
     >
       <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">

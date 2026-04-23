@@ -64,6 +64,18 @@ export type RemoveReactionParams = { conversationId: string; messageId: string; 
 export type CreateConversationParams = { title?: string; additionalMembers?: string[] };
 export type CreateConversationResult = { conversationId: string };
 
+export type BotStatusParams = {
+  online: boolean;
+  at: number;
+  conversationId?: string;
+  model?: string | null;
+  provider?: string | null;
+  /** Current usage for this conversation's session, in tokens. */
+  contextTokens?: number | null;
+  /** Effective capacity (context-window cap) for this conversation's session, in tokens. */
+  contextWindow?: number | null;
+};
+
 export type KiloChatClient = {
   createMessage(p: CreateMessageParams): Promise<CreateMessageResult>;
   editMessage(p: EditMessageParams): Promise<EditMessageResult>;
@@ -77,6 +89,10 @@ export type KiloChatClient = {
   renameConversation(p: RenameConversationParams): Promise<void>;
   listConversations(p: ListConversationsParams): Promise<ListConversationsResult>;
   createConversation(p: CreateConversationParams): Promise<CreateConversationResult>;
+  /**
+   * Fire-and-forget bot presence/context update. Never throws; errors are logged.
+   */
+  sendBotStatus(p: BotStatusParams): Promise<void>;
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -332,6 +348,25 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     );
   }
 
+  async function sendBotStatus(params: BotStatusParams): Promise<void> {
+    try {
+      const response = await fetchImpl(`${base}/_kilo/kilo-chat/bot-status`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        console.warn(
+          `[kilo-chat] bot-status responded ${response.status}: ${await response.text().catch(() => '')}`
+        );
+      } else {
+        void response.body?.cancel();
+      }
+    } catch (err) {
+      console.warn('[kilo-chat] bot-status request failed:', err);
+    }
+  }
+
   return {
     createMessage,
     editMessage,
@@ -345,5 +380,6 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     renameConversation,
     listConversations,
     createConversation,
+    sendBotStatus,
   };
 }

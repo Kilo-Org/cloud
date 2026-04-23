@@ -1,4 +1,5 @@
-import type { KiloChatEventName, KiloChatEventOf } from '@kilocode/kilo-chat';
+import type { KiloChatEventName, KiloChatEventOf, BotStatusEvent } from '@kilocode/kilo-chat';
+import { lookupSandboxOwnerUserId } from './sandbox-owner';
 
 function getEventService(env: Env): Env['EVENT_SERVICE'] | null {
   return env.EVENT_SERVICE ?? null;
@@ -43,6 +44,21 @@ export async function pushInstanceEvent<N extends KiloChatEventName>(
   await Promise.allSettled(
     humanMemberIds.map(userId => es.pushEvent(userId, context, event, payload))
   );
+}
+
+/**
+ * Resolves the sandbox owner and pushes a `bot.status` event to them on the
+ * instance-level context. Returns `false` when no active owner exists.
+ */
+export async function pushBotStatusEvent(
+  env: Env,
+  sandboxId: string,
+  payload: BotStatusEvent
+): Promise<{ delivered: boolean; ownerUserId: string | null }> {
+  const ownerUserId = await lookupSandboxOwnerUserId(env, sandboxId);
+  if (!ownerUserId) return { delivered: false, ownerUserId: null };
+  await pushInstanceEvent(env, sandboxId, [ownerUserId], 'bot.status', payload);
+  return { delivered: true, ownerUserId };
 }
 
 /**

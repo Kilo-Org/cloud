@@ -229,6 +229,8 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
 // Webhook-based channel — no long-running monitor needed. A minimal
 // gateway.startAccount ensures the approval handler bootstrap runs and
 // the native runtime can deliver rich approval messages.
+const HEARTBEAT_MS = 15_000;
+
 kiloChatPlugin.gateway = {
   startAccount: async ({ abortSignal, channelRuntime }) => {
     // Register the approval native runtime context on the gateway's channel
@@ -242,6 +244,23 @@ kiloChatPlugin.gateway = {
         abortSignal,
       });
     }
+
+    // Heartbeat loop: the browser uses this to render a real "Online" dot
+    // (driven by plugin liveness, not the Fly machine lifecycle).
+    const client = makeClient();
+    const sendHeartbeat = (online: boolean) => {
+      void client.sendBotStatus({ online, at: Date.now() });
+    };
+    sendHeartbeat(true);
+    const timer = setInterval(() => sendHeartbeat(true), HEARTBEAT_MS);
+    abortSignal.addEventListener(
+      'abort',
+      () => {
+        clearInterval(timer);
+        sendHeartbeat(false);
+      },
+      { once: true }
+    );
 
     // Keep alive until the account is stopped.
     await new Promise<void>(resolve => {

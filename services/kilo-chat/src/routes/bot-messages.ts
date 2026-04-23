@@ -14,6 +14,7 @@ import {
   handleListBotConversations,
   handleCreateBotConversation,
 } from './handler';
+import { handleBotStatus } from '../services/bot-status';
 
 export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
   app.post('/bot/v1/sandboxes/:sandboxId/messages', handleCreateMessage);
@@ -34,4 +35,5 @@ export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthCont
   app.patch('/bot/v1/sandboxes/:sandboxId/conversations/:conversationId', handleRenameConversation);
   app.get('/bot/v1/sandboxes/:sandboxId/conversations', handleListBotConversations);
   app.post('/bot/v1/sandboxes/:sandboxId/conversations', handleCreateBotConversation);
+  app.post('/bot/v1/sandboxes/:sandboxId/bot-status', handleBotStatus);
 }

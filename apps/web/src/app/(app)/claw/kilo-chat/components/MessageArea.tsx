@@ -27,6 +27,7 @@ import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
 import { BotStatus } from './BotStatus';
+import { ContextUsageRing } from './ContextUsageRing';
 import { KiloChatApiError } from '@kilocode/kilo-chat';
 import { MessageCircle, ArrowDown } from 'lucide-react';
 
@@ -35,8 +36,18 @@ type MessageAreaProps = {
 };
 
 export function MessageArea({ conversationId }: MessageAreaProps) {
-  const { currentUserId, instanceStatus, assistantName, sandboxId, eventService, kiloChatClient } =
-    useKiloChatContext();
+  const {
+    currentUserId,
+    instanceStatus,
+    assistantName,
+    sandboxId,
+    eventService,
+    kiloChatClient,
+    botPresence,
+    botContext,
+  } = useKiloChatContext();
+  const presence = sandboxId ? botPresence(sandboxId) : undefined;
+  const ctxUsage = botContext(conversationId);
   const queryClient = useQueryClient();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -303,7 +314,15 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
           }}
           title={isRenamingTitle ? undefined : 'Click to rename'}
         />
-        <BotStatus instanceStatus={instanceStatus} />
+        <div className="flex items-center gap-3">
+          {ctxUsage && (
+            <ContextUsageRing
+              contextTokens={ctxUsage.contextTokens}
+              contextWindow={ctxUsage.contextWindow}
+            />
+          )}
+          <BotStatus instanceStatus={instanceStatus} presence={presence} />
+        </div>
       </div>
 
       {/* Messages */}

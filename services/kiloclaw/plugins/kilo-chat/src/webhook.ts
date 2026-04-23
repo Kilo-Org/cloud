@@ -18,6 +18,7 @@ import { createKiloChatClient, type KiloChatClient } from './client.js';
 import { resolveControllerUrl, resolveGatewayToken } from './env.js';
 import { DEFAULT_ACCOUNT_ID } from './channel.js';
 import { createPreviewStream } from './preview-stream.js';
+import { readSessionUsage, toContextPayload } from './bot-status.js';
 
 // Historical callers sent `message.created` payloads without a `type` field;
 // the preprocess step injects the default so the discriminated union always
@@ -277,6 +278,28 @@ async function dispatchInbound(
       typing: buildTypingParams({ client, conversationId: payload.conversationId }),
     });
 
+    let selectedModel: { provider?: string; model?: string } | null = null;
+    const onModelSelectedTap: typeof onModelSelected = ctx => {
+      selectedModel = { provider: ctx.provider, model: ctx.model };
+      onModelSelected?.(ctx);
+    };
+
+    const sessionKey = ctxPayload.SessionKey ?? route.sessionKey;
+    const pushBotStatus = (online: boolean) => {
+      try {
+        const usage = readSessionUsage({ storePath, sessionKey });
+        const ctxFields = toContextPayload(usage, selectedModel);
+        void client.sendBotStatus({
+          online,
+          at: Date.now(),
+          conversationId: payload.conversationId,
+          ...ctxFields,
+        });
+      } catch (err) {
+        console.warn('[kilo-chat] post-turn bot-status failed:', err);
+      }
+    };
+
     const deliver = createNormalizedOutboundDeliverer(wiring.deliver);
 
     await channelRuntime.reply.dispatchReplyWithBufferedBlockDispatcher({
@@ -289,16 +312,27 @@ async function dispatchInbound(
       },
       replyOptions: {
         ...wiring.replyOptions,
-        onModelSelected,
+        onModelSelected: onModelSelectedTap,
         disableBlockStreaming: false,
       },
     });
     await wiring.finalize();
+    pushBotStatus(true);
   } catch (err) {
     try {
       await wiring.finalize(err);
     } catch {
       // best-effort cleanup; do not let finalize errors mask the original dispatch error
+    }
+    // Best-effort refresh so the UI doesn't stall on the failed turn.
+    try {
+      void client.sendBotStatus({
+        online: true,
+        at: Date.now(),
+        conversationId: payload.conversationId,
+      });
+    } catch {
+      // swallow — sendBotStatus already swallows its own errors
     }
     throw err;
   }

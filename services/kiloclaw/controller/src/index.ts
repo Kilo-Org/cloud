@@ -33,6 +33,7 @@ import {
   registerKiloChatRenameRoute,
   registerKiloChatListConversationsRoute,
   registerKiloChatCreateConversationRoute,
+  registerKiloChatBotStatusRoute,
 } from './routes/kilo-chat';
 import { registerInboundEmailRoute } from './routes/inbound-email';
 import { registerFileRoutes } from './routes/files';
@@ -415,6 +416,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     registerKiloChatRenameRoute(honoApp, kiloChatOpts);
     registerKiloChatListConversationsRoute(honoApp, kiloChatOpts);
     registerKiloChatCreateConversationRoute(honoApp, kiloChatOpts);
+    registerKiloChatBotStatusRoute(honoApp, kiloChatOpts);
   } else {
     console.warn(
       '[kilo-chat] Routes not registered:',

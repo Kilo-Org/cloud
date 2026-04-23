@@ -1052,7 +1052,9 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
     });
 
     expect(result).toEqual({ success: true });
-    expect(mockKiloclawStart).toHaveBeenCalledWith(targetUser.id, instance.id);
+    expect(mockKiloclawStart).toHaveBeenCalledWith(targetUser.id, instance.id, {
+      reason: 'admin_request',
+    });
 
     const updatedInstance = await db.query.kiloclaw_instances.findFirst({
       where: eq(kiloclaw_instances.id, instance.id),

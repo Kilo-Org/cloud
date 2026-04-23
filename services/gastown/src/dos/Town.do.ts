@@ -4423,6 +4423,30 @@ export class TownDO extends DurableObject<Env> {
 
     try {
       const container = getTownContainerStub(this.env, townId);
+
+      // Measure Cloudflare container cold-start latency from the worker's
+      // perspective: warmUp() invokes startAndWaitForPorts() directly, so the
+      // returned durationMs is the true time-to-ready without the arbitrary
+      // 5s truncation of a plain /health ping. For already-warm containers
+      // this is a cheap RPC that returns { coldStart: false }.
+      try {
+        const warm = await container.warmUp();
+        if (warm.coldStart) {
+          writeEvent(this.env, {
+            event: 'container.cold_start',
+            townId,
+            durationMs: warm.durationMs,
+          });
+        }
+      } catch (err) {
+        writeEvent(this.env, {
+          event: 'container.cold_start',
+          townId,
+          error: err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300),
+        });
+        // Fall through to /health ping anyway — the container may recover.
+      }
+
       // Always include X-Town-Config so the container populates
       // lastKnownTownConfig on startup — before any /agents/start arrives.
       // This ensures org context and credentials are available immediately
@@ -4473,7 +4497,11 @@ export class TownDO extends DurableObject<Env> {
           });
           const rawBody: unknown = await healthResp.json().catch(() => null);
           const HealthBody = z
-            .object({ startedAt: z.string().optional(), uptime: z.number().optional() })
+            .object({
+              startedAt: z.string().optional(),
+              uptime: z.number().optional(),
+              mayorReadyAt: z.string().optional(),
+            })
             .passthrough();
           const body = HealthBody.safeParse(rawBody);
           if (body.success && body.data.startedAt) {
@@ -4484,6 +4512,25 @@ export class TownDO extends DurableObject<Env> {
               containerStartedAt: body.data.startedAt,
               durationMs: Date.now() - containerStartedAt,
             });
+
+            // Emit mayor.session_ready exactly once per container instance.
+            // Keyed by the container's startedAt so a restart re-arms the
+            // measurement. Stored durably so restarts of this DO don't cause
+            // duplicate emissions.
+            if (body.data.mayorReadyAt) {
+              const key = `mayor:ready_reported_for:${body.data.startedAt}`;
+              const alreadyReported = await this.ctx.storage.get<boolean>(key);
+              if (!alreadyReported) {
+                await this.ctx.storage.put(key, true);
+                const mayorReadyAt = new Date(body.data.mayorReadyAt).getTime();
+                writeEvent(this.env, {
+                  event: 'mayor.session_ready',
+                  townId,
+                  containerStartedAt: body.data.startedAt,
+                  durationMs: mayorReadyAt - containerStartedAt,
+                });
+              }
+            }
           }
         }
       } catch {

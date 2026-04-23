@@ -10,6 +10,7 @@ import {
   activeServerCount,
   getUptime,
   getStartTime,
+  getMayorReadyAt,
   stopAll,
   drainAll,
   isDraining,
@@ -221,6 +222,7 @@ app.get('/health', c => {
     uptime: getUptime(),
     draining: isDraining() || undefined,
     startedAt: getStartTime(),
+    mayorReadyAt: getMayorReadyAt() ?? undefined,
   };
   return c.json(response);
 });

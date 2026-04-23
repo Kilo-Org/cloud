@@ -78,6 +78,26 @@ export function getStartTime(): string {
   return new Date(startTime).toISOString();
 }
 
+// Timestamp (ISO 8601) of the moment the first mayor agent in this container
+// reached 'running' status. Used by /health so the Town DO can compute
+// container-start-to-mayor-ready latency. Stays null until a mayor is up;
+// survives subsequent mayor exits since the window is measured against the
+// first mayor ready in the container's lifetime.
+let mayorReadyAt: string | null = null;
+
+export function getMayorReadyAt(): string | null {
+  return mayorReadyAt;
+}
+
+function markMayorReadyOnce(): void {
+  if (mayorReadyAt !== null) return;
+  mayorReadyAt = new Date().toISOString();
+  log.info('mayor.ready', {
+    containerUptimeMs: getUptime(),
+    mayorReadyAt,
+  });
+}
+
 async function hydrateDbFromSnapshot(
   agentId: string,
   apiUrl: string,
@@ -1044,6 +1064,9 @@ export async function startAgent(
     // despite being active — causing the drain to wait indefinitely.
     if (agent.status === 'starting') {
       agent.status = 'running';
+      if (request.role === 'mayor') {
+        markMayorReadyOnce();
+      }
     }
 
     // 4. Send the initial prompt

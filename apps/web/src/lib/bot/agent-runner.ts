@@ -16,6 +16,11 @@ import {
   updateBotRequest,
 } from '@/lib/bot/request-logging';
 import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/step-budget';
+import {
+  buildCloudAgentModelSelectionPrompt,
+  modelSelectionSchema,
+  resolveCloudAgentModel,
+} from '@/lib/bot/tools/cloud-agent-model-selection';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
@@ -37,7 +42,7 @@ import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { BotRequestStep } from '@kilocode/db/schema';
-import { ToolLoopAgent, generateText, stepCountIs, tool } from 'ai';
+import { ToolLoopAgent, generateObject, generateText, stepCountIs, tool } from 'ai';
 import type { StepResult, ToolSet } from 'ai';
 import { Actions, Card, CardText, LinkButton, Section } from 'chat';
 import { ThreadImpl } from 'chat';
@@ -123,6 +128,14 @@ ${formatGitHubRepositoriesForPrompt(githubContext)}
 ${formatGitLabRepositoriesForPrompt(gitlabContext)}
 
 Treat this context as authoritative. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo (or group/project for GitLab) and ensure it's accessible to the integration. Never invent repository names.
+
+## Cloud Agent model requests
+- You can select a Cloud Agent model by setting spawnCloudAgentSession.modelRequest.
+- If the user says to use a model, such as "use minimax", "use opus", or "use the cheap fast model", call spawnCloudAgentSession with modelRequest set to that exact user wording.
+- Do not say the tool cannot select a model. The spawn tool resolves natural-language model requests server-side.
+- Do not invent exact model IDs. Pass the user's model wording unless they provided an exact provider/model ID.
+- Remove model-selection-only wording from the Cloud Agent prompt when modelRequest captures it.
+- If spawnCloudAgentSession returns a model-selection ambiguity or unavailable-model error, ask the user to clarify instead of spawning with the default model.
 
 ## Accuracy & safety
 - Don't claim you ran tools, changed code, or created a PR/MR unless the tool results confirm it.
@@ -262,7 +275,11 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
       spawnCloudAgentSession: tool({
         description: `Spawn a Cloud Agent session to perform coding tasks on a GitHub repository or GitLab project. The agent can make code changes, fix bugs, implement features, review/analyze code, run tests, or open PRs/MRs. Do NOT use it for questions you can answer directly.
 
-This tool returns an acknowledgement immediately. The final Cloud Agent result will be posted later in the same thread after the async session completes.`,
+This tool accepts modelRequest for user-requested Cloud Agent model selection. For example, if the user says "use minimax", set modelRequest to "minimax" and keep the task itself in prompt.
+
+This tool returns an acknowledgement immediately. The final Cloud Agent result will be posted later in the same thread after the async session completes.
+
+If the user explicitly requested a Cloud Agent model, pass their wording in modelRequest and do not invent exact model IDs.`,
         inputSchema: spawnCloudAgentInputSchema,
         execute: async args => {
           let resolvedCloudAgentSessionId: string | undefined;
@@ -298,6 +315,19 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               prSignature,
               chatPlatform,
               currentStep,
+              resolveModel: async input =>
+                resolveCloudAgentModel({
+                  ...input,
+                  selectModel: async selectionInput => {
+                    const result = await generateObject({
+                      model: provider.chatModel(modelSlug),
+                      schema: modelSelectionSchema,
+                      prompt: buildCloudAgentModelSelectionPrompt(selectionInput),
+                      temperature: 0,
+                    });
+                    return result.object;
+                  },
+                }),
             }
           );
 

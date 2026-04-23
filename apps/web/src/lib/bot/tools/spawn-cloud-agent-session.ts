@@ -18,6 +18,10 @@ import {
 import { APP_URL } from '@/lib/constants';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
+import type {
+  ResolveCloudAgentModelInput,
+  ResolveCloudAgentModelResult,
+} from '@/lib/bot/tools/cloud-agent-model-selection';
 import { resolveBotSessionProfile } from '@/lib/bot/tools/resolve-bot-session-profile';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -72,6 +76,12 @@ export const spawnCloudAgentInputSchema = z.object({
     .describe(
       'The task description for the Cloud Agent. Be specific about what changes or analysis you want.'
     ),
+  modelRequest: z
+    .string()
+    .describe(
+      'Optional natural-language model preference for the Cloud Agent session. This is how you select a user-requested Cloud Agent model: pass phrases like "minimax", "opus", "latest Claude", "cheap fast model", or an exact provider/model ID. Only set this when the user explicitly asks for a model.'
+    )
+    .optional(),
   mode: z
     .enum(['code', 'ask'])
     .describe(
@@ -81,6 +91,13 @@ export const spawnCloudAgentInputSchema = z.object({
 
 type SpawnCloudAgentInput = z.infer<typeof spawnCloudAgentInputSchema>;
 
+type SpawnCloudAgentSessionOptions = {
+  prSignature?: string;
+  chatPlatform?: string;
+  currentStep?: number;
+  resolveModel?: (input: ResolveCloudAgentModelInput) => Promise<ResolveCloudAgentModelResult>;
+};
+
 /**
  * Spawn a Cloud Agent session and collect the results.
  * Supports both GitHub (githubRepo) and GitLab (gitlabProject) repositories.
@@ -88,13 +105,13 @@ type SpawnCloudAgentInput = z.infer<typeof spawnCloudAgentInputSchema>;
  */
 export default async function spawnCloudAgentSession(
   args: SpawnCloudAgentInput,
-  model: string,
+  defaultModel: string,
   platformIntegration: PlatformIntegration,
   authToken: string,
   ticketUserId: string,
   botRequestId: string | undefined,
   onSessionReady?: RunSessionInput['onSessionReady'],
-  options?: { prSignature?: string; chatPlatform?: string; currentStep?: number }
+  options?: SpawnCloudAgentSessionOptions
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
 
@@ -123,6 +140,25 @@ export default async function spawnCloudAgentSession(
   }
 
   const owner: Owner = ownerFromIntegration(platformIntegration);
+  let cloudAgentModel = defaultModel;
+  if (options?.resolveModel) {
+    try {
+      const modelResolution = await options.resolveModel({
+        modelRequest: args.modelRequest,
+        defaultModel,
+        prompt: args.prompt,
+        owner,
+      });
+      if (!modelResolution.ok) {
+        return { response: modelResolution.response };
+      }
+      cloudAgentModel = modelResolution.model;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { response: `Error selecting Cloud Agent model: ${message}` };
+    }
+  }
+
   let profileConfig: MergeProfileConfigurationResult;
   try {
     profileConfig = await resolveBotSessionProfile(owner, ticketUserId, args);
@@ -165,7 +201,7 @@ export default async function spawnCloudAgentSession(
     prepareInput = {
       prompt,
       mode,
-      model,
+      model: cloudAgentModel,
       gitUrl,
       gitToken: gitlabToken,
       platform: 'gitlab',
@@ -195,7 +231,7 @@ export default async function spawnCloudAgentSession(
       githubRepo: args.githubRepo,
       prompt,
       mode,
-      model,
+      model: cloudAgentModel,
       githubToken,
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,

@@ -135,7 +135,7 @@ export function KiloChatLayout({
       kiloChatClient.onConversationRenamed((_ctx, e) => {
         queryClient.setQueriesData<ConversationListResponse>(
           { queryKey: ['kilo-chat', 'conversations'] },
-          old => {
+          (old: ConversationListResponse | undefined) => {
             if (!old) return old;
             return {
               ...old,
@@ -153,7 +153,7 @@ export function KiloChatLayout({
       kiloChatClient.onConversationLeft((_ctx, e) => {
         queryClient.setQueriesData<ConversationListResponse>(
           { queryKey: ['kilo-chat', 'conversations'] },
-          old => {
+          (old: ConversationListResponse | undefined) => {
             if (!old) return old;
             const filtered = old.conversations.filter(c => c.conversationId !== e.conversationId);
             if (filtered.length === old.conversations.length) return old;
@@ -164,7 +164,7 @@ export function KiloChatLayout({
       kiloChatClient.onConversationRead((_ctx, e) => {
         queryClient.setQueriesData<ConversationListResponse>(
           { queryKey: ['kilo-chat', 'conversations'] },
-          old => {
+          (old: ConversationListResponse | undefined) => {
             if (!old) return old;
             return {
               ...old,
@@ -178,7 +178,7 @@ export function KiloChatLayout({
       kiloChatClient.onConversationActivity((_ctx, e) => {
         queryClient.setQueriesData<ConversationListResponse>(
           { queryKey: ['kilo-chat', 'conversations'] },
-          old => {
+          (old: ConversationListResponse | undefined) => {
             if (!old) return old;
             return {
               ...old,

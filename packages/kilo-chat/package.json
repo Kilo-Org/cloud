@@ -17,7 +17,8 @@
   },
   "dependencies": {
     "@kilocode/event-service": "workspace:*",
-    "ulid": "3.0.1"
+    "ulid": "3.0.1",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",

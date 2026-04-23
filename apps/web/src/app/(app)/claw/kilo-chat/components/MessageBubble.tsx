@@ -7,7 +7,13 @@ import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile, Copy } from 'lucid
 import { EmojiQuickPick } from './EmojiQuickPick';
 import { EmojiPicker } from './EmojiPicker';
 import { ReactionPills } from './ReactionPills';
-import type { Message, ContentBlock } from '@kilocode/kilo-chat';
+import type {
+  Message,
+  ContentBlock,
+  ReactionSummary,
+  ActionsBlock,
+  ActionItem,
+} from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './KiloChatLayout';
 import { toast } from 'sonner';
@@ -78,8 +84,10 @@ export const MessageBubble = memo(function MessageBubble({
 
   const textContent = message.deleted ? '' : contentBlocksToText(message.content);
 
-  const myReactions = new Set(
-    message.reactions.filter(r => r.memberIds.includes(currentUserId)).map(r => r.emoji)
+  const myReactions = new Set<string>(
+    message.reactions
+      .filter((r: ReactionSummary) => r.memberIds.includes(currentUserId))
+      .map((r: ReactionSummary) => r.emoji)
   );
 
   function handleStartEdit() {
@@ -297,14 +305,14 @@ export const MessageBubble = memo(function MessageBubble({
 
             {!message.deleted &&
               message.content
-                .filter(b => b.type === 'actions')
-                .map(block => {
+                .filter((b: ContentBlock) => b.type === 'actions')
+                .map((block: ContentBlock) => {
                   if (block.type !== 'actions') return null;
-                  const actionsBlock = block;
+                  const actionsBlock: ActionsBlock = block;
 
                   if (actionsBlock.resolved) {
                     const resolvedAction = actionsBlock.actions.find(
-                      a => a.value === actionsBlock.resolved?.value
+                      (a: ActionItem) => a.value === actionsBlock.resolved?.value
                     );
                     const label = resolvedAction?.label ?? actionsBlock.resolved.value;
                     const isApproved = actionsBlock.resolved.value !== 'deny';
@@ -321,7 +329,7 @@ export const MessageBubble = memo(function MessageBubble({
 
                   return (
                     <div key={actionsBlock.groupId} className="mt-2 flex items-center gap-2">
-                      {actionsBlock.actions.map(action => (
+                      {actionsBlock.actions.map((action: ActionItem) => (
                         <button
                           key={action.value}
                           onClick={() =>

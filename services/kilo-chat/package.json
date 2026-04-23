@@ -29,6 +29,7 @@
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
+    "lru-cache": "^11.2.7",
     "ulid": "3.0.1",
     "zod": "catalog:"
   }

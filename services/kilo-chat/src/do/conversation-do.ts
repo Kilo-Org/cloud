@@ -128,6 +128,10 @@ export type ExecuteActionResult =
       error: string;
     };
 
+export type RevertActionResolutionResult =
+  | { ok: true }
+  | { ok: false; code: 'not_found'; error: string };
+
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
   | { ok: true; added: true; id: string; memberContext: MemberContext }
@@ -151,6 +155,39 @@ export class ConversationDO extends DurableObject<Env> {
 
   notifyDeliveryFailed(messageId: string, _senderId: string): void {
     this.db.update(messages).set({ delivery_failed: 1 }).where(eq(messages.id, messageId)).run();
+  }
+
+  revertActionResolution(params: {
+    messageId: string;
+    groupId: string;
+  }): RevertActionResolutionResult {
+    const row = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
+    if (!row || row.deleted === 1) {
+      return { ok: false, code: 'not_found', error: 'Message not found' };
+    }
+    const content = parseStoredContent(row.content, row.id);
+    const actionsBlock = content.find(
+      (b): b is ActionsBlock => b.type === 'actions' && b.groupId === params.groupId
+    );
+    if (!actionsBlock) {
+      return { ok: false, code: 'not_found', error: 'Action group not found' };
+    }
+    // Idempotent: already unresolved is a no-op success.
+    if (!actionsBlock.resolved) {
+      return { ok: true };
+    }
+    actionsBlock.resolved = undefined;
+    const newVersion = row.version + 1;
+    this.db
+      .update(messages)
+      .set({
+        content: JSON.stringify(content),
+        version: newVersion,
+        updated_at: Date.now(),
+      })
+      .where(eq(messages.id, params.messageId))
+      .run();
+    return { ok: true };
   }
 
   initialize(params: InitializeParams): { ok: true } | { ok: false; error: string } {

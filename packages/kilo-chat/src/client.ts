@@ -32,6 +32,7 @@ import type {
   MessageUpdatedEvent,
   MessageDeletedEvent,
   MessageDeliveryFailedEvent,
+  ActionDeliveryFailedEvent,
   TypingEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
@@ -224,6 +225,10 @@ export class KiloChatClient {
     handler: (ctx: string, e: MessageDeliveryFailedEvent) => void
   ): () => void {
     return this.on('message.delivery_failed', handler);
+  }
+
+  onActionDeliveryFailed(handler: (ctx: string, e: ActionDeliveryFailedEvent) => void): () => void {
+    return this.on('action.delivery_failed', handler);
   }
 
   onTyping(handler: (ctx: string, e: TypingEvent) => void): () => void {

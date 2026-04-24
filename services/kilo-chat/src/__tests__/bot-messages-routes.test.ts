@@ -147,25 +147,225 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages', () => {
 
     expect(res.status).toBe(400);
   });
+});
 
-  it('returns 400 when content is missing', async () => {
-    const { sandboxId, conversationId, testEnv } = await setupData('bot-create-nocontent');
+// ─── POST .../messages/:messageId/delivery-failed ──────────────────────────
+
+describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-failed', () => {
+  it('flips deliveryFailed and returns 202', async () => {
+    const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-msg-df-ok');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
     const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason: 'boom' }),
+      },
+      testEnv
+    );
+    expect(res.status).toBe(202);
+
+    // second call is idempotent (UPDATE is a no-op)
+    const second = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: '{}',
+      },
+      testEnv
+    );
+    expect(second.status).toBe(202);
+  });
+
+  it('returns 401 without auth token', async () => {
+    const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-msg-df-noauth');
+    const app = makeBotApp();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      },
+      testEnv
+    );
+    expect(res.status).toBe(401);
+  });
+});
+
+// ─── POST .../actions/:groupId/delivery-failed ─────────────────────────────
+
+describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed', () => {
+  async function setupWithResolvedAction(suffix: string) {
+    const userId = `user-${suffix}`;
+    const sandboxId = `sandbox-${suffix}`;
+    grantSandbox(userId, sandboxId);
+
+    const setupApp = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+    // user app for conv + message creation
+    setupApp.use('*', async (c, next) => {
+      c.set('callerId', userId);
+      c.set('callerKind', 'user');
+      await next();
+    });
+    registerConversationRoutes(setupApp);
+    registerMessageRoutes(setupApp);
+
+    const testEnv = makeEnv();
+
+    const convRes = await setupApp.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId, title: 'Actions' }),
+      },
+      testEnv
+    );
+    const { conversationId } = await convRes.json<{ conversationId: string }>();
+
+    // bot creates a message with an actions block
+    const botApp = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    const msgRes = await botApp.request(
       `/bot/v1/sandboxes/${sandboxId}/messages`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-        body: JSON.stringify({ conversationId }), // missing content
+        body: JSON.stringify({
+          conversationId,
+          content: [
+            {
+              type: 'actions',
+              groupId: 'g1',
+              actions: [{ value: 'allow-once', label: 'Allow', style: 'primary' }],
+            },
+          ],
+        }),
       },
       testEnv
     );
+    expect(msgRes.status).toBe(201);
+    const { messageId } = await msgRes.json<{ messageId: string }>();
 
+    // user resolves the action
+    const execRes = await setupApp.request(
+      `/v1/conversations/${conversationId}/messages/${messageId}/execute-action`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ groupId: 'g1', value: 'allow-once' }),
+      },
+      testEnv
+    );
+    expect(execRes.status).toBe(200);
+
+    return { sandboxId, conversationId, messageId, testEnv, token };
+  }
+
+  it('reverts resolution and returns 202', async () => {
+    const { sandboxId, conversationId, messageId, testEnv, token } =
+      await setupWithResolvedAction('bot-act-df-ok');
+    const app = makeBotApp();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/g1/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ messageId }),
+      },
+      testEnv
+    );
+    expect(res.status).toBe(202);
+  });
+
+  it('is idempotent when already unresolved', async () => {
+    const { sandboxId, conversationId, messageId, testEnv, token } =
+      await setupWithResolvedAction('bot-act-df-idem');
+    const app = makeBotApp();
+
+    const first = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/g1/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ messageId }),
+      },
+      testEnv
+    );
+    expect(first.status).toBe(202);
+
+    const second = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/g1/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ messageId }),
+      },
+      testEnv
+    );
+    expect(second.status).toBe(202);
+  });
+
+  it('returns 400 for missing messageId body', async () => {
+    const { sandboxId, conversationId, testEnv, token } =
+      await setupWithResolvedAction('bot-act-df-badbody');
+    const app = makeBotApp();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/g1/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: '{}',
+      },
+      testEnv
+    );
     expect(res.status).toBe(400);
   });
 
+  it('returns 404 when message is unknown', async () => {
+    const { sandboxId, conversationId, testEnv, token } =
+      await setupWithResolvedAction('bot-act-df-missing');
+    const app = makeBotApp();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/g1/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ messageId: '00000000000000000000000000' }),
+      },
+      testEnv
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 401 without auth', async () => {
+    const { sandboxId, conversationId, messageId, testEnv } =
+      await setupWithResolvedAction('bot-act-df-noauth');
+    const app = makeBotApp();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/g1/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ messageId }),
+      },
+      testEnv
+    );
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('POST /bot/v1/sandboxes/:sandboxId/messages (auth edge cases)', () => {
   it('returns 401 without auth token', async () => {
     const { sandboxId, conversationId, testEnv } = await setupData('bot-create-noauth');
     const app = makeBotApp();

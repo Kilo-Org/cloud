@@ -8,7 +8,7 @@
  */
 
 import type { Context } from 'hono';
-import type { ZodSchema } from 'zod';
+import { z, type ZodSchema } from 'zod';
 import type { AuthContext } from '../auth';
 import { withDORetry } from '@kilocode/worker-utils';
 import { createBotConversationFor, renameConversationFor } from '../services/conversations';
@@ -20,6 +20,8 @@ import {
   executeActionFor,
 } from '../services/messages';
 import { addReactionFor, removeReactionFor } from '../services/reactions';
+import { notifyMessageDeliveryFailed } from '../webhook/deliver';
+import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
 import { setTypingFor, stopTypingFor } from '../services/typing';
 import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
 import type {
@@ -213,6 +215,84 @@ export async function handleExecuteAction(c: HonoCtx) {
   }
 
   return c.json({ ok: true } satisfies OkResponse);
+}
+
+// ─── messageDeliveryFailed (bot-reported) ───────────────────────────────────
+
+// Body is diagnostic-only; reason is logged and dropped.
+const messageDeliveryFailedBodySchema = z
+  .object({ reason: z.string().max(1000).optional() })
+  .loose();
+
+export async function handleMessageDeliveryFailed(c: HonoCtx) {
+  const convId = parseConversationId(c);
+  if (!convId.ok) return convId.response;
+  const msgId = parseMessageId(c);
+  if (!msgId.ok) return msgId.response;
+
+  // Accept empty body. Validate when present but never fail on shape.
+  let body: unknown = {};
+  try {
+    body = await c.req.json();
+  } catch {
+    body = {};
+  }
+  messageDeliveryFailedBodySchema.safeParse(body);
+
+  await notifyMessageDeliveryFailed(c.env, {
+    conversationId: convId.data,
+    messageId: msgId.data,
+    senderId: c.get('callerId'),
+  });
+  return c.json({}, 202);
+}
+
+// ─── actionDeliveryFailed (bot-reported) ────────────────────────────────────
+
+const actionDeliveryFailedBodySchema = z.object({
+  messageId: z.string().min(1),
+  reason: z.string().max(1000).optional(),
+});
+
+export async function handleActionDeliveryFailed(c: HonoCtx) {
+  const convId = parseConversationId(c);
+  if (!convId.ok) return convId.response;
+
+  const groupIdRaw = c.req.param('groupId');
+  if (!groupIdRaw) {
+    return c.json({ error: 'Invalid groupId' }, 400);
+  }
+
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON' }, 400);
+  }
+  const parsed = actionDeliveryFailedBodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400);
+  }
+
+  const { messageId } = parsed.data;
+  const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
+  const result = await convStub.revertActionResolution({ messageId, groupId: groupIdRaw });
+  if (!result.ok) {
+    return c.json({ error: result.error }, 404);
+  }
+
+  const ctx = await getConversationContext(c.env, convId.data);
+  if (ctx?.sandboxId) {
+    await pushEventToHumanMembers(
+      c.env,
+      convId.data,
+      ctx.sandboxId,
+      ctx.humanMemberIds,
+      'action.delivery_failed',
+      { conversationId: convId.data, messageId, groupId: groupIdRaw }
+    );
+  }
+  return c.json({}, 202);
 }
 
 // ─── addReaction ─────────────────────────────────────────────────────────────

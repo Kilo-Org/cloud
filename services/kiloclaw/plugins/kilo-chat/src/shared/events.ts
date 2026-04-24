@@ -73,6 +73,12 @@ export const actionExecutedEventSchema = z.object({
   executedBy: z.string(),
 });
 
+export const actionDeliveryFailedEventSchema = z.object({
+  conversationId: z.string(),
+  messageId: z.string(),
+  groupId: z.string(),
+});
+
 export const botStatusEventSchema = z.object({
   sandboxId: z.string(),
   online: z.boolean(),
@@ -106,6 +112,10 @@ export const kiloChatEventSchema = z.discriminatedUnion('event', [
   z.object({ event: z.literal('conversation.read'), payload: conversationReadEventSchema }),
   z.object({ event: z.literal('conversation.activity'), payload: conversationActivityEventSchema }),
   z.object({ event: z.literal('action.executed'), payload: actionExecutedEventSchema }),
+  z.object({
+    event: z.literal('action.delivery_failed'),
+    payload: actionDeliveryFailedEventSchema,
+  }),
   z.object({ event: z.literal('bot.status'), payload: botStatusEventSchema }),
 ]);
 
@@ -134,6 +144,7 @@ const payloadSchemaRegistry: { [K in KiloChatEventName]: z.ZodType<KiloChatEvent
   'conversation.read': conversationReadEventSchema,
   'conversation.activity': conversationActivityEventSchema,
   'action.executed': actionExecutedEventSchema,
+  'action.delivery_failed': actionDeliveryFailedEventSchema,
   'bot.status': botStatusEventSchema,
 };
 

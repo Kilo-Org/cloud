@@ -82,27 +82,49 @@ export async function deliverToBot(
 
     logger.error('Webhook permanently failed');
     try {
-      await withDORetry(
-        () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(msg.conversationId)),
-        stub => stub.notifyDeliveryFailed(msg.messageId, msg.from),
-        'ConversationDO.notifyDeliveryFailed'
-      );
-
-      const ctx = convContext ?? (await getConversationContext(env, msg.conversationId));
-      if (ctx?.sandboxId) {
-        await pushEventToHumanMembers(
-          env,
-          msg.conversationId,
-          ctx.sandboxId,
-          ctx.humanMemberIds,
-          'message.delivery_failed',
-          { messageId: msg.messageId }
-        );
-      }
+      await notifyMessageDeliveryFailed(env, {
+        conversationId: msg.conversationId,
+        messageId: msg.messageId,
+        senderId: msg.from,
+        convContext,
+      });
     } catch (err) {
       logger.error('Failed to notify delivery failure', formatError(err));
     }
   });
+}
+
+/**
+ * Flip the `delivery_failed` flag on a message and push the
+ * `message.delivery_failed` event to human members. One source of truth for
+ * both the RPC-exhausted retry path and the bot-reported failure route.
+ */
+export async function notifyMessageDeliveryFailed(
+  env: Env,
+  params: {
+    conversationId: string;
+    messageId: string;
+    senderId: string;
+    convContext?: { humanMemberIds: string[]; sandboxId: string | null };
+  }
+): Promise<void> {
+  await withDORetry(
+    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId)),
+    stub => stub.notifyDeliveryFailed(params.messageId, params.senderId),
+    'ConversationDO.notifyDeliveryFailed'
+  );
+
+  const ctx = params.convContext ?? (await getConversationContext(env, params.conversationId));
+  if (ctx?.sandboxId) {
+    await pushEventToHumanMembers(
+      env,
+      params.conversationId,
+      ctx.sandboxId,
+      ctx.humanMemberIds,
+      'message.delivery_failed',
+      { messageId: params.messageId }
+    );
+  }
 }
 
 /**

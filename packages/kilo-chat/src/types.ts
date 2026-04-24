@@ -44,6 +44,7 @@ import type {
   conversationReadEventSchema,
   conversationActivityEventSchema,
   actionExecutedEventSchema,
+  actionDeliveryFailedEventSchema,
   botStatusEventSchema,
 } from './events';
 
@@ -88,6 +89,7 @@ export type ConversationLeftEvent = z.infer<typeof conversationLeftEventSchema>;
 export type ConversationReadEvent = z.infer<typeof conversationReadEventSchema>;
 export type ConversationActivityEvent = z.infer<typeof conversationActivityEventSchema>;
 export type ActionExecutedEvent = z.infer<typeof actionExecutedEventSchema>;
+export type ActionDeliveryFailedEvent = z.infer<typeof actionDeliveryFailedEventSchema>;
 export type BotStatusEvent = z.infer<typeof botStatusEventSchema>;
 
 // ── API request/response types ──────────────────────────────────────

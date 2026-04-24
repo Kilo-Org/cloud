@@ -76,6 +76,19 @@ export type BotStatusParams = {
   contextWindow?: number | null;
 };
 
+export type ReportMessageDeliveryFailedParams = {
+  conversationId: string;
+  messageId: string;
+  reason?: string;
+};
+
+export type ReportActionDeliveryFailedParams = {
+  conversationId: string;
+  groupId: string;
+  messageId: string;
+  reason?: string;
+};
+
 export type KiloChatClient = {
   createMessage(p: CreateMessageParams): Promise<CreateMessageResult>;
   editMessage(p: EditMessageParams): Promise<EditMessageResult>;
@@ -93,6 +106,14 @@ export type KiloChatClient = {
    * Fire-and-forget bot presence/context update. Never throws; errors are logged.
    */
   sendBotStatus(p: BotStatusParams): Promise<void>;
+  /**
+   * Best-effort "message delivery failed" report. Never throws; errors are logged.
+   */
+  reportMessageDeliveryFailed(p: ReportMessageDeliveryFailedParams): Promise<void>;
+  /**
+   * Best-effort "action delivery failed" report. Never throws; errors are logged.
+   */
+  reportActionDeliveryFailed(p: ReportActionDeliveryFailedParams): Promise<void>;
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -367,6 +388,63 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     }
   }
 
+  async function reportMessageDeliveryFailed(
+    params: ReportMessageDeliveryFailedParams
+  ): Promise<void> {
+    try {
+      const response = await fetchImpl(
+        `${base}/_kilo/kilo-chat/conversations/${encodeURIComponent(
+          params.conversationId
+        )}/messages/${encodeURIComponent(params.messageId)}/delivery-failed`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            ...(params.reason !== undefined && { reason: params.reason }),
+          }),
+        }
+      );
+      if (!response.ok) {
+        console.warn(
+          `[kilo-chat] reportMessageDeliveryFailed responded ${response.status}: ${await response.text().catch(() => '')}`
+        );
+      } else {
+        void response.body?.cancel();
+      }
+    } catch (err) {
+      console.warn('[kilo-chat] reportMessageDeliveryFailed request failed:', err);
+    }
+  }
+
+  async function reportActionDeliveryFailed(
+    params: ReportActionDeliveryFailedParams
+  ): Promise<void> {
+    try {
+      const response = await fetchImpl(
+        `${base}/_kilo/kilo-chat/conversations/${encodeURIComponent(
+          params.conversationId
+        )}/actions/${encodeURIComponent(params.groupId)}/delivery-failed`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            messageId: params.messageId,
+            ...(params.reason !== undefined && { reason: params.reason }),
+          }),
+        }
+      );
+      if (!response.ok) {
+        console.warn(
+          `[kilo-chat] reportActionDeliveryFailed responded ${response.status}: ${await response.text().catch(() => '')}`
+        );
+      } else {
+        void response.body?.cancel();
+      }
+    } catch (err) {
+      console.warn('[kilo-chat] reportActionDeliveryFailed request failed:', err);
+    }
+  }
+
   return {
     createMessage,
     editMessage,
@@ -381,5 +459,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     listConversations,
     createConversation,
     sendBotStatus,
+    reportMessageDeliveryFailed,
+    reportActionDeliveryFailed,
   };
 }

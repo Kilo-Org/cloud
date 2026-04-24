@@ -108,6 +108,9 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
         updateCache({ type: 'message.delivery_failed', data });
         toast.error('Message could not be delivered to the bot');
       }),
+      kiloChatClient.onActionDeliveryFailed((_ctx, data) => {
+        updateCache({ type: 'action.delivery_failed', data });
+      }),
       kiloChatClient.onTyping((_ctx, data) => {
         handleTypingEvent(data);
       }),

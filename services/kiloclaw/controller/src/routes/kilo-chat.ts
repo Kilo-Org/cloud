@@ -389,6 +389,40 @@ export function registerKiloChatGetMembersRoute(app: Hono, options: KiloChatRout
   });
 }
 
+export function registerKiloChatMessageDeliveryFailedRoute(
+  app: Hono,
+  options: KiloChatRouteOptions
+): void {
+  app.post(
+    '/_kilo/kilo-chat/conversations/:conversationId/messages/:messageId/delivery-failed',
+    c =>
+      relayBodyRoute(c, options, {
+        method: 'POST',
+        upstreamSuffix: ctx =>
+          `/conversations/${encodeURIComponent(
+            routeParam(ctx, 'conversationId')
+          )}/messages/${encodeURIComponent(routeParam(ctx, 'messageId'))}/delivery-failed`,
+        bodyLimit: MAX_SMALL_BODY_BYTES,
+      })
+  );
+}
+
+export function registerKiloChatActionDeliveryFailedRoute(
+  app: Hono,
+  options: KiloChatRouteOptions
+): void {
+  app.post('/_kilo/kilo-chat/conversations/:conversationId/actions/:groupId/delivery-failed', c =>
+    relayBodyRoute(c, options, {
+      method: 'POST',
+      upstreamSuffix: ctx =>
+        `/conversations/${encodeURIComponent(
+          routeParam(ctx, 'conversationId')
+        )}/actions/${encodeURIComponent(routeParam(ctx, 'groupId'))}/delivery-failed`,
+      bodyLimit: MAX_SMALL_BODY_BYTES,
+    })
+  );
+}
+
 async function parseConversationId(c: import('hono').Context): Promise<string | Response> {
   const read = await readBodyWithLimit(c, MAX_SMALL_BODY_BYTES);
   if (!read.ok) return read.response;

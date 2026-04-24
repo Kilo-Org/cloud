@@ -13,6 +13,8 @@ import {
   handleRenameConversation,
   handleListBotConversations,
   handleCreateBotConversation,
+  handleMessageDeliveryFailed,
+  handleActionDeliveryFailed,
 } from './handler';
 import { handleBotStatus } from '../services/bot-status';
 
@@ -36,4 +38,12 @@ export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthCont
   app.get('/bot/v1/sandboxes/:sandboxId/conversations', handleListBotConversations);
   app.post('/bot/v1/sandboxes/:sandboxId/conversations', handleCreateBotConversation);
   app.post('/bot/v1/sandboxes/:sandboxId/bot-status', handleBotStatus);
+  app.post(
+    '/bot/v1/sandboxes/:sandboxId/conversations/:conversationId/messages/:messageId/delivery-failed',
+    handleMessageDeliveryFailed
+  );
+  app.post(
+    '/bot/v1/sandboxes/:sandboxId/conversations/:conversationId/actions/:groupId/delivery-failed',
+    handleActionDeliveryFailed
+  );
 }

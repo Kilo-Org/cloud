@@ -64,6 +64,8 @@ export function parseInboundPayload(raw: unknown): KiloChatInboundPayload | null
 const execApprovalDecisionSchema = z.enum(['allow-once', 'allow-always', 'deny']);
 
 export type ActionExecutedPayload = {
+  conversationId: string;
+  messageId: string;
   groupId: string;
   value: ExecApprovalDecision;
   executedBy: string;
@@ -78,6 +80,8 @@ const actionExecutedPluginSchema = z.preprocess(
   withDefaultType('action.executed'),
   z.object({
     type: z.literal('action.executed'),
+    conversationId: z.string().min(1),
+    messageId: z.string().min(1),
     groupId: z.string().min(1),
     value: execApprovalDecisionSchema,
     executedBy: z.string().min(1),
@@ -88,6 +92,8 @@ export function parseActionExecutedPayload(raw: unknown): ActionExecutedPayload 
   const result = actionExecutedPluginSchema.safeParse(raw);
   if (!result.success) return null;
   return {
+    conversationId: result.data.conversationId,
+    messageId: result.data.messageId,
     groupId: result.data.groupId,
     value: result.data.value,
     executedBy: result.data.executedBy,
@@ -414,6 +420,20 @@ export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
       ackAccepted(res);
       void handleActionExecuted(deps.api, actionPayload).catch(err => {
         console.error('[kilo-chat] action.executed failed:', err);
+        try {
+          const client = createKiloChatClient({
+            controllerBaseUrl: resolveControllerUrl(),
+            gatewayToken: resolveGatewayToken(),
+          });
+          void client.reportActionDeliveryFailed({
+            conversationId: actionPayload.conversationId,
+            messageId: actionPayload.messageId,
+            groupId: actionPayload.groupId,
+            reason: err instanceof Error ? err.message : String(err),
+          });
+        } catch {
+          // swallow — report is best-effort
+        }
       });
       return true;
     }
@@ -438,6 +458,19 @@ export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
     ackAccepted(res);
     void dispatchInbound(deps.api, payload).catch(err => {
       console.error('[kilo-chat] dispatch failed:', err);
+      try {
+        const client = createKiloChatClient({
+          controllerBaseUrl: resolveControllerUrl(),
+          gatewayToken: resolveGatewayToken(),
+        });
+        void client.reportMessageDeliveryFailed({
+          conversationId: payload.conversationId,
+          messageId: payload.messageId,
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      } catch {
+        // swallow — report is best-effort
+      }
     });
     return true;
   };

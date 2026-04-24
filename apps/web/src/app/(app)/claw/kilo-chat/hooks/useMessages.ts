@@ -10,10 +10,12 @@ import type {
   MessageUpdatedEvent,
   MessageDeletedEvent,
   MessageDeliveryFailedEvent,
+  ActionDeliveryFailedEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
 } from '@kilocode/kilo-chat';
 import { useCallback } from 'react';
+import { toast } from 'sonner';
 
 const PAGE_SIZE = 50;
 
@@ -412,6 +414,30 @@ export function useMessageCacheUpdater(conversationId: string | null) {
               ),
             };
           });
+          break;
+        }
+        case 'action.delivery_failed': {
+          const e = event.data as ActionDeliveryFailedEvent;
+          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+            if (!old) return old;
+            return {
+              ...old,
+              pages: old.pages.map(page =>
+                page.map(msg => {
+                  if (msg.id !== e.messageId) return msg;
+                  return {
+                    ...msg,
+                    content: msg.content.map(block => {
+                      if (block.type !== 'actions') return block;
+                      if (block.groupId !== e.groupId) return block;
+                      return { ...block, resolved: undefined };
+                    }),
+                  };
+                })
+              ),
+            };
+          });
+          toast.error("Couldn't reach the bot — please try again");
           break;
         }
         case 'reaction.added': {

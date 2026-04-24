@@ -534,6 +534,84 @@ describe('ConversationDO', () => {
     });
   });
 
+  describe('revertActionResolution', () => {
+    async function setupResolved(id: string) {
+      const stub = getStub(id);
+      await stub.initialize({
+        id,
+        title: 'Action',
+        createdBy: 'user-a',
+        createdAt: 1000,
+        members: [
+          { id: 'user-a', kind: 'user' as const },
+          { id: 'bot-primary', kind: 'bot' as const },
+        ],
+      });
+      const create = await stub.createMessage({
+        senderId: 'bot-primary',
+        content: [
+          {
+            type: 'actions' as const,
+            groupId: 'g1',
+            actions: [{ value: 'allow-once', label: 'Allow', style: 'primary' as const }],
+          },
+        ],
+      });
+      if (!create.ok) throw new Error('setup failed');
+      const exec = await stub.executeAction({
+        messageId: create.messageId,
+        memberId: 'user-a',
+        groupId: 'g1',
+        value: 'allow-once',
+      });
+      if (!exec.ok) throw new Error('exec failed');
+      return { stub, messageId: create.messageId };
+    }
+
+    it('clears resolved and bumps version', async () => {
+      const { stub, messageId } = await setupResolved('conv-revert-ok');
+      const before = await stub.listMessages({ limit: 10 });
+      const versionBefore =
+        (before.messages[0].content.find(b => b.type === 'actions') as { resolved?: unknown })
+          .resolved !== undefined;
+      expect(versionBefore).toBe(true);
+
+      const result = await stub.revertActionResolution({ messageId, groupId: 'g1' });
+      expect(result.ok).toBe(true);
+
+      const after = await stub.listMessages({ limit: 10 });
+      const actions = after.messages[0].content.find(b => b.type === 'actions') as {
+        resolved?: unknown;
+      };
+      expect(actions.resolved).toBeUndefined();
+    });
+
+    it('is idempotent when already unresolved', async () => {
+      const { stub, messageId } = await setupResolved('conv-revert-idem');
+      const first = await stub.revertActionResolution({ messageId, groupId: 'g1' });
+      expect(first.ok).toBe(true);
+      const second = await stub.revertActionResolution({ messageId, groupId: 'g1' });
+      expect(second.ok).toBe(true);
+    });
+
+    it('returns not_found for unknown messageId', async () => {
+      const { stub } = await setupResolved('conv-revert-missing-msg');
+      const result = await stub.revertActionResolution({
+        messageId: '00000000000000000000000000',
+        groupId: 'g1',
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe('not_found');
+    });
+
+    it('returns not_found for unknown groupId', async () => {
+      const { stub, messageId } = await setupResolved('conv-revert-missing-group');
+      const result = await stub.revertActionResolution({ messageId, groupId: 'other' });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe('not_found');
+    });
+  });
+
   describe('schema constraints', () => {
     it('rejects a reply that points at a non-existent parent message (FK)', async () => {
       const stub = getStub('conv-fk-reply');

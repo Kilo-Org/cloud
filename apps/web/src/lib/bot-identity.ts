@@ -4,6 +4,23 @@ import type { StateAdapter } from 'chat';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { botIdentityRedisKey } from '@/lib/redis-keys';
 
+const CHAT_SDK_CACHE_KEY_PREFIX = 'chat-sdk:cache:';
+const REDIS_SCAN_BATCH_SIZE = 100;
+const REDIS_DELETE_BATCH_SIZE = 100;
+
+type RedisScanClient = {
+  scanIterator(options: { MATCH: string; COUNT: number }): AsyncIterable<string | string[]>;
+  del(keys: string[]): Promise<unknown>;
+};
+
+type StateAdapterWithRedisClient = StateAdapter & {
+  getClient(): RedisScanClient;
+};
+
+function hasRedisClient(state: StateAdapter): state is StateAdapterWithRedisClient {
+  return 'getClient' in state && typeof state.getClient === 'function';
+}
+
 /**
  * Platform identity coordinates — the minimum info needed to identify
  * a user on any chat platform (Slack, Discord, Teams, Google Chat, etc.).
@@ -50,6 +67,48 @@ export async function unlinkKiloUser(
 ): Promise<void> {
   const { platform, teamId, userId } = identity;
   await state.delete(botIdentityRedisKey(platform, teamId, userId));
+}
+
+export async function unlinkTeamKiloUsers(
+  state: StateAdapter,
+  platform: string,
+  teamId: string
+): Promise<number> {
+  if (!hasRedisClient(state)) {
+    return 0;
+  }
+
+  const client = state.getClient();
+  const pattern = `${CHAT_SDK_CACHE_KEY_PREFIX}${botIdentityRedisKey(platform, teamId, '*')}`;
+  let pendingKeys: string[] = [];
+  let deletedKeys = 0;
+
+  async function deletePendingKeys(): Promise<void> {
+    if (pendingKeys.length === 0) return;
+
+    const keysToDelete = pendingKeys;
+    pendingKeys = [];
+    deletedKeys += keysToDelete.length;
+    await client.del(keysToDelete);
+  }
+
+  for await (const scannedKeys of client.scanIterator({
+    MATCH: pattern,
+    COUNT: REDIS_SCAN_BATCH_SIZE,
+  })) {
+    if (Array.isArray(scannedKeys)) {
+      pendingKeys.push(...scannedKeys);
+    } else {
+      pendingKeys.push(scannedKeys);
+    }
+
+    if (pendingKeys.length >= REDIS_DELETE_BATCH_SIZE) {
+      await deletePendingKeys();
+    }
+  }
+
+  await deletePendingKeys();
+  return deletedKeys;
 }
 
 // -- HMAC-signed link tokens --------------------------------------------------

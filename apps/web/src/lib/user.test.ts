@@ -209,6 +209,8 @@ describe('User', () => {
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
+        api_token_pepper: 'api-token-pepper',
+        web_session_pepper: 'web-session-pepper',
         blocked_at: '2026-01-15T12:00:00.000Z',
         blocked_by_kilo_user_id: 'admin-user-id',
         is_admin: true,
@@ -235,7 +237,10 @@ describe('User', () => {
       );
       expect(softDeleted!.customer_source).toBeNull();
       expect(softDeleted!.signup_ip).toBeNull();
-      expect(softDeleted!.api_token_pepper).toBeNull();
+      expect(softDeleted!.api_token_pepper).toEqual(expect.any(String));
+      expect(softDeleted!.api_token_pepper).not.toBe('api-token-pepper');
+      expect(softDeleted!.web_session_pepper).toEqual(expect.any(String));
+      expect(softDeleted!.web_session_pepper).not.toBe('web-session-pepper');
       expect(softDeleted!.default_model).toBeNull();
       expect(softDeleted!.blocked_reason).toMatch(/^soft-deleted at \d{4}-\d{2}-\d{2}T/);
       expect(softDeleted!.blocked_at).toBeNull();

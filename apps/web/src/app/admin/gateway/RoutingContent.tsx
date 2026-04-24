@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DEFAULT_VERCEL_PERCENTAGE } from '@/lib/gateway-config';
+import { DEFAULT_VERCEL_PERCENTAGE } from '@/lib/ai-gateway/gateway-config';
 
 export function RoutingContent() {
   const trpc = useTRPC();

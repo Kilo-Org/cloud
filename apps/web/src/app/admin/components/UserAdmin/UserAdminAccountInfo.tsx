@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/admin-utils';
 import type { UserDetailProps } from '@/types/admin';
 import ResetAPIKeyButton from './ResetAPIKeyButton';
 import ResetToMagicLinkLoginButton from './ResetToMagicLinkLoginButton';
+import SignOutBrowserSessionsButton from './SignOutBrowserSessionsButton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { SquareArrowOutUpRight, Webhook } from 'lucide-react';
@@ -56,6 +57,7 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
           <div className="flex flex-wrap items-center gap-2">
             <UserStatusBadge is_detail={true} user={user} />
             <PaymentMethodStatusBadge paymentMethodStatus={user.paymentMethodStatus} />
+            <SignOutBrowserSessionsButton userId={user.id} />
             <ResetAPIKeyButton userId={user.id} />
             {!user.is_sso_protected_domain && <ResetToMagicLinkLoginButton userId={user.id} />}
             <Button variant="outline" size="sm" asChild>

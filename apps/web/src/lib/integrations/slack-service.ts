@@ -44,6 +44,11 @@ export const SLACK_SCOPES = [
 
 const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
 
+type SlackUninstallOptions = {
+  deleteChatSdkInstallation?: (teamId: string) => Promise<void>;
+  deleteChatSdkIdentityCache?: (teamId: string) => Promise<void>;
+};
+
 function getOwnershipConditions(owner: Owner) {
   return owner.type === 'user'
     ? [
@@ -206,7 +211,7 @@ export async function upsertSlackInstallation({
 /**
  * Uninstall Slack integration for an owner
  */
-export async function uninstallApp(owner: Owner) {
+export async function uninstallApp(owner: Owner, options: SlackUninstallOptions = {}) {
   const integration = await getInstallation(owner);
 
   if (!integration || integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
@@ -224,6 +229,19 @@ export async function uninstallApp(owner: Owner) {
     } catch (error) {
       console.error('Failed to revoke Slack token:', error);
     }
+  }
+
+  const teamId = integration.platform_installation_id ?? integration.platform_account_id;
+  if (options.deleteChatSdkInstallation || options.deleteChatSdkIdentityCache) {
+    if (!teamId) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Slack installation is missing a team ID',
+      });
+    }
+
+    await options.deleteChatSdkInstallation?.(teamId);
+    await options.deleteChatSdkIdentityCache?.(teamId);
   }
 
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));

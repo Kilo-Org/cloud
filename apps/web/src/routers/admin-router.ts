@@ -57,6 +57,7 @@ import { TRPCError } from '@trpc/server';
 import { assertNoError, successResult } from '@/lib/maybe-result';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
+import { revokeWebSessions } from '@/lib/web-session-revocation';
 import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
@@ -419,6 +420,12 @@ export const adminRouter = createTRPCRouter({
         .update(kilocode_users)
         .set({ api_token_pepper: crypto.randomUUID() })
         .where(eq(kilocode_users.id, input.userId));
+
+      return successResult();
+    }),
+
+    signOutBrowserSessions: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input }) => {
+      await revokeWebSessions(input.userId);
 
       return successResult();
     }),

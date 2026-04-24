@@ -38,6 +38,7 @@ import {
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
 import { getBalanceForUser } from '@/lib/user.balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+import { revokeWebSessions } from '@/lib/web-session-revocation';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
@@ -298,6 +299,12 @@ export const userRouter = createTRPCRouter({
       .update(kilocode_users)
       .set({ api_token_pepper: crypto.randomUUID() })
       .where(eq(kilocode_users.id, ctx.user.id));
+
+    return successResult();
+  }),
+
+  signOutBrowserSessions: baseProcedure.mutation(async ({ ctx }) => {
+    await revokeWebSessions(ctx.user.id);
 
     return successResult();
   }),

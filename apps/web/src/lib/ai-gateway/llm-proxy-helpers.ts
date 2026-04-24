@@ -35,7 +35,7 @@ import type {
   MicrodollarUsageStats,
   PromptInfo,
 } from '@/lib/ai-gateway/processUsage.types';
-import { getMaxTokens } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 export { proxyErrorTypeSchema, ProxyErrorType } from '@/lib/proxy-error-types';
@@ -161,10 +161,6 @@ function byokErrorMessage(status: number): string | undefined {
   return byokErrorMessages[status];
 }
 
-function estimateTokenCount(request: GatewayRequest) {
-  return Math.round(JSON.stringify(request).length / 4 + (getMaxTokens(request) ?? 0));
-}
-
 export async function makeErrorReadable({
   requestedModel,
   request,
@@ -195,20 +191,8 @@ export async function makeErrorReadable({
     }
   }
 
-  // Sometimes we get generic or nonsensical errors when the context length is exceeded
-  // (such as "Internal Server Error" or "No allowed providers are available for the selected model")
-  const model = kiloExclusiveModels.find(m => m.public_id === requestedModel);
-  if (model) {
-    const estimatedTokenCount = estimateTokenCount(request);
-    if (estimatedTokenCount >= model.context_length) {
-      const error = `The maximum context length is ${model.context_length} tokens. However, about ${estimatedTokenCount} tokens were requested.`;
-      warnExceptInTest(`Responding with ${response.status} ${error}`);
-      return NextResponse.json(
-        { error, error_type: ProxyErrorType.context_length_exceeded, message: error },
-        { status: response.status }
-      );
-    }
-  }
+  const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
+  if (overflowResponse) return overflowResponse;
 
   if (isKiloStealthModel(requestedModel)) {
     return await stealthModelError(response);
@@ -513,6 +497,7 @@ function parseMistralFimUsageFromString(
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: statusCode,
   };
 }
 
@@ -612,6 +597,7 @@ async function parseMistralFimUsageFromStream(
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: statusCode,
   };
 }
 
@@ -679,7 +665,10 @@ type EmbeddingResponse = {
   usage: EmbeddingUsage;
 };
 
-export function parseEmbeddingUsageFromResponse(responseText: string): MicrodollarUsageStats {
+export function parseEmbeddingUsageFromResponse(
+  responseText: string,
+  statusCode: number
+): MicrodollarUsageStats {
   const json: EmbeddingResponse = JSON.parse(responseText);
 
   // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
@@ -689,7 +678,7 @@ export function parseEmbeddingUsageFromResponse(responseText: string): Microdoll
     messageId: json.id ?? null,
     model: json.model,
     responseContent: '',
-    hasError: !json.model,
+    hasError: !json.model || statusCode >= 400,
     inference_provider: null,
     inputTokens: json.usage.prompt_tokens,
     outputTokens: 0,
@@ -704,6 +693,7 @@ export function parseEmbeddingUsageFromResponse(responseText: string): Microdoll
     generation_time: null,
     streamed: false,
     cancelled: false,
+    status_code: statusCode,
   };
 }
 
@@ -730,11 +720,12 @@ export function countAndStoreEmbeddingUsage(
 ) {
   debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
 
+  const statusCode = usageContext.status_code ?? 0;
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
     : clonedResponse
         .text()
-        .then(text => parseEmbeddingUsageFromResponse(text))
+        .then(text => parseEmbeddingUsageFromResponse(text, statusCode))
         .catch(() => null);
 
   after(

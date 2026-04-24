@@ -78,7 +78,7 @@ import {
   getToolsAvailable,
   getToolsUsed,
 } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { isKiloAutoModel } from '@/lib/ai-gateway/kilo-auto';

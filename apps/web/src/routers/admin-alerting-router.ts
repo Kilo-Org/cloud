@@ -1,7 +1,7 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { z } from 'zod';
 import { fetchO11yJson, O11yRequestError } from '@/lib/ai-gateway/o11y-client';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/ai-gateway/model-utils';
 import { TRPCError } from '@trpc/server';
 
 const AlertingConfigSchema = z.object({

@@ -1,0 +1,26 @@
+{
+  "name": "@kilocode/ai-gateway",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./adapters": "./src/adapters/index.ts",
+    "./gateway-config": "./src/gateway-config.ts",
+    "./http": "./src/http/index.ts",
+    "./kilolog-hash": "./src/kilolog-hash.ts",
+    "./model-utils": "./src/model-utils.ts",
+    "./observability": "./src/observability/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/ai-gateway/src"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:"
+  }
+}

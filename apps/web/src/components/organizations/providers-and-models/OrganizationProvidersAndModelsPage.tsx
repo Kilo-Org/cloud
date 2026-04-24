@@ -7,7 +7,7 @@ import {
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
 import { useOpenRouterModelsAndProviders } from '@/app/api/openrouter/hooks';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/ai-gateway/model-utils';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { OrganizationContextProvider } from '../OrganizationContext';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';

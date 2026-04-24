@@ -39,6 +39,7 @@
     "@chat-adapter/state-memory": "^4.20.1",
     "@chat-adapter/state-redis": "^4.20.1",
     "google-auth-library": "^10.4.1",
+    "@kilocode/ai-gateway": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",

@@ -10,6 +10,8 @@
     "forceConsistentCasingInFileNames": true,
     "paths": {
       "@/*": ["./src/*"],
+      "@kilocode/ai-gateway": ["../../packages/ai-gateway/src/index.ts"],
+      "@kilocode/ai-gateway/*": ["../../packages/ai-gateway/src/*"],
       "@kilocode/db": ["../../packages/db/src/index.ts"],
       "@kilocode/db/*": ["../../packages/db/src/*"],
       "@kilocode/encryption": ["../../packages/encryption/src/index.ts"],

@@ -22,7 +22,7 @@ import { createCachedFetch } from '@/lib/cached-fetch';
 import {
   GatewayPercentageSchema,
   DEFAULT_VERCEL_PERCENTAGE,
-} from '@/lib/ai-gateway/gateway-config';
+} from '@kilocode/ai-gateway/gateway-config';
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';

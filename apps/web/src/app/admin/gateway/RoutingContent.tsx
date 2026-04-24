@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DEFAULT_VERCEL_PERCENTAGE, NOTE_MAX_LENGTH } from '@/lib/ai-gateway/gateway-config';
+import { DEFAULT_VERCEL_PERCENTAGE, NOTE_MAX_LENGTH } from '@kilocode/ai-gateway/gateway-config';
 
 export function RoutingContent() {
   const trpc = useTRPC();

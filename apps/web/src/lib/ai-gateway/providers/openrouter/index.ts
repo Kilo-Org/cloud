@@ -18,7 +18,7 @@ import {
 import { AUTO_MODELS } from '@/lib/ai-gateway/kilo-auto';
 
 // Re-export from shared module for backwards compatibility
-export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+export { normalizeModelId } from '@kilocode/ai-gateway/model-utils';
 
 function buildAutoModels(): OpenRouterModel[] {
   return AUTO_MODELS.map(m => ({

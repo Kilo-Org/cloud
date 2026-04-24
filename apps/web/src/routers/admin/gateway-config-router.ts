@@ -1,12 +1,12 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { redisGet, redisSet } from '@/lib/redis';
 import {
-  GatewayConfigSchema,
-  GatewayConfigInputSchema,
   DEFAULT_GATEWAY_CONFIG,
-} from '@/lib/ai-gateway/gateway-config';
+  GatewayConfigInputSchema,
+  GatewayConfigSchema,
+} from '@kilocode/ai-gateway/gateway-config';
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
-import type { GatewayConfig } from '@/lib/ai-gateway/gateway-config';
+import type { GatewayConfig } from '@kilocode/ai-gateway/gateway-config';
 import { TRPCError } from '@trpc/server';
 
 async function readConfig(): Promise<GatewayConfig> {

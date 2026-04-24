@@ -3,7 +3,7 @@ import { db } from '@/lib/drizzle';
 import { logExceptInTest } from '@/lib/utils.server';
 import { after } from 'next/server';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { kilologHash } from '@/lib/ai-gateway/kilologHash';
+import { kilologHash } from '@kilocode/ai-gateway/kilolog-hash';
 import { createHash } from 'crypto';
 import { redisSet } from '@/lib/redis';
 import { requestLogRedisKey } from '@/lib/redis-keys';

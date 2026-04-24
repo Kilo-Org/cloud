@@ -1,6 +1,6 @@
 import { modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/ai-gateway/model-utils';
 import type { NormalizedOpenRouterResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { desc } from 'drizzle-orm';
 

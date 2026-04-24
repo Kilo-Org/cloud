@@ -14,6 +14,7 @@ import {
   pushEventToHumanMembers,
   pushInstanceEvent,
 } from './event-push';
+import type { ConversationInfo } from '../do/conversation-do';
 
 type DeferCtx = { waitUntil: (p: Promise<unknown>) => void } | undefined;
 
@@ -57,9 +58,42 @@ export async function createMessageFor(
   const { messageId } = result;
 
   // Single getInfo() call to get all members — avoids separate getBotMembersExcluding RPC.
+  // Must stay on the critical path: info is needed inside postCommitFanOut.
   const info = await convStub.getInfo();
   if (!info) return { ok: true, messageId, clientId };
 
+  const fanOut = postCommitFanOut(
+    env,
+    convStub,
+    info,
+    callerId,
+    conversationId,
+    messageId,
+    content,
+    inReplyToMessageId,
+    clientId
+  );
+
+  if (ctx) {
+    ctx.waitUntil(fanOut);
+  } else {
+    await fanOut;
+  }
+
+  return { ok: true, messageId, clientId };
+}
+
+async function postCommitFanOut(
+  env: Env,
+  convStub: DurableObjectStub<import('../index').ConversationDO>,
+  info: ConversationInfo,
+  callerId: string,
+  conversationId: string,
+  messageId: string,
+  content: ContentBlock[],
+  inReplyToMessageId: string | undefined,
+  clientId: string | undefined
+): Promise<void> {
   const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
   const botMembers = info.members.filter(m => m.kind === 'bot' && m.id !== callerId);
 
@@ -84,7 +118,7 @@ export async function createMessageFor(
       }
     }
 
-    const deliverPromise = Promise.all(
+    await Promise.all(
       botMembers.map(bot =>
         deliverToBot(env, convStub, {
           targetBotId: bot.id,
@@ -99,9 +133,6 @@ export async function createMessageFor(
         })
       )
     );
-    if (ctx) {
-      ctx.waitUntil(deliverPromise);
-    }
   }
 
   // Auto-title unnamed conversations with the first message text.
@@ -204,8 +235,6 @@ export async function createMessageFor(
       })
     );
   }
-
-  return { ok: true, messageId, clientId };
 }
 
 // ─── editMessage ────────────────────────────────────────────────────────────

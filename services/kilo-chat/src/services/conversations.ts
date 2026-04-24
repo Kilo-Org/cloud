@@ -9,8 +9,7 @@ import { extractConversationContext, extractSandboxId, pushInstanceEvent } from 
 import { getSandboxOwner } from './sandbox-ownership';
 import { cachedUserOwnsSandbox } from './sandbox-ownership-cached';
 import { validateUserIds } from './user-lookup';
-
-type DeferCtx = { waitUntil: (p: Promise<unknown>) => void } | undefined;
+import type { DeferCtx } from './messages';
 
 // ─── createConversation ────────────────────────────────────────────────────
 
@@ -287,7 +286,8 @@ export type MarkReadResult = { ok: true } | { ok: false; code: 'forbidden'; erro
 export async function markReadFor(
   env: Env,
   userId: string,
-  params: MarkReadParams
+  params: MarkReadParams,
+  ctx?: DeferCtx
 ): Promise<MarkReadResult> {
   const { conversationId } = params;
 
@@ -310,11 +310,13 @@ export async function markReadFor(
 
   const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
   if (sandboxId) {
-    await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
+    const pushPromise = pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
       conversationId,
       memberId: userId,
       lastReadAt: now,
     });
+    if (ctx) ctx.waitUntil(pushPromise);
+    else await pushPromise;
   }
 
   return { ok: true };

@@ -12,6 +12,7 @@ import type { ZodSchema } from 'zod';
 import type { AuthContext } from '../auth';
 import { withDORetry } from '@kilocode/worker-utils';
 import { createBotConversationFor, renameConversationFor } from '../services/conversations';
+import type { DeferCtx } from '../services/messages';
 import {
   createMessageFor,
   deleteMessageFor,
@@ -89,7 +90,7 @@ function parseSandboxId(c: HonoCtx) {
   return { ok: true as const, data: result.data };
 }
 
-function makeSchedule(c: HonoCtx): { waitUntil: (p: Promise<unknown>) => void } | undefined {
+export function makeSchedule(c: HonoCtx): DeferCtx {
   try {
     // Probe for executionCtx — absent in unit-test (app.request) mode.
     const ectx = c.executionCtx;
@@ -129,10 +130,15 @@ export async function handleEditMessage(c: HonoCtx) {
   if (!body.ok) return body.response;
 
   const callerId = c.get('callerId');
-  const result = await editMessageFor(c.env, callerId, {
-    ...body.data,
-    messageId: msgId.data,
-  });
+  const result = await editMessageFor(
+    c.env,
+    callerId,
+    {
+      ...body.data,
+      messageId: msgId.data,
+    },
+    makeSchedule(c)
+  );
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
@@ -156,10 +162,15 @@ export async function handleDeleteMessage(c: HonoCtx) {
   }
 
   const callerId = c.get('callerId');
-  const result = await deleteMessageFor(c.env, callerId, {
-    conversationId: convId.data,
-    messageId: msgId.data,
-  });
+  const result = await deleteMessageFor(
+    c.env,
+    callerId,
+    {
+      conversationId: convId.data,
+      messageId: msgId.data,
+    },
+    makeSchedule(c)
+  );
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
@@ -214,11 +225,16 @@ export async function handleAddReaction(c: HonoCtx) {
   if (!body.ok) return body.response;
 
   const callerId = c.get('callerId');
-  const result = await addReactionFor(c.env, callerId, {
-    conversationId: body.data.conversationId,
-    messageId: msgId.data,
-    emoji: body.data.emoji,
-  });
+  const result = await addReactionFor(
+    c.env,
+    callerId,
+    {
+      conversationId: body.data.conversationId,
+      messageId: msgId.data,
+      emoji: body.data.emoji,
+    },
+    makeSchedule(c)
+  );
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
@@ -242,11 +258,16 @@ export async function handleRemoveReaction(c: HonoCtx) {
   }
 
   const callerId = c.get('callerId');
-  const result = await removeReactionFor(c.env, callerId, {
-    conversationId: parsed.data.conversationId,
-    messageId: msgId.data,
-    emoji: parsed.data.emoji,
-  });
+  const result = await removeReactionFor(
+    c.env,
+    callerId,
+    {
+      conversationId: parsed.data.conversationId,
+      messageId: msgId.data,
+      emoji: parsed.data.emoji,
+    },
+    makeSchedule(c)
+  );
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
@@ -456,10 +477,15 @@ export async function handleRenameConversation(c: HonoCtx) {
   if (!body.ok) return body.response;
 
   const callerId = c.get('callerId');
-  const result = await renameConversationFor(c.env, callerId, {
-    conversationId: convId.data,
-    title: body.data.title,
-  });
+  const result = await renameConversationFor(
+    c.env,
+    callerId,
+    {
+      conversationId: convId.data,
+      title: body.data.title,
+    },
+    makeSchedule(c)
+  );
   if (!result.ok) {
     return c.json({ error: result.error }, 403);
   }

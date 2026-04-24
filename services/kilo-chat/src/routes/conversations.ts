@@ -20,6 +20,7 @@ import {
   paginationQuerySchema,
   renameConversationSchema,
 } from './schemas';
+import { makeSchedule } from './handler';
 
 const createConversationSchema = z.object({
   sandboxId: sandboxIdSchema,
@@ -135,10 +136,15 @@ export function registerConversationRoutes(
     }
 
     const callerId = c.get('callerId');
-    const result = await renameConversationFor(c.env, callerId, {
-      conversationId,
-      title: body.data.title,
-    });
+    const result = await renameConversationFor(
+      c.env,
+      callerId,
+      {
+        conversationId,
+        title: body.data.title,
+      },
+      makeSchedule(c)
+    );
     if (!result.ok) {
       return c.json({ error: result.error }, 403);
     }
@@ -160,7 +166,7 @@ export function registerConversationRoutes(
     const conversationId = idParam.data;
 
     const callerId = c.get('callerId');
-    const result = await leaveConversationFor(c.env, callerId, { conversationId });
+    const result = await leaveConversationFor(c.env, callerId, { conversationId }, makeSchedule(c));
     if (!result.ok) {
       return c.json({ error: result.error }, 403);
     }
@@ -177,7 +183,7 @@ export function registerConversationRoutes(
     const conversationId = idParam.data;
 
     const callerId = c.get('callerId');
-    const result = await markReadFor(c.env, callerId, { conversationId });
+    const result = await markReadFor(c.env, callerId, { conversationId }, makeSchedule(c));
     if (!result.ok) {
       return c.json({ error: result.error }, 403);
     }

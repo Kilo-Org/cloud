@@ -18,7 +18,7 @@ import {
 } from './event-push';
 import type { ConversationInfo } from '../do/conversation-do';
 
-type DeferCtx = { waitUntil: (p: Promise<unknown>) => void } | undefined;
+export type DeferCtx = { waitUntil: (p: Promise<unknown>) => void } | undefined;
 
 // ─── createMessage ──────────────────────────────────────────────────────────
 
@@ -288,7 +288,8 @@ export type EditMessageResult = EditMessageOk | EditMessageStale | EditMessageEr
 export async function editMessageFor(
   env: Env,
   callerId: string,
-  params: EditMessageParams
+  params: EditMessageParams,
+  ctx?: DeferCtx
 ): Promise<EditMessageResult> {
   const { conversationId, messageId, content, timestamp } = params;
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
@@ -309,7 +310,7 @@ export async function editMessageFor(
   }
 
   if (result.memberContext.sandboxId) {
-    await pushEventToHumanMembers(
+    const pushPromise = pushEventToHumanMembers(
       env,
       conversationId,
       result.memberContext.sandboxId,
@@ -317,6 +318,8 @@ export async function editMessageFor(
       'message.updated',
       { messageId: result.messageId, content, clientUpdatedAt: timestamp }
     );
+    if (ctx) ctx.waitUntil(pushPromise);
+    else await pushPromise;
   }
 
   return {
@@ -341,7 +344,8 @@ export type DeleteMessageResult =
 export async function deleteMessageFor(
   env: Env,
   callerId: string,
-  params: DeleteMessageParams
+  params: DeleteMessageParams,
+  ctx?: DeferCtx
 ): Promise<DeleteMessageResult> {
   const { conversationId, messageId } = params;
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
@@ -354,7 +358,7 @@ export async function deleteMessageFor(
   }
 
   if (result.memberContext.sandboxId) {
-    await pushEventToHumanMembers(
+    const pushPromise = pushEventToHumanMembers(
       env,
       conversationId,
       result.memberContext.sandboxId,
@@ -362,6 +366,8 @@ export async function deleteMessageFor(
       'message.deleted',
       { messageId }
     );
+    if (ctx) ctx.waitUntil(pushPromise);
+    else await pushPromise;
   }
 
   return { ok: true };
@@ -408,36 +414,38 @@ export async function executeActionFor(
   const info = await convStub.getInfo();
   if (info) {
     const convContext = extractConversationContext(info.members);
-    if (convContext.sandboxId) {
-      await pushEventToHumanMembers(
-        env,
-        conversationId,
-        convContext.sandboxId,
-        convContext.humanMemberIds,
-        'message.updated',
-        { messageId, content: result.content, clientUpdatedAt: null }
-      );
-
-      // Deliver action.executed webhook only to the bot that authored the
-      // message holding the resolved actions block. Other bots in the
-      // conversation did not present these buttons and must not see the user's
-      // decision.
-      const author = info.members.find(m => m.id === result.messageSenderId && m.kind === 'bot');
-      if (author) {
-        const deliverPromise = deliverActionExecutedToBot(env, {
-          type: 'action.executed',
-          targetBotId: author.id,
+    const fanOut = async () => {
+      if (convContext.sandboxId) {
+        await pushEventToHumanMembers(
+          env,
           conversationId,
-          messageId,
-          groupId,
-          value,
-          executedBy: callerId,
-          executedAt: new Date().toISOString(),
-        });
-        if (ctx) ctx.waitUntil(deliverPromise);
-        else await deliverPromise;
+          convContext.sandboxId,
+          convContext.humanMemberIds,
+          'message.updated',
+          { messageId, content: result.content, clientUpdatedAt: null }
+        );
+
+        // Deliver action.executed webhook only to the bot that authored the
+        // message holding the resolved actions block. Other bots in the
+        // conversation did not present these buttons and must not see the user's
+        // decision.
+        const author = info.members.find(m => m.id === result.messageSenderId && m.kind === 'bot');
+        if (author) {
+          await deliverActionExecutedToBot(env, {
+            type: 'action.executed',
+            targetBotId: author.id,
+            conversationId,
+            messageId,
+            groupId,
+            value,
+            executedBy: callerId,
+            executedAt: new Date().toISOString(),
+          });
+        }
       }
-    }
+    };
+    if (ctx) ctx.waitUntil(fanOut());
+    else await fanOut();
   }
 
   return { ok: true };

@@ -1,6 +1,7 @@
 /** Identity-agnostic reaction operations. See services/messages.ts for rationale. */
 
 import { pushEventToHumanMembers } from './event-push';
+import type { DeferCtx } from './messages';
 
 export type AddReactionParams = {
   conversationId: string;
@@ -15,7 +16,8 @@ export type AddReactionResult =
 export async function addReactionFor(
   env: Env,
   callerId: string,
-  params: AddReactionParams
+  params: AddReactionParams,
+  ctx?: DeferCtx
 ): Promise<AddReactionResult> {
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId));
   const result = await convStub.addReaction({
@@ -29,7 +31,7 @@ export async function addReactionFor(
 
   if (result.added) {
     if (result.memberContext.sandboxId) {
-      await pushEventToHumanMembers(
+      const pushPromise = pushEventToHumanMembers(
         env,
         params.conversationId,
         result.memberContext.sandboxId,
@@ -37,6 +39,8 @@ export async function addReactionFor(
         'reaction.added',
         { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
       );
+      if (ctx) ctx.waitUntil(pushPromise);
+      else await pushPromise;
     }
   }
 
@@ -56,7 +60,8 @@ export type RemoveReactionResult =
 export async function removeReactionFor(
   env: Env,
   callerId: string,
-  params: RemoveReactionParams
+  params: RemoveReactionParams,
+  ctx?: DeferCtx
 ): Promise<RemoveReactionResult> {
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId));
   const result = await convStub.removeReaction({
@@ -70,7 +75,7 @@ export async function removeReactionFor(
 
   if (result.removed) {
     if (result.memberContext.sandboxId) {
-      await pushEventToHumanMembers(
+      const pushPromise = pushEventToHumanMembers(
         env,
         params.conversationId,
         result.memberContext.sandboxId,
@@ -78,6 +83,8 @@ export async function removeReactionFor(
         'reaction.removed',
         { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
       );
+      if (ctx) ctx.waitUntil(pushPromise);
+      else await pushPromise;
     }
   }
 

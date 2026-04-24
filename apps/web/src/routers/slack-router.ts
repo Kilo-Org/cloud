@@ -11,16 +11,21 @@ import {
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { bot } from '@/lib/bot';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 
-async function deleteChatSdkSlackInstallation(teamId: string): Promise<void> {
+async function getInitializedBot() {
+  const { bot } = await import('@/lib/bot');
   await bot.initialize();
+  return bot;
+}
+
+async function deleteChatSdkSlackInstallation(teamId: string): Promise<void> {
+  const bot = await getInitializedBot();
   await bot.getAdapter('slack').deleteInstallation(teamId);
 }
 
 async function deleteChatSdkSlackIdentityCache(teamId: string): Promise<void> {
-  await bot.initialize();
+  const bot = await getInitializedBot();
   await unlinkTeamKiloUsers(bot.getState(), 'slack', teamId);
 }
 

@@ -149,7 +149,7 @@ const nextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'geolocation=(), camera=(), microphone=()',
+            value: 'geolocation=(self), camera=(), microphone=()',
           },
           {
             key: 'Cross-Origin-Resource-Policy',

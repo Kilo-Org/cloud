@@ -1,26 +1,22 @@
-import {
-  contentBlockSchema,
-  type ContentBlock,
-  type ActionsBlock,
-  type Message,
-  type ReactionSummary,
-} from '@kilocode/kilo-chat';
+import type { ContentBlock, ActionsBlock, Message, ReactionSummary } from '@kilocode/kilo-chat';
 import { DurableObject } from 'cloudflare:workers';
 import { logger } from '../util/logger';
 
+/**
+ * Parses stored message content JSON. Content was validated by Zod at write
+ * time (route handler → createMessage/editMessage), so we trust the stored
+ * shape and use a type assertion instead of re-validating on every read.
+ */
 function parseStoredContent(rawContent: string, messageId: string): ContentBlock[] {
   try {
-    const parsed: unknown = JSON.parse(rawContent);
-    const result = contentBlockSchema.array().safeParse(parsed);
-    if (result.success) return result.data;
-    logger.warn('Invalid message content', { messageId, issues: result.error.issues });
+    return JSON.parse(rawContent) as ContentBlock[];
   } catch (err) {
     logger.warn('Unparseable message content', {
       messageId,
       error: err instanceof Error ? err.message : String(err),
     });
+    return [];
   }
-  return [];
 }
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';

@@ -1,6 +1,6 @@
 import {
   chatWebhookRpcSchema,
-  contentBlockSchema,
+  type ContentBlock,
   type messageCreatedWebhookSchema,
   type actionExecutedWebhookSchema,
 } from '@kilocode/kilo-chat';
@@ -17,20 +17,19 @@ export type WebhookMessage = {
   conversationId: string;
   messageId: string;
   from: string;
-  content: unknown;
+  content: ContentBlock[];
   sentAt: string;
   inReplyToMessageId?: string;
   inReplyToBody?: string;
   inReplyToSender?: string;
 };
 
-const webhookContentSchema = z.array(contentBlockSchema).catch([]);
-
 function buildPayload(msg: WebhookMessage): MessageCreatedPayload {
-  const blocks = webhookContentSchema.parse(msg.content);
+  // Content was validated at the route handler entry point; trust the shape.
+  const blocks = msg.content as ContentBlock[];
   const text = blocks
     .filter(b => b.type === 'text')
-    .map(b => b.text)
+    .map(b => (b as { type: 'text'; text: string }).text)
     .join('');
   return {
     type: 'message.created',
@@ -64,10 +63,11 @@ export async function deliverToBot(
     });
 
     const payload = buildPayload(msg);
-    const rpcPayload = chatWebhookRpcSchema.parse({
+    // Payload fields are already validated; skip redundant Zod parse.
+    const rpcPayload = {
       targetBotId: msg.targetBotId,
       ...payload,
-    });
+    } as z.infer<typeof chatWebhookRpcSchema>;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
@@ -121,7 +121,8 @@ export async function deliverActionExecutedToBot(
       messageId: msg.messageId,
     });
 
-    const rpcPayload = chatWebhookRpcSchema.parse(msg);
+    // Payload fields are already validated; skip redundant Zod parse.
+    const rpcPayload = msg as z.infer<typeof chatWebhookRpcSchema>;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         await env.KILOCLAW.deliverChatWebhook(rpcPayload);

@@ -3,7 +3,6 @@ import type { AppEnv } from '../types';
 import { isValidImageTag } from '../lib/image-tag-validation';
 import { GoogleCredentialsSchema, InstanceIdParam } from '../schemas/instance-config';
 import { instrumented } from '../middleware/analytics';
-import { withDORetry } from '@kilocode/worker-utils';
 
 /**
  * API routes
@@ -33,19 +32,30 @@ function parseInstanceId(c: {
 }
 
 /**
+ * Resolve the user's KiloClawInstance DO stub.
+ *
+ * When instanceId is provided, uses it as the DO key (multi-instance).
+ * When absent, uses the authenticated userId (legacy single-instance).
+ */
+function resolveStub(
+  c: { get: (key: 'userId') => string; env: AppEnv['Bindings'] },
+  instanceId?: string
+) {
+  const doKey = instanceId ?? c.get('userId');
+  return c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+}
+
+/**
  * Verify that the authenticated user owns the instance when an instanceId is provided.
  * Returns null if the check passes, or a 403 Response if it fails.
  */
 async function verifyInstanceOwnership(
   c: { get: (key: 'userId') => string; env: AppEnv['Bindings'] },
+  stub: ReturnType<typeof resolveStub>,
   instanceId?: string
 ): Promise<Response | null> {
   if (!instanceId) return null;
-  const status = await withDORetry(
-    () => c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(instanceId)),
-    stub => stub.getStatus(),
-    'KiloClawInstance.getStatus'
-  );
+  const status = await stub.getStatus();
   if (status.userId !== c.get('userId')) {
     return new Response(JSON.stringify({ error: 'Access denied' }), {
       status: 403,
@@ -80,7 +90,8 @@ adminApi.post('/machine/restart', c =>
     const parsed = parseInstanceId(c);
     if ('error' in parsed) return parsed.error;
     const { instanceId } = parsed;
-    const denied = await verifyInstanceOwnership(c, instanceId);
+    const stub = resolveStub(c, instanceId);
+    const denied = await verifyInstanceOwnership(c, stub, instanceId);
     if (denied) return denied;
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const rawTag = typeof body.imageTag === 'string' ? body.imageTag : undefined;
@@ -90,12 +101,7 @@ adminApi.post('/machine/restart', c =>
     }
 
     const imageTag = rawTag;
-    const doKey = instanceId ?? c.get('userId');
-    const result = await withDORetry(
-      () => c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey)),
-      stub => stub.restartMachine(imageTag ? { imageTag } : undefined),
-      'KiloClawInstance.restartMachine'
-    );
+    const result = await stub.restartMachine(imageTag ? { imageTag } : undefined);
 
     if (result.success) {
       return c.json({
@@ -117,7 +123,8 @@ adminApi.post('/gateway/restart', c =>
     const parsed = parseInstanceId(c);
     if ('error' in parsed) return parsed.error;
     const { instanceId } = parsed;
-    const denied = await verifyInstanceOwnership(c, instanceId);
+    const stub = resolveStub(c, instanceId);
+    const denied = await verifyInstanceOwnership(c, stub, instanceId);
     if (denied) return denied;
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const rawTag = typeof body.imageTag === 'string' ? body.imageTag : undefined;
@@ -127,12 +134,7 @@ adminApi.post('/gateway/restart', c =>
     }
 
     const imageTag = rawTag;
-    const doKey = instanceId ?? c.get('userId');
-    const result = await withDORetry(
-      () => c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey)),
-      stub => stub.restartMachine(imageTag ? { imageTag } : undefined),
-      'KiloClawInstance.restartMachine'
-    );
+    const result = await stub.restartMachine(imageTag ? { imageTag } : undefined);
 
     if (result.success) {
       return c.json({
@@ -189,13 +191,9 @@ adminApi.get('/google-credentials', c =>
     const parsed = parseInstanceId(c);
     if ('error' in parsed) return parsed.error;
     const { instanceId } = parsed;
-    const doKey = instanceId ?? c.get('userId');
+    const stub = resolveStub(c, instanceId);
     try {
-      const status = await withDORetry(
-        () => c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey)),
-        stub => stub.getStatus(),
-        'KiloClawInstance.getStatus'
-      );
+      const status = await stub.getStatus();
       if (instanceId && status.userId !== c.get('userId')) {
         return c.json({ error: 'Access denied' }, 403);
       }
@@ -213,7 +211,8 @@ adminApi.post('/google-credentials', c =>
     const iid = parseInstanceId(c);
     if ('error' in iid) return iid.error;
     const { instanceId } = iid;
-    const denied = await verifyInstanceOwnership(c, instanceId);
+    const stub = resolveStub(c, instanceId);
+    const denied = await verifyInstanceOwnership(c, stub, instanceId);
     if (denied) return denied;
     let body: unknown;
     try {
@@ -232,12 +231,7 @@ adminApi.post('/google-credentials', c =>
     }
 
     try {
-      const doKey = instanceId ?? c.get('userId');
-      const result = await withDORetry(
-        () => c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey)),
-        stub => stub.updateGoogleCredentials(parsed.data),
-        'KiloClawInstance.updateGoogleCredentials'
-      );
+      const result = await stub.updateGoogleCredentials(parsed.data);
       return c.json(result, 200);
     } catch (err) {
       console.error('[api] google-credentials failed:', err);
@@ -252,15 +246,11 @@ adminApi.delete('/google-credentials', c =>
     const parsed = parseInstanceId(c);
     if ('error' in parsed) return parsed.error;
     const { instanceId } = parsed;
-    const denied = await verifyInstanceOwnership(c, instanceId);
+    const stub = resolveStub(c, instanceId);
+    const denied = await verifyInstanceOwnership(c, stub, instanceId);
     if (denied) return denied;
     try {
-      const doKey = instanceId ?? c.get('userId');
-      const result = await withDORetry(
-        () => c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey)),
-        stub => stub.clearGoogleCredentials(),
-        'KiloClawInstance.clearGoogleCredentials'
-      );
+      const result = await stub.clearGoogleCredentials();
       return c.json(result, 200);
     } catch (err) {
       console.error('[api] google-credentials delete failed:', err);

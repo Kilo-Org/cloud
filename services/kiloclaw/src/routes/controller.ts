@@ -13,7 +13,6 @@ import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
 } from '@kilocode/worker-utils/instance-id';
-import { withDORetry } from '@kilocode/worker-utils';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { waitUntil } from 'cloudflare:workers';
 import {
@@ -287,12 +286,8 @@ async function authorizeGoogleControllerRequest(c: Context<AppEnv>, sandboxId: s
     }
   }
 
-  const getStub = () => c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
-  const config = await withDORetry(
-    getStub,
-    stub => stub.getConfig(),
-    'KiloClawInstance.getConfig'
-  ).catch(() => null);
+  const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+  const config = await stub.getConfig().catch(() => null);
   if (!config?.kilocodeApiKey || !timingSafeEqual(apiKey, config.kilocodeApiKey)) {
     return { error: c.json({ error: 'Forbidden' }, 403) };
   }
@@ -308,7 +303,7 @@ async function authorizeGoogleControllerRequest(c: Context<AppEnv>, sandboxId: s
     return { error: c.json({ error: 'Instance not found' }, 404) };
   }
 
-  return { apiKey, gatewayToken, db, instance, doKey };
+  return { apiKey, gatewayToken, db, instance, stub };
 }
 
 controller.post('/checkin', async (c: Context<AppEnv>) => {
@@ -352,17 +347,16 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
     }
   }
 
-  const getStub = () => c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
-  const config = await withDORetry(
-    getStub,
-    stub => stub.getConfig(),
-    'KiloClawInstance.getConfig'
-  ).catch(() => null);
+  const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+  const config = await stub.getConfig().catch(() => null);
   if (!config?.kilocodeApiKey || !timingSafeEqual(apiKey, config.kilocodeApiKey)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
-  const status = await withDORetry(getStub, stub => stub.getStatus(), 'KiloClawInstance.getStatus');
+  // Resolve the real userId from the DO — needed for PostHog attribution and
+  // instance-ready emails. For legacy DOs, doKey IS the userId. For instance-keyed
+  // DOs, doKey is the instanceId and the DO stores the actual userId.
+  const status = await stub.getStatus();
   const userId = status.userId ?? doKey;
 
   try {
@@ -436,11 +430,7 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
   if (data.loadAvg5m <= INSTANCE_READY_LOAD_THRESHOLD) {
     try {
       const apiOrigin = backendApiOrigin(c.env.BACKEND_API_URL);
-      const { shouldNotify } = await withDORetry(
-        getStub,
-        stub => stub.tryMarkInstanceReady(),
-        'KiloClawInstance.tryMarkInstanceReady'
-      );
+      const { shouldNotify } = await stub.tryMarkInstanceReady();
 
       if (c.env.INTERNAL_API_SECRET) {
         console.log('[controller] instance-ready: dispatching notification', {
@@ -484,8 +474,7 @@ controller.post('/google/token', async (c: Context<AppEnv>) => {
     return authorized.error;
   }
 
-  const { db, instance, doKey } = authorized;
-  const getStub = () => c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+  const { db, instance, stub } = authorized;
 
   const connection = await getGoogleOAuthConnectionByInstanceId(db, instance.id);
   if (!connection || connection.provider !== 'google') {
@@ -540,19 +529,14 @@ controller.post('/google/token', async (c: Context<AppEnv>) => {
       lastError: 'refresh_token_decryption_failed',
       lastErrorAt: new Date().toISOString(),
     });
-    await withDORetry(
-      getStub,
-      stub =>
-        stub.updateGoogleOAuthConnection({
-          status: 'action_required',
-          accountEmail: connection.account_email,
-          accountSubject: connection.account_subject,
-          scopes: connection.scopes,
-          capabilities: connection.capabilities,
-          lastError: 'refresh_token_decryption_failed',
-        }),
-      'KiloClawInstance.updateGoogleOAuthConnection'
-    );
+    await stub.updateGoogleOAuthConnection({
+      status: 'action_required',
+      accountEmail: connection.account_email,
+      accountSubject: connection.account_subject,
+      scopes: connection.scopes,
+      capabilities: connection.capabilities,
+      lastError: 'refresh_token_decryption_failed',
+    });
     return c.json({ error: 'Google OAuth token is invalid and requires reconnect' }, 409);
   }
 
@@ -574,19 +558,14 @@ controller.post('/google/token', async (c: Context<AppEnv>) => {
       lastErrorAt: null,
     });
 
-    await withDORetry(
-      getStub,
-      stub =>
-        stub.updateGoogleOAuthConnection({
-          status: 'active',
-          accountEmail: connection.account_email,
-          accountSubject: connection.account_subject,
-          scopes: nextScopes,
-          capabilities: connection.capabilities,
-          lastError: null,
-        }),
-      'KiloClawInstance.updateGoogleOAuthConnection'
-    );
+    await stub.updateGoogleOAuthConnection({
+      status: 'active',
+      accountEmail: connection.account_email,
+      accountSubject: connection.account_subject,
+      scopes: nextScopes,
+      capabilities: connection.capabilities,
+      lastError: null,
+    });
 
     return c.json({
       accessToken: refreshed.accessToken,
@@ -607,19 +586,14 @@ controller.post('/google/token', async (c: Context<AppEnv>) => {
         lastErrorAt: new Date().toISOString(),
       });
 
-      await withDORetry(
-        getStub,
-        stub =>
-          stub.updateGoogleOAuthConnection({
-            status: 'action_required',
-            accountEmail: connection.account_email,
-            accountSubject: connection.account_subject,
-            scopes: connection.scopes,
-            capabilities: connection.capabilities,
-            lastError: `${mapped.code}: ${mapped.description}`,
-          }),
-        'KiloClawInstance.updateGoogleOAuthConnection'
-      );
+      await stub.updateGoogleOAuthConnection({
+        status: 'action_required',
+        accountEmail: connection.account_email,
+        accountSubject: connection.account_subject,
+        scopes: connection.scopes,
+        capabilities: connection.capabilities,
+        lastError: `${mapped.code}: ${mapped.description}`,
+      });
 
       return c.json({ error: 'Google OAuth requires reconnect', reason: mapped.code }, 409);
     }
@@ -673,8 +647,7 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
     return authorized.error;
   }
 
-  const { db, instance, doKey } = authorized;
-  const getStub = () => c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+  const { db, instance, stub } = authorized;
   const existing = await getGoogleOAuthConnectionByInstanceId(db, instance.id);
 
   const encryptionKey = c.env.GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY;
@@ -846,19 +819,14 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
     `);
   }
 
-  await withDORetry(
-    getStub,
-    stub =>
-      stub.updateGoogleOAuthConnection({
-        status: resolvedStatus,
-        accountEmail: resolvedAccountEmail,
-        accountSubject: resolvedAccountSubject,
-        scopes: resolvedScopes,
-        capabilities: resolvedCapabilities,
-        lastError: resolvedLastError,
-      }),
-    'KiloClawInstance.updateGoogleOAuthConnection'
-  );
+  await stub.updateGoogleOAuthConnection({
+    status: resolvedStatus,
+    accountEmail: resolvedAccountEmail,
+    accountSubject: resolvedAccountSubject,
+    scopes: resolvedScopes,
+    capabilities: resolvedCapabilities,
+    lastError: resolvedLastError,
+  });
 
   return c.json({ migrated: true, profile: resolvedProfile }, 200);
 });

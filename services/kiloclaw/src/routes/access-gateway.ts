@@ -11,7 +11,6 @@ import { signKiloToken, validateKiloToken } from '../auth/jwt';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { sandboxIdFromInstanceId, isValidInstanceId } from '@kilocode/worker-utils/instance-id';
-import { withDORetry } from '@kilocode/worker-utils';
 import type { KiloClawEnv } from '../types';
 
 /**
@@ -50,11 +49,8 @@ async function assertInstanceOwnership(
   userId: string,
   instanceId: string
 ): Promise<void> {
-  const status = await withDORetry(
-    () => env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(instanceId)),
-    stub => stub.getStatus(),
-    'KiloClawInstance.getStatus'
-  );
+  const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(instanceId));
+  const status = await stub.getStatus();
   if (!status.userId || status.userId !== userId) {
     throw new Error('Instance access denied');
   }
@@ -77,11 +73,9 @@ async function resolveSandboxId(
   // Instance-keyed: go directly to the Instance DO — no registry lookup needed.
   if (instanceId && isValidInstanceId(instanceId)) {
     try {
-      const status = await withDORetry(
-        () => env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(instanceId)),
-        stub => stub.getStatus(),
-        'KiloClawInstance.getStatus'
-      );
+      const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(instanceId));
+      const status = await stub.getStatus();
+      // Belt-and-suspenders: reject even if the caller forgot to check ownership
       if (status.userId && status.userId !== userId) {
         console.error('[access-gateway] resolveSandboxId: ownership mismatch', {
           userId,
@@ -100,19 +94,13 @@ async function resolveSandboxId(
   // Legacy: resolve via user registry
   try {
     const registryKey = `user:${userId}`;
-    const entries = await withDORetry(
-      () => env.KILOCLAW_REGISTRY.get(env.KILOCLAW_REGISTRY.idFromName(registryKey)),
-      stub => stub.listInstances(registryKey),
-      'KiloClawRegistry.listInstances'
-    );
+    const registryStub = env.KILOCLAW_REGISTRY.get(env.KILOCLAW_REGISTRY.idFromName(registryKey));
+    const entries = await registryStub.listInstances(registryKey);
     if (entries.length > 0) {
       const entry = entries[0];
       try {
-        const status = await withDORetry(
-          () => env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(entry.doKey)),
-          stub => stub.getStatus(),
-          'KiloClawInstance.getStatus'
-        );
+        const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(entry.doKey));
+        const status = await stub.getStatus();
         if (status.sandboxId) return status.sandboxId;
       } catch {
         if (isValidInstanceId(entry.doKey)) {

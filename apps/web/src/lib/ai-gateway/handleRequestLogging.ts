@@ -8,6 +8,7 @@ import { createHash } from 'crypto';
 import { redisSet } from '@/lib/redis';
 import { requestLogRedisKey } from '@/lib/redis-keys';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
+import { stripNulBytesInPlace } from '@/lib/ai-gateway/strip-nul-bytes';
 
 const users = [
   '992891e9fe987b8960a05ed0bc9cc456979d1d71410d467f212e6233dbc0a523', // christiaan
@@ -54,7 +55,7 @@ export async function handleRequestLogging(params: {
           status_code: clonedResponse.status,
           model,
           provider,
-          request: request.body,
+          request: sanitizedRequestBody(request),
           response,
           error,
         })
@@ -91,4 +92,20 @@ export async function handleRequestLogging(params: {
       }
     }
   });
+}
+
+function sanitizedRequestBody(request: GatewayRequest): GatewayRequest['body'] {
+  const dirtyFields: string[] = [];
+  stripNulBytesInPlace(request.body, dirtyFields);
+  if (dirtyFields.length > 0) {
+    logExceptInTest(
+      'api_request_log request string field contained NUL bytes; sanitized before insert',
+      {
+        source: 'handleRequestLogging',
+        fields: dirtyFields,
+        kind: request.kind,
+      }
+    );
+  }
+  return request.body;
 }

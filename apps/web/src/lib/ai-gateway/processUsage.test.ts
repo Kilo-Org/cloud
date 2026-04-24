@@ -8,9 +8,9 @@ import {
   mapToUsageStats,
   logMicrodollarUsage,
   processOpenRouterUsage,
-  stripNulBytesInPlace,
   toInsertableDbUsageRecord,
 } from './processUsage';
+import { stripNulBytesInPlace } from '@/lib/ai-gateway/strip-nul-bytes';
 import type { OpenRouterGeneration } from '@/lib/ai-gateway/providers/openrouter/types';
 import { verifyApproval } from '../../tests/helpers/approval.helper';
 import { insertTestUser } from '../../tests/helpers/user.helper';

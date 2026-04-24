@@ -57,6 +57,7 @@ import { computeOpenRouterCostFields, drainSseStream } from '@/lib/ai-gateway/pr
 import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { stripNulBytesInPlace } from '@/lib/ai-gateway/strip-nul-bytes';
 
 const posthogClient = PostHogClient();
 
@@ -126,36 +127,6 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     auto_model: usageContext.auto_model,
     ttfb_ms: usageContext.ttfb_ms,
   };
-}
-
-/**
- * Strip NUL bytes (\u0000) in place from every string-typed field on `obj`.
- *
- * Postgres `text` columns reject NUL bytes with `22021 invalid byte sequence
- * for encoding "UTF8": 0x00`, which crashes the `microdollar_usage` CTE insert
- * and leaves the request un-billed (see Sentry KILOCODE-WEB-1G3Z).
- *
- * NULs have been observed in client-populated fields on the LLM gateway hot
- * path: HTTP headers from the VS Code extension (machine_id, session_id,
- * http_user_agent) and prompt-derived fields (system_prompt_prefix,
- * user_prompt_prefix). Sanitizing at the DB boundary is a safety net; once
- * the upstream source is identified via the `console.warn` in
- * `toInsertableDbUsageRecord` (queryable in Axiom), sanitize at the source
- * and remove this.
- *
- * Any sanitized field names are appended to `dirtyFields` so the caller can
- * log them for source attribution.
- */
-export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: string[]): void {
-  for (const key of Object.keys(obj)) {
-    const value = obj[key];
-    if (typeof value === 'string' && value.indexOf('\u0000') >= 0) {
-      // Using split/join rather than a regex avoids the no-control-regex
-      // lint rule; the NUL byte is the intended match here.
-      obj[key] = value.split('\u0000').join('');
-      dirtyFields.push(key);
-    }
-  }
 }
 
 export function toInsertableDbUsageRecord(

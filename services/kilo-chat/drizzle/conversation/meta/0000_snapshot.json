@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "24124417-0456-4509-b245-5bf83506a86e",
+  "id": "194a40b0-4e9a-44cc-824b-b562d8a30cb9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "conversation": {
@@ -169,7 +169,15 @@
           "default": 0
         }
       },
-      "indexes": {},
+      "indexes": {
+        "messages_sender_id_idx": {
+          "name": "messages_sender_id_idx",
+          "columns": [
+            "sender_id"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {
         "messages_sender_id_members_id_fk": {
           "name": "messages_sender_id_members_id_fk",

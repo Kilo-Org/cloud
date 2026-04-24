@@ -30,6 +30,7 @@ CREATE TABLE `messages` (
 	CONSTRAINT "messages_version_check" CHECK("messages"."version" >= 1)
 );
 --> statement-breakpoint
+CREATE INDEX `messages_sender_id_idx` ON `messages` (`sender_id`);--> statement-breakpoint
 CREATE TABLE `reactions` (
 	`message_id` text NOT NULL,
 	`member_id` text NOT NULL,

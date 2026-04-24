@@ -96,6 +96,33 @@ function parseAwsCredentials(input: string) {
   }
 }
 
+export function getAnthropicProviderOptionsForVercel(
+  requestedModel: string,
+  request: GatewayRequest
+): AnthropicProviderOptions | undefined {
+  const anthropicOptions: AnthropicProviderOptions = {};
+
+  // Workaround for Vercel not displaying thinking by default, unlike OpenRouter.
+  const isOpus47Thinking =
+    requestedModel.includes('opus-4.7') && isReasoningExplicitlyEnabled(request);
+  if (isOpus47Thinking) {
+    anthropicOptions.thinking = { type: 'adaptive', display: 'summarized' };
+  }
+
+  if (request.kind === 'chat_completions' && request.body.verbosity) {
+    anthropicOptions.effort = request.body.verbosity;
+  }
+  if (request.kind === 'responses' && request.body.text?.verbosity) {
+    anthropicOptions.effort = request.body.text.verbosity;
+  }
+
+  if (Object.keys(anthropicOptions).length === 0) {
+    return undefined;
+  }
+
+  return anthropicOptions;
+}
+
 export function getVercelInferenceProviderConfigForUserByok(
   provider: BYOKResult
 ): [VercelUserByokInferenceProviderId, VercelInferenceProviderConfig[]] {
@@ -157,20 +184,11 @@ export function applyVercelSettings(
   }
 
   if (requestToMutate.body.providerOptions) {
-    const anthropicOptions: AnthropicProviderOptions = {};
-    // Workaround for Vercel not displaying thinking by default, unlike OpenRouter.
-    const isOpus47Thinking =
-      requestedModel.includes('opus-4.7') && isReasoningExplicitlyEnabled(requestToMutate);
-    if (isOpus47Thinking) {
-      anthropicOptions.thinking = { type: 'adaptive', display: 'summarized' };
-    }
-    if (requestToMutate.kind === 'chat_completions' && requestToMutate.body.verbosity) {
-      anthropicOptions.effort = requestToMutate.body.verbosity;
-    }
-    if (requestToMutate.kind === 'responses' && requestToMutate.body.text?.verbosity) {
-      anthropicOptions.effort = requestToMutate.body.text.verbosity;
-    }
-    if (Object.keys(anthropicOptions).length > 0) {
+    const anthropicOptions = getAnthropicProviderOptionsForVercel(
+      requestedModel,
+      requestToMutate
+    );
+    if (anthropicOptions) {
       requestToMutate.body.providerOptions.anthropic = anthropicOptions;
     }
   }

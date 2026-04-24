@@ -6,13 +6,13 @@ import { bulkBlockUsers, type BulkBlockResponse } from '@/lib/abuse/bulkBlock';
 
 const schema = z.object({
   kilo_user_emails_or_ids: z.array(z.string().min(1)).min(1),
-  block_reason: z.string().min(1),
+  block_reason: z.string().trim().min(1),
 });
 
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse<BulkBlockResponse | { error: string }>> {
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
   const parsed = schema.safeParse(await request.json());
@@ -26,7 +26,7 @@ export async function POST(
       { status: 400 }
     );
   const { kilo_user_emails_or_ids, block_reason } = parsed.data;
-  const result = await bulkBlockUsers(kilo_user_emails_or_ids, block_reason);
+  const result = await bulkBlockUsers(kilo_user_emails_or_ids, block_reason, user.id);
   const status = result.success ? 200 : 400;
   return NextResponse.json(result, { status });
 }

@@ -22,7 +22,7 @@ const TEXT_SWAP_EASE = { duration: 0.18, ease: EASE_OUT_QUART } as const;
 
 const NAME_SUGGESTIONS = ['Aria', 'Echo', 'Nova', 'Rex', 'Sage', 'Iris', 'Orion', 'Pixel'];
 
-const EMOJI_OPTIONS = ['🤖', '👾', '🧠', '⚡', '🔮', '🔥', '🐉', '✨', '🌙'];
+const EMOJI_OPTIONS = ['🤖', '⚡', '🛰️', '🌈', '🪄', '🐉', '👽', '🔮', '🪬'];
 
 function pickRandom<T>(items: readonly T[]): T {
   return items[Math.floor(Math.random() * items.length)];
@@ -37,28 +37,28 @@ type NaturePreset = {
 
 const NATURE_PRESETS: NaturePreset[] = [
   {
-    id: 'ai-assistant',
-    emoji: '🤖',
-    label: 'AI assistant',
-    vibe: 'Helpful, capable, professional',
+    id: 'operator',
+    emoji: '⚙️',
+    label: 'Operator',
+    vibe: 'Focused, capable, effective',
+  },
+  {
+    id: 'muse',
+    emoji: '✨',
+    label: 'Muse',
+    vibe: 'Creative, inspiring, full of ideas',
   },
   {
     id: 'digital-creature',
-    emoji: '🐙',
-    label: 'Digital creature',
+    emoji: '👾',
+    label: 'Digital Creature',
     vibe: 'Quirky, alive, a bit unpredictable',
   },
   {
-    id: 'virtual-companion',
-    emoji: '🌙',
-    label: 'Virtual companion',
-    vibe: 'Warm, present, genuinely cares',
-  },
-  {
-    id: 'something-weirder',
-    emoji: '🌀',
-    label: 'Something weirder...',
-    vibe: 'Define it yourself',
+    id: 'oracle',
+    emoji: '🧿',
+    label: 'Oracle',
+    vibe: 'Perceptive, calm, insightful',
   },
 ];
 
@@ -68,15 +68,17 @@ export type BotIdentityStepResult = {
 };
 
 export function BotIdentityStep({
-  instanceRunning,
+  currentStep,
+  totalSteps,
   onContinue,
 }: {
-  instanceRunning: boolean;
+  currentStep: number;
+  totalSteps: number;
   onContinue: (result: BotIdentityStepResult) => void;
 }) {
   const [botName, setBotName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🤖');
-  const [selectedNatureId, setSelectedNatureId] = useState('ai-assistant');
+  const [selectedNatureId, setSelectedNatureId] = useState('operator');
   const [weatherLocation, setWeatherLocation] = useState<WeatherLocationSelection | null>(null);
   const [isShuffling, setIsShuffling] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
@@ -139,11 +141,10 @@ export function BotIdentityStep({
 
   return (
     <OnboardingStepView
-      currentStep={1}
-      totalSteps={4}
+      currentStep={currentStep}
+      totalSteps={totalSteps}
       title="Give your bot an identity"
       description="Make it yours. You can always change this later."
-      showProvisioningBanner={!instanceRunning}
       contentClassName="gap-6"
     >
       <div className="grid gap-6 md:grid-cols-[1fr_2fr] md:gap-8">

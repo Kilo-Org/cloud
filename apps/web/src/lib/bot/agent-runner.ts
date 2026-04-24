@@ -10,7 +10,11 @@ import {
   formatConversationContextForPrompt,
 } from '@/lib/bot/conversation-context';
 import { buildPrSignature, getRequesterInfo } from '@/lib/bot/pr-signature';
-import { updateBotRequest, linkBotRequestToSession } from '@/lib/bot/request-logging';
+import {
+  linkBotRequestToSession,
+  recordBotRequestCloudAgentSession,
+  updateBotRequest,
+} from '@/lib/bot/request-logging';
 import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/step-budget';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
@@ -38,6 +42,7 @@ import type { StepResult, ToolSet } from 'ai';
 import { Actions, Card, CardText, LinkButton, Section } from 'chat';
 import { ThreadImpl } from 'chat';
 import type { Author, Message, Thread } from 'chat';
+import { randomUUID } from 'crypto';
 
 export type BotAgentContinuation = {
   finalText: string;
@@ -228,6 +233,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
   const initialSteps = params.initialSteps ?? [];
   const completedStepCount = Math.max(params.completedStepCount ?? 0, initialSteps.length);
   const remainingIterations = getRemainingBotIterations(completedStepCount);
+  const spawnGroupId = params.botRequestId ? randomUUID() : undefined;
   const collectedSteps: BotRequestStep[] = [];
   let startedCloudAgentSession = false;
 
@@ -259,7 +265,12 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
 This tool returns an acknowledgement immediately. The final Cloud Agent result will be posted later in the same thread after the async session completes.`,
         inputSchema: spawnCloudAgentInputSchema,
         execute: async args => {
-          let resolvedSessionId: string | undefined;
+          let resolvedCloudAgentSessionId: string | undefined;
+          let resolvedKiloSessionId: string | undefined;
+          const currentStep = getNextBotCallbackStep({
+            completedStepCount,
+            completedStepsInCurrentRun: collectedSteps.length,
+          });
 
           const result = await spawnCloudAgentSession(
             args,
@@ -270,7 +281,8 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
             params.botRequestId,
             ({ kiloSessionId, cloudAgentSessionId }) => {
               startedCloudAgentSession = true;
-              resolvedSessionId = cloudAgentSessionId;
+              resolvedCloudAgentSessionId = cloudAgentSessionId;
+              resolvedKiloSessionId = kiloSessionId;
               params.onSessionReady?.({ kiloSessionId, cloudAgentSessionId, prompt: args.prompt });
               const sessionUrl = buildSessionUrl(kiloSessionId, owner);
               void postSessionLinkEphemeral({
@@ -285,17 +297,27 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
             {
               prSignature,
               chatPlatform,
-              currentStep: getNextBotCallbackStep({
-                completedStepCount,
-                completedStepsInCurrentRun: collectedSteps.length,
-              }),
+              currentStep,
             }
           );
 
           // Persist the session link synchronously so callbacks can
           // correlate immediately — must complete before we return.
-          if (params.botRequestId && resolvedSessionId) {
-            await linkBotRequestToSession(params.botRequestId, resolvedSessionId);
+          if (params.botRequestId && resolvedCloudAgentSessionId) {
+            await linkBotRequestToSession(params.botRequestId, resolvedCloudAgentSessionId);
+          }
+
+          if (params.botRequestId && spawnGroupId && resolvedCloudAgentSessionId) {
+            await recordBotRequestCloudAgentSession({
+              botRequestId: params.botRequestId,
+              spawnGroupId,
+              cloudAgentSessionId: resolvedCloudAgentSessionId,
+              kiloSessionId: resolvedKiloSessionId,
+              mode: args.mode,
+              githubRepo: args.githubRepo,
+              gitlabProject: args.gitlabProject,
+              callbackStep: currentStep,
+            });
           }
 
           return result;

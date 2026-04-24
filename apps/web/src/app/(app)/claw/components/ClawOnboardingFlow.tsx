@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePostHog } from 'posthog-js/react';
+import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { Check, Sparkles, TriangleAlert, X } from 'lucide-react';
 import { KILO_AUTO_BALANCED_MODEL } from '@/lib/kilo-auto';
@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useClawServiceDegraded } from '../hooks/useClawHooks';
+import { useOnboardingSaves } from '../hooks/useOnboardingSaves';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { BotIdentityStep } from './BotIdentityStep';
@@ -21,9 +22,8 @@ import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
-import { CreateInstanceCard } from './CreateInstanceCard';
-import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep, ProvisioningStepView } from './ProvisioningStep';
+import { DEFAULT_ONBOARDING_EXEC_PRESET } from './claw.types';
 import type { BotIdentity, ExecPreset } from './claw.types';
 import {
   getClawOnboardingFlowState,
@@ -116,11 +116,12 @@ function ClawOnboardingFlowInner({
   const gatewayUrl = useGatewayUrl(status);
 
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('identity');
-  const [selectedPreset, setSelectedPreset] = useState<ExecPreset | null>(null);
+  const selectedPreset: ExecPreset = DEFAULT_ONBOARDING_EXEC_PRESET;
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
+  const [onboardingSaveSession, setOnboardingSaveSession] = useState(0);
   const hasCapturedIdentityView = useRef(false);
   const hasCapturedDoneView = useRef(false);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
@@ -131,7 +132,6 @@ function ClawOnboardingFlowInner({
     createSetupStarted,
     setupFailed,
     onboardingStep,
-    selectedPreset,
     hasBotIdentity: botIdentity !== null,
     selectedChannelId,
   };
@@ -156,13 +156,30 @@ function ClawOnboardingFlowInner({
   });
 
   const { data: isServiceDegraded } = useClawServiceDegraded();
+  useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
 
+  // Save bot identity, exec preset, and channel tokens as soon as the instance
+  // row exists. This closes the tab-close window where customizations entered
+  // during the provisioning spinner could otherwise be lost with the unmounted
+  // ProvisioningStep.
+  const onboardingSaves = useOnboardingSaves({
+    hasInstance: flowState.instanceStatus !== null,
+    botIdentity,
+    selectedPreset,
+    channelTokens,
+    resetKey: `${onboardingSaveSession}:${
+      flowState.instanceStatus?.instanceId ?? flowState.instanceStatus?.sandboxId ?? 'pending'
+    }`,
+    mutations,
+  });
+
   useEffect(() => {
-    if (!flowState.createSetupActive || hasCapturedIdentityView.current) return;
+    if (flowState.renderStep !== 'identity' || hasCapturedIdentityView.current) return;
     hasCapturedIdentityView.current = true;
+    posthog?.capture('claw_page_viewed');
     posthog?.capture('claw_setup_identity_viewed');
-  }, [flowState.createSetupActive, posthog]);
+  }, [flowState.renderStep, posthog]);
 
   useEffect(() => {
     if (
@@ -178,7 +195,6 @@ function ClawOnboardingFlowInner({
 
   const resetWizardSelections = useCallback(() => {
     setOnboardingStep('identity');
-    setSelectedPreset(null);
     setBotIdentity(null);
     setChannelTokens(null);
     setSelectedChannelId(null);
@@ -186,6 +202,7 @@ function ClawOnboardingFlowInner({
 
   const handleCreateFlowStarted = useCallback(() => {
     setLocalCreateSetupStarted(true);
+    setOnboardingSaveSession(value => value + 1);
     resetWizardSelections();
     onCreateFlowStarted?.();
   }, [onCreateFlowStarted, resetWizardSelections]);
@@ -221,19 +238,11 @@ function ClawOnboardingFlowInner({
     );
   }
 
-  function renderCreateInstanceStep() {
-    return (
-      <CreateInstanceCard
-        isPending={mutations.provision.isPending}
-        onCreate={handleCreateFlowStarted}
-      />
-    );
-  }
-
   function renderIdentityStep() {
     return (
       <BotIdentityStep
-        instanceRunning={flowState.instanceRunning}
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
         onContinue={({ identity, weatherLocation }) => {
           posthog?.capture('claw_setup_identity_completed', {
             bot_name_is_custom: identity.botName !== 'KiloClaw',
@@ -245,6 +254,7 @@ function ClawOnboardingFlowInner({
           } else {
             posthog?.capture('claw_weather_location_skipped');
           }
+
           if (flowState.instanceStatus) {
             if (weatherLocation) {
               mutations.updateConfig.mutate(
@@ -253,24 +263,17 @@ function ClawOnboardingFlowInner({
               );
             }
           } else {
+            posthog?.capture('claw_create_instance_clicked', {
+              selected_model: KILO_AUTO_BALANCED_MODEL.id,
+            });
             provisionInstance(weatherLocation?.location);
           }
-          posthog?.capture('claw_setup_permissions_viewed');
-          setBotIdentity(identity);
-          setOnboardingStep('permissions');
-        }}
-      />
-    );
-  }
-
-  function renderPermissionsStep() {
-    return (
-      <PermissionStep
-        instanceRunning={flowState.instanceRunning}
-        onSelect={preset => {
-          posthog?.capture('claw_setup_permissions_completed', { preset });
+          posthog?.capture('claw_setup_permissions_completed', {
+            preset: DEFAULT_ONBOARDING_EXEC_PRESET,
+            defaulted: true,
+          });
           posthog?.capture('claw_setup_channels_viewed');
-          setSelectedPreset(preset);
+          setBotIdentity(identity);
           setOnboardingStep('channels');
         }}
       />
@@ -280,6 +283,8 @@ function ClawOnboardingFlowInner({
   function renderChannelsStep() {
     return (
       <ChannelSelectionStepView
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
         instanceRunning={flowState.instanceRunning}
         onSelect={(channelId, tokens) => {
           posthog?.capture('claw_setup_channels_completed', {
@@ -306,17 +311,20 @@ function ClawOnboardingFlowInner({
   }
 
   function renderProvisioningStep() {
-    if (mode === 'post-provisioning') return <ProvisioningStepView />;
-    if (selectedPreset === null) return renderPermissionsStep();
+    if (mode === 'post-provisioning')
+      return (
+        <ProvisioningStepView
+          currentStep={flowState.currentStep}
+          totalSteps={flowState.totalSteps}
+        />
+      );
 
     return (
       <ProvisioningStep
-        preset={selectedPreset}
-        channelTokens={channelTokens}
-        botIdentity={botIdentity}
-        instanceRunning={flowState.instanceRunning}
-        mutations={mutations}
+        currentStep={flowState.currentStep}
         totalSteps={flowState.totalSteps}
+        onboardingSavesReady={onboardingSaves.ready}
+        instanceRunning={flowState.instanceRunning}
         onComplete={() => {
           posthog?.capture('claw_setup_provisioned');
           posthog?.capture(
@@ -333,6 +341,8 @@ function ClawOnboardingFlowInner({
 
     return (
       <ChannelPairingStep
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
         channelId={selectedChannelId}
         mutations={mutations}
         onComplete={() => {
@@ -373,12 +383,8 @@ function ClawOnboardingFlowInner({
     const renderStep = flowState.renderStep;
 
     switch (renderStep) {
-      case 'create-instance':
-        return renderCreateInstanceStep();
       case 'identity':
         return renderIdentityStep();
-      case 'permissions':
-        return renderPermissionsStep();
       case 'channels':
         return renderChannelsStep();
       case 'provisioning':

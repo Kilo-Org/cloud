@@ -53,7 +53,10 @@ import {
   getPersonalProvisionLockKey,
   withKiloclawProvisionContextLock,
 } from '@/lib/kiloclaw/provision-lock';
-import { clearSubscriptionLifecycleAfterInstanceDestroy } from '@/lib/kiloclaw/instance-lifecycle';
+import {
+  clearSubscriptionLifecycleAfterInstanceDestroy,
+  clearTrialInactivityStopAfterStart,
+} from '@/lib/kiloclaw/instance-lifecycle';
 
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import {
@@ -89,6 +92,12 @@ import {
   KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/credit-billing';
 import {
+  logCreditEnrollmentAttempted,
+  logCreditEnrollmentFailed,
+  logCreditEnrollmentSucceeded,
+  type CreditEnrollmentFailureReason,
+} from '@/lib/kiloclaw/credit-enrollment-observability';
+import {
   CurrentPersonalSubscriptionResolutionError,
   resolveCurrentPersonalSubscriptionRow,
 } from '@/lib/kiloclaw/current-personal-subscription';
@@ -101,7 +110,13 @@ import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
  * Error codes whose messages may contain raw internal details (e.g. filesystem
  * paths) and should NOT be forwarded to the client.
  */
-const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed']);
+const UNSAFE_ERROR_CODES = new Set([
+  'config_read_failed',
+  'config_replace_failed',
+  'openclaw_import_symlink_escape',
+  'openclaw_import_symlink_target',
+  'openclaw_import_target_not_file',
+]);
 const KILOCLAW_USER_SUBSCRIPTION_CHANGE_REASON = {
   cancelRequested: 'user_requested_cancellation',
   reactivated: 'user_reactivated_subscription',
@@ -283,6 +298,25 @@ async function getLatestPersonalBillingInstance(
     .limit(1);
 
   return instance ?? null;
+}
+
+function classifyEnrollWithCreditsError(message: string): {
+  code: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST' | 'INTERNAL_SERVER_ERROR';
+  failureReason: CreditEnrollmentFailureReason;
+} {
+  if (message.includes('not found')) {
+    return { code: 'NOT_FOUND', failureReason: 'user_not_found' };
+  }
+  if (message.includes('already processed')) {
+    return { code: 'CONFLICT', failureReason: 'duplicate_enrollment' };
+  }
+  if (message.includes('already exists')) {
+    return { code: 'CONFLICT', failureReason: 'active_subscription_exists' };
+  }
+  if (message.includes('Insufficient credit balance')) {
+    return { code: 'BAD_REQUEST', failureReason: 'insufficient_credits' };
+  }
+  return { code: 'INTERNAL_SERVER_ERROR', failureReason: 'internal_error' };
 }
 
 async function resolvePersonalBillingAnchor(params: {
@@ -561,7 +595,17 @@ const userTimezoneSchema = z
 const userLocationSchema = z.string().trim().min(1).max(200);
 const weatherLocationInputSchema = z.object({ location: userLocationSchema });
 const WTTR_LOCATION_TIMEOUT_MS = 4_000;
+const WTTR_SERVICE_UNAVAILABLE_MESSAGE =
+  "wttr.in is down right now. We'll store your location as entered.";
 const COORDINATE_LOCATION_PATTERN = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/;
+
+type WeatherLocationValidationResult = {
+  location: string;
+  currentWeatherText: string;
+  status: 'validated' | 'service_unavailable';
+};
+
+type WttrFetchResult = { ok: true; response: Response } | { ok: false };
 
 const wttrValueSchema = z.object({ value: z.string().trim().min(1) });
 const wttrNearestAreaSchema = z.object({
@@ -652,27 +696,44 @@ function isTimeoutError(error: unknown): boolean {
   return error.name === 'TimeoutError' || error.name === 'AbortError';
 }
 
-async function fetchWttr(location: string, query: string): Promise<Response> {
+function wttrServiceUnavailableResult(location: string): WeatherLocationValidationResult {
+  return {
+    location,
+    currentWeatherText: WTTR_SERVICE_UNAVAILABLE_MESSAGE,
+    status: 'service_unavailable',
+  };
+}
+
+function isWttrServiceUnavailableStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function weatherLocationNotFound(): never {
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message: 'Weather location could not be found.',
+  });
+}
+
+async function fetchWttr(location: string, query: string): Promise<WttrFetchResult> {
   try {
-    return await fetch(`https://wttr.in/${encodeURIComponent(location)}?${query}`, {
-      headers: {
-        Accept: 'text/plain, application/json;q=0.9, */*;q=0.8',
-        'User-Agent': 'curl/8.7.1',
-      },
-      signal: AbortSignal.timeout(WTTR_LOCATION_TIMEOUT_MS),
-    });
+    return {
+      ok: true,
+      response: await fetch(`https://wttr.in/${encodeURIComponent(location)}?${query}`, {
+        headers: {
+          Accept: 'text/plain, application/json;q=0.9, */*;q=0.8',
+          'User-Agent': 'curl/8.7.1',
+        },
+        signal: AbortSignal.timeout(WTTR_LOCATION_TIMEOUT_MS),
+      }),
+    };
   } catch (error) {
-    if (isTimeoutError(error)) {
-      throw new TRPCError({
-        code: 'TIMEOUT',
-        message: 'Weather location validation timed out. Please try again or skip weather setup.',
+    if (!isTimeoutError(error)) {
+      sentryLogger('kiloclaw-weather', 'warning')('wttr.in validation unavailable', {
+        location_query: query,
       });
     }
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message:
-        'Weather location validation is unavailable. Please try again or skip weather setup.',
-    });
+    return { ok: false };
   }
 }
 
@@ -681,36 +742,45 @@ async function fetchReadableLocationName(
   preferredAreaName: string
 ): Promise<string | null> {
   try {
-    const response = await fetchWttr(location, 'format=j1');
-    if (!response.ok) return null;
-    return normalizeWeatherLocation(await response.json(), preferredAreaName);
+    const result = await fetchWttr(location, 'format=j1');
+    if (!result.ok || !result.response.ok) return null;
+    return normalizeWeatherLocation(await result.response.json(), preferredAreaName);
   } catch {
     return null;
   }
 }
 
-async function validateWeatherLocation(
-  location: string
-): Promise<{ location: string; currentWeatherText: string }> {
-  const response = await fetchWttr(location, 'format=3');
+async function validateWeatherLocation(location: string): Promise<WeatherLocationValidationResult> {
+  const result = await fetchWttr(location, 'format=3');
+  if (!result.ok) return wttrServiceUnavailableResult(location);
 
+  const response = result.response;
   if (!response.ok) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Weather location could not be found.',
-    });
+    if (isWttrServiceUnavailableStatus(response.status)) {
+      return wttrServiceUnavailableResult(location);
+    }
+    weatherLocationNotFound();
   }
 
-  const parsed = parseWttrFormat3(await response.text());
+  let responseText: string;
+  try {
+    responseText = await response.text();
+  } catch {
+    return wttrServiceUnavailableResult(location);
+  }
+
+  const parsed = parseWttrFormat3(responseText);
   if (!parsed) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Weather location could not be found.',
-    });
+    if (hasUnknownLocationMarker(responseText)) weatherLocationNotFound();
+    return wttrServiceUnavailableResult(location);
   }
 
   const resolvedLocation = await fetchReadableLocationName(location, parsed.location);
-  return { ...parsed, ...(resolvedLocation ? { location: resolvedLocation } : undefined) };
+  return {
+    ...parsed,
+    status: 'validated',
+    ...(resolvedLocation ? { location: resolvedLocation } : undefined),
+  };
 }
 
 // TODO: Replace with catalog-driven schema. This hardcoded list must be kept
@@ -737,6 +807,9 @@ const updateConfigSchema = z.object({
 
 const updateKiloCodeConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
+  vectorMemoryEnabled: z.boolean().optional(),
+  vectorMemoryModel: z.string().nullable().optional(),
+  dreamingEnabled: z.boolean().optional(),
 });
 
 const patchWebSearchConfigSchema = z.object({
@@ -795,7 +868,11 @@ function buildWorkerChannelsPatch(channels: z.infer<typeof patchChannelsSchema>)
 
 type KiloCodeConfigPublicResponse = Pick<
   KiloCodeConfigResponse,
-  'kilocodeApiKeyExpiresAt' | 'kilocodeDefaultModel'
+  | 'kilocodeApiKeyExpiresAt'
+  | 'kilocodeDefaultModel'
+  | 'vectorMemoryEnabled'
+  | 'vectorMemoryModel'
+  | 'dreamingEnabled'
 >;
 
 function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDashboardStatus {
@@ -848,6 +925,9 @@ function sanitizeKiloCodeConfigResponse(
   return {
     kilocodeApiKeyExpiresAt: response.kilocodeApiKeyExpiresAt,
     kilocodeDefaultModel: response.kilocodeDefaultModel,
+    vectorMemoryEnabled: response.vectorMemoryEnabled,
+    vectorMemoryModel: response.vectorMemoryModel,
+    dreamingEnabled: response.dreamingEnabled,
   };
 }
 
@@ -2387,10 +2467,19 @@ export const kiloclawRouter = createTRPCRouter({
   start: clawAccessProcedure.mutation(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    const result = await client.start(ctx.user.id, workerInstanceId(instance));
-    // /api/platform/start always returns { ok: true } regardless of whether
-    // the machine transitioned state, so this may fire for no-op requests.
-    // The UI only enables Start when isStartable is true, so false fires are rare.
+    const result = await client.start(ctx.user.id, workerInstanceId(instance), {
+      reason: 'manual_user_request',
+    });
+    if (instance && result.currentStatus === 'running') {
+      try {
+        await clearTrialInactivityStopAfterStart({
+          kiloUserId: ctx.user.id,
+          instanceId: instance.id,
+        });
+      } catch (error) {
+        console.error('Failed to clear trial inactivity stop marker after start:', error);
+      }
+    }
     PostHogClient().capture({
       distinctId: ctx.user.google_user_email,
       event: 'claw_instance_started',
@@ -2402,7 +2491,9 @@ export const kiloclawRouter = createTRPCRouter({
   stop: clawAccessProcedure.mutation(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.stop(ctx.user.id, workerInstanceId(instance));
+    return client.stop(ctx.user.id, workerInstanceId(instance), {
+      reason: 'manual_user_request',
+    });
   }),
 
   destroy: baseProcedure.mutation(async ({ ctx }) => {
@@ -2410,7 +2501,9 @@ export const kiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     let result: Awaited<ReturnType<KiloClawInternalClient['destroy']>>;
     try {
-      result = await client.destroy(ctx.user.id, workerInstanceId(destroyedRow));
+      result = await client.destroy(ctx.user.id, workerInstanceId(destroyedRow), {
+        reason: 'manual_user_request',
+      });
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);
@@ -3374,6 +3467,34 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }),
 
+  importOpenclawWorkspace: clawAccessProcedure
+    .input(
+      z.object({
+        files: z
+          .array(
+            z.object({
+              path: z.string().min(1),
+              content: z.string(),
+            })
+          )
+          .min(1)
+          .max(500),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        return await client.importOpenclawWorkspace(
+          ctx.user.id,
+          input.files,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        handleFileOperationError(err, 'import OpenClaw workspace');
+      }
+    }),
+
   patchOpenclawConfig: clawAccessProcedure
     .input(z.object({ patch: z.record(z.string(), z.unknown()) }))
     .mutation(async ({ ctx, input }) => {
@@ -3720,21 +3841,33 @@ export const kiloclawRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { anchorInstance } = await resolvePersonalBillingAnchor({
+      const startedAt = Date.now();
+      logCreditEnrollmentAttempted({
         userId: ctx.user.id,
+        plan: input.plan,
         instanceId: input.instanceId,
       });
-      if (!anchorInstance) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Provision KiloClaw first before enrolling hosting with credits.',
-        });
-      }
 
-      // Intro pricing eligibility (spec Credit Enrollment rule 3).
-      const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
+      // Track the resolved instance id so the outer catch can include it
+      // on failures that happen after anchor resolution.
+      let resolvedInstanceId: string | undefined = input.instanceId;
 
       try {
+        const { anchorInstance } = await resolvePersonalBillingAnchor({
+          userId: ctx.user.id,
+          instanceId: input.instanceId,
+        });
+        if (!anchorInstance) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Provision KiloClaw first before enrolling hosting with credits.',
+          });
+        }
+        resolvedInstanceId = anchorInstance.id;
+
+        // Intro pricing eligibility (spec Credit Enrollment rule 3).
+        const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
+
         await enrollWithCreditsImpl({
           userId: ctx.user.id,
           instanceId: anchorInstance.id,
@@ -3745,20 +3878,48 @@ export const kiloclawRouter = createTRPCRouter({
             actorId: ctx.user.id,
           },
         });
+
+        logCreditEnrollmentSucceeded({
+          userId: ctx.user.id,
+          plan: input.plan,
+          instanceId: anchorInstance.id,
+          durationMs: Date.now() - startedAt,
+        });
+
+        return { success: true };
       } catch (error) {
-        if (error instanceof TRPCError) throw error;
+        const durationMs = Date.now() - startedAt;
+
+        if (error instanceof TRPCError) {
+          // TRPCErrors surface from this flow's own no_instance guard (BAD_REQUEST)
+          // or from upstream helpers like resolvePersonalBillingAnchor (CONFLICT).
+          // Log before re-throwing so the funnel invariant holds; preserve the
+          // original error code for the HTTP response.
+          const failureReason: CreditEnrollmentFailureReason =
+            error.code === 'BAD_REQUEST' ? 'no_instance' : 'precondition_failed';
+          logCreditEnrollmentFailed({
+            userId: ctx.user.id,
+            plan: input.plan,
+            instanceId: resolvedInstanceId,
+            failureReason,
+            durationMs,
+            error: error.message,
+          });
+          throw error;
+        }
+
         const message = error instanceof Error ? error.message : 'Credit enrollment failed';
-        const code = message.includes('not found')
-          ? 'NOT_FOUND'
-          : message.includes('already exists') || message.includes('already processed')
-            ? 'CONFLICT'
-            : message.includes('Insufficient credit balance')
-              ? 'BAD_REQUEST'
-              : 'INTERNAL_SERVER_ERROR';
+        const { code, failureReason } = classifyEnrollWithCreditsError(message);
+        logCreditEnrollmentFailed({
+          userId: ctx.user.id,
+          plan: input.plan,
+          instanceId: resolvedInstanceId,
+          failureReason,
+          durationMs,
+          error: message,
+        });
         throw new TRPCError({ code, message, cause: error });
       }
-
-      return { success: true };
     }),
 
   createKiloPassUpsellCheckout: baseProcedure

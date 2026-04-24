@@ -81,6 +81,8 @@ function createMockUser(overrides: Partial<User> = {}): User {
     updated_at: new Date().toISOString(),
     is_admin: false,
     blocked_reason: null,
+    blocked_at: null,
+    blocked_by_kilo_user_id: null,
     api_token_pepper: 'test-pepper',
     auto_top_up_enabled: false,
     stripe_customer_id: 'cus_test123',

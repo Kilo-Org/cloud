@@ -41,6 +41,12 @@ RUN apt-get update \
     && node --version \
     && npm --version
 
+# Route npm's git-backed deps (GitHub refs, ssh:// transitive deps like
+# baileys → libsignal-node) through https during the build so we don't need
+# an ssh client in the image. The final stage removes /etc/gitconfig so this
+# build-only config does not ship in the runtime image.
+RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.com/"
+
 # Install pnpm globally
 RUN npm install -g pnpm
 
@@ -62,6 +68,23 @@ RUN npm install -g openclaw@2026.4.9 \
     && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null; then echo "ERROR: old 5e3 value still present after patch" >&2; exit 1; fi \
     && echo "OK: patched DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
     && openclaw --version
+
+# Bake bundled plugin runtime deps into the image so first boot is pure
+# startup — no npm install from `openclaw doctor` on shared-cpu Fly machines.
+# Each step writes to a temp file and is chained with && so failures break
+# the build (Debian's /bin/sh is dash, no pipefail). jq does the workspace:
+# filter so no pipe is needed between jq and sort.
+RUN cd /usr/local/lib/node_modules/openclaw \
+    && jq -r '((.dependencies // {}) + (.optionalDependencies // {})) | to_entries[] | select(.value | startswith("workspace:") | not) | "\(.key)@\(.value)"' \
+         dist/extensions/*/package.json > /tmp/bundled-plugin-specs.raw \
+    && sort -u /tmp/bundled-plugin-specs.raw > /tmp/bundled-plugin-specs.txt \
+    && test -s /tmp/bundled-plugin-specs.txt \
+    && xargs -a /tmp/bundled-plugin-specs.txt npm install \
+           --omit=dev --no-save --package-lock=false \
+           --ignore-scripts --legacy-peer-deps \
+           --no-fund --no-audit \
+    && rm -f /tmp/bundled-plugin-specs.raw /tmp/bundled-plugin-specs.txt \
+    && rm -rf /root/.npm
 
 # Install ClawHub CLI
 RUN npm install -g clawhub
@@ -149,9 +172,12 @@ RUN cd /tmp/controller-build \
 FROM runtime AS final
 
 # Install prebuilt customizer plugin package from builder stage.
+# Also drop /etc/gitconfig (set earlier for the build's ssh→https rewrite) so
+# it doesn't persist in the runtime image.
 COPY --from=customizer-builder /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-customizer.tgz
 RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz \
     && rm -f /tmp/kiloclaw-customizer.tgz \
+    && rm -f /etc/gitconfig \
     && rm -rf /root/.npm
 
 # Copy the compiled controller from the builder stage

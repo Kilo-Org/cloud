@@ -9,17 +9,36 @@ type AutoModelVariation = {
   featureHeader: FeatureValue | null;
   sessionId: string | null;
   apiKind: GatewayRequest['kind'] | null;
+  clientIp: string | null;
   balance: number;
 };
 
-// A representative set of variations that covers the major resolution branches:
-// - Default routing (no mode/feature, zero balance)
-// - Paid balance (affects kilo-auto/small: routes to the non-free Gemma variant)
-// - Claw mode with kiloclaw feature (routes balanced→claw model, frontier→Opus)
+// we don't vary apiKind for now because messages/responses use on kilo-auto is currently rare
 const VARIATIONS: AutoModelVariation[] = [
-  { modeHeader: null, featureHeader: null, sessionId: null, apiKind: null, balance: 0 },
-  { modeHeader: null, featureHeader: null, sessionId: null, apiKind: null, balance: 1 },
-  { modeHeader: 'claw', featureHeader: 'kiloclaw', sessionId: null, apiKind: null, balance: 0 },
+  {
+    modeHeader: null,
+    featureHeader: null,
+    sessionId: null,
+    apiKind: null,
+    clientIp: null,
+    balance: 0,
+  },
+  {
+    modeHeader: null,
+    featureHeader: null,
+    sessionId: null,
+    apiKind: null,
+    clientIp: null,
+    balance: 1,
+  },
+  {
+    modeHeader: 'claw',
+    featureHeader: 'kiloclaw',
+    sessionId: null,
+    apiKind: null,
+    clientIp: null,
+    balance: 0,
+  },
 ];
 
 export async function getMonitoredModels() {

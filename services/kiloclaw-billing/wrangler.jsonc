@@ -6,6 +6,7 @@
   "compatibility_date": "2026-04-07",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
+  "preview_urls": false,
   "logpush": true,
   "dev": {
     "port": 8807,
@@ -19,10 +20,19 @@
     "cpu_ms": 120000,
   },
   "triggers": {
-    "crons": ["0 * * * *"],
+    "crons": ["0 * * * *", "0 8 * * *"],
   },
   "vars": {
     "KILOCODE_BACKEND_BASE_URL": "https://app.kilo.ai",
+    "TRIAL_INACTIVITY_STOP_ENABLED": "true",
+    "TRIAL_INACTIVITY_STOP_DRY_RUN": "false",
+    "SNOWFLAKE_ACCOUNT_HOST": "fyc17898.us-east-1.snowflakecomputing.com",
+    "SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER": "FYC17898",
+    "SNOWFLAKE_USERNAME": "KILOCODE_USER",
+    "SNOWFLAKE_ROLE": "KILOCODE_ROLE",
+    "SNOWFLAKE_WAREHOUSE": "WH_KILOCODE",
+    "SNOWFLAKE_DATABASE": "KILO_DW",
+    "SNOWFLAKE_SCHEMA": "DBT_PROD",
   },
   "hyperdrive": [
     {
@@ -37,6 +47,10 @@
         "binding": "LIFECYCLE_QUEUE",
         "queue": "kiloclaw-billing-lifecycle",
       },
+      {
+        "binding": "TRIAL_INACTIVITY_QUEUE",
+        "queue": "kiloclaw-billing-trial-inactivity",
+      },
     ],
     "consumers": [
       {
@@ -47,12 +61,21 @@
         "max_concurrency": 1,
         "dead_letter_queue": "kiloclaw-billing-lifecycle-dlq",
       },
+      {
+        "queue": "kiloclaw-billing-trial-inactivity",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "max_concurrency": 5,
+        "dead_letter_queue": "kiloclaw-billing-trial-inactivity-dlq",
+      },
     ],
   },
   "services": [
     {
       "binding": "KILOCLAW",
       "service": "kiloclaw",
+      "environment": "production",
     },
   ],
   // Secrets:
@@ -61,4 +84,6 @@
   // - STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: canonical Stripe intro price ID shared with standard-plan reporting
   // - INTERNAL_API_SECRET: auth for the Next.js billing side-effect endpoint
   // - KILOCLAW_INTERNAL_API_SECRET: auth for /api/platform/* on the kiloclaw worker
+  // - SNOWFLAKE_PRIVATE_KEY_PEM: Snowflake JWT private key in raw PEM format
+  // - SNOWFLAKE_PUBLIC_KEY_FINGERPRINT: Snowflake JWT public key fingerprint
 }

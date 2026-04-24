@@ -11,6 +11,13 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-04-20',
+    description:
+      'Added support for Vector Search, Embedding Models, and Dreaming in Memory configuration. Vector Search lets your agent find relevant context across its memory files using semantic embeddings instead of plain keyword matches. Pick the Embedding Model that generates those vectors to trade off quality, speed, and cost. Dreaming runs in the background and promotes strong short-term signals into durable long-term memory, so the agent remembers what matters across sessions.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
     date: '2026-04-15',
     description:
       'KiloClaw instances now come with a read-only email address for receiving messages and notifications without granting send access. You can find the address on the KiloClaw settings page.',

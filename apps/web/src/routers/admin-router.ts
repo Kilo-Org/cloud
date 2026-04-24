@@ -33,18 +33,21 @@ import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router'
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
+import { creditCampaignsRouter } from '@/routers/admin/credit-campaigns-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
 import { adminGastownRouter } from '@/routers/admin/gastown-router';
 import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router';
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
-import { adminSecurityAdvisorContentRouter } from '@/routers/admin/security-advisor-content-router';
+import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
+import { adminShellSecurityContentRouter } from '@/routers/admin/shell-security-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
+import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
 import { eq, and, ne, or, ilike, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
@@ -260,7 +263,7 @@ const ResetToMagicLinkLoginSchema = z.object({
 
 const UpdateUserBlockStatusSchema = z.object({
   userId: z.string(),
-  blocked_reason: z.string().nullable(),
+  blocked_reason: z.string().trim().min(1).nullable(),
 });
 
 const GetStytchFingerprintsSchema = z.object({
@@ -477,10 +480,22 @@ export const adminRouter = createTRPCRouter({
 
     updateBlockStatus: adminProcedure
       .input(UpdateUserBlockStatusSchema)
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        const blockMetadata = input.blocked_reason
+          ? {
+              blocked_reason: input.blocked_reason,
+              blocked_at: new Date().toISOString(),
+              blocked_by_kilo_user_id: ctx.user.id,
+            }
+          : {
+              blocked_reason: null,
+              blocked_at: null,
+              blocked_by_kilo_user_id: null,
+            };
+
         await db
           .update(kilocode_users)
-          .set({ blocked_reason: input.blocked_reason })
+          .set(blockMetadata)
           .where(eq(kilocode_users.id, input.userId));
 
         return successResult();
@@ -953,6 +968,7 @@ export const adminRouter = createTRPCRouter({
             .where(
               and(
                 eq(kiloclaw_instances.user_id, input.userId),
+                isNull(kiloclaw_instances.organization_id),
                 isNull(kiloclaw_instances.destroyed_at)
               )
             )
@@ -961,7 +977,19 @@ export const adminRouter = createTRPCRouter({
           if (activeInstance) {
             try {
               const client = new KiloClawInternalClient();
-              await client.start(input.userId, workerInstanceId(activeInstance));
+              const startResult = await client.start(
+                input.userId,
+                workerInstanceId(activeInstance),
+                {
+                  reason: 'admin_request',
+                }
+              );
+              if (startResult.currentStatus === 'running') {
+                await clearTrialInactivityStopAfterStart({
+                  kiloUserId: input.userId,
+                  instanceId: activeInstance.id,
+                });
+              }
             } catch {
               // Best effort — instance will be startable by the user from the dashboard
             }
@@ -1399,7 +1427,11 @@ export const adminRouter = createTRPCRouter({
           if (!user.blocked_reason) {
             await tx
               .update(kilocode_users)
-              .set({ blocked_reason: input.reason })
+              .set({
+                blocked_reason: input.reason,
+                blocked_at: new Date().toISOString(),
+                blocked_by_kilo_user_id: ctx.user.id,
+              })
               .where(eq(kilocode_users.id, input.userId));
           }
 
@@ -1905,6 +1937,7 @@ export const adminRouter = createTRPCRouter({
   ossSponsorship: ossSponsorshipRouter,
   contributorChampions: contributorChampionsRouter,
   bulkUserCredits: bulkUserCreditsRouter,
+  creditCampaigns: creditCampaignsRouter,
   emailTesting: emailTestingRouter,
   botRequests: adminBotRequestsRouter,
   gastown: adminGastownRouter,
@@ -1912,6 +1945,11 @@ export const adminRouter = createTRPCRouter({
   customLlm: adminCustomLlmRouter,
   gatewayConfig: adminGatewayConfigRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
-  securityAdvisorContent: adminSecurityAdvisorContentRouter,
+  bulkBlock: adminBulkBlockRouter,
+  // Key kept as `securityAdvisorContent` for tRPC client compatibility —
+  // admin UI consumers reference `trpc.admin.securityAdvisorContent.*`.
+  // Backing router renamed to `adminShellSecurityContentRouter` as part of
+  // the shell-security rebrand; the key/symbol asymmetry is intentional.
+  securityAdvisorContent: adminShellSecurityContentRouter,
   freeModelUsage: adminFreeModelUsageRouter,
 });

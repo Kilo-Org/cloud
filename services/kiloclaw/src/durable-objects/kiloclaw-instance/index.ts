@@ -22,10 +22,19 @@ import type {
   ProviderState,
   KiloExaSearchMode,
 } from '../../schemas/instance-config';
-import { DEFAULT_INSTANCE_FEATURES, ProviderStateSchema } from '../../schemas/instance-config';
+import {
+  DEFAULT_INSTANCE_FEATURES,
+  DEFAULT_VECTOR_MEMORY_MODEL,
+  ProviderStateSchema,
+} from '../../schemas/instance-config';
 import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
 import * as fly from '../../fly/client';
 import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '../../auth/sandbox-id';
+import type {
+  KiloclawDestroyReason,
+  KiloclawStartReason,
+  KiloclawStopReason,
+} from '@kilocode/worker-utils';
 import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
@@ -69,6 +78,7 @@ import { nextAlarmTime, doLog, doError, doWarn, toLoggable, createReconcileConte
 import { attemptMetadataRecovery } from './reconcile';
 import { buildUserEnvVars, resolveImageTag, resolveRuntimeImageRef } from './config';
 import * as gateway from './gateway';
+import { buildChannelConfigPatch } from './channel-config';
 import * as pairing from './pairing';
 import * as kiloCliRun from './kilo-cli-run';
 import {
@@ -242,16 +252,27 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
   }
 
+  private async clearPendingStartReason(): Promise<void> {
+    if (this.s.pendingStartReason === null) {
+      return;
+    }
+
+    this.s.pendingStartReason = null;
+    await this.persist({ pendingStartReason: null });
+  }
+
   private async markStartFailedFromProvider(message: string): Promise<void> {
     const now = Date.now();
     this.s.status = 'stopped';
     this.s.startingAt = null;
+    this.s.pendingStartReason = null;
     this.s.lastStoppedAt = now;
     this.s.lastStartErrorMessage = message;
     this.s.lastStartErrorAt = now;
     await this.persist({
       status: 'stopped',
       startingAt: null,
+      pendingStartReason: null,
       lastStoppedAt: now,
       lastStartErrorMessage: message,
       lastStartErrorAt: now,
@@ -280,10 +301,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async markNonFlyRunningFromProvider(reason: 'start' | 'runtime'): Promise<void> {
     const startingAt = this.s.startingAt;
+    const startReason = reason === 'start' ? this.s.pendingStartReason : null;
     this.s.status = 'running';
     this.s.startingAt = null;
     this.s.restartingAt = null;
     this.s.restartUpdateSent = false;
+    this.s.pendingStartReason = reason === 'start' ? null : this.s.pendingStartReason;
     if (this.s.lastStartedAt === null) {
       this.s.lastStartedAt = Date.now();
     }
@@ -297,6 +320,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       startingAt: null,
       restartingAt: null,
       restartUpdateSent: false,
+      ...(reason === 'start' ? { pendingStartReason: null } : {}),
       lastStartedAt: this.s.lastStartedAt,
       healthCheckFailCount: 0,
       lastStartErrorMessage: null,
@@ -309,6 +333,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.emitEvent({
         event: 'instance.started',
         status: 'running',
+        label: startReason ?? undefined,
         durationMs: startingAt ? Date.now() - startingAt : undefined,
       });
     }
@@ -792,7 +817,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     if (isNew) {
-      await this.startAsync(userId);
+      await this.startAsync(userId, { reason: 'initial_provision' });
     }
 
     this.emitEvent({
@@ -808,10 +833,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     kilocodeApiKey?: string | null;
     kilocodeApiKeyExpiresAt?: string | null;
     kilocodeDefaultModel?: string | null;
+    vectorMemoryEnabled?: boolean;
+    vectorMemoryModel?: string | null;
+    dreamingEnabled?: boolean;
   }): Promise<{
     kilocodeApiKey: string | null;
     kilocodeApiKeyExpiresAt: string | null;
     kilocodeDefaultModel: string | null;
+    vectorMemoryEnabled: boolean;
+    vectorMemoryModel: string | null;
+    dreamingEnabled: boolean;
   }> {
     await this.loadState();
 
@@ -829,6 +860,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.kilocodeDefaultModel = patch.kilocodeDefaultModel;
       pending.kilocodeDefaultModel = this.s.kilocodeDefaultModel;
     }
+    if (patch.vectorMemoryEnabled !== undefined) {
+      this.s.vectorMemoryEnabled = patch.vectorMemoryEnabled;
+      pending.vectorMemoryEnabled = this.s.vectorMemoryEnabled;
+    }
+    if (patch.vectorMemoryModel !== undefined) {
+      this.s.vectorMemoryModel = patch.vectorMemoryModel;
+      pending.vectorMemoryModel = this.s.vectorMemoryModel;
+    }
+    if (patch.dreamingEnabled !== undefined) {
+      this.s.dreamingEnabled = patch.dreamingEnabled;
+      pending.dreamingEnabled = this.s.dreamingEnabled;
+    }
 
     if (Object.keys(pending).length > 0) {
       await this.ctx.storage.put(pending);
@@ -841,10 +884,78 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       });
     }
 
+    // Live-patch vector memory config on the running machine when toggled or model changed.
+    // Must include the full `remote` block (baseUrl, apiKey, headers) so OpenClaw routes
+    // embedding requests through the Kilo Gateway instead of the default OpenAI endpoint.
+    if (patch.vectorMemoryEnabled !== undefined || patch.vectorMemoryModel !== undefined) {
+      if (this.s.vectorMemoryEnabled) {
+        const model = this.s.vectorMemoryModel ?? DEFAULT_VECTOR_MEMORY_MODEL;
+        const baseUrl = this.env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
+        // Feature attribution for embedding calls — matches FEATURE_HEADER /
+        // FEATURE_VALUES in apps/web/src/lib/feature-detection.ts so that
+        // microdollar_usage_metadata.feature_id records 'kiloclaw-embedding'.
+        const headers: Record<string, string> = {
+          'x-kilocode-feature': 'kiloclaw-embedding',
+        };
+        if (this.s.orgId) {
+          headers['X-KiloCode-OrganizationId'] = this.s.orgId;
+        }
+        await gateway.patchConfigOnMachine(this.s, this.env, {
+          agents: {
+            defaults: {
+              memorySearch: {
+                enabled: true,
+                provider: 'openai',
+                model,
+                remote: {
+                  baseUrl,
+                  apiKey: this.s.kilocodeApiKey ?? '',
+                  headers,
+                },
+              },
+            },
+          },
+        });
+      } else {
+        // Send explicit nulls so deepMerge overwrites (rather than preserves)
+        // the stale remote block — the boot-time writer deletes these keys.
+        await gateway.patchConfigOnMachine(this.s, this.env, {
+          agents: {
+            defaults: {
+              memorySearch: {
+                enabled: false,
+                provider: null,
+                model: null,
+                remote: null,
+              },
+            },
+          },
+        });
+      }
+    }
+
+    // Live-patch dreaming config on the running machine when toggled.
+    if (patch.dreamingEnabled !== undefined) {
+      await gateway.patchConfigOnMachine(this.s, this.env, {
+        plugins: {
+          entries: {
+            'memory-core': {
+              config: {
+                dreaming: { enabled: this.s.dreamingEnabled },
+              },
+            },
+          },
+        },
+      });
+    }
+
     return {
       kilocodeApiKey: this.s.kilocodeApiKey,
       kilocodeApiKeyExpiresAt: this.s.kilocodeApiKeyExpiresAt,
       kilocodeDefaultModel: this.s.kilocodeDefaultModel,
+      vectorMemoryEnabled: this.s.vectorMemoryEnabled,
+      vectorMemoryModel: this.s.vectorMemoryModel,
+      dreamingEnabled: this.s.dreamingEnabled,
     };
   }
 
@@ -903,6 +1014,87 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
   }
 
+  /**
+   * Flush DO-side config that was patched while the gateway wasn't reachable
+   * (status !== 'running') to the live gateway now.
+   *
+   * Called:
+   * - From _startInner after status transitions to 'running' (covers the
+   *   common onboarding path where a client patches during 'starting').
+   * - From the alarm retry block when flags stayed set because the inline
+   *   gateway call failed, or because the starting→running transition was
+   *   driven by reconcileStarting instead of _startInner.
+   *
+   * No-op when nothing is pending. On per-field failure the flag stays true
+   * so the next alarm retries.
+   */
+  private async flushPendingConfigToGateway(reason: string): Promise<void> {
+    if (this.s.status !== 'running' || !getRuntimeId(this.s)) return;
+
+    const pending: Partial<PersistedState> = {};
+
+    if (this.s.botIdentityApplyPending) {
+      try {
+        await gateway.writeBotIdentity(this.s, this.env, {
+          botName: this.s.botName,
+          botNature: this.s.botNature,
+          botVibe: this.s.botVibe,
+          botEmoji: this.s.botEmoji,
+        });
+        this.s.botIdentityApplyPending = false;
+        pending.botIdentityApplyPending = false;
+        doLog(this.s, 'flushPendingConfigToGateway: bot identity applied', { reason });
+      } catch (err) {
+        doWarn(this.s, 'flushPendingConfigToGateway: bot identity failed; will retry', {
+          reason,
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    if (this.s.execPresetApplyPending) {
+      try {
+        await gateway.patchOpenclawConfig(this.s, this.env, {
+          tools: {
+            exec: {
+              security: this.s.execSecurity,
+              ask: this.s.execAsk,
+            },
+          },
+        });
+        this.s.execPresetApplyPending = false;
+        pending.execPresetApplyPending = false;
+        doLog(this.s, 'flushPendingConfigToGateway: exec preset applied', { reason });
+      } catch (err) {
+        doWarn(this.s, 'flushPendingConfigToGateway: exec preset failed; will retry', {
+          reason,
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    if (this.s.channelsApplyPending) {
+      try {
+        const patch = buildChannelConfigPatch(this.env, this.s.channels);
+        if (patch) {
+          await gateway.patchOpenclawConfig(this.s, this.env, patch);
+        }
+        this.s.channelsApplyPending = false;
+        pending.channelsApplyPending = false;
+        doLog(this.s, 'flushPendingConfigToGateway: channels applied', { reason });
+      } catch (err) {
+        doWarn(this.s, 'flushPendingConfigToGateway: channels failed; will retry', {
+          reason,
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    if (Object.keys(pending).length > 0) {
+      await this.ctx.storage.put(pending);
+    }
+  }
+
   async updateExecPreset(patch: {
     security?: string;
     ask?: string;
@@ -920,8 +1112,34 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       pending.execAsk = patch.ask;
     }
 
-    if (Object.keys(pending).length > 0) {
-      await this.ctx.storage.put(pending);
+    if (Object.keys(pending).length === 0) {
+      return {
+        execSecurity: this.s.execSecurity,
+        execAsk: this.s.execAsk,
+      };
+    }
+
+    this.s.execPresetApplyPending = true;
+    pending.execPresetApplyPending = true;
+    await this.ctx.storage.put(storageUpdate(pending));
+
+    if (this.s.status === 'running') {
+      try {
+        await gateway.patchOpenclawConfig(this.s, this.env, {
+          tools: {
+            exec: {
+              security: this.s.execSecurity,
+              ask: this.s.execAsk,
+            },
+          },
+        });
+        this.s.execPresetApplyPending = false;
+        await this.ctx.storage.put(storageUpdate({ execPresetApplyPending: false }));
+      } catch (err) {
+        doWarn(this.s, 'updateExecPreset: gateway patch failed; deferring to alarm', {
+          error: toLoggable(err),
+        });
+      }
     }
 
     return {
@@ -983,17 +1201,36 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       pending.botEmoji = patch.botEmoji;
     }
 
-    if (Object.keys(pending).length > 0) {
-      await this.ctx.storage.put(pending);
-    }
-
-    if (this.s.status === 'running' && Object.keys(pending).length > 0) {
-      await gateway.writeBotIdentity(this.s, this.env, {
+    if (Object.keys(pending).length === 0) {
+      return {
         botName: this.s.botName,
         botNature: this.s.botNature,
         botVibe: this.s.botVibe,
         botEmoji: this.s.botEmoji,
-      });
+      };
+    }
+
+    this.s.botIdentityApplyPending = true;
+    pending.botIdentityApplyPending = true;
+    await this.ctx.storage.put(storageUpdate(pending));
+
+    if (this.s.status === 'running') {
+      try {
+        await gateway.writeBotIdentity(this.s, this.env, {
+          botName: this.s.botName,
+          botNature: this.s.botNature,
+          botVibe: this.s.botVibe,
+          botEmoji: this.s.botEmoji,
+        });
+        this.s.botIdentityApplyPending = false;
+        await this.ctx.storage.put(storageUpdate({ botIdentityApplyPending: false }));
+      } catch (err) {
+        // Gateway reachable only after flyMachineId + controller up; on
+        // transient failure, keep the alarm retry path queued.
+        doWarn(this.s, 'updateBotIdentity: gateway write failed; deferring to alarm', {
+          error: toLoggable(err),
+        });
+      }
     }
 
     return {
@@ -1016,13 +1253,52 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     slackApp: boolean;
   }> {
     const secretsPatch: Record<string, EncryptedEnvelope | null> = {};
+    let includesRemoval = false;
+    let includesAddition = false;
     for (const [key, value] of Object.entries(patch)) {
       if (value !== undefined) {
         secretsPatch[key] = value;
+        if (value === null) {
+          includesRemoval = true;
+        } else {
+          includesAddition = true;
+        }
       }
     }
 
     const { configured } = await this.updateSecrets(secretsPatch);
+
+    const pending: Partial<PersistedState> = {};
+    if (Object.keys(secretsPatch).length > 0) {
+      if (includesAddition && this.s.status === 'running' && getRuntimeId(this.s)) {
+        try {
+          const configPatch = buildChannelConfigPatch(this.env, this.s.channels);
+          if (configPatch) {
+            await gateway.patchOpenclawConfig(this.s, this.env, configPatch);
+          }
+          this.s.channelsApplyPending = false;
+          pending.channelsApplyPending = false;
+        } catch (err) {
+          doWarn(this.s, 'updateChannels: gateway patch failed; deferring to alarm', {
+            error: toLoggable(err),
+          });
+          this.s.channelsApplyPending = true;
+          pending.channelsApplyPending = true;
+        }
+      } else if (includesAddition) {
+        this.s.channelsApplyPending = true;
+        pending.channelsApplyPending = true;
+      } else if (includesRemoval && (!this.s.channelsApplyPending || !this.s.channels)) {
+        // Removals are not live-applied, but do not erase a pending additive replay
+        // while other channel config remains queued for the gateway.
+        this.s.channelsApplyPending = false;
+        pending.channelsApplyPending = false;
+      }
+    }
+
+    if (Object.keys(pending).length > 0) {
+      await this.ctx.storage.put(pending);
+    }
 
     return {
       telegram: configured.includes('telegramBotToken'),
@@ -1417,14 +1693,24 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   async start(
     userId?: string,
-    options?: { skipCooldown?: boolean }
-  ): Promise<{ started: boolean }> {
+    options?: { skipCooldown?: boolean; reason?: KiloclawStartReason }
+  ): Promise<{
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     // Guard against concurrent start() calls — two overlapping invocations
     // (e.g. startAsync via waitUntil + a direct RPC start) can both see
     // flyMachineId as null and each create a Fly machine, orphaning one.
     if (this.startInProgress) {
       doWarn(this.s, 'start: already in progress, skipping duplicate call');
-      return { started: false };
+      return {
+        started: false,
+        previousStatus: this.s.status,
+        currentStatus: this.s.status,
+        startedAt: this.s.lastStartedAt,
+      };
     }
     this.startInProgress = true;
 
@@ -1437,9 +1723,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async _startInner(
     userId?: string,
-    options?: { skipCooldown?: boolean }
-  ): Promise<{ started: boolean }> {
+    options?: { skipCooldown?: boolean; reason?: KiloclawStartReason }
+  ): Promise<{
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     await this.loadState();
+    const previousStatus = this.s.status;
+    const startReason = options?.reason ?? this.s.pendingStartReason;
 
     if (this.s.status === 'destroying') {
       throw new Error('Cannot start: instance is being destroyed');
@@ -1560,8 +1853,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
               createReconcileContext(this.s, this.env, 'start')
             );
             console.log('[DO] Machine already running, mount verified');
+            await this.clearPendingStartReason();
             await this.scheduleAlarm();
-            return { started: false };
+            return {
+              started: false,
+              previousStatus,
+              currentStatus: this.s.status,
+              startedAt: this.s.lastStartedAt,
+            };
           }
           console.log(
             '[DO] Status is running but machine state is:',
@@ -1653,12 +1952,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const currentStatus = await this.ctx.storage.get('status');
     if (!currentStatus || currentStatus === 'destroying') {
       doWarn(this.s, 'start: instance was destroyed while starting, aborting');
-      return { started: false };
+      if (currentStatus === 'destroying') {
+        await this.clearPendingStartReason();
+      } else {
+        this.s.pendingStartReason = null;
+      }
+      return {
+        started: false,
+        previousStatus,
+        currentStatus: typeof currentStatus === 'string' ? currentStatus : this.s.status,
+        startedAt: this.s.lastStartedAt,
+      };
     }
 
     const startingAt = this.s.startingAt;
     this.s.status = 'running';
     this.s.startingAt = null;
+    this.s.pendingStartReason = null;
     this.s.lastStartedAt = Date.now();
     this.s.healthCheckFailCount = 0;
     this.s.lastStartErrorMessage = null;
@@ -1666,6 +1976,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.persist({
       status: 'running',
       startingAt: null,
+      pendingStartReason: null,
       lastStartedAt: this.s.lastStartedAt,
       healthCheckFailCount: 0,
       flyMachineId: this.s.flyMachineId,
@@ -1674,15 +1985,22 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
 
     await this.syncGoogleWorkspaceConfig('instance_started');
+    await this.flushPendingConfigToGateway('instance_started');
 
     this.emitEvent({
       event: 'instance.started',
       status: 'running',
+      label: startReason ?? undefined,
       durationMs: startingAt ? Date.now() - startingAt : undefined,
     });
 
     await this.scheduleAlarm();
-    return { started: true };
+    return {
+      started: true,
+      previousStatus,
+      currentStatus: this.s.status,
+      startedAt: this.s.lastStartedAt,
+    };
   }
 
   /**
@@ -1691,7 +2009,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Used by provision() so the RPC call returns quickly instead of waiting for
    * the full runtime startup sequence.
    */
-  async startAsync(userId?: string): Promise<void> {
+  async startAsync(userId?: string, options?: { reason?: KiloclawStartReason }): Promise<void> {
     await this.loadState();
 
     if (this.s.status === 'destroying') {
@@ -1708,13 +2026,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // Record startingAt so reconcileStarting() can time out after STARTING_TIMEOUT_MS.
     this.s.status = 'starting';
     this.s.startingAt = Date.now();
-    await this.persist({ status: 'starting', startingAt: this.s.startingAt });
+    this.s.pendingStartReason = options?.reason ?? null;
+    await this.persist({
+      status: 'starting',
+      startingAt: this.s.startingAt,
+      pendingStartReason: this.s.pendingStartReason,
+    });
     await this.scheduleAlarm();
 
     // Run the actual start in the background; the reconcile alarm will
     // pick up the result and transition to 'running' (or fall back on error).
     this.ctx.waitUntil(
-      this.start(userId).catch(async err => {
+      this.start(userId, { reason: options?.reason }).catch(async err => {
         doError(this.s, 'startAsync: background start failed', {
           error: toLoggable(err),
         });
@@ -1784,12 +2107,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     );
   }
 
-  async stop(): Promise<void> {
+  async stop(options?: { reason?: KiloclawStopReason }): Promise<{
+    stopped: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    stoppedAt: number | null;
+  }> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.sandboxId) {
       throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
     }
+    const previousStatus = this.s.status;
     if (
       this.s.status === 'stopped' ||
       this.s.status === 'provisioned' ||
@@ -1800,7 +2129,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.status === 'restoring'
     ) {
       console.log('[DO] Instance not running (status:', this.s.status, '), no-op');
-      return;
+      return {
+        stopped: false,
+        previousStatus,
+        currentStatus: this.s.status,
+        stoppedAt: this.s.lastStoppedAt,
+      };
     }
 
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
@@ -1833,13 +2167,21 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.emitEvent({
       event: 'instance.stopped',
       status: 'stopped',
+      label: options?.reason,
       value: machineUptimeMs,
     });
 
     await this.scheduleAlarm();
+
+    return {
+      stopped: true,
+      previousStatus,
+      currentStatus: this.s.status,
+      stoppedAt: this.s.lastStoppedAt,
+    };
   }
 
-  async destroy(): Promise<DestroyResult> {
+  async destroy(options?: { reason?: KiloclawDestroyReason }): Promise<DestroyResult> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.sandboxId) {
@@ -1869,6 +2211,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.emitEvent({
       event: 'instance.destroy_started',
       status: 'destroying',
+      label: options?.reason,
       value: machineUptimeMs,
     });
 
@@ -2259,7 +2602,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
-  async getConfig(): Promise<InstanceConfig> {
+  async getConfig(): Promise<
+    InstanceConfig & {
+      vectorMemoryEnabled: boolean;
+      vectorMemoryModel: string | null;
+      dreamingEnabled: boolean;
+    }
+  > {
     await this.loadState();
     return {
       envVars: this.s.envVars ?? undefined,
@@ -2276,6 +2625,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       channels: this.s.channels ?? undefined,
       machineSize: this.s.machineSize ?? undefined,
       customSecretMeta: this.s.customSecretMeta ?? undefined,
+      vectorMemoryEnabled: this.s.vectorMemoryEnabled,
+      vectorMemoryModel: this.s.vectorMemoryModel,
+      dreamingEnabled: this.s.dreamingEnabled,
     };
   }
 
@@ -2722,6 +3074,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.writeFile(this.s, this.env, filePath, content, etag);
   }
 
+  async importOpenclawWorkspace(files: Array<{ path: string; content: string }>) {
+    await this.loadState();
+    return gateway.importOpenclawWorkspace(this.s, this.env, files);
+  }
+
   // ── Restart machine (user-facing) ──────────────────────────────────
 
   async restartMachine(options?: {
@@ -3017,6 +3374,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       await this.syncGoogleWorkspaceConfig('alarm_retry');
     }
 
+    // Flushes patches that landed in DO state while status was not 'running'
+    // (Window B of the onboarding timing analysis). Covers both the rare path
+    // where reconcileStarting — not _startInner — flipped status to 'running'
+    // in a prior alarm tick, and the case where an inline gateway call failed.
+    if (
+      (this.s.botIdentityApplyPending ||
+        this.s.execPresetApplyPending ||
+        this.s.channelsApplyPending) &&
+      this.s.status === 'running'
+    ) {
+      await this.flushPendingConfigToGateway('alarm_retry');
+    }
+
     if (this.s.status !== 'recovering') {
       await cleanupPendingRecoveryVolumeIfNeeded(
         this.recoveryRuntime(),
@@ -3055,7 +3425,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         this.s,
         this.env,
         'alarm',
-        () => this.destroy().then(() => undefined),
+        () => this.destroy({ reason: 'stale_provision_cleanup' }).then(() => undefined),
         (userId, sandboxId) =>
           markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
       );

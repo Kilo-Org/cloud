@@ -64,7 +64,13 @@ import {
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { stripAnsi } from '@/lib/stripAnsi';
-import { DetailField, formatAbsoluteTime, formatRelativeTime, parseTimestamp } from './shared';
+import {
+  DetailField,
+  EventLabelCell,
+  formatAbsoluteTime,
+  formatRelativeTime,
+  parseTimestamp,
+} from './shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { AdminFileEditor } from './AdminFileEditor';
@@ -953,7 +959,7 @@ function EventsTable({ rows }: { rows: KiloclawEventRow[] }) {
             <th className="pr-4 pb-2">Event</th>
             <th className="pr-4 pb-2">Delivery</th>
             <th className="pr-4 pb-2">Status</th>
-            <th className="pr-4 pb-2">Label</th>
+            <th className="pr-4 pb-2">Attribution / Label</th>
             <th className="pr-4 pb-2">Duration</th>
             <th className="pb-2">Error</th>
           </tr>
@@ -983,7 +989,7 @@ function EventsTable({ rows }: { rows: KiloclawEventRow[] }) {
                   <span className="text-xs">{row.status || '—'}</span>
                 </td>
                 <td className="py-2 pr-4">
-                  <span className="text-xs">{row.label || '—'}</span>
+                  <EventLabelCell event={row.event} label={row.label} />
                 </td>
                 <td className="py-2 pr-4 whitespace-nowrap">
                   <span className="text-xs">{formatDuration(row.duration_ms)}</span>
@@ -1732,7 +1738,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               <div className="flex items-center gap-3">
                 {isActive ? (
                   <>
-                    <Badge className="bg-green-600">Active</Badge>
+                    {data.lifecycle_state === 'suspended' ? (
+                      <Badge className="bg-amber-600">Suspended</Badge>
+                    ) : data.lifecycle_state === 'inactive_trial_stopped' ? (
+                      <Badge className="bg-sky-700">Inactive Trial Stopped</Badge>
+                    ) : (
+                      <Badge className="bg-green-600">Active</Badge>
+                    )}
                     <Button
                       variant="destructive"
                       size="sm"
@@ -1787,6 +1799,19 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 {data.destroyed_at ? (
                   <span title={formatAbsoluteTime(data.destroyed_at)}>
                     {formatRelativeTime(data.destroyed_at)}
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </DetailField>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Calendar className="text-muted-foreground h-4 w-4 shrink-0" />
+              <DetailField label="Inactive Trial Stopped At">
+                {data.inactive_trial_stopped_at ? (
+                  <span title={formatAbsoluteTime(data.inactive_trial_stopped_at)}>
+                    {formatRelativeTime(data.inactive_trial_stopped_at)}
                   </span>
                 ) : (
                   '—'

@@ -185,6 +185,45 @@ export const credit_transactions = pgTable(
 
 export type CreditTransaction = typeof credit_transactions.$inferSelect;
 
+export const credit_campaigns = pgTable(
+  'credit_campaigns',
+  {
+    id: serial().primaryKey().notNull(),
+    slug: text().notNull(),
+    credit_category: text().notNull(),
+    // Using integer (4-byte, max ~2.1B) rather than bigint because the
+    // amount_usd is Zod-capped at $1000 = 1e9 microdollars, well under
+    // int32. Keeps drizzle out of its bigint read path, which returns
+    // native JS BigInt and chokes Next.js's RSC IO-tracing serializer.
+    amount_microdollars: integer().notNull(),
+    credit_expiry_hours: integer(),
+    campaign_ends_at: timestamp({ withTimezone: true, mode: 'string' }),
+    total_redemptions_allowed: integer().notNull(),
+    active: boolean().notNull().default(true),
+    description: text().notNull(),
+    created_by_kilo_user_id: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_credit_campaigns_slug').on(table.slug),
+    uniqueIndex('UQ_credit_campaigns_credit_category').on(table.credit_category),
+    check('credit_campaigns_slug_format_check', sql`${table.slug} ~ '^[a-z0-9-]{5,40}$'`),
+    check('credit_campaigns_amount_positive_check', sql`${table.amount_microdollars} > 0`),
+    check(
+      'credit_campaigns_credit_expiry_hours_positive_check',
+      sql`${table.credit_expiry_hours} IS NULL OR ${table.credit_expiry_hours} > 0`
+    ),
+    check(
+      'credit_campaigns_total_redemptions_allowed_positive_check',
+      sql`${table.total_redemptions_allowed} > 0`
+    ),
+  ]
+);
+
+export type CreditCampaign = typeof credit_campaigns.$inferSelect;
+export type NewCreditCampaign = typeof credit_campaigns.$inferInsert;
+
 /**
  * When adding or removing PII/account-linked columns, update
  * softDeleteUser() in src/lib/user.ts (and src/lib/user.test.ts) to
@@ -223,6 +262,8 @@ export const kilocode_users = pgTable(
     has_validation_stytch: boolean(),
     has_validation_novel_card_with_hold: boolean().default(false).notNull(),
     blocked_reason: text(),
+    blocked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    blocked_by_kilo_user_id: text(),
     api_token_pepper: text(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     is_bot: boolean().default(false).notNull(),
@@ -247,6 +288,8 @@ export const kilocode_users = pgTable(
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
     index('IDX_kilocode_users_signup_ip_created_at').on(table.signup_ip, table.created_at),
+    index('IDX_kilocode_users_blocked_at').on(table.blocked_at),
+    index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
@@ -3722,6 +3765,7 @@ export const kiloclaw_instances = pgTable(
     organization_id: uuid().references(() => organizations.id),
     name: text(),
     inbound_email_enabled: boolean().default(true).notNull(),
+    inactive_trial_stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
@@ -4209,6 +4253,70 @@ export const app_min_versions = pgTable('app_min_versions', {
 export type AppMinVersions = typeof app_min_versions.$inferSelect;
 export type NewBotRequest = typeof bot_requests.$inferInsert;
 
+// ─── Bot Request Cloud Agent Sessions ───────────────────────────────
+
+export type BotRequestCloudAgentSessionStatus =
+  | 'prepared'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'interrupted';
+
+export const bot_request_cloud_agent_sessions = pgTable(
+  'bot_request_cloud_agent_sessions',
+  {
+    id: idPrimaryKeyColumn,
+
+    bot_request_id: uuid()
+      .notNull()
+      .references(() => bot_requests.id, { onDelete: 'cascade' }),
+
+    spawn_group_id: uuid(),
+
+    cloud_agent_session_id: text().notNull(),
+    kilo_session_id: text(),
+    execution_id: text(),
+
+    status: text().notNull().$type<BotRequestCloudAgentSessionStatus>().default('running'),
+
+    mode: text().$type<'code' | 'ask'>(),
+
+    github_repo: text(),
+    gitlab_project: text(),
+
+    callback_step: integer().notNull().default(0),
+    error_message: text(),
+    final_message: text(),
+    final_message_fetched_at: timestamp({ withTimezone: true, mode: 'string' }),
+    final_message_error: text(),
+
+    terminal_at: timestamp({ withTimezone: true, mode: 'string' }),
+    continuation_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_bot_request_cas_cloud_agent_session_id').on(table.cloud_agent_session_id),
+    index('IDX_bot_request_cas_bot_request_id').on(table.bot_request_id),
+    index('IDX_bot_request_cas_bot_request_id_spawn_group_id').on(
+      table.bot_request_id,
+      table.spawn_group_id
+    ),
+    index('IDX_bot_request_cas_bot_request_id_spawn_group_id_status').on(
+      table.bot_request_id,
+      table.spawn_group_id,
+      table.status
+    ),
+  ]
+);
+
+export type BotRequestCloudAgentSession = typeof bot_request_cloud_agent_sessions.$inferSelect;
+export type NewBotRequestCloudAgentSession = typeof bot_request_cloud_agent_sessions.$inferInsert;
+
 // ─── KiloClaw CLI Runs ──────────────────────────────────────────────
 
 export type KiloClawCliRunStatus = 'running' | 'completed' | 'failed' | 'cancelled';
@@ -4369,7 +4477,7 @@ export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
 // Three tables are read together by a TTL-cached content loader and injected
 // into the report generator so copy changes (check descriptions, KiloClaw
 // coverage blurbs, CTA copy) do not require a code deploy. Edited via the
-// admin UI under /admin/kiloclaw?tab=security-advisor-content. Rows can be
+// admin UI under /admin/kiloclaw?tab=shell-security-content. Rows can be
 // soft-disabled via is_active.
 //
 // Note on `updated_at`: `.$onUpdateFn(() => sql\`now()\`)` only fires on

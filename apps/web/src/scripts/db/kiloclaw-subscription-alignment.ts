@@ -17,6 +17,10 @@
  *   pnpm script db kiloclaw-subscription-alignment apply-changelog-baseline
  *   pnpm script db kiloclaw-subscription-alignment preview-multi-row-all-destroyed
  *   pnpm script db kiloclaw-subscription-alignment apply-multi-row-all-destroyed
+ *   pnpm script db kiloclaw-subscription-alignment preview-personal-destroyed-current-access
+ *   pnpm script db kiloclaw-subscription-alignment apply-personal-destroyed-current-access [--confirm-cancel-credit-access]
+ *   pnpm script db kiloclaw-subscription-alignment preview-org-destroyed-current-chain
+ *   pnpm script db kiloclaw-subscription-alignment apply-org-destroyed-current-chain
  *
  * Flags:
  *   --confirm-sandboxes-destroyed   Required for apply-duplicates to write
@@ -26,6 +30,10 @@
  *     itself and would hide the row from apply-duplicates). Without this
  *     flag, apply-duplicates prints a manifest of duplicate sandbox IDs and
  *     exits without writes.
+ *
+ *   --confirm-cancel-credit-access   Required for apply-personal-destroyed-current-access
+ *     to cancel active credit-funded standard/commit rows. Without this flag,
+ *     those rows are reported but not mutated.
  *
  *   --bulk   Enables chunked bulk write path for low-risk, high-volume
  *     backfills. Used by:
@@ -53,7 +61,7 @@
  * it. No instances are touched. Safe to run without flags.
  */
 
-import { and, asc, desc, eq, inArray, isNull, notExists, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, notExists, or, sql } from 'drizzle-orm';
 
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import {
@@ -93,7 +101,11 @@ type Mode =
   | 'preview-changelog-baseline'
   | 'apply-changelog-baseline'
   | 'preview-multi-row-all-destroyed'
-  | 'apply-multi-row-all-destroyed';
+  | 'apply-multi-row-all-destroyed'
+  | 'preview-personal-destroyed-current-access'
+  | 'apply-personal-destroyed-current-access'
+  | 'preview-org-destroyed-current-chain'
+  | 'apply-org-destroyed-current-chain';
 
 type PersonalInstanceWithoutRow = {
   instanceId: string;
@@ -246,6 +258,63 @@ type DuplicateActiveInstanceCandidate = {
 
 type MissingChangelogBaselineRow = KiloClawSubscription;
 
+export type PersonalDestroyedCurrentAccessAction =
+  | 'cancel_destroyed_trial'
+  | 'cancel_destroyed_credits_subscription'
+  | 'manual_review_stripe'
+  | 'manual_review_past_due'
+  | 'manual_review_unknown_access';
+
+export type PersonalDestroyedCurrentAccessCandidate = {
+  action: PersonalDestroyedCurrentAccessAction;
+  userId: string;
+  subscriptionId: string;
+  instanceId: string;
+  sandboxId: string;
+  plan: string;
+  status: string;
+  paymentSource: string | null;
+  stripeSubscriptionId: string | null;
+  trialEndsAt: string | null;
+  instanceDestroyedAt: string;
+  subscriptionCreatedAt: string;
+  subscriptionUpdatedAt: string;
+};
+
+export type PersonalDestroyedCurrentAccessApplyOutcome =
+  | 'canceled_trial'
+  | 'canceled_credits'
+  | 'skipped_no_work'
+  | 'skipped_requires_credit_confirmation'
+  | 'skipped_manual_review'
+  | 'skipped_has_live_current_row'
+  | 'skipped_multiple_current_rows'
+  | 'skipped_already_non_access'
+  | 'skipped_already_transferred'
+  | 'error';
+
+type OrgDestroyedCurrentChainSourceRow = {
+  organizationId: string;
+  userId: string;
+  subscriptionId: string;
+  instanceId: string;
+  sandboxId: string;
+  instanceDestroyedAt: string | null;
+  subscriptionCreatedAt: string;
+};
+
+type OrgDestroyedCurrentChainPair = {
+  sourceId: string;
+  targetId: string;
+};
+
+type OrgDestroyedCurrentChainCandidate = {
+  organizationId: string;
+  userId: string;
+  rows: OrgDestroyedCurrentChainSourceRow[];
+  pairs: OrgDestroyedCurrentChainPair[];
+};
+
 const ALIGNMENT_SCRIPT_ACTOR = {
   actorType: 'system',
   actorId: 'kiloclaw-subscription-alignment',
@@ -395,7 +464,7 @@ async function insertAlignmentChangeLog(
   writer: DbOrTx,
   params: {
     subscriptionId: string;
-    action: 'backfilled' | 'reassigned';
+    action: 'backfilled' | 'reassigned' | 'canceled';
     reason: string;
     before: KiloClawSubscription | null;
     after: KiloClawSubscription | null;
@@ -3366,6 +3435,700 @@ async function applyMultiRowAllDestroyedCollapse(options: ApplyOptions) {
   printSection('Users skipped during multi-row-all-destroyed apply', skipped.slice(0, 50));
 }
 
+function classifyPersonalDestroyedCurrentAccessRow(row: {
+  paymentSource: string | null;
+  plan: string;
+  status: string;
+  stripeSubscriptionId: string | null;
+}): PersonalDestroyedCurrentAccessAction {
+  if (row.paymentSource === 'stripe' || row.stripeSubscriptionId !== null) {
+    return 'manual_review_stripe';
+  }
+  if (row.status === 'past_due') {
+    return 'manual_review_past_due';
+  }
+  if (row.plan === 'trial' && row.status === 'trialing' && row.paymentSource === null) {
+    return 'cancel_destroyed_trial';
+  }
+  if (
+    (row.plan === 'standard' || row.plan === 'commit') &&
+    row.status === 'active' &&
+    row.paymentSource === 'credits'
+  ) {
+    return 'cancel_destroyed_credits_subscription';
+  }
+  return 'manual_review_unknown_access';
+}
+
+export async function listPersonalDestroyedCurrentAccessCandidates(): Promise<
+  PersonalDestroyedCurrentAccessCandidate[]
+> {
+  const { rows } = await db.execute<{
+    user_id: string;
+    subscription_id: string;
+    instance_id: string;
+    sandbox_id: string;
+    plan: string;
+    status: string;
+    payment_source: string | null;
+    stripe_subscription_id: string | null;
+    trial_ends_at: string | null;
+    instance_destroyed_at: string;
+    subscription_created_at: string;
+    subscription_updated_at: string;
+  }>(sql`
+    WITH current_personal AS (
+      SELECT
+        s.id AS subscription_id,
+        s.user_id,
+        s.instance_id,
+        s.plan,
+        s.status,
+        s.payment_source,
+        s.stripe_subscription_id,
+        s.suspended_at,
+        s.trial_ends_at,
+        s.created_at AS subscription_created_at,
+        s.updated_at AS subscription_updated_at,
+        i.sandbox_id,
+        i.destroyed_at AS instance_destroyed_at,
+        COUNT(*) OVER (PARTITION BY s.user_id) AS current_personal_count,
+        COUNT(*) FILTER (WHERE i.destroyed_at IS NULL) OVER (PARTITION BY s.user_id) AS live_current_personal_count
+      FROM ${kiloclaw_subscriptions} s
+      INNER JOIN ${kiloclaw_instances} i ON i.id = s.instance_id
+      WHERE s.transferred_to_subscription_id IS NULL
+        AND s.instance_id IS NOT NULL
+        AND i.user_id = s.user_id
+        AND i.organization_id IS NULL
+    )
+    SELECT
+      user_id,
+      subscription_id,
+      instance_id,
+      sandbox_id,
+      plan,
+      status,
+      payment_source,
+      stripe_subscription_id,
+      trial_ends_at,
+      instance_destroyed_at,
+      subscription_created_at,
+      subscription_updated_at
+    FROM current_personal
+    WHERE current_personal_count = 1
+      AND live_current_personal_count = 0
+      AND instance_destroyed_at IS NOT NULL
+      AND (
+        status = 'active'
+        OR (status = 'past_due' AND suspended_at IS NULL)
+        OR (status = 'trialing' AND trial_ends_at > now())
+      )
+    ORDER BY subscription_created_at DESC, subscription_id DESC
+  `);
+
+  return rows.map(row => ({
+    action: classifyPersonalDestroyedCurrentAccessRow({
+      paymentSource: row.payment_source,
+      plan: row.plan,
+      status: row.status,
+      stripeSubscriptionId: row.stripe_subscription_id,
+    }),
+    userId: row.user_id,
+    subscriptionId: row.subscription_id,
+    instanceId: row.instance_id,
+    sandboxId: row.sandbox_id,
+    plan: row.plan,
+    status: row.status,
+    paymentSource: row.payment_source,
+    stripeSubscriptionId: row.stripe_subscription_id,
+    trialEndsAt: row.trial_ends_at,
+    instanceDestroyedAt: row.instance_destroyed_at,
+    subscriptionCreatedAt: row.subscription_created_at,
+    subscriptionUpdatedAt: row.subscription_updated_at,
+  }));
+}
+
+function summarizePersonalDestroyedCurrentAccessCandidates(
+  candidates: PersonalDestroyedCurrentAccessCandidate[]
+): Array<{ action: PersonalDestroyedCurrentAccessAction; count: number }> {
+  const actions: PersonalDestroyedCurrentAccessAction[] = [
+    'cancel_destroyed_trial',
+    'cancel_destroyed_credits_subscription',
+    'manual_review_stripe',
+    'manual_review_past_due',
+    'manual_review_unknown_access',
+  ];
+  return actions.map(action => ({
+    action,
+    count: candidates.filter(candidate => candidate.action === action).length,
+  }));
+}
+
+async function previewPersonalDestroyedCurrentAccess() {
+  const candidates = await listPersonalDestroyedCurrentAccessCandidates();
+
+  console.log('\npersonal-destroyed-current-access preview');
+  console.table(summarizePersonalDestroyedCurrentAccessCandidates(candidates));
+
+  for (const action of [
+    'cancel_destroyed_trial',
+    'cancel_destroyed_credits_subscription',
+    'manual_review_stripe',
+    'manual_review_past_due',
+    'manual_review_unknown_access',
+  ] satisfies PersonalDestroyedCurrentAccessAction[]) {
+    printSection(
+      `Sample rows for ${action}`,
+      candidates
+        .filter(candidate => candidate.action === action)
+        .slice(0, 25)
+        .map(candidate => ({
+          userId: candidate.userId,
+          subscriptionId: candidate.subscriptionId,
+          instanceId: candidate.instanceId,
+          sandboxId: candidate.sandboxId,
+          plan: candidate.plan,
+          status: candidate.status,
+          paymentSource: candidate.paymentSource,
+          stripeSubscriptionId: candidate.stripeSubscriptionId,
+          trialEndsAt: candidate.trialEndsAt,
+          instanceDestroyedAt: candidate.instanceDestroyedAt,
+          subscriptionCreatedAt: candidate.subscriptionCreatedAt,
+          subscriptionUpdatedAt: candidate.subscriptionUpdatedAt,
+        }))
+    );
+  }
+}
+
+async function lockCurrentPersonalSubscriptionRowsForUser(
+  tx: DrizzleTransaction,
+  userId: string
+): Promise<void> {
+  await tx.execute(sql`
+    SELECT s.id
+    FROM ${kiloclaw_subscriptions} s
+    INNER JOIN ${kiloclaw_instances} i ON i.id = s.instance_id
+    WHERE s.user_id = ${userId}
+      AND s.transferred_to_subscription_id IS NULL
+      AND s.instance_id IS NOT NULL
+      AND i.user_id = s.user_id
+      AND i.organization_id IS NULL
+    FOR UPDATE OF s
+  `);
+}
+
+export async function applyPersonalDestroyedCurrentAccessRow(
+  candidate: PersonalDestroyedCurrentAccessCandidate,
+  options: ApplyOptions
+): Promise<PersonalDestroyedCurrentAccessApplyOutcome> {
+  if (
+    candidate.action === 'cancel_destroyed_credits_subscription' &&
+    !options.confirmCancelCreditAccess
+  ) {
+    return 'skipped_requires_credit_confirmation';
+  }
+  if (candidate.action.startsWith('manual_review_')) {
+    return 'skipped_manual_review';
+  }
+
+  return await db.transaction(async tx => {
+    await lockCurrentPersonalSubscriptionRowsForUser(tx, candidate.userId);
+
+    const [targetSubscription] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, candidate.subscriptionId))
+      .limit(1);
+
+    if (!targetSubscription) {
+      return 'skipped_no_work' as const;
+    }
+    if (targetSubscription.transferred_to_subscription_id !== null) {
+      return 'skipped_already_transferred' as const;
+    }
+
+    const currentRows = await tx
+      .select({
+        subscription: kiloclaw_subscriptions,
+        instance: {
+          id: kiloclaw_instances.id,
+          userId: kiloclaw_instances.user_id,
+          sandboxId: kiloclaw_instances.sandbox_id,
+          organizationId: kiloclaw_instances.organization_id,
+          destroyedAt: kiloclaw_instances.destroyed_at,
+        },
+      })
+      .from(kiloclaw_subscriptions)
+      .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, candidate.userId),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
+          isNotNull(kiloclaw_subscriptions.instance_id),
+          eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id),
+          isNull(kiloclaw_instances.organization_id)
+        )
+      );
+
+    const liveCurrentRows = currentRows.filter(row => row.instance.destroyedAt === null);
+    if (liveCurrentRows.length > 0) {
+      return 'skipped_has_live_current_row' as const;
+    }
+    if (currentRows.length !== 1) {
+      return 'skipped_multiple_current_rows' as const;
+    }
+
+    const [currentRow] = currentRows;
+    if (!currentRow || currentRow.subscription.id !== candidate.subscriptionId) {
+      return 'skipped_no_work' as const;
+    }
+    if (currentRow.instance.destroyedAt === null) {
+      return 'skipped_has_live_current_row' as const;
+    }
+    if (!isAccessGrantingSubscription(currentRow.subscription, new Date())) {
+      return 'skipped_already_non_access' as const;
+    }
+
+    const action = classifyPersonalDestroyedCurrentAccessRow({
+      paymentSource: currentRow.subscription.payment_source,
+      plan: currentRow.subscription.plan,
+      status: currentRow.subscription.status,
+      stripeSubscriptionId: currentRow.subscription.stripe_subscription_id,
+    });
+    if (action === 'cancel_destroyed_credits_subscription' && !options.confirmCancelCreditAccess) {
+      return 'skipped_requires_credit_confirmation' as const;
+    }
+    if (action.startsWith('manual_review_')) {
+      return 'skipped_manual_review' as const;
+    }
+    if (action !== candidate.action) {
+      return 'skipped_no_work' as const;
+    }
+
+    const [updated] = await tx
+      .update(kiloclaw_subscriptions)
+      .set({
+        status: 'canceled',
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: null,
+        auto_resume_retry_after: null,
+        auto_resume_attempt_count: 0,
+        auto_top_up_triggered_for_period: null,
+        cancel_at_period_end: false,
+        pending_conversion: false,
+        scheduled_plan: null,
+        scheduled_by: null,
+      })
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.id, candidate.subscriptionId),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      return 'skipped_already_transferred' as const;
+    }
+
+    await insertAlignmentChangeLog(tx, {
+      subscriptionId: updated.id,
+      action: 'canceled',
+      reason:
+        action === 'cancel_destroyed_trial'
+          ? 'apply_personal_destroyed_current_access_cancel_trial'
+          : 'apply_personal_destroyed_current_access_cancel_credits',
+      before: currentRow.subscription,
+      after: updated,
+    });
+
+    return action === 'cancel_destroyed_trial' ? 'canceled_trial' : 'canceled_credits';
+  });
+}
+
+async function applyPersonalDestroyedCurrentAccess(options: ApplyOptions) {
+  const candidates = await listPersonalDestroyedCurrentAccessCandidates();
+  const results = {
+    users_succeeded: 0,
+    users_skipped_no_work: 0,
+    users_skipped_requires_credit_confirmation: 0,
+    users_skipped_manual_review: 0,
+    users_skipped_race: 0,
+    users_error: 0,
+    rows_canceled_trial: 0,
+    rows_canceled_credits: 0,
+    change_logs_written: 0,
+  };
+  const skipped: Array<{
+    userId: string;
+    subscriptionId: string;
+    instanceId: string;
+    action: PersonalDestroyedCurrentAccessAction;
+    outcome: PersonalDestroyedCurrentAccessApplyOutcome;
+    error?: string;
+  }> = [];
+  const startedAt = Date.now();
+
+  console.log(`\npersonal-destroyed-current-access apply: ${candidates.length} candidate row(s)`);
+
+  for (const [index, candidate] of candidates.entries()) {
+    try {
+      const outcome = await applyPersonalDestroyedCurrentAccessRow(candidate, options);
+      if (outcome === 'canceled_trial') {
+        results.users_succeeded += 1;
+        results.rows_canceled_trial += 1;
+        results.change_logs_written += 1;
+      } else if (outcome === 'canceled_credits') {
+        results.users_succeeded += 1;
+        results.rows_canceled_credits += 1;
+        results.change_logs_written += 1;
+      } else if (outcome === 'skipped_no_work') {
+        results.users_skipped_no_work += 1;
+        skipped.push({ ...candidate, outcome });
+      } else if (outcome === 'skipped_requires_credit_confirmation') {
+        results.users_skipped_requires_credit_confirmation += 1;
+        skipped.push({ ...candidate, outcome });
+      } else if (outcome === 'skipped_manual_review') {
+        results.users_skipped_manual_review += 1;
+        skipped.push({ ...candidate, outcome });
+      } else {
+        results.users_skipped_race += 1;
+        skipped.push({ ...candidate, outcome });
+      }
+    } catch (error) {
+      console.error('personal-destroyed-current-access row failed', {
+        userId: candidate.userId,
+        subscriptionId: candidate.subscriptionId,
+        action: candidate.action,
+        error: describeError(error),
+      });
+      results.users_error += 1;
+      skipped.push({ ...candidate, outcome: 'error', error: describeError(error) });
+    }
+
+    logApplyProgress({
+      label: 'apply-personal-destroyed-current-access',
+      processed: index + 1,
+      total: candidates.length,
+      startedAt,
+      every: 50,
+    });
+  }
+
+  console.log('\npersonal-destroyed-current-access apply results');
+  console.table(Object.entries(results).map(([metric, count]) => ({ metric, count })));
+  printSection(
+    'Rows skipped or errored during personal-destroyed-current-access apply',
+    skipped.slice(0, 50).map(row => ({
+      userId: row.userId,
+      subscriptionId: row.subscriptionId,
+      instanceId: row.instanceId,
+      action: row.action,
+      outcome: row.outcome,
+      error: row.error,
+    }))
+  );
+}
+
+async function listOrgDestroyedCurrentChainSourceRows(): Promise<
+  OrgDestroyedCurrentChainSourceRow[]
+> {
+  return await db
+    .select({
+      organizationId: kiloclaw_instances.organization_id,
+      userId: kiloclaw_subscriptions.user_id,
+      subscriptionId: kiloclaw_subscriptions.id,
+      instanceId: kiloclaw_instances.id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+      instanceDestroyedAt: kiloclaw_instances.destroyed_at,
+      subscriptionCreatedAt: kiloclaw_subscriptions.created_at,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
+        isNotNull(kiloclaw_instances.organization_id),
+        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id)
+      )
+    )
+    .orderBy(
+      asc(kiloclaw_instances.organization_id),
+      asc(kiloclaw_subscriptions.user_id),
+      asc(kiloclaw_subscriptions.created_at),
+      asc(kiloclaw_subscriptions.id)
+    )
+    .then(rows =>
+      rows.flatMap(row => {
+        if (!row.organizationId) return [];
+        return [
+          {
+            organizationId: row.organizationId,
+            userId: row.userId,
+            subscriptionId: row.subscriptionId,
+            instanceId: row.instanceId,
+            sandboxId: row.sandboxId,
+            instanceDestroyedAt: row.instanceDestroyedAt,
+            subscriptionCreatedAt: row.subscriptionCreatedAt,
+          },
+        ];
+      })
+    );
+}
+
+function buildOrgDestroyedCurrentChainCandidatesFromRows(
+  rows: OrgDestroyedCurrentChainSourceRow[]
+): OrgDestroyedCurrentChainCandidate[] {
+  const byOrgUser = new Map<string, OrgDestroyedCurrentChainSourceRow[]>();
+  for (const row of rows) {
+    const key = `${row.organizationId}:${row.userId}`;
+    const existing = byOrgUser.get(key);
+    if (existing) {
+      existing.push(row);
+    } else {
+      byOrgUser.set(key, [row]);
+    }
+  }
+
+  const candidates: OrgDestroyedCurrentChainCandidate[] = [];
+  for (const groupRows of byOrgUser.values()) {
+    const liveRows = groupRows.filter(row => row.instanceDestroyedAt === null);
+    const destroyedRows = groupRows.filter(row => row.instanceDestroyedAt !== null);
+    if (liveRows.length !== 1 || destroyedRows.length === 0 || groupRows.length <= 1) {
+      continue;
+    }
+
+    const orderedRows = [...destroyedRows, liveRows[0]].filter(
+      (row): row is OrgDestroyedCurrentChainSourceRow => !!row
+    );
+    const pairs: OrgDestroyedCurrentChainPair[] = [];
+    for (let index = 0; index < orderedRows.length - 1; index += 1) {
+      const source = orderedRows[index];
+      const target = orderedRows[index + 1];
+      if (!source || !target) continue;
+      pairs.push({ sourceId: source.subscriptionId, targetId: target.subscriptionId });
+    }
+
+    const [firstRow] = orderedRows;
+    if (!firstRow || pairs.length === 0) continue;
+    candidates.push({
+      organizationId: firstRow.organizationId,
+      userId: firstRow.userId,
+      rows: orderedRows,
+      pairs,
+    });
+  }
+
+  return candidates;
+}
+
+async function buildOrgDestroyedCurrentChainCandidates(): Promise<
+  OrgDestroyedCurrentChainCandidate[]
+> {
+  return buildOrgDestroyedCurrentChainCandidatesFromRows(
+    await listOrgDestroyedCurrentChainSourceRows()
+  );
+}
+
+async function previewOrgDestroyedCurrentChain() {
+  const candidates = await buildOrgDestroyedCurrentChainCandidates();
+  const orgCount = new Set(candidates.map(candidate => candidate.organizationId)).size;
+  const userCount = new Set(candidates.map(candidate => candidate.userId)).size;
+  const predecessorRows = candidates.reduce((acc, candidate) => acc + candidate.pairs.length, 0);
+
+  console.log('\norg-destroyed-current-chain preview');
+  console.table([
+    { metric: 'org_user_pairs_affected', count: candidates.length },
+    { metric: 'orgs_affected', count: orgCount },
+    { metric: 'users_affected', count: userCount },
+    { metric: 'predecessor_rows_to_transfer', count: predecessorRows },
+    { metric: 'pairs_to_write', count: predecessorRows },
+  ]);
+  printSection(
+    'Sample org destroyed-current chains',
+    candidates.slice(0, 25).map(candidate => ({
+      organizationId: candidate.organizationId,
+      userId: candidate.userId,
+      rowsInChain: candidate.rows.length,
+      pairsToWrite: candidate.pairs.length,
+      oldestSourceId: candidate.pairs[0]?.sourceId ?? null,
+      finalTargetId: candidate.pairs[candidate.pairs.length - 1]?.targetId ?? null,
+    }))
+  );
+}
+
+async function applyOrgDestroyedCurrentChainCandidate(
+  candidate: OrgDestroyedCurrentChainCandidate
+): Promise<{ outcome: 'succeeded' | 'skipped_no_work' | 'skipped_race'; pairsWritten: number }> {
+  return await db.transaction(async tx => {
+    const lockedRows = await tx
+      .select({
+        organizationId: kiloclaw_instances.organization_id,
+        userId: kiloclaw_subscriptions.user_id,
+        subscription: kiloclaw_subscriptions,
+        instanceId: kiloclaw_instances.id,
+        sandboxId: kiloclaw_instances.sandbox_id,
+        instanceDestroyedAt: kiloclaw_instances.destroyed_at,
+      })
+      .from(kiloclaw_subscriptions)
+      .innerJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, candidate.userId),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
+          eq(kiloclaw_instances.user_id, candidate.userId),
+          eq(kiloclaw_instances.organization_id, candidate.organizationId)
+        )
+      )
+      .orderBy(asc(kiloclaw_subscriptions.created_at), asc(kiloclaw_subscriptions.id))
+      .for('update');
+
+    const sourceRows = lockedRows.flatMap(row => {
+      if (!row.organizationId) return [];
+      return [
+        {
+          organizationId: row.organizationId,
+          userId: row.userId,
+          subscriptionId: row.subscription.id,
+          instanceId: row.instanceId,
+          sandboxId: row.sandboxId,
+          instanceDestroyedAt: row.instanceDestroyedAt,
+          subscriptionCreatedAt: row.subscription.created_at,
+        },
+      ];
+    });
+    const [freshCandidate] = buildOrgDestroyedCurrentChainCandidatesFromRows(sourceRows);
+    if (!freshCandidate) {
+      return { outcome: 'skipped_no_work' as const, pairsWritten: 0 };
+    }
+    if (freshCandidate.pairs.length !== candidate.pairs.length) {
+      return { outcome: 'skipped_race' as const, pairsWritten: 0 };
+    }
+
+    const targetIds = freshCandidate.pairs.map(pair => pair.targetId);
+    const existingReferences = await tx
+      .select({ id: kiloclaw_subscriptions.id })
+      .from(kiloclaw_subscriptions)
+      .where(inArray(kiloclaw_subscriptions.transferred_to_subscription_id, targetIds))
+      .for('update');
+    if (existingReferences.length > 0) {
+      return { outcome: 'skipped_race' as const, pairsWritten: 0 };
+    }
+
+    const bySubscriptionId = new Map(
+      lockedRows.map(row => [row.subscription.id, row.subscription])
+    );
+    let pairsWritten = 0;
+    for (const pair of freshCandidate.pairs) {
+      const before = bySubscriptionId.get(pair.sourceId);
+      if (!before) {
+        throw new Error('Org destroyed-current chain source disappeared during apply');
+      }
+
+      const [after] = await tx
+        .update(kiloclaw_subscriptions)
+        .set({ transferred_to_subscription_id: pair.targetId })
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.id, pair.sourceId),
+            isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+          )
+        )
+        .returning();
+
+      if (!after) {
+        return { outcome: 'skipped_race' as const, pairsWritten: 0 };
+      }
+
+      await insertAlignmentChangeLog(tx, {
+        subscriptionId: after.id,
+        action: 'reassigned',
+        reason: 'apply_org_destroyed_current_chain_transfer',
+        before,
+        after,
+      });
+      pairsWritten += 1;
+    }
+
+    return { outcome: pairsWritten > 0 ? 'succeeded' : 'skipped_no_work', pairsWritten };
+  });
+}
+
+async function applyOrgDestroyedCurrentChain() {
+  const candidates = await buildOrgDestroyedCurrentChainCandidates();
+  const results = {
+    org_user_pairs_succeeded: 0,
+    org_user_pairs_skipped_no_work: 0,
+    org_user_pairs_skipped_race: 0,
+    org_user_pairs_error: 0,
+    pairs_written: 0,
+    change_logs_written: 0,
+  };
+  const skipped: Array<{
+    organizationId: string;
+    userId: string;
+    outcome: string;
+    error?: string;
+  }> = [];
+  const startedAt = Date.now();
+
+  console.log(`\norg-destroyed-current-chain apply: ${candidates.length} org/user pair(s)`);
+
+  for (const [index, candidate] of candidates.entries()) {
+    try {
+      const result = await applyOrgDestroyedCurrentChainCandidate(candidate);
+      if (result.outcome === 'succeeded') {
+        results.org_user_pairs_succeeded += 1;
+        results.pairs_written += result.pairsWritten;
+        results.change_logs_written += result.pairsWritten;
+      } else if (result.outcome === 'skipped_no_work') {
+        results.org_user_pairs_skipped_no_work += 1;
+        skipped.push({
+          organizationId: candidate.organizationId,
+          userId: candidate.userId,
+          outcome: result.outcome,
+        });
+      } else {
+        results.org_user_pairs_skipped_race += 1;
+        skipped.push({
+          organizationId: candidate.organizationId,
+          userId: candidate.userId,
+          outcome: result.outcome,
+        });
+      }
+    } catch (error) {
+      console.error('org-destroyed-current-chain row failed', {
+        organizationId: candidate.organizationId,
+        userId: candidate.userId,
+        error: describeError(error),
+      });
+      results.org_user_pairs_error += 1;
+      skipped.push({
+        organizationId: candidate.organizationId,
+        userId: candidate.userId,
+        outcome: 'error',
+        error: describeError(error),
+      });
+    }
+
+    logApplyProgress({
+      label: 'apply-org-destroyed-current-chain',
+      processed: index + 1,
+      total: candidates.length,
+      startedAt,
+      every: 50,
+    });
+  }
+
+  console.log('\norg-destroyed-current-chain apply results');
+  console.table(Object.entries(results).map(([metric, count]) => ({ metric, count })));
+  printSection(
+    'Org destroyed-current chains skipped or errored during apply',
+    skipped.slice(0, 50)
+  );
+}
+
 type OrgApplyOutcome = OrgBackfillAction | 'skipped';
 
 const ORG_BACKFILL_REASON: Record<OrgBackfillAction, string> = {
@@ -3523,8 +4286,9 @@ async function applyOrgBackfill() {
   printSection('Org rows skipped during apply', skipped);
 }
 
-type ApplyOptions = {
+export type ApplyOptions = {
   confirmSandboxesDestroyed: boolean;
+  confirmCancelCreditAccess: boolean;
   bulk: boolean;
 };
 
@@ -3545,6 +4309,10 @@ function parseMode(inputMode?: string): Mode {
     case 'apply-changelog-baseline':
     case 'preview-multi-row-all-destroyed':
     case 'apply-multi-row-all-destroyed':
+    case 'preview-personal-destroyed-current-access':
+    case 'apply-personal-destroyed-current-access':
+    case 'preview-org-destroyed-current-chain':
+    case 'apply-org-destroyed-current-chain':
       return mode;
     default:
       throw new Error(`Unsupported mode: ${inputMode}`);
@@ -3554,6 +4322,7 @@ function parseMode(inputMode?: string): Mode {
 function parseApplyOptions(args: string[]): ApplyOptions {
   return {
     confirmSandboxesDestroyed: args.includes('--confirm-sandboxes-destroyed'),
+    confirmCancelCreditAccess: args.includes('--confirm-cancel-credit-access'),
     bulk: args.includes('--bulk'),
   };
 }
@@ -3573,6 +4342,10 @@ const singleModeHandlers: Partial<Record<Mode, ModeHandler>> = {
   'apply-changelog-baseline': applyChangelogBaselineBackfill,
   'preview-multi-row-all-destroyed': previewMultiRowAllDestroyedCollapse,
   'apply-multi-row-all-destroyed': applyMultiRowAllDestroyedCollapse,
+  'preview-personal-destroyed-current-access': previewPersonalDestroyedCurrentAccess,
+  'apply-personal-destroyed-current-access': applyPersonalDestroyedCurrentAccess,
+  'preview-org-destroyed-current-chain': previewOrgDestroyedCurrentChain,
+  'apply-org-destroyed-current-chain': applyOrgDestroyedCurrentChain,
 };
 
 export async function run(...args: string[]) {

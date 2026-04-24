@@ -4,7 +4,6 @@ import {
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { minimax_m25_free_model } from '@/lib/ai-gateway/providers/minimax';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
@@ -84,13 +83,18 @@ export const BALANCED_CODEX_MODEL: ResolvedAutoModel = {
   reasoning: { enabled: true, effort: 'low' },
 };
 
+export const BALANCED_HAIKU_MODEL: ResolvedAutoModel = {
+  model: 'anthropic/claude-haiku-4.5',
+  reasoning: { enabled: true, effort: 'medium' },
+};
+
 export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   model: claude_sonnet_clawsetup_model.public_id,
   reasoning: { enabled: true, effort: 'high' },
   verbosity: 'high',
 };
 
-export const BALANCED_CLAW_MODEL: ResolvedAutoModel = {
+export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
   model: qwen36_plus_model.public_id,
   reasoning: { enabled: true },
 };
@@ -116,18 +120,16 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Kilo Auto Free',
-  description: 'Free with limited capability. No credits required.',
-  context_length: minimax_m25_free_model.context_length,
-  max_completion_tokens: minimax_m25_free_model.max_completion_tokens,
+  description:
+    'Free with limited capability. No credits required. Note: prompts may be logged by the upstream provider and used to improve their services.',
+  context_length: 256_000,
+  max_completion_tokens: 10_000,
   prompt_price: '0',
   completion_price: '0',
   input_cache_read_price: '0',
   input_cache_write_price: '0',
   supports_images: false,
-  roocode_settings: {
-    included_tools: ['search_and_replace'],
-    excluded_tools: ['apply_diff', 'edit_file'],
-  },
+  roocode_settings: undefined,
   opencode_settings: undefined,
 };
 
@@ -137,19 +139,14 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   description: 'Great balance of price and capability.',
   context_length: 400_000,
   max_completion_tokens: 65_536,
-  prompt_price: '0.00000175',
-  completion_price: '0.000014',
-  input_cache_read_price: '0.000000175',
-  input_cache_write_price: undefined,
+  prompt_price: '0.000000325',
+  completion_price: '0.00000195',
+  input_cache_read_price: '0.0000000325',
+  input_cache_write_price: '0.00000040625',
   supports_images: true,
-  roocode_settings: {
-    included_tools: ['apply_patch'],
-    excluded_tools: ['apply_diff', 'edit_file'],
-  },
+  roocode_settings: undefined,
   opencode_settings: {
-    ai_sdk_provider: 'openai',
-    family: 'gpt',
-    prompt: 'codex',
+    ai_sdk_provider: 'openai-compatible',
   },
 };
 

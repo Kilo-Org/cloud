@@ -134,6 +134,16 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   const extraServices = targets.length === 0 ? [] : resolveTargets(targets);
   const serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
 
+  // --- Check for socat when kiloclaw-docker-tcp is requested ---
+  if (serviceNames.includes('kiloclaw-docker-tcp')) {
+    try {
+      execSync('which socat', { stdio: 'ignore' });
+    } catch {
+      console.error('socat is not installed. Install it with: brew install socat');
+      process.exit(1);
+    }
+  }
+
   // --- Start Docker infra ---
   const hasInfra = serviceNames.some(name => getService(name).type === 'infra');
   if (hasInfra) {

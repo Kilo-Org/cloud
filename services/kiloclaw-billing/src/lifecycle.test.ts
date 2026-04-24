@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetWorkerDb } = vi.hoisted(() => ({
-  mockGetWorkerDb: vi.fn(),
-}));
+const { mockGetWorkerDb, mockGetMissingSnowflakeConfig, mockQueryKiloclawActiveUserIds } =
+  vi.hoisted(() => ({
+    mockGetWorkerDb: vi.fn(),
+    mockGetMissingSnowflakeConfig: vi.fn<() => string[]>(() => []),
+    mockQueryKiloclawActiveUserIds: vi.fn(),
+  }));
 
 vi.mock('@kilocode/db', async importOriginal => {
   const actual: Record<string, unknown> = await importOriginal();
@@ -12,7 +15,12 @@ vi.mock('@kilocode/db', async importOriginal => {
   };
 });
 
-import { runSweep } from './lifecycle.js';
+vi.mock('./snowflake.js', () => ({
+  getMissingSnowflakeConfig: mockGetMissingSnowflakeConfig,
+  queryKiloclawActiveUserIds: mockQueryKiloclawActiveUserIds,
+}));
+
+import { processTrialInactivityStopCandidate, runSweep } from './lifecycle.js';
 import type { BillingWorkerEnv } from './types.js';
 
 let loggedValues: unknown[] = [];
@@ -152,20 +160,47 @@ function createMockDb(
 }
 
 function createEnv(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch']): BillingWorkerEnv {
+  return createEnvWithQueueMocks(fetchImpl).env;
+}
+
+function createEnvWithQueueMocks(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch']): {
+  env: BillingWorkerEnv;
+  trialInactivitySendBatch: ReturnType<typeof vi.fn>;
+} {
+  const trialInactivitySendBatch = vi.fn();
+
   return {
-    HYPERDRIVE: { connectionString: 'postgres://test' },
-    LIFECYCLE_QUEUE: {
-      send: vi.fn(),
-    } as never,
-    KILOCLAW: {
-      fetch: fetchImpl,
+    env: {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      LIFECYCLE_QUEUE: {
+        send: vi.fn(),
+      } as never,
+      TRIAL_INACTIVITY_QUEUE: {
+        send: vi.fn(),
+        sendBatch: trialInactivitySendBatch,
+      } as never,
+      KILOCLAW: {
+        fetch: fetchImpl,
+      },
+      KILOCODE_BACKEND_BASE_URL: 'https://app.kilo.ai',
+      STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
+      STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
+      STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
+      INTERNAL_API_SECRET: 'next-internal-api-secret',
+      KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+      TRIAL_INACTIVITY_STOP_ENABLED: 'true',
+      TRIAL_INACTIVITY_STOP_DRY_RUN: 'false',
+      SNOWFLAKE_ACCOUNT_HOST: 'fyc17898.us-east-1',
+      SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER: 'FYC17898',
+      SNOWFLAKE_USERNAME: 'KILOCODE_USER',
+      SNOWFLAKE_ROLE: 'KILOCODE_ROLE',
+      SNOWFLAKE_WAREHOUSE: 'WH_KILOCODE',
+      SNOWFLAKE_DATABASE: 'KILO_DW',
+      SNOWFLAKE_SCHEMA: 'DBT_PROD',
+      SNOWFLAKE_PRIVATE_KEY_PEM: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----',
+      SNOWFLAKE_PUBLIC_KEY_FINGERPRINT: 'SHA256:test',
     },
-    KILOCODE_BACKEND_BASE_URL: 'https://app.kilo.ai',
-    STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
-    STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
-    STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
-    INTERNAL_API_SECRET: 'next-internal-api-secret',
-    KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
+    trialInactivitySendBatch,
   };
 }
 
@@ -197,6 +232,12 @@ describe('interrupted auto-resume sweep', () => {
     const fetch = vi.fn(async (request: RequestInfo | URL) => {
       const url = request instanceof Request ? request.url : String(request);
       expect(url).toContain(`/api/platform/start-async?instanceId=${instanceId}`);
+      if (request instanceof Request) {
+        await expect(request.json()).resolves.toEqual({
+          userId: 'user-1',
+          reason: 'interrupted_auto_resume',
+        });
+      }
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -396,6 +437,99 @@ describe('interrupted auto-resume sweep', () => {
     expect(updates).toHaveLength(0);
     expect(txUpdates).toHaveLength(0);
     expect(txDeletes).toHaveLength(0);
+  });
+});
+
+describe('trial expiry sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+  });
+
+  it('clears the inactivity marker when an expired trial leaves trialing state', async () => {
+    const instanceId = '21212121-2121-4212-8212-212121212121';
+    const { db, updates } = createMockDb([
+      [
+        {
+          id: 'sub-trial-expired',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          sandbox_id: 'ki_21212121212142128212212121212121',
+          instance_destroyed_at: null,
+          organization_id: null,
+          email: 'user-1@example.com',
+        },
+      ],
+      [
+        {
+          id: 'sub-trial-expired',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          plan: 'trial',
+          status: 'trialing',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn(async (request: RequestInfo | URL) => {
+      const url = request instanceof Request ? request.url : String(request);
+      if (!url.includes('/api/platform/stop')) {
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          stopped: true,
+          previousStatus: 'running',
+          currentStatus: 'stopped',
+          stoppedAt: Date.parse('2026-04-22T00:00:00.000Z'),
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }
+      );
+    });
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '21212121-2121-4212-8212-212121212120',
+        sweep: 'trial_expiry',
+      },
+      1
+    );
+
+    expect(summary.sweep1_trial_expiry).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const stopRequest = fetch.mock.calls[0]?.[0];
+    expect(stopRequest).toBeInstanceOf(Request);
+    if (!(stopRequest instanceof Request)) {
+      throw new Error('expected Request');
+    }
+    expect(await stopRequest.json()).toEqual({
+      userId: 'user-1',
+      reason: 'trial_expiry',
+    });
+    const cancellationUpdate = updates.find(
+      update =>
+        update.status === 'canceled' &&
+        typeof update.suspended_at === 'string' &&
+        typeof update.destruction_deadline === 'string'
+    );
+    expect(cancellationUpdate).toBeDefined();
+    expect(updates).toContainEqual({ inactive_trial_stopped_at: null });
   });
 });
 
@@ -673,13 +807,18 @@ describe('instance destruction sweep', () => {
       [{ id: 'sub-1', user_id: 'user-1', instance_id: instanceId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
-    const fetch = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ ok: true }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-    );
+    const fetch = vi.fn(async (request: RequestInfo | URL) => {
+      if (request instanceof Request) {
+        await expect(request.json()).resolves.toEqual({
+          userId: 'user-1',
+          reason: 'destruction_deadline_elapsed',
+        });
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
 
     const summary = await runSweep(
       createEnv(fetch),
@@ -1660,5 +1799,336 @@ describe('soft-deleted user lifecycle exclusion', () => {
     expect(summary.earlybird_warnings).toBe(0);
     expect(inserts).toEqual([]);
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('trial inactivity stop sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    mockGetMissingSnowflakeConfig.mockReset();
+    mockGetMissingSnowflakeConfig.mockReturnValue([]);
+    mockQueryKiloclawActiveUserIds.mockReset();
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('enqueues stop-candidate work for personal trial instances with no qualifying Snowflake usage', async () => {
+    const instanceId = '77777777-7777-4777-8777-777777777777';
+    const { db, updates } = createMockDb([
+      [
+        {
+          subscription_id: 'sub-1',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          sandbox_id: 'ki_77777777777747778777777777777777',
+          organization_id: null,
+          instance_destroyed_at: null,
+          instance_created_at: '2026-04-18T00:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    mockQueryKiloclawActiveUserIds.mockResolvedValue(new Set());
+    const { env, trialInactivitySendBatch } = createEnvWithQueueMocks(vi.fn());
+
+    const summary = await runSweep(
+      env,
+      {
+        runId: '77777777-7777-4777-8777-777777777770',
+        sweep: 'trial_inactivity_stop',
+      },
+      1
+    );
+
+    expect(summary.trial_inactivity_candidates).toBe(1);
+    expect(summary.trial_inactivity_batches).toBe(1);
+    expect(summary.trial_inactivity_stop_messages_enqueued).toBe(1);
+    expect(summary.trial_inactivity_stops).toBe(0);
+    expect(trialInactivitySendBatch).toHaveBeenCalledWith([
+      {
+        body: {
+          kind: 'trial_inactivity_stop_candidate',
+          runId: '77777777-7777-4777-8777-777777777770',
+          sweep: 'trial_inactivity_stop_candidate',
+          subscriptionId: 'sub-1',
+          userId: 'user-1',
+          instanceId,
+        },
+      },
+    ]);
+    expect(updates).toEqual([]);
+  });
+
+  it('skips stopping candidates with qualifying Snowflake usage and logs the skip reason', async () => {
+    const instanceId = '78787878-7878-4878-8878-787878787878';
+    const { db, updates } = createMockDb([
+      [
+        {
+          subscription_id: 'sub-active-usage',
+          user_id: 'user-with-usage',
+          instance_id: instanceId,
+          sandbox_id: 'ki_78787878787848788878787878787878',
+          organization_id: null,
+          instance_destroyed_at: null,
+          instance_created_at: '2026-04-18T00:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    mockQueryKiloclawActiveUserIds.mockResolvedValue(new Set(['user-with-usage']));
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: '78787878-7878-4878-8878-787878787870',
+        sweep: 'trial_inactivity_stop',
+      },
+      1
+    );
+
+    expect(summary.trial_inactivity_candidates).toBe(1);
+    expect(summary.trial_inactivity_stop_messages_enqueued).toBe(0);
+    expect(summary.trial_inactivity_stops).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping trial inactivity stop because Snowflake reported recent usage',
+          event: 'subscription_row_skipped',
+          outcome: 'skipped',
+          reason: 'recent_snowflake_usage',
+          userId: 'user-with-usage',
+          instanceId,
+        }),
+      ])
+    );
+  });
+
+  it('enqueues stop-candidate work during dry-run mode without mutating the database', async () => {
+    const instanceId = '88888888-8888-4888-8888-888888888888';
+    const { db, updates } = createMockDb([
+      [
+        {
+          subscription_id: 'sub-1',
+          user_id: 'user-1',
+          instance_id: instanceId,
+          sandbox_id: 'ki_88888888888848888888888888888888',
+          organization_id: null,
+          instance_destroyed_at: null,
+          instance_created_at: '2026-04-18T00:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    mockQueryKiloclawActiveUserIds.mockResolvedValue(new Set());
+    const env = createEnv(vi.fn());
+    env.TRIAL_INACTIVITY_STOP_DRY_RUN = 'true';
+
+    const summary = await runSweep(
+      env,
+      {
+        runId: '88888888-8888-4888-8888-888888888880',
+        sweep: 'trial_inactivity_stop',
+      },
+      1
+    );
+
+    expect(summary.trial_inactivity_stop_messages_enqueued).toBe(1);
+    expect(summary.trial_inactivity_dry_run_candidates).toBe(0);
+    expect(summary.trial_inactivity_stops).toBe(0);
+    expect(updates).toEqual([]);
+  });
+
+  it('logs and skips the run when Snowflake config is missing', async () => {
+    const { db } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    mockGetMissingSnowflakeConfig.mockReturnValue(['SNOWFLAKE_ACCOUNT_HOST']);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: '99999999-9999-4999-8999-999999999999',
+        sweep: 'trial_inactivity_stop',
+      },
+      1
+    );
+
+    expect(summary.errors).toBe(1);
+    expect(summary.trial_inactivity_candidates).toBe(0);
+    expect(mockQueryKiloclawActiveUserIds).not.toHaveBeenCalled();
+  });
+
+  it('stops a stop-candidate message with a single stop call and writes the marker', async () => {
+    const instanceId = '98989898-9898-4898-8898-989898989898';
+    const { db, updates } = createMockDb([
+      [
+        {
+          subscription_id: 'sub-stop',
+          user_id: 'user-stop',
+          instance_id: instanceId,
+          sandbox_id: 'ki_98989898989848988898989898989898',
+          organization_id: null,
+          instance_destroyed_at: null,
+          instance_created_at: '2026-04-18T00:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn(async (request: RequestInfo | URL) => {
+      const url = request instanceof Request ? request.url : String(request);
+      if (url.includes('/api/platform/stop')) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            stopped: true,
+            previousStatus: 'running',
+            currentStatus: 'stopped',
+            stoppedAt: Date.parse('2026-04-22T00:00:00.000Z'),
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        );
+      }
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    const summary = await processTrialInactivityStopCandidate(
+      createEnv(fetch),
+      {
+        kind: 'trial_inactivity_stop_candidate',
+        runId: '98989898-9898-4898-8898-989898989890',
+        sweep: 'trial_inactivity_stop_candidate',
+        subscriptionId: 'sub-stop',
+        userId: 'user-stop',
+        instanceId,
+      },
+      1
+    );
+
+    expect(summary.trial_inactivity_candidates).toBe(1);
+    expect(summary.trial_inactivity_stops).toBe(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(
+      fetch.mock.calls[0]?.[0] instanceof Request
+        ? fetch.mock.calls[0][0].url
+        : String(fetch.mock.calls[0]?.[0])
+    ).toContain('/api/platform/stop');
+    const stopRequest = fetch.mock.calls[0]?.[0];
+    expect(stopRequest).toBeInstanceOf(Request);
+    if (!(stopRequest instanceof Request)) {
+      throw new Error('expected Request');
+    }
+    expect(await stopRequest.json()).toEqual({
+      userId: 'user-stop',
+      reason: 'trial_inactivity',
+    });
+    expect(updates).toContainEqual(
+      expect.objectContaining({ inactive_trial_stopped_at: '2026-04-22T00:00:00.000Z' })
+    );
+  });
+
+  it('treats a non-running stop-candidate message as a skip without marking the row', async () => {
+    const instanceId = '97979797-9797-4979-8979-979797979797';
+    const { db, updates } = createMockDb([
+      [
+        {
+          subscription_id: 'sub-skipped',
+          user_id: 'user-skipped',
+          instance_id: instanceId,
+          sandbox_id: 'ki_97979797979749798979797979797979',
+          organization_id: null,
+          instance_destroyed_at: null,
+          instance_created_at: '2026-04-18T00:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            stopped: false,
+            previousStatus: 'stopped',
+            currentStatus: 'stopped',
+            stoppedAt: Date.parse('2026-04-21T00:00:00.000Z'),
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
+    );
+
+    const summary = await processTrialInactivityStopCandidate(
+      createEnv(fetch),
+      {
+        kind: 'trial_inactivity_stop_candidate',
+        runId: '97979797-9797-4979-8979-979797979790',
+        sweep: 'trial_inactivity_stop_candidate',
+        subscriptionId: 'sub-skipped',
+        userId: 'user-skipped',
+        instanceId,
+      },
+      1
+    );
+
+    expect(summary.trial_inactivity_candidates).toBe(1);
+    expect(summary.trial_inactivity_stops).toBe(0);
+    expect(updates).toEqual([]);
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping trial inactivity stop because instance is not running',
+          reason: 'instance_not_running',
+          platformStatus: 'stopped',
+          userId: 'user-skipped',
+          instanceId,
+        }),
+      ])
+    );
+  });
+
+  it('skips stop-candidate messages that are no longer eligible before calling the platform', async () => {
+    const { db, updates } = createMockDb([[]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await processTrialInactivityStopCandidate(
+      createEnv(fetch),
+      {
+        kind: 'trial_inactivity_stop_candidate',
+        runId: '96969696-9696-4969-8969-969696969690',
+        sweep: 'trial_inactivity_stop_candidate',
+        subscriptionId: 'sub-missing',
+        userId: 'user-missing',
+        instanceId: '96969696-9696-4969-8969-969696969696',
+      },
+      1
+    );
+
+    expect(summary.trial_inactivity_candidates).toBe(0);
+    expect(summary.trial_inactivity_stops).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toEqual([]);
+    expect(loggedValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'Skipping trial inactivity stop because candidate is no longer eligible',
+          reason: 'candidate_no_longer_eligible',
+          userId: 'user-missing',
+          instanceId: '96969696-9696-4969-8969-969696969696',
+        }),
+      ])
+    );
   });
 });

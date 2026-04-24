@@ -29,25 +29,30 @@ import { grok_code_fast_1_optimized_free_model } from '@/lib/ai-gateway/provider
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
-export const preferredModels = [
-  KILO_AUTO_FRONTIER_MODEL.id,
-  KILO_AUTO_BALANCED_MODEL.id,
-  KILO_AUTO_FREE_MODEL.id,
-  'inclusionai/ling-2.6-flash:free',
-  seed_20_pro_free_model.status === 'public' ? seed_20_pro_free_model.public_id : null,
+export const autoFreeModels = [
+  'inclusionai/ling-2.6-1t:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'tencent/hy3-preview:free',
   grok_code_fast_1_optimized_free_model.status === 'public'
     ? grok_code_fast_1_optimized_free_model.public_id
     : null,
   stepfun_35_flash_free_model.status === 'public' ? stepfun_35_flash_free_model.public_id : null,
-  'openrouter/elephant-alpha',
+].filter(m => m !== null);
+
+export const preferredModels = [
+  KILO_AUTO_FRONTIER_MODEL.id,
+  KILO_AUTO_BALANCED_MODEL.id,
+  KILO_AUTO_FREE_MODEL.id,
+  ...autoFreeModels,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   'openai/gpt-5.4',
   'google/gemini-3.1-pro-preview',
   MINIMAX_CURRENT_MODEL_ID,
+  qwen36_plus_model.public_id,
   'z-ai/glm-5.1',
-].filter(m => m !== null);
+];
 
 export function isFreeModel(model: string): boolean {
   return (

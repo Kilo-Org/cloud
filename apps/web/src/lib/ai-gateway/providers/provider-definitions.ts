@@ -18,7 +18,8 @@ export default {
     id: 'alibaba',
     apiUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
     apiKey: getEnvVariable('ALIBABA_API_KEY'),
-    supportedChatApis: ['chat_completions', 'responses'],
+    // Prompt caching is not supported on the responses API for Alibaba; enabling it is therefore dangerous.
+    supportedChatApis: ['chat_completions' /*, 'responses'*/],
     transformRequest(context) {
       context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
       addCacheBreakpoints(context.request);
@@ -28,10 +29,16 @@ export default {
     id: 'bytedance',
     apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/v3',
     apiKey: getEnvVariable('BYTEDANCE_API_KEY'),
-    supportedChatApis: ['chat_completions', 'responses'],
+    // Prompt caching is not supported on the responses API for Bytedance; enabling it is therefore dangerous.
+    supportedChatApis: ['chat_completions' /*, 'responses'*/],
     transformRequest(context) {
-      if (context.request.kind === 'chat_completions' || context.request.kind === 'responses') {
+      if (!isReasoningExplicitlyDisabled(context.request)) {
         context.request.body.thinking = { type: 'enabled' };
+        if (context.request.kind === 'chat_completions') {
+          context.request.body.reasoning_effort ??= context.request.body.reasoning?.effort;
+        }
+      } else {
+        context.request.body.thinking = { type: 'disabled' };
       }
       if (context.request.kind === 'responses') {
         delete context.request.body.prompt_cache_key;
@@ -45,15 +52,8 @@ export default {
     id: 'martian',
     apiUrl: 'https://api.withmartian.com/v1',
     apiKey: getEnvVariable('MARTIAN_API_KEY'),
-    supportedChatApis: [
-      'chat_completions', // through our custom wrapper
-      'responses',
-    ],
-    transformRequest(context) {
-      if (context.request.kind === 'chat_completions') {
-        delete context.request.body.reasoning;
-      }
-    },
+    supportedChatApis: ['responses'],
+    transformRequest() {},
   },
   MISTRAL: {
     id: 'mistral',

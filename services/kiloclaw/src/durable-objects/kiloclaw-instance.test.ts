@@ -90,6 +90,29 @@ vi.mock('../utils/env-encryption', () => ({
   encryptEnvValue: vi.fn((_key: string, value: string) => `enc:v1:fake_${value}`),
 }));
 
+vi.mock('../utils/encryption', async () => {
+  const actual = await vi.importActual('../utils/encryption');
+  return {
+    ...actual,
+    decryptChannelTokens: vi.fn((channels: Record<string, { encryptedData: string }>) => {
+      const result: Record<string, string> = {};
+      if (channels.telegramBotToken) {
+        result.TELEGRAM_BOT_TOKEN = channels.telegramBotToken.encryptedData;
+      }
+      if (channels.discordBotToken) {
+        result.DISCORD_BOT_TOKEN = channels.discordBotToken.encryptedData;
+      }
+      if (channels.slackBotToken) {
+        result.SLACK_BOT_TOKEN = channels.slackBotToken.encryptedData;
+      }
+      if (channels.slackAppToken) {
+        result.SLACK_APP_TOKEN = channels.slackAppToken.encryptedData;
+      }
+      return result;
+    }),
+  };
+});
+
 // -- Mock stream-chat client --
 vi.mock('../stream-chat/client', () => ({
   setupDefaultStreamChatChannel: vi.fn().mockResolvedValue({
@@ -103,6 +126,7 @@ vi.mock('../stream-chat/client', () => ({
 }));
 
 import { KiloClawInstance } from './kiloclaw-instance';
+import { buildChannelConfigPatch } from './kiloclaw-instance/channel-config';
 import * as flyClient from '../fly/client';
 import { FlyApiError } from '../fly/client';
 import * as db from '../db';
@@ -211,6 +235,7 @@ function createFakeEnv() {
       get: vi.fn().mockReturnValue(appStub),
     } as unknown,
     HYPERDRIVE: { connectionString: 'postgresql://fake' } as unknown,
+    AGENT_ENV_VARS_PRIVATE_KEY: 'test-private-key',
     KV_CLAW_CACHE: {
       get: vi.fn().mockResolvedValue(null),
       put: vi.fn().mockResolvedValue(undefined),
@@ -434,6 +459,21 @@ describe('two-phase destroy', () => {
     // Storage fully cleared
     expect(storage._store.size).toBe(0);
     expect(storage._getAlarm()).toBeNull();
+  });
+
+  it('labels destroy analytics with the destroy reason', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage);
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await instance.destroy({ reason: 'manual_user_request' });
+
+    const destroyEvents = analyticsEventsByName(env, 'instance.destroy_started');
+    expect(destroyEvents).toHaveLength(1);
+    expect(destroyEvents[0]?.blobs).toEqual(expect.arrayContaining(['manual_user_request']));
   });
 
   it('keeps pendingDestroyMachineId when machine delete fails', async () => {
@@ -1631,8 +1671,13 @@ describe('status guards', () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { status: 'destroying' });
 
-    await instance.stop();
+    const result = await instance.stop();
 
+    expect(result).toMatchObject({
+      stopped: false,
+      previousStatus: 'destroying',
+      currentStatus: 'destroying',
+    });
     // Status unchanged
     expect(storage._store.get('status')).toBe('destroying');
     expect(flyClient.stopMachineAndWait).not.toHaveBeenCalled();
@@ -2581,7 +2626,7 @@ describe('updateChannels', () => {
     version: 1 as const,
   };
 
-  it('sets a telegram token on a provisioned instance', async () => {
+  it('sets a telegram token on a provisioned instance and queues live apply', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage);
 
@@ -2591,19 +2636,21 @@ describe('updateChannels', () => {
     expect(result.discord).toBe(false);
     const channels = storage._store.get('channels') as Record<string, unknown>;
     expect(channels.telegramBotToken).toEqual(fakeEnvelope);
+    expect(storage._store.get('channelsApplyPending')).toBe(true);
   });
 
-  it('removes a telegram token when null is passed', async () => {
+  it('removes a telegram token and clears pending apply when no channels remain', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
       channels: { telegramBotToken: fakeEnvelope },
+      channelsApplyPending: true,
     });
 
     const result = await instance.updateChannels({ telegramBotToken: null });
 
     expect(result.telegram).toBe(false);
-    // channels should be null when all tokens are removed
     expect(storage._store.get('channels')).toBeNull();
+    expect(storage._store.get('channelsApplyPending')).toBe(false);
   });
 
   it('merges with existing channels — setting telegram preserves discord', async () => {
@@ -2672,6 +2719,188 @@ describe('updateChannels', () => {
     expect(channels.discordBotToken).toEqual(discordEnvelope);
     expect(secrets.TELEGRAM_BOT_TOKEN).toEqual(fakeEnvelope);
     expect(secrets.DISCORD_BOT_TOKEN).toEqual(discordEnvelope);
+  });
+
+  it('calls /_kilo/config/patch with full stored channel state on running instances', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'channels-app';
+    const discordEnvelope = { ...fakeEnvelope, encryptedData: 'discord-data' };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      flyMachineId: 'machine-1',
+      sandboxId: 'sandbox-1',
+      channels: { telegramBotToken: fakeEnvelope },
+      encryptedSecrets: { TELEGRAM_BOT_TOKEN: fakeEnvelope },
+      channelsApplyPending: true,
+    });
+
+    await instance.updateChannels({ discordBotToken: discordEnvelope });
+
+    const patchCall = fetchMock.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/config/patch')
+    );
+    expect(patchCall).toBeDefined();
+    const [, init] = patchCall as [unknown, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      channels: {
+        telegram: {
+          botToken: 'data',
+          enabled: true,
+          dmPolicy: 'pairing',
+        },
+        discord: {
+          token: 'discord-data',
+          enabled: true,
+          dm: { policy: 'pairing' },
+        },
+      },
+      plugins: {
+        entries: {
+          telegram: { enabled: true },
+          discord: { enabled: true },
+        },
+      },
+    });
+    expect(storage._store.get('channelsApplyPending')).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('live-patches mixed channel removals and additions from current stored state', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'channels-app';
+    const discordEnvelope = { ...fakeEnvelope, encryptedData: 'discord-data' };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      flyMachineId: 'machine-1',
+      sandboxId: 'sandbox-1',
+      channels: { telegramBotToken: fakeEnvelope },
+      encryptedSecrets: { TELEGRAM_BOT_TOKEN: fakeEnvelope },
+      channelsApplyPending: true,
+    });
+
+    await instance.updateChannels({
+      telegramBotToken: null,
+      discordBotToken: discordEnvelope,
+    });
+
+    const channels = storage._store.get('channels') as Record<string, unknown>;
+    expect(channels.telegramBotToken).toBeUndefined();
+    expect(channels.discordBotToken).toEqual(discordEnvelope);
+    const patchCall = fetchMock.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/config/patch')
+    );
+    expect(patchCall).toBeDefined();
+    const [, init] = patchCall as [unknown, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      channels: {
+        discord: {
+          token: 'discord-data',
+          enabled: true,
+          dm: { policy: 'pairing' },
+        },
+      },
+      plugins: {
+        entries: {
+          discord: { enabled: true },
+        },
+      },
+    });
+    expect(storage._store.get('channelsApplyPending')).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps pending channel apply when a removal leaves queued channel config', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'channels-app';
+    const discordEnvelope = { ...fakeEnvelope, encryptedData: 'discord-data' };
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      flyMachineId: 'machine-1',
+      sandboxId: 'sandbox-1',
+      channels: {
+        telegramBotToken: fakeEnvelope,
+        discordBotToken: discordEnvelope,
+      },
+      encryptedSecrets: {
+        TELEGRAM_BOT_TOKEN: fakeEnvelope,
+        DISCORD_BOT_TOKEN: discordEnvelope,
+      },
+      channelsApplyPending: true,
+    });
+
+    await instance.updateChannels({ telegramBotToken: null });
+
+    const channels = storage._store.get('channels') as Record<string, unknown>;
+    expect(channels.telegramBotToken).toBeUndefined();
+    expect(channels.discordBotToken).toEqual(discordEnvelope);
+    expect(storage._store.get('channelsApplyPending')).toBe(true);
+    expect(
+      fetchMock.mock.calls.some(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/config/patch')
+      )
+    ).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps channelsApplyPending when live channel patch fails on running instances', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'channels-app';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'boom' }), {
+        status: 503,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, { flyMachineId: 'machine-1', sandboxId: 'sandbox-1' });
+
+    await instance.updateChannels({ telegramBotToken: fakeEnvelope });
+
+    expect(storage._store.get('channelsApplyPending')).toBe(true);
+    expectStructuredWarn(warnSpy, 'updateChannels: gateway patch failed');
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps channelsApplyPending when live channel patch cannot decrypt stored tokens', async () => {
+    const env = {
+      ...createFakeEnv(),
+      FLY_APP_NAME: 'channels-app',
+      AGENT_ENV_VARS_PRIVATE_KEY: '',
+    };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, { flyMachineId: 'machine-1', sandboxId: 'sandbox-1' });
+
+    await instance.updateChannels({ telegramBotToken: fakeEnvelope });
+
+    expect(
+      fetchMock.mock.calls.some(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/config/patch')
+      )
+    ).toBe(false);
+    expect(storage._store.get('channelsApplyPending')).toBe(true);
+    expectStructuredWarn(warnSpy, 'updateChannels: gateway patch failed');
+    vi.unstubAllGlobals();
   });
 });
 
@@ -2999,6 +3228,215 @@ describe('updateSecrets', () => {
     await expect(
       instance.updateSecrets({ KEY_B: envelope2 }, { KEY_B: { configPath: 'talk.apiKey' } })
     ).rejects.toThrow('Config path "talk.apiKey" is already used by secret "KEY_A"');
+  });
+});
+
+// ============================================================================
+// updateKiloCodeConfig — memory & dreaming fields
+// ============================================================================
+
+describe('updateKiloCodeConfig memory fields', () => {
+  it('persists vector memory and dreaming fields on a provisioned instance', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const result = await instance.updateKiloCodeConfig({
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: 'openai/text-embedding-3-small',
+      dreamingEnabled: true,
+    });
+
+    expect(result.vectorMemoryEnabled).toBe(true);
+    expect(result.vectorMemoryModel).toBe('openai/text-embedding-3-small');
+    expect(result.dreamingEnabled).toBe(true);
+
+    expect(storage._store.get('vectorMemoryEnabled')).toBe(true);
+    expect(storage._store.get('vectorMemoryModel')).toBe('openai/text-embedding-3-small');
+    expect(storage._store.get('dreamingEnabled')).toBe(true);
+  });
+
+  it('clears vectorMemoryModel when disabling vector memory', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: 'openai/text-embedding-3-small',
+    });
+
+    const result = await instance.updateKiloCodeConfig({
+      vectorMemoryEnabled: false,
+      vectorMemoryModel: null,
+    });
+
+    expect(result.vectorMemoryEnabled).toBe(false);
+    expect(result.vectorMemoryModel).toBeNull();
+    expect(storage._store.get('vectorMemoryEnabled')).toBe(false);
+    expect(storage._store.get('vectorMemoryModel')).toBeNull();
+  });
+
+  it('returns defaults (false/null/false) for legacy instances with no persisted values', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const result = await instance.updateKiloCodeConfig({});
+
+    expect(result.vectorMemoryEnabled).toBe(false);
+    expect(result.vectorMemoryModel).toBeNull();
+    expect(result.dreamingEnabled).toBe(false);
+  });
+
+  it('only touches keys present in the patch', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: 'openai/text-embedding-3-small',
+      dreamingEnabled: false,
+    });
+
+    const result = await instance.updateKiloCodeConfig({ dreamingEnabled: true });
+
+    expect(result.vectorMemoryEnabled).toBe(true);
+    expect(result.vectorMemoryModel).toBe('openai/text-embedding-3-small');
+    expect(result.dreamingEnabled).toBe(true);
+  });
+
+  it('live-patches memorySearch with a full remote block when enabling on a running instance', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      flyAppName: 'acct-test',
+      kilocodeApiKey: 'tok-123',
+      orgId: 'org_abc',
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await instance.updateKiloCodeConfig({
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: 'openai/text-embedding-3-small',
+    });
+
+    const configPatchCalls = fetchSpy.mock.calls.filter(call =>
+      fetchInputUrl(call[0]).endsWith('/_kilo/config/patch')
+    );
+    expect(configPatchCalls).toHaveLength(1);
+
+    const body = JSON.parse(configPatchCalls[0][1]?.body as string) as Record<string, unknown>;
+    expect(body).toEqual({
+      agents: {
+        defaults: {
+          memorySearch: {
+            enabled: true,
+            provider: 'openai',
+            model: 'openai/text-embedding-3-small',
+            remote: {
+              baseUrl: 'https://api.kilo.ai/api/gateway/',
+              apiKey: 'tok-123',
+              headers: {
+                'x-kilocode-feature': 'kiloclaw-embedding',
+                'X-KiloCode-OrganizationId': 'org_abc',
+              },
+            },
+          },
+        },
+      },
+    });
+
+    fetchSpy.mockRestore();
+  });
+
+  it('live-patches explicit nulls for provider/model/remote when disabling memory', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      flyAppName: 'acct-test',
+      vectorMemoryEnabled: true,
+      vectorMemoryModel: 'openai/text-embedding-3-small',
+    });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await instance.updateKiloCodeConfig({
+      vectorMemoryEnabled: false,
+      vectorMemoryModel: null,
+    });
+
+    const configPatchCalls = fetchSpy.mock.calls.filter(call =>
+      fetchInputUrl(call[0]).endsWith('/_kilo/config/patch')
+    );
+    expect(configPatchCalls).toHaveLength(1);
+
+    const body = JSON.parse(configPatchCalls[0][1]?.body as string) as Record<string, unknown>;
+    expect(body).toEqual({
+      agents: {
+        defaults: {
+          memorySearch: {
+            enabled: false,
+            provider: null,
+            model: null,
+            remote: null,
+          },
+        },
+      },
+    });
+
+    fetchSpy.mockRestore();
+  });
+
+  it('live-patches memory-core dreaming when toggled on a running instance', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    await instance.updateKiloCodeConfig({ dreamingEnabled: true });
+
+    const configPatchCalls = fetchSpy.mock.calls.filter(call =>
+      fetchInputUrl(call[0]).endsWith('/_kilo/config/patch')
+    );
+    expect(configPatchCalls).toHaveLength(1);
+
+    const body = JSON.parse(configPatchCalls[0][1]?.body as string) as Record<string, unknown>;
+    expect(body).toEqual({
+      plugins: {
+        entries: {
+          'memory-core': { config: { dreaming: { enabled: true } } },
+        },
+      },
+    });
+
+    fetchSpy.mockRestore();
+  });
+
+  it('skips live-patch when the machine is not running', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    await instance.updateKiloCodeConfig({
+      vectorMemoryEnabled: true,
+      dreamingEnabled: true,
+    });
+
+    const configPatchCalls = fetchSpy.mock.calls.filter(call =>
+      fetchInputUrl(call[0]).endsWith('/_kilo/config/patch')
+    );
+    expect(configPatchCalls).toHaveLength(0);
+
+    fetchSpy.mockRestore();
   });
 });
 
@@ -4238,15 +4676,26 @@ describe('stop: error propagation', () => {
   });
 
   it('succeeds when Fly stop completes normally', async () => {
-    const { instance, storage } = createInstance();
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(createFakeStorage(), env);
     await seedRunning(storage);
 
     (flyClient.stopMachineAndWait as Mock).mockResolvedValue(undefined);
 
-    await instance.stop();
+    const result = await instance.stop({ reason: 'trial_inactivity' });
 
+    expect(result).toMatchObject({
+      stopped: true,
+      previousStatus: 'running',
+      currentStatus: 'stopped',
+    });
+    expect(typeof result.stoppedAt).toBe('number');
     expect(storage._store.get('status')).toBe('stopped');
     expect(storage._store.get('lastStoppedAt')).toBeDefined();
+
+    const stoppedEvents = analyticsEventsByName(env, 'instance.stopped');
+    expect(stoppedEvents).toHaveLength(1);
+    expect(stoppedEvents[0]?.blobs).toEqual(expect.arrayContaining(['trial_inactivity']));
   });
 
   it('throws with status 404 when instance was never provisioned', async () => {
@@ -5560,7 +6009,8 @@ describe('provision: auto-start after fresh provision', () => {
   });
 
   it('calls start() on fresh provision and ends in running state', async () => {
-    const { instance, storage, waitUntilPromises } = createInstance();
+    const env = createFakeEnv();
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
 
     (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
       id: 'vol-1',
@@ -5576,6 +6026,7 @@ describe('provision: auto-start after fresh provision', () => {
     // provision() returns before start() runs: waitUntil defers the promise,
     // so status must be 'starting' here — not 'running'.
     expect(storage._store.get('status')).toBe('starting');
+    expect(storage._store.get('pendingStartReason')).toBe('initial_provision');
 
     // Await background tasks to let start() complete
     await Promise.all(waitUntilPromises);
@@ -5583,6 +6034,11 @@ describe('provision: auto-start after fresh provision', () => {
     expect(flyClient.createMachine).toHaveBeenCalled();
     expect(storage._store.get('status')).toBe('running');
     expect(storage._store.get('flyMachineId')).toBe('machine-1');
+    expect(storage._store.get('pendingStartReason')).toBeNull();
+
+    const startEvents = analyticsEventsByName(env, 'instance.started');
+    expect(startEvents).toHaveLength(1);
+    expect(startEvents[0]?.blobs).toEqual(expect.arrayContaining(['initial_provision']));
   });
 
   it('wires capacity eviction callback during initial volume provisioning', async () => {
@@ -5741,6 +6197,32 @@ describe('provision: auto-start after fresh provision', () => {
 
     expect(storage._store.get('provider')).toBe('fly');
     expect(storage._store.get('status')).toBe('running');
+  });
+});
+
+describe('startAsync start-reason attribution', () => {
+  it('persists the start reason until the async start completes', async () => {
+    const env = createFakeEnv();
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { status: 'stopped', flyMachineId: 'machine-1' });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'failed', config: {} });
+    (flyClient.updateMachine as Mock).mockResolvedValue({});
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+
+    await instance.startAsync('user-1', { reason: 'snapshot_restore' });
+
+    expect(storage._store.get('pendingStartReason')).toBe('snapshot_restore');
+
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('pendingStartReason')).toBeNull();
+
+    const startEvents = analyticsEventsByName(env, 'instance.started');
+    expect(startEvents).toHaveLength(1);
+    expect(startEvents[0]?.blobs).toEqual(expect.arrayContaining(['snapshot_restore']));
   });
 });
 
@@ -6122,6 +6604,7 @@ describe('auto-destroy stale provisioned instances', () => {
   });
 
   function createInstanceWithPostgres(markImpl: () => Promise<void> = () => Promise.resolve()): {
+    env: ReturnType<typeof createFakeEnv>;
     instance: KiloClawInstance;
     storage: ReturnType<typeof createFakeStorage>;
     markDestroyed: Mock;
@@ -6137,12 +6620,12 @@ describe('auto-destroy stale provisioned instances', () => {
     (db.markInstanceDestroyed as Mock).mockImplementation(markDestroyed);
 
     const { instance, storage } = createInstance(undefined, env);
-    return { instance, storage, markDestroyed };
+    return { env, instance, storage, markDestroyed };
   }
 
   it('auto-destroys provisioned instance older than threshold with no machine', async () => {
     const staleTime = Date.now() - STALE_PROVISION_THRESHOLD_MS - 60_000; // 1 min past threshold
-    const { instance, storage, markDestroyed } = createInstanceWithPostgres();
+    const { env, instance, storage, markDestroyed } = createInstanceWithPostgres();
     await seedProvisioned(storage, {
       provisionedAt: staleTime,
       flyMachineId: null,
@@ -6160,6 +6643,10 @@ describe('auto-destroy stale provisioned instances', () => {
     expect(flyClient.listMachines).toHaveBeenCalled();
     // Volume reconciliation should not have run (destroyed before that)
     expect(flyClient.getVolume).not.toHaveBeenCalled();
+
+    const destroyEvents = analyticsEventsByName(env, 'instance.destroy_started');
+    expect(destroyEvents).toHaveLength(1);
+    expect(destroyEvents[0]?.blobs).toEqual(expect.arrayContaining(['stale_provision_cleanup']));
   });
 
   it('does not auto-destroy if provisionedAt is within threshold', async () => {
@@ -7875,6 +8362,96 @@ describe('updateExecPreset', () => {
     expect(result.execSecurity).toBe('full');
     expect(result.execAsk).toBe('off');
   });
+
+  it('sets execPresetApplyPending while status=starting and does not call the gateway', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'exec-app';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedStarting(storage, { flyMachineId: 'machine-1', sandboxId: 'sandbox-1' });
+
+    await instance.updateExecPreset({ security: 'full', ask: 'off' });
+
+    expect(storage._store.get('execSecurity')).toBe('full');
+    expect(storage._store.get('execAsk')).toBe('off');
+    expect(storage._store.get('execPresetApplyPending')).toBe(true);
+    expect(
+      fetchMock.mock.calls.some(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/config/patch')
+      )
+    ).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('calls /_kilo/config/patch and clears the pending flag on running instances', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'exec-app';
+    const calls: string[] = [];
+    const fetchMock = vi.fn().mockImplementation(() => {
+      calls.push('fetch');
+      return Promise.resolve(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    storage.put = (entries: Record<string, unknown>) => {
+      if ('execPresetApplyPending' in entries) {
+        calls.push(`put:${String(entries.execPresetApplyPending)}`);
+      } else {
+        calls.push('put');
+      }
+      for (const [key, value] of Object.entries(entries)) {
+        storage._store.set(key, value);
+      }
+    };
+    await seedRunning(storage, {
+      flyMachineId: 'machine-1',
+      sandboxId: 'sandbox-1',
+      execPresetApplyPending: true,
+    });
+
+    await instance.updateExecPreset({ security: 'full', ask: 'off' });
+
+    const patchCall = fetchMock.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/config/patch')
+    );
+    expect(patchCall).toBeDefined();
+    const [, init] = patchCall as [unknown, RequestInit];
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      tools: { exec: { security: 'full', ask: 'off' } },
+    });
+    expect(calls).toEqual(['put:true', 'fetch', 'put:false']);
+    expect(storage._store.get('execPresetApplyPending')).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('sets execPresetApplyPending when the gateway rejects the patch on a running instance', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'exec-app';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'boom' }), {
+        status: 500,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, { flyMachineId: 'machine-1', sandboxId: 'sandbox-1' });
+
+    await instance.updateExecPreset({ security: 'full', ask: 'off' });
+
+    expect(storage._store.get('execSecurity')).toBe('full');
+    expect(storage._store.get('execPresetApplyPending')).toBe(true);
+    expectStructuredWarn(warnSpy, 'updateExecPreset: gateway patch failed');
+    vi.unstubAllGlobals();
+  });
 });
 
 describe('updateBotIdentity', () => {
@@ -7904,18 +8481,33 @@ describe('updateBotIdentity', () => {
   it('writes IDENTITY.md on running instances', async () => {
     const env = createFakeEnv();
     env.FLY_APP_NAME = 'bot-app';
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ ok: true, path: 'workspace/IDENTITY.md' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
-    );
+    const calls: string[] = [];
+    const fetchMock = vi.fn().mockImplementation(() => {
+      calls.push('fetch');
+      return Promise.resolve(
+        new Response(JSON.stringify({ ok: true, path: 'workspace/IDENTITY.md' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+    });
     vi.stubGlobal('fetch', fetchMock);
     const { instance, storage } = createInstance(undefined, env);
+    storage.put = (entries: Record<string, unknown>) => {
+      if ('botIdentityApplyPending' in entries) {
+        calls.push(`put:${String(entries.botIdentityApplyPending)}`);
+      } else {
+        calls.push('put');
+      }
+      for (const [key, value] of Object.entries(entries)) {
+        storage._store.set(key, value);
+      }
+    };
     await seedProvisioned(storage, {
       status: 'running',
       flyMachineId: 'machine-1',
       sandboxId: 'sandbox-1',
+      botIdentityApplyPending: true,
     });
 
     await instance.updateBotIdentity({ botName: 'Milo' });
@@ -7932,6 +8524,326 @@ describe('updateBotIdentity', () => {
         }),
       })
     );
+    expect(calls).toEqual(['put:true', 'fetch', 'put:false']);
+    expect(storage._store.get('botIdentityApplyPending')).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('sets botIdentityApplyPending while status=starting and does not call the gateway', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'bot-app';
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedStarting(storage, { flyMachineId: 'machine-1', sandboxId: 'sandbox-1' });
+
+    await instance.updateBotIdentity({ botName: 'Milo' });
+
+    expect(storage._store.get('botName')).toBe('Milo');
+    expect(storage._store.get('botIdentityApplyPending')).toBe(true);
+    expect(
+      fetchMock.mock.calls.some(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/bot-identity')
+      )
+    ).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('sets botIdentityApplyPending when the gateway rejects the write on a running instance', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'bot-app';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'boom' }), {
+        status: 500,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, { flyMachineId: 'machine-1', sandboxId: 'sandbox-1' });
+
+    await instance.updateBotIdentity({ botName: 'Milo' });
+
+    expect(storage._store.get('botName')).toBe('Milo');
+    expect(storage._store.get('botIdentityApplyPending')).toBe(true);
+    expectStructuredWarn(warnSpy, 'updateBotIdentity: gateway write failed');
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('channel config patch builder', () => {
+  const fakeEnvelope = {
+    encryptedData: 'data',
+    encryptedDEK: 'dek',
+    algorithm: 'rsa-aes-256-gcm' as const,
+    version: 1 as const,
+  };
+
+  it('builds telegram, discord, and slack config patches from stored channels', () => {
+    const patch = buildChannelConfigPatch(createFakeEnv(), {
+      telegramBotToken: { ...fakeEnvelope, encryptedData: 'telegram-token' },
+      discordBotToken: { ...fakeEnvelope, encryptedData: 'discord-token' },
+      slackBotToken: { ...fakeEnvelope, encryptedData: 'slack-bot-token' },
+      slackAppToken: { ...fakeEnvelope, encryptedData: 'slack-app-token' },
+    });
+
+    expect(patch).toEqual({
+      channels: {
+        telegram: {
+          botToken: 'telegram-token',
+          enabled: true,
+          dmPolicy: 'pairing',
+        },
+        discord: {
+          token: 'discord-token',
+          enabled: true,
+          dm: { policy: 'pairing' },
+        },
+        slack: {
+          botToken: 'slack-bot-token',
+          appToken: 'slack-app-token',
+          enabled: true,
+        },
+      },
+      plugins: {
+        entries: {
+          telegram: { enabled: true },
+          discord: { enabled: true },
+          slack: { enabled: true },
+        },
+      },
+    });
+  });
+
+  it('returns null for empty channels or partial slack state', () => {
+    const env = createFakeEnv();
+
+    expect(buildChannelConfigPatch(env, null)).toBeNull();
+    expect(buildChannelConfigPatch(env, { slackBotToken: fakeEnvelope })).toBeNull();
+  });
+
+  it('throws when stored channels need decrypting but the worker has no private key', () => {
+    expect(() =>
+      buildChannelConfigPatch(
+        { ...createFakeEnv(), AGENT_ENV_VARS_PRIVATE_KEY: undefined },
+        {
+          telegramBotToken: fakeEnvelope,
+        }
+      )
+    ).toThrow('AGENT_ENV_VARS_PRIVATE_KEY is required to build live channel config patch');
+  });
+});
+
+describe('flushPendingConfigToGateway: alarm retry for pending identity/exec/channels', () => {
+  it('flushes pending bot identity and exec preset when alarm ticks on a running instance', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'flush-app';
+    const fetchMock = vi.fn().mockImplementation((url: unknown) => {
+      if (typeof url === 'string' && url.includes('/_kilo/bot-identity')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, path: 'workspace/IDENTITY.md' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        );
+      }
+      if (typeof url === 'string' && url.includes('/_kilo/config/patch')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        );
+      }
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      flyMachineId: 'machine-1',
+      sandboxId: 'sandbox-1',
+      botName: 'Milo',
+      botNature: 'Ops copilot',
+      botIdentityApplyPending: true,
+      execSecurity: 'full',
+      execAsk: 'off',
+      execPresetApplyPending: true,
+    });
+
+    // getMachine lets the Fly reconcile path no-op; we only care about the
+    // pre-reconcile flush block.
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { mounts: [{ volume: 'vol-1', path: '/root' }] },
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.alarm();
+
+    const botCall = fetchMock.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/bot-identity')
+    );
+    expect(botCall).toBeDefined();
+    const [, botInit] = botCall as [unknown, RequestInit];
+    expect(JSON.parse(botInit.body as string)).toEqual({
+      botName: 'Milo',
+      botNature: 'Ops copilot',
+      botVibe: null,
+      botEmoji: null,
+    });
+    const patchCall = fetchMock.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/config/patch')
+    );
+    expect(patchCall).toBeDefined();
+    const [, patchInit] = patchCall as [unknown, RequestInit];
+    expect(JSON.parse(patchInit.body as string)).toEqual({
+      tools: { exec: { security: 'full', ask: 'off' } },
+    });
+
+    expect(storage._store.get('botIdentityApplyPending')).toBe(false);
+    expect(storage._store.get('execPresetApplyPending')).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('flushes pending channel config on alarm and clears the pending flag', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'flush-app';
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      flyMachineId: 'machine-1',
+      sandboxId: 'sandbox-1',
+      channels: {
+        telegramBotToken: {
+          encryptedData: 'telegram-token',
+          encryptedDEK: 'dek',
+          algorithm: 'rsa-aes-256-gcm',
+          version: 1,
+        },
+      },
+      encryptedSecrets: {
+        TELEGRAM_BOT_TOKEN: {
+          encryptedData: 'telegram-token',
+          encryptedDEK: 'dek',
+          algorithm: 'rsa-aes-256-gcm',
+          version: 1,
+        },
+      },
+      channelsApplyPending: true,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { mounts: [{ volume: 'vol-1', path: '/root' }] },
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.alarm();
+
+    const patchCall = fetchMock.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/config/patch')
+    );
+    expect(patchCall).toBeDefined();
+    const [, init] = patchCall as [unknown, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      channels: {
+        telegram: {
+          botToken: 'telegram-token',
+          enabled: true,
+          dmPolicy: 'pairing',
+        },
+      },
+      plugins: { entries: { telegram: { enabled: true } } },
+    });
+    expect(storage._store.get('channelsApplyPending')).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps pending channel config set when alarm retry fails', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'flush-app';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'down' }), {
+        status: 503,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      flyMachineId: 'machine-1',
+      sandboxId: 'sandbox-1',
+      channels: {
+        telegramBotToken: {
+          encryptedData: 'telegram-token',
+          encryptedDEK: 'dek',
+          algorithm: 'rsa-aes-256-gcm',
+          version: 1,
+        },
+      },
+      channelsApplyPending: true,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { mounts: [{ volume: 'vol-1', path: '/root' }] },
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.alarm();
+
+    expect(storage._store.get('channelsApplyPending')).toBe(true);
+    expectStructuredWarn(warnSpy, 'flushPendingConfigToGateway: channels failed');
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps pending channel config set when alarm retry cannot decrypt stored tokens', async () => {
+    const env = {
+      ...createFakeEnv(),
+      FLY_APP_NAME: 'flush-app',
+      AGENT_ENV_VARS_PRIVATE_KEY: '',
+    };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      flyMachineId: 'machine-1',
+      sandboxId: 'sandbox-1',
+      channels: {
+        telegramBotToken: {
+          encryptedData: 'telegram-token',
+          encryptedDEK: 'dek',
+          algorithm: 'rsa-aes-256-gcm',
+          version: 1,
+        },
+      },
+      channelsApplyPending: true,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { mounts: [{ volume: 'vol-1', path: '/root' }] },
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.alarm();
+
+    expect(
+      fetchMock.mock.calls.some(
+        (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/_kilo/config/patch')
+      )
+    ).toBe(false);
+    expect(storage._store.get('channelsApplyPending')).toBe(true);
+    expectStructuredWarn(warnSpy, 'flushPendingConfigToGateway: channels failed');
     vi.unstubAllGlobals();
   });
 });

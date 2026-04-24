@@ -22,6 +22,7 @@ import * as reviewQueue from './review-queue';
 import * as patrol from './patrol';
 import { getRig } from './rigs';
 import { parseGitUrl } from '../../util/platform-pr.util';
+import type { PRStatusResult } from './town-scm';
 
 // ── Bead mutations ──────────────────────────────────────────────────
 
@@ -132,6 +133,12 @@ const CloseConvoy = z.object({
   convoy_id: z.string(),
 });
 
+const FailConvoy = z.object({
+  type: z.literal('fail_convoy'),
+  convoy_id: z.string(),
+  reason: z.string(),
+});
+
 // ── Side effects (deferred) ─────────────────────────────────────────
 
 const DispatchAgent = z.object({
@@ -206,6 +213,7 @@ export const Action = z.discriminatedUnion('type', [
   UpdateConvoyProgress,
   SetConvoyReadyToLand,
   CloseConvoy,
+  FailConvoy,
   // Side effects
   DispatchAgent,
   StopAgent,
@@ -239,6 +247,7 @@ export type DeleteAgent = z.infer<typeof DeleteAgent>;
 export type UpdateConvoyProgress = z.infer<typeof UpdateConvoyProgress>;
 export type SetConvoyReadyToLand = z.infer<typeof SetConvoyReadyToLand>;
 export type CloseConvoy = z.infer<typeof CloseConvoy>;
+export type FailConvoy = z.infer<typeof FailConvoy>;
 export type DispatchAgent = z.infer<typeof DispatchAgent>;
 export type StopAgent = z.infer<typeof StopAgent>;
 export type PollPr = z.infer<typeof PollPr>;
@@ -271,8 +280,8 @@ export type ApplyActionContext = {
   dispatchAgent: (agentId: string, beadId: string, rigId: string) => Promise<boolean>;
   /** Stop an agent's container process. */
   stopAgent: (agentId: string) => Promise<void>;
-  /** Check a PR's status via GitHub/GitLab API. Returns 'open'|'merged'|'closed'|null. */
-  checkPRStatus: (prUrl: string) => Promise<'open' | 'merged' | 'closed' | null>;
+  /** Check a PR's status via GitHub/GitLab API. Returns PRStatusResult or null. */
+  checkPRStatus: (prUrl: string) => Promise<PRStatusResult | null>;
   /** Check PR for unresolved review comments and failing CI checks. */
   checkPRFeedback: (prUrl: string) => Promise<PRFeedbackCheckResult | null>;
   /** Merge a PR via GitHub/GitLab API. */
@@ -397,7 +406,22 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'create_landing_mr': {
-      // Create an MR bead for the landing merge (feature branch → main)
+      const timestamp = now();
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.metadata} = json_set(
+            COALESCE(${beads.columns.metadata}, '{}'),
+            '$.landing_mr_attempts',
+            COALESCE(json_extract(${beads.columns.metadata}, '$.landing_mr_attempts'), 0) + 1,
+            '$.last_landing_mr_attempt_at', ?
+          ),
+          ${beads.columns.updated_at} = ?
+          WHERE ${beads.bead_id} = ?
+        `,
+        [timestamp, timestamp, action.convoy_id]
+      );
       reviewQueue.submitToReviewQueue(sql, {
         agent_id: 'system',
         bead_id: action.convoy_id,
@@ -592,7 +616,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'close_convoy': {
-      // Use updateBeadStatus for terminal state guard + bead event logging
       beadOps.updateBeadStatus(sql, action.convoy_id, 'closed', 'system');
       query(
         sql,
@@ -602,6 +625,25 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           WHERE ${convoy_metadata.columns.bead_id} = ?
         `,
         [now(), action.convoy_id]
+      );
+      return null;
+    }
+
+    case 'fail_convoy': {
+      beadOps.updateBeadStatus(sql, action.convoy_id, 'failed', 'system');
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.metadata} = json_set(
+            COALESCE(${beads.columns.metadata}, '{}'),
+            '$.failureReason', 'landing_mr_exhausted',
+            '$.failureMessage', ?
+          ),
+          ${beads.columns.updated_at} = ?
+          WHERE ${beads.bead_id} = ?
+        `,
+        [action.reason, now(), action.convoy_id]
       );
       return null;
     }
@@ -683,8 +725,8 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
       return async () => {
         try {
-          const status = await ctx.checkPRStatus(action.pr_url);
-          if (status !== null) {
+          const prStatusResult = await ctx.checkPRStatus(action.pr_url);
+          if (prStatusResult !== null) {
             // Any non-null result resets the consecutive null counter
             query(
               sql,
@@ -698,6 +740,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               `,
               [action.bead_id]
             );
+            const { status, mergeable_state } = prStatusResult;
             if (status !== 'open') {
               ctx.insertEvent('pr_status_changed', {
                 bead_id: action.bead_id,
@@ -710,6 +753,125 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             const townConfig = await ctx.getTownConfig();
             const refineryConfig = townConfig.refinery;
             if (!refineryConfig) return;
+
+            if (mergeable_state === 'unknown') {
+              // GitHub is still computing mergeability — skip this poll and
+              // check again on the next tick. Do NOT treat 'unknown' as clean
+              // or dirty to avoid prematurely clearing has_conflicts or
+              // emitting pr_conflict_detected before GitHub has a definitive answer.
+              return;
+            }
+
+            if (mergeable_state === 'dirty') {
+              // PR has merge conflicts — emit event ONCE per conflict episode.
+              // The reconciler decides whether to create a conflict bead or an escalation
+              // based on the rig's auto_resolve_merge_conflicts config.
+              const conflictMetaRows = z
+                .object({ has_conflicts: z.unknown() })
+                .array()
+                .parse([
+                  ...query(
+                    sql,
+                    /* sql */ `
+                      SELECT json_extract(${beads.columns.metadata}, '$.has_conflicts') AS has_conflicts
+                      FROM ${beads}
+                      WHERE ${beads.bead_id} = ?
+                    `,
+                    [action.bead_id]
+                  ),
+                ]);
+              const alreadyMarked =
+                conflictMetaRows[0]?.has_conflicts === 1 ||
+                conflictMetaRows[0]?.has_conflicts === true;
+
+              if (!alreadyMarked) {
+                // Mark conflict on MR bead metadata
+                query(
+                  sql,
+                  /* sql */ `
+                    UPDATE ${beads}
+                    SET ${beads.columns.metadata} = json_set(
+                      COALESCE(${beads.columns.metadata}, '{}'),
+                      '$.has_conflicts', 1,
+                      '$.conflicts_detected_at', ?
+                    ),
+                    ${beads.columns.updated_at} = ?
+                    WHERE ${beads.bead_id} = ?
+                  `,
+                  [now(), now(), action.bead_id]
+                );
+
+                // Get MR bead source bead ID and branch for the event payload
+                const mrMetaRows = z
+                  .object({ source_bead_id: z.string().nullable(), branch: z.string().nullable() })
+                  .array()
+                  .parse([
+                    ...query(
+                      sql,
+                      /* sql */ `
+                        SELECT
+                          json_extract(${beads.columns.metadata}, '$.source_bead_id') AS source_bead_id,
+                          ${review_metadata.columns.branch} AS branch
+                        FROM ${beads}
+                        INNER JOIN ${review_metadata} ON ${review_metadata.bead_id} = ${beads.bead_id}
+                        WHERE ${beads.bead_id} = ?
+                      `,
+                      [action.bead_id]
+                    ),
+                  ]);
+                const sourceBead = mrMetaRows[0]?.source_bead_id ?? null;
+                const conflictBranch = mrMetaRows[0]?.branch ?? '';
+
+                ctx.insertEvent('pr_conflict_detected', {
+                  bead_id: action.bead_id,
+                  payload: {
+                    mr_bead_id: action.bead_id,
+                    source_bead_id: sourceBead,
+                    pr_url: action.pr_url,
+                    branch: conflictBranch,
+                  },
+                });
+              }
+
+              // A dirty PR must not proceed to the auto-merge timer — reset the
+              // grace-period clock so the timer starts fresh once conflicts are resolved.
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${review_metadata}
+                  SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+                  WHERE ${review_metadata.bead_id} = ?
+                    AND ${review_metadata.columns.auto_merge_ready_since} IS NOT NULL
+                `,
+                [action.bead_id]
+              );
+              return;
+            } else if (
+              mergeable_state === 'clean' ||
+              mergeable_state === 'blocked' ||
+              mergeable_state === 'has_hooks'
+            ) {
+              // Conflict definitively resolved — clear the has_conflicts flag.
+              // 'clean': no conflicts, all checks pass.
+              // 'blocked': no conflicts but checks are failing (e.g. required reviews).
+              // 'has_hooks': no conflicts but pre-receive hooks are pending.
+              // 'unknown' is handled above (GitHub still computing — retry next poll).
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.metadata} = json_remove(
+                    COALESCE(${beads.columns.metadata}, '{}'),
+                    '$.has_conflicts',
+                    '$.conflicts_detected_at'
+                  ),
+                  ${beads.columns.updated_at} = ?
+                  WHERE ${beads.bead_id} = ?
+                    AND json_extract(${beads.columns.metadata}, '$.has_conflicts') IS NOT NULL
+                `,
+                [now(), action.bead_id]
+              );
+            }
 
             const wantsAutoResolve = refineryConfig.auto_resolve_pr_feedback === true;
             const wantsAutoMerge =
@@ -736,10 +898,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               // If the PR was merged externally during that window, inserting
               // pr_feedback_detected would create a feedback bead for a merged
               // PR — leading to a duplicate PR on an already-merged branch.
-              const freshStatus = await ctx.checkPRStatus(action.pr_url);
-              if (freshStatus !== 'open') {
+              const freshStatusResult = await ctx.checkPRStatus(action.pr_url);
+              if (freshStatusResult?.status !== 'open') {
                 console.log(
-                  `${LOG} poll_pr: PR status changed to '${freshStatus}' during feedback check, skipping feedback for bead=${action.bead_id}`
+                  `${LOG} poll_pr: PR status changed to '${freshStatusResult?.status ?? 'null'}' during feedback check, skipping feedback for bead=${action.bead_id}`
                 );
               } else {
                 const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);

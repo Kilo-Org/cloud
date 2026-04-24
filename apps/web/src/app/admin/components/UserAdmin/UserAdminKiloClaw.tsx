@@ -1,12 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ExternalLink, History } from 'lucide-react';
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  CreditCard,
+  ExternalLink,
+  History,
+  Wallet,
+} from 'lucide-react';
+import type { inferRouterOutputs } from '@trpc/server';
+import type { RootRouter } from '@/routers/root-router';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Dialog,
   DialogContent,
@@ -18,15 +30,24 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioButtonGroup } from '@/components/ui/RadioGroup';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTRPC } from '@/lib/trpc/utils';
-import { formatDate } from '@/lib/admin-utils';
+import { formatDate, formatRelativeTime } from '@/lib/admin-utils';
 import { toast } from 'sonner';
+
+// ---------------------------------------------------------------------------
+// Types (derived from the tRPC router output)
+// ---------------------------------------------------------------------------
+
+type RouterOutputs = inferRouterOutputs<RootRouter>;
+type KiloClawState = RouterOutputs['admin']['users']['getKiloClawState'];
+type Subscription = KiloClawState['subscriptions'][number];
 
 const DEFAULT_TRIAL_DAYS = 7;
 
-function formatDateOrDash(date: string | null | undefined): string {
-  return date ? formatDate(date) : '—';
-}
+// ---------------------------------------------------------------------------
+// Small formatting helpers
+// ---------------------------------------------------------------------------
 
 function toLocalDateInputValue(date: string): string {
   const parsed = new Date(date);
@@ -46,69 +67,48 @@ function formatJsonSummary(value: Record<string, unknown> | null | undefined): s
   return JSON.stringify(value, null, 2);
 }
 
-function getAccessBadgeClass(hasAccess: boolean) {
-  return hasAccess ? 'bg-green-900/20 text-green-400' : 'bg-red-900/20 text-red-400';
+function formatDateCompact(date: string) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(date));
 }
 
-function isTransferredHistoricalSubscription(subscription: {
-  transferred_to_subscription_id: string | null;
-}) {
-  return Boolean(subscription.transferred_to_subscription_id);
+function formatStatusLabel(status: Subscription['status']) {
+  if (status === 'past_due') return 'past due';
+  return status;
 }
 
-function isInactiveSubscription(subscription: {
-  status: string;
-  transferred_to_subscription_id: string | null;
-}) {
-  return subscription.status === 'canceled' || isTransferredHistoricalSubscription(subscription);
+function formatPlanLabel(plan: Subscription['plan']) {
+  return plan.charAt(0).toUpperCase() + plan.slice(1);
 }
 
-function getSubscriptionScope(subscription: {
-  instance: {
-    organization_id?: string | null;
-    organization_name?: string | null;
-  } | null;
-}) {
-  if (!subscription.instance?.organization_id) {
-    return {
-      type: 'personal' as const,
-      organizationId: null,
-      organizationName: null,
-    };
-  }
-
-  return {
-    type: 'organization' as const,
-    organizationId: subscription.instance.organization_id,
-    organizationName: subscription.instance.organization_name ?? null,
-  };
+function formatScopeLabel(type: 'personal' | 'organization') {
+  return type === 'personal' ? 'Personal' : 'Organization';
 }
 
-function formatSubscriptionScopeValue(subscription: {
-  instance: {
-    organization_id?: string | null;
-    organization_name?: string | null;
-  } | null;
-}) {
-  const scope = getSubscriptionScope(subscription);
-  if (scope.type === 'personal') {
-    return 'personal';
-  }
-
-  return scope.organizationName
-    ? `organization — ${scope.organizationName} (${scope.organizationId})`
-    : `organization — ${scope.organizationId}`;
+function stripeSubscriptionUrl(id: string) {
+  return `https://dashboard.stripe.com/subscriptions/${id}`;
 }
 
-function getSubscriptionStatusBadgeClass(status: string) {
+function stripeScheduleUrl(id: string) {
+  return `https://dashboard.stripe.com/subscription_schedules/${id}`;
+}
+
+// Severity model:
+//   red    = broken / blocked (no access, past_due, unpaid, suspended, canceled)
+//   yellow = warning / attention soon (trialing, cancels-at-period-end, deadline <7d)
+//   green  = healthy (active)
+function getStatusBadgeClass(status: Subscription['status']) {
   switch (status) {
     case 'active':
       return 'bg-green-900/20 text-green-400';
     case 'trialing':
-      return 'bg-blue-900/20 text-blue-400';
+      return 'bg-yellow-900/20 text-yellow-400';
     case 'past_due':
     case 'unpaid':
-      return 'bg-yellow-900/20 text-yellow-400';
+      return 'bg-red-900/20 text-red-400';
     case 'canceled':
       return 'bg-red-900/20 text-red-400';
     default:
@@ -116,30 +116,939 @@ function getSubscriptionStatusBadgeClass(status: string) {
   }
 }
 
+function getAccessBadgeClass(hasAccess: boolean) {
+  return hasAccess ? 'bg-green-900/20 text-green-400' : 'bg-red-900/20 text-red-400';
+}
+
+function getScope(sub: Subscription) {
+  if (!sub.instance?.organization_id) {
+    return { type: 'personal' as const, organizationId: null, organizationName: null };
+  }
+  return {
+    type: 'organization' as const,
+    organizationId: sub.instance.organization_id,
+    organizationName: sub.instance.organization_name ?? null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Chain grouping — walk `transferred_to_subscription_id` linked list so
+// predecessor subscriptions nest under their tail/current record.
+// ---------------------------------------------------------------------------
+
+type Chain = { tail: Subscription; predecessors: Subscription[] };
+
+function buildChains(subs: Subscription[]): Chain[] {
+  const byId = new Map(subs.map(s => [s.id, s]));
+  const tails = subs.filter(s => !s.transferred_to_subscription_id);
+
+  const predecessorsByTarget = new Map<string, Subscription[]>();
+  for (const sub of subs) {
+    if (sub.transferred_to_subscription_id) {
+      const list = predecessorsByTarget.get(sub.transferred_to_subscription_id) ?? [];
+      list.push(sub);
+      predecessorsByTarget.set(sub.transferred_to_subscription_id, list);
+    }
+  }
+
+  return tails.map(tail => {
+    const predecessors: Subscription[] = [];
+    let cursor: Subscription | undefined = tail;
+    const visited = new Set<string>([tail.id]);
+    while (cursor) {
+      const preds = predecessorsByTarget.get(cursor.id) ?? [];
+      const unvisited = preds.filter(p => !visited.has(p.id));
+      if (unvisited.length === 0) break;
+      unvisited.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const next = unvisited[0];
+      if (!next) break;
+      visited.add(next.id);
+      predecessors.push(next);
+      cursor = byId.get(next.id);
+    }
+    return { tail, predecessors };
+  });
+}
+
+// Compute the single most-relevant next date for the summary strip.
+function computeNextKeyDate(sub: Subscription): {
+  label: string;
+  date: string;
+  severity: 'neutral' | 'warn' | 'danger';
+} | null {
+  const urgentMs = 7 * 86_400_000;
+  const now = Date.now();
+
+  if (sub.status === 'past_due') return null;
+
+  let label: string | null = null;
+  let date: string | null = null;
+  let warnWithinMs: number | null = null;
+
+  if (sub.status === 'trialing') {
+    label = 'Trial ends';
+    date = sub.trial_ends_at;
+    warnWithinMs = 3 * 86_400_000;
+  } else if (sub.cancel_at_period_end) {
+    label = 'Cancels at period end';
+    date = sub.current_period_end;
+    warnWithinMs = urgentMs;
+  } else if (sub.status === 'active') {
+    label = sub.payment_source === 'credits' ? 'Credit renewal' : 'Next renewal';
+    date = sub.current_period_end;
+  }
+
+  if (!label || !date) return null;
+
+  const msRemaining = new Date(date).getTime() - now;
+  const severity: 'neutral' | 'warn' | 'danger' =
+    warnWithinMs !== null && msRemaining < warnWithinMs ? 'warn' : 'neutral';
+
+  return { label, date, severity };
+}
+
+// ---------------------------------------------------------------------------
+// Small UI building blocks
+// ---------------------------------------------------------------------------
+
+function DateWithRelative({
+  date,
+  severity = 'neutral',
+  withTime = false,
+}: {
+  date: string | null;
+  severity?: 'neutral' | 'warn' | 'danger';
+  withTime?: boolean;
+}) {
+  if (!date) return <span>—</span>;
+  const absolute = withTime ? formatDate(date) : formatDateCompact(date);
+  const relClass =
+    severity === 'danger'
+      ? 'text-red-400'
+      : severity === 'warn'
+        ? 'text-yellow-400'
+        : 'text-muted-foreground';
+
+  return (
+    <span className="text-sm">
+      <span>{absolute}</span>
+      <span className={`ml-1.5 text-xs ${relClass}`}>({formatRelativeTime(date)})</span>
+    </span>
+  );
+}
+
+function StripeLink({ id, kind }: { id: string; kind: 'subscription' | 'schedule' }) {
+  const url = kind === 'subscription' ? stripeSubscriptionUrl(id) : stripeScheduleUrl(id);
+  const display = id.length > 24 ? `${id.slice(0, 20)}…` : id;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="group inline-flex items-center gap-1 font-mono text-xs text-blue-400 hover:underline"
+    >
+      <span>{display}</span>
+      <ExternalLink className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+    </a>
+  );
+}
+
+function TruncatedId({ id, label }: { id: string; label?: string }) {
+  const truncated = id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
+  const copy = () => {
+    void navigator.clipboard.writeText(id);
+    toast.success(`${label ?? 'ID'} copied to clipboard`);
+  };
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={copy}
+            className="inline-flex items-center gap-1 rounded border border-transparent px-1 font-mono text-xs text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground"
+          >
+            <span>{truncated}</span>
+            <Copy className="h-3 w-3 opacity-60" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="font-mono text-xs">Click to copy: {id}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function Field({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div>
+      <h4 className="text-muted-foreground text-xs font-medium">{label}</h4>
+      <div className="text-sm">{value}</div>
+    </div>
+  );
+}
+
+function InstanceLink({ instance }: { instance: NonNullable<Subscription['instance']> }) {
+  const displayName = instance.name ?? instance.sandbox_id;
+  return (
+    <Link
+      href={`/admin/kiloclaw/${instance.id}`}
+      className="group inline-flex items-center gap-1 text-blue-400 hover:underline"
+    >
+      <span className="font-medium">{displayName}</span>
+      <ExternalLink className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+      {instance.destroyed_at ? <span className="ml-1 text-red-400">(destroyed)</span> : null}
+    </Link>
+  );
+}
+
+function PaymentSourceLabel({ sub }: { sub: Subscription }) {
+  if (sub.payment_source === 'credits') {
+    const variant = sub.stripe_subscription_id ? 'hybrid' : 'pure';
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <Wallet className="h-3 w-3" />
+        Credits <span className="opacity-70">({variant})</span>
+      </span>
+    );
+  }
+  if (sub.payment_source === 'stripe') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <CreditCard className="h-3 w-3" />
+        Stripe
+      </span>
+    );
+  }
+  return <span className="text-xs text-muted-foreground">No payment source</span>;
+}
+
+// ---------------------------------------------------------------------------
+// Summary strip — consistent access/plan/payment/next-date header.
+// ---------------------------------------------------------------------------
+
+function SummaryStrip({
+  state,
+  effective,
+}: {
+  state: KiloClawState;
+  effective: Subscription | null;
+}) {
+  const nextDate = effective ? computeNextKeyDate(effective) : null;
+  const nextDateClass =
+    nextDate?.severity === 'warn'
+      ? 'text-yellow-400'
+      : nextDate?.severity === 'danger'
+        ? 'text-red-400'
+        : 'text-muted-foreground';
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border bg-card/40 px-4 py-2.5 text-sm">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Access:</span>
+        <Badge className={getAccessBadgeClass(state.hasAccess)}>
+          {state.hasAccess ? 'has access' : 'no access'}
+        </Badge>
+        {state.accessReason ? (
+          <span className="text-xs text-muted-foreground">via {state.accessReason}</span>
+        ) : null}
+      </div>
+
+      <span className="h-4 w-px bg-border" />
+
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Plan:</span>
+        {effective ? (
+          <>
+            <span className="font-medium">{formatPlanLabel(effective.plan)}</span>
+            <Badge className={getStatusBadgeClass(effective.status)}>
+              {formatStatusLabel(effective.status)}
+            </Badge>
+            {effective.cancel_at_period_end ? (
+              <span className="text-xs text-yellow-400">(cancels at period end)</span>
+            ) : null}
+          </>
+        ) : (
+          <span className="text-muted-foreground">none</span>
+        )}
+      </div>
+
+      {effective?.payment_source ? (
+        <>
+          <span className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Payment:</span>
+            <PaymentSourceLabel sub={effective} />
+          </div>
+        </>
+      ) : null}
+
+      {nextDate ? (
+        <>
+          <span className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{nextDate.label}:</span>
+            <span className="font-medium">{formatDateCompact(nextDate.date)}</span>
+            <span className={`text-xs ${nextDateClass}`}>
+              ({formatRelativeTime(nextDate.date)})
+            </span>
+          </div>
+        </>
+      ) : null}
+
+      {state.earlybird ? (
+        <>
+          <span className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Earlybird:</span>
+            <span className="font-medium">{formatDateCompact(state.earlybird.expiresAt)}</span>
+            <span className="text-xs text-muted-foreground">
+              ({state.earlybird.daysRemaining} days left)
+            </span>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Past-due banner — single source of truth for past-due/destruction messaging.
+// ---------------------------------------------------------------------------
+
+function PastDueBanner({ sub }: { sub: Subscription }) {
+  return (
+    <div className="rounded-lg border border-red-500/40 bg-red-950/20 p-3 text-sm">
+      <div className="flex items-center gap-2 text-red-300">
+        <AlertTriangle className="h-4 w-4" />
+        <span className="font-medium">Subscription is past due</span>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-red-100/80">
+        {sub.past_due_since ? (
+          <span>
+            Past due since {formatDateCompact(sub.past_due_since)} (
+            {formatRelativeTime(sub.past_due_since)})
+          </span>
+        ) : null}
+        {sub.suspended_at ? (
+          <span>Instance suspended {formatRelativeTime(sub.suspended_at)}</span>
+        ) : null}
+        {sub.destruction_deadline ? (
+          <span className="font-medium text-yellow-300">
+            Instance will be destroyed on {formatDate(sub.destruction_deadline)} (
+            {formatRelativeTime(sub.destruction_deadline)})
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Contextual field computation — only surface fields relevant to the state.
+// ---------------------------------------------------------------------------
+
+function getRelevantFields(
+  sub: Subscription,
+  options: { pastDueBannerShown: boolean } = { pastDueBannerShown: false }
+): Array<{ label: string; value: ReactNode }> {
+  const fields: Array<{ label: string; value: ReactNode }> = [];
+
+  const scope = getScope(sub);
+  const isTrial = sub.plan === 'trial';
+  const isStripe = sub.payment_source === 'stripe' || !!sub.stripe_subscription_id;
+  const nowMs = Date.now();
+
+  // Organization name is already shown as a header badge; show the
+  // Organization field here only when the name is unknown (ID-only fallback).
+  if (scope.type === 'organization' && !scope.organizationName) {
+    fields.push({
+      label: 'Organization',
+      value: scope.organizationId ?? '—',
+    });
+  }
+
+  if (isTrial) {
+    fields.push({
+      label: 'Trial started',
+      value: <DateWithRelative date={sub.trial_started_at} />,
+    });
+    fields.push({
+      label: 'Trial ends',
+      value: <DateWithRelative date={sub.trial_ends_at} severity="warn" withTime />,
+    });
+  } else {
+    if (sub.trial_started_at) {
+      fields.push({
+        label: 'First trial started',
+        value: <DateWithRelative date={sub.trial_started_at} />,
+      });
+    }
+    const periodEndMs = sub.current_period_end ? new Date(sub.current_period_end).getTime() : null;
+    const periodInPast = periodEndMs !== null && periodEndMs < nowMs;
+    fields.push({
+      label: 'Period',
+      value: (
+        <span className={`text-sm ${periodInPast ? 'text-muted-foreground' : ''}`}>
+          {sub.current_period_start ? formatDateCompact(sub.current_period_start) : '—'}
+          {' → '}
+          {sub.current_period_end ? formatDateCompact(sub.current_period_end) : '—'}
+        </span>
+      ),
+    });
+    if (sub.plan === 'commit' && sub.commit_ends_at) {
+      fields.push({
+        label: 'Commit ends',
+        value: <DateWithRelative date={sub.commit_ends_at} />,
+      });
+    }
+  }
+
+  // When the past-due banner is visible, it owns these details.
+  if (!options.pastDueBannerShown && sub.past_due_since) {
+    fields.push({
+      label: 'Past due since',
+      value: <DateWithRelative date={sub.past_due_since} severity="danger" withTime />,
+    });
+  }
+  if (!options.pastDueBannerShown && sub.suspended_at) {
+    fields.push({
+      label: 'Suspended',
+      value: <DateWithRelative date={sub.suspended_at} severity="danger" withTime />,
+    });
+  }
+  // Destruction deadline is a top-signal field — always surface it when set
+  // unless the past-due banner (effective sub only) already owns it.
+  if (!options.pastDueBannerShown && sub.destruction_deadline) {
+    fields.push({
+      label: 'Destruction deadline',
+      value: <DateWithRelative date={sub.destruction_deadline} severity="warn" withTime />,
+    });
+  }
+  if (sub.scheduled_plan) {
+    fields.push({
+      label: 'Scheduled plan',
+      value: `${formatPlanLabel(sub.scheduled_plan)}${sub.scheduled_by ? ` (${sub.scheduled_by})` : ''}`,
+    });
+  }
+  if (sub.payment_source === 'credits' && sub.credit_renewal_at && !isTrial) {
+    fields.push({
+      label: 'Credit renewal',
+      value: <DateWithRelative date={sub.credit_renewal_at} />,
+    });
+  }
+
+  if (isStripe && sub.stripe_subscription_id) {
+    fields.push({
+      label: 'Stripe',
+      value: <StripeLink id={sub.stripe_subscription_id} kind="subscription" />,
+    });
+  }
+
+  return fields;
+}
+
+// ---------------------------------------------------------------------------
+// Subscription card (primary tail record)
+// ---------------------------------------------------------------------------
+
+type SubscriptionCardActions = {
+  onChangeLog: (subscriptionId: string) => void;
+  onEditTrial: (subscriptionId: string) => void;
+  onCancel: (
+    subscriptionId: string,
+    status: Subscription['status'],
+    options?: { forceImmediate?: boolean }
+  ) => void;
+};
+
+function SubscriptionCard({
+  sub,
+  isEffective,
+  historyCount,
+  showHistory,
+  onToggleHistory,
+  historyContent,
+  pastDueBannerShown,
+  actions,
+}: {
+  sub: Subscription;
+  isEffective: boolean;
+  historyCount: number;
+  showHistory: boolean;
+  onToggleHistory: () => void;
+  historyContent: ReactNode;
+  pastDueBannerShown: boolean;
+  actions: SubscriptionCardActions;
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const scope = getScope(sub);
+  const relevantFields = getRelevantFields(sub, { pastDueBannerShown });
+
+  const canEditTrial = sub.status === 'trialing' || sub.status === 'canceled';
+
+  // Cancel button visibility mirrors the statuses the cancelKiloClawSubscription
+  // mutation accepts (active, past_due, trialing):
+  //   - trialing: "Cancel Trial" (dialog forces immediate)
+  //   - active/past_due + already scheduled to cancel at period end:
+  //     "Cancel Immediately" (the remaining escalation; dialog forces immediate)
+  //   - active/past_due (not scheduled): "Cancel" (dialog offers period_end or immediate)
+  //   - anything else (canceled, unpaid): no cancel button
+  const showCancel =
+    sub.status === 'active' || sub.status === 'past_due' || sub.status === 'trialing';
+  const cancelAlreadyScheduled =
+    sub.cancel_at_period_end && (sub.status === 'active' || sub.status === 'past_due');
+  const cancelLabel =
+    sub.status === 'trialing'
+      ? 'Cancel Trial'
+      : cancelAlreadyScheduled
+        ? 'Cancel Immediately'
+        : 'Cancel';
+
+  return (
+    <div
+      className={`rounded-lg border p-4 ${isEffective ? 'border-blue-500/40 bg-blue-950/10' : ''}`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={getStatusBadgeClass(sub.status)}>
+              {formatStatusLabel(sub.status)}
+            </Badge>
+            <span className="text-base font-semibold">{formatPlanLabel(sub.plan)}</span>
+            <Badge variant="outline" className="text-xs">
+              {formatScopeLabel(scope.type)}
+            </Badge>
+            {scope.type === 'organization' && scope.organizationName ? (
+              <Badge variant="outline" className="text-xs">
+                {scope.organizationName}
+              </Badge>
+            ) : null}
+            {sub.cancel_at_period_end ? (
+              <Badge className="bg-yellow-900/20 text-yellow-400">cancels at period end</Badge>
+            ) : null}
+            {sub.pending_conversion ? (
+              <Badge className="bg-purple-900/20 text-purple-400">pending conversion</Badge>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {sub.instance ? (
+              <span className="inline-flex items-center gap-1">
+                <span>Instance:</span>
+                <InstanceLink instance={sub.instance} />
+              </span>
+            ) : null}
+            {sub.instance && sub.payment_source ? <span>•</span> : null}
+            {sub.payment_source ? <PaymentSourceLabel sub={sub} /> : null}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => actions.onChangeLog(sub.id)}>
+            <History className="mr-1 h-3 w-3" />
+            Change Log
+          </Button>
+          {canEditTrial ? (
+            <Button variant="outline" size="sm" onClick={() => actions.onEditTrial(sub.id)}>
+              {sub.status === 'canceled' ? 'Reset Trial' : 'Edit Trial End'}
+            </Button>
+          ) : null}
+          {showCancel ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-red-500/30 text-red-400 hover:bg-red-950/30"
+              onClick={() =>
+                actions.onCancel(sub.id, sub.status, {
+                  forceImmediate: cancelAlreadyScheduled,
+                })
+              }
+            >
+              {cancelLabel}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
+        {relevantFields.map(f => (
+          <Field key={f.label} label={f.label} value={f.value} />
+        ))}
+      </div>
+
+      <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen} className="mt-3">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center gap-1.5 rounded border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/40"
+          >
+            {detailsOpen ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            Details (IDs, timestamps, Stripe refs)
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-2">
+          <div className="grid grid-cols-2 gap-3 rounded border bg-muted/10 p-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
+            <Field
+              label="Subscription ID"
+              value={<TruncatedId id={sub.id} label="Subscription ID" />}
+            />
+            {sub.instance_id ? (
+              <Field
+                label="Instance ID"
+                value={<TruncatedId id={sub.instance_id} label="Instance ID" />}
+              />
+            ) : null}
+            {sub.stripe_subscription_id ? (
+              <Field
+                label="Stripe Subscription"
+                value={<StripeLink id={sub.stripe_subscription_id} kind="subscription" />}
+              />
+            ) : null}
+            {sub.stripe_schedule_id ? (
+              <Field
+                label="Stripe Schedule"
+                value={<StripeLink id={sub.stripe_schedule_id} kind="schedule" />}
+              />
+            ) : null}
+            {sub.transferred_to_subscription_id ? (
+              <Field
+                label="Transferred to"
+                value={<TruncatedId id={sub.transferred_to_subscription_id} label="Successor ID" />}
+              />
+            ) : null}
+            <Field label="Created" value={<DateWithRelative date={sub.created_at} />} />
+            <Field label="Updated" value={<DateWithRelative date={sub.updated_at} />} />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {historyCount > 0 ? (
+        <div className="mt-3 border-t pt-3">
+          <button
+            type="button"
+            onClick={onToggleHistory}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {showHistory ? (
+              <ChevronDown className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+            {showHistory ? 'Hide' : 'Show'} history ({historyCount} previous subscription
+            {historyCount !== 1 ? 's' : ''})
+          </button>
+          {showHistory ? (
+            <div className="relative mt-2 space-y-1.5 border-l-2 border-muted-foreground/20 pl-4">
+              {historyContent}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Compact row — single-line expandable. Used for predecessors and for
+// standalone inactive chains.
+// ---------------------------------------------------------------------------
+
+function CompactSubscriptionRow({
+  sub,
+  successorId,
+  onChangeLog,
+}: {
+  sub: Subscription;
+  successorId?: string | null;
+  onChangeLog: (subscriptionId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const trialRange =
+    sub.trial_started_at && sub.trial_ends_at
+      ? `${formatDateCompact(sub.trial_started_at)} → ${formatDateCompact(sub.trial_ends_at)}`
+      : null;
+  const periodRange =
+    sub.current_period_start && sub.current_period_end
+      ? `${formatDateCompact(sub.current_period_start)} → ${formatDateCompact(sub.current_period_end)}`
+      : null;
+  const range = trialRange ?? periodRange ?? '—';
+
+  // The schema has no `canceled_at` column and `updated_at` may reflect later
+  // mutations, so for canceled rows we only claim "last update" — for accurate
+  // cancellation timing admins should open the Change Log.
+  const timelineStamp =
+    sub.status === 'canceled'
+      ? `last update ${formatRelativeTime(sub.updated_at)}`
+      : `created ${formatRelativeTime(sub.created_at)}`;
+
+  return (
+    <div className="rounded border bg-muted/10">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-muted/20"
+      >
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {open ? (
+            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+          )}
+          <Badge className={getStatusBadgeClass(sub.status)}>{formatStatusLabel(sub.status)}</Badge>
+          <span className="font-medium">{formatPlanLabel(sub.plan)}</span>
+          <span className="text-muted-foreground">{range}</span>
+          {successorId ? (
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
+              <span>↑ transferred to</span>
+              <TruncatedId id={successorId} label="Successor ID" />
+            </span>
+          ) : null}
+        </div>
+        <span className="shrink-0 text-muted-foreground">{timelineStamp}</span>
+      </button>
+      {open ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t bg-background/40 px-3 py-2 text-xs">
+          <span className="inline-flex items-center gap-1 text-muted-foreground">
+            <span>ID:</span>
+            <TruncatedId id={sub.id} label="Subscription ID" />
+          </span>
+          {sub.stripe_subscription_id ? (
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
+              <span>Stripe:</span>
+              <StripeLink id={sub.stripe_subscription_id} kind="subscription" />
+            </span>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => onChangeLog(sub.id)}
+          >
+            <History className="mr-1 h-3 w-3" />
+            Change Log
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bulk collapsed group — used when many canceled chains and no active chain.
+// ---------------------------------------------------------------------------
+
+function BulkCanceledGroup({
+  chains,
+  onChangeLog,
+}: {
+  chains: Chain[];
+  onChangeLog: (subscriptionId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const startDate = chains
+    .flatMap(c => [c.tail, ...c.predecessors])
+    .map(s => s.trial_started_at ?? s.created_at)
+    .filter((d): d is string => !!d)
+    .sort()
+    .at(0);
+  const endDate = chains
+    .flatMap(c => [c.tail, ...c.predecessors])
+    .map(s => s.trial_ends_at ?? s.updated_at)
+    .filter((d): d is string => !!d)
+    .sort()
+    .at(-1);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-2 rounded border border-dashed bg-muted/10 px-3 py-2 text-left text-sm hover:bg-muted/20"
+        >
+          <div className="flex items-center gap-2">
+            {open ? (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+            <span className="font-medium">
+              {chains.length} canceled subscription{chains.length === 1 ? '' : 's'}
+            </span>
+            {startDate && endDate ? (
+              <span className="text-xs text-muted-foreground">
+                {formatDateCompact(startDate)} – {formatDateCompact(endDate)}
+              </span>
+            ) : null}
+          </div>
+          <span className="text-xs text-muted-foreground">Click to expand</span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2 space-y-1.5">
+        {chains.map(chain => (
+          <CompactSubscriptionRow
+            key={chain.tail.id}
+            sub={chain.tail}
+            successorId={chain.tail.transferred_to_subscription_id}
+            onChangeLog={onChangeLog}
+          />
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section — Personal / Organization subscription groups.
+// ---------------------------------------------------------------------------
+
+function SubscriptionsSection({
+  title,
+  description,
+  chains,
+  effectiveSubscriptionId,
+  expandedHistory,
+  toggleHistory,
+  hideInactive,
+  onHideInactiveChange,
+  emptyMessage,
+  pastDueBannerSubId,
+  actions,
+}: {
+  title: string;
+  description: string;
+  chains: Chain[];
+  effectiveSubscriptionId: string | null;
+  expandedHistory: Set<string>;
+  toggleHistory: (tailId: string) => void;
+  hideInactive: boolean;
+  onHideInactiveChange: (v: boolean) => void;
+  emptyMessage: string;
+  pastDueBannerSubId: string | null;
+  actions: SubscriptionCardActions;
+}) {
+  const activeChains = chains.filter(c => c.tail.status !== 'canceled');
+  const canceledChains = chains.filter(c => c.tail.status === 'canceled');
+  const visibleCanceled = hideInactive ? [] : canceledChains;
+
+  // Always let admins reveal canceled chains when any exist, even if there
+  // are no active chains — otherwise 1-2 canceled rows would be orphaned.
+  const showToggle = canceledChains.length > 0;
+  const hiddenCount = hideInactive ? canceledChains.length : 0;
+
+  // Bulk-collapse only when there are many canceled chains to keep the
+  // inactive-only view compact, but remain useful even for small counts
+  // thanks to the always-visible toggle.
+  const useBulkCollapse = activeChains.length === 0 && canceledChains.length >= 3;
+
+  const renderChain = (chain: Chain) => {
+    const isEffective = chain.tail.id === effectiveSubscriptionId;
+    const showHistory = expandedHistory.has(chain.tail.id);
+    const isStandaloneInactive =
+      chain.tail.status === 'canceled' && chain.predecessors.length === 0 && !isEffective;
+
+    if (isStandaloneInactive) {
+      return (
+        <CompactSubscriptionRow
+          key={chain.tail.id}
+          sub={chain.tail}
+          successorId={chain.tail.transferred_to_subscription_id}
+          onChangeLog={actions.onChangeLog}
+        />
+      );
+    }
+
+    return (
+      <SubscriptionCard
+        key={chain.tail.id}
+        sub={chain.tail}
+        isEffective={isEffective}
+        historyCount={chain.predecessors.length}
+        showHistory={showHistory}
+        onToggleHistory={() => toggleHistory(chain.tail.id)}
+        pastDueBannerShown={chain.tail.id === pastDueBannerSubId}
+        actions={actions}
+        historyContent={chain.predecessors.map(p => (
+          <CompactSubscriptionRow
+            key={p.id}
+            sub={p}
+            successorId={p.transferred_to_subscription_id}
+            onChangeLog={actions.onChangeLog}
+          />
+        ))}
+      />
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h4 className="text-sm font-medium">{title}</h4>
+          <p className="text-muted-foreground text-xs">{description}</p>
+        </div>
+        {showToggle ? (
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={hideInactive}
+              onChange={e => onHideInactiveChange(e.target.checked)}
+              className="rounded"
+            />
+            Hide inactive
+            {hiddenCount > 0 ? (
+              <span className="text-muted-foreground">({hiddenCount} hidden)</span>
+            ) : null}
+          </label>
+        ) : null}
+      </div>
+
+      {chains.length === 0 ? (
+        <p className="text-muted-foreground text-xs italic">{emptyMessage}</p>
+      ) : useBulkCollapse && hideInactive ? (
+        <BulkCanceledGroup chains={canceledChains} onChangeLog={actions.onChangeLog} />
+      ) : (
+        <div className="space-y-3">
+          {activeChains.map(renderChain)}
+          {visibleCanceled.map(renderChain)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cancel mode helper
+// ---------------------------------------------------------------------------
+
 const CANCEL_MODES = ['period_end', 'immediate'] as const;
 type CancelMode = (typeof CANCEL_MODES)[number];
 function isCancelMode(value: string): value is CancelMode {
   return (CANCEL_MODES as readonly string[]).includes(value);
 }
 
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export function UserAdminKiloClaw({ userId }: { userId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Trial edit dialog
   const [trialDialogOpen, setTrialDialogOpen] = useState(false);
   const [trialSubscriptionId, setTrialSubscriptionId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
 
-  // Cancel dialog
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelSubscriptionId, setCancelSubscriptionId] = useState<string | null>(null);
   const [cancelMode, setCancelMode] = useState<CancelMode>('period_end');
 
-  // Hide inactive toggle
-  const [hideInactive, setHideInactive] = useState(true);
+  const [hideInactivePersonal, setHideInactivePersonal] = useState(true);
+  const [hideInactiveOrg, setHideInactiveOrg] = useState(true);
+  const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set());
 
-  // Change log dialog
   const [changeLogSubscriptionId, setChangeLogSubscriptionId] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery(
@@ -207,11 +1116,10 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
       toast.error('Select a trial end date');
       return;
     }
-    const trialEndsAt = localDateInputToEndOfDayIso(selectedDate);
     updateTrialEndAt.mutate({
       userId,
       subscriptionId: trialSubscriptionId,
-      trial_ends_at: trialEndsAt,
+      trial_ends_at: localDateInputToEndOfDayIso(selectedDate),
     });
   };
 
@@ -229,9 +1137,15 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
     setTrialDialogOpen(true);
   };
 
-  const openCancelDialog = (subscriptionId: string, status: string) => {
+  const openCancelDialog = (
+    subscriptionId: string,
+    status: Subscription['status'],
+    options?: { forceImmediate?: boolean }
+  ) => {
     setCancelSubscriptionId(subscriptionId);
-    setCancelMode(status === 'past_due' || status === 'trialing' ? 'immediate' : 'period_end');
+    const immediate =
+      options?.forceImmediate === true || status === 'past_due' || status === 'trialing';
+    setCancelMode(immediate ? 'immediate' : 'period_end');
     setCancelDialogOpen(true);
   };
 
@@ -242,6 +1156,38 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
   const closeChangeLogDialog = () => {
     setChangeLogSubscriptionId(null);
   };
+
+  const toggleHistory = (tailId: string) => {
+    setExpandedHistory(prev => {
+      const next = new Set(prev);
+      if (next.has(tailId)) next.delete(tailId);
+      else next.add(tailId);
+      return next;
+    });
+  };
+
+  const actions: SubscriptionCardActions = {
+    onChangeLog: openChangeLogDialog,
+    onEditTrial: openTrialDialog,
+    onCancel: openCancelDialog,
+  };
+
+  const subscriptions = data?.subscriptions ?? [];
+  const derived = useMemo(() => {
+    const chains = buildChains(subscriptions);
+    const personal = chains.filter(c => getScope(c.tail).type === 'personal');
+    const organization = chains.filter(c => getScope(c.tail).type === 'organization');
+    const personalActive = personal.filter(c => c.tail.status !== 'canceled').length;
+    const orgActive = organization.filter(c => c.tail.status !== 'canceled').length;
+    return {
+      personalChains: personal,
+      organizationChains: organization,
+      personalActive,
+      personalCanceled: personal.length - personalActive,
+      orgActive,
+      orgCanceled: organization.length - orgActive,
+    };
+  }, [subscriptions]);
 
   if (isLoading) {
     return (
@@ -256,7 +1202,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
     );
   }
 
-  if (error) {
+  if (error || !data) {
     return (
       <Card className="lg:col-span-4">
         <CardHeader>
@@ -269,192 +1215,27 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
     );
   }
 
-  const subscriptions = data?.subscriptions ?? [];
-  const visibleSubscriptions = hideInactive
-    ? subscriptions.filter(s => !isInactiveSubscription(s))
-    : subscriptions;
-  const hiddenCount = subscriptions.length - visibleSubscriptions.length;
-  const personalSubscriptions = subscriptions.filter(
-    subscription => getSubscriptionScope(subscription).type === 'personal'
-  );
-  const organizationSubscriptions = subscriptions.filter(
-    subscription => getSubscriptionScope(subscription).type === 'organization'
-  );
-  const visiblePersonalSubscriptions = visibleSubscriptions.filter(
-    subscription => getSubscriptionScope(subscription).type === 'personal'
-  );
-  const visibleOrganizationSubscriptions = visibleSubscriptions.filter(
-    subscription => getSubscriptionScope(subscription).type === 'organization'
-  );
+  const effective = subscriptions.find(s => s.id === data.effectiveSubscriptionId) ?? null;
+  const pastDueBannerSubId = effective?.status === 'past_due' ? effective.id : null;
 
-  const cancelingSubscription = subscriptions.find(s => s.id === cancelSubscriptionId);
+  const {
+    personalChains,
+    organizationChains,
+    personalActive,
+    personalCanceled,
+    orgActive,
+    orgCanceled,
+  } = derived;
 
-  const renderSubscriptionCards = (sectionSubscriptions: typeof visibleSubscriptions) => {
-    if (sectionSubscriptions.length === 0) {
-      return null;
-    }
+  const totalActive = personalActive + orgActive;
+  const totalInactive = personalCanceled + orgCanceled;
+  const countLabel =
+    subscriptions.length === 0
+      ? 'No subscriptions'
+      : `${totalActive} active · ${totalInactive} inactive`;
 
-    return (
-      <div className="space-y-4">
-        {sectionSubscriptions.map(sub => {
-          const scope = getSubscriptionScope(sub);
-          const isTransferred = isTransferredHistoricalSubscription(sub);
-          const isEffective = !isTransferred && sub.id === data?.effectiveSubscriptionId;
-          const canEditTrialEnd =
-            !isTransferred && (sub.status === 'trialing' || sub.status === 'canceled');
-          const isTrialReset = sub.status === 'canceled';
-          const canCancel =
-            !isTransferred &&
-            (sub.status === 'active' || sub.status === 'past_due') &&
-            sub.plan !== 'trial' &&
-            !sub.cancel_at_period_end;
-          const canImmediateCancel =
-            !isTransferred &&
-            (sub.status === 'active' || sub.status === 'past_due') &&
-            sub.plan !== 'trial';
-          const canCancelTrial = !isTransferred && sub.status === 'trialing';
-
-          return (
-            <div
-              key={sub.id}
-              className={`rounded-lg border p-4 ${isEffective ? 'border-blue-500/40 bg-blue-950/10' : ''}`}
-            >
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Badge className={getSubscriptionStatusBadgeClass(sub.status)}>
-                    {sub.status}
-                  </Badge>
-                  <span className="text-sm font-semibold">{sub.plan}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {scope.type}
-                  </Badge>
-                  {scope.type === 'organization' && scope.organizationName ? (
-                    <Badge variant="outline" className="text-xs">
-                      {scope.organizationName}
-                    </Badge>
-                  ) : null}
-                  {isEffective && (
-                    <Badge variant="outline" className="text-xs">
-                      personal effective
-                    </Badge>
-                  )}
-                  {isTransferred && (
-                    <Badge variant="outline" className="text-muted-foreground text-xs">
-                      historical / ignored
-                    </Badge>
-                  )}
-                  {sub.cancel_at_period_end && (
-                    <Badge className="bg-orange-900/20 text-orange-400">
-                      cancels at period end
-                    </Badge>
-                  )}
-                  {sub.pending_conversion && (
-                    <Badge className="bg-purple-900/20 text-purple-400">pending conversion</Badge>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  {sub.instance && (
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/admin/kiloclaw/${sub.instance.id}`}>
-                        <ExternalLink className="mr-1 h-3 w-3" />
-                        View Instance
-                      </Link>
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => openChangeLogDialog(sub.id)}>
-                    <History className="mr-1 h-3 w-3" />
-                    Change Log
-                  </Button>
-                  {canEditTrialEnd && (
-                    <Button variant="outline" size="sm" onClick={() => openTrialDialog(sub.id)}>
-                      {isTrialReset ? 'Reset Trial' : 'Edit Trial End'}
-                    </Button>
-                  )}
-                  {canCancel && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-red-500/30 text-red-400 hover:bg-red-950/30"
-                      onClick={() => openCancelDialog(sub.id, sub.status)}
-                    >
-                      Cancel
-                    </Button>
-                  )}
-                  {!canCancel && canImmediateCancel && sub.cancel_at_period_end && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-red-500/30 text-red-400 hover:bg-red-950/30"
-                      onClick={() => openCancelDialog(sub.id, sub.status)}
-                    >
-                      Cancel Immediately
-                    </Button>
-                  )}
-                  {canCancelTrial && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-red-500/30 text-red-400 hover:bg-red-950/30"
-                      onClick={() => openCancelDialog(sub.id, sub.status)}
-                    >
-                      Cancel Trial
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                <Field label="Scope" value={formatSubscriptionScopeValue(sub)} />
-                {scope.type === 'organization' ? (
-                  <Field
-                    label="Organization"
-                    value={
-                      scope.organizationName
-                        ? `${scope.organizationName} (${scope.organizationId})`
-                        : (scope.organizationId ?? '—')
-                    }
-                  />
-                ) : null}
-                <Field label="Payment Source" value={sub.payment_source ?? '—'} />
-                <Field label="Stripe Subscription" value={sub.stripe_subscription_id ?? '—'} mono />
-                <Field
-                  label="Transferred To"
-                  value={sub.transferred_to_subscription_id ?? '—'}
-                  mono
-                />
-                <Field label="Instance ID" value={sub.instance_id ?? '—'} mono />
-                <Field
-                  label="Instance"
-                  value={
-                    sub.instance
-                      ? `${sub.instance.name ?? sub.instance.sandbox_id}${sub.instance.destroyed_at ? ' (destroyed)' : ''}`
-                      : '—'
-                  }
-                />
-                <Field label="Trial Started" value={formatDateOrDash(sub.trial_started_at)} />
-                <Field label="Trial Ends" value={formatDateOrDash(sub.trial_ends_at)} />
-                <Field label="Period Start" value={formatDateOrDash(sub.current_period_start)} />
-                <Field label="Period End" value={formatDateOrDash(sub.current_period_end)} />
-                <Field label="Commit Ends" value={formatDateOrDash(sub.commit_ends_at)} />
-                <Field label="Credit Renewal" value={formatDateOrDash(sub.credit_renewal_at)} />
-                <Field label="Scheduled Plan" value={sub.scheduled_plan ?? '—'} />
-                <Field label="Scheduled By" value={sub.scheduled_by ?? '—'} />
-                <Field label="Stripe Schedule" value={sub.stripe_schedule_id ?? '—'} mono />
-                <Field label="Suspended At" value={formatDateOrDash(sub.suspended_at)} />
-                <Field
-                  label="Destruction Deadline"
-                  value={formatDateOrDash(sub.destruction_deadline)}
-                />
-                <Field label="Past Due Since" value={formatDateOrDash(sub.past_due_since)} />
-                <Field label="Created" value={formatDate(sub.created_at)} />
-                <Field label="Updated" value={formatDate(sub.updated_at)} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+  const hasOrgSubs = organizationChains.length > 0;
+  const cancelingSubscription = subscriptions.find(s => s.id === cancelSubscriptionId) ?? null;
 
   return (
     <>
@@ -463,24 +1244,20 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <CardTitle>KiloClaw</CardTitle>
-              <CardDescription>
-                {subscriptions.length === 0
-                  ? 'No subscriptions'
-                  : `${subscriptions.length} subscription${subscriptions.length !== 1 ? 's' : ''}`}
-              </CardDescription>
+              <CardDescription>{countLabel}</CardDescription>
             </div>
-            {data?.activeInstanceId && !subscriptions.some(s => s.instance) && (
+            {data.activeInstanceId && !subscriptions.some(s => s.instance) ? (
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/admin/kiloclaw/${data.activeInstanceId}`}>
                   <ExternalLink className="mr-1 h-3 w-3" />
                   View Instance
                 </Link>
               </Button>
-            )}
+            ) : null}
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {data?.needsSupportReview && (
+        <CardContent className="space-y-5">
+          {data.needsSupportReview ? (
             <div className="rounded-lg border border-yellow-500/40 bg-yellow-950/20 p-4">
               <h4 className="text-sm font-medium text-yellow-300">
                 Billing state needs support review
@@ -495,110 +1272,53 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                 </p>
               ) : null}
             </div>
-          )}
+          ) : null}
 
-          {/* Access & earlybird summary */}
-          <div className="flex items-center gap-4">
-            <div>
-              <h4 className="text-muted-foreground text-xs font-medium">Personal access</h4>
-              <Badge className={getAccessBadgeClass(data?.hasAccess ?? false)}>
-                {data?.hasAccess ? 'has access' : 'no access'}
-              </Badge>
-              {data?.accessReason ? (
-                <p className="text-muted-foreground mt-1 text-xs">{data.accessReason}</p>
-              ) : null}
-            </div>
+          {subscriptions.length > 0 ? <SummaryStrip state={data} effective={effective} /> : null}
 
-            {data?.earlybird ? (
-              <div className="rounded-lg border p-3">
-                <h4 className="mb-1 text-sm font-medium">Earlybird</h4>
-                <div className="flex gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Expires</span>
-                    <p>{formatDate(data.earlybird.expiresAt)}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Days remaining</span>
-                    <p>{data.earlybird.daysRemaining}</p>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
+          {effective?.status === 'past_due' ? <PastDueBanner sub={effective} /> : null}
 
-          {/* Hide inactive toggle */}
-          {subscriptions.some(isInactiveSubscription) && (
-            <div className="flex items-center gap-2">
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={hideInactive}
-                  onChange={e => setHideInactive(e.target.checked)}
-                  className="rounded"
-                />
-                Hide inactive subscriptions
-                {hiddenCount > 0 && (
-                  <span className="text-muted-foreground">({hiddenCount} hidden)</span>
-                )}
-              </label>
-            </div>
-          )}
-
-          {/* Subscription list */}
           {subscriptions.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               This user does not have any KiloClaw subscription rows.
             </p>
           ) : (
             <div className="space-y-6">
-              <div className="space-y-3">
-                <div>
-                  <h4 className="text-sm font-medium">Personal subscriptions</h4>
-                  <p className="text-muted-foreground text-xs">
-                    Personal subscriptions affect the Personal access state above.
-                  </p>
-                </div>
-                {visiblePersonalSubscriptions.length > 0 ? (
-                  renderSubscriptionCards(visiblePersonalSubscriptions)
-                ) : personalSubscriptions.length > 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    All personal subscriptions are inactive. Uncheck &quot;Hide inactive
-                    subscriptions&quot; to view them.
-                  </p>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    This user does not have any personal KiloClaw subscription rows.
-                  </p>
-                )}
-              </div>
+              <SubscriptionsSection
+                title="Personal subscriptions"
+                description="Personal subscriptions affect the Personal access state above."
+                chains={personalChains}
+                effectiveSubscriptionId={data.effectiveSubscriptionId}
+                expandedHistory={expandedHistory}
+                toggleHistory={toggleHistory}
+                hideInactive={hideInactivePersonal}
+                onHideInactiveChange={setHideInactivePersonal}
+                emptyMessage="No personal subscriptions."
+                pastDueBannerSubId={pastDueBannerSubId}
+                actions={actions}
+              />
 
-              <div className="space-y-3">
-                <div>
-                  <h4 className="text-sm font-medium">Organization subscriptions</h4>
-                  <p className="text-muted-foreground text-xs">
-                    Organization-scoped subscriptions are listed separately and do not grant
-                    personal access.
-                  </p>
-                </div>
-                {visibleOrganizationSubscriptions.length > 0 ? (
-                  renderSubscriptionCards(visibleOrganizationSubscriptions)
-                ) : organizationSubscriptions.length > 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    All organization subscriptions are inactive. Uncheck &quot;Hide inactive
-                    subscriptions&quot; to view them.
-                  </p>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    This user does not have any organization-scoped KiloClaw subscription rows.
-                  </p>
-                )}
-              </div>
+              {hasOrgSubs ? (
+                <SubscriptionsSection
+                  title="Organization subscriptions"
+                  description="Organization-scoped subscriptions are listed separately and do not grant personal access."
+                  chains={organizationChains}
+                  effectiveSubscriptionId={data.effectiveSubscriptionId}
+                  expandedHistory={expandedHistory}
+                  toggleHistory={toggleHistory}
+                  hideInactive={hideInactiveOrg}
+                  onHideInactiveChange={setHideInactiveOrg}
+                  emptyMessage="No organization subscriptions."
+                  pastDueBannerSubId={pastDueBannerSubId}
+                  actions={actions}
+                />
+              ) : null}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Trial edit dialog */}
+      {/* Trial edit / reset dialog */}
       <Dialog open={trialDialogOpen} onOpenChange={setTrialDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -714,6 +1434,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
         </DialogContent>
       </Dialog>
 
+      {/* Change log dialog */}
       <Dialog
         open={Boolean(changeLogSubscriptionId)}
         onOpenChange={open => !open && closeChangeLogDialog()}
@@ -785,14 +1506,5 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <h4 className="text-muted-foreground text-xs font-medium">{label}</h4>
-      <p className={`text-sm ${mono ? 'font-mono' : ''}`}>{value}</p>
-    </div>
   );
 }

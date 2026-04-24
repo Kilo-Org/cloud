@@ -1,5 +1,10 @@
 import 'server-only';
 
+import type {
+  KiloclawDestroyReason,
+  KiloclawStartReason,
+  KiloclawStopReason,
+} from '@kilocode/worker-utils';
 import { KILOCLAW_API_URL, KILOCLAW_INTERNAL_API_SECRET } from '@/lib/config.server';
 import type {
   ImageVersionEntry,
@@ -23,6 +28,7 @@ import type {
   DevicePairingApproveResponse,
   VolumeSnapshotsResponse,
   DoctorResponse,
+  OpenclawWorkspaceImportResponse,
   KiloCliRunStartResponse,
   KiloCliRunStatusResponse,
   GatewayProcessStatusResponse,
@@ -152,50 +158,78 @@ export class KiloClawInternalClient {
   async start(
     userId: string,
     instanceId?: string,
-    options?: { skipCooldown?: boolean }
-  ): Promise<{ ok: true }> {
+    options?: { skipCooldown?: boolean; reason?: KiloclawStartReason }
+  ): Promise<{
+    ok: true;
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/start${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, ...options }),
+        body: JSON.stringify({
+          userId,
+          ...(options?.skipCooldown ? { skipCooldown: true } : {}),
+          ...(options?.reason ? { reason: options.reason } : {}),
+        }),
       },
       { userId }
     );
   }
 
-  async startAsync(userId: string, instanceId?: string): Promise<{ ok: true }> {
+  async startAsync(
+    userId: string,
+    instanceId?: string,
+    options?: { reason?: KiloclawStartReason }
+  ): Promise<{ ok: true }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/start-async${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );
   }
 
-  async stop(userId: string, instanceId?: string): Promise<{ ok: true }> {
+  async stop(
+    userId: string,
+    instanceId?: string,
+    options?: { reason?: KiloclawStopReason }
+  ): Promise<{
+    ok: true;
+    stopped: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    stoppedAt: number | null;
+  }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/stop${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );
   }
 
-  async destroy(userId: string, instanceId?: string): Promise<{ ok: true }> {
+  async destroy(
+    userId: string,
+    instanceId?: string,
+    options?: { reason?: KiloclawDestroyReason }
+  ): Promise<{ ok: true }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/destroy${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );
@@ -613,6 +647,18 @@ export class KiloClawInternalClient {
     return this.request(`/api/platform/files/write${params}`, {
       method: 'POST',
       body: JSON.stringify({ userId, path: filePath, content, etag }),
+    });
+  }
+
+  async importOpenclawWorkspace(
+    userId: string,
+    files: Array<{ path: string; content: string }>,
+    instanceId?: string
+  ): Promise<OpenclawWorkspaceImportResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(`/api/platform/files/import-openclaw-workspace${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, files }),
     });
   }
 

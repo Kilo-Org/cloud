@@ -292,7 +292,7 @@ export function createMayorTools(client: MayorGastownClient) {
     }),
 
     gt_bead_update: tool({
-      description: "Edit a bead's status, title, body, priority, or labels.",
+      description: "Edit a bead's status, title, body, priority, labels, or dependency blockers.",
       args: {
         rig_id: tool.schema.string().describe('The UUID of the rig the bead belongs to'),
         bead_id: tool.schema.string().describe('The UUID of the bead to update'),
@@ -310,6 +310,13 @@ export function createMayorTools(client: MayorGastownClient) {
           .array(tool.schema.string())
           .describe('Replacement labels array for the bead')
           .optional(),
+        depends_on: tool.schema
+          .array(tool.schema.string())
+          .describe(
+            "Replace this bead's blockers. Pass an array of bead UUIDs that must be closed before this bead can be dispatched. " +
+              'Pass an empty array [] to remove all blockers. Omit to leave dependencies unchanged.'
+          )
+          .optional(),
       },
       async execute(args) {
         const bead = await client.updateBead(args.rig_id, args.bead_id, {
@@ -318,6 +325,7 @@ export function createMayorTools(client: MayorGastownClient) {
           status: args.status,
           priority: args.priority,
           labels: args.labels,
+          depends_on: args.depends_on,
         });
         return `Bead ${bead.bead_id} updated. Status: ${bead.status}, Priority: ${bead.priority}, Title: "${bead.title}".`;
       },
@@ -337,14 +345,22 @@ export function createMayorTools(client: MayorGastownClient) {
     }),
 
     gt_bead_delete: tool({
-      description: 'Delete a bead. Use with caution — this is irreversible.',
+      description:
+        'Delete one or more beads. Use with caution — this is irreversible. Pass a single UUID string or an array of UUIDs to bulk-delete up to 5000 at once.',
       args: {
-        rig_id: tool.schema.string().describe('The UUID of the rig the bead belongs to'),
-        bead_id: tool.schema.string().describe('The UUID of the bead to delete'),
+        rig_id: tool.schema.string().describe('The UUID of the rig the bead(s) belong to'),
+        bead_id: tool.schema
+          .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
+          .describe('A single bead UUID or an array of bead UUIDs to delete'),
       },
       async execute(args) {
-        await client.deleteBead(args.rig_id, args.bead_id);
-        return `Bead ${args.bead_id} deleted.`;
+        const ids = Array.isArray(args.bead_id) ? args.bead_id : [args.bead_id];
+        if (ids.length === 1 && ids[0]) {
+          await client.deleteBead(args.rig_id, ids[0]);
+          return `Bead ${ids[0]} deleted.`;
+        }
+        const result = await client.deleteBeads(args.rig_id, ids);
+        return `Deleted ${result.deleted} beads.`;
       },
     }),
 
@@ -368,6 +384,40 @@ export function createMayorTools(client: MayorGastownClient) {
       async execute(args) {
         await client.closeConvoy(args.convoy_id);
         return `Convoy ${args.convoy_id} force-closed.`;
+      },
+    }),
+
+    gt_convoy_add_bead: tool({
+      description:
+        'Add an existing bead to an existing convoy. Use this after gt_sling to make a standalone bead ' +
+        "part of a convoy's tracked progress and landing. The bead will count toward the convoy's " +
+        'completion and will be included in the convoy landing.',
+      args: {
+        convoy_id: tool.schema.string().describe('UUID of the convoy to add the bead to'),
+        bead_id: tool.schema.string().describe('UUID of the bead to add'),
+        depends_on: tool.schema
+          .array(tool.schema.string())
+          .describe('Optional: bead UUIDs that must complete before this bead is dispatched')
+          .optional(),
+      },
+      async execute(args) {
+        const result = await client.convoyAddBead(args.convoy_id, args.bead_id, args.depends_on);
+        return `Bead ${args.bead_id} added to convoy ${args.convoy_id}. Convoy now tracking ${result.total_beads} beads.`;
+      },
+    }),
+
+    gt_convoy_remove_bead: tool({
+      description:
+        'Remove a bead from a convoy. The bead will no longer count toward convoy progress or landing. ' +
+        'Dependency edges between this bead and other convoy beads are also removed. ' +
+        'The bead itself is not deleted — it becomes a standalone bead.',
+      args: {
+        convoy_id: tool.schema.string().describe('UUID of the convoy'),
+        bead_id: tool.schema.string().describe('UUID of the bead to remove from the convoy'),
+      },
+      async execute(args) {
+        const result = await client.convoyRemoveBead(args.convoy_id, args.bead_id);
+        return `Bead ${args.bead_id} removed from convoy ${args.convoy_id}. Convoy now tracking ${result.total_beads} beads.`;
       },
     }),
 

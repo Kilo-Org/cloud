@@ -6,10 +6,10 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
-import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET } from '@/lib/config.server';
+import { SLACK_CLIENT_ID } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { WebClient } from '@slack/web-api';
-import type { OAuthV2Response } from '@slack/oauth';
+import type { SlackInstallation } from '@chat-adapter/slack';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
@@ -72,36 +72,6 @@ export function getSlackOAuthUrl(state: string): string {
   });
 
   return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
-}
-
-/**
- * Exchange OAuth code for access token
- */
-export async function exchangeSlackCode(code: string): Promise<OAuthV2Response> {
-  if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
-    throw new Error('Slack OAuth credentials are not configured');
-  }
-
-  const response = await fetch('https://slack.com/api/oauth.v2.access', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      client_id: SLACK_CLIENT_ID,
-      client_secret: SLACK_CLIENT_SECRET,
-      code,
-      redirect_uri: SLACK_REDIRECT_URI,
-    }),
-  });
-
-  const data = (await response.json()) as OAuthV2Response;
-
-  if (!data.ok || !data.access_token) {
-    throw new Error(`Slack OAuth error: ${data.error || 'No access token received'}`);
-  }
-
-  return data;
 }
 
 /**
@@ -169,17 +139,19 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 }
 
 /**
- * Create or update Slack installation from OAuth response
+ * Create or update Slack installation from the Chat SDK OAuth callback result.
  */
-export async function upsertSlackInstallation(
-  owner: Owner,
-  oauthResponse: OAuthV2Response
-): Promise<PlatformIntegration> {
+export async function upsertSlackInstallation({
+  owner,
+  teamId,
+  installation,
+}: {
+  owner: Owner;
+  teamId: string;
+  installation: SlackInstallation;
+}): Promise<PlatformIntegration> {
   const existing = await getInstallation(owner);
-
-  const teamId = oauthResponse.team?.id || '';
-  const teamName = oauthResponse.team?.name || 'Unknown Team';
-  const scopes = oauthResponse.scope?.split(',') || null;
+  const teamName = installation.teamName || 'Unknown Team';
 
   // For org integrations, get a model that respects the allow list
   // For user integrations, use the Slack-specific default model
@@ -189,15 +161,8 @@ export async function upsertSlackInstallation(
       : SLACK_DEFAULT_MODEL;
 
   const metadata = {
-    access_token: oauthResponse.access_token,
-    bot_user_id: oauthResponse.bot_user_id,
-    app_id: oauthResponse.app_id,
-    authed_user_id: oauthResponse.authed_user?.id,
-    authed_user_scope: oauthResponse.authed_user?.scope,
-    authed_user_access_token: oauthResponse.authed_user?.access_token,
-    incoming_webhook: oauthResponse.incoming_webhook,
-    enterprise_id: oauthResponse.enterprise?.id,
-    enterprise_name: oauthResponse.enterprise?.name,
+    access_token: installation.botToken,
+    bot_user_id: installation.botUserId,
     model_slug: defaultModel,
   };
 
@@ -207,7 +172,7 @@ export async function upsertSlackInstallation(
       .set({
         platform_account_id: teamId,
         platform_account_login: teamName,
-        scopes,
+        scopes: SLACK_SCOPES,
         integration_status: INTEGRATION_STATUS.ACTIVE,
         metadata,
         updated_at: new Date().toISOString(),
@@ -228,7 +193,7 @@ export async function upsertSlackInstallation(
       platform_installation_id: teamId,
       platform_account_id: teamId,
       platform_account_login: teamName,
-      scopes,
+      scopes: SLACK_SCOPES,
       integration_status: INTEGRATION_STATUS.ACTIVE,
       metadata,
       installed_at: new Date().toISOString(),

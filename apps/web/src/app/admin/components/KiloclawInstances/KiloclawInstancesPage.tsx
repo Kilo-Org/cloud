@@ -50,7 +50,7 @@ import { formatRelativeTime } from './shared';
 
 type SortField = 'created_at' | 'destroyed_at';
 type SortOrder = 'asc' | 'desc';
-type StatusFilter = 'all' | 'active' | 'suspended' | 'destroyed';
+type StatusFilter = 'all' | 'active' | 'inactive_trial_stopped' | 'suspended' | 'destroyed';
 
 const subscriptionBadgeClass: Record<KiloClawSubscriptionStatus, string> = {
   active: 'border-green-500/30 bg-green-500/15 text-green-400',
@@ -82,6 +82,7 @@ function formatLifespan(minutes: number | null): string {
 type OverviewData = {
   totalInstances: number;
   activeInstances: number;
+  inactiveTrialStoppedInstances: number;
   suspendedInstances: number;
   destroyedInstances: number;
   uniqueUsers: number;
@@ -93,7 +94,7 @@ type OverviewData = {
 
 function OverviewStatsCards({ data }: { data: OverviewData }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Total Instances</CardTitle>
@@ -115,6 +116,18 @@ function OverviewStatsCards({ data }: { data: OverviewData }) {
           <p className="text-muted-foreground text-xs">
             {data.destroyedInstances.toLocaleString()} destroyed
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Inactive Trial Stops</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">
+            {data.inactiveTrialStoppedInstances.toLocaleString()}
+          </div>
+          <p className="text-muted-foreground text-xs">Stopped without suspending billing access</p>
         </CardContent>
       </Card>
 
@@ -496,6 +509,7 @@ export function KiloclawInstancesPage() {
           <SelectContent>
             <SelectItem value="all">All Instances</SelectItem>
             <SelectItem value="active">Active Only</SelectItem>
+            <SelectItem value="inactive_trial_stopped">Inactive Trial Stopped</SelectItem>
             <SelectItem value="suspended">Suspended Only</SelectItem>
             <SelectItem value="destroyed">Destroyed Only</SelectItem>
           </SelectContent>
@@ -611,10 +625,12 @@ export function KiloclawInstancesPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {instance.destroyed_at !== null ? (
+                    {instance.lifecycle_state === 'destroyed' ? (
                       <Badge variant="secondary">Destroyed</Badge>
-                    ) : instance.suspended_at !== null ? (
+                    ) : instance.lifecycle_state === 'suspended' ? (
                       <Badge className="bg-amber-600">Suspended</Badge>
+                    ) : instance.lifecycle_state === 'inactive_trial_stopped' ? (
+                      <Badge className="bg-sky-700">Inactive Trial Stopped</Badge>
                     ) : (
                       <Badge variant="default" className="bg-green-600">
                         Active

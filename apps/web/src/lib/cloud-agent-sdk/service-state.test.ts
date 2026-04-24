@@ -1100,6 +1100,97 @@ describe('createServiceState', () => {
     });
   });
 
+  describe('suggestion.shown', () => {
+    it('sets suggestion state and fires onSuggestionAsked', () => {
+      const onSuggestionAsked = jest.fn();
+      const state = createServiceState(makeConfig({ onSuggestionAsked }));
+      const actions = [
+        { label: 'Review', prompt: '/local-review' },
+        { label: 'Skip', prompt: 'no thanks' },
+      ];
+
+      state.process({
+        type: 'suggestion.shown',
+        requestId: 'sug-1',
+        text: 'Review?',
+        actions,
+        callId: 'call-1',
+      });
+
+      expect(state.getSuggestion()).toEqual({
+        requestId: 'sug-1',
+        text: 'Review?',
+        actions,
+        callId: 'call-1',
+      });
+      expect(onSuggestionAsked).toHaveBeenCalledWith('sug-1', 'Review?', actions, 'call-1');
+    });
+  });
+
+  describe('suggestion.accepted', () => {
+    it('clears suggestion and fires onSuggestionResolved', () => {
+      const onSuggestionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onSuggestionResolved }));
+
+      state.process({ type: 'suggestion.shown', requestId: 'sug-1', text: 't', actions: [] });
+      state.process({ type: 'suggestion.accepted', requestId: 'sug-1', index: 0 });
+
+      expect(state.getSuggestion()).toBeNull();
+      expect(onSuggestionResolved).toHaveBeenCalledWith('sug-1');
+    });
+
+    it('second matching resolve is fully a no-op (callback fires exactly once)', () => {
+      const onSuggestionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onSuggestionResolved }));
+
+      state.process({ type: 'suggestion.shown', requestId: 'sug-1', text: 't', actions: [] });
+      state.process({ type: 'suggestion.accepted', requestId: 'sug-1', index: 0 });
+      state.process({ type: 'suggestion.dismissed', requestId: 'sug-1' });
+
+      expect(state.getSuggestion()).toBeNull();
+      expect(onSuggestionResolved).toHaveBeenCalledTimes(1);
+      expect(onSuggestionResolved).toHaveBeenCalledWith('sug-1');
+    });
+
+    it('resolve with mismatched requestId does not clear state', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'suggestion.shown', requestId: 'sug-1', text: 't', actions: [] });
+      state.process({ type: 'suggestion.accepted', requestId: 'other', index: 0 });
+
+      expect(state.getSuggestion()).toEqual({
+        requestId: 'sug-1',
+        text: 't',
+        actions: [],
+      });
+    });
+  });
+
+  describe('suggestion.dismissed', () => {
+    it('clears suggestion and fires onSuggestionResolved', () => {
+      const onSuggestionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onSuggestionResolved }));
+
+      state.process({ type: 'suggestion.shown', requestId: 'sug-1', text: 't', actions: [] });
+      state.process({ type: 'suggestion.dismissed', requestId: 'sug-1' });
+
+      expect(state.getSuggestion()).toBeNull();
+      expect(onSuggestionResolved).toHaveBeenCalledWith('sug-1');
+    });
+  });
+
+  describe('reset suggestion', () => {
+    it('clears suggestion on reset', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'suggestion.shown', requestId: 'sug-1', text: 't', actions: [] });
+      expect(state.getSuggestion()).not.toBeNull();
+
+      state.reset();
+
+      expect(state.getSuggestion()).toBeNull();
+    });
+  });
+
   describe('child session detection', () => {
     it('root session busy changes activity', () => {
       const state = createServiceState(makeConfig());

@@ -9,6 +9,7 @@ import type {
 } from '../../schemas/instance-config';
 import type { FlyClientConfig } from '../../fly/client';
 import { userIdFromSandboxId } from '../../auth/sandbox-id';
+import type { KiloclawStartReason } from '@kilocode/worker-utils';
 import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
@@ -77,6 +78,7 @@ export type InstanceMutableState = {
   restartingAt: number | null;
   recoveryStartedAt: number | null;
   restartUpdateSent: boolean;
+  pendingStartReason: KiloclawStartReason | null;
   lastStartedAt: number | null;
   lastStoppedAt: number | null;
   // Legacy Fly compatibility mirrors. `providerState` is the canonical
@@ -116,10 +118,13 @@ export type InstanceMutableState = {
   gmailPushOidcEmail: string | null;
   execSecurity: string | null;
   execAsk: string | null;
+  execPresetApplyPending: boolean;
   botName: string | null;
   botNature: string | null;
   botVibe: string | null;
   botEmoji: string | null;
+  botIdentityApplyPending: boolean;
+  channelsApplyPending: boolean;
   // Snapshot restore tracking
   previousVolumeId: string | null;
   restoreStartedAt: string | null;
@@ -132,6 +137,9 @@ export type InstanceMutableState = {
   streamChatBotUserId: string | null;
   streamChatBotUserToken: string | null;
   streamChatChannelId: string | null;
+  vectorMemoryEnabled: boolean;
+  vectorMemoryModel: string | null;
+  dreamingEnabled: boolean;
   /** In-memory only — throttles live Fly checks in getStatus(). */
   lastLiveCheckAt: number | null;
 };

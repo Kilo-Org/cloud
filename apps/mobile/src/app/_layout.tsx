@@ -42,7 +42,8 @@ Sentry.init({
   // Enable Logs
   enableLogs: true,
 
-  tracesSampleRate: 1,
+  // Tracing is fully disabled.
+  tracesSampleRate: 0,
 
   // Configure Session Replay
   replaysSessionSampleRate: 0.1,
@@ -53,7 +54,7 @@ Sentry.init({
   attachViewHierarchy: true,
 
   integrations: [Sentry.mobileReplayIntegration(), navigationIntegration],
-  enableNativeFramesTracking: !isRunningInExpoGo(),
+  enableNativeFramesTracking: false,
 
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   spotlight: __DEV__,

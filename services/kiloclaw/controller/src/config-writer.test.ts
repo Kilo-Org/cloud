@@ -95,7 +95,8 @@ describe('generateBaseConfig', () => {
     // No kilocode provider entry in production — built-in provider takes over
     expect(config.models).toBeUndefined();
 
-    // No default model override when env var not set
+    // No default model override when env var not set, and no memorySearch
+    // schema introduced when the feature is off and absent from existing config.
     expect(config.agents).toBeUndefined();
 
     // Tool profile
@@ -168,7 +169,7 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
   });
 
-  it('auto-assigns kilo-exa even when web search was explicitly disabled but provider is missing', () => {
+  it('does not auto-assign kilo-exa when web search is explicitly disabled and provider is missing', () => {
     const existing = JSON.stringify({
       tools: {
         web: {
@@ -181,9 +182,22 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps(existing);
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    expect(config.tools.web.search.provider).toBe('kilo-exa');
-    expect(config.tools.web.search.enabled).toBe(true);
-    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+    expect(config.tools.web.search.provider).toBeUndefined();
+    expect(config.tools.web.search.enabled).toBe(false);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBeUndefined();
+  });
+
+  it('does not auto-assign kilo-exa when BRAVE_API_KEY is configured and provider is missing', () => {
+    const existing = JSON.stringify({ tools: { web: { search: {} } } });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBeUndefined();
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBeUndefined();
   });
 
   it('preserves explicit kilo-exa provider when mode is unset', () => {
@@ -1034,6 +1048,140 @@ describe('generateBaseConfig', () => {
     );
     expect(config).toBeDefined();
   });
+
+  // ── Vector memory ───────────────────────────────────────────────────
+
+  it('does not introduce memorySearch schema when disabled and absent from existing config', () => {
+    // Older OpenClaw versions (< 2026.4.5) reject agents.defaults.memorySearch
+    // during `doctor` validation. When the feature is off and the config never
+    // had it, leave the config untouched so those versions keep booting.
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+    expect(config.agents?.defaults?.memorySearch).toBeUndefined();
+  });
+
+  it('enables memorySearch via Kilo Gateway when the flag is on', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_VECTOR_MEMORY_ENABLED: 'true',
+      KILOCLAW_VECTOR_MEMORY_MODEL: 'openai/text-embedding-3-small',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.agents.defaults.memorySearch.enabled).toBe(true);
+    expect(config.agents.defaults.memorySearch.provider).toBe('openai');
+    expect(config.agents.defaults.memorySearch.model).toBe('openai/text-embedding-3-small');
+    expect(config.agents.defaults.memorySearch.remote.baseUrl).toBe(
+      'https://api.kilo.ai/api/gateway/'
+    );
+    expect(config.agents.defaults.memorySearch.remote.apiKey).toBe('test-api-key');
+    expect(config.agents.defaults.memorySearch.remote.headers).toEqual({
+      'x-kilocode-feature': 'kiloclaw-embedding',
+    });
+  });
+
+  it('falls back to the default embedding model when no model env var is set', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILOCLAW_VECTOR_MEMORY_ENABLED: 'true' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.agents.defaults.memorySearch.model).toBe('mistralai/mistral-embed-2312');
+  });
+
+  it('honors KILOCODE_API_BASE_URL override on the memorySearch remote block', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_VECTOR_MEMORY_ENABLED: 'true',
+      KILOCODE_API_BASE_URL: 'https://example.internal/gateway/',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.agents.defaults.memorySearch.remote.baseUrl).toBe(
+      'https://example.internal/gateway/'
+    );
+  });
+
+  it('adds X-KiloCode-OrganizationId memorySearch header when org id is set', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_VECTOR_MEMORY_ENABLED: 'true',
+      KILOCODE_ORGANIZATION_ID: 'org_abc123',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.agents.defaults.memorySearch.remote.headers).toEqual({
+      'x-kilocode-feature': 'kiloclaw-embedding',
+      'X-KiloCode-OrganizationId': 'org_abc123',
+    });
+  });
+
+  it('clears stale memorySearch.remote config when disabled on a subsequent boot', () => {
+    const existing = JSON.stringify({
+      agents: {
+        defaults: {
+          memorySearch: {
+            enabled: true,
+            provider: 'openai',
+            model: 'openai/text-embedding-3-small',
+            remote: { baseUrl: 'https://old/', apiKey: 'stale', headers: {} },
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+    expect(config.agents.defaults.memorySearch.enabled).toBe(false);
+    expect(config.agents.defaults.memorySearch.provider).toBeUndefined();
+    expect(config.agents.defaults.memorySearch.model).toBeUndefined();
+    expect(config.agents.defaults.memorySearch.remote).toBeUndefined();
+  });
+
+  // ── Dreaming ────────────────────────────────────────────────────────
+
+  it('does not introduce memory-core dreaming schema when disabled and absent from existing config', () => {
+    // Older OpenClaw versions (< 2026.4.5) reject
+    // plugins.entries['memory-core'].config.dreaming during `doctor` validation.
+    // When the feature is off and the config never had it, leave it untouched.
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+    expect(config.plugins.entries['memory-core']).toBeUndefined();
+  });
+
+  it('enables dreaming when KILOCLAW_DREAMING_ENABLED=true', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILOCLAW_DREAMING_ENABLED: 'true' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+    expect(config.plugins.entries['memory-core'].config.dreaming.enabled).toBe(true);
+  });
+
+  it('flips dreaming off without deleting other memory-core plugin config', () => {
+    const existing = JSON.stringify({
+      plugins: {
+        entries: {
+          'memory-core': { config: { dreaming: { enabled: true }, extra: 'keep-me' } },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+    expect(config.plugins.entries['memory-core'].config.dreaming.enabled).toBe(false);
+    expect(config.plugins.entries['memory-core'].config.extra).toBe('keep-me');
+  });
+
+  it('leaves memory-core plugin config untouched when dreaming is off and entry lacks dreaming', () => {
+    // If memory-core exists for another reason but has never had a dreaming key,
+    // we must not introduce one — older OpenClaw versions reject it.
+    const existing = JSON.stringify({
+      plugins: {
+        entries: {
+          'memory-core': { config: { extra: 'keep-me' } },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+    expect(config.plugins.entries['memory-core'].config.dreaming).toBeUndefined();
+    expect(config.plugins.entries['memory-core'].config.extra).toBe('keep-me');
+  });
 });
 
 describe('setNestedValue', () => {
@@ -1212,6 +1360,8 @@ describe('writeBaseConfig', () => {
     expect(args).toContain('--skip-channels');
     expect(args).toContain('--skip-skills');
     expect(args).toContain('--skip-health');
+    expect(args).toContain('--secret-input-mode');
+    expect(args[args.indexOf('--secret-input-mode') + 1]).toBe('ref');
   });
 
   it('forces tools.profile to full even without KILOCLAW_FRESH_INSTALL', () => {
@@ -1238,6 +1388,20 @@ describe('writeBaseConfig', () => {
     const config = JSON.parse(written[0].data);
     expect(config.tools?.web?.search?.provider).toBe('kilo-exa');
     expect(config.tools?.web?.search?.enabled).toBe(true);
+  });
+
+  it('does not auto-assign Exa web search provider on restore path when BRAVE_API_KEY is configured', () => {
+    const { deps, written } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      ...minimalEnv(),
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    delete env.KILOCLAW_FRESH_INSTALL;
+
+    writeBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    const config = JSON.parse(written[0].data);
+    expect(config.tools?.web?.search?.provider).toBeUndefined();
   });
 
   it('throws if KILOCODE_API_KEY is missing', () => {

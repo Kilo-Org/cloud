@@ -11,12 +11,47 @@ import {
 } from '../../types';
 
 const CONFIG_KEY = 'town:config';
+const NEW_TOWN_DEFAULTS_SEEDED_KEY = 'town:config:newDefaultsSeeded';
 
 const TOWN_LOG = '[Town.do]';
 
+/**
+ * Defaults that were introduced for NEW towns in #2725 but that must NOT
+ * be retroactively applied to existing persisted configs (doing so would
+ * silently flip production behavior for every town that pre-dates the change).
+ *
+ * These are seeded exactly once per town, the first time a Town DO loads
+ * its config and finds nothing persisted (fresh create) AND has not already
+ * been seeded. Seeded state is tracked under a separate key so that legacy
+ * towns which have _other_ config saved but never touched these fields do
+ * not get silently rewritten on next load.
+ */
+const NEW_TOWN_CONFIG_DEFAULTS = {
+  merge_strategy: 'pr' as const,
+  staged_convoys_default: true,
+  refinery: {
+    gates: [] as string[],
+    auto_merge: true,
+    require_clean_merge: true,
+    code_review: true,
+    review_mode: 'comments' as const,
+    auto_resolve_pr_feedback: true,
+    auto_merge_delay_minutes: 5 as number | null,
+  },
+};
+
 export async function getTownConfig(storage: DurableObjectStorage): Promise<TownConfig> {
   const raw = await storage.get<unknown>(CONFIG_KEY);
-  if (!raw) return TownConfigSchema.parse({});
+  if (!raw) {
+    // Fresh town: seed the new-style defaults from #2725 and persist so they
+    // become the town's actual config (rather than schema-injected defaults
+    // on every read). This keeps new-town behavior modern while leaving
+    // legacy towns — which already have a persisted row — untouched.
+    const seeded = TownConfigSchema.parse(NEW_TOWN_CONFIG_DEFAULTS);
+    await storage.put(CONFIG_KEY, seeded);
+    await storage.put(NEW_TOWN_DEFAULTS_SEEDED_KEY, true);
+    return seeded;
+  }
   return TownConfigSchema.parse(raw);
 }
 
@@ -89,6 +124,10 @@ export async function updateTownConfig(
               update.refinery.auto_resolve_pr_feedback ??
               current.refinery?.auto_resolve_pr_feedback ??
               false,
+            auto_resolve_merge_conflicts:
+              update.refinery.auto_resolve_merge_conflicts ??
+              current.refinery?.auto_resolve_merge_conflicts ??
+              true,
             auto_merge_delay_minutes:
               update.refinery.auto_merge_delay_minutes !== undefined
                 ? update.refinery.auto_merge_delay_minutes
@@ -191,6 +230,7 @@ export type EffectiveConfig = {
   review_mode: 'rework' | 'comments';
   code_review: boolean;
   auto_resolve_pr_feedback: boolean;
+  auto_resolve_merge_conflicts: boolean;
   auto_merge_delay_minutes: number | null;
   merge_strategy: MergeStrategy;
   convoy_merge_mode: 'review-then-land' | 'review-and-merge';
@@ -227,6 +267,10 @@ export function resolveRigConfig(
       rigOverride?.auto_resolve_pr_feedback ??
       townConfig.refinery?.auto_resolve_pr_feedback ??
       false,
+    auto_resolve_merge_conflicts:
+      rigOverride?.auto_resolve_merge_conflicts ??
+      townConfig.refinery?.auto_resolve_merge_conflicts ??
+      true,
     auto_merge_delay_minutes:
       rigOverride?.auto_merge_delay_minutes !== undefined
         ? rigOverride.auto_merge_delay_minutes

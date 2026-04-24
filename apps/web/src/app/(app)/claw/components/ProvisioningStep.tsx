@@ -2,16 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Volume2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useClawGatewayReady } from '../hooks/useClawHooks';
-import {
-  type BotIdentity,
-  type ExecPreset,
-  type ClawMutations,
-  execPresetToConfig,
-  channelTokensToConfigPatch,
-} from './claw.types';
 import { OnboardingStepView } from './OnboardingStepView';
 
 /** Play a short chime via the Web Audio API. */
@@ -33,98 +25,24 @@ function playChime() {
 }
 
 export function ProvisioningStep({
-  preset,
-  channelTokens,
-  botIdentity,
+  currentStep,
+  totalSteps,
+  onboardingSavesReady,
   instanceRunning,
-  mutations,
-  totalSteps = 4,
   onComplete,
 }: {
-  preset: ExecPreset;
-  channelTokens: Record<string, string> | null;
-  botIdentity: BotIdentity | null;
+  currentStep: number;
+  totalSteps: number;
+  onboardingSavesReady: boolean;
   instanceRunning: boolean;
-  mutations: ClawMutations;
-  totalSteps?: number;
   onComplete: () => void;
 }) {
-  const completedRef = useRef(false);
-  const [configReady, setConfigReady] = useState(false);
-
-  // Keep stable references to callbacks so the effect only re-runs
-  // when data values change, not when the parent re-renders or mutation
-  // state transitions (pending→error) produce new object references.
+  // Bot identity, exec preset, and channel token saves start from
+  // `ClawOnboardingFlow` as soon as the instance row exists. This component
+  // waits for those durable writes plus gateway ready+settled before it chimes
+  // and advances.
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
-  const patchOpenclawConfigRef = useRef(mutations.patchOpenclawConfig.mutate);
-  patchOpenclawConfigRef.current = mutations.patchOpenclawConfig.mutate;
-  const patchChannelsRef = useRef(mutations.patchChannels.mutate);
-  patchChannelsRef.current = mutations.patchChannels.mutate;
-  const patchExecPresetRef = useRef(mutations.patchExecPreset.mutate);
-  patchExecPresetRef.current = mutations.patchExecPreset.mutate;
-  const patchBotIdentityRef = useRef(mutations.patchBotIdentity.mutate);
-  patchBotIdentityRef.current = mutations.patchBotIdentity.mutate;
-  const channelTokensRef = useRef(channelTokens);
-  channelTokensRef.current = channelTokens;
-  const botIdentityRef = useRef(botIdentity);
-  botIdentityRef.current = botIdentity;
-
-  useEffect(() => {
-    if (!instanceRunning || completedRef.current) return;
-    completedRef.current = true;
-
-    // Build the full openclaw.json patch: exec preset + channel config.
-    const configPatch: Record<string, unknown> = {};
-
-    if (preset !== 'always-ask') {
-      const { security, ask } = execPresetToConfig(preset);
-      configPatch.tools = { exec: { security, ask } };
-    }
-
-    const channelPatch = channelTokensToConfigPatch(channelTokensRef.current);
-    if (channelPatch) Object.assign(configPatch, channelPatch);
-
-    // Also persist channel tokens to durable storage so they survive
-    // machine restarts. Fire-and-forget — the live config patch above
-    // is what matters for the immediate user experience.
-    const tokens = channelTokensRef.current;
-    if (tokens && Object.keys(tokens).length > 0) {
-      patchChannelsRef.current(tokens);
-    }
-
-    // Persist exec permissions preset to durable storage so it survives
-    // machine restarts/redeploys. Fire-and-forget — same pattern as channels.
-    if (preset !== 'always-ask') {
-      const { security, ask } = execPresetToConfig(preset);
-      patchExecPresetRef.current({ security, ask });
-    }
-
-    if (botIdentityRef.current) {
-      patchBotIdentityRef.current({
-        botName: botIdentityRef.current.botName,
-        botNature: botIdentityRef.current.botNature,
-        botVibe: botIdentityRef.current.botVibe,
-        botEmoji: botIdentityRef.current.botEmoji,
-      });
-    }
-
-    if (Object.keys(configPatch).length === 0) {
-      setConfigReady(true);
-      return;
-    }
-
-    patchOpenclawConfigRef.current(
-      { patch: configPatch },
-      {
-        onSuccess: () => setConfigReady(true),
-        onError: (err: { message: string }) => {
-          completedRef.current = false;
-          toast.error(err.message);
-        },
-      }
-    );
-  }, [instanceRunning, preset]);
 
   // Poll the gateway /ready endpoint to know when channels are fully set up
   // and the system's CPU load has settled after boot.
@@ -157,20 +75,20 @@ export function ProvisioningStep({
     return () => clearTimeout(timer);
   }, [gatewayReady]);
 
-  // Advance to the next step when config is applied, gateway reports ready,
-  // and boot CPU pressure has subsided (settled === true).
+  // Advance to the next step when required onboarding saves have succeeded,
+  // the gateway reports ready, and boot CPU pressure has subsided.
   useEffect(() => {
-    if (configReady && isGatewaySettled) {
+    if (onboardingSavesReady && isGatewaySettled) {
       playChime();
       onCompleteRef.current();
     }
-  }, [configReady, isGatewaySettled]);
+  }, [onboardingSavesReady, isGatewaySettled]);
 
   if (gateway502Expired) {
-    return <ProvisioningErrorView totalSteps={totalSteps} />;
+    return <ProvisioningErrorView currentStep={currentStep} totalSteps={totalSteps} />;
   }
 
-  return <ProvisioningStepView totalSteps={totalSteps} />;
+  return <ProvisioningStepView currentStep={currentStep} totalSteps={totalSteps} />;
 }
 
 const PROVISIONING_PHRASES = [
@@ -211,10 +129,16 @@ const PROVISIONING_PHRASES = [
 ];
 
 /** Error view shown when the gateway returns a 502 during provisioning. */
-export function ProvisioningErrorView({ totalSteps = 4 }: { totalSteps?: number }) {
+export function ProvisioningErrorView({
+  currentStep,
+  totalSteps,
+}: {
+  currentStep: number;
+  totalSteps: number;
+}) {
   return (
     <OnboardingStepView
-      currentStep={4}
+      currentStep={currentStep}
       totalSteps={totalSteps}
       stepLabel="Provisioning failed"
       contentClassName="items-center gap-8"
@@ -246,7 +170,13 @@ export function ProvisioningErrorView({ totalSteps = 4 }: { totalSteps?: number 
 }
 
 /** Pure visual shell — extracted so Storybook can render it without wiring up mutations. */
-export function ProvisioningStepView({ totalSteps = 4 }: { totalSteps?: number }) {
+export function ProvisioningStepView({
+  currentStep,
+  totalSteps,
+}: {
+  currentStep: number;
+  totalSteps: number;
+}) {
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -269,7 +199,7 @@ export function ProvisioningStepView({ totalSteps = 4 }: { totalSteps?: number }
   }, []);
   return (
     <OnboardingStepView
-      currentStep={4}
+      currentStep={currentStep}
       totalSteps={totalSteps}
       stepLabel="Almost there..."
       contentClassName="items-center gap-8"

@@ -13,6 +13,7 @@ import {
 import type { ClawOnboardingRenderStep } from '../components/ClawOnboardingFlow.state';
 import { ClawOnboardingFakeWalkthrough } from '../components/ClawOnboardingFakeWalkthrough';
 import { WelcomePage } from '../components/billing/WelcomePage';
+import { getClawNewStatusQueryForBoundary } from './ClawNewClient.state';
 
 const ClawOnboardingWithBoundary = withStatusQueryBoundary(ClawOnboardingFlow);
 
@@ -30,7 +31,7 @@ function LoadingState() {
 function ClawNewLoader({
   mode,
   createFlowStartedAt,
-  billingUpdatedAt,
+  billingInstanceId,
   onCreateFlowStarted,
   setupFailed,
   onCreateFlowFailed,
@@ -38,7 +39,7 @@ function ClawNewLoader({
   mode: ClawOnboardingMode;
   createFlowStartedAt: number | null;
   setupFailed: boolean;
-  billingUpdatedAt: number;
+  billingInstanceId: string | null;
   onCreateFlowStarted: () => void;
   onCreateFlowFailed: () => void;
 }) {
@@ -62,19 +63,11 @@ function ClawNewLoader({
     );
   }
 
-  const statusQueryForBoundary = setupFailed
-    ? {
-        data: statusQuery.data,
-        isLoading: false,
-        error: null,
-      }
-    : statusQuery.error || statusQuery.dataUpdatedAt >= billingUpdatedAt
-      ? statusQuery
-      : {
-          data: undefined,
-          isLoading: true,
-          error: null,
-        };
+  const statusQueryForBoundary = getClawNewStatusQueryForBoundary({
+    statusQuery,
+    setupFailed,
+    billingInstanceId,
+  });
 
   return (
     <ClawOnboardingWithBoundary
@@ -131,10 +124,6 @@ function ClawNewLiveClient() {
     );
   }
 
-  if (!setupFailed && createFlowStartedAt === null && billingQuery.isFetching) {
-    return <LoadingState />;
-  }
-
   const billing = billingQuery.data;
   const isNewUser =
     billing &&
@@ -151,8 +140,11 @@ function ClawNewLiveClient() {
     );
   }
 
-  const hasActiveInstance =
-    billing?.instance?.exists === true && billing.instance.destroyed === false;
+  const billingInstanceId =
+    billing?.instance?.exists === true && billing.instance.destroyed === false
+      ? billing.instance.id
+      : null;
+  const hasActiveInstance = billingInstanceId !== null;
   const mode: ClawOnboardingMode =
     createFlowStartedAt !== null || !hasActiveInstance ? 'create-first' : 'post-provisioning';
 
@@ -161,7 +153,7 @@ function ClawNewLiveClient() {
       mode={mode}
       createFlowStartedAt={createFlowStartedAt}
       setupFailed={setupFailed}
-      billingUpdatedAt={billingQuery.dataUpdatedAt}
+      billingInstanceId={billingInstanceId}
       onCreateFlowStarted={onCreateFlowStarted}
       onCreateFlowFailed={onCreateFlowFailed}
     />

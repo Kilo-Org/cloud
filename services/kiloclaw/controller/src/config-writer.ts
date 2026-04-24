@@ -39,7 +39,23 @@ function pruneOldConfigBackups(dir: string, base: string, deps: ConfigWriterDeps
   }
 }
 
-/** Flags passed to `openclaw onboard` for non-interactive first-boot setup. */
+/**
+ * Flags passed to `openclaw onboard` for non-interactive first-boot setup.
+ *
+ * `--secret-input-mode ref` stores the kilocode credential in
+ * `agents/<id>/agent/auth-profiles.json` as an env-backed SecretRef
+ * (`keyRef: { source: "env", provider: "default", id: "KILOCODE_API_KEY" }`)
+ * instead of embedding the literal key. No plaintext on disk means the
+ * auth resolver can't shadow env-based rotation with a stale file value;
+ * rotation itself is driven by `supervisor.restart()` in
+ * `routes/env.ts` so the respawned gateway inherits the controller's
+ * current env.
+ *
+ * Works because the gateway process env has `KILOCODE_API_KEY` set before
+ * we spawn onboard (via `decryptEnvVars`), and `resolveNonInteractiveApiKey`
+ * in openclaw accepts `--kilocode-api-key` together with `--secret-input-mode
+ * ref` as long as the env var is present.
+ */
 const ONBOARD_FLAGS = [
   'onboard',
   '--non-interactive',
@@ -53,6 +69,8 @@ const ONBOARD_FLAGS = [
   '--skip-channels',
   '--skip-skills',
   '--skip-health',
+  '--secret-input-mode',
+  'ref',
 ] as const;
 
 const KILOCLAW_CUSTOMIZER_PLUGIN_ID = 'kiloclaw-customizer';
@@ -343,10 +361,14 @@ export function generateBaseConfig(
   const searchProvider = config.tools?.web?.search?.provider;
   const hasExplicitSearchProvider =
     typeof searchProvider === 'string' && searchProvider.trim().length > 0;
+  const hasExplicitSearchDisabled = config.tools?.web?.search?.enabled === false;
+  const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
+  const hasExplicitSearchPreference =
+    hasExplicitSearchProvider || hasExplicitSearchDisabled || braveConfigured;
 
   const kiloExaSearchMode = resolveKiloExaSearchMode(env.KILO_EXA_SEARCH_MODE);
   const shouldForceExa = kiloExaSearchMode === 'kilo-proxy';
-  const shouldAutoAssignExa = kiloExaSearchMode === 'unset' && !hasExplicitSearchProvider;
+  const shouldAutoAssignExa = kiloExaSearchMode === 'unset' && !hasExplicitSearchPreference;
   if (shouldForceExa || shouldAutoAssignExa) {
     customizerWebSearchConfig.enabled = true;
     config.tools = config.tools ?? {};
@@ -360,7 +382,6 @@ export function generateBaseConfig(
   } else if (kiloExaSearchMode === 'disabled') {
     customizerWebSearchConfig.enabled = false;
 
-    const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
     if (
       braveConfigured &&
       (!hasExplicitSearchProvider || config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID)
@@ -493,6 +514,68 @@ export function generateBaseConfig(
       }
     }
     console.log('Hooks enabled with inbound email mapping (dedicated token)');
+  }
+
+  // Vector memory configuration — configures OpenClaw's builtin memory search
+  // to use the Kilo Gateway embeddings endpoint via the OpenAI-compatible adapter.
+  // Only introduce the memorySearch schema when the feature is being enabled, or
+  // when an existing config already contains it (so we can flip it off / clean up
+  // stale remote blocks). Older OpenClaw versions (< 2026.4.5) don't recognize
+  // this schema and will reject it during `doctor` validation before the user
+  // has a chance to upgrade.
+  if (env.KILOCLAW_VECTOR_MEMORY_ENABLED === 'true') {
+    // Source of truth for the default: worker
+    // `services/kiloclaw/src/schemas/instance-config.ts` → DEFAULT_VECTOR_MEMORY_MODEL.
+    // Duplicated here because the controller bundle is built from an isolated
+    // COPY of `controller/` and cannot import from the worker tree.
+    const model = env.KILOCLAW_VECTOR_MEMORY_MODEL || 'mistralai/mistral-embed-2312';
+    const baseUrl = env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
+
+    config.agents = config.agents ?? {};
+    config.agents.defaults = config.agents.defaults ?? {};
+    config.agents.defaults.memorySearch = config.agents.defaults.memorySearch ?? {};
+    config.agents.defaults.memorySearch.enabled = true;
+    config.agents.defaults.memorySearch.provider = 'openai';
+    config.agents.defaults.memorySearch.model = model;
+    config.agents.defaults.memorySearch.remote = {
+      baseUrl,
+      apiKey: env.KILOCODE_API_KEY || '',
+      headers: {
+        // Feature attribution for embedding calls — mirrors FEATURE_VALUES in
+        // apps/web/src/lib/feature-detection.ts. Hardcoded because the controller
+        // bundle is built from an isolated COPY and cannot import from the worker tree.
+        'x-kilocode-feature': 'kiloclaw-embedding',
+        ...(env.KILOCODE_ORGANIZATION_ID
+          ? { 'X-KiloCode-OrganizationId': env.KILOCODE_ORGANIZATION_ID }
+          : {}),
+      },
+    };
+    console.log(`Vector memory enabled: provider=openai model=${model}`);
+  } else if (config.agents?.defaults?.memorySearch) {
+    config.agents.defaults.memorySearch.enabled = false;
+    // Clean up stale remote config from previous boots where memory was enabled.
+    delete config.agents.defaults.memorySearch.provider;
+    delete config.agents.defaults.memorySearch.model;
+    delete config.agents.defaults.memorySearch.remote;
+  }
+
+  // Dreaming configuration — enables OpenClaw's background memory consolidation
+  // (moves strong short-term signals into durable long-term memory automatically).
+  // Only introduce the dreaming schema when the feature is being enabled, or when
+  // an existing config already contains it. Older OpenClaw versions don't
+  // recognize this schema (same upgrade gate as memorySearch above).
+  if (env.KILOCLAW_DREAMING_ENABLED === 'true') {
+    config.plugins = config.plugins ?? {};
+    config.plugins.entries = config.plugins.entries ?? {};
+    config.plugins.entries['memory-core'] = config.plugins.entries['memory-core'] ?? {};
+    config.plugins.entries['memory-core'].config =
+      config.plugins.entries['memory-core'].config ?? {};
+    config.plugins.entries['memory-core'].config.dreaming =
+      config.plugins.entries['memory-core'].config.dreaming ?? {};
+    config.plugins.entries['memory-core'].config.dreaming.enabled = true;
+    console.log('Dreaming enabled');
+  } else if (config.plugins?.entries?.['memory-core']?.config?.dreaming) {
+    config.plugins.entries['memory-core'].config.dreaming.enabled = false;
   }
 
   // Custom secret config path patching — set decrypted secret values at

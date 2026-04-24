@@ -32,6 +32,7 @@ export const FEATURE_VALUES = [
   'openclaw',
   'direct-gateway',
   'embeddings',
+  'kiloclaw-embedding',
   'openclaw-embedding',
   'gastown',
 ] as const;

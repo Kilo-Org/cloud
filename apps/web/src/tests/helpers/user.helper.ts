@@ -21,6 +21,8 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     total_microdollars_acquired: 0,
     is_admin: false,
     blocked_reason: null,
+    blocked_at: null,
+    blocked_by_kilo_user_id: null,
     has_validation_novel_card_with_hold: false,
     has_validation_stytch: false,
     api_token_pepper: null,

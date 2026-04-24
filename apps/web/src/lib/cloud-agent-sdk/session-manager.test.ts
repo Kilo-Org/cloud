@@ -25,6 +25,8 @@ const mockSession = {
   answer: jest.fn(),
   reject: jest.fn(),
   respondToPermission: jest.fn(),
+  acceptSuggestion: jest.fn(),
+  dismissSuggestion: jest.fn(),
   canSend: true,
   canInterrupt: true,
   state: {
@@ -38,6 +40,7 @@ const mockSession = {
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
+    getSuggestion: jest.fn(() => null),
   },
   storage: null as JotaiSessionStorage | null,
 };
@@ -48,6 +51,8 @@ const mockSessionCallbacks: {
   onQuestionResolved?: (...args: unknown[]) => void;
   onPermissionAsked?: (...args: unknown[]) => void;
   onPermissionResolved?: (...args: unknown[]) => void;
+  onSuggestionAsked?: (...args: unknown[]) => void;
+  onSuggestionResolved?: (...args: unknown[]) => void;
   onResolved?: (resolved: ResolvedSession) => void;
 } = {};
 
@@ -63,6 +68,8 @@ jest.mock('./session', () => ({
       onQuestionResolved?: (...args: unknown[]) => void;
       onPermissionAsked?: (...args: unknown[]) => void;
       onPermissionResolved?: (...args: unknown[]) => void;
+      onSuggestionAsked?: (...args: unknown[]) => void;
+      onSuggestionResolved?: (...args: unknown[]) => void;
       onResolved?: (resolved: ResolvedSession) => void;
     }) => {
       latestStorage = sessionConfig.storage;
@@ -82,6 +89,8 @@ jest.mock('./session', () => ({
       mockSessionCallbacks.onQuestionResolved = sessionConfig.onQuestionResolved;
       mockSessionCallbacks.onPermissionAsked = sessionConfig.onPermissionAsked;
       mockSessionCallbacks.onPermissionResolved = sessionConfig.onPermissionResolved;
+      mockSessionCallbacks.onSuggestionAsked = sessionConfig.onSuggestionAsked;
+      mockSessionCallbacks.onSuggestionResolved = sessionConfig.onSuggestionResolved;
       mockSessionCallbacks.onResolved = sessionConfig.onResolved;
       return mockSession;
     }
@@ -1256,6 +1265,53 @@ describe('createSessionManager', () => {
 
       mockSessionCallbacks.onPermissionResolved?.('req-1');
       expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
+    });
+
+    it('onSuggestionAsked sets activeSuggestion with callId', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const actions = [{ label: 'Review', prompt: '/local-review' }];
+      mockSessionCallbacks.onSuggestionAsked?.('sug-1', 'Review?', actions, 'call-1');
+      expect(atomValue(config.store, mgr.atoms.activeSuggestion)).toEqual({
+        requestId: 'sug-1',
+        text: 'Review?',
+        actions,
+        callId: 'call-1',
+      });
+    });
+
+    it('onSuggestionResolved clears activeSuggestion', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onSuggestionAsked?.('sug-1', 'Review?', [], 'call-1');
+      expect(atomValue(config.store, mgr.atoms.activeSuggestion)).not.toBeNull();
+
+      mockSessionCallbacks.onSuggestionResolved?.('sug-1');
+      expect(atomValue(config.store, mgr.atoms.activeSuggestion)).toBeNull();
+    });
+
+    it('acceptSuggestion forwards to session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      await mgr.acceptSuggestion('sug-1', 0);
+
+      expect(mockSession.acceptSuggestion).toHaveBeenCalledWith({ requestId: 'sug-1', index: 0 });
+    });
+
+    it('dismissSuggestion forwards to session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      await mgr.dismissSuggestion('sug-2');
+
+      expect(mockSession.dismissSuggestion).toHaveBeenCalledWith({ requestId: 'sug-2' });
     });
 
     it('destroy clears activeQuestion and activePermission', async () => {

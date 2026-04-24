@@ -17,7 +17,7 @@ export function getSlackTeamId(message: Message<SlackEvent>): string {
  * Extend the switch for Discord / Teams / Google Chat / etc.
  */
 export function getPlatformIdentity(thread: Thread, message: Message): PlatformIdentity {
-  const platform = thread.id.split(':')[0]; // "slack", "discord", "gchat", "teams", …
+  const platform = thread.id.split(':')[0]; // "slack", "discord", "gchat", "teams", ...
 
   switch (platform) {
     case 'slack': {
@@ -29,19 +29,19 @@ export function getPlatformIdentity(thread: Thread, message: Message): PlatformI
   }
 }
 
-async function getSlackNextInstallation(teamId: string) {
+async function getSlackPlatformIntegration(teamId: string) {
   const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
-        eq(platform_integrations.platform, PLATFORM.SLACK_NEXT),
+        eq(platform_integrations.platform, PLATFORM.SLACK),
         eq(platform_integrations.platform_installation_id, teamId)
       )
     )
     .limit(1);
 
-  return integration;
+  return integration ?? null;
 }
 
 export async function getPlatformIntegration(thread: Thread, message: Message) {
@@ -49,7 +49,7 @@ export async function getPlatformIntegration(thread: Thread, message: Message) {
 
   switch (platform) {
     case 'slack':
-      return await getSlackNextInstallation(getSlackTeamId(message as Message<SlackEvent>));
+      return await getSlackPlatformIntegration(getSlackTeamId(message as Message<SlackEvent>));
     default:
       throw new Error(`PlatformNotSupported: ${platform}`);
   }

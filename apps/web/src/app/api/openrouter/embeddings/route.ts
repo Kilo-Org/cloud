@@ -188,6 +188,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     session_id: null,
     mode: null,
     auto_model: null,
+    ttfb_ms: null,
   };
 
   setTag('ui.ai_model', requestBodyParsed.model);
@@ -255,6 +256,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
+  usageContext.ttfb_ms = ttfbMs;
 
   emitApiMetricsForResponse(
     {

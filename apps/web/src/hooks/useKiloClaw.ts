@@ -314,6 +314,18 @@ export function useKiloClawMutations() {
         },
       })
     ),
+    importOpenclawWorkspace: useMutation(
+      trpc.kiloclaw.importOpenclawWorkspace.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.fileTree.queryKey(),
+          });
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.readFile.queryKey(),
+          });
+        },
+      })
+    ),
     patchExecPreset: useMutation(
       trpc.kiloclaw.patchExecPreset.mutationOptions({ onSuccess: invalidateStatus })
     ),

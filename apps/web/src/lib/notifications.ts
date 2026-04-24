@@ -381,7 +381,7 @@ async function generateFirstDayWelcomeNotification(
       id: 'first-day-welcome-jan-8',
       title: 'Welcome to Kilo Code!',
       message:
-        'We added $2.50 to your balance to get started! If you want something to try, try asking Kilo to clone Kilo-Org/KiloMan and run it.',
+        'We added $1.25 to your balance to get started! If you want something to try, try asking Kilo to clone Kilo-Org/KiloMan and run it.',
       action: {
         actionText: 'Open Kilo-Org/KiloMan',
         actionURL: 'https://github.com/Kilo-Org/kiloman',

@@ -8,6 +8,7 @@
 import type { QuestionInfo } from '@/types/opencode.gen';
 import type { Images } from '@/lib/images-schema';
 import type { NormalizedEvent } from './normalizer';
+import type { SuggestionAction } from './types';
 import { createChatProcessor } from './chat-processor';
 import { createServiceState } from './service-state';
 import type { ServiceState } from './service-state';
@@ -49,6 +50,13 @@ type CloudAgentSessionConfig = {
     always?: string[]
   ) => void;
   onPermissionResolved?: (requestId: string) => void;
+  onSuggestionAsked?: (
+    requestId: string,
+    text: string,
+    actions: SuggestionAction[],
+    callId?: string
+  ) => void;
+  onSuggestionResolved?: (requestId: string) => void;
   onBranchChanged?: (branch: string) => void;
   onResolved?: (resolved: ResolvedSession) => void;
   onSessionCreated?: (info: SessionInfo) => void;
@@ -81,6 +89,15 @@ type CloudAgentSessionRespondToPermissionInput = {
   response: PermissionResponse;
 };
 
+type CloudAgentSessionAcceptSuggestionInput = {
+  requestId: string;
+  index: number;
+};
+
+type CloudAgentSessionDismissSuggestionInput = {
+  requestId: string;
+};
+
 type CloudAgentSessionTransport = {
   // Cloud Agent transport construction
   getTicket?: (
@@ -110,6 +127,10 @@ type CloudAgentSession = {
   respondToPermission: (
     payload: CloudAgentSessionRespondToPermissionInput
   ) => unknown | Promise<unknown>;
+  acceptSuggestion: (payload: CloudAgentSessionAcceptSuggestionInput) => unknown | Promise<unknown>;
+  dismissSuggestion: (
+    payload: CloudAgentSessionDismissSuggestionInput
+  ) => unknown | Promise<unknown>;
 
   // Capability checks
   canSend: boolean;
@@ -133,6 +154,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     onQuestionResolved: config.onQuestionResolved,
     onPermissionAsked: config.onPermissionAsked,
     onPermissionResolved: config.onPermissionResolved,
+    onSuggestionAsked: config.onSuggestionAsked,
+    onSuggestionResolved: config.onSuggestionResolved,
     onBranchChanged: config.onBranchChanged,
     onSessionCreated: config.onSessionCreated,
     onSessionUpdated: config.onSessionUpdated,
@@ -286,6 +309,40 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       }
       return transport.respondToPermission(payload);
     },
+    acceptSuggestion: async payload => {
+      if (!transport?.acceptSuggestion) {
+        throw new Error('CloudAgentSession transport.acceptSuggestion is not configured');
+      }
+      // Wait for the command to be acknowledged before clearing local state,
+      // so that transport failures (network drop, 404, timeout) can propagate
+      // back to the caller and the SuggestionCard stays mounted to surface
+      // the error. The bus event that follows is a no-op thanks to the
+      // requestId guard in processSuggestionResolved.
+      const result = await transport.acceptSuggestion(payload);
+      const current = serviceState.getSuggestion();
+      if (current && current.requestId === payload.requestId) {
+        serviceState.process({
+          type: 'suggestion.accepted',
+          requestId: payload.requestId,
+          index: payload.index,
+        });
+      }
+      return result;
+    },
+    dismissSuggestion: async payload => {
+      if (!transport?.dismissSuggestion) {
+        throw new Error('CloudAgentSession transport.dismissSuggestion is not configured');
+      }
+      const result = await transport.dismissSuggestion(payload);
+      const current = serviceState.getSuggestion();
+      if (current && current.requestId === payload.requestId) {
+        serviceState.process({
+          type: 'suggestion.dismissed',
+          requestId: payload.requestId,
+        });
+      }
+      return result;
+    },
     get canSend() {
       return transport?.send !== undefined;
     },
@@ -323,8 +380,10 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 export { createCloudAgentSession };
 export type {
   CloudAgentSession,
+  CloudAgentSessionAcceptSuggestionInput,
   CloudAgentSessionAnswerInput,
   CloudAgentSessionConfig,
+  CloudAgentSessionDismissSuggestionInput,
   CloudAgentSessionRejectInput,
   CloudAgentSessionRespondToPermissionInput,
   CloudAgentSessionSendInput,

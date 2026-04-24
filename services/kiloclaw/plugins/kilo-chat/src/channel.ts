@@ -137,7 +137,7 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
             groupId: Type.Optional(
               Type.String({
                 description:
-                  'Conversation/group id. Alias for `to`. Required for `renameGroup`; optional elsewhere (falls back to the current conversation).',
+                  'Conversation/group id. Required for `renameGroup` (must be the target conversation, not the current one). Optional elsewhere — falls back to the current conversation.',
               })
             ),
             target: Type.Optional(
@@ -149,6 +149,14 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
           visibility: 'current-channel' as const,
         },
       }),
+      // Tell the OpenClaw message-tool runtime that `groupId`/`conversationId`
+      // count as a target for `renameGroup`. Without this, the runtime treats
+      // the action as targetless and injects `toolContext.currentChannelId`
+      // as `to`, which would silently rename the active conversation instead
+      // of the one the caller specified.
+      messageActionTargetAliases: {
+        renameGroup: { aliases: ['groupId', 'conversationId'] },
+      },
       supportsAction: ({ action }: { action: string }) =>
         action === 'react' ||
         action === 'read' ||

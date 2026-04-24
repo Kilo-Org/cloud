@@ -13,10 +13,15 @@ export type HandleKiloChatRenameActionParams = {
 export async function handleKiloChatRenameAction(
   args: HandleKiloChatRenameActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
+  // Prefer the explicit, semantic params over `to`. The OpenClaw message-tool
+  // runtime will inject `toolContext.currentChannelId` as `to` whenever no
+  // registered target alias is present, which would otherwise cause us to
+  // silently rename the active conversation instead of the one the caller
+  // specified via `groupId`/`conversationId`.
   const raw =
-    readStringParam(args.params, 'to') ??
+    readStringParam(args.params, 'groupId') ??
     readStringParam(args.params, 'conversationId') ??
-    readStringParam(args.params, 'groupId');
+    readStringParam(args.params, 'to');
   if (!raw) {
     throw new Error('kilo-chat: groupId is required for renameGroup');
   }

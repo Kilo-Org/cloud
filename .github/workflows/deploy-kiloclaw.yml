@@ -60,7 +60,7 @@ jobs:
         working-directory: services/kiloclaw
         run: |
           # Validate all expected paths exist before hashing
-          for path in Dockerfile controller container plugins/kiloclaw-customizer skills \
+          for path in Dockerfile controller container plugins/kiloclaw-customizer plugins/kiloclaw-morning-briefing skills \
                       openclaw-pairing-list.js openclaw-device-pairing-list.js; do
             if [ ! -e "$path" ]; then
               echo "::error::Required path not found: $path"
@@ -69,7 +69,7 @@ jobs:
           done
 
           CONTENT_HASH=$(
-            find Dockerfile controller/ container/ plugins/kiloclaw-customizer/ skills/ \
+            find Dockerfile controller/ container/ plugins/kiloclaw-customizer/ plugins/kiloclaw-morning-briefing/ skills/ \
               openclaw-pairing-list.js openclaw-device-pairing-list.js \
               -type f \
               | sort \

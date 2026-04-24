@@ -13,6 +13,9 @@ import {
   EnvPatchResponseSchema,
   ToolsMdSectionSyncResponseSchema,
   OpenclawConfigResponseSchema,
+  MorningBriefingStatusResponseSchema,
+  MorningBriefingActionResponseSchema,
+  MorningBriefingReadResponseSchema,
   OpenclawWorkspaceImportResponseSchema,
   GatewayControllerError,
 } from '../gateway-controller-types';
@@ -66,7 +69,8 @@ export async function callGatewayController<T>(
   path: string,
   method: 'GET' | 'POST',
   responseSchema: ZodType<T>,
-  jsonBody?: unknown
+  jsonBody?: unknown,
+  options?: { timeoutMs?: number }
 ): Promise<T> {
   const { routingTarget, sandboxId } = await requireGatewayControllerContext(state, env);
 
@@ -87,11 +91,14 @@ export async function callGatewayController<T>(
   }
 
   let response: Response;
+  const timeoutMs = options?.timeoutMs ?? 30_000;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
   try {
     response = await fetch(url, {
       method,
       headers,
       body: jsonBody !== undefined ? JSON.stringify(jsonBody) : undefined,
+      signal: timeoutSignal,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -262,6 +269,21 @@ export function isErrorUnknownRoute(error: unknown): boolean {
   return (
     error instanceof GatewayControllerError &&
     (error.code === 'controller_route_unavailable' || (error.status === 404 && !error.code))
+  );
+}
+
+function isMorningBriefingWarmupControllerError(error: unknown): boolean {
+  if (!(error instanceof GatewayControllerError)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('instance has no machine id') ||
+    message.includes('instance not provisioned') ||
+    message.includes('gateway not running') ||
+    message.includes('failed to reach gateway') ||
+    message.includes('operation was aborted due to timeout')
   );
 }
 
@@ -461,6 +483,115 @@ export async function importOpenclawWorkspace(
       'POST',
       OpenclawWorkspaceImportResponseSchema,
       { files }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function getMorningBriefingStatus(
+  state: InstanceMutableState,
+  env: KiloClawEnv
+): Promise<z.infer<typeof MorningBriefingStatusResponseSchema> | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/morning-briefing/status',
+      'GET',
+      MorningBriefingStatusResponseSchema,
+      undefined,
+      { timeoutMs: 5_000 }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    if (isMorningBriefingWarmupControllerError(error)) {
+      return {
+        ok: true,
+        enabled: false,
+        reconcileState: 'in_progress',
+        error: 'Gateway warming up, retrying shortly.',
+        code: 'gateway_warming_up',
+        retryAfterSec: 2,
+      };
+    }
+    throw error;
+  }
+}
+
+export async function enableMorningBriefing(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  input: { cron?: string; timezone?: string }
+): Promise<z.infer<typeof MorningBriefingActionResponseSchema> | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/morning-briefing/enable',
+      'POST',
+      MorningBriefingActionResponseSchema,
+      input,
+      { timeoutMs: 8_000 }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function disableMorningBriefing(
+  state: InstanceMutableState,
+  env: KiloClawEnv
+): Promise<z.infer<typeof MorningBriefingActionResponseSchema> | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/morning-briefing/disable',
+      'POST',
+      MorningBriefingActionResponseSchema,
+      {},
+      { timeoutMs: 8_000 }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function runMorningBriefing(
+  state: InstanceMutableState,
+  env: KiloClawEnv
+): Promise<z.infer<typeof MorningBriefingActionResponseSchema> | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/morning-briefing/run',
+      'POST',
+      MorningBriefingActionResponseSchema,
+      {}
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function readMorningBriefing(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  day: 'today' | 'yesterday'
+): Promise<z.infer<typeof MorningBriefingReadResponseSchema> | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      `/_kilo/morning-briefing/read/${day}`,
+      'GET',
+      MorningBriefingReadResponseSchema
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

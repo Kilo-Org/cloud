@@ -30,6 +30,7 @@ export const adminGatewayConfigRouter = createTRPCRouter({
       updated_at: new Date().toISOString(),
       updated_by: ctx.user.id,
       updated_by_email: ctx.user.google_user_email,
+      note: input.note,
     };
     const written = await redisSet(VERCEL_ROUTING_REDIS_KEY, JSON.stringify(config));
     if (!written) {

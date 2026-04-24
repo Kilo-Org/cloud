@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
+import { createParser } from 'eventsource-parser';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 export const toolCallArgumentErrorSchema = z.object({
@@ -64,17 +65,18 @@ function parseArgsString(
 }
 
 /**
- * Returns the JSON payload strings from `data: <payload>` lines, excluding `[DONE]`.
+ * Returns the JSON payload strings from SSE `data:` events, excluding `[DONE]`.
  * Returns an empty array if the text does not look like an SSE stream.
  */
 function parseSseDataLines(text: string): string[] {
-  const lines: string[] = [];
-  for (const line of text.split('\n')) {
-    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-      lines.push(line.slice(6));
-    }
-  }
-  return lines;
+  const payloads: string[] = [];
+  const parser = createParser({
+    onEvent(event) {
+      if (event.data !== '[DONE]') payloads.push(event.data);
+    },
+  });
+  parser.feed(text);
+  return payloads;
 }
 
 type ToolAccumulator = { id: string; name: string; arguments: string };

@@ -67,6 +67,7 @@ export function ConversationItem({
 
   const handleCancelRename = useCallback(() => {
     setIsRenaming(false);
+    setRenameValue('');
   }, []);
 
   const handleStartLeave = useCallback(() => {

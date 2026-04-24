@@ -19,10 +19,13 @@ export default function KiloChatConversationPage() {
 
   useEffect(() => {
     if (conversationDetail.isError && !isLeaving) {
-      toast.error('Conversation not found');
+      const status = (conversationDetail.error as { status?: number })?.status;
+      const message =
+        status === 403 || status === 404 ? 'Conversation not found' : 'Failed to load conversation';
+      toast.error(message);
       router.replace('/claw/kilo-chat');
     }
-  }, [conversationDetail.isError, isLeaving, router]);
+  }, [conversationDetail.isError, conversationDetail.error, isLeaving, router]);
 
   if (isLeaving) {
     return null;

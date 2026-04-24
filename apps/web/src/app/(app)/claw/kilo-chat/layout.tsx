@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useUser } from '@/hooks/useUser';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
 import { getKiloChatToken } from './token';
@@ -15,9 +15,13 @@ export default function KiloChatRootLayout({ children }: { children: React.React
 
   // Derive instance list from the single personal instance the status hook exposes.
   // When multi-instance support is added, this can be expanded.
-  const instances = status?.sandboxId
-    ? [{ sandboxId: status.sandboxId, label: status.name ?? 'My Instance' }]
-    : [];
+  const instances = useMemo(
+    () =>
+      status?.sandboxId
+        ? [{ sandboxId: status.sandboxId, label: status.name ?? 'My Instance' }]
+        : [],
+    [status?.sandboxId, status?.name]
+  );
 
   const currentUserId = user?.id ?? '';
 

@@ -51,6 +51,15 @@ export async function extractAndUploadImages(
       const filename = `${imageId}.${ext}`;
       const r2Key = `${userId}/cloud-agent/${messageUuid}/${filename}`;
 
+      if (
+        typeof attachment.size === 'number' &&
+        attachment.size > CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES
+      ) {
+        throw new Error(
+          `Image ${attachment.name ?? filename} exceeds ${CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES / (1024 * 1024)}MB limit (${(attachment.size / (1024 * 1024)).toFixed(1)}MB)`
+        );
+      }
+
       const data = await attachment.fetchData();
 
       if (data.byteLength > CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES) {

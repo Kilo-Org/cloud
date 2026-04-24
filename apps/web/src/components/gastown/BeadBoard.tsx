@@ -115,7 +115,11 @@ function BeadCard({
         <CardContent className="p-3">
           <div className="mb-2 flex items-start justify-between gap-2">
             <div className="flex min-w-0 items-start gap-1.5">
-              {held && <Clock className="mt-0.5 size-3 shrink-0 text-amber-400/60" title="Held" />}
+              {held && (
+                <span title="Held" className="mt-0.5 flex shrink-0">
+                  <Clock className="size-3 text-amber-400/60" aria-label="Held" />
+                </span>
+              )}
               <h4 className="line-clamp-2 text-sm font-medium text-white/90">{bead.title}</h4>
             </div>
             <div className="flex shrink-0 items-center gap-1">

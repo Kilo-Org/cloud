@@ -40,7 +40,7 @@ describe('ConversationDO', () => {
     expect(await stub.isMember('user-stranger')).toBe(false);
   });
 
-  it('createMessage - creates message, returns ULID', async () => {
+  it('createMessage - creates message, returns ULID and info', async () => {
     const stub = getStub('conv-create-1');
     await stub.initialize(BASE_PARAMS);
     const result = await stub.createMessage({
@@ -50,6 +50,8 @@ describe('ConversationDO', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.messageId).toMatch(/^[0-9A-Z]{26}$/);
+      expect(result.info).not.toBeNull();
+      expect(result.info.members).toHaveLength(2);
     }
   });
 

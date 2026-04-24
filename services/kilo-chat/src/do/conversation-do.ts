@@ -53,7 +53,7 @@ export type CreateMessageParams = {
 };
 
 export type CreateMessageResult =
-  | { ok: true; messageId: string }
+  | { ok: true; messageId: string; info: ConversationInfo }
   | { ok: false; code: 'forbidden' | 'internal'; error: string };
 
 export type ListMessagesParams = {
@@ -244,7 +244,8 @@ export class ConversationDO extends DurableObject<Env> {
       throw err;
     }
 
-    return { ok: true, messageId };
+    const info = this.getInfo();
+    return { ok: true, messageId, info: info! };
   }
 
   getMessage(messageId: string): GetMessageResult {

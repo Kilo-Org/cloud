@@ -57,16 +57,7 @@ export async function createMessageFor(
     return { ok: false, code: 'internal' as const, error: result.error };
   }
 
-  const { messageId } = result;
-
-  // Single getInfo() call to get all members — avoids separate getBotMembersExcluding RPC.
-  // Must stay on the critical path: info is needed inside postCommitFanOut.
-  const info = await withDORetry(
-    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-    stub => stub.getInfo(),
-    'ConversationDO.getInfo'
-  );
-  if (!info) return { ok: true, messageId, clientId };
+  const { messageId, info } = result;
 
   const fanOut = postCommitFanOut(
     env,

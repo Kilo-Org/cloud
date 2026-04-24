@@ -531,7 +531,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     // request. Once the gateway is warm and CPU has settled, the upgrade
     // runs safely in the background.
     if (env.KILOCLAW_KILO_CLI === 'true') {
-      const KILO_CLI_UPGRADE_DELAY_MS = 5 * 60 * 1000; // 5 minutes
+      const KILO_CLI_UPGRADE_DELAY_MS = 3 * 60 * 60 * 1000; // 3 hours
       setTimeout(() => {
         // Strip NPM_CONFIG_PREFIX so the install overwrites the system-wide
         // binary in /usr/local/bin instead of writing to the per-user prefix.

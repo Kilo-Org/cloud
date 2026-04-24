@@ -133,29 +133,29 @@ export class ConversationDO extends DurableObject<Env> {
 
   initialize(params: InitializeParams): { ok: true } | { ok: false; error: string } {
     try {
-      // Insert members before conversation — conversation.created_by has FK to members.id
-      for (const member of params.members) {
-        this.db
-          .insert(members)
+      this.db.transaction(tx => {
+        // Insert members before conversation — conversation.created_by has FK to members.id
+        tx.insert(members)
+          .values(
+            params.members.map(member => ({
+              id: member.id,
+              kind: member.kind,
+              joined_at: params.createdAt,
+            }))
+          )
+          .onConflictDoNothing()
+          .run();
+
+        tx.insert(conversation)
           .values({
-            id: member.id,
-            kind: member.kind,
-            joined_at: params.createdAt,
+            id: params.id,
+            title: params.title,
+            created_by: params.createdBy,
+            created_at: params.createdAt,
           })
           .onConflictDoNothing()
           .run();
-      }
-
-      this.db
-        .insert(conversation)
-        .values({
-          id: params.id,
-          title: params.title,
-          created_by: params.createdBy,
-          created_at: params.createdAt,
-        })
-        .onConflictDoNothing()
-        .run();
+      });
 
       return { ok: true };
     } catch (err) {

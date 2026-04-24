@@ -6,6 +6,7 @@ import { CopyTokenButton } from '@/components/auth/CopyTokenButton';
 import { Code, Terminal } from 'lucide-react';
 import type { CustomerInfo } from '@/lib/customerInfo';
 import { ResetAPITokenDialog } from './ResetAPITokenDialog';
+import { SignOutBrowserSessionsDialog } from './SignOutBrowserSessionsDialog';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -120,7 +121,10 @@ export function IntegrationsCard({
               {normalizedLastUsed === 'cli' && <LastUsedBadge />}
             </Link>
           </div>
-          <ResetAPITokenDialog />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <SignOutBrowserSessionsDialog />
+            <ResetAPITokenDialog />
+          </div>
         </div>
         <div className="mt-6 space-y-3">
           <h3 className="text-sm font-medium">API Key</h3>

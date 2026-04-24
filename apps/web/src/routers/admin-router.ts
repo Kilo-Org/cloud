@@ -416,13 +416,16 @@ export const adminRouter = createTRPCRouter({
     }),
 
     resetAPIKey: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input }) => {
-      await db.transaction(async tx => {
-        await tx
-          .update(kilocode_users)
-          .set({ api_token_pepper: crypto.randomUUID() })
-          .where(eq(kilocode_users.id, input.userId));
-        await revokeWebSessions(input.userId, tx);
-      });
+      await db
+        .update(kilocode_users)
+        .set({ api_token_pepper: crypto.randomUUID() })
+        .where(eq(kilocode_users.id, input.userId));
+
+      return successResult();
+    }),
+
+    signOutBrowserSessions: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input }) => {
+      await revokeWebSessions(input.userId);
 
       return successResult();
     }),

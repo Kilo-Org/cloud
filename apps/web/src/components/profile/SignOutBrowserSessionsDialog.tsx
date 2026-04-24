@@ -11,21 +11,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { AlertTriangle, LogOut } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 
-export function ResetAPITokenDialog() {
+export function SignOutBrowserSessionsDialog() {
   const trpc = useTRPC();
-  const router = useRouter();
 
-  const resetAPIKeyMutation = useMutation(
-    trpc.user.resetAPIKey.mutationOptions({
-      onSuccess: () => {
-        toast.success('API token reset successfully. Refreshing token...');
-        router.refresh();
+  const signOutBrowserSessionsMutation = useMutation(
+    trpc.user.signOutBrowserSessions.mutationOptions({
+      onSuccess: async () => {
+        toast.success('Browser sessions signed out. Redirecting to sign-in page...');
+        await signOut({ callbackUrl: '/users/sign_in' });
       },
     })
   );
@@ -33,23 +32,20 @@ export function ResetAPITokenDialog() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive">
-          <RotateCcw className="mr-2 h-4 w-4" />
-          Reset API Token
+        <Button variant="outline" size="sm">
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign Out Browser Sessions
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-orange-600">
             <AlertTriangle className="h-5 w-5" />
-            Reset all API tokens?
+            Sign out all browser sessions?
           </DialogTitle>
           <DialogDescription className="text-muted-foreground pt-3">
-            <strong className="text-foreground">This action cannot be undone.</strong>
-            <br />
-            <br />
-            Resetting your API token will invalidate all existing CLI, VS Code, JetBrains, and other
-            API tokens. Browser sessions will stay signed in.
+            This will sign you out of Kilo Code in every browser, including this one. CLI, VS Code,
+            JetBrains, and other API tokens will continue to work.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
@@ -57,7 +53,7 @@ export function ResetAPITokenDialog() {
             <Button
               variant="secondary"
               className="w-full sm:w-auto"
-              disabled={resetAPIKeyMutation.isPending}
+              disabled={signOutBrowserSessionsMutation.isPending}
             >
               Cancel
             </Button>
@@ -65,10 +61,12 @@ export function ResetAPITokenDialog() {
           <Button
             variant="destructive"
             className="w-full sm:w-auto"
-            onClick={() => resetAPIKeyMutation.mutate()}
-            disabled={resetAPIKeyMutation.isPending}
+            onClick={() => signOutBrowserSessionsMutation.mutate()}
+            disabled={signOutBrowserSessionsMutation.isPending}
           >
-            {resetAPIKeyMutation.isPending ? 'Resetting...' : 'Reset API Token'}
+            {signOutBrowserSessionsMutation.isPending
+              ? 'Signing out...'
+              : 'Sign Out Browser Sessions'}
           </Button>
         </DialogFooter>
       </DialogContent>

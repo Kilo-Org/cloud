@@ -16,14 +16,14 @@ import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
 
-export default function ResetAPIKeyButton({ userId }: { userId: string }) {
+export default function SignOutBrowserSessionsButton({ userId }: { userId: string }) {
   const [isDialogOpen, setDialogOpen] = useState(false);
   const trpc = useTRPC();
 
-  const resetAPIKeyMutation = useMutation(
-    trpc.admin.users.resetAPIKey.mutationOptions({
+  const signOutBrowserSessionsMutation = useMutation(
+    trpc.admin.users.signOutBrowserSessions.mutationOptions({
       onSuccess: () => {
-        toast.success('API Key was successfully reset!');
+        toast.success('Browser sessions were successfully signed out!');
         setDialogOpen(false);
       },
     })
@@ -33,30 +33,32 @@ export default function ResetAPIKeyButton({ userId }: { userId: string }) {
     <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
-          Reset API keys
+          Sign out browser sessions
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Reset API keys</DialogTitle>
+          <DialogTitle>Sign out browser sessions</DialogTitle>
           <DialogDescription>
-            Are you sure that you want to reset the API keys for this user? This action can not be
-            undone. Browser sessions will stay signed in.
+            Are you sure that you want to sign out all browser sessions for this user? CLI, VS Code,
+            JetBrains, and other API tokens will continue to work.
           </DialogDescription>
         </DialogHeader>
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" disabled={resetAPIKeyMutation.isPending}>
+            <Button variant="outline" disabled={signOutBrowserSessionsMutation.isPending}>
               Cancel
             </Button>
           </DialogClose>
           <Button
             variant="destructive"
-            onClick={() => resetAPIKeyMutation.mutate({ userId })}
-            disabled={resetAPIKeyMutation.isPending}
+            onClick={() => signOutBrowserSessionsMutation.mutate({ userId })}
+            disabled={signOutBrowserSessionsMutation.isPending}
           >
-            Reset API Keys
+            {signOutBrowserSessionsMutation.isPending
+              ? 'Signing out...'
+              : 'Sign Out Browser Sessions'}
           </Button>
         </DialogFooter>
       </DialogContent>

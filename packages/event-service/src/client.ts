@@ -1,5 +1,10 @@
+import type { z } from 'zod';
 import type { ClientMessage, EventServiceConfig } from './types';
-import { connectTicketResponseSchema, serverMessageSchema } from './schemas';
+import {
+  connectTicketResponseSchema,
+  serverMessageSchema,
+  type connectQuerySchema,
+} from './schemas';
 
 export class EventServiceClient {
   private readonly url: string;
@@ -58,10 +63,10 @@ export class EventServiceClient {
     const { ticket, userId } = connectTicketResponseSchema.parse(await res.json());
 
     // Step 2: Connect WebSocket using the ticket
+    const query: z.input<typeof connectQuerySchema> = { ticket, userId };
+    const qs = new URLSearchParams({ ticket: query.ticket, userId: query.userId }).toString();
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(
-        `${this.url}/connect?ticket=${encodeURIComponent(ticket)}&userId=${encodeURIComponent(userId)}`
-      );
+      const ws = new WebSocket(`${this.url}/connect?${qs}`);
       this.ws = ws;
 
       ws.addEventListener('open', () => {

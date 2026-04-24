@@ -1,22 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
-import { z } from 'zod';
+import { clientMessageSchema, MAX_CONTEXTS } from '@kilocode/event-service';
 import { logger, withLogTags } from '../util/logger';
 import type { ServerMessage } from '../types';
-
-const MAX_CONTEXTS = 200;
-const MAX_CONTEXT_LENGTH = 256;
-
-const contextSchema = z.string().min(1).max(MAX_CONTEXT_LENGTH);
-const clientMessageSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('context.subscribe'),
-    contexts: z.array(contextSchema).max(MAX_CONTEXTS),
-  }),
-  z.object({
-    type: z.literal('context.unsubscribe'),
-    contexts: z.array(contextSchema).max(MAX_CONTEXTS),
-  }),
-]);
 
 type SerializedState = { contexts: string[] };
 

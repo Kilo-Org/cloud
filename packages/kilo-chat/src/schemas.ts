@@ -190,9 +190,37 @@ export const paginationQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+export const listConversationsQuerySchema = paginationQuerySchema.extend({
+  sandboxId: sandboxIdSchema.optional(),
+});
+
+export const deleteMessageQuerySchema = z.object({
+  conversationId: ulidSchema,
+});
+
 export const listMessagesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   before: ulidSchema.optional(),
+});
+
+export const botStatusRequestSchema = z.object({
+  online: z.boolean(),
+  at: z.number(),
+  conversationId: z.string().optional(),
+  model: z.string().nullish(),
+  provider: z.string().nullish(),
+  contextTokens: z.number().nullish(),
+  contextWindow: z.number().nullish(),
+});
+
+// Diagnostic-only body; reason is logged and dropped. `loose()` accepts extra keys.
+export const messageDeliveryFailedRequestSchema = z
+  .object({ reason: z.string().max(1000).optional() })
+  .loose();
+
+export const actionDeliveryFailedRequestSchema = z.object({
+  messageId: z.string().min(1),
+  reason: z.string().max(1000).optional(),
 });
 
 export const createBotConversationRequestSchema = z.object({

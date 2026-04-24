@@ -9,6 +9,11 @@ import {
   messageListResponseSchema,
   addReactionResponseSchema,
   okResponseSchema,
+  type listConversationsQuerySchema,
+  type listMessagesQuerySchema,
+  type deleteMessageQuerySchema,
+  type reactionRequestBodySchema,
+  type executeActionRequestSchema,
 } from './schemas';
 import {
   getKiloChatEventPayloadSchema,
@@ -25,7 +30,6 @@ import type {
   CreateMessageResponse,
   EditMessageRequest,
   EditMessageResponse,
-  DeleteMessageRequest,
   RenameConversationRequest,
   Message,
   MessageCreatedEvent,
@@ -80,7 +84,10 @@ export class KiloChatClient {
     });
   }
 
-  async deleteMessage(messageId: string, req: DeleteMessageRequest): Promise<void> {
+  async deleteMessage(
+    messageId: string,
+    req: z.input<typeof deleteMessageQuerySchema>
+  ): Promise<void> {
     await this.httpRequest(`/v1/messages/${messageId}`, {
       method: 'DELETE',
       query: req,
@@ -137,20 +144,22 @@ export class KiloChatClient {
 
   async addReaction(
     messageId: string,
-    conversationId: string,
-    emoji: string
+    req: z.input<typeof reactionRequestBodySchema>
   ): Promise<{ id: string }> {
     return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'POST',
-      body: { conversationId, emoji },
+      body: req,
       schema: addReactionClientResponseSchema,
     });
   }
 
-  async removeReaction(messageId: string, conversationId: string, emoji: string): Promise<void> {
+  async removeReaction(
+    messageId: string,
+    req: z.input<typeof reactionRequestBodySchema>
+  ): Promise<void> {
     await this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'DELETE',
-      query: { conversationId, emoji },
+      query: req,
       schema: voidSchema,
     });
   }
@@ -158,7 +167,7 @@ export class KiloChatClient {
   async executeAction(
     conversationId: string,
     messageId: string,
-    req: { groupId: string; value: string }
+    req: z.input<typeof executeActionRequestSchema>
   ): Promise<{ ok: true }> {
     return this.httpRequest(
       `/v1/conversations/${conversationId}/messages/${messageId}/execute-action`,
@@ -169,11 +178,10 @@ export class KiloChatClient {
   // ── Queries via HTTP ──────────────────────────────────────────────────────
 
   async listConversations(
-    sandboxId?: string,
-    opts?: { limit?: number; offset?: number }
+    opts?: z.input<typeof listConversationsQuerySchema>
   ): Promise<ConversationListResponse> {
     return this.httpRequest('/v1/conversations', {
-      query: { sandboxId, limit: opts?.limit, offset: opts?.offset },
+      query: { sandboxId: opts?.sandboxId, limit: opts?.limit, offset: opts?.offset },
       schema: conversationListResponseSchema,
     });
   }
@@ -186,7 +194,7 @@ export class KiloChatClient {
 
   async listMessages(
     conversationId: string,
-    opts?: { before?: string; limit?: number }
+    opts?: z.input<typeof listMessagesQuerySchema>
   ): Promise<Message[]> {
     const res = await this.httpRequest(`/v1/conversations/${conversationId}/messages`, {
       query: { before: opts?.before, limit: opts?.limit },
@@ -278,7 +286,7 @@ export class KiloChatClient {
     opts: {
       method?: string;
       body?: unknown;
-      query?: Record<string, string | number | undefined>;
+      query?: Record<string, unknown>;
       schema: z.ZodType<T>;
     }
   ): Promise<T> {
@@ -288,7 +296,8 @@ export class KiloChatClient {
     if (opts.query) {
       const params = new URLSearchParams();
       for (const [k, v] of Object.entries(opts.query)) {
-        if (v !== undefined) params.set(k, String(v));
+        if (typeof v === 'string') params.set(k, v);
+        else if (typeof v === 'number' || typeof v === 'boolean') params.set(k, v.toString());
       }
       const qs = params.toString();
       if (qs) url += `?${qs}`;

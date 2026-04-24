@@ -1,7 +1,8 @@
 import type { Context } from 'hono';
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { AuthContext } from '../auth';
 import type { OkResponse } from '@kilocode/kilo-chat';
+import { botStatusRequestSchema } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { sandboxIdSchema } from '../routes/schemas';
@@ -9,17 +10,7 @@ import { extractSandboxId, pushBotStatusEvent } from './event-push';
 
 type HonoCtx = Context<{ Bindings: Env; Variables: AuthContext }>;
 
-export const botStatusPayloadSchema = z.object({
-  online: z.boolean(),
-  at: z.number(),
-  conversationId: z.string().optional(),
-  model: z.string().nullish(),
-  provider: z.string().nullish(),
-  contextTokens: z.number().nullish(),
-  contextWindow: z.number().nullish(),
-});
-
-export type BotStatusPayload = z.infer<typeof botStatusPayloadSchema>;
+export type BotStatusPayload = z.infer<typeof botStatusRequestSchema>;
 
 export async function handleBotStatus(c: HonoCtx): Promise<Response> {
   const sandboxResult = sandboxIdSchema.safeParse(c.req.param('sandboxId'));
@@ -35,7 +26,7 @@ export async function handleBotStatus(c: HonoCtx): Promise<Response> {
     return c.json({ error: 'Invalid JSON' }, 400);
   }
 
-  const parsed = botStatusPayloadSchema.safeParse(raw);
+  const parsed = botStatusRequestSchema.safeParse(raw);
   if (!parsed.success) {
     return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400);
   }

@@ -1,17 +1,12 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { z } from 'zod';
 import type { ConnectTicketResponse } from '@kilocode/event-service';
+import { connectQuerySchema } from '@kilocode/event-service';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
 import { authenticateToken } from './auth';
 import { logger } from './util/logger';
-
-const connectQuerySchema = z.object({
-  ticket: z.string().min(1),
-  userId: z.string().min(1),
-});
 
 export { UserSessionDO } from './do/user-session-do';
 export { TicketDO } from './do/ticket-do';

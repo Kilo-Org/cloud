@@ -1,5 +1,4 @@
 import type { Hono } from 'hono';
-import { z } from 'zod';
 import type { AuthContext } from '../auth';
 import type {
   CreateConversationResponse,
@@ -16,16 +15,11 @@ import {
 } from '../services/conversations';
 import {
   ulidSchema,
-  sandboxIdSchema,
-  paginationQuerySchema,
+  createConversationSchema,
+  listConversationsQuerySchema,
   renameConversationSchema,
 } from './schemas';
 import { makeSchedule } from './handler';
-
-const createConversationSchema = z.object({
-  sandboxId: sandboxIdSchema,
-  title: z.string().max(200).optional(),
-});
 
 export function registerConversationRoutes(
   app: Hono<{ Bindings: Env; Variables: AuthContext }>
@@ -67,24 +61,15 @@ export function registerConversationRoutes(
   app.get('/v1/conversations', async c => {
     const callerId = c.get('callerId');
 
-    let sandboxId: string | undefined;
-    const rawSandboxId = c.req.query('sandboxId');
-    if (rawSandboxId !== undefined) {
-      const sbx = sandboxIdSchema.safeParse(rawSandboxId);
-      if (!sbx.success) {
-        return c.json({ error: 'Invalid sandboxId', issues: sbx.error.issues }, 400);
-      }
-      sandboxId = sbx.data;
-    }
-
-    const query = paginationQuerySchema.safeParse({
+    const query = listConversationsQuerySchema.safeParse({
+      sandboxId: c.req.query('sandboxId'),
       limit: c.req.query('limit'),
       offset: c.req.query('offset'),
     });
     if (!query.success) {
       return c.json({ error: 'Invalid query parameters', issues: query.error.issues }, 400);
     }
-    const { limit, offset } = query.data;
+    const { sandboxId, limit, offset } = query.data;
 
     const { conversations, hasMore } = await withDORetry(
       () => c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId)),

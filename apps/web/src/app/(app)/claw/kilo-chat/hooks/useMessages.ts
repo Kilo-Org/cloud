@@ -191,7 +191,7 @@ export function useAddReaction(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
-      client.addReaction(messageId, conversationId ?? '', emoji),
+      client.addReaction(messageId, { conversationId: conversationId ?? '', emoji }),
     onMutate: async variables => {
       if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
@@ -231,7 +231,7 @@ export function useRemoveReaction(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
-      client.removeReaction(messageId, conversationId ?? '', emoji),
+      client.removeReaction(messageId, { conversationId: conversationId ?? '', emoji }),
     onMutate: async variables => {
       if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];

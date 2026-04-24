@@ -5,7 +5,7 @@ import type { CreateConversationRequest, ConversationListResponse } from '@kiloc
 export function useConversations(client: KiloChatClient, sandboxId: string | null) {
   return useQuery({
     queryKey: ['kilo-chat', 'conversations', sandboxId],
-    queryFn: () => client.listConversations(sandboxId ?? undefined),
+    queryFn: () => client.listConversations({ sandboxId: sandboxId ?? undefined }),
     enabled: !!sandboxId,
   });
 }

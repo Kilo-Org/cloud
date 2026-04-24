@@ -7,16 +7,25 @@ export const connectTicketResponseSchema = z.object({
   userId: z.string(),
 });
 
+export const connectQuerySchema = z.object({
+  ticket: z.string().min(1),
+  userId: z.string().min(1),
+});
+
 // ── Client → Server ────────────────────────────────────────────────
+
+export const MAX_CONTEXTS = 200;
+export const MAX_CONTEXT_LENGTH = 256;
+const contextSchema = z.string().min(1).max(MAX_CONTEXT_LENGTH);
 
 export const contextSubscribeMessageSchema = z.object({
   type: z.literal('context.subscribe'),
-  contexts: z.array(z.string()),
+  contexts: z.array(contextSchema).max(MAX_CONTEXTS),
 });
 
 export const contextUnsubscribeMessageSchema = z.object({
   type: z.literal('context.unsubscribe'),
-  contexts: z.array(z.string()),
+  contexts: z.array(contextSchema).max(MAX_CONTEXTS),
 });
 
 export const clientMessageSchema = z.discriminatedUnion('type', [

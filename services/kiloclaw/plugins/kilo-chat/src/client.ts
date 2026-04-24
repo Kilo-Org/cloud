@@ -1,12 +1,23 @@
 import type { z } from 'zod';
 import {
+  actionDeliveryFailedRequestSchema,
   addReactionResponseSchema,
   botGetMembersResponseSchema,
   botListConversationsResponseSchema,
   botListMessagesResponseSchema,
+  botStatusRequestSchema,
+  createBotConversationRequestSchema,
   createConversationResponseSchema,
+  createMessageRequestSchema,
   createMessageResponseSchema,
+  deleteMessageQuerySchema,
+  editMessageRequestSchema,
   editMessageResponseSchema,
+  listMessagesQuerySchema,
+  messageDeliveryFailedRequestSchema,
+  paginationQuerySchema,
+  reactionRequestBodySchema,
+  renameConversationRequestSchema,
   type botConversationSummarySchema,
   type contentBlockSchema,
   type enrichedConversationMemberSchema,
@@ -26,68 +37,52 @@ export type KiloChatClientOptions = {
   fetchImpl?: typeof fetch;
 };
 
-export type CreateMessageParams = {
-  conversationId: string;
-  content: ContentBlock[];
-  inReplyToMessageId?: string;
-};
+export type CreateMessageParams = z.input<typeof createMessageRequestSchema>;
 export type CreateMessageResult = { messageId: string };
 export type EditMessageResult = { messageId: string; stale?: boolean };
 
-export type EditMessageParams = {
-  conversationId: string;
-  messageId: string;
-  content: ContentBlock[];
-  timestamp: number;
-};
+export type EditMessageParams = { messageId: string } & z.input<typeof editMessageRequestSchema>;
 
-export type DeleteMessageParams = { conversationId: string; messageId: string };
+export type DeleteMessageParams = { messageId: string } & z.input<typeof deleteMessageQuerySchema>;
 
 export type SendTypingParams = { conversationId: string };
 
-export type ListMessagesParams = { conversationId: string; before?: string; limit?: number };
+export type ListMessagesParams = { conversationId: string } & z.input<
+  typeof listMessagesQuerySchema
+>;
 export type ListMessagesResult = { messages: Message[] };
 export type GetMembersParams = { conversationId: string };
 export type GetMembersResult = BotGetMembersResponse;
 
-export type RenameConversationParams = { conversationId: string; title: string };
+export type RenameConversationParams = { conversationId: string } & z.input<
+  typeof renameConversationRequestSchema
+>;
 
-export type ListConversationsParams = { limit?: number; offset?: number };
+export type ListConversationsParams = z.input<typeof paginationQuerySchema>;
 export type ConversationMember = EnrichedConversationMember;
 export type ConversationSummary = BotConversationSummary;
 export type ListConversationsResult = BotListConversationsResponse;
 
-export type AddReactionParams = { conversationId: string; messageId: string; emoji: string };
+export type AddReactionParams = { messageId: string } & z.input<typeof reactionRequestBodySchema>;
 export type AddReactionResult = { id: string };
-export type RemoveReactionParams = { conversationId: string; messageId: string; emoji: string };
+export type RemoveReactionParams = { messageId: string } & z.input<
+  typeof reactionRequestBodySchema
+>;
 
-export type CreateConversationParams = { title?: string; additionalMembers?: string[] };
+export type CreateConversationParams = z.input<typeof createBotConversationRequestSchema>;
 export type CreateConversationResult = { conversationId: string };
 
-export type BotStatusParams = {
-  online: boolean;
-  at: number;
-  conversationId?: string;
-  model?: string | null;
-  provider?: string | null;
-  /** Current usage for this conversation's session, in tokens. */
-  contextTokens?: number | null;
-  /** Effective capacity (context-window cap) for this conversation's session, in tokens. */
-  contextWindow?: number | null;
-};
+export type BotStatusParams = z.input<typeof botStatusRequestSchema>;
 
 export type ReportMessageDeliveryFailedParams = {
   conversationId: string;
   messageId: string;
-  reason?: string;
-};
+} & z.input<typeof messageDeliveryFailedRequestSchema>;
 
 export type ReportActionDeliveryFailedParams = {
   conversationId: string;
   groupId: string;
-  messageId: string;
-  reason?: string;
-};
+} & z.input<typeof actionDeliveryFailedRequestSchema>;
 
 export type KiloChatClient = {
   createMessage(p: CreateMessageParams): Promise<CreateMessageResult>;

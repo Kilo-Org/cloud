@@ -8,7 +8,7 @@
  */
 
 import type { Context } from 'hono';
-import { z, type ZodSchema } from 'zod';
+import { type ZodSchema } from 'zod';
 import type { AuthContext } from '../auth';
 import { withDORetry } from '@kilocode/worker-utils';
 import { createBotConversationFor, renameConversationFor } from '../services/conversations';
@@ -45,6 +45,9 @@ import {
   paginationQuerySchema,
   reactionBodySchema,
   renameConversationSchema,
+  deleteMessageQuerySchema,
+  messageDeliveryFailedRequestSchema,
+  actionDeliveryFailedRequestSchema,
 } from './schemas';
 
 type HonoCtx = Context<{ Bindings: Env; Variables: AuthContext }>;
@@ -158,8 +161,10 @@ export async function handleDeleteMessage(c: HonoCtx) {
   const msgId = parseMessageId(c);
   if (!msgId.ok) return msgId.response;
 
-  const convId = ulidSchema.safeParse(c.req.query('conversationId'));
-  if (!convId.success) {
+  const query = deleteMessageQuerySchema.safeParse({
+    conversationId: c.req.query('conversationId'),
+  });
+  if (!query.success) {
     return c.json({ error: 'Invalid or missing conversationId query parameter' }, 400);
   }
 
@@ -168,7 +173,7 @@ export async function handleDeleteMessage(c: HonoCtx) {
     c.env,
     callerId,
     {
-      conversationId: convId.data,
+      conversationId: query.data.conversationId,
       messageId: msgId.data,
     },
     makeSchedule(c)
@@ -219,11 +224,6 @@ export async function handleExecuteAction(c: HonoCtx) {
 
 // ─── messageDeliveryFailed (bot-reported) ───────────────────────────────────
 
-// Body is diagnostic-only; reason is logged and dropped.
-const messageDeliveryFailedBodySchema = z
-  .object({ reason: z.string().max(1000).optional() })
-  .loose();
-
 export async function handleMessageDeliveryFailed(c: HonoCtx) {
   const convId = parseConversationId(c);
   if (!convId.ok) return convId.response;
@@ -237,7 +237,7 @@ export async function handleMessageDeliveryFailed(c: HonoCtx) {
   } catch {
     body = {};
   }
-  messageDeliveryFailedBodySchema.safeParse(body);
+  messageDeliveryFailedRequestSchema.safeParse(body);
 
   await notifyMessageDeliveryFailed(c.env, {
     conversationId: convId.data,
@@ -248,11 +248,6 @@ export async function handleMessageDeliveryFailed(c: HonoCtx) {
 }
 
 // ─── actionDeliveryFailed (bot-reported) ────────────────────────────────────
-
-const actionDeliveryFailedBodySchema = z.object({
-  messageId: z.string().min(1),
-  reason: z.string().max(1000).optional(),
-});
 
 export async function handleActionDeliveryFailed(c: HonoCtx) {
   const convId = parseConversationId(c);
@@ -269,7 +264,7 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
   } catch {
     return c.json({ error: 'Invalid JSON' }, 400);
   }
-  const parsed = actionDeliveryFailedBodySchema.safeParse(raw);
+  const parsed = actionDeliveryFailedRequestSchema.safeParse(raw);
   if (!parsed.success) {
     return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400);
   }

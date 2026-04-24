@@ -116,6 +116,13 @@ function formatMorningBriefingSchedule(cron: string, timezone: string): string {
   return `Automatically runs daily at ${timeLabel} ${timezoneLabel}`;
 }
 
+function joinFriendlyList(items: string[]): string {
+  if (items.length === 0) return '';
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
 // ---------------------------------------------------------------------------
 // 1Password setup guide dialog
 // ---------------------------------------------------------------------------
@@ -495,6 +502,11 @@ function MorningBriefingCard({
   briefingStatus:
     | {
         enabled?: boolean;
+        desiredEnabled?: boolean;
+        observedEnabled?: boolean | null;
+        reconcileState?: 'idle' | 'in_progress' | 'succeeded' | 'failed';
+        lastReconcileAction?: 'enable' | 'disable' | null;
+        code?: string;
         cron?: string;
         timezone?: string;
         lastGeneratedDate?: string | null;
@@ -538,30 +550,93 @@ function MorningBriefingCard({
       },
     } as const);
 
+  const hasSchedule = Boolean(briefingStatus?.cron && briefingStatus?.timezone);
+  const desiredEnabled = briefingStatus?.desiredEnabled ?? briefingStatus?.enabled ?? false;
+  const observedEnabled = briefingStatus?.observedEnabled ?? briefingStatus?.enabled ?? false;
+  const reconcileState = briefingStatus?.reconcileState ?? 'idle';
+  const lastReconcileAction = briefingStatus?.lastReconcileAction ?? null;
+  const isWarmupState = briefingStatus?.code === 'gateway_warming_up' || !actionsReady;
+  const isTransitioning =
+    reconcileState === 'in_progress' ||
+    mutations.enableMorningBriefing.isPending ||
+    mutations.disableMorningBriefing.isPending;
+
+  const statusLabel = (() => {
+    if (isWarmupState) {
+      return 'Instance Warming Up';
+    }
+
+    if (mutations.enableMorningBriefing.isPending) {
+      return 'Enabling';
+    }
+    if (mutations.disableMorningBriefing.isPending) {
+      return 'Disabling';
+    }
+
+    if (reconcileState === 'in_progress') {
+      if (lastReconcileAction === 'enable') {
+        return observedEnabled === true ? 'Enabled' : 'Enabling';
+      }
+      if (lastReconcileAction === 'disable') {
+        return observedEnabled === false ? 'Disabled' : 'Disabling';
+      }
+      if (desiredEnabled && observedEnabled !== true) {
+        return 'Enabling';
+      }
+      if (!desiredEnabled && observedEnabled === true) {
+        return 'Disabling';
+      }
+    }
+
+    return observedEnabled ? 'Enabled' : 'Disabled';
+  })();
+  const statusVariant =
+    observedEnabled || (isTransitioning && desiredEnabled) ? 'default' : 'secondary';
+
+  const readySources = [
+    sourceReadiness.github.configured ? 'GitHub' : null,
+    sourceReadiness.linear.configured ? 'Linear' : null,
+    sourceReadiness.web.configured ? 'Web Search' : null,
+  ].filter((value): value is string => value !== null);
+  const missingSources = [
+    sourceReadiness.github.configured ? null : 'GitHub',
+    sourceReadiness.linear.configured ? null : 'Linear',
+    sourceReadiness.web.configured ? null : 'Web Search',
+  ].filter((value): value is string => value !== null);
+
+  const sourceSummaryText =
+    readySources.length === 3
+      ? 'All sources are connected: GitHub, Linear, and Web Search.'
+      : readySources.length === 0
+        ? 'No sources are connected yet. Configure GitHub, Linear, or Web Search to generate richer briefings.'
+        : `Connected sources: ${joinFriendlyList(readySources)}. Disconnected sources: ${joinFriendlyList(missingSources)}.`;
+  const showScheduleDetails = !isWarmupState && hasSchedule && desiredEnabled;
+  const canUseBriefingControls = actionsReady && desiredEnabled;
+
   return (
     <div className="rounded-lg border px-4 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium">Morning Briefing</p>
-            <Badge variant={briefingStatus?.enabled ? 'default' : 'secondary'}>
-              {briefingStatus?.enabled ? 'Enabled' : 'Disabled'}
-            </Badge>
+            <Badge variant={statusVariant}>{statusLabel}</Badge>
           </div>
-          <p className="text-muted-foreground text-xs">
-            {briefingStatus?.cron && briefingStatus?.timezone
-              ? formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)
-              : 'Schedule not configured'}
-          </p>
-          <p className="text-muted-foreground text-xs">
-            Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
-          </p>
+          {showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone && (
+            <p className="text-muted-foreground text-xs">
+              {formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)}
+            </p>
+          )}
+          {showScheduleDetails && (
+            <p className="text-muted-foreground text-xs">
+              Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
             variant="outline"
-            disabled={!actionsReady || mutations.enableMorningBriefing.isPending}
+            disabled={!actionsReady || desiredEnabled || mutations.enableMorningBriefing.isPending}
             onClick={() => {
               mutations.enableMorningBriefing.mutate(
                 {},
@@ -577,7 +652,9 @@ function MorningBriefingCard({
           <Button
             size="sm"
             variant="outline"
-            disabled={!actionsReady || mutations.disableMorningBriefing.isPending}
+            disabled={
+              !actionsReady || !desiredEnabled || mutations.disableMorningBriefing.isPending
+            }
             onClick={() => {
               mutations.disableMorningBriefing.mutate(undefined, {
                 onSuccess: () => toast.success('Morning Briefing disabled'),
@@ -590,7 +667,7 @@ function MorningBriefingCard({
           <Button
             size="sm"
             variant="outline"
-            disabled={!actionsReady || mutations.runMorningBriefing.isPending}
+            disabled={!canUseBriefingControls || mutations.runMorningBriefing.isPending}
             onClick={() => {
               mutations.runMorningBriefing.mutate(undefined, {
                 onSuccess: data => {
@@ -603,10 +680,20 @@ function MorningBriefingCard({
           >
             {mutations.runMorningBriefing.isPending ? 'Running...' : 'Run Now'}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setRequestedDay('today')}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!canUseBriefingControls}
+            onClick={() => setRequestedDay('today')}
+          >
             View Today
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setRequestedDay('yesterday')}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!canUseBriefingControls}
+            onClick={() => setRequestedDay('yesterday')}
+          >
             View Yesterday
           </Button>
         </div>
@@ -614,25 +701,18 @@ function MorningBriefingCard({
 
       {!actionsReady && (
         <p className="text-muted-foreground mt-2 text-xs">
-          Instance is still warming up. Morning Briefing actions will enable once the gateway is
-          fully ready.
+          Instance is still warming up. Morning Briefing controls will become available once the
+          gateway is fully ready.
         </p>
       )}
 
-      <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
-        <div className="rounded border px-2 py-1">
-          <span className="font-medium">GitHub:</span>{' '}
-          {sourceReadiness.github.configured ? 'Ready' : 'Not ready'}
-        </div>
-        <div className="rounded border px-2 py-1">
-          <span className="font-medium">Linear:</span>{' '}
-          {sourceReadiness.linear.configured ? 'Ready' : 'Not ready'}
-        </div>
-        <div className="rounded border px-2 py-1">
-          <span className="font-medium">Web Search:</span>{' '}
-          {sourceReadiness.web.configured ? 'Ready' : 'Not ready'}
-        </div>
-      </div>
+      {!desiredEnabled && actionsReady && (
+        <p className="text-muted-foreground mt-2 text-xs">
+          Enable Morning Briefing to get a personalized briefing everyday.
+        </p>
+      )}
+
+      <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
 
       {requestedDay && (
         <div className="mt-3">
@@ -1313,6 +1393,7 @@ export function SettingsTab({
       : '/api/integrations/google/disconnect';
   }, [organizationId]);
   const canSeeGoogleCalendar = !!user?.is_admin;
+  const canSeeMorningBriefing = !!user?.is_admin;
 
   function handleCycleInboundEmailAddress() {
     mutations.cycleInboundEmailAddress.mutate(undefined, {
@@ -1768,18 +1849,20 @@ export function SettingsTab({
             mutations={mutations}
             onRedeploy={onRedeploy}
           />
-          <MorningBriefingCard
-            mutations={mutations}
-            briefingStatus={morningBriefingStatus}
-            actionsReady={
-              isRunning && gatewayReady?.ready === true && gatewayReady?.settled === true
-            }
-            fallbackReadiness={{
-              githubConfigured: configuredSecrets.github ?? false,
-              linearConfigured: configuredSecrets.linear ?? false,
-              webConfigured: braveSearchConfigured || exaSearchConfigured,
-            }}
-          />
+          {canSeeMorningBriefing && (
+            <MorningBriefingCard
+              mutations={mutations}
+              briefingStatus={morningBriefingStatus}
+              actionsReady={
+                isRunning && gatewayReady?.ready === true && gatewayReady?.settled === true
+              }
+              fallbackReadiness={{
+                githubConfigured: configuredSecrets.github ?? false,
+                linearConfigured: configuredSecrets.linear ?? false,
+                webConfigured: braveSearchConfigured || exaSearchConfigured,
+              }}
+            />
+          )}
         </div>
       </div>
 

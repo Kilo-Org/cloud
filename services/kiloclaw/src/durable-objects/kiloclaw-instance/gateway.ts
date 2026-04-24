@@ -487,7 +487,7 @@ export async function getMorningBriefingStatus(
       'GET',
       MorningBriefingStatusResponseSchema,
       undefined,
-      { timeoutMs: 3_000 }
+      { timeoutMs: 5_000 }
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

@@ -1923,6 +1923,7 @@ function isMorningBriefingWarmupError(err: unknown): boolean {
   return (
     normalized.includes('Gateway not running') ||
     normalized.includes('Failed to reach gateway') ||
+    normalized.includes('operation was aborted due to timeout') ||
     normalized.includes('Gateway controller request failed (401)')
   );
 }

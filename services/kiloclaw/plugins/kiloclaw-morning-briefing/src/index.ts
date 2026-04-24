@@ -895,6 +895,7 @@ async function getStatusSnapshot(api: {
   reconcileState: 'idle' | 'in_progress' | 'succeeded' | 'failed';
   lastReconcileAt: string | null;
   lastReconcileError: string | null;
+  lastReconcileAction: 'enable' | 'disable' | null;
   desiredEnabled: boolean;
   observedEnabled: boolean | null;
 }> {
@@ -921,6 +922,7 @@ async function getStatusSnapshot(api: {
     reconcileState: status.reconcileState,
     lastReconcileAt: status.lastReconcileAt,
     lastReconcileError: status.lastReconcileError,
+    lastReconcileAction: status.lastReconcileAction,
     desiredEnabled: config.enabled,
     observedEnabled: status.observedEnabled,
   };
@@ -1095,7 +1097,11 @@ export default definePluginEntry({
         readStoredConfig(api, paths),
         readStoredStatus(paths),
       ]);
-      if (status.reconcileState === 'in_progress' || status.observedEnabled !== config.enabled) {
+      const shouldReconcile =
+        status.reconcileState === 'in_progress' ||
+        config.enabled ||
+        (status.observedEnabled !== null && status.observedEnabled !== config.enabled);
+      if (shouldReconcile) {
         triggerReconcile(config.enabled ? 'enable' : 'disable');
       }
     })();

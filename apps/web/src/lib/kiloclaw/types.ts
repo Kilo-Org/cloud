@@ -417,6 +417,7 @@ export type MorningBriefingStatusResponse = {
   lastGeneratedDate?: string | null;
   lastGeneratedAt?: string | null;
   reconcileState?: 'idle' | 'in_progress' | 'succeeded' | 'failed';
+  lastReconcileAction?: 'enable' | 'disable' | null;
   desiredEnabled?: boolean;
   observedEnabled?: boolean | null;
   lastReconcileAt?: string | null;

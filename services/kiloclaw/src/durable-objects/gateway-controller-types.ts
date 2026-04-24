@@ -113,6 +113,7 @@ export const MorningBriefingStatusResponseSchema = z.object({
   lastGeneratedDate: z.string().nullable().optional(),
   lastGeneratedAt: z.string().nullable().optional(),
   reconcileState: z.enum(['idle', 'in_progress', 'succeeded', 'failed']).optional(),
+  lastReconcileAction: z.enum(['enable', 'disable']).nullable().optional(),
   desiredEnabled: z.boolean().optional(),
   observedEnabled: z.boolean().nullable().optional(),
   lastReconcileAt: z.string().nullable().optional(),

@@ -366,4 +366,41 @@ describe('morning briefing lifecycle', () => {
     const response = await harness.commandHandler({ args: 'today' });
     expect(response.text).toBe('utc fallback briefing');
   });
+
+  it('normalizes invalid persisted timezone on enable without override', async () => {
+    const now = new Date().toISOString();
+    const harness = await createHarness({
+      preloadedConfig: {
+        enabled: false,
+        cronJobId: null,
+        cron: '0 7 * * *',
+        timezone: 'America/Chcago',
+        updatedAt: now,
+      },
+    });
+
+    const response = await harness.commandHandler({ args: 'enable' });
+    expect(response.text).toContain('- timezone: UTC');
+
+    await waitForReconcileState(harness.stateDir, 'succeeded');
+    const config = await readJson(path.join(harness.stateDir, 'morning-briefing', 'config.json'));
+    expect(config.timezone).toBe('UTC');
+  });
+
+  it('normalizes invalid persisted timezone during startup reconcile', async () => {
+    const now = new Date().toISOString();
+    const harness = await createHarness({
+      preloadedConfig: {
+        enabled: true,
+        cronJobId: null,
+        cron: '0 7 * * *',
+        timezone: 'America/Chcago',
+        updatedAt: now,
+      },
+    });
+
+    await waitForReconcileState(harness.stateDir, 'succeeded');
+    const config = await readJson(path.join(harness.stateDir, 'morning-briefing', 'config.json'));
+    expect(config.timezone).toBe('UTC');
+  });
 });

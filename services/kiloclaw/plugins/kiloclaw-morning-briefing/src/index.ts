@@ -267,6 +267,20 @@ function resolveDefaults(api: {
   };
 }
 
+function resolveEffectiveTimezone(
+  api: { logger: { warn?: (message: string) => void } },
+  timezone: string,
+  context: 'enable' | 'schedule' | 'date'
+): string {
+  if (isValidTimezone(timezone)) {
+    return timezone;
+  }
+  api.logger.warn?.(
+    `Morning briefing: invalid configured timezone "${timezone}" during ${context}; falling back to ${DEFAULT_TIMEZONE}`
+  );
+  return DEFAULT_TIMEZONE;
+}
+
 async function readStoredConfig(
   api: {
     runtime: { state: { resolveStateDir: () => string } };
@@ -398,6 +412,7 @@ async function ensureCronJob(
   },
   config: StoredConfig
 ): Promise<{ cronJobId: string; cron: string; timezone: string }> {
+  const timezone = resolveEffectiveTimezone(api, config.timezone, 'schedule');
   const existingJobs = await listBriefingCronJobs(api);
   let cronJobId = pickCanonicalCronJobId(existingJobs, config.cronJobId);
 
@@ -413,13 +428,13 @@ async function ensureCronJob(
         '--cron',
         config.cron,
         '--tz',
-        config.timezone,
+        timezone,
         '--tools',
         'morning_briefing_generate',
         '--no-deliver',
       ]);
       await removeDuplicateBriefingCronJobs(api, cronJobId);
-      return { cronJobId, cron: config.cron, timezone: config.timezone };
+      return { cronJobId, cron: config.cron, timezone };
     } catch (error) {
       api.logger.warn?.(
         `Morning briefing: existing cron edit failed (${String(error)}), recreating.`
@@ -439,7 +454,7 @@ async function ensureCronJob(
     '--cron',
     config.cron,
     '--tz',
-    config.timezone,
+    timezone,
     '--tools',
     'morning_briefing_generate',
     '--no-deliver',
@@ -458,7 +473,7 @@ async function ensureCronJob(
   return {
     cronJobId: resolvedId,
     cron: config.cron,
-    timezone: config.timezone,
+    timezone,
   };
 }
 
@@ -892,13 +907,8 @@ async function resolveDateKeyForOffset(
   const paths = getStatePaths(api);
   await ensureStorage(paths);
   const config = await readStoredConfig(api, paths);
-  if (!isValidTimezone(config.timezone)) {
-    api.logger.warn?.(
-      `Morning briefing: invalid configured timezone \"${config.timezone}\", falling back to ${DEFAULT_TIMEZONE}`
-    );
-    return offsetDateKey(new Date(), offset, DEFAULT_TIMEZONE);
-  }
-  return offsetDateKey(new Date(), offset, config.timezone);
+  const timezone = resolveEffectiveTimezone(api, config.timezone, 'date');
+  return offsetDateKey(new Date(), offset, timezone);
 }
 
 async function getStatusSnapshot(api: {
@@ -999,6 +1009,8 @@ export default definePluginEntry({
           const finalConfig: StoredConfig = {
             ...config,
             cronJobId: ensured.cronJobId,
+            cron: ensured.cron,
+            timezone: ensured.timezone,
             updatedAt: new Date().toISOString(),
           };
           await writeJsonFile(paths.configPath, finalConfig);
@@ -1113,11 +1125,14 @@ export default definePluginEntry({
       if (requestedTimezone && !isValidTimezone(requestedTimezone)) {
         throw new Error(`Invalid timezone: ${requestedTimezone}`);
       }
+      const timezone = requestedTimezone
+        ? requestedTimezone
+        : resolveEffectiveTimezone(api, current.timezone, 'enable');
       const nextConfig: StoredConfig = {
         ...current,
         enabled: true,
         cron: input.cron?.trim() || current.cron,
-        timezone: requestedTimezone || current.timezone,
+        timezone,
         updatedAt: new Date().toISOString(),
       };
 

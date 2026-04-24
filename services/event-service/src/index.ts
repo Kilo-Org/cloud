@@ -3,7 +3,10 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { z } from 'zod';
 import type { ConnectTicketResponse } from '@kilocode/event-service';
+import { useWorkersLogger } from 'workers-tagged-logger';
+import type { MiddlewareHandler } from 'hono';
 import { authenticateToken } from './auth';
+import { logger } from './util/logger';
 
 const connectQuerySchema = z.object({
   ticket: z.string().min(1),
@@ -19,6 +22,10 @@ app.use(
   '/connect/*',
   cors({ origin: ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'] })
 );
+
+// ── Structured logging context ──────────────────────────────────────────
+app.use('*', useWorkersLogger('event-service') as unknown as MiddlewareHandler);
+
 app.get('/health', c => c.json({ ok: true }));
 
 // Step 1: Exchange JWT for a short-lived, single-use connection ticket.
@@ -29,6 +36,7 @@ app.post('/connect/ticket', async c => {
   if (!auth) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
+  logger.setTags({ userId: auth.userId });
 
   const ticketDO = c.env.TICKET_DO.get(c.env.TICKET_DO.idFromName(auth.userId));
   const ticket = await ticketDO.create(auth.userId);
@@ -51,6 +59,7 @@ app.get('/connect', async c => {
   if (!redeemedUserId) {
     return c.json({ error: 'Invalid or expired ticket' }, 401);
   }
+  logger.setTags({ userId: redeemedUserId });
 
   const doId = c.env.USER_SESSION_DO.idFromName(redeemedUserId);
   const stub = c.env.USER_SESSION_DO.get(doId);
@@ -68,6 +77,7 @@ export default class extends WorkerEntrypoint<Env> {
     event: string,
     payload: unknown
   ): Promise<boolean> {
+    logger.setTags({ userId, context, event });
     const stub = this.env.USER_SESSION_DO.get(this.env.USER_SESSION_DO.idFromName(userId));
     return stub.pushEvent(context, event, payload);
   }

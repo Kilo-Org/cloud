@@ -1,5 +1,6 @@
 import { createMiddleware } from 'hono/factory';
 import { extractBearerToken, getCachedSecret } from '@kilocode/worker-utils';
+import { logger } from './util/logger';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { deriveGatewayToken } from './lib/gateway-token';
 import type { AuthContext } from './auth';
@@ -40,5 +41,6 @@ export const botAuthMiddleware = createMiddleware<{
 
   c.set('callerId', `bot:kiloclaw:${sandboxId}`);
   c.set('callerKind', 'bot');
+  logger.setTags({ callerId: `bot:kiloclaw:${sandboxId}`, callerKind: 'bot', sandboxId });
   return next();
 });

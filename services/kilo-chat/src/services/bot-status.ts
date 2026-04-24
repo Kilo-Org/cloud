@@ -2,7 +2,8 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import type { AuthContext } from '../auth';
 import type { OkResponse } from '@kilocode/kilo-chat';
-import { withDORetry } from '@kilocode/worker-utils';
+import { formatError, withDORetry } from '@kilocode/worker-utils';
+import { logger } from '../util/logger';
 import { sandboxIdSchema } from '../routes/schemas';
 import { extractSandboxId, pushBotStatusEvent } from './event-push';
 
@@ -63,7 +64,7 @@ export async function handleBotStatus(c: HonoCtx): Promise<Response> {
       sandboxId,
     });
   } catch (err) {
-    console.error('[bot-status] push failed:', err);
+    logger.error('Bot status push failed', formatError(err));
     return c.json({ error: 'Bad Gateway' }, 502);
   }
 

@@ -23,6 +23,7 @@
     "@kilocode/event-service": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "hono": "catalog:",
+    "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   }
 }

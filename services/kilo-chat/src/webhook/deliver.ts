@@ -4,8 +4,9 @@ import {
   type messageCreatedWebhookSchema,
   type actionExecutedWebhookSchema,
 } from '@kilocode/kilo-chat';
-import { withDORetry } from '@kilocode/worker-utils';
+import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
+import { logger, withLogTags } from '../util/logger';
 import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
 
 type MessageCreatedPayload = z.infer<typeof messageCreatedWebhookSchema>;
@@ -55,49 +56,54 @@ export async function deliverToBot(
   msg: WebhookMessage,
   convContext?: { humanMemberIds: string[]; sandboxId: string | null }
 ): Promise<void> {
-  const payload = buildPayload(msg);
-  const rpcPayload = chatWebhookRpcSchema.parse({
-    targetBotId: msg.targetBotId,
-    ...payload,
-  });
+  return withLogTags({ source: 'deliverToBot' }, async () => {
+    logger.setTags({
+      targetBotId: msg.targetBotId,
+      conversationId: msg.conversationId,
+      messageId: msg.messageId,
+    });
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      await env.KILOCLAW.deliverChatWebhook(rpcPayload);
-      return;
-    } catch (err) {
-      console.error(`Webhook delivery attempt ${attempt + 1} failed:`, err);
-      if (attempt < MAX_RETRIES) {
-        await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
+    const payload = buildPayload(msg);
+    const rpcPayload = chatWebhookRpcSchema.parse({
+      targetBotId: msg.targetBotId,
+      ...payload,
+    });
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        await env.KILOCLAW.deliverChatWebhook(rpcPayload);
+        return;
+      } catch (err) {
+        logger.error('Webhook delivery failed', { attempt: attempt + 1, ...formatError(err) });
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
+        }
       }
     }
-  }
 
-  console.error(
-    `Webhook permanently failed for message ${msg.messageId} in conversation ${msg.conversationId}`
-  );
-  try {
-    await withDORetry(
-      () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(msg.conversationId)),
-      stub => stub.notifyDeliveryFailed(msg.messageId, msg.from),
-      'ConversationDO.notifyDeliveryFailed'
-    );
-
-    // Push delivery_failed event to human members
-    const ctx = convContext ?? (await getConversationContext(env, msg.conversationId));
-    if (ctx?.sandboxId) {
-      await pushEventToHumanMembers(
-        env,
-        msg.conversationId,
-        ctx.sandboxId,
-        ctx.humanMemberIds,
-        'message.delivery_failed',
-        { messageId: msg.messageId }
+    logger.error('Webhook permanently failed');
+    try {
+      await withDORetry(
+        () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(msg.conversationId)),
+        stub => stub.notifyDeliveryFailed(msg.messageId, msg.from),
+        'ConversationDO.notifyDeliveryFailed'
       );
+
+      const ctx = convContext ?? (await getConversationContext(env, msg.conversationId));
+      if (ctx?.sandboxId) {
+        await pushEventToHumanMembers(
+          env,
+          msg.conversationId,
+          ctx.sandboxId,
+          ctx.humanMemberIds,
+          'message.delivery_failed',
+          { messageId: msg.messageId }
+        );
+      }
+    } catch (err) {
+      logger.error('Failed to notify delivery failure', formatError(err));
     }
-  } catch (err) {
-    console.error('Failed to notify delivery failure:', err);
-  }
+  });
 }
 
 /**
@@ -108,17 +114,28 @@ export async function deliverActionExecutedToBot(
   env: Env,
   msg: ActionExecutedWebhookPayload & { targetBotId: string }
 ): Promise<void> {
-  const rpcPayload = chatWebhookRpcSchema.parse(msg);
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      await env.KILOCLAW.deliverChatWebhook(rpcPayload);
-      return;
-    } catch (err) {
-      console.error(`Action webhook delivery attempt ${attempt + 1} failed:`, err);
-      if (attempt < MAX_RETRIES) {
-        await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
+  return withLogTags({ source: 'deliverActionExecutedToBot' }, async () => {
+    logger.setTags({
+      targetBotId: msg.targetBotId,
+      conversationId: msg.conversationId,
+      messageId: msg.messageId,
+    });
+
+    const rpcPayload = chatWebhookRpcSchema.parse(msg);
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        await env.KILOCLAW.deliverChatWebhook(rpcPayload);
+        return;
+      } catch (err) {
+        logger.error('Action webhook delivery failed', {
+          attempt: attempt + 1,
+          ...formatError(err),
+        });
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
+        }
       }
     }
-  }
-  console.error(`Action webhook permanently failed for message ${msg.messageId}`);
+    logger.error('Action webhook permanently failed');
+  });
 }

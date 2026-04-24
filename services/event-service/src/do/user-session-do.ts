@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
+import { logger, withLogTags } from '../util/logger';
 import type { ServerMessage } from '../types';
 
 const MAX_CONTEXTS = 200;
@@ -88,23 +89,27 @@ export class UserSessionDO extends DurableObject<Env> {
   // ── Event push ─────────────────────────────────────────────────────
 
   async pushEvent(context: string, event: string, payload: unknown): Promise<boolean> {
-    const sockets = this.ctx.getWebSockets();
-    const message: ServerMessage = { type: 'event', context, event, payload };
-    const text = JSON.stringify(message);
-    let delivered = false;
+    return withLogTags({ source: 'UserSessionDO.pushEvent' }, () => {
+      logger.setTags({ userId: this.ctx.id.name, context, event });
 
-    for (const ws of sockets) {
-      const state = this.getState(ws);
-      if (state.contexts.has(context)) {
-        delivered = true;
-        try {
-          ws.send(text);
-        } catch {
-          // Connection dead — hibernation will clean up
+      const sockets = this.ctx.getWebSockets();
+      const message: ServerMessage = { type: 'event', context, event, payload };
+      const text = JSON.stringify(message);
+      let delivered = false;
+
+      for (const ws of sockets) {
+        const state = this.getState(ws);
+        if (state.contexts.has(context)) {
+          delivered = true;
+          try {
+            ws.send(text);
+          } catch {
+            // Connection dead — hibernation will clean up
+          }
         }
       }
-    }
-    return delivered;
+      return delivered;
+    });
   }
 
   // ── Helpers ────────────────────────────────────────────────────────

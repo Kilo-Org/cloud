@@ -1,5 +1,6 @@
 import { createMiddleware } from 'hono/factory';
 import { extractBearerToken, getCachedSecret, verifyKiloToken } from '@kilocode/worker-utils';
+import { logger } from './util/logger';
 
 export type AuthContext = {
   callerId: string;
@@ -28,6 +29,7 @@ export const authMiddleware = createMiddleware<{
     const payload = await verifyKiloToken(token, jwtSecret);
     c.set('callerId', payload.kiloUserId);
     c.set('callerKind', 'user');
+    logger.setTags({ callerId: payload.kiloUserId, callerKind: 'user' });
     return next();
   } catch {
     return c.json({ error: 'Unauthorized' }, 401);

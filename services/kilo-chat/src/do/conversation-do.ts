@@ -6,15 +6,19 @@ import {
   type ReactionSummary,
 } from '@kilocode/kilo-chat';
 import { DurableObject } from 'cloudflare:workers';
+import { logger } from '../util/logger';
 
 function parseStoredContent(rawContent: string, messageId: string): ContentBlock[] {
   try {
     const parsed: unknown = JSON.parse(rawContent);
     const result = contentBlockSchema.array().safeParse(parsed);
     if (result.success) return result.data;
-    console.warn(`ConversationDO: invalid content for message ${messageId}`, result.error.issues);
+    logger.warn('Invalid message content', { messageId, issues: result.error.issues });
   } catch (err) {
-    console.warn(`ConversationDO: unparseable content for message ${messageId}`, err);
+    logger.warn('Unparseable message content', {
+      messageId,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
   return [];
 }

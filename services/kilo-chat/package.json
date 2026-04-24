@@ -33,6 +33,7 @@
     "lru-cache": "^11.2.7",
     "p-limit": "catalog:",
     "ulid": "3.0.1",
+    "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   }
 }

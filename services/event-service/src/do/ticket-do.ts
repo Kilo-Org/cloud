@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { withLogTags } from '../util/logger';
 
 const TICKET_TTL_MS = 30_000; // 30 seconds
 const CLEANUP_INTERVAL_MS = 60_000; // 1 minute
@@ -39,23 +40,25 @@ export class TicketDO extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
-    const now = Date.now();
-    const all = await this.ctx.storage.list<TicketEntry>({ prefix: 'ticket:' });
-    const expired: string[] = [];
-    let remaining = 0;
-    for (const [key, entry] of all) {
-      if (now > entry.expiresAt) {
-        expired.push(key);
-      } else {
-        remaining++;
+    return withLogTags({ source: 'TicketDO.alarm' }, async () => {
+      const now = Date.now();
+      const all = await this.ctx.storage.list<TicketEntry>({ prefix: 'ticket:' });
+      const expired: string[] = [];
+      let remaining = 0;
+      for (const [key, entry] of all) {
+        if (now > entry.expiresAt) {
+          expired.push(key);
+        } else {
+          remaining++;
+        }
       }
-    }
-    if (expired.length > 0) {
-      await this.ctx.storage.delete(expired);
-    }
-    if (remaining > 0) {
-      await this.ctx.storage.setAlarm(Date.now() + CLEANUP_INTERVAL_MS);
-    }
+      if (expired.length > 0) {
+        await this.ctx.storage.delete(expired);
+      }
+      if (remaining > 0) {
+        await this.ctx.storage.setAlarm(Date.now() + CLEANUP_INTERVAL_MS);
+      }
+    });
   }
 
   private async scheduleCleanup(): Promise<void> {

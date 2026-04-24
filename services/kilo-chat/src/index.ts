@@ -3,6 +3,10 @@ import { Hono } from 'hono';
 import pLimit from 'p-limit';
 import { withDORetry } from '@kilocode/worker-utils';
 import { cors } from 'hono/cors';
+import { useWorkersLogger } from 'workers-tagged-logger';
+import type { MiddlewareHandler } from 'hono';
+import { logger } from './util/logger';
+import { formatError } from '@kilocode/worker-utils';
 import { authMiddleware } from './auth';
 import { botAuthMiddleware } from './auth-bot';
 import type { AuthContext } from './auth';
@@ -35,6 +39,27 @@ app.use(
     maxAge: 86400,
   })
 );
+
+// ── Structured logging context ──────────────────────────────────────────
+// Establishes AsyncLocalStorage context so all downstream logs are tagged.
+// Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
+app.use('*', useWorkersLogger('kilo-chat') as unknown as MiddlewareHandler);
+
+// Tag URL params early. Auth-derived tags (callerId, callerKind) are set
+// by the auth middleware files where those values are established.
+const RE_SANDBOX = /\/sandboxes\/(?<sandboxId>[^/]+)/;
+const RE_CONVERSATION = /\/conversations\/(?<conversationId>[^/]+)/;
+const RE_MESSAGE = /\/messages\/(?<messageId>[^/]+)/;
+
+app.use('*', async (c, next) => {
+  const path = c.req.path;
+  logger.setTags({
+    sandboxId: RE_SANDBOX.exec(path)?.groups?.sandboxId,
+    conversationId: RE_CONVERSATION.exec(path)?.groups?.conversationId,
+    messageId: RE_MESSAGE.exec(path)?.groups?.messageId,
+  });
+  await next();
+});
 
 app.get('/health', c => c.json({ ok: true }));
 
@@ -109,8 +134,12 @@ export default class extends WorkerEntrypoint<Env> {
       )
     );
     for (let i = 0; i < results.length; i++) {
-      if (results[i].status === 'rejected') {
-        console.error('destroySandboxData: conversation cleanup failed:', results[i].reason);
+      const result = results[i];
+      if (result.status === 'rejected') {
+        logger.error('destroySandboxData: conversation cleanup failed', {
+          ...formatError(result.reason),
+          conversationId: allConversationIds[i],
+        });
         failedConversations.push(allConversationIds[i]);
       }
     }

@@ -8,7 +8,8 @@
  */
 
 import type { ContentBlock } from '@kilocode/kilo-chat';
-import { withDORetry } from '@kilocode/worker-utils';
+import { formatError, withDORetry } from '@kilocode/worker-utils';
+import { logger } from '../util/logger';
 import { deliverToBot, deliverActionExecutedToBot } from '../webhook/deliver';
 import {
   extractConversationContext,
@@ -182,7 +183,7 @@ async function postCommitFanOut(
           });
         }
       } catch (err) {
-        console.error('Failed to auto-title conversation:', err);
+        logger.error('Failed to auto-title conversation', formatError(err));
       }
     }
   }
@@ -210,7 +211,7 @@ async function postCommitFanOut(
   );
   for (const r of results) {
     if (r.status === 'rejected') {
-      console.error('Failed to update MembershipDO lastActivityAt:', r.reason);
+      logger.error('Failed to update MembershipDO lastActivityAt', formatError(r.reason));
     }
   }
   if (sandboxId) {

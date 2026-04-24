@@ -6,8 +6,10 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DEFAULT_VERCEL_PERCENTAGE } from '@/lib/ai-gateway/gateway-config';
+import { DEFAULT_VERCEL_PERCENTAGE, NOTE_MAX_LENGTH } from '@/lib/ai-gateway/gateway-config';
 
 export function RoutingContent() {
   const trpc = useTRPC();
@@ -16,11 +18,13 @@ export function RoutingContent() {
   const { data, isLoading } = useQuery(trpc.admin.gatewayConfig.get.queryOptions());
 
   const [inputValue, setInputValue] = useState('');
+  const [noteValue, setNoteValue] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     if (data) {
       setInputValue(data.vercel_routing_percentage?.toString() ?? '');
+      setNoteValue('');
       setHasChanges(false);
     }
   }, [data]);
@@ -39,22 +43,28 @@ export function RoutingContent() {
     })
   );
 
+  function noteInput(): string | null {
+    const trimmed = noteValue.trim();
+    return trimmed === '' ? null : trimmed;
+  }
+
   function handleSave() {
     const trimmed = inputValue.trim();
+    const note = noteInput();
     if (trimmed === '') {
-      mutation.mutate({ vercel_routing_percentage: null });
+      mutation.mutate({ vercel_routing_percentage: null, note });
     } else {
       const num = Number(trimmed);
       if (!Number.isInteger(num) || num < 0 || num > 100) {
         toast.error('Please enter a whole number between 0 and 100, or leave empty for default');
         return;
       }
-      mutation.mutate({ vercel_routing_percentage: num });
+      mutation.mutate({ vercel_routing_percentage: num, note });
     }
   }
 
   function handleClear() {
-    mutation.mutate({ vercel_routing_percentage: null });
+    mutation.mutate({ vercel_routing_percentage: null, note: noteInput() });
   }
 
   if (isLoading) {
@@ -109,6 +119,21 @@ export function RoutingContent() {
             )}
           </div>
 
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="routing-note">Note (optional)</Label>
+            <Textarea
+              id="routing-note"
+              placeholder="Why is this change being made?"
+              maxLength={NOTE_MAX_LENGTH}
+              value={noteValue}
+              onChange={e => {
+                setNoteValue(e.target.value);
+                setHasChanges(true);
+              }}
+              className="min-h-20"
+            />
+          </div>
+
           <div className="text-muted-foreground text-sm">
             {isOverrideActive ? (
               <p>
@@ -125,6 +150,11 @@ export function RoutingContent() {
             ) : (
               <p>
                 No override set. Using default routing ({DEFAULT_VERCEL_PERCENTAGE}% to Vercel).
+              </p>
+            )}
+            {data?.note && (
+              <p className="mt-2">
+                <span className="font-medium">Previous note:</span> {data.note}
               </p>
             )}
           </div>

@@ -288,6 +288,22 @@ describe('createPreviewStream', () => {
     }
   });
 
+  it('splits text exceeding the per-block cap into multiple content blocks', async () => {
+    const { client, createMessage } = makeClientSpies();
+    const stream = createPreviewStream({ client, conversationId: 'c1', throttleMs: 100 });
+    // 16 000 chars -> 7500 + 7500 + 1000 = 3 blocks (cap 7500 per block).
+    const longText = 'a'.repeat(16_000);
+    await stream.finalize(longText);
+    expect(createMessage).toHaveBeenCalledTimes(1);
+    const { content } = createMessage.mock.calls[0]![0] as {
+      content: Array<{ type: string; text: string }>;
+    };
+    expect(content).toHaveLength(3);
+    expect(content.every(b => b.type === 'text')).toBe(true);
+    expect(content.every(b => b.text.length <= 8000)).toBe(true);
+    expect(content.map(b => b.text).join('')).toBe(longText);
+  });
+
   it('warns when the finalize PATCH itself is stale', async () => {
     vi.useFakeTimers();
     try {

@@ -1,4 +1,22 @@
-import type { KiloChatClient } from './client.js';
+import type { ContentBlock, KiloChatClient } from './client.js';
+
+/**
+ * Backend caps each text block at 8000 chars and each message at 20 content
+ * blocks (see packages/kilo-chat/src/schemas.ts). Long streaming replies
+ * accumulate more text than a single block can hold, so we split the text
+ * into multiple text blocks before each POST/PATCH. Cap well below 8000 to
+ * leave headroom; 20 × 7500 = 150 000 chars per message is ample.
+ */
+const TEXT_BLOCK_MAX = 7500;
+
+function buildTextContent(text: string): ContentBlock[] {
+  if (text.length <= TEXT_BLOCK_MAX) return [{ type: 'text', text }];
+  const blocks: ContentBlock[] = [];
+  for (let i = 0; i < text.length; i += TEXT_BLOCK_MAX) {
+    blocks.push({ type: 'text', text: text.slice(i, i + TEXT_BLOCK_MAX) });
+  }
+  return blocks;
+}
 
 export type PreviewStream = {
   update(partialText: string): void;
@@ -68,7 +86,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
         try {
           const res = await opts.client.createMessage({
             conversationId: opts.conversationId,
-            content: [{ type: 'text', text }],
+            content: buildTextContent(text),
             inReplyToMessageId: opts.inReplyToMessageId,
           });
           messageId = res.messageId;
@@ -85,7 +103,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
         const res = await opts.client.editMessage({
           conversationId: opts.conversationId,
           messageId,
-          content: [{ type: 'text', text }],
+          content: buildTextContent(text),
           timestamp: Date.now(),
         });
         if (res.stale) {
@@ -151,7 +169,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       if (messageId === undefined) {
         const res = await opts.client.createMessage({
           conversationId: opts.conversationId,
-          content: [{ type: 'text', text: finalText }],
+          content: buildTextContent(finalText),
           inReplyToMessageId: opts.inReplyToMessageId,
         });
         messageId = res.messageId;
@@ -163,7 +181,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
           const res = await opts.client.editMessage({
             conversationId: opts.conversationId,
             messageId,
-            content: [{ type: 'text', text: finalText }],
+            content: buildTextContent(finalText),
             timestamp: Date.now(),
           });
           if (res.stale) {

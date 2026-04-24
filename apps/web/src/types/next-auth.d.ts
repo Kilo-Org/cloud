@@ -8,14 +8,14 @@ declare module 'next-auth' {
     exp: number;
     sub: string;
     kiloUserId: string;
-    pepper?: string | null;
+    webSessionPepper?: string | null;
     version: number;
     isNewUser?: boolean;
     isAdmin: boolean;
   }
   interface Session {
     kiloUserId: string;
-    pepper?: string | null;
+    webSessionPepper?: string | null;
     isNewUser: boolean;
     isAdmin: boolean; //also probably not a good idea; no reason to trust this over in-db state and we need that anyhow.
     user: {

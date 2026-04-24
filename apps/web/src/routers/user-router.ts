@@ -38,6 +38,7 @@ import {
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
 import { getBalanceForUser } from '@/lib/user.balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+import { revokeWebSessions } from '@/lib/web-session-revocation';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
@@ -294,10 +295,13 @@ export const userRouter = createTRPCRouter({
     }),
 
   resetAPIKey: baseProcedure.mutation(async ({ ctx }) => {
-    await db
-      .update(kilocode_users)
-      .set({ api_token_pepper: crypto.randomUUID() })
-      .where(eq(kilocode_users.id, ctx.user.id));
+    await db.transaction(async tx => {
+      await tx
+        .update(kilocode_users)
+        .set({ api_token_pepper: crypto.randomUUID() })
+        .where(eq(kilocode_users.id, ctx.user.id));
+      await revokeWebSessions(ctx.user.id, tx);
+    });
 
     return successResult();
   }),

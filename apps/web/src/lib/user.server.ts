@@ -81,6 +81,7 @@ import { processSSOUserLogin } from '@/lib/sso-user';
 import { getLowerDomainFromEmail } from '@/lib/utils';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
+import { isWebSessionCurrent } from '@/lib/web-session-revocation';
 
 export type TurnstileJwtPayload = {
   /**
@@ -807,7 +808,7 @@ const authOptions: NextAuthOptions = {
         token.exp = Math.floor(Date.now() / 1000) + secondsInDay * 30;
         token.iat = Math.floor(Date.now() / 1000);
         token.isNewUser = (profile as ExtendedProfile)?.isNewUser || false;
-        token.pepper = existingUser.api_token_pepper;
+        token.webSessionPepper = existingUser.web_session_pepper;
         token.isAdmin = existingUser.is_admin;
       } catch (error) {
         captureException(error, {
@@ -828,7 +829,7 @@ const authOptions: NextAuthOptions = {
       session.user.id = castToken.sub;
       session.isAdmin = castToken.isAdmin || false; // Ensure isAdmin is always defined
       session.kiloUserId = castToken.kiloUserId;
-      session.pepper = castToken.pepper;
+      session.webSessionPepper = castToken.webSessionPepper ?? null;
       session.isNewUser = castToken.isNewUser || false; // Pass isNewUser to the session
       return session;
     },
@@ -914,7 +915,7 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
   const user = await findUserById(maybeKiloUserId, readDb);
   if (!user) return authError(401, 'Unauthorized (D)', maybeKiloUserId);
 
-  if (user.api_token_pepper != session.pepper)
+  if (!isWebSessionCurrent(session.webSessionPepper, user))
     return authError(401, 'Reauthentication required', maybeKiloUserId);
 
   // NOTE: we currently do not thread organization id through here as its only used for extension-originated requests

@@ -12,10 +12,16 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { bot } from '@/lib/bot';
+import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 
 async function deleteChatSdkSlackInstallation(teamId: string): Promise<void> {
   await bot.initialize();
   await bot.getAdapter('slack').deleteInstallation(teamId);
+}
+
+async function deleteChatSdkSlackIdentityCache(teamId: string): Promise<void> {
+  await bot.initialize();
+  await unlinkTeamKiloUsers(bot.getState(), 'slack', teamId);
 }
 
 export const slackRouter = createTRPCRouter({
@@ -69,6 +75,7 @@ export const slackRouter = createTRPCRouter({
     const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
     const result = await slackService.uninstallApp(owner, {
       deleteChatSdkInstallation: deleteChatSdkSlackInstallation,
+      deleteChatSdkIdentityCache: deleteChatSdkSlackIdentityCache,
     });
 
     if (input?.organizationId) {

@@ -53,22 +53,29 @@ describe('slack-service uninstallApp', () => {
     mockDeleteWhere.mockResolvedValue(undefined);
   });
 
-  it('deletes the Chat SDK Slack installation before removing the platform integration row', async () => {
+  it('deletes Chat SDK Slack state before removing the platform integration row', async () => {
     mockLimit.mockResolvedValue([buildSlackIntegration()]);
     const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
 
-    await expect(uninstallApp(owner, { deleteChatSdkInstallation })).resolves.toEqual({
+    await expect(
+      uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
+    ).resolves.toEqual({
       success: true,
     });
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
+    expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T123');
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
     expect(deleteChatSdkInstallation.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteChatSdkIdentityCache.mock.invocationCallOrder[0]
+    );
+    expect(deleteChatSdkIdentityCache.mock.invocationCallOrder[0]).toBeLessThan(
       mockDeleteWhere.mock.invocationCallOrder[0]
     );
   });
 
-  it('does not remove the platform integration row when Chat SDK cleanup fails', async () => {
+  it('does not remove the platform integration row when Chat SDK installation cleanup fails', async () => {
     mockLimit.mockResolvedValue([buildSlackIntegration()]);
     const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {
       throw new Error('redis unavailable');
@@ -78,6 +85,21 @@ describe('slack-service uninstallApp', () => {
       'redis unavailable'
     );
 
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
+  });
+
+  it('does not remove the platform integration row when Chat SDK identity cleanup fails', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {
+      throw new Error('redis unavailable');
+    });
+
+    await expect(
+      uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
+    ).rejects.toThrow('redis unavailable');
+
+    expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
     expect(mockDeleteWhere).not.toHaveBeenCalled();
   });
 

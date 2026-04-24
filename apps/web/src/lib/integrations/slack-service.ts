@@ -46,6 +46,7 @@ const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
 
 type SlackUninstallOptions = {
   deleteChatSdkInstallation?: (teamId: string) => Promise<void>;
+  deleteChatSdkIdentityCache?: (teamId: string) => Promise<void>;
 };
 
 function getOwnershipConditions(owner: Owner) {
@@ -231,7 +232,7 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   }
 
   const teamId = integration.platform_installation_id ?? integration.platform_account_id;
-  if (options.deleteChatSdkInstallation) {
+  if (options.deleteChatSdkInstallation || options.deleteChatSdkIdentityCache) {
     if (!teamId) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
@@ -239,7 +240,8 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
       });
     }
 
-    await options.deleteChatSdkInstallation(teamId);
+    await options.deleteChatSdkInstallation?.(teamId);
+    await options.deleteChatSdkIdentityCache?.(teamId);
   }
 
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));

@@ -6,11 +6,11 @@ export type BotPresence = {
   model?: string | null;
 };
 
-export type BotDisplayState = 'online' | 'idle' | 'offline';
+export type BotDisplayState = 'online' | 'idle' | 'offline' | 'unknown';
 
 type BotDisplay = {
   state: BotDisplayState;
-  label: 'Online' | 'Idle' | 'Offline';
+  label: 'Online' | 'Idle' | 'Offline' | 'Unknown';
 };
 
 export function computeBotDisplay(params: {
@@ -19,9 +19,8 @@ export function computeBotDisplay(params: {
   now: number;
 }): BotDisplay {
   if (params.instanceStatus !== 'running') return { state: 'offline', label: 'Offline' };
-  if (!params.presence || !params.presence.online) {
-    return { state: 'offline', label: 'Offline' };
-  }
+  if (!params.presence) return { state: 'unknown', label: 'Unknown' };
+  if (!params.presence.online) return { state: 'offline', label: 'Offline' };
   const elapsed = params.now - params.presence.lastAt;
   if (elapsed > 90_000) return { state: 'offline', label: 'Offline' };
   if (elapsed > 30_000) return { state: 'idle', label: 'Idle' };
@@ -32,6 +31,7 @@ const DOT_CLASS: Record<BotDisplayState, string> = {
   online: 'bg-green-500',
   idle: 'bg-amber-500',
   offline: 'bg-muted-foreground/50',
+  unknown: 'bg-muted-foreground/30',
 };
 
 type BotStatusProps = {
@@ -51,7 +51,8 @@ export function BotStatus({ instanceStatus, presence }: BotStatusProps) {
 }
 
 function buildTooltip(state: BotDisplayState, presence: BotPresence | undefined): string {
-  if (state === 'offline' || !presence) return 'Bot is offline';
+  if (state === 'unknown' || !presence) return 'Bot status unknown';
+  if (state === 'offline') return 'Bot is offline';
   const seconds = Math.max(0, Math.round((Date.now() - presence.lastAt) / 1000));
   const bits = [`Last heartbeat ${seconds}s ago`];
   if (presence.model) bits.push(`model: ${presence.model}`);

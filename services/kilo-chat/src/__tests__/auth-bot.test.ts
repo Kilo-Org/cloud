@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Hono } from 'hono';
+import { clearSecretCacheForTest } from '@kilocode/worker-utils';
 import type { AuthContext } from '../auth';
 import { botAuthMiddleware } from '../auth-bot';
 import { deriveGatewayToken } from '../lib/gateway-token';
@@ -24,6 +25,8 @@ function mockEnv(overrides: Partial<Env> = {}): Env {
 }
 
 describe('botAuthMiddleware', () => {
+  beforeEach(() => clearSecretCacheForTest());
+
   it('returns 401 when no Authorization header', async () => {
     const app = createApp();
     const res = await app.fetch(

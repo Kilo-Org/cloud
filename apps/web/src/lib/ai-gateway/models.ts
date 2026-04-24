@@ -7,7 +7,7 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
-} from '@/lib/kilo-auto';
+} from '@/lib/ai-gateway/kilo-auto';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   claude_sonnet_clawsetup_model,

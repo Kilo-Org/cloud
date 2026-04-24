@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
+import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 
 type DefaultsResponse = {
   defaultModel: string;

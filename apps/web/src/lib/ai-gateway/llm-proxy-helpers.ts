@@ -36,7 +36,7 @@ import type {
   PromptInfo,
 } from '@/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
-import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
+import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 export { proxyErrorTypeSchema, ProxyErrorType } from '@/lib/proxy-error-types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';

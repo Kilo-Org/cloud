@@ -13,7 +13,7 @@ import type { SlackInstallation } from '@chat-adapter/slack';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
+import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 // Default model for Slack integrations - separate from the global platform default

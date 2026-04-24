@@ -26,7 +26,13 @@ import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombob
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
-import { useClawConfig, useClawMyPin, useClawGoogleSetupCommand } from '../hooks/useClawHooks';
+import {
+  useClawConfig,
+  useClawMyPin,
+  useClawGoogleSetupCommand,
+  useClawMorningBriefingStatus,
+  useClawReadMorningBriefing,
+} from '../hooks/useClawHooks';
 import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
 import { useClawContext } from './ClawContext';
 
@@ -444,6 +450,165 @@ function GoogleAccountCard({
         }}
       />
     </>
+  );
+}
+
+function MorningBriefingCard({
+  mutations,
+  briefingStatus,
+  fallbackReadiness,
+}: {
+  mutations: ClawMutations;
+  briefingStatus:
+    | {
+        enabled?: boolean;
+        cron?: string;
+        timezone?: string;
+        lastGeneratedDate?: string | null;
+        sourceReadiness?: {
+          github: { configured: boolean; summary: string };
+          linear: { configured: boolean; summary: string };
+          web: { configured: boolean; summary: string };
+        };
+      }
+    | undefined;
+  fallbackReadiness: {
+    githubConfigured: boolean;
+    linearConfigured: boolean;
+    webConfigured: boolean;
+  };
+}) {
+  const [requestedDay, setRequestedDay] = useState<'today' | 'yesterday' | null>(null);
+  const { data: readData, isFetching: isReading } = useClawReadMorningBriefing(requestedDay, true);
+
+  const sourceReadiness =
+    briefingStatus?.sourceReadiness ??
+    ({
+      github: {
+        configured: fallbackReadiness.githubConfigured,
+        summary: fallbackReadiness.githubConfigured
+          ? 'Configured in Developer Tools'
+          : 'Not configured',
+      },
+      linear: {
+        configured: fallbackReadiness.linearConfigured,
+        summary: fallbackReadiness.linearConfigured
+          ? 'Configured in Developer Tools'
+          : 'Not configured',
+      },
+      web: {
+        configured: fallbackReadiness.webConfigured,
+        summary: fallbackReadiness.webConfigured
+          ? 'Configured in Search settings'
+          : 'Not configured',
+      },
+    } as const);
+
+  return (
+    <div className="rounded-lg border px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium">Morning Briefing</p>
+            <Badge variant={briefingStatus?.enabled ? 'default' : 'secondary'}>
+              {briefingStatus?.enabled ? 'Enabled' : 'Disabled'}
+            </Badge>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            {briefingStatus?.cron && briefingStatus?.timezone
+              ? `Schedule: ${briefingStatus.cron} (${briefingStatus.timezone})`
+              : 'Schedule not configured'}
+          </p>
+          <p className="text-muted-foreground text-xs">
+            Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={mutations.setupMorningBriefing.isPending}
+            onClick={() => {
+              mutations.setupMorningBriefing.mutate(
+                {},
+                {
+                  onSuccess: () => toast.success('Morning Briefing enabled'),
+                  onError: err => toast.error(`Failed to enable Morning Briefing: ${err.message}`),
+                }
+              );
+            }}
+          >
+            {mutations.setupMorningBriefing.isPending ? 'Enabling...' : 'Enable / Setup'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={mutations.disableMorningBriefing.isPending}
+            onClick={() => {
+              mutations.disableMorningBriefing.mutate(undefined, {
+                onSuccess: () => toast.success('Morning Briefing disabled'),
+                onError: err => toast.error(`Failed to disable Morning Briefing: ${err.message}`),
+              });
+            }}
+          >
+            {mutations.disableMorningBriefing.isPending ? 'Disabling...' : 'Disable'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={mutations.runMorningBriefing.isPending}
+            onClick={() => {
+              mutations.runMorningBriefing.mutate(undefined, {
+                onSuccess: data => {
+                  const date = data.date ? ` for ${data.date}` : '';
+                  toast.success(`Morning Briefing generated${date}`);
+                },
+                onError: err => toast.error(`Failed to run Morning Briefing: ${err.message}`),
+              });
+            }}
+          >
+            {mutations.runMorningBriefing.isPending ? 'Running...' : 'Run Now'}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setRequestedDay('today')}>
+            View Today
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setRequestedDay('yesterday')}>
+            View Yesterday
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+        <div className="rounded border px-2 py-1">
+          <span className="font-medium">GitHub:</span>{' '}
+          {sourceReadiness.github.configured ? 'Ready' : 'Not ready'}
+        </div>
+        <div className="rounded border px-2 py-1">
+          <span className="font-medium">Linear:</span>{' '}
+          {sourceReadiness.linear.configured ? 'Ready' : 'Not ready'}
+        </div>
+        <div className="rounded border px-2 py-1">
+          <span className="font-medium">Web Search:</span>{' '}
+          {sourceReadiness.web.configured ? 'Ready' : 'Not ready'}
+        </div>
+      </div>
+
+      {requestedDay && (
+        <div className="mt-3">
+          {isReading ? (
+            <p className="text-muted-foreground text-xs">Loading saved briefing...</p>
+          ) : readData?.markdown ? (
+            <pre className="bg-muted max-h-56 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">
+              {readData.markdown}
+            </pre>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              No saved briefing for {requestedDay === 'today' ? 'today' : 'yesterday'}.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1015,6 +1180,7 @@ export function SettingsTab({
     isControllerVersionError,
   } = useClawUpdateAvailable(status);
   const { data: myPin } = useClawMyPin();
+  const { data: morningBriefingStatus } = useClawMorningBriefingStatus(true);
   const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
   const hasModelSelectionError = isRunning && isControllerVersionError;
@@ -1559,6 +1725,15 @@ export function SettingsTab({
             gmailNotificationsEnabled={status.gmailNotificationsEnabled}
             mutations={mutations}
             onRedeploy={onRedeploy}
+          />
+          <MorningBriefingCard
+            mutations={mutations}
+            briefingStatus={morningBriefingStatus}
+            fallbackReadiness={{
+              githubConfigured: configuredSecrets.github ?? false,
+              linearConfigured: configuredSecrets.linear ?? false,
+              webConfigured: braveSearchConfigured || exaSearchConfigured,
+            }}
           />
         </div>
       </div>

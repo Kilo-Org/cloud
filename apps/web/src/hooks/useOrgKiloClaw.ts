@@ -106,6 +106,16 @@ export function useOrgControllerVersion(organizationId: string, enabled: boolean
   );
 }
 
+export function useOrgMorningBriefingStatus(organizationId: string, enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.kiloclaw.getMorningBriefingStatus.queryOptions(
+      { organizationId },
+      { enabled, refetchInterval: enabled ? 30_000 : false }
+    )
+  );
+}
+
 export function useOrgKiloClawServiceDegraded(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(
@@ -423,6 +433,39 @@ export function useOrgKiloClawMutations(
   const rawCancelKiloCliRun = useMutation(
     trpc.organizations.kiloclaw.cancelKiloCliRun.mutationOptions({ onSuccess: invalidateStatus })
   );
+  const rawSetupMorningBriefing = useMutation(
+    trpc.organizations.kiloclaw.setupMorningBriefing.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
+            organizationId,
+          }),
+        });
+      },
+    })
+  );
+  const rawDisableMorningBriefing = useMutation(
+    trpc.organizations.kiloclaw.disableMorningBriefing.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
+            organizationId,
+          }),
+        });
+      },
+    })
+  );
+  const rawRunMorningBriefing = useMutation(
+    trpc.organizations.kiloclaw.runMorningBriefing.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
+            organizationId,
+          }),
+        });
+      },
+    })
+  );
 
   const mutations = {
     start: bindVoid(rawStart),
@@ -451,6 +494,9 @@ export function useOrgKiloClawMutations(
     patchOpenclawConfig: bind(rawPatchOpenclawConfig),
     disconnectGoogle: bindVoid(rawDisconnectGoogle),
     setGmailNotifications: bind(rawSetGmailNotifications),
+    setupMorningBriefing: bind(rawSetupMorningBriefing),
+    disableMorningBriefing: bindVoid(rawDisableMorningBriefing),
+    runMorningBriefing: bindVoid(rawRunMorningBriefing),
     startKiloCliRun: bind(rawStartKiloCliRun),
     cancelKiloCliRun: bind(rawCancelKiloCliRun),
     rename: bind(rawRename),

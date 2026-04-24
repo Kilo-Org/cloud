@@ -75,6 +75,9 @@ const ONBOARD_FLAGS = [
 
 const KILOCLAW_CUSTOMIZER_PLUGIN_ID = 'kiloclaw-customizer';
 const KILOCLAW_CUSTOMIZER_PLUGIN_PATH = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
+const KILOCLAW_MORNING_BRIEFING_PLUGIN_ID = 'kiloclaw-morning-briefing';
+const KILOCLAW_MORNING_BRIEFING_PLUGIN_PATH =
+  '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing';
 const KILO_EXA_PROVIDER_ID = 'kilo-exa';
 
 type KiloExaSearchMode = 'kilo-proxy' | 'disabled';
@@ -401,6 +404,19 @@ export function generateBaseConfig(
 
   customizerPluginConfig.webSearch = customizerWebSearchConfig;
   config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID].config = customizerPluginConfig;
+
+  if (!(config.plugins.load.paths as string[]).includes(KILOCLAW_MORNING_BRIEFING_PLUGIN_PATH)) {
+    (config.plugins.load.paths as string[]).push(KILOCLAW_MORNING_BRIEFING_PLUGIN_PATH);
+  }
+  if (
+    Array.isArray(config.plugins.allow) &&
+    !config.plugins.allow.includes(KILOCLAW_MORNING_BRIEFING_PLUGIN_ID)
+  ) {
+    config.plugins.allow.push(KILOCLAW_MORNING_BRIEFING_PLUGIN_ID);
+  }
+  config.plugins.entries[KILOCLAW_MORNING_BRIEFING_PLUGIN_ID] =
+    config.plugins.entries[KILOCLAW_MORNING_BRIEFING_PLUGIN_ID] ?? {};
+  config.plugins.entries[KILOCLAW_MORNING_BRIEFING_PLUGIN_ID].enabled = true;
 
   // Telegram
   if (env.TELEGRAM_BOT_TOKEN) {

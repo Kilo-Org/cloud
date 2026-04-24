@@ -513,6 +513,7 @@ function parseMistralFimUsageFromString(
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: statusCode,
   };
 }
 
@@ -612,6 +613,7 @@ async function parseMistralFimUsageFromStream(
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: statusCode,
   };
 }
 
@@ -679,7 +681,10 @@ type EmbeddingResponse = {
   usage: EmbeddingUsage;
 };
 
-export function parseEmbeddingUsageFromResponse(responseText: string): MicrodollarUsageStats {
+export function parseEmbeddingUsageFromResponse(
+  responseText: string,
+  statusCode: number
+): MicrodollarUsageStats {
   const json: EmbeddingResponse = JSON.parse(responseText);
 
   // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
@@ -689,7 +694,7 @@ export function parseEmbeddingUsageFromResponse(responseText: string): Microdoll
     messageId: json.id ?? null,
     model: json.model,
     responseContent: '',
-    hasError: !json.model,
+    hasError: !json.model || statusCode >= 400,
     inference_provider: null,
     inputTokens: json.usage.prompt_tokens,
     outputTokens: 0,
@@ -704,6 +709,7 @@ export function parseEmbeddingUsageFromResponse(responseText: string): Microdoll
     generation_time: null,
     streamed: false,
     cancelled: false,
+    status_code: statusCode,
   };
 }
 
@@ -730,11 +736,12 @@ export function countAndStoreEmbeddingUsage(
 ) {
   debugSaveProxyResponseStream(clonedResponse, '.log.resp.json');
 
+  const statusCode = usageContext.status_code ?? 0;
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
     : clonedResponse
         .text()
-        .then(text => parseEmbeddingUsageFromResponse(text))
+        .then(text => parseEmbeddingUsageFromResponse(text, statusCode))
         .catch(() => null);
 
   after(

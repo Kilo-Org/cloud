@@ -288,7 +288,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 100, total_tokens: 100, cost: 0.00005 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     // toMicrodollars(0.00005) = Math.round(0.00005 * 1_000_000) = 50
     expect(result.cost_mUsd).toBe(50);
@@ -299,7 +299,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 1000, total_tokens: 1000 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.cost_mUsd).toBe(0);
   });
@@ -307,7 +307,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should extract id as messageId', () => {
     const response = makeResponse({ id: 'embd-abc' });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.messageId).toBe('embd-abc');
   });
@@ -317,7 +317,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
     const parsed = JSON.parse(response);
     delete parsed.id;
 
-    const result = parseEmbeddingUsageFromResponse(JSON.stringify(parsed));
+    const result = parseEmbeddingUsageFromResponse(JSON.stringify(parsed), 200);
 
     expect(result.messageId).toBeNull();
   });
@@ -325,7 +325,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should set hasError to true when model is empty', () => {
     const response = makeResponse({ model: '' });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.hasError).toBe(true);
   });
@@ -333,7 +333,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should set hasError to false when model is present', () => {
     const response = makeResponse({ model: 'text-embedding-3-small' });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.hasError).toBe(false);
   });
@@ -341,7 +341,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should always set outputTokens to 0 and streamed/cancelled to false', () => {
     const response = makeResponse();
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.outputTokens).toBe(0);
     expect(result.streamed).toBe(false);
@@ -353,7 +353,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 42, total_tokens: 42 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response);
+    const result = parseEmbeddingUsageFromResponse(response, 200);
 
     expect(result.inputTokens).toBe(42);
   });

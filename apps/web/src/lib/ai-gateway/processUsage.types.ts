@@ -65,10 +65,10 @@ export type NotYetCostedUsageStats = {
   generation_time: number | null;
   streamed: boolean | null;
   cancelled: boolean | null;
-  /** Numeric HTTP-like code extracted from an in-stream error payload. When set,
-   *  overrides the HTTP status code recorded in usage metadata (e.g. a 200
-   *  response that turns out to contain a 502 error event). */
-  status_code_override?: number | null;
+  /** Effective HTTP status code for this usage record. Starts from the upstream
+   *  response status and is overwritten by a numeric `error.code` encountered
+   *  in-stream (e.g. a 200 response that ends up carrying a 502 error event). */
+  status_code: number;
 };
 
 export type JustTheCostsUsageStats = {

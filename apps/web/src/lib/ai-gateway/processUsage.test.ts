@@ -43,6 +43,7 @@ describe('processOpenRouterUsage', () => {
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: 200,
   };
 
   test('should correctly process usage for a non-byok case', () => {
@@ -201,7 +202,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     );
 
     expect(result.hasError).toBe(true);
-    expect(result.status_code_override).toBe(502);
+    expect(result.status_code).toBe(502);
   });
 });
 
@@ -350,6 +351,7 @@ describe('logMicrodollarUsage', () => {
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: 200,
   };
   const createBaseUsageContext = (user: {
     id: string;
@@ -792,6 +794,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: 200,
   };
 
   // Node's Headers constructor rejects values containing NUL bytes (invalid

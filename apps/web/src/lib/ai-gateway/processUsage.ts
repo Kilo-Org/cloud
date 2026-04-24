@@ -138,11 +138,12 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
  * path: HTTP headers from the VS Code extension (machine_id, session_id,
  * http_user_agent) and prompt-derived fields (system_prompt_prefix,
  * user_prompt_prefix). Sanitizing at the DB boundary is a safety net; once
- * the upstream source is identified via the sampled `captureMessage` in
- * `toInsertableDbUsageRecord`, sanitize at the source and remove this.
+ * the upstream source is identified via the `console.warn` in
+ * `toInsertableDbUsageRecord` (queryable in Axiom), sanitize at the source
+ * and remove this.
  *
  * Any sanitized field names are appended to `dirtyFields` so the caller can
- * report them to Sentry for source attribution.
+ * log them for source attribution.
  */
 export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: string[]): void {
   for (const key of Object.keys(obj)) {
@@ -217,18 +218,17 @@ export function toInsertableDbUsageRecord(
   const dirtyFields: string[] = [];
   stripNulBytesInPlace(core as unknown as Record<string, unknown>, dirtyFields);
   stripNulBytesInPlace(metadata as unknown as Record<string, unknown>, dirtyFields);
-  if (dirtyFields.length > 0 && Math.random() < 0.05) {
-    // 5% sampling is enough to identify the source field(s) without flooding
-    // Sentry. Remove once upstream sanitization lands.
-    captureMessage('microdollar_usage string field contained NUL bytes; sanitized before insert', {
-      level: 'warning',
-      tags: { source: 'toInsertableDbUsageRecord' },
-      extra: {
-        fields: dirtyFields,
-        kilo_user_id,
-        requested_model: usageContextInfo.requested_model,
-        provider,
-      },
+  if (dirtyFields.length > 0) {
+    // Log to Axiom (not Sentry) — this is a one-off source-attribution probe,
+    // not an issue to triage. Once the dominant field is identified via
+    // `summarize count() by fields`, sanitize at the source and remove both
+    // this log and the sanitizer above.
+    console.warn('microdollar_usage string field contained NUL bytes; sanitized before insert', {
+      source: 'toInsertableDbUsageRecord',
+      fields: dirtyFields,
+      kilo_user_id,
+      requested_model: usageContextInfo.requested_model,
+      provider,
     });
   }
 

@@ -712,7 +712,7 @@ function MorningBriefingCard({
         </div>
       </div>
 
-      {!actionsReady && (
+      {isWarmupState && (
         <p className="text-muted-foreground mt-2 text-xs">
           Instance is still warming up. Morning Briefing controls will become available once the
           gateway is fully ready.

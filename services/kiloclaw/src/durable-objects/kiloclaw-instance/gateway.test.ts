@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { deriveGatewayToken } from '../../auth/gateway-token';
 import { createMutableState } from './state';
 import { getGatewayProcessStatus, getMorningBriefingStatus, waitForHealthy } from './gateway';
+import { GatewayControllerError } from '../gateway-controller-types';
 
 type FetchMock = ReturnType<
   typeof vi.fn<(input: string | URL | Request, init?: RequestInit) => Promise<Response>>
@@ -141,5 +142,28 @@ describe('gateway controller routing', () => {
       code: 'gateway_warming_up',
       retryAfterSec: 2,
     });
+  });
+
+  it('does not mask 401 auth failures as warm-up for morning-briefing status', async () => {
+    const state = createMutableState();
+    state.provider = 'fly';
+    state.sandboxId = 'sandbox-1';
+    state.flyAppName = 'test-app';
+    state.flyMachineId = 'machine-1';
+
+    const fetchMock: FetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      getMorningBriefingStatus(state, {
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        FLY_APP_NAME: 'fallback-app',
+      } as never)
+    ).rejects.toBeInstanceOf(GatewayControllerError);
   });
 });

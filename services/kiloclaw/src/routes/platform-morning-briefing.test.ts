@@ -101,4 +101,24 @@ describe('platform morning-briefing warm-up handling', () => {
       reconcileState: 'in_progress',
     });
   });
+
+  it('does not treat 401 as warm-up for enable retries', async () => {
+    const enableMorningBriefing = vi
+      .fn<() => Promise<{ ok: boolean; enabled: boolean }>>()
+      .mockRejectedValue(new Error('Gateway controller request failed (401)'));
+    const env = baseEnv({ enableMorningBriefing });
+
+    const response = await platform.request(
+      '/morning-briefing/enable',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(500);
+    expect(enableMorningBriefing).toHaveBeenCalledTimes(1);
+  });
 });

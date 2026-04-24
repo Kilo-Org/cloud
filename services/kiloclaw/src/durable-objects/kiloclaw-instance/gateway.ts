@@ -283,8 +283,7 @@ function isMorningBriefingWarmupControllerError(error: unknown): boolean {
     message.includes('instance not provisioned') ||
     message.includes('gateway not running') ||
     message.includes('failed to reach gateway') ||
-    message.includes('operation was aborted due to timeout') ||
-    message.includes('gateway controller request failed (401)')
+    message.includes('operation was aborted due to timeout')
   );
 }
 

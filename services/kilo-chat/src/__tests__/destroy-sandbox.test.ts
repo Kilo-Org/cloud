@@ -63,11 +63,14 @@ describe('destroySandboxData', () => {
     // Call the RPC method via the self-referencing service binding.
     // KILO_CHAT_SELF is only in miniflare config, not in the Env type, so cast.
     const worker = (env as unknown as Record<string, unknown>).KILO_CHAT_SELF as {
-      destroySandboxData(sandboxId: string): Promise<{ ok: boolean; conversationsDeleted: number }>;
+      destroySandboxData(
+        sandboxId: string
+      ): Promise<{ ok: boolean; conversationsDeleted: number; failedConversations: string[] }>;
     };
     const result = await worker.destroySandboxData(SANDBOX_ID);
     expect(result.ok).toBe(true);
     expect(result.conversationsDeleted).toBe(2);
+    expect(result.failedConversations).toEqual([]);
 
     // Verify doomed conversations are wiped
     const conv1 = await getConvStub('conv-doomed-1').getInfo();
@@ -92,10 +95,13 @@ describe('destroySandboxData', () => {
 
   it('returns zero when sandbox has no conversations', async () => {
     const worker = (env as unknown as Record<string, unknown>).KILO_CHAT_SELF as {
-      destroySandboxData(sandboxId: string): Promise<{ ok: boolean; conversationsDeleted: number }>;
+      destroySandboxData(
+        sandboxId: string
+      ): Promise<{ ok: boolean; conversationsDeleted: number; failedConversations: string[] }>;
     };
     const result = await worker.destroySandboxData('sandbox-nonexistent');
     expect(result.ok).toBe(true);
     expect(result.conversationsDeleted).toBe(0);
+    expect(result.failedConversations).toEqual([]);
   });
 });

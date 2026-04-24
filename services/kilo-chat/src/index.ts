@@ -53,7 +53,9 @@ export default class extends WorkerEntrypoint<Env> {
     return app.fetch(request, this.env, this.ctx);
   }
 
-  async destroySandboxData(sandboxId: string): Promise<{ ok: true; conversationsDeleted: number }> {
+  async destroySandboxData(
+    sandboxId: string
+  ): Promise<{ ok: boolean; conversationsDeleted: number; failedConversations: string[] }> {
     const botId = `bot:kiloclaw:${sandboxId}`;
     // Discover all conversations for this sandbox, paginating through all results.
     const allConversationIds: string[] = [];
@@ -75,6 +77,7 @@ export default class extends WorkerEntrypoint<Env> {
     // Fan out with concurrency limit: for each conversation, clean up
     // member MembershipDOs then destroy ConversationDO.
     const limit = pLimit(10);
+    const failedConversations: string[] = [];
     const results = await Promise.allSettled(
       allConversationIds.map(conversationId =>
         limit(async () => {
@@ -87,25 +90,28 @@ export default class extends WorkerEntrypoint<Env> {
           if (info) {
             // Remove this conversation from every member's MembershipDO.
             await Promise.all(
-              info.members.map(member => {
-                const memberStub = this.env.MEMBERSHIP_DO.get(
-                  this.env.MEMBERSHIP_DO.idFromName(member.id)
-                );
-                return memberStub.removeConversation(conversationId);
-              })
+              info.members.map(member =>
+                withDORetry(
+                  () => this.env.MEMBERSHIP_DO.get(this.env.MEMBERSHIP_DO.idFromName(member.id)),
+                  stub => stub.removeConversation(conversationId),
+                  'MembershipDO.removeConversation'
+                )
+              )
             );
           }
 
-          const convStub = this.env.CONVERSATION_DO.get(
-            this.env.CONVERSATION_DO.idFromName(conversationId)
+          await withDORetry(
+            () => this.env.CONVERSATION_DO.get(this.env.CONVERSATION_DO.idFromName(conversationId)),
+            stub => stub.destroy(),
+            'ConversationDO.destroy'
           );
-          await convStub.destroy();
         })
       )
     );
-    for (const r of results) {
-      if (r.status === 'rejected') {
-        console.error('destroySandboxData: conversation cleanup failed:', r.reason);
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === 'rejected') {
+        console.error('destroySandboxData: conversation cleanup failed:', results[i].reason);
+        failedConversations.push(allConversationIds[i]);
       }
     }
 
@@ -113,6 +119,10 @@ export default class extends WorkerEntrypoint<Env> {
     const botMembership = this.env.MEMBERSHIP_DO.get(this.env.MEMBERSHIP_DO.idFromName(botId));
     await botMembership.removeConversationsBySandbox(sandboxId);
 
-    return { ok: true, conversationsDeleted: allConversationIds.length };
+    return {
+      ok: failedConversations.length === 0,
+      conversationsDeleted: allConversationIds.length - failedConversations.length,
+      failedConversations,
+    };
   }
 }

@@ -245,7 +245,9 @@ function createFakeEnv() {
       writeDataPoint,
     } as unknown,
     KILO_CHAT: {
-      destroySandboxData: vi.fn().mockResolvedValue({ ok: true, conversationsDeleted: 0 }),
+      destroySandboxData: vi
+        .fn()
+        .mockResolvedValue({ ok: true, conversationsDeleted: 0, failedConversations: [] }),
     } as unknown,
   };
 }

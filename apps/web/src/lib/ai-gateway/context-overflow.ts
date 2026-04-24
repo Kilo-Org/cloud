@@ -44,18 +44,10 @@ const upstreamErrorBodySchema = z.object({
 // bodies are left to the generic estimate-based path below (or forwarded
 // unchanged).
 async function extractUpstreamContextOverflowBody(response: Response): Promise<object | null> {
-  const rawBody = await response
+  const parsedJson: unknown = await response
     .clone()
-    .text()
+    .json()
     .catch(() => null);
-  if (rawBody === null) return null;
-
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(rawBody);
-  } catch {
-    return null;
-  }
   if (typeof parsedJson !== 'object' || parsedJson === null || Array.isArray(parsedJson)) {
     return null;
   }

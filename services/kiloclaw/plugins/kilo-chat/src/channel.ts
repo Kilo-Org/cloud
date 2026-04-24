@@ -68,6 +68,13 @@ function inspectAccount(
 
 const pluginBase = createChannelPluginBase({
   id: CHANNEL_ID,
+  meta: {
+    label: 'Kilo Chat',
+    selectionLabel: 'Kilo Chat',
+    docsPath: '/channels/kilo-chat',
+    blurb: "Kilo's hosted chat channel for OpenClaw instances.",
+    markdownCapable: true,
+  },
   setup: {
     applyAccountConfig: ({ cfg }) => cfg,
   },

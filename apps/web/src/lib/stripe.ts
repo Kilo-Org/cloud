@@ -771,52 +771,66 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
             const triggeredByUserId =
               autoTopUpConfig?.created_by_user_id ?? SYSTEM_AUTO_TOP_UP_USER_ID;
 
-            await processTopupForOrganization(
+            const orgAutoTopUpOk = await processTopupForOrganization(
               triggeredByUserId,
               organizationId,
               invoice.amount_paid,
               config
             );
 
-            const orgAmountDollars = invoice.amount_paid;
-            const sendOrgNotification = async () => {
-              try {
-                const org = await getOrganizationById(organizationId);
-                if (!org) return;
+            if (!orgAutoTopUpOk) {
+              sentryLogger('stripe', 'info')(
+                'Org auto top-up already registered (invoice fallback)',
+                {
+                  organization_id: organizationId,
+                  invoice_id: invoice.id,
+                  charge_id: chargeId,
+                  traceId,
+                }
+              );
+            }
 
-                const triggeredByUser =
-                  triggeredByUserId !== SYSTEM_AUTO_TOP_UP_USER_ID
-                    ? await findUserById(triggeredByUserId)
-                    : null;
-                const triggeredByEmail =
-                  triggeredByUser?.google_user_email ?? 'Auto top-up (system)';
+            if (orgAutoTopUpOk) {
+              const orgAmountDollars = invoice.amount_paid;
+              const sendOrgNotification = async () => {
+                try {
+                  const org = await getOrganizationById(organizationId);
+                  if (!org) return;
 
-                const newBalanceMicrodollars =
-                  org.total_microdollars_acquired - org.microdollars_used;
+                  const triggeredByUser =
+                    triggeredByUserId !== SYSTEM_AUTO_TOP_UP_USER_ID
+                      ? await findUserById(triggeredByUserId)
+                      : null;
+                  const triggeredByEmail =
+                    triggeredByUser?.google_user_email ?? 'Auto top-up (system)';
 
-                const members = await getOrganizationMembers(organizationId);
-                const ownerEmails = members
-                  .filter(m => m.role === 'owner' && m.status === 'active')
-                  .map(m => m.email);
+                  const newBalanceMicrodollars =
+                    org.total_microdollars_acquired - org.microdollars_used;
 
-                for (const email of ownerEmails) {
-                  await sendAutoTopUpSuccessEmail(email, {
-                    accountName: org.name,
-                    amountDollars: (orgAmountDollars / 100).toFixed(2),
-                    newBalanceDollars: (newBalanceMicrodollars / 1_000_000).toFixed(2),
-                    triggeredByEmail,
-                    organizationId,
+                  const members = await getOrganizationMembers(organizationId);
+                  const ownerEmails = members
+                    .filter(m => m.role === 'owner' && m.status === 'active')
+                    .map(m => m.email);
+
+                  for (const email of ownerEmails) {
+                    await sendAutoTopUpSuccessEmail(email, {
+                      accountName: org.name,
+                      amountDollars: (orgAmountDollars / 100).toFixed(2),
+                      newBalanceDollars: (newBalanceMicrodollars / 1_000_000).toFixed(2),
+                      triggeredByEmail,
+                      organizationId,
+                    });
+                  }
+                } catch (emailError) {
+                  captureException(emailError, {
+                    tags: { source: 'auto_top_up_success_email' },
+                    extra: { organization_id: organizationId },
                   });
                 }
-              } catch (emailError) {
-                captureException(emailError, {
-                  tags: { source: 'auto_top_up_success_email' },
-                  extra: { organization_id: organizationId },
-                });
-              }
-            };
-            if (IS_IN_AUTOMATED_TEST) await sendOrgNotification();
-            else after(sendOrgNotification);
+              };
+              if (IS_IN_AUTOMATED_TEST) await sendOrgNotification();
+              else after(sendOrgNotification);
+            }
 
             processedSuccessfully = true;
           } catch (error) {

@@ -94,7 +94,7 @@ export async function processTopupForOrganization(
   const creditDescription = `Organization top-up via ${config.type}`;
   const creditAmountInMicrodollars = toMicrodollars(amountInCents / 100);
 
-  await db.transaction(async (tx: DrizzleTransaction) => {
+  const creditsApplied = await db.transaction(async (tx: DrizzleTransaction) => {
     logExceptInTest(
       `processing topup for ${organization.id} - ${amountInCents} in transaction with payment id ${config.stripe_payment_id}`
     );
@@ -116,7 +116,7 @@ export async function processTopupForOrganization(
       logExceptInTest(
         `Skipping duplicate topup for ${organization.id} - payment id ${config.stripe_payment_id} already processed`
       );
-      return;
+      return false;
     }
 
     // Update organization balance
@@ -127,7 +127,12 @@ export async function processTopupForOrganization(
         microdollars_balance: sql`${organizations.microdollars_balance} + ${Math.round(creditAmountInMicrodollars)}`,
       })
       .where(eq(organizations.id, organization.id));
+
+    return true;
   });
+
+  if (!creditsApplied) return false;
+
   await createAuditLog({
     action: 'organization.purchase_credits',
     actor_id: kiloUserId,
@@ -146,4 +151,6 @@ export async function processTopupForOrganization(
       );
     }
   }
+
+  return true;
 }

@@ -279,6 +279,8 @@ function isMorningBriefingWarmupControllerError(error: unknown): boolean {
 
   const message = error.message.toLowerCase();
   return (
+    message.includes('instance has no machine id') ||
+    message.includes('instance not provisioned') ||
     message.includes('gateway not running') ||
     message.includes('failed to reach gateway') ||
     message.includes('operation was aborted due to timeout') ||

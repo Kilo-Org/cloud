@@ -54,6 +54,15 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return { minimum_balance: '10', organization_url };
     case 'autoTopUpFailed':
       return { reason: 'Card declined', credits_url: `${NEXTAUTH_URL}/credits?show-auto-top-up` };
+    case 'autoTopUpSuccess':
+      return {
+        account_name: 'Acme Corp',
+        amount: '$50.00',
+        new_balance: '$87.50',
+        triggered_by: 'alice@example.com',
+        timestamp: new Date().toUTCString(),
+        credits_url: `${NEXTAUTH_URL}/organizations/${orgId}/payment-details`,
+      };
     case 'ossInviteNewUser':
       return {
         organization_name: 'Acme OSS',

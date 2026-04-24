@@ -16,6 +16,7 @@ export const subjects = {
   magicLink: 'Sign in to Kilo Code',
   balanceAlert: 'Kilo: Low Balance Alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
+  autoTopUpSuccess: 'Kilo: Auto Top-Up Successful',
   ossInviteNewUser: 'Kilo: OSS Sponsorship Offer',
   ossInviteExistingUser: 'Kilo: OSS Sponsorship Offer',
   ossExistingOrgProvisioned: 'Kilo: OSS Sponsorship Offer',
@@ -205,6 +206,35 @@ export async function sendAutoTopUpFailedEmail(
     to,
     templateName: 'autoTopUpFailed',
     templateVars: { reason: props.reason, credits_url },
+  });
+}
+
+type AutoTopUpSuccessEmailProps = {
+  accountName: string;
+  amountDollars: string;
+  newBalanceDollars: string;
+  triggeredByEmail: string;
+  organizationId?: string;
+};
+
+export async function sendAutoTopUpSuccessEmail(
+  to: string,
+  props: AutoTopUpSuccessEmailProps
+): Promise<SendResult> {
+  const credits_url = props.organizationId
+    ? `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`
+    : `${NEXTAUTH_URL}/credits?show-auto-top-up`;
+  return send({
+    to,
+    templateName: 'autoTopUpSuccess',
+    templateVars: {
+      account_name: props.accountName,
+      amount: `$${props.amountDollars}`,
+      new_balance: `$${props.newBalanceDollars}`,
+      triggered_by: props.triggeredByEmail,
+      timestamp: new Date().toUTCString(),
+      credits_url,
+    },
   });
 }
 

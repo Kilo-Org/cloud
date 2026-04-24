@@ -24,7 +24,10 @@ import {
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
   SYSTEM_AUTO_TOP_UP_USER_ID,
 } from './autoTopUpConstants';
-import { findUserByStripeCustomerId } from './user';
+import { findUserById, findUserByStripeCustomerId } from './user';
+import { after } from 'next/server';
+import { sendAutoTopUpSuccessEmail } from '@/lib/email';
+import { getOrganizationById, getOrganizationMembers } from '@/lib/organizations/organizations';
 import type { UnifiedInvoice } from '@/types/billing';
 import type { StripeConfig } from '@/lib/credits';
 import { processTopUp } from '@/lib/credits';
@@ -57,6 +60,7 @@ import {
 import { enqueueImpactSaleReversalForCharge } from '@/lib/affiliate-events';
 import { invoiceLooksLikeKiloClawByPriceId } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import {
+  IS_IN_AUTOMATED_TEST,
   STRIPE_TEAMS_MONTHLY_PRICE_ID,
   STRIPE_TEAMS_ANNUAL_PRICE_ID,
   STRIPE_ENTERPRISE_MONTHLY_PRICE_ID,
@@ -696,6 +700,32 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
               });
             }
 
+            if (autoTopUpOk) {
+              const amountDollars = invoice.amount_paid;
+              const sendNotification = async () => {
+                try {
+                  const freshUser = await findUserById(user.id);
+                  if (!freshUser?.google_user_email) return;
+
+                  const newBalanceMicrodollars =
+                    freshUser.total_microdollars_acquired - freshUser.microdollars_used;
+                  await sendAutoTopUpSuccessEmail(freshUser.google_user_email, {
+                    accountName: freshUser.google_user_name ?? freshUser.google_user_email,
+                    amountDollars: (amountDollars / 100).toFixed(2),
+                    newBalanceDollars: (newBalanceMicrodollars / 1_000_000).toFixed(2),
+                    triggeredByEmail: freshUser.google_user_email,
+                  });
+                } catch (emailError) {
+                  captureException(emailError, {
+                    tags: { source: 'auto_top_up_success_email' },
+                    extra: { kilo_user_id: user.id },
+                  });
+                }
+              };
+              if (IS_IN_AUTOMATED_TEST) await sendNotification();
+              else after(sendNotification);
+            }
+
             processedSuccessfully = true;
           } catch (error) {
             sentryLogger('stripe', 'error')('Auto top-up webhook processing failed for user', {
@@ -738,12 +768,55 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
               columns: { created_by_user_id: true },
             });
 
+            const triggeredByUserId =
+              autoTopUpConfig?.created_by_user_id ?? SYSTEM_AUTO_TOP_UP_USER_ID;
+
             await processTopupForOrganization(
-              autoTopUpConfig?.created_by_user_id ?? SYSTEM_AUTO_TOP_UP_USER_ID,
+              triggeredByUserId,
               organizationId,
               invoice.amount_paid,
               config
             );
+
+            const orgAmountDollars = invoice.amount_paid;
+            const sendOrgNotification = async () => {
+              try {
+                const org = await getOrganizationById(organizationId);
+                if (!org) return;
+
+                const triggeredByUser =
+                  triggeredByUserId !== SYSTEM_AUTO_TOP_UP_USER_ID
+                    ? await findUserById(triggeredByUserId)
+                    : null;
+                const triggeredByEmail =
+                  triggeredByUser?.google_user_email ?? 'Auto top-up (system)';
+
+                const newBalanceMicrodollars =
+                  org.total_microdollars_acquired - org.microdollars_used;
+
+                const members = await getOrganizationMembers(organizationId);
+                const ownerEmails = members
+                  .filter(m => m.role === 'owner' && m.status === 'active')
+                  .map(m => m.email);
+
+                for (const email of ownerEmails) {
+                  await sendAutoTopUpSuccessEmail(email, {
+                    accountName: org.name,
+                    amountDollars: (orgAmountDollars / 100).toFixed(2),
+                    newBalanceDollars: (newBalanceMicrodollars / 1_000_000).toFixed(2),
+                    triggeredByEmail,
+                    organizationId,
+                  });
+                }
+              } catch (emailError) {
+                captureException(emailError, {
+                  tags: { source: 'auto_top_up_success_email' },
+                  extra: { organization_id: organizationId },
+                });
+              }
+            };
+            if (IS_IN_AUTOMATED_TEST) await sendOrgNotification();
+            else after(sendOrgNotification);
 
             processedSuccessfully = true;
           } catch (error) {

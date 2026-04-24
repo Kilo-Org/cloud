@@ -557,8 +557,7 @@ function MorningBriefingCard({
   const observedEnabled = briefingStatus?.observedEnabled ?? briefingStatus?.enabled ?? false;
   const reconcileState = briefingStatus?.reconcileState ?? 'idle';
   const lastReconcileAction = briefingStatus?.lastReconcileAction ?? null;
-  const isWarmupState =
-    isRunning && (actionsReady === false || briefingStatus?.code === 'gateway_warming_up');
+  const isWarmupState = isRunning && actionsReady === false;
   const isTransitioning =
     reconcileState === 'in_progress' ||
     mutations.enableMorningBriefing.isPending ||
@@ -720,7 +719,7 @@ function MorningBriefingCard({
         </p>
       )}
 
-      {!desiredEnabled && actionsReady && (
+      {!desiredEnabled && controlsEnabled && (
         <p className="text-muted-foreground mt-2 text-xs">
           Enable Morning Briefing to get a personalized briefing everyday.
         </p>

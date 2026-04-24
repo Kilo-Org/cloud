@@ -8,6 +8,7 @@ import {
   getConfiguredConnectSrcOrigins,
   getContentSecurityPolicyHeaderName,
   getContentSecurityPolicyMode,
+  getSecurityPolicyReportingHeaders,
 } from '@/lib/security-headers';
 
 function baseProxy(request: NextRequestWithAuth) {
@@ -34,6 +35,10 @@ function baseProxy(request: NextRequestWithAuth) {
         connectSrcUrls: getConfiguredConnectSrcOrigins(),
       })
     );
+
+    for (const [name, value] of Object.entries(getSecurityPolicyReportingHeaders())) {
+      response.headers.set(name, value);
+    }
   }
 
   return response;

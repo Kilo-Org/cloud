@@ -16,6 +16,9 @@ export type ContentSecurityPolicyOptions = {
 
 export type ContentSecurityPolicyMode = 'enforce' | 'report-only' | 'off';
 
+const CSP_REPORTING_GROUP = 'csp-endpoint';
+const SENTRY_SECURITY_REPORT_MAX_AGE_SECONDS = 10886400;
+
 const ADDITIONAL_SOURCE_ENV_BY_DIRECTIVE = {
   'script-src': 'CSP_ADDITIONAL_SCRIPT_SRC',
   'connect-src': 'CSP_ADDITIONAL_CONNECT_SRC',
@@ -52,6 +55,61 @@ function webSocketOriginFromUrl(value: string | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+function getSentryEnvironment(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed || trimmed.length > 64 || /[\s/]/.test(trimmed) || trimmed === 'None') return null;
+  return trimmed;
+}
+
+function getOptionalQueryValue(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed || null;
+}
+
+export function getSentrySecurityReportUri(
+  env: Record<string, string | undefined> = process.env
+): string | null {
+  const dsn = env.NEXT_PUBLIC_SENTRY_DSN;
+  if (!dsn) return null;
+
+  try {
+    const url = new URL(dsn);
+    const projectId = url.pathname.split('/').filter(Boolean).at(-1);
+    const sentryKey = url.username;
+    if (!projectId || !sentryKey) return null;
+
+    const reportUri = new URL(`/api/${projectId}/security/`, url.origin);
+    reportUri.searchParams.set('sentry_key', sentryKey);
+
+    const sentryEnvironment = getSentryEnvironment(env.SENTRY_ENVIRONMENT ?? env.VERCEL_ENV);
+    if (sentryEnvironment) reportUri.searchParams.set('sentry_environment', sentryEnvironment);
+
+    const sentryRelease = getOptionalQueryValue(env.SENTRY_RELEASE);
+    if (sentryRelease) reportUri.searchParams.set('sentry_release', sentryRelease);
+
+    return reportUri.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function getSecurityPolicyReportingHeaders(
+  env: Record<string, string | undefined> = process.env
+): Record<string, string> {
+  const reportUri = getSentrySecurityReportUri(env);
+  if (!reportUri) return {};
+
+  return {
+    'Report-To': JSON.stringify({
+      group: CSP_REPORTING_GROUP,
+      max_age: SENTRY_SECURITY_REPORT_MAX_AGE_SECONDS,
+      endpoints: [{ url: reportUri }],
+      include_subdomains: true,
+    }),
+    'Reporting-Endpoints': `${CSP_REPORTING_GROUP}="${reportUri}"`,
+  };
 }
 
 function parseAdditionalCspSources(value: string | undefined): string[] {
@@ -146,6 +204,8 @@ export function buildContentSecurityPolicy({
     ...getAdditionalCspSources('connect-src', env),
   ]);
 
+  const reportUri = getSentrySecurityReportUri(env);
+
   const directives: Record<string, string[]> = {
     'default-src': ["'self'"],
     'base-uri': ["'self'"],
@@ -190,6 +250,7 @@ export function buildContentSecurityPolicy({
     'worker-src': ["'self'", 'blob:', ...getAdditionalCspSources('worker-src', env)],
     'media-src': ["'self'", 'blob:', ...getAdditionalCspSources('media-src', env)],
     'manifest-src': ["'self'"],
+    ...(reportUri ? { 'report-uri': [reportUri], 'report-to': [CSP_REPORTING_GROUP] } : {}),
   };
 
   return Object.entries(directives)

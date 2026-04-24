@@ -32,6 +32,7 @@ type TestHarness = {
   stateDir: string;
   commandHandler: (ctx: { args?: string }) => Promise<{ text: string }>;
   statusHttpHandler: (_req: unknown, res: FakeResponse) => Promise<void>;
+  enableHttpHandler: (req: unknown, res: FakeResponse) => Promise<void>;
   cronJobs: CronJob[];
   runCommandWithTimeout: ReturnType<typeof vi.fn>;
 };
@@ -48,6 +49,14 @@ class FakeResponse {
   end(chunk?: string): void {
     this.body = chunk ?? '';
   }
+}
+
+function createJsonRequest(body: Record<string, unknown>): AsyncIterable<string> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      yield JSON.stringify(body);
+    },
+  };
 }
 
 async function createHarness(options?: {
@@ -146,6 +155,7 @@ async function createHarness(options?: {
 
   let commandHandler: ((ctx: { args?: string }) => Promise<{ text: string }>) | null = null;
   let statusHttpHandler: ((_req: unknown, res: FakeResponse) => Promise<void>) | null = null;
+  let enableHttpHandler: ((req: unknown, res: FakeResponse) => Promise<void>) | null = null;
 
   morningBriefingPlugin.register({
     runtime: {
@@ -169,20 +179,23 @@ async function createHarness(options?: {
     }) => {
       if (route.path.endsWith('/status')) {
         statusHttpHandler = route.handler;
+      } else if (route.path.endsWith('/enable')) {
+        enableHttpHandler = route.handler;
       }
     },
     registerTool: vi.fn(),
     on: vi.fn(),
   } as never);
 
-  if (!commandHandler || !statusHttpHandler) {
-    throw new Error('Failed to register command or status handler');
+  if (!commandHandler || !statusHttpHandler || !enableHttpHandler) {
+    throw new Error('Failed to register command or HTTP handlers');
   }
 
   return {
     stateDir,
     commandHandler,
     statusHttpHandler,
+    enableHttpHandler,
     cronJobs,
     runCommandWithTimeout,
   };
@@ -342,6 +355,21 @@ describe('morning briefing lifecycle', () => {
     await expect(
       harness.commandHandler({ args: 'enable 0 7 * * * America/Chcago' })
     ).rejects.toThrow('Invalid timezone: America/Chcago');
+  });
+
+  it('returns 400 for invalid timezone in enable HTTP route', async () => {
+    const harness = await createHarness();
+    const response = new FakeResponse();
+
+    await harness.enableHttpHandler(
+      createJsonRequest({ cron: '0 7 * * *', timezone: 'America/Chcago' }),
+      response
+    );
+
+    expect(response.statusCode).toBe(400);
+    const payload = JSON.parse(response.body) as Record<string, unknown>;
+    expect(payload.ok).toBe(false);
+    expect(payload.error).toBe('Invalid timezone: America/Chcago');
   });
 
   it('falls back to UTC date key when persisted timezone is invalid', async () => {

@@ -1415,6 +1415,13 @@ export default definePluginEntry({
             message: 'Enable requested. Reconciliation is running in background.',
           });
         } catch (error) {
+          if (error instanceof Error && error.message.startsWith('Invalid timezone:')) {
+            sendJson(res, 400, {
+              ok: false,
+              error: error.message,
+            });
+            return;
+          }
           sendJson(res, 500, {
             ok: false,
             error: error instanceof Error ? error.message : String(error),

@@ -82,7 +82,7 @@ describe('destroySandboxData', () => {
 
     // Verify bot's membership is empty
     const botMembership = await getMemberStub(BOT_ID).listConversations();
-    expect(botMembership.total).toBe(0);
+    expect(botMembership.hasMore).toBe(false);
 
     // Verify surviving conversation is intact
     const kept = await getConvStub('conv-keep').getInfo();

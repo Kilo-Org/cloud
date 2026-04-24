@@ -201,13 +201,13 @@ describe('GET /v1/conversations', () => {
     expect(res.status).toBe(200);
     const body = await res.json<{
       conversations: Array<{ conversationId: string; conversationTitle: string | null }>;
-      total: number;
+      hasMore: boolean;
       limit: number;
       offset: number;
     }>();
     expect(Array.isArray(body.conversations)).toBe(true);
     expect(body.conversations.length).toBeGreaterThanOrEqual(2);
-    expect(body.total).toBeGreaterThanOrEqual(2);
+    expect(body.hasMore).toBe(false);
     expect(body.limit).toBe(50);
     expect(body.offset).toBe(0);
     const titles = body.conversations.map(c => c.conversationTitle);

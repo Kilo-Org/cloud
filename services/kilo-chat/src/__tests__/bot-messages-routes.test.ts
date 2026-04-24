@@ -965,9 +965,9 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations', () => {
     expect(res.status).toBe(200);
     const body = await res.json<{
       conversations: Array<{ conversationId: string; title: string | null }>;
-      total: number;
+      hasMore: boolean;
     }>();
-    expect(body.total).toBeGreaterThanOrEqual(1);
+    expect(body.hasMore).toBe(false);
     expect(body.conversations.some(c => c.conversationId === conversationId)).toBe(true);
   });
 

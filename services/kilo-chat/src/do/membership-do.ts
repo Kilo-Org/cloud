@@ -33,22 +33,15 @@ export class MembershipDO extends DurableObject<Env> {
     sandboxId?: string,
     limit: number = 50,
     offset: number = 0
-  ): { conversations: ConversationEntry[]; total: number } {
+  ): { conversations: ConversationEntry[]; hasMore: boolean } {
     const where = sandboxId ? eq(conversations.sandbox_id, sandboxId) : undefined;
-
-    const total =
-      this.db
-        .select({ count: sql<number>`count(*)` })
-        .from(conversations)
-        .where(where)
-        .get()?.count ?? 0;
 
     const rows = this.db
       .select()
       .from(conversations)
       .where(where)
       .orderBy(desc(sql`coalesce(${conversations.last_activity_at}, ${conversations.joined_at})`))
-      .limit(limit)
+      .limit(limit + 1)
       .offset(offset)
       .all()
       .map(row => ({
@@ -59,7 +52,10 @@ export class MembershipDO extends DurableObject<Env> {
         joinedAt: row.joined_at,
       }));
 
-    return { conversations: rows, total };
+    const hasMore = rows.length > limit;
+    if (hasMore) rows.pop();
+
+    return { conversations: rows, hasMore };
   }
 
   addConversation(params: AddConversationParams): void {

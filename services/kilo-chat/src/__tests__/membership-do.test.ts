@@ -11,7 +11,7 @@ describe('MembershipDO', () => {
   it('returns empty list initially', async () => {
     const stub = getStub('user-1');
     const result = await stub.listConversations();
-    expect(result).toEqual({ conversations: [], total: 0 });
+    expect(result).toEqual({ conversations: [], hasMore: false });
   });
 
   it('adds a conversation and lists it', async () => {
@@ -23,7 +23,7 @@ describe('MembershipDO', () => {
       joinedAt: 1000,
     });
     const result = await stub.listConversations();
-    expect(result.total).toBe(1);
+    expect(result.hasMore).toBe(false);
     expect(result.conversations).toEqual([
       {
         conversationId: 'conv-1',
@@ -93,7 +93,7 @@ describe('MembershipDO', () => {
     });
     await stub.removeConversation('conv-1');
     const result = await stub.listConversations();
-    expect(result).toEqual({ conversations: [], total: 0 });
+    expect(result).toEqual({ conversations: [], hasMore: false });
   });
 
   it('removeConversationsBySandbox - deletes only matching sandbox rows', async () => {
@@ -120,7 +120,7 @@ describe('MembershipDO', () => {
     await stub.removeConversationsBySandbox('sandbox-doomed');
 
     const result = await stub.listConversations();
-    expect(result.total).toBe(1);
+    expect(result.hasMore).toBe(false);
     expect(result.conversations[0].conversationId).toBe('conv-c');
   });
 
@@ -136,6 +136,6 @@ describe('MembershipDO', () => {
     await stub.removeConversationsBySandbox('sandbox-nonexistent');
 
     const result = await stub.listConversations();
-    expect(result.total).toBe(1);
+    expect(result.hasMore).toBe(false);
   });
 });

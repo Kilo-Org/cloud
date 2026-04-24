@@ -346,7 +346,11 @@ export async function handleListBotConversations(c: HonoCtx) {
   const { limit, offset } = query.data;
 
   const membershipStub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(botCallerId));
-  const { conversations, total } = await membershipStub.listConversations(sandboxId, limit, offset);
+  const { conversations, hasMore } = await membershipStub.listConversations(
+    sandboxId,
+    limit,
+    offset
+  );
 
   // Step 1: Fetch info for all conversations in parallel
   const conversationsWithInfo = await Promise.all(
@@ -384,7 +388,7 @@ export async function handleListBotConversations(c: HonoCtx) {
     })),
   }));
 
-  return c.json({ conversations: enriched, total, limit, offset });
+  return c.json({ conversations: enriched, hasMore, limit, offset });
 }
 
 // ─── createBotConversation ──────────────────────────────────────────────────

@@ -76,8 +76,8 @@ export function registerConversationRoutes(
     const { limit, offset } = query.data;
 
     const stub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
-    const { conversations, total } = await stub.listConversations(sandboxId, limit, offset);
-    return c.json({ conversations, total, limit, offset });
+    const { conversations, hasMore } = await stub.listConversations(sandboxId, limit, offset);
+    return c.json({ conversations, hasMore, limit, offset });
   });
 
   // GET /v1/conversations/:id — get conversation details

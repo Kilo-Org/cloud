@@ -64,7 +64,7 @@ export default class extends WorkerEntrypoint<Env> {
       for (const c of page.conversations) {
         allConversationIds.push(c.conversationId);
       }
-      if (page.conversations.length < PAGE_SIZE) break;
+      if (!page.hasMore) break;
       offset += PAGE_SIZE;
     }
 

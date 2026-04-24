@@ -14,7 +14,10 @@ export { TicketDO } from './do/ticket-do';
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use('/connect/*', cors());
+app.use(
+  '/connect/*',
+  cors({ origin: ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'] })
+);
 app.get('/health', c => c.json({ ok: true }));
 
 // Step 1: Exchange JWT for a short-lived, single-use connection ticket.

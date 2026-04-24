@@ -8,6 +8,7 @@ declare module 'next-auth' {
     exp: number;
     sub: string;
     kiloUserId: string;
+    pepper?: string | null;
     webSessionPepper?: string | null;
     version: number;
     isNewUser?: boolean;

@@ -829,7 +829,7 @@ const authOptions: NextAuthOptions = {
       session.user.id = castToken.sub;
       session.isAdmin = castToken.isAdmin || false; // Ensure isAdmin is always defined
       session.kiloUserId = castToken.kiloUserId;
-      session.webSessionPepper = castToken.webSessionPepper ?? null;
+      session.webSessionPepper = castToken.webSessionPepper ?? castToken.pepper ?? null;
       session.isNewUser = castToken.isNewUser || false; // Pass isNewUser to the session
       return session;
     },

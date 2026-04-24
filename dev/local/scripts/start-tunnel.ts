@@ -80,6 +80,7 @@ if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
 
 const port = process.argv[2] ?? '3000';
 const controllerPort = process.argv[3] ?? '8795';
+const kiloChatPort = process.argv[4] ?? '8808';
 const config = loadTunnelConfig();
 
 const children: Array<{ label: string; child: ReturnType<typeof spawn> }> = [];
@@ -179,6 +180,16 @@ if (config.tunnelName) {
       updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
       console.log(`\nController tunnel URL: ${url}`);
       console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
+    },
+  });
+
+  startQuickTunnel({
+    label: 'kilo-chat',
+    localPort: kiloChatPort,
+    onUrl: url => {
+      updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', url);
+      console.log(`\nKilo-chat tunnel URL: ${url}`);
+      console.log(`Set KILOCHAT_BASE_URL=${url}`);
     },
   });
 }

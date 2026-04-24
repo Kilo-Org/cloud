@@ -45,12 +45,17 @@
 ---
 
 ## Bead 3: Mayor system prompt
+
 ### Status: completed
+
 ### Deviations from plan
+
 - `notifyMayorOfNewBead()` was already partially implemented by bead 1 (with a slightly different message). Updated the message to match the spec exactly (adding the `To start the bead immediately, remove the gt:held label via gt_bead_update.` line and the `When you reply, create a message bead` instruction using the exact wording from the bead spec).
 - The mayor system prompt lives in `services/gastown/src/prompts/mayor-system.prompt.ts` — a standalone file exporting `buildMayorSystemPrompt()`. Added the new `## User-Created Beads` section at the end, before the closing backtick.
 - `gt_bead_update` in `mayor-tools.ts` already exposed both `labels: string[]` and `body: string` — no changes needed there.
+
 ### Notes for future implementors
+
 - The mayor system prompt is in `services/gastown/src/prompts/mayor-system.prompt.ts`, NOT inline in `Town.do.ts`. It's called via `dispatch.systemPromptForRole()` which calls `buildMayorSystemPrompt()` from `container-dispatch.ts`.
 - `sendMayorMessage()` in `Town.do.ts` sends a message to the mayor's running container via the kilo API. It's called from `notifyMayorOfNewBead()` after a user creates a held bead.
 - `gt_bead_update` (mayor-tools.ts:294) already has both `labels` and `body` parameters — no changes needed.

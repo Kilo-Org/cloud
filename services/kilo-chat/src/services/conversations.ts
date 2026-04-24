@@ -10,6 +10,7 @@ import { getSandboxOwner } from './sandbox-ownership';
 import { cachedUserOwnsSandbox } from './sandbox-ownership-cached';
 import { validateUserIds } from './user-lookup';
 import type { DeferCtx } from './messages';
+import type { UpdateTitleIfMemberResult } from '../do/conversation-do';
 
 // ─── createConversation ────────────────────────────────────────────────────
 
@@ -185,7 +186,7 @@ export async function renameConversationFor(
 
   const result = await withDORetry(
     () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-    stub => stub.updateTitleIfMember(userId, title),
+    (stub): Promise<UpdateTitleIfMemberResult> => stub.updateTitleIfMember(userId, title),
     'ConversationDO.updateTitleIfMember'
   );
   if (!result.ok) {

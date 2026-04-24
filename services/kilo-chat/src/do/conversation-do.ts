@@ -261,7 +261,8 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     const info = this.getInfo();
-    return { ok: true, messageId, info: info! };
+    if (!info) return { ok: false, code: 'internal', error: 'Conversation not initialized' };
+    return { ok: true, messageId, info };
   }
 
   getMessage(messageId: string): GetMessageResult {

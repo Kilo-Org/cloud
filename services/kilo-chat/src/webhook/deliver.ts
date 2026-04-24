@@ -1,11 +1,11 @@
-import {
+import type {
   chatWebhookRpcSchema,
-  type ContentBlock,
-  type messageCreatedWebhookSchema,
-  type actionExecutedWebhookSchema,
+  ContentBlock,
+  messageCreatedWebhookSchema,
+  actionExecutedWebhookSchema,
 } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { logger, withLogTags } from '../util/logger';
 import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
 
@@ -26,10 +26,9 @@ export type WebhookMessage = {
 
 function buildPayload(msg: WebhookMessage): MessageCreatedPayload {
   // Content was validated at the route handler entry point; trust the shape.
-  const blocks = msg.content as ContentBlock[];
-  const text = blocks
-    .filter(b => b.type === 'text')
-    .map(b => (b as { type: 'text'; text: string }).text)
+  const text = msg.content
+    .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
+    .map(b => b.text)
     .join('');
   return {
     type: 'message.created',

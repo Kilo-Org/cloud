@@ -41,6 +41,19 @@ function originFromUrl(value: string | undefined): string | null {
   }
 }
 
+function webSocketOriginFromUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'https:') return `wss://${url.host}`;
+    if (url.protocol === 'http:') return `ws://${url.host}`;
+    if (url.protocol === 'wss:' || url.protocol === 'ws:') return url.origin;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function parseAdditionalCspSources(value: string | undefined): string[] {
   if (!value || value.includes(';')) return [];
   return compactUnique(
@@ -66,6 +79,8 @@ export function getConfiguredConnectSrcOrigins(
     originFromUrl(env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL),
     originFromUrl(env.NEXT_PUBLIC_SESSION_INGEST_WS_URL),
     originFromUrl(env.NEXT_PUBLIC_GASTOWN_URL),
+    webSocketOriginFromUrl(env.NEXT_PUBLIC_GASTOWN_URL),
+    originFromUrl(env.NEXT_PUBLIC_SENTRY_DSN),
   ]);
 }
 

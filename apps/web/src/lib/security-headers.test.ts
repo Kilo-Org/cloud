@@ -52,6 +52,8 @@ describe('security headers', () => {
       NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL: 'wss://next-agent.example.com/path',
       NEXT_PUBLIC_SESSION_INGEST_WS_URL: 'wss://ingest.example.com/path',
       NEXT_PUBLIC_GASTOWN_URL: 'https://gastown.example.com/api',
+      NEXT_PUBLIC_SENTRY_DSN:
+        'https://27ef80847dcd5e044283c8f88d95ffc9@o4509356317474816.ingest.us.sentry.io/4509565130637312',
     };
 
     expect(getConfiguredConnectSrcOrigins(env)).toEqual([
@@ -59,7 +61,17 @@ describe('security headers', () => {
       'wss://next-agent.example.com',
       'wss://ingest.example.com',
       'https://gastown.example.com',
+      'wss://gastown.example.com',
+      'https://o4509356317474816.ingest.us.sentry.io',
     ]);
+  });
+
+  it('derives ws:// Gastown origins for non-HTTPS development URLs', () => {
+    expect(
+      getConfiguredConnectSrcOrigins({
+        NEXT_PUBLIC_GASTOWN_URL: 'http://localhost:8787/api',
+      })
+    ).toEqual(['http://localhost:8787', 'ws://localhost:8787']);
   });
 
   it('supports enforcement, report-only, and off modes', () => {

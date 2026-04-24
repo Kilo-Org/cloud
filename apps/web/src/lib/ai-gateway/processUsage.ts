@@ -240,6 +240,7 @@ export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
 ) {
+  usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
   const { core, metadata } = toInsertableDbUsageRecord(usageStats, contextInfo);
 
@@ -696,6 +697,7 @@ export async function parseMicrodollarUsageFromStream(
   let model: string | null = null;
   let responseContent = ''; // for abuse investigation
   let reportedError = statusCode >= 400;
+  let effectiveStatusCode = statusCode;
   const startedAt = performance.now();
   let firstTokenReceived = false;
   let usage: OpenRouterUsage | null = null;
@@ -729,6 +731,9 @@ export async function parseMicrodollarUsageFromStream(
       if ('error' in json) {
         const error = json.error as OpenRouterError;
         reportedError = true;
+        if (typeof error.code === 'number') {
+          effectiveStatusCode = error.code;
+        }
         captureException(new Error(`OpenRouter error: ${error.message}`), {
           tags: { source: 'sse_processing' },
           extra: { json, event },
@@ -780,6 +785,7 @@ export async function parseMicrodollarUsageFromStream(
     generation_time: null,
     streamed: true,
     cancelled: null,
+    status_code: effectiveStatusCode,
   };
 
   const costs = processOpenRouterUsage(usage, coreProps);
@@ -822,6 +828,7 @@ export function parseMicrodollarUsageFromString(
     generation_time: null,
     streamed: false,
     cancelled: null,
+    status_code: statusCode,
   };
 
   const costs = processOpenRouterUsage(responseJson?.usage, coreProps);
@@ -892,6 +899,7 @@ async function processTokenData(
 
     genStats.model = usageStats.model; // openrouter bug?
     genStats.hasError = usageStats.hasError; // retain by choice
+    genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
     if (genStats.cost_mUsd !== usageStats.cost_mUsd) {
       console.warn(
@@ -1004,5 +1012,6 @@ export const mapToUsageStats = (
     generation_time: data.generation_time ?? null,
     streamed: data.streamed ?? null,
     cancelled: data.cancelled ?? null,
+    status_code: 200,
   };
 };

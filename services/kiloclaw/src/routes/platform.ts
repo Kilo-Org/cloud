@@ -1911,6 +1911,234 @@ platform.patch('/openclaw-config', async c => {
   }
 });
 
+const MorningBriefingSetupSchema = z.object({
+  userId: z.string().min(1),
+  cron: z.string().min(1).optional(),
+  timezone: z.string().min(1).optional(),
+});
+
+function isMorningBriefingWarmupError(err: unknown): boolean {
+  const raw = err instanceof Error ? err.message : String(err);
+  const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
+  return (
+    normalized.includes('Gateway not running') ||
+    normalized.includes('Failed to reach gateway') ||
+    normalized.includes('operation was aborted due to timeout')
+  );
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function withMorningBriefingWarmupRetry<T>(operation: () => Promise<T>): Promise<T> {
+  const delaysMs = [0, 750, 1500];
+  let lastError: unknown = null;
+
+  for (const delayMs of delaysMs) {
+    if (delayMs > 0) {
+      await sleep(delayMs);
+    }
+
+    try {
+      return await operation();
+    } catch (err) {
+      lastError = err;
+      if (!isMorningBriefingWarmupError(err)) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Gateway warming up');
+}
+
+// GET /api/platform/morning-briefing/status?userId=...
+platform.get('/morning-briefing/status', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const result = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getMorningBriefingStatus(),
+      'getMorningBriefingStatus'
+    );
+    if (!result) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(result, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return c.json(
+        {
+          ok: true,
+          enabled: false,
+          reconcileState: 'in_progress',
+          error: 'Gateway warming up, retrying shortly.',
+          code: 'gateway_warming_up',
+          retryAfterSec: 2,
+        },
+        200
+      );
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/status');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/enable
+platform.post('/morning-briefing/enable', async c => {
+  const result = await parseBody(c, MorningBriefingSetupSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, cron, timezone } = result.data;
+  try {
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.enableMorningBriefing({ cron, timezone }),
+        'enableMorningBriefing'
+      )
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/enable');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/disable
+platform.post('/morning-briefing/disable', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        result.data.userId,
+        iidResult.instanceId,
+        stub => stub.disableMorningBriefing(),
+        'disableMorningBriefing'
+      )
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/disable');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/run
+platform.post('/morning-briefing/run', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub => stub.runMorningBriefing(),
+      'runMorningBriefing'
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/run');
+    return jsonError(message, status, code);
+  }
+});
+
+// GET /api/platform/morning-briefing/read/{today|yesterday}?userId=...
+platform.get('/morning-briefing/read/:day', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const day = c.req.param('day');
+  if (day !== 'today' && day !== 'yesterday') {
+    return c.json({ error: 'day must be today or yesterday' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.readMorningBriefing(day),
+      'readMorningBriefing'
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      `morning-briefing/read/${day}`
+    );
+    return jsonError(message, status, code);
+  }
+});
+
 // GET /api/platform/files/tree?userId=...
 platform.get('/files/tree', async c => {
   const userId = setValidatedQueryUserId(c);

@@ -59,7 +59,7 @@ RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#fix/plugin-name-r
 RUN npm install -g @steipete/summarize@0.12.0
 
 # Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.1.13
+RUN npm install -g @kilocode/cli@7.2.22
 
 # Install Go (available at runtime for users to `go install` additional tools)
 ENV GO_VERSION=1.26.0
@@ -134,7 +134,7 @@ EXPOSE 18789
 # feature flags) lives in the controller's bootstrap module — no shell wrapper needed.
 CMD ["node", "/usr/local/bin/kiloclaw-controller.js"]
 
-# Build customizer plugin tarball in isolated stage so dev dependencies
+# Build custom plugins tarballs in isolated stages so dev dependencies
 # are not persisted in the runtime image.
 FROM runtime AS customizer-builder
 
@@ -158,11 +158,23 @@ RUN cd /tmp/kilo-chat \
     && cd / \
     && rm -rf /tmp/kilo-chat /root/.npm
 
+FROM runtime AS morning-briefing-builder
+
+COPY plugins/kiloclaw-morning-briefing/ /tmp/kiloclaw-morning-briefing/
+RUN cd /tmp/kiloclaw-morning-briefing \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kiloclaw-morning-briefing.tgz \
+    && cd / \
+    && rm -rf /tmp/kiloclaw-morning-briefing /root/.npm
+
 FROM runtime AS final
 
 COPY --from=customizer-builder /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-customizer.tgz
-RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz \
+COPY --from=morning-briefing-builder /tmp/kiloclaw-morning-briefing.tgz /tmp/kiloclaw-morning-briefing.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-morning-briefing.tgz \
     && rm -f /tmp/kiloclaw-customizer.tgz \
+    && rm -f /tmp/kiloclaw-morning-briefing.tgz \
     && rm -rf /root/.npm
 
 # Install prebuilt kilo-chat plugin package from builder stage.

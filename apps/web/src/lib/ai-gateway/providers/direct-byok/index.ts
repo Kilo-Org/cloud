@@ -103,7 +103,10 @@ export async function getDirectByokModelsForUser(userId: string) {
 }
 
 export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiKey: string) {
-  if (directByokProvider.ai_sdk_provider === 'openai-compatible') {
+  if (
+    directByokProvider.ai_sdk_provider === 'openai-compatible' ||
+    directByokProvider.ai_sdk_provider === 'alibaba'
+  ) {
     return createOpenAICompatible({
       baseURL: directByokProvider.base_url,
       apiKey,

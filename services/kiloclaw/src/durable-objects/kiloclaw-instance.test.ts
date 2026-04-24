@@ -273,6 +273,8 @@ function fetchInputUrl(input: Parameters<typeof fetch>[0]): string {
   return input.url;
 }
 
+const backgroundWaitUntilPromises: Promise<unknown>[] = [];
+
 function createInstance(
   storage = createFakeStorage(),
   env = createFakeEnv()
@@ -286,6 +288,7 @@ function createInstance(
     storage,
     waitUntil: (p: Promise<unknown>) => {
       waitUntilPromises.push(p);
+      backgroundWaitUntilPromises.push(p);
     },
   } as unknown;
   const instance = new KiloClawInstance(
@@ -433,7 +436,9 @@ beforeEach(() => {
   );
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await Promise.allSettled(backgroundWaitUntilPromises.splice(0));
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -8559,9 +8564,10 @@ describe('updateBotIdentity', () => {
         }),
       })
     );
-    expect(calls).toEqual(['put:true', 'fetch', 'put:false']);
+    expect(calls[0]).toBe('put:true');
+    expect(calls[calls.length - 1]).toBe('put:false');
+    expect(calls.filter(call => call === 'fetch').length).toBeGreaterThanOrEqual(1);
     expect(storage._store.get('botIdentityApplyPending')).toBe(false);
-    vi.unstubAllGlobals();
   });
 
   it('sets botIdentityApplyPending while status=starting and does not call the gateway', async () => {

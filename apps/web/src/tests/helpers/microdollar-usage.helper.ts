@@ -31,6 +31,7 @@ function defineDefaultUsageStats(): MicrodollarUsageStats {
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: 200,
   };
 }
 

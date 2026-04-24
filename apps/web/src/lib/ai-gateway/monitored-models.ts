@@ -1,6 +1,6 @@
-import { AUTO_MODELS, isKiloAutoModel } from '@/lib/kilo-auto';
+import { AUTO_MODELS, isKiloAutoModel } from '@/lib/ai-gateway/kilo-auto';
 import type { FeatureValue } from '@/lib/feature-detection';
-import { resolveAutoModel } from '@/lib/kilo-auto/resolution';
+import { resolveAutoModel } from '@/lib/ai-gateway/kilo-auto/resolution';
 import { preferredModels } from '@/lib/ai-gateway/models';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 

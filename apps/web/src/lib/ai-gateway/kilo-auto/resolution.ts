@@ -22,7 +22,7 @@ import {
   type ResolvedAutoModel,
   KILO_AUTO_LEGACY_MODEL,
   BALANCED_HAIKU_MODEL,
-} from '@/lib/kilo-auto';
+} from '@/lib/ai-gateway/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import {

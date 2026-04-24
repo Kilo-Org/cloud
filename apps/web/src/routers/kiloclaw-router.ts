@@ -2463,6 +2463,45 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }),
 
+  getMorningBriefingStatus: clawAccessProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    const client = new KiloClawInternalClient();
+    return client.getMorningBriefingStatus(ctx.user.id, workerInstanceId(instance));
+  }),
+
+  enableMorningBriefing: clawAccessProcedure
+    .input(
+      z.object({
+        cron: z.string().min(1).optional(),
+        timezone: z.string().min(1).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return client.enableMorningBriefing(ctx.user.id, input, workerInstanceId(instance));
+    }),
+
+  disableMorningBriefing: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    const client = new KiloClawInternalClient();
+    return client.disableMorningBriefing(ctx.user.id, workerInstanceId(instance));
+  }),
+
+  runMorningBriefing: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    const client = new KiloClawInternalClient();
+    return client.runMorningBriefing(ctx.user.id, workerInstanceId(instance));
+  }),
+
+  readMorningBriefing: clawAccessProcedure
+    .input(z.object({ day: z.enum(['today', 'yesterday']) }))
+    .query(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return client.readMorningBriefing(ctx.user.id, input.day, workerInstanceId(instance));
+    }),
+
   // Instance lifecycle
   start: clawAccessProcedure.mutation(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);

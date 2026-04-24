@@ -7,11 +7,18 @@ import { withKiloEditorCookie } from './middleware/withKiloEditorCookie';
 function baseProxy(request: NextRequestWithAuth) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-pathname', request.nextUrl.pathname);
-  return NextResponse.next({
+  const response = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   });
+
+  if (request.nextUrl.pathname === '/auth/verify-magic-link') {
+    response.headers.set('Cache-Control', 'no-store');
+    response.headers.set('X-Robots-Tag', 'noindex, noarchive, nofollow');
+  }
+
+  return response;
 }
 
 export const proxy = withBlockedClients(

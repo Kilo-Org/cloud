@@ -60,6 +60,7 @@ export const messages = sqliteTable(
       columns: [table.in_reply_to_message_id],
       foreignColumns: [table.id],
     }),
+    senderIdx: index('messages_sender_id_idx').on(table.sender_id),
     deletedCheck: check('messages_deleted_check', sql`${table.deleted} IN (0, 1)`),
     versionCheck: check('messages_version_check', sql`${table.version} >= 1`),
   })

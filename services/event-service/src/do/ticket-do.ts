@@ -30,8 +30,11 @@ export class TicketDO extends DurableObject<Env> {
   async redeem(ticket: string): Promise<string | null> {
     const entry = await this.ctx.storage.get<TicketEntry>(`ticket:${ticket}`);
     if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      await this.ctx.storage.delete(`ticket:${ticket}`);
+      return null;
+    }
     await this.ctx.storage.delete(`ticket:${ticket}`);
-    if (Date.now() > entry.expiresAt) return null;
     return entry.userId;
   }
 

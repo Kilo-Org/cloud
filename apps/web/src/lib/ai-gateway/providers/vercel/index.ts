@@ -24,7 +24,9 @@ import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
     const raw = await redisGet(VERCEL_ROUTING_REDIS_KEY);
-    return GatewayPercentageSchema.parse(JSON.parse(raw ?? 'null')).vercel_routing_percentage;
+    if (!raw) return DEFAULT_VERCEL_PERCENTAGE;
+    const { vercel_routing_percentage } = GatewayPercentageSchema.parse(JSON.parse(raw));
+    return vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE;
   },
   10_000,
   DEFAULT_VERCEL_PERCENTAGE

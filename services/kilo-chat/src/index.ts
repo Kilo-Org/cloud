@@ -106,11 +106,17 @@ export default class extends WorkerEntrypoint<Env> {
     const results = await Promise.allSettled(
       allConversationIds.map(conversationId =>
         limit(async () => {
-          const destroyed = await withDORetry(
-            () => this.env.CONVERSATION_DO.get(this.env.CONVERSATION_DO.idFromName(conversationId)),
-            stub => stub.destroyAndReturnMembers(),
-            'ConversationDO.destroyAndReturnMembers'
+          // Not wrapped in withDORetry: destroyAndReturnMembers mutates then
+          // returns the member list, so a retry after a successful first call
+          // would observe an empty DO and skip the human MembershipDO cleanup
+          // below. On transport failure we let Promise.allSettled record this
+          // conversation as failed so the caller can retry the whole sandbox
+          // sweep (which is itself idempotent — already-destroyed DOs just
+          // report no members and the final bot-membership sweep still runs).
+          const stub = this.env.CONVERSATION_DO.get(
+            this.env.CONVERSATION_DO.idFromName(conversationId)
           );
+          const destroyed = await stub.destroyAndReturnMembers();
 
           if (destroyed) {
             await Promise.all(

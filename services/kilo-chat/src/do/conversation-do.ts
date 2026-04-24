@@ -523,10 +523,12 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   destroy(): void {
-    this.db.delete(reactions).run();
-    this.db.delete(messages).run();
-    this.db.delete(conversation).run();
-    this.db.delete(members).run();
+    this.db.transaction(tx => {
+      tx.delete(reactions).run();
+      tx.delete(messages).run();
+      tx.delete(conversation).run();
+      tx.delete(members).run();
+    });
   }
 
   leaveMember(memberId: string): {

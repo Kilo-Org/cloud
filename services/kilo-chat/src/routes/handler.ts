@@ -10,6 +10,7 @@
 import type { Context } from 'hono';
 import type { ZodSchema } from 'zod';
 import type { AuthContext } from '../auth';
+import { withDORetry } from '@kilocode/worker-utils';
 import { createBotConversationFor, renameConversationFor } from '../services/conversations';
 import {
   createMessageFor,
@@ -269,13 +270,17 @@ export async function handleListMessages(c: HonoCtx) {
   }
 
   const callerId = c.get('callerId');
-  const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
 
   // Single RPC: membership check + message fetch combined.
-  const result = await convStub.listMessagesIfMember(callerId, {
-    limit: query.data.limit,
-    before: query.data.before,
-  });
+  const result = await withDORetry(
+    () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data)),
+    stub =>
+      stub.listMessagesIfMember(callerId, {
+        limit: query.data.limit,
+        before: query.data.before,
+      }),
+    'ConversationDO.listMessagesIfMember'
+  );
 
   if (result === null) {
     return c.json({ error: 'Forbidden' }, 403);
@@ -291,9 +296,12 @@ export async function handleGetMembers(c: HonoCtx) {
   if (!convId.ok) return convId.response;
 
   const callerId = c.get('callerId');
-  const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
 
-  const info = await convStub.getInfo();
+  const info = await withDORetry(
+    () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data)),
+    stub => stub.getInfo(),
+    'ConversationDO.getInfo'
+  );
   if (!info || !info.members.some(m => m.id === callerId)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
@@ -357,20 +365,20 @@ export async function handleListBotConversations(c: HonoCtx) {
   const botCallerId = `bot:kiloclaw:${sandboxId}`;
   const { limit, offset } = query.data;
 
-  const membershipStub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(botCallerId));
-  const { conversations, hasMore } = await membershipStub.listConversations(
-    sandboxId,
-    limit,
-    offset
+  const { conversations, hasMore } = await withDORetry(
+    () => c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(botCallerId)),
+    stub => stub.listConversations(sandboxId, limit, offset),
+    'MembershipDO.listConversations'
   );
 
   // Step 1: Fetch info for all conversations in parallel
   const conversationsWithInfo = await Promise.all(
     conversations.map(async conv => {
-      const convStub = c.env.CONVERSATION_DO.get(
-        c.env.CONVERSATION_DO.idFromName(conv.conversationId)
+      const info = await withDORetry(
+        () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conv.conversationId)),
+        stub => stub.getInfo(),
+        'ConversationDO.getInfo'
       );
-      const info = await convStub.getInfo();
       return { conv, members: info?.members ?? [] };
     })
   );

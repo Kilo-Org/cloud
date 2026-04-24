@@ -1,6 +1,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import pLimit from 'p-limit';
+import { withDORetry } from '@kilocode/worker-utils';
 import { cors } from 'hono/cors';
 import { authMiddleware } from './auth';
 import { botAuthMiddleware } from './auth-bot';
@@ -54,14 +55,16 @@ export default class extends WorkerEntrypoint<Env> {
 
   async destroySandboxData(sandboxId: string): Promise<{ ok: true; conversationsDeleted: number }> {
     const botId = `bot:kiloclaw:${sandboxId}`;
-    const botMembership = this.env.MEMBERSHIP_DO.get(this.env.MEMBERSHIP_DO.idFromName(botId));
-
     // Discover all conversations for this sandbox, paginating through all results.
     const allConversationIds: string[] = [];
     const PAGE_SIZE = 100;
     let offset = 0;
     while (true) {
-      const page = await botMembership.listConversations(sandboxId, PAGE_SIZE, offset);
+      const page = await withDORetry(
+        () => this.env.MEMBERSHIP_DO.get(this.env.MEMBERSHIP_DO.idFromName(botId)),
+        stub => stub.listConversations(sandboxId, PAGE_SIZE, offset),
+        'MembershipDO.listConversations'
+      );
       for (const c of page.conversations) {
         allConversationIds.push(c.conversationId);
       }
@@ -75,10 +78,11 @@ export default class extends WorkerEntrypoint<Env> {
     const results = await Promise.allSettled(
       allConversationIds.map(conversationId =>
         limit(async () => {
-          const convStub = this.env.CONVERSATION_DO.get(
-            this.env.CONVERSATION_DO.idFromName(conversationId)
+          const info = await withDORetry(
+            () => this.env.CONVERSATION_DO.get(this.env.CONVERSATION_DO.idFromName(conversationId)),
+            stub => stub.getInfo(),
+            'ConversationDO.getInfo'
           );
-          const info = await convStub.getInfo();
 
           if (info) {
             // Remove this conversation from every member's MembershipDO.
@@ -92,6 +96,9 @@ export default class extends WorkerEntrypoint<Env> {
             );
           }
 
+          const convStub = this.env.CONVERSATION_DO.get(
+            this.env.CONVERSATION_DO.idFromName(conversationId)
+          );
           await convStub.destroy();
         })
       )
@@ -103,6 +110,7 @@ export default class extends WorkerEntrypoint<Env> {
     }
 
     // Final sweep: bulk-delete any remaining entries in the bot's MembershipDO.
+    const botMembership = this.env.MEMBERSHIP_DO.get(this.env.MEMBERSHIP_DO.idFromName(botId));
     await botMembership.removeConversationsBySandbox(sandboxId);
 
     return { ok: true, conversationsDeleted: allConversationIds.length };

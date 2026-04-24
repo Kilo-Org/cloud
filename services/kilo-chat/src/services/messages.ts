@@ -8,6 +8,7 @@
  */
 
 import type { ContentBlock } from '@kilocode/kilo-chat';
+import { withDORetry } from '@kilocode/worker-utils';
 import { deliverToBot, deliverActionExecutedToBot } from '../webhook/deliver';
 import {
   extractConversationContext,
@@ -15,7 +16,6 @@ import {
   pushInstanceEvent,
 } from './event-push';
 import type { ConversationInfo } from '../do/conversation-do';
-import type { ConversationDO } from '../index';
 
 type DeferCtx = { waitUntil: (p: Promise<unknown>) => void } | undefined;
 
@@ -60,12 +60,15 @@ export async function createMessageFor(
 
   // Single getInfo() call to get all members — avoids separate getBotMembersExcluding RPC.
   // Must stay on the critical path: info is needed inside postCommitFanOut.
-  const info = await convStub.getInfo();
+  const info = await withDORetry(
+    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.getInfo(),
+    'ConversationDO.getInfo'
+  );
   if (!info) return { ok: true, messageId, clientId };
 
   const fanOut = postCommitFanOut(
     env,
-    convStub,
     info,
     callerId,
     conversationId,
@@ -86,7 +89,6 @@ export async function createMessageFor(
 
 async function postCommitFanOut(
   env: Env,
-  convStub: DurableObjectStub<ConversationDO>,
   info: ConversationInfo,
   callerId: string,
   conversationId: string,
@@ -106,7 +108,11 @@ async function postCommitFanOut(
     let inReplyToBody: string | undefined;
     let inReplyToSender: string | undefined;
     if (inReplyToMessageId) {
-      const parent = await convStub.getMessage(inReplyToMessageId);
+      const parent = await withDORetry(
+        () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+        stub => stub.getMessage(inReplyToMessageId),
+        'ConversationDO.getMessage'
+      );
       if (parent && !parent.deleted) {
         inReplyToBody = parent.content
           .filter(
@@ -123,7 +129,6 @@ async function postCommitFanOut(
       botMembers.map(bot =>
         deliverToBot(
           env,
-          convStub,
           {
             targetBotId: bot.id,
             conversationId,
@@ -156,12 +161,19 @@ async function postCommitFanOut(
     if (text.length > 0) {
       const title = text.length > 80 ? text.slice(0, 77) + '...' : text;
       try {
-        await convStub.updateTitle(title);
+        await withDORetry(
+          () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+          stub => stub.updateTitle(title),
+          'ConversationDO.updateTitle'
+        );
         await Promise.allSettled(
-          info.members.map(member => {
-            const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
-            return stub.updateConversationTitle(conversationId, title);
-          })
+          info.members.map(member =>
+            withDORetry(
+              () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
+              stub => stub.updateConversationTitle(conversationId, title),
+              'MembershipDO.updateConversationTitle'
+            )
+          )
         );
         if (sandboxId) {
           await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
@@ -182,11 +194,18 @@ async function postCommitFanOut(
   const isSenderHuman = humanMemberIds.includes(callerId);
   const results = await Promise.allSettled(
     info.members.map(member => {
-      const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
       if (isSenderHuman && member.id === callerId) {
-        return stub.updateLastActivityAndMarkRead(conversationId, now);
+        return withDORetry(
+          () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
+          stub => stub.updateLastActivityAndMarkRead(conversationId, now),
+          'MembershipDO.updateLastActivityAndMarkRead'
+        );
       }
-      return stub.updateLastActivity(conversationId, now);
+      return withDORetry(
+        () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
+        stub => stub.updateLastActivity(conversationId, now),
+        'MembershipDO.updateLastActivity'
+      );
     })
   );
   for (const r of results) {
@@ -226,8 +245,11 @@ async function postCommitFanOut(
       otherHumans.map(async userId => {
         const present = deliveryMap.get(userId) ?? false;
         if (present) {
-          const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
-          await stub.markRead(conversationId, now);
+          await withDORetry(
+            () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId)),
+            stub => stub.markRead(conversationId, now),
+            'MembershipDO.markRead'
+          );
           await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
             conversationId,
             memberId: userId,

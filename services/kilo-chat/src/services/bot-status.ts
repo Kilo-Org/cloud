@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import type { AuthContext } from '../auth';
 import type { OkResponse } from '@kilocode/kilo-chat';
+import { withDORetry } from '@kilocode/worker-utils';
 import { sandboxIdSchema } from '../routes/schemas';
 import { extractSandboxId, pushBotStatusEvent } from './event-push';
 
@@ -40,10 +41,12 @@ export async function handleBotStatus(c: HonoCtx): Promise<Response> {
 
   // When a conversationId is provided, verify it actually belongs to this sandbox.
   if (parsed.data.conversationId) {
-    const convStub = c.env.CONVERSATION_DO.get(
-      c.env.CONVERSATION_DO.idFromName(parsed.data.conversationId)
+    const info = await withDORetry(
+      () =>
+        c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(parsed.data.conversationId!)),
+      stub => stub.getInfo(),
+      'ConversationDO.getInfo'
     );
-    const info = await convStub.getInfo();
     if (!info) {
       return c.json({ error: 'Unknown conversation' }, 404);
     }

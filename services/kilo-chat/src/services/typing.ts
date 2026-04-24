@@ -1,5 +1,6 @@
 /** Identity-agnostic typing indicators. See services/messages.ts for rationale. */
 
+import { withDORetry } from '@kilocode/worker-utils';
 import { pushEventToHumanMembers } from './event-push';
 
 export type TypingParams = { conversationId: string };
@@ -28,8 +29,11 @@ async function pushTypingEvent(
   params: TypingParams,
   event: 'typing' | 'typing.stop'
 ): Promise<TypingResult> {
-  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId));
-  const result = await convStub.setTyping(callerId);
+  const result = await withDORetry(
+    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId)),
+    async stub => stub.setTyping(callerId),
+    'ConversationDO.setTyping'
+  );
   if (!result.ok) {
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }

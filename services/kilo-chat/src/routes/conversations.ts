@@ -7,6 +7,7 @@ import type {
   ConversationDetailResponse,
   OkResponse,
 } from '@kilocode/kilo-chat';
+import { withDORetry } from '@kilocode/worker-utils';
 import {
   createConversationFor,
   renameConversationFor,
@@ -84,8 +85,11 @@ export function registerConversationRoutes(
     }
     const { limit, offset } = query.data;
 
-    const stub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
-    const { conversations, hasMore } = await stub.listConversations(sandboxId, limit, offset);
+    const { conversations, hasMore } = await withDORetry(
+      () => c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId)),
+      stub => stub.listConversations(sandboxId, limit, offset),
+      'MembershipDO.listConversations'
+    );
     return c.json({ conversations, hasMore, limit, offset } satisfies ConversationListResponse);
   });
 
@@ -97,10 +101,13 @@ export function registerConversationRoutes(
     }
     const conversationId = idParam.data;
     const callerId = c.get('callerId');
-    const stub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
 
     // Single RPC: getInfo returns members, so we check membership from the result.
-    const info = await stub.getInfo();
+    const info = await withDORetry(
+      () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
+      stub => stub.getInfo(),
+      'ConversationDO.getInfo'
+    );
     if (!info || !info.members.some(m => m.id === callerId)) {
       return c.json({ error: 'Forbidden' }, 403);
     }

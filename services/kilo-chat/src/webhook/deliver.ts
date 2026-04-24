@@ -4,6 +4,7 @@ import {
   type messageCreatedWebhookSchema,
   type actionExecutedWebhookSchema,
 } from '@kilocode/kilo-chat';
+import { withDORetry } from '@kilocode/worker-utils';
 import { z } from 'zod';
 import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
 
@@ -20,10 +21,6 @@ export type WebhookMessage = {
   inReplyToMessageId?: string;
   inReplyToBody?: string;
   inReplyToSender?: string;
-};
-
-type ConversationStub = {
-  notifyDeliveryFailed(messageId: string, senderId: string): Promise<void>;
 };
 
 const webhookContentSchema = z.array(contentBlockSchema).catch([]);
@@ -55,7 +52,6 @@ const MAX_RETRIES = 2;
  */
 export async function deliverToBot(
   env: Env,
-  convStub: ConversationStub,
   msg: WebhookMessage,
   convContext?: { humanMemberIds: string[]; sandboxId: string | null }
 ): Promise<void> {
@@ -81,7 +77,11 @@ export async function deliverToBot(
     `Webhook permanently failed for message ${msg.messageId} in conversation ${msg.conversationId}`
   );
   try {
-    await convStub.notifyDeliveryFailed(msg.messageId, msg.from);
+    await withDORetry(
+      () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(msg.conversationId)),
+      stub => stub.notifyDeliveryFailed(msg.messageId, msg.from),
+      'ConversationDO.notifyDeliveryFailed'
+    );
 
     // Push delivery_failed event to human members
     const ctx = convContext ?? (await getConversationContext(env, msg.conversationId));

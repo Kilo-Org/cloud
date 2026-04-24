@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { z } from 'zod';
 import type { ConnectTicketResponse } from '@kilocode/event-service';
+import { withDORetry } from '@kilocode/worker-utils';
 import { authenticateToken } from './auth';
 
 const connectQuerySchema = z.object({
@@ -68,8 +69,10 @@ export default class extends WorkerEntrypoint<Env> {
     event: string,
     payload: unknown
   ): Promise<boolean> {
-    const doId = this.env.USER_SESSION_DO.idFromName(userId);
-    const stub = this.env.USER_SESSION_DO.get(doId);
-    return stub.pushEvent(context, event, payload);
+    return withDORetry(
+      () => this.env.USER_SESSION_DO.get(this.env.USER_SESSION_DO.idFromName(userId)),
+      stub => stub.pushEvent(context, event, payload),
+      'UserSessionDO.pushEvent'
+    );
   }
 }

@@ -4,6 +4,7 @@
  */
 
 import { ulid } from 'ulid';
+import { withDORetry } from '@kilocode/worker-utils';
 import { extractConversationContext, extractSandboxId, pushInstanceEvent } from './event-push';
 import { getSandboxOwner, userOwnsSandbox } from './sandbox-ownership';
 import { validateUserIds } from './user-lookup';
@@ -174,21 +175,31 @@ export async function renameConversationFor(
   params: RenameConversationParams
 ): Promise<RenameConversationResult> {
   const { conversationId, title } = params;
-  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
 
   // Single getInfo() call: membership check + member list for fan-out.
-  const info = await convStub.getInfo();
+  const info = await withDORetry(
+    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.getInfo(),
+    'ConversationDO.getInfo'
+  );
   if (!info || !info.members.some(m => m.id === userId)) {
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }
 
-  await convStub.updateTitle(title);
+  await withDORetry(
+    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.updateTitle(title),
+    'ConversationDO.updateTitle'
+  );
 
   await Promise.all(
-    info.members.map(member => {
-      const memberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
-      return memberStub.updateConversationTitle(conversationId, title);
-    })
+    info.members.map(member =>
+      withDORetry(
+        () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
+        stub => stub.updateConversationTitle(conversationId, title),
+        'MembershipDO.updateConversationTitle'
+      )
+    )
   );
   const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
   if (sandboxId) {
@@ -217,11 +228,17 @@ export async function leaveConversationFor(
   params: LeaveConversationParams
 ): Promise<LeaveConversationResult> {
   const { conversationId } = params;
-  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
 
-  if (!(await convStub.isMember(userId))) {
+  const isMember = await withDORetry(
+    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.isMember(userId),
+    'ConversationDO.isMember'
+  );
+  if (!isMember) {
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }
+
+  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
 
   const { remainingUsers, botMembers } = await convStub.leaveMember(userId);
 
@@ -263,17 +280,23 @@ export async function markReadFor(
   params: MarkReadParams
 ): Promise<MarkReadResult> {
   const { conversationId } = params;
-  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
 
   // Single getInfo() call for both membership check and context extraction.
-  const info = await convStub.getInfo();
+  const info = await withDORetry(
+    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.getInfo(),
+    'ConversationDO.getInfo'
+  );
   if (!info || !info.members.some(m => m.id === userId)) {
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }
 
   const now = Date.now();
-  const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
-  await stub.markRead(conversationId, now);
+  await withDORetry(
+    () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId)),
+    stub => stub.markRead(conversationId, now),
+    'MembershipDO.markRead'
+  );
 
   const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
   if (sandboxId) {

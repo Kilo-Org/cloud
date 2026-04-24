@@ -1,4 +1,5 @@
 import type { KiloChatEventName, KiloChatEventOf, BotStatusEvent } from '@kilocode/kilo-chat';
+import { withDORetry } from '@kilocode/worker-utils';
 import { lookupSandboxOwnerUserId } from './sandbox-owner';
 
 function getEventService(env: Env): Env['EVENT_SERVICE'] | null {
@@ -88,8 +89,11 @@ export async function getConversationContext(
   env: Env,
   conversationId: string
 ): Promise<{ humanMemberIds: string[]; sandboxId: string | null } | null> {
-  const stub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
-  const info = await stub.getInfo();
+  const info = await withDORetry(
+    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.getInfo(),
+    'ConversationDO.getInfo'
+  );
   if (!info) return null;
 
   const humanMemberIds = info.members.filter(m => m.kind === 'user').map(m => m.id);

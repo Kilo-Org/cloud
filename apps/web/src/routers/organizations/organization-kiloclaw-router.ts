@@ -1154,6 +1154,57 @@ export const organizationKiloclawRouter = createTRPCRouter({
       }
     }),
 
+  getMorningBriefingStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+    const client = new KiloClawInternalClient();
+    return client.getMorningBriefingStatus(ctx.user.id, workerInstanceId(instance));
+  }),
+
+  enableMorningBriefing: organizationMemberMutationProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid(),
+        cron: z.string().min(1).optional(),
+        timezone: z.string().min(1).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.enableMorningBriefing(
+        ctx.user.id,
+        {
+          cron: input.cron,
+          timezone: input.timezone,
+        },
+        workerInstanceId(instance)
+      );
+    }),
+
+  disableMorningBriefing: organizationMemberMutationProcedure
+    .input(z.object({ organizationId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.disableMorningBriefing(ctx.user.id, workerInstanceId(instance));
+    }),
+
+  runMorningBriefing: organizationMemberMutationProcedure
+    .input(z.object({ organizationId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.runMorningBriefing(ctx.user.id, workerInstanceId(instance));
+    }),
+
+  readMorningBriefing: organizationMemberProcedure
+    .input(z.object({ organizationId: z.uuid(), day: z.enum(['today', 'yesterday']) }))
+    .query(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.readMorningBriefing(ctx.user.id, input.day, workerInstanceId(instance));
+    }),
+
   // ── Google integration ────────────────────────────────────────
 
   getGoogleSetupCommand: organizationMemberProcedure.query(async ({ ctx, input }) => {

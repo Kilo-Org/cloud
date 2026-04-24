@@ -101,6 +101,16 @@ export function useControllerVersion(enabled: boolean) {
   );
 }
 
+export function useMorningBriefingStatus(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.getMorningBriefingStatus.queryOptions(undefined, {
+      enabled,
+      refetchInterval: enabled ? 30_000 : false,
+    })
+  );
+}
+
 export function useKiloCliRunStatus(runId: string | null) {
   const trpc = useTRPC();
   return useQuery(
@@ -346,6 +356,36 @@ export function useKiloClawMutations() {
     ),
     setGmailNotifications: useMutation(
       trpc.kiloclaw.setGmailNotifications.mutationOptions({ onSuccess: invalidateStatus })
+    ),
+    enableMorningBriefing: useMutation(
+      trpc.kiloclaw.enableMorningBriefing.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),
+          });
+        },
+      })
+    ),
+    disableMorningBriefing: useMutation(
+      trpc.kiloclaw.disableMorningBriefing.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),
+          });
+        },
+      })
+    ),
+    runMorningBriefing: useMutation(
+      trpc.kiloclaw.runMorningBriefing.mutationOptions({
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),
+          });
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.readMorningBriefing.queryKey({ day: 'today' }),
+          });
+        },
+      })
     ),
     rename: useMutation(
       trpc.kiloclaw.renameInstance.mutationOptions({ onSuccess: invalidateStatus })

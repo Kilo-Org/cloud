@@ -3079,6 +3079,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.importOpenclawWorkspace(this.s, this.env, files);
   }
 
+  async getMorningBriefingStatus() {
+    await this.loadState();
+    return gateway.getMorningBriefingStatus(this.s, this.env);
+  }
+
+  async enableMorningBriefing(input: { cron?: string; timezone?: string }) {
+    await this.loadState();
+    return gateway.enableMorningBriefing(this.s, this.env, input);
+  }
+
+  async disableMorningBriefing() {
+    await this.loadState();
+    return gateway.disableMorningBriefing(this.s, this.env);
+  }
+
+  async runMorningBriefing() {
+    await this.loadState();
+    return gateway.runMorningBriefing(this.s, this.env);
+  }
+
+  async readMorningBriefing(day: 'today' | 'yesterday') {
+    await this.loadState();
+    return gateway.readMorningBriefing(this.s, this.env, day);
+  }
+
   // ── Restart machine (user-facing) ──────────────────────────────────
 
   async restartMachine(options?: {

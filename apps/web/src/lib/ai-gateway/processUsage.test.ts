@@ -2,11 +2,14 @@ import { test, describe, expect } from '@jest/globals';
 import type { MicrodollarUsageStats, MicrodollarUsageContext } from './processUsage.types';
 import {
   extractPromptInfo,
+  extractUsageContextInfo,
   parseMicrodollarUsageFromStream,
   parseMicrodollarUsageFromString,
   mapToUsageStats,
   logMicrodollarUsage,
   processOpenRouterUsage,
+  stripNulBytesInPlace,
+  toInsertableDbUsageRecord,
 } from './processUsage';
 import type { OpenRouterGeneration } from '@/lib/ai-gateway/providers/openrouter/types';
 import { verifyApproval } from '../../tests/helpers/approval.helper';
@@ -712,5 +715,191 @@ describe('logMicrodollarUsage', () => {
     // Verify user balance was NOT updated (org usage doesn't deplete user balance)
     const updatedUser = await findUserById('test-insert-org-user');
     expect(updatedUser?.microdollars_used).toBe(4000); // unchanged
+  });
+});
+
+describe('stripNulBytesInPlace', () => {
+  test('strips NUL bytes from string values and tracks field names', () => {
+    const obj: Record<string, unknown> = {
+      clean: 'normal',
+      dirty: 'bad\u0000val',
+      other: 42,
+      nil: null,
+      multiple: 'a\u0000b\u0000c',
+    };
+    const dirtyFields: string[] = [];
+
+    stripNulBytesInPlace(obj, dirtyFields);
+
+    expect(obj.clean).toBe('normal');
+    expect(obj.dirty).toBe('badval');
+    expect(obj.other).toBe(42);
+    expect(obj.nil).toBeNull();
+    expect(obj.multiple).toBe('abc');
+    expect(dirtyFields.sort()).toEqual(['dirty', 'multiple']);
+  });
+
+  test('is a no-op when no NUL bytes are present', () => {
+    const obj: Record<string, unknown> = { a: 'x', b: 'y', c: 1 };
+    const dirtyFields: string[] = [];
+
+    stripNulBytesInPlace(obj, dirtyFields);
+
+    expect(dirtyFields).toEqual([]);
+    expect(obj).toEqual({ a: 'x', b: 'y', c: 1 });
+  });
+});
+
+describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
+  const baseUsageStats: MicrodollarUsageStats = {
+    messageId: 'msg-id',
+    hasError: false,
+    cost_mUsd: 500,
+    inputTokens: 100,
+    outputTokens: 50,
+    cacheWriteTokens: 0,
+    cacheHitTokens: 0,
+    is_byok: false,
+    model: 'provider/model',
+    responseContent: '',
+    inference_provider: 'prov',
+    upstream_id: 'up',
+    finish_reason: 'stop',
+    latency: null,
+    moderation_latency: null,
+    generation_time: null,
+    streamed: null,
+    cancelled: null,
+  };
+
+  // Node's Headers constructor rejects values containing NUL bytes (invalid
+  // per RFC 7230), so HTTP-header-sourced fields like `http_user_agent`,
+  // `machine_id`, `session_id`, `editor_name`, and `project_id` cannot
+  // realistically carry NULs in production. The realistic vector is fields
+  // sourced from the JSON request body or upstream LLM responses:
+  // `model`, `requested_model`, `inference_provider`, `upstream_id`,
+  // `finish_reason`, `message_id`, `system_prompt_prefix`, `user_prompt_prefix`.
+  // The sanitizer still covers every string field defensively.
+  const makeUsageContext = (overrides: Partial<MicrodollarUsageContext> = {}) =>
+    ({
+      api_kind: 'chat_completions',
+      kiloUserId: 'user-1',
+      prior_microdollar_usage: 0,
+      provider: 'openrouter',
+      fraudHeaders: getFraudDetectionHeaders(new Headers({ 'user-agent': 'test-agent' })),
+      isStreaming: false,
+      project_id: null,
+      requested_model: 'provider/requested-model',
+      promptInfo: {
+        system_prompt_prefix: 'sys-prefix',
+        system_prompt_length: 10,
+        user_prompt_prefix: 'usr-prefix',
+      },
+      max_tokens: null,
+      has_middle_out_transform: null,
+      status_code: null,
+      editor_name: 'vscode',
+      machine_id: 'machine',
+      user_byok: false,
+      has_tools: false,
+      feature: null,
+      session_id: 'session',
+      mode: null,
+      auto_model: null,
+      ttfb_ms: null,
+      ...overrides,
+    }) satisfies MicrodollarUsageContext;
+
+  test('strips NUL bytes from body- and upstream-sourced string fields', () => {
+    // Fields whose values cross the CTE insert as individual SQL parameters.
+    // A NUL byte in any of them crashes the insert with Postgres 22021 --
+    // see KILOCODE-WEB-1G3Z.
+    const usageStats: MicrodollarUsageStats = {
+      ...baseUsageStats,
+      messageId: 'msg\u0000id',
+      model: 'provider/model\u0000evil',
+      inference_provider: 'prov\u0000',
+      upstream_id: 'up\u0000',
+      finish_reason: 'stop\u0000',
+    };
+    const usageContext = makeUsageContext({
+      requested_model: 'req\u0000model',
+      promptInfo: {
+        system_prompt_prefix: 'sys\u0000prefix',
+        system_prompt_length: 10,
+        user_prompt_prefix: 'usr\u0000prefix',
+      },
+    });
+
+    const { core, metadata } = toInsertableDbUsageRecord(
+      usageStats,
+      extractUsageContextInfo(usageContext)
+    );
+
+    // core fields (from the LLM response body)
+    expect(core.model).toBe('provider/modelevil');
+    expect(core.inference_provider).toBe('prov');
+    expect(core.requested_model).toBe('reqmodel');
+
+    // metadata fields (from prompt extraction + upstream response)
+    expect(metadata.system_prompt_prefix).toBe('sysprefix');
+    expect(metadata.user_prompt_prefix).toBe('usrprefix');
+    expect(metadata.upstream_id).toBe('up');
+    expect(metadata.finish_reason).toBe('stop');
+    expect(metadata.message_id).toBe('msgid');
+
+    // No stray NUL bytes anywhere in the returned record.
+    for (const value of Object.values(core)) {
+      if (typeof value === 'string') expect(value.includes('\u0000')).toBe(false);
+    }
+    for (const value of Object.values(metadata)) {
+      if (typeof value === 'string') expect(value.includes('\u0000')).toBe(false);
+    }
+  });
+
+  test('strips NUL bytes from a directly-constructed fraudHeaders object', () => {
+    // Bypass Node's Headers validation to exercise the defensive coverage of
+    // HTTP-header-sourced fields. This documents that IF a NUL byte ever
+    // reaches these fields (e.g. through a future upstream change), the
+    // sanitizer will still strip it.
+    const usageContext = makeUsageContext({
+      fraudHeaders: {
+        http_x_forwarded_for: '1.2.3.4\u0000',
+        http_x_vercel_ip_city: 'Amsterdam\u0000',
+        http_x_vercel_ip_country: 'NL\u0000',
+        http_x_vercel_ip_latitude: 52.37,
+        http_x_vercel_ip_longitude: 4.89,
+        http_x_vercel_ja4_digest: 'abc\u0000',
+        http_user_agent: 'kilo\u0000evil',
+      },
+    });
+
+    const { metadata } = toInsertableDbUsageRecord(
+      baseUsageStats,
+      extractUsageContextInfo(usageContext)
+    );
+
+    expect(metadata.http_user_agent).toBe('kiloevil');
+    expect(metadata.http_x_forwarded_for).toBe('1.2.3.4');
+    expect(metadata.http_x_vercel_ip_city).toBe('Amsterdam');
+    expect(metadata.http_x_vercel_ip_country).toBe('NL');
+    expect(metadata.http_x_vercel_ja4_digest).toBe('abc');
+  });
+
+  test('is a no-op on records without NUL bytes', () => {
+    const { core, metadata } = toInsertableDbUsageRecord(
+      baseUsageStats,
+      extractUsageContextInfo(makeUsageContext())
+    );
+
+    expect(core.model).toBe('provider/model');
+    expect(core.inference_provider).toBe('prov');
+    expect(core.requested_model).toBe('provider/requested-model');
+    expect(metadata.machine_id).toBe('machine');
+    expect(metadata.session_id).toBe('session');
+    expect(metadata.editor_name).toBe('vscode');
+    expect(metadata.upstream_id).toBe('up');
+    expect(metadata.finish_reason).toBe('stop');
+    expect(metadata.message_id).toBe('msg-id');
   });
 });

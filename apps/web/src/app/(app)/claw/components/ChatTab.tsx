@@ -112,9 +112,23 @@ function StreamChatUI({
   useEffect(() => {
     if (!client) return;
     const ch = client.channel('messaging', channelId);
-    void ch.watch({ presence: true });
-    setChannel(ch);
+    let cancelled = false;
+    void (async () => {
+      await ch.watch({ presence: true });
+      if (cancelled) return;
+      // Disable file uploads client-side by stripping the capability before
+      // Channel reads it. This hides the attachment button, disables drag-
+      // and-drop, and makes paste-to-upload a no-op — all three paths in
+      // stream-chat-react gate on channel.data.own_capabilities["upload-file"].
+      if (ch.data?.own_capabilities) {
+        ch.data.own_capabilities = ch.data.own_capabilities.filter(
+          capability => capability !== 'upload-file'
+        );
+      }
+      setChannel(ch);
+    })();
     return () => {
+      cancelled = true;
       void ch.stopWatching();
     };
   }, [client, channelId]);

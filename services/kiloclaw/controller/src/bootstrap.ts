@@ -16,6 +16,8 @@ import { execFileSync as nodeExecFileSync } from 'node:child_process';
 import { generateBaseConfig, writeBaseConfig, writeMcporterConfig } from './config-writer';
 import type { ConfigWriterDeps } from './config-writer';
 import { atomicWrite } from './atomic-write';
+import { migrateKilocodeAuthProfilesToKeyRef } from './auth-profiles-migration';
+import type { AuthProfilesMigrationDeps } from './auth-profiles-migration';
 
 const CONFIG_DIR = '/root/.openclaw';
 const CONFIG_PATH = '/root/.openclaw/openclaw.json';
@@ -55,6 +57,7 @@ export type BootstrapDeps = {
   renameSync: (oldPath: string, newPath: string) => void;
   unlinkSync: (path: string) => void;
   readdirSync: (dir: string) => string[];
+  statSync: (p: string) => { isDirectory: () => boolean };
   execFileSync: (cmd: string, args: string[], opts?: ExecOpts) => string;
 };
 
@@ -69,6 +72,7 @@ const defaultDeps: BootstrapDeps = {
   renameSync: (oldPath, newPath) => fs.renameSync(oldPath, newPath),
   unlinkSync: p => fs.unlinkSync(p),
   readdirSync: dir => fs.readdirSync(dir),
+  statSync: p => fs.statSync(p),
   execFileSync: (cmd, args, opts) =>
     nodeExecFileSync(cmd, args, {
       encoding: 'utf8',
@@ -612,6 +616,20 @@ function toConfigWriterDeps(deps: BootstrapDeps): ConfigWriterDeps {
   };
 }
 
+/** Adapt BootstrapDeps to AuthProfilesMigrationDeps. */
+function toAuthProfilesMigrationDeps(deps: BootstrapDeps): AuthProfilesMigrationDeps {
+  return {
+    existsSync: deps.existsSync,
+    readdirSync: deps.readdirSync,
+    statSync: deps.statSync,
+    readFileSync: deps.readFileSync,
+    writeFileSync: deps.writeFileSync,
+    renameSync: deps.renameSync,
+    unlinkSync: deps.unlinkSync,
+    chmodSync: deps.chmodSync,
+  };
+}
+
 export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
   const configExists = deps.existsSync(CONFIG_PATH);
   const cwDeps = toConfigWriterDeps(deps);
@@ -660,6 +678,22 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   // config fallback — but some openclaw versions require explicit defaults
   // in exec-approvals.json to fully suppress interactive approval prompts.
   seedExecApprovalsDefaults(env, deps);
+
+  // Migrate any legacy plaintext kilocode keys in auth-profiles.json to
+  // env-backed keyRefs. No-op on fresh installs (onboard writes keyRefs
+  // directly thanks to --secret-input-mode ref) and on instances already
+  // migrated. Running unconditionally also covers the case where an older
+  // auth-profiles.json somehow reappears (e.g., legacy auth.json migration
+  // on first load).
+  const migrationReport = migrateKilocodeAuthProfilesToKeyRef(
+    CONFIG_DIR,
+    toAuthProfilesMigrationDeps(deps)
+  );
+  if (migrationReport.profilesMigrated > 0) {
+    console.log(
+      `[controller] auth-profiles migration: ${migrationReport.profilesMigrated} profile(s) across ${migrationReport.filesModified} file(s)`
+    );
+  }
 
   writeBotIdentityFile(env, deps);
   writeUserProfileFile(env, deps);

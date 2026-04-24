@@ -128,6 +128,36 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   };
 }
 
+/**
+ * Strip NUL bytes (\u0000) in place from every string-typed field on `obj`.
+ *
+ * Postgres `text` columns reject NUL bytes with `22021 invalid byte sequence
+ * for encoding "UTF8": 0x00`, which crashes the `microdollar_usage` CTE insert
+ * and leaves the request un-billed (see Sentry KILOCODE-WEB-1G3Z).
+ *
+ * NULs have been observed in client-populated fields on the LLM gateway hot
+ * path: HTTP headers from the VS Code extension (machine_id, session_id,
+ * http_user_agent) and prompt-derived fields (system_prompt_prefix,
+ * user_prompt_prefix). Sanitizing at the DB boundary is a safety net; once
+ * the upstream source is identified via the `console.warn` in
+ * `toInsertableDbUsageRecord` (queryable in Axiom), sanitize at the source
+ * and remove this.
+ *
+ * Any sanitized field names are appended to `dirtyFields` so the caller can
+ * log them for source attribution.
+ */
+export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: string[]): void {
+  for (const key of Object.keys(obj)) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.indexOf('\u0000') >= 0) {
+      // Using split/join rather than a regex avoids the no-control-regex
+      // lint rule; the NUL byte is the intended match here.
+      obj[key] = value.split('\u0000').join('');
+      dirtyFields.push(key);
+    }
+  }
+}
+
 export function toInsertableDbUsageRecord(
   usageStats: MicrodollarUsageStats,
   usageContextInfo: UsageContextInfo
@@ -181,6 +211,26 @@ export function toInsertableDbUsageRecord(
     //never log any sensitive data for orgs
     metadata.user_prompt_prefix = null;
     metadata.system_prompt_prefix = null;
+  }
+
+  // Strip NUL bytes before returning. Postgres `text` columns reject them
+  // (error 22021) and crash the microdollar_usage CTE insert, leaving the
+  // request un-billed. See KILOCODE-WEB-1G3Z.
+  const dirtyFields: string[] = [];
+  stripNulBytesInPlace(core as unknown as Record<string, unknown>, dirtyFields);
+  stripNulBytesInPlace(metadata as unknown as Record<string, unknown>, dirtyFields);
+  if (dirtyFields.length > 0) {
+    // Log to Axiom (not Sentry) — this is a one-off source-attribution probe,
+    // not an issue to triage. Once the dominant field is identified via
+    // `summarize count() by fields`, sanitize at the source and remove both
+    // this log and the sanitizer above.
+    console.warn('microdollar_usage string field contained NUL bytes; sanitized before insert', {
+      source: 'toInsertableDbUsageRecord',
+      fields: dirtyFields,
+      kilo_user_id,
+      requested_model: usageContextInfo.requested_model,
+      provider,
+    });
   }
 
   return { core, metadata };

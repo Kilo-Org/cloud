@@ -7,7 +7,7 @@ function getEventService(env: Env): Env['EVENT_SERVICE'] | null {
 
 /**
  * Pushes an event to the event-service for each human member of a conversation.
- * Fire-and-forget: failures are logged but don't block the caller.
+ * Returns a map of userId → delivered (true if the user had an active WS in context).
  */
 export async function pushEventToHumanMembers<N extends KiloChatEventName>(
   env: Env,
@@ -16,14 +16,25 @@ export async function pushEventToHumanMembers<N extends KiloChatEventName>(
   humanMemberIds: string[],
   event: N,
   payload: KiloChatEventOf<N>
-): Promise<void> {
+): Promise<Map<string, boolean>> {
   const es = getEventService(env);
-  if (!es) return;
+  if (!es) return new Map();
   const context = `/kiloclaw/${sandboxId}/${conversationId}`;
 
-  await Promise.allSettled(
-    humanMemberIds.map(userId => es.pushEvent(userId, context, event, payload))
+  const results = await Promise.allSettled(
+    humanMemberIds.map(async userId => {
+      const delivered = await es.pushEvent(userId, context, event, payload);
+      return [userId, delivered] as const;
+    })
   );
+
+  const map = new Map<string, boolean>();
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      map.set(r.value[0], r.value[1]);
+    }
+  }
+  return map;
 }
 
 /**
@@ -59,25 +70,6 @@ export async function pushBotStatusEvent(
   if (!ownerUserId) return { delivered: false, ownerUserId: null };
   await pushInstanceEvent(env, sandboxId, [ownerUserId], 'bot.status', payload);
   return { delivered: true, ownerUserId };
-}
-
-/**
- * Checks if a user is present (has an active WS connection) in a conversation context.
- */
-export async function isUserPresentInConversation(
-  env: Env,
-  userId: string,
-  sandboxId: string,
-  conversationId: string
-): Promise<boolean> {
-  const es = getEventService(env);
-  if (!es) return false;
-  const context = `/kiloclaw/${sandboxId}/${conversationId}`;
-  try {
-    return await es.isUserInContext(userId, context);
-  } catch {
-    return false;
-  }
 }
 
 /**

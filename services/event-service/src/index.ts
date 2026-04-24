@@ -61,15 +61,14 @@ export default class extends WorkerEntrypoint<Env> {
     return app.fetch(request, this.env, this.ctx);
   }
 
-  async pushEvent(userId: string, context: string, event: string, payload: unknown): Promise<void> {
+  async pushEvent(
+    userId: string,
+    context: string,
+    event: string,
+    payload: unknown
+  ): Promise<boolean> {
     const doId = this.env.USER_SESSION_DO.idFromName(userId);
     const stub = this.env.USER_SESSION_DO.get(doId);
-    await stub.pushEvent(context, event, payload);
-  }
-
-  async isUserInContext(userId: string, context: string): Promise<boolean> {
-    const doId = this.env.USER_SESSION_DO.idFromName(userId);
-    const stub = this.env.USER_SESSION_DO.get(doId);
-    return stub.isUserInContext(context);
+    return stub.pushEvent(context, event, payload);
   }
 }

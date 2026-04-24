@@ -10,8 +10,7 @@ declare global {
       deliverChatWebhook(payload: z.infer<typeof chatWebhookRpcSchema>): Promise<void>;
     };
     EVENT_SERVICE: Fetcher & {
-      pushEvent(userId: string, context: string, event: string, payload: unknown): Promise<void>;
-      isUserInContext(userId: string, context: string): Promise<boolean>;
+      pushEvent(userId: string, context: string, event: string, payload: unknown): Promise<boolean>;
     };
   }
 }

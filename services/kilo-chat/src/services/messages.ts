@@ -13,7 +13,6 @@ import {
   extractConversationContext,
   pushEventToHumanMembers,
   pushInstanceEvent,
-  isUserPresentInConversation,
 } from './event-push';
 
 type DeferCtx = { waitUntil: (p: Promise<unknown>) => void } | undefined;
@@ -160,8 +159,8 @@ export async function createMessageFor(
       await senderStub.markRead(conversationId, now).catch(() => {});
     }
 
-    // Push message.created on conversation context
-    await pushEventToHumanMembers(
+    // Push message.created on conversation context; capture delivery map for presence check below.
+    const deliveryMap = await pushEventToHumanMembers(
       env,
       conversationId,
       sandboxId,
@@ -183,11 +182,11 @@ export async function createMessageFor(
       });
     }
 
-    // For each non-sender human member: if they're present in the conversation,
-    // auto-mark read. Otherwise, push conversation.activity on the instance context.
+    // For each non-sender human member: if they received the message.created event,
+    // they are present — auto-mark read. Otherwise, push conversation.activity.
     await Promise.allSettled(
       otherHumans.map(async userId => {
-        const present = await isUserPresentInConversation(env, userId, sandboxId, conversationId);
+        const present = deliveryMap.get(userId) ?? false;
         if (present) {
           const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
           await stub.markRead(conversationId, now);

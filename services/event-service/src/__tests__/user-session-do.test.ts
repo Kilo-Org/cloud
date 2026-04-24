@@ -92,37 +92,37 @@ describe('UserSessionDO', () => {
     ws.close();
   });
 
-  it('isUserInContext returns true when connection has matching context', async () => {
+  it('pushEvent returns true when connection has matching context', async () => {
     const userId = 'user-present-match';
     const { ws, stub } = await connectWs(userId);
 
     ws.send(JSON.stringify({ type: 'context.subscribe', contexts: ['project:present'] }));
     await new Promise(r => setTimeout(r, 50));
 
-    const result = await stub.isUserInContext('project:present');
+    const result = await stub.pushEvent('project:present', 'test', {});
     expect(result).toBe(true);
 
     ws.close();
   });
 
-  it('isUserInContext returns false when no matching context', async () => {
+  it('pushEvent returns false when no matching context', async () => {
     const userId = 'user-present-no-match';
     const { ws, stub } = await connectWs(userId);
 
     ws.send(JSON.stringify({ type: 'context.subscribe', contexts: ['project:a'] }));
     await new Promise(r => setTimeout(r, 50));
 
-    const result = await stub.isUserInContext('project:b');
+    const result = await stub.pushEvent('project:b', 'test', {});
     expect(result).toBe(false);
 
     ws.close();
   });
 
-  it('isUserInContext returns false when no connections', async () => {
+  it('pushEvent returns false when no connections', async () => {
     const id = env.USER_SESSION_DO.idFromName('user-present-no-connections');
     const stub = env.USER_SESSION_DO.get(id);
 
-    const result = await stub.isUserInContext('project:any');
+    const result = await stub.pushEvent('project:any', 'test', {});
     expect(result).toBe(false);
   });
 
@@ -157,7 +157,7 @@ describe('UserSessionDO', () => {
     ws.send(JSON.stringify({ type: 'context.subscribe', contexts }));
     await new Promise(r => setTimeout(r, 50));
 
-    expect(await stub.isUserInContext('project:200')).toBe(false);
+    expect(await stub.pushEvent('project:200', 'test', {})).toBe(false);
     ws.close();
   });
 });

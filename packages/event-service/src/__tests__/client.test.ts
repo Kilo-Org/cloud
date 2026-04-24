@@ -46,6 +46,10 @@ class MockWebSocket {
     this.readyState = 3;
     for (const fn of this.listeners.get('close') ?? []) fn(new CloseEvent('close'));
   }
+
+  triggerError(): void {
+    for (const fn of this.listeners.get('error') ?? []) fn(new Event('error'));
+  }
 }
 
 let lastMockWs: MockWebSocket;
@@ -195,6 +199,47 @@ describe('EventServiceClient', () => {
     expect(ws1).not.toBe(ws2);
     expect(ws1.readyState).toBe(3); // CLOSED — properly cleaned up
     expect(allMockWs).toHaveLength(2);
+  });
+
+  it('error+close before open schedules a single reconnect timer', async () => {
+    vi.useFakeTimers();
+    try {
+      let wsCount = 0;
+      // Override the WebSocket mock so the first socket errors before open
+      // (error → close, the sequence browsers fire). The second socket
+      // succeeds normally so we can count reconnect attempts cleanly.
+      vi.stubGlobal('WebSocket', function (url: string) {
+        lastMockWs = new MockWebSocket(url);
+        allMockWs.push(lastMockWs);
+        wsCount++;
+        if (wsCount === 1) {
+          lastMockWs.readyState = 0; // CONNECTING
+          void Promise.resolve().then(() => {
+            lastMockWs.triggerError();
+            lastMockWs.triggerClose();
+          });
+        } else {
+          // Reconnect attempt succeeds
+          void Promise.resolve().then(() => lastMockWs.triggerOpen());
+        }
+        return lastMockWs;
+      });
+
+      const client = makeClient();
+      // connect() should absorb the failure and schedule a reconnect
+      await client.connect();
+      expect(client.isConnected()).toBe(false);
+      expect(allMockWs).toHaveLength(1);
+
+      // Advance past the max first-attempt delay. If the bug were present,
+      // two timers would fire and we'd see 3 WebSockets (original + 2
+      // reconnects). With the fix, exactly one reconnect fires.
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(allMockWs).toHaveLength(2);
+      expect(client.isConnected()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('schedules reconnect after initial ticket failure', async () => {

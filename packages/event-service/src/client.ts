@@ -216,6 +216,7 @@ export class EventServiceClient {
   }
 
   private scheduleReconnect(): void {
+    if (this.reconnectTimer !== null) return;
     const base = Math.min(30_000, 1000 * 2 ** this.reconnectAttempts);
     const delay = base * (0.5 + Math.random() * 0.5);
     this.reconnectAttempts++;

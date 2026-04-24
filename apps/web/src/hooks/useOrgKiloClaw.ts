@@ -463,6 +463,12 @@ export function useOrgKiloClawMutations(
             organizationId,
           }),
         });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.readMorningBriefing.queryKey({
+            organizationId,
+            day: 'today',
+          }),
+        });
       },
     })
   );

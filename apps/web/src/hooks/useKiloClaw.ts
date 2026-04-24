@@ -381,6 +381,9 @@ export function useKiloClawMutations() {
           await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),
           });
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.readMorningBriefing.queryKey({ day: 'today' }),
+          });
         },
       })
     ),

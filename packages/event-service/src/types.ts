@@ -1,34 +1,30 @@
-// ── HTTP response types ────────────────────────────────────────────
+import type { z } from 'zod';
+import type {
+  connectTicketResponseSchema,
+  contextSubscribeMessageSchema,
+  contextUnsubscribeMessageSchema,
+  clientMessageSchema,
+  eventMessageSchema,
+  serverMessageSchema,
+} from './schemas';
 
-export type ConnectTicketResponse = {
-  ticket: string;
-  userId: string;
-};
+// ── HTTP responses ─────────────────────────────────────────────────
 
-// Client → Server
-export type ContextSubscribeMessage = {
-  type: 'context.subscribe';
-  contexts: string[];
-};
+export type ConnectTicketResponse = z.infer<typeof connectTicketResponseSchema>;
 
-export type ContextUnsubscribeMessage = {
-  type: 'context.unsubscribe';
-  contexts: string[];
-};
+// ── Client → Server ────────────────────────────────────────────────
 
-export type ClientMessage = ContextSubscribeMessage | ContextUnsubscribeMessage;
+export type ContextSubscribeMessage = z.infer<typeof contextSubscribeMessageSchema>;
+export type ContextUnsubscribeMessage = z.infer<typeof contextUnsubscribeMessageSchema>;
+export type ClientMessage = z.infer<typeof clientMessageSchema>;
 
-// Server → Client
-export type EventMessage = {
-  type: 'event';
-  context: string;
-  event: string;
-  payload: unknown;
-};
+// ── Server → Client ────────────────────────────────────────────────
 
-export type ServerMessage = EventMessage;
+export type EventMessage = z.infer<typeof eventMessageSchema>;
+export type ServerMessage = z.infer<typeof serverMessageSchema>;
 
-// Config
+// ── Config ─────────────────────────────────────────────────────────
+
 export type EventServiceConfig = {
   url: string;
   getToken: () => Promise<string>;

@@ -82,6 +82,31 @@ After all gates pass and your work is complete, create a pull request before cal
 `
       : ''
   }
+## PR Conflict Resolution Workflow
+
+When your hooked bead has the \`gt:pr-conflict\` label, **or** when it has the \`gt:pr-feedback\` label and \`pr_conflict_context\` is present in your context, you are resolving merge conflicts on an existing PR branch. **This is an exception to the "do not switch branches" rule.** You MUST check out the PR branch from your bead metadata (\`pr_conflict_context.branch\`).
+
+1. Check out the PR branch: \`git fetch origin && git checkout <branch>\`
+2. Rebase onto the target branch to incorporate its latest changes:
+   \`\`\`
+   git rebase origin/<target_branch>
+   \`\`\`
+3. If there are conflicts during rebase, resolve them:
+   - Edit conflicting files to resolve conflict markers (\`<<<<<<<\`, \`=======\`, \`>>>>>>>\`)
+   - Stage the resolved files: \`git add <file>\`
+   - Continue the rebase: \`git rebase --continue\`
+   - Repeat until the rebase completes
+4. Push the rebased branch:
+   \`\`\`
+   git push --force-with-lease origin <branch>
+   \`\`\`
+5. If the bead metadata has \`has_feedback: true\`, also address the PR review feedback (see PR Fixup Workflow below) before calling gt_done.
+ 6. Call \`gt_done\` with both required arguments once all conflicts are resolved (and feedback addressed if applicable):
+    - \`pr_url\`: the PR URL from \`pr_conflict_context.pr_url\`
+    - \`branch\`: the branch name from \`pr_conflict_context.branch\`
+
+Do NOT create a new PR. Push to the existing branch.
+
 ## PR Fixup Workflow
 
 When your hooked bead has the \`gt:pr-fixup\` label, you are fixing an existing PR rather than creating new work. **This is the ONE exception to the "do not switch branches" rule.** You MUST check out the PR branch from your bead metadata instead of using the default worktree branch.
@@ -101,7 +126,7 @@ Do NOT create a new PR. Push to the existing branch.
 - Commit after every meaningful unit of work (new function, passing test, config change).
 - Push after every commit. Do not batch pushes.
 - Use descriptive commit messages referencing the bead if applicable.
-- Branch naming: your branch is pre-configured in your worktree. Do not switch branches — **unless** your bead has the \`gt:pr-fixup\` label (see PR Fixup Workflow above).
+- Branch naming: your branch is pre-configured in your worktree. Do not switch branches — **unless** your bead has the \`gt:pr-fixup\` or \`gt:pr-conflict\` label (see workflows above).
 
 ## Escalation
 

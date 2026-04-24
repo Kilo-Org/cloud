@@ -16,7 +16,10 @@ import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openro
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { redisGet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
-import { GatewayPercentageSchema, DEFAULT_VERCEL_PERCENTAGE } from '@/lib/gateway-config';
+import {
+  GatewayPercentageSchema,
+  DEFAULT_VERCEL_PERCENTAGE,
+} from '@/lib/ai-gateway/gateway-config';
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
@@ -24,7 +27,9 @@ import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
     const raw = await redisGet(VERCEL_ROUTING_REDIS_KEY);
-    return GatewayPercentageSchema.parse(JSON.parse(raw ?? 'null')).vercel_routing_percentage;
+    if (!raw) return DEFAULT_VERCEL_PERCENTAGE;
+    const { vercel_routing_percentage } = GatewayPercentageSchema.parse(JSON.parse(raw));
+    return vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE;
   },
   10_000,
   DEFAULT_VERCEL_PERCENTAGE

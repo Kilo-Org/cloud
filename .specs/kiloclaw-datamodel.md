@@ -152,6 +152,15 @@ on application logs that may be rotated or incomplete.
 9. When the single-instance limit is relaxed in the future, no
    schema migration SHALL be required.
 
+### Operational Instance Markers
+
+Instance records MAY store operational lifecycle markers that do not
+by themselves grant or revoke billing entitlement. These markers are
+runtime metadata on the instance record, not a substitute for
+subscription status, suspension, or destruction fields.
+Markers MAY be cleared when the lifecycle condition they represent no
+longer applies.
+
 ### Record Lookup
 
 10. Fetching a single record from `kiloclaw_instance` or

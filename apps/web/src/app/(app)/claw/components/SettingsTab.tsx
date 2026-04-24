@@ -26,7 +26,14 @@ import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombob
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
-import { useClawConfig, useClawMyPin, useClawGoogleSetupCommand } from '../hooks/useClawHooks';
+import {
+  useClawConfig,
+  useClawMyPin,
+  useClawGoogleSetupCommand,
+  useClawGatewayReady,
+  useClawMorningBriefingStatus,
+  useClawReadMorningBriefing,
+} from '../hooks/useClawHooks';
 import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
 import { useClawContext } from './ClawContext';
 
@@ -77,6 +84,45 @@ type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 const EXA_SEARCH_UI_MIN_CONTROLLER_VERSION = '2026.4.14';
 const MEMORY_MIN_OPENCLAW_VERSION = '2026.4.5';
 const OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION = '2026.4.22';
+const MORNING_BRIEFING_MIN_IMAGE_CALVER = '2026.4.24';
+
+function formatMorningBriefingSchedule(cron: string, timezone: string): string {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) {
+    return `Schedule: ${cron} (${timezone})`;
+  }
+
+  const [minuteRaw, hourRaw, dayOfMonth, month, dayOfWeek] = parts;
+  const minute = Number.parseInt(minuteRaw, 10);
+  const hour24 = Number.parseInt(hourRaw, 10);
+
+  const isDaily = dayOfMonth === '*' && month === '*' && dayOfWeek === '*';
+  const isValidTime =
+    Number.isInteger(minute) &&
+    Number.isInteger(hour24) &&
+    minute >= 0 &&
+    minute <= 59 &&
+    hour24 >= 0 &&
+    hour24 <= 23;
+
+  if (!isDaily || !isValidTime) {
+    return `Schedule: ${cron} (${timezone})`;
+  }
+
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const meridiem = hour24 >= 12 ? 'PM' : 'AM';
+  const timeLabel = `${hour12}:${String(minute).padStart(2, '0')} ${meridiem}`;
+  const timezoneLabel = timezone === 'America/Chicago' ? 'CT' : timezone;
+
+  return `Automatically runs daily at ${timeLabel} ${timezoneLabel}`;
+}
+
+function joinFriendlyList(items: string[]): string {
+  if (items.length === 0) return '';
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
 
 // ---------------------------------------------------------------------------
 // 1Password setup guide dialog
@@ -444,6 +490,260 @@ function GoogleAccountCard({
         }}
       />
     </>
+  );
+}
+
+function MorningBriefingCard({
+  mutations,
+  briefingStatus,
+  fallbackReadiness,
+  isRunning,
+  actionsReady,
+}: {
+  mutations: ClawMutations;
+  briefingStatus:
+    | {
+        enabled?: boolean;
+        desiredEnabled?: boolean;
+        observedEnabled?: boolean | null;
+        reconcileState?: 'idle' | 'in_progress' | 'succeeded' | 'failed';
+        lastReconcileAction?: 'enable' | 'disable' | null;
+        code?: string;
+        cron?: string;
+        timezone?: string;
+        lastGeneratedDate?: string | null;
+        sourceReadiness?: {
+          github: { configured: boolean; summary: string };
+          linear: { configured: boolean; summary: string };
+          web: { configured: boolean; summary: string };
+        };
+      }
+    | undefined;
+  fallbackReadiness: {
+    githubConfigured: boolean;
+    linearConfigured: boolean;
+    webConfigured: boolean;
+  };
+  isRunning: boolean;
+  actionsReady: boolean;
+}) {
+  const [requestedDay, setRequestedDay] = useState<'today' | 'yesterday' | null>(null);
+  const { data: readData, isFetching: isReading } = useClawReadMorningBriefing(requestedDay, true);
+
+  const sourceReadiness =
+    briefingStatus?.sourceReadiness ??
+    ({
+      github: {
+        configured: fallbackReadiness.githubConfigured,
+        summary: fallbackReadiness.githubConfigured
+          ? 'Configured in Developer Tools'
+          : 'Not configured',
+      },
+      linear: {
+        configured: fallbackReadiness.linearConfigured,
+        summary: fallbackReadiness.linearConfigured
+          ? 'Configured in Developer Tools'
+          : 'Not configured',
+      },
+      web: {
+        configured: fallbackReadiness.webConfigured,
+        summary: fallbackReadiness.webConfigured
+          ? 'Configured in Search settings'
+          : 'Not configured',
+      },
+    } as const);
+
+  const hasSchedule = Boolean(briefingStatus?.cron && briefingStatus?.timezone);
+  const desiredEnabled = briefingStatus?.desiredEnabled ?? briefingStatus?.enabled ?? false;
+  const observedEnabled = briefingStatus?.observedEnabled ?? briefingStatus?.enabled ?? false;
+  const reconcileState = briefingStatus?.reconcileState ?? 'idle';
+  const lastReconcileAction = briefingStatus?.lastReconcileAction ?? null;
+  const isWarmupState = isRunning && actionsReady === false;
+  const isTransitioning =
+    reconcileState === 'in_progress' ||
+    mutations.enableMorningBriefing.isPending ||
+    mutations.disableMorningBriefing.isPending;
+
+  const statusLabel = (() => {
+    if (isWarmupState) {
+      return 'Instance Warming Up';
+    }
+
+    if (!isRunning) {
+      return 'Instance Stopped';
+    }
+
+    if (mutations.enableMorningBriefing.isPending) {
+      return 'Enabling';
+    }
+    if (mutations.disableMorningBriefing.isPending) {
+      return 'Disabling';
+    }
+
+    if (reconcileState === 'in_progress') {
+      if (lastReconcileAction === 'enable') {
+        return observedEnabled === true ? 'Enabled' : 'Enabling';
+      }
+      if (lastReconcileAction === 'disable') {
+        return observedEnabled === false ? 'Disabled' : 'Disabling';
+      }
+      if (desiredEnabled && observedEnabled !== true) {
+        return 'Enabling';
+      }
+      if (!desiredEnabled && observedEnabled === true) {
+        return 'Disabling';
+      }
+    }
+
+    return observedEnabled ? 'Enabled' : 'Disabled';
+  })();
+  const statusVariant =
+    statusLabel === 'Instance Stopped'
+      ? 'secondary'
+      : observedEnabled || (isTransitioning && desiredEnabled)
+        ? 'default'
+        : 'secondary';
+
+  const readySources = [
+    sourceReadiness.github.configured ? 'GitHub' : null,
+    sourceReadiness.linear.configured ? 'Linear' : null,
+    sourceReadiness.web.configured ? 'Web Search' : null,
+  ].filter((value): value is string => value !== null);
+  const missingSources = [
+    sourceReadiness.github.configured ? null : 'GitHub',
+    sourceReadiness.linear.configured ? null : 'Linear',
+    sourceReadiness.web.configured ? null : 'Web Search',
+  ].filter((value): value is string => value !== null);
+
+  const sourceSummaryText =
+    readySources.length === 3
+      ? 'All sources are connected: GitHub, Linear, and Web Search.'
+      : readySources.length === 0
+        ? 'No sources are connected yet. Configure GitHub, Linear, or Web Search to generate richer briefings.'
+        : `Connected sources: ${joinFriendlyList(readySources)}. Disconnected sources: ${joinFriendlyList(missingSources)}.`;
+  const showScheduleDetails = !isWarmupState && hasSchedule && desiredEnabled;
+  const controlsEnabled = actionsReady && !isWarmupState;
+  const canUseBriefingControls = controlsEnabled && desiredEnabled;
+
+  return (
+    <div className="rounded-lg border px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium">Morning Briefing</p>
+            <Badge variant={statusVariant}>{statusLabel}</Badge>
+          </div>
+          {showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone && (
+            <p className="text-muted-foreground text-xs">
+              {formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)}
+            </p>
+          )}
+          {showScheduleDetails && (
+            <p className="text-muted-foreground text-xs">
+              Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={
+              !controlsEnabled || desiredEnabled || mutations.enableMorningBriefing.isPending
+            }
+            onClick={() => {
+              mutations.enableMorningBriefing.mutate(
+                {},
+                {
+                  onSuccess: () => toast.success('Morning Briefing enabled'),
+                  onError: err => toast.error(`Failed to enable Morning Briefing: ${err.message}`),
+                }
+              );
+            }}
+          >
+            {mutations.enableMorningBriefing.isPending ? 'Enabling...' : 'Enable'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={
+              !controlsEnabled || !desiredEnabled || mutations.disableMorningBriefing.isPending
+            }
+            onClick={() => {
+              mutations.disableMorningBriefing.mutate(undefined, {
+                onSuccess: () => toast.success('Morning Briefing disabled'),
+                onError: err => toast.error(`Failed to disable Morning Briefing: ${err.message}`),
+              });
+            }}
+          >
+            {mutations.disableMorningBriefing.isPending ? 'Disabling...' : 'Disable'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!canUseBriefingControls || mutations.runMorningBriefing.isPending}
+            onClick={() => {
+              mutations.runMorningBriefing.mutate(undefined, {
+                onSuccess: data => {
+                  const date = data.date ? ` for ${data.date}` : '';
+                  toast.success(`Morning Briefing generated${date}`);
+                },
+                onError: err => toast.error(`Failed to run Morning Briefing: ${err.message}`),
+              });
+            }}
+          >
+            {mutations.runMorningBriefing.isPending ? 'Running...' : 'Run Now'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!canUseBriefingControls}
+            onClick={() => setRequestedDay('today')}
+          >
+            View Today
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!canUseBriefingControls}
+            onClick={() => setRequestedDay('yesterday')}
+          >
+            View Yesterday
+          </Button>
+        </div>
+      </div>
+
+      {isWarmupState && (
+        <p className="text-muted-foreground mt-2 text-xs">
+          Instance is still warming up. Morning Briefing controls will become available once the
+          gateway is fully ready.
+        </p>
+      )}
+
+      {!desiredEnabled && controlsEnabled && (
+        <p className="text-muted-foreground mt-2 text-xs">
+          Enable Morning Briefing to get a personalized briefing everyday.
+        </p>
+      )}
+
+      <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
+
+      {requestedDay && (
+        <div className="mt-3">
+          {isReading ? (
+            <p className="text-muted-foreground text-xs">Loading saved briefing...</p>
+          ) : readData?.markdown ? (
+            <pre className="bg-muted max-h-56 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">
+              {readData.markdown}
+            </pre>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              No saved briefing for {requestedDay === 'today' ? 'today' : 'yesterday'}.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1015,6 +1315,8 @@ export function SettingsTab({
     isControllerVersionError,
   } = useClawUpdateAvailable(status);
   const { data: myPin } = useClawMyPin();
+  const { data: morningBriefingStatus } = useClawMorningBriefingStatus(true);
+  const { data: gatewayReady } = useClawGatewayReady(isRunning);
   const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
   const hasModelSelectionError = isRunning && isControllerVersionError;
@@ -1105,6 +1407,9 @@ export function SettingsTab({
       : '/api/integrations/google/disconnect';
   }, [organizationId]);
   const canSeeGoogleCalendar = !!user?.is_admin;
+  const canSeeMorningBriefing =
+    !!user?.is_admin &&
+    calverAtLeast(cleanVersion(status.trackedImageTag), MORNING_BRIEFING_MIN_IMAGE_CALVER);
 
   function handleCycleInboundEmailAddress() {
     mutations.cycleInboundEmailAddress.mutate(undefined, {
@@ -1560,6 +1865,21 @@ export function SettingsTab({
             mutations={mutations}
             onRedeploy={onRedeploy}
           />
+          {canSeeMorningBriefing && (
+            <MorningBriefingCard
+              mutations={mutations}
+              briefingStatus={morningBriefingStatus}
+              isRunning={isRunning}
+              actionsReady={
+                isRunning && gatewayReady?.ready === true && gatewayReady?.settled === true
+              }
+              fallbackReadiness={{
+                githubConfigured: configuredSecrets.github ?? false,
+                linearConfigured: configuredSecrets.linear ?? false,
+                webConfigured: braveSearchConfigured || exaSearchConfigured,
+              }}
+            />
+          )}
         </div>
       </div>
 

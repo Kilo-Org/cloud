@@ -23,6 +23,7 @@ import { registerGmailPushRoute } from './routes/gmail-push';
 import { registerInboundEmailRoute } from './routes/inbound-email';
 import { registerFileRoutes } from './routes/files';
 import { registerKiloCliRunRoutes } from './routes/kilo-cli-run';
+import { registerMorningBriefingRoutes } from './routes/morning-briefing';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
 import { writeGogCredentials } from './gog-credentials';
@@ -378,6 +379,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   const honoApp = new Hono();
   registerHealthRoute(honoApp, supervisor, config.expectedToken, controllerState);
   registerGatewayRoutes(honoApp, supervisor, config.expectedToken);
+  registerMorningBriefingRoutes(honoApp, supervisor, config.expectedToken);
   registerConfigRoutes(honoApp, supervisor, config.expectedToken);
   registerPairingRoutes(honoApp, pairingCache, config.expectedToken);
   registerEnvRoutes(honoApp, supervisor, config.expectedToken);
@@ -531,7 +533,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     // request. Once the gateway is warm and CPU has settled, the upgrade
     // runs safely in the background.
     if (env.KILOCLAW_KILO_CLI === 'true') {
-      const KILO_CLI_UPGRADE_DELAY_MS = 5 * 60 * 1000; // 5 minutes
+      const KILO_CLI_UPGRADE_DELAY_MS = 3 * 60 * 60 * 1000; // 3 hours
       setTimeout(() => {
         // Strip NPM_CONFIG_PREFIX so the install overwrites the system-wide
         // binary in /usr/local/bin instead of writing to the per-user prefix.

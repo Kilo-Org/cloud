@@ -39,7 +39,23 @@ function pruneOldConfigBackups(dir: string, base: string, deps: ConfigWriterDeps
   }
 }
 
-/** Flags passed to `openclaw onboard` for non-interactive first-boot setup. */
+/**
+ * Flags passed to `openclaw onboard` for non-interactive first-boot setup.
+ *
+ * `--secret-input-mode ref` stores the kilocode credential in
+ * `agents/<id>/agent/auth-profiles.json` as an env-backed SecretRef
+ * (`keyRef: { source: "env", provider: "default", id: "KILOCODE_API_KEY" }`)
+ * instead of embedding the literal key. No plaintext on disk means the
+ * auth resolver can't shadow env-based rotation with a stale file value;
+ * rotation itself is driven by `supervisor.restart()` in
+ * `routes/env.ts` so the respawned gateway inherits the controller's
+ * current env.
+ *
+ * Works because the gateway process env has `KILOCODE_API_KEY` set before
+ * we spawn onboard (via `decryptEnvVars`), and `resolveNonInteractiveApiKey`
+ * in openclaw accepts `--kilocode-api-key` together with `--secret-input-mode
+ * ref` as long as the env var is present.
+ */
 const ONBOARD_FLAGS = [
   'onboard',
   '--non-interactive',
@@ -53,10 +69,15 @@ const ONBOARD_FLAGS = [
   '--skip-channels',
   '--skip-skills',
   '--skip-health',
+  '--secret-input-mode',
+  'ref',
 ] as const;
 
 const KILOCLAW_CUSTOMIZER_PLUGIN_ID = 'kiloclaw-customizer';
 const KILOCLAW_CUSTOMIZER_PLUGIN_PATH = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
+const KILOCLAW_MORNING_BRIEFING_PLUGIN_ID = 'kiloclaw-morning-briefing';
+const KILOCLAW_MORNING_BRIEFING_PLUGIN_PATH =
+  '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing';
 const KILO_EXA_PROVIDER_ID = 'kilo-exa';
 
 type KiloExaSearchMode = 'kilo-proxy' | 'disabled';
@@ -343,10 +364,14 @@ export function generateBaseConfig(
   const searchProvider = config.tools?.web?.search?.provider;
   const hasExplicitSearchProvider =
     typeof searchProvider === 'string' && searchProvider.trim().length > 0;
+  const hasExplicitSearchDisabled = config.tools?.web?.search?.enabled === false;
+  const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
+  const hasExplicitSearchPreference =
+    hasExplicitSearchProvider || hasExplicitSearchDisabled || braveConfigured;
 
   const kiloExaSearchMode = resolveKiloExaSearchMode(env.KILO_EXA_SEARCH_MODE);
   const shouldForceExa = kiloExaSearchMode === 'kilo-proxy';
-  const shouldAutoAssignExa = kiloExaSearchMode === 'unset' && !hasExplicitSearchProvider;
+  const shouldAutoAssignExa = kiloExaSearchMode === 'unset' && !hasExplicitSearchPreference;
   if (shouldForceExa || shouldAutoAssignExa) {
     customizerWebSearchConfig.enabled = true;
     config.tools = config.tools ?? {};
@@ -360,7 +385,6 @@ export function generateBaseConfig(
   } else if (kiloExaSearchMode === 'disabled') {
     customizerWebSearchConfig.enabled = false;
 
-    const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
     if (
       braveConfigured &&
       (!hasExplicitSearchProvider || config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID)
@@ -380,6 +404,19 @@ export function generateBaseConfig(
 
   customizerPluginConfig.webSearch = customizerWebSearchConfig;
   config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID].config = customizerPluginConfig;
+
+  if (!(config.plugins.load.paths as string[]).includes(KILOCLAW_MORNING_BRIEFING_PLUGIN_PATH)) {
+    (config.plugins.load.paths as string[]).push(KILOCLAW_MORNING_BRIEFING_PLUGIN_PATH);
+  }
+  if (
+    Array.isArray(config.plugins.allow) &&
+    !config.plugins.allow.includes(KILOCLAW_MORNING_BRIEFING_PLUGIN_ID)
+  ) {
+    config.plugins.allow.push(KILOCLAW_MORNING_BRIEFING_PLUGIN_ID);
+  }
+  config.plugins.entries[KILOCLAW_MORNING_BRIEFING_PLUGIN_ID] =
+    config.plugins.entries[KILOCLAW_MORNING_BRIEFING_PLUGIN_ID] ?? {};
+  config.plugins.entries[KILOCLAW_MORNING_BRIEFING_PLUGIN_ID].enabled = true;
 
   // Telegram
   if (env.TELEGRAM_BOT_TOKEN) {

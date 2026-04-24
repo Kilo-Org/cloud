@@ -11,17 +11,14 @@ function VerifyMagicLinkContent() {
 
   useEffect(() => {
     const token = searchParams.get('token');
-    const email = searchParams.get('email');
     const callbackUrl = searchParams.get('callbackUrl') || '/users/after-sign-in';
 
-    if (!token || !email) {
+    if (!token) {
       window.location.href = '/users/sign_in?error=INVALID_VERIFICATION';
       return;
     }
 
-    // Sign in using the email provider with the token
     signIn('email', {
-      email,
       token,
       callbackUrl,
       redirect: true,

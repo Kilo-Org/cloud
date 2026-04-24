@@ -24,6 +24,7 @@ type KiloClawClientMock = {
   KiloClawInternalClient: AnyMock;
   __getStatusMock: AnyMock;
   __destroyMock: AnyMock;
+  __startMock: AnyMock;
 };
 
 jest.mock('@/lib/stripe-client', () => {
@@ -77,9 +78,11 @@ jest.mock('@/lib/config.server', () => {
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const getStatusMock = jest.fn();
   const destroyMock = jest.fn();
+  const startMock = jest.fn();
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       getStatus: getStatusMock,
+      start: startMock,
       destroy: destroyMock,
     })),
     KiloClawApiError: class KiloClawApiError extends Error {
@@ -93,6 +96,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
     },
     __getStatusMock: getStatusMock,
     __destroyMock: destroyMock,
+    __startMock: startMock,
   };
 });
 
@@ -104,6 +108,13 @@ let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) =>
     status: 'validated' | 'service_unavailable';
   }>;
   cycleInboundEmailAddress: () => Promise<{ inboundEmailAddress: string }>;
+  start: () => Promise<{
+    ok: true;
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }>;
   destroy: () => Promise<{ ok: true }>;
 };
 const kiloclawClientMock = jest.requireMock<KiloClawClientMock>(
@@ -313,6 +324,7 @@ describe('kiloclawRouter getStatus', () => {
     await cleanupDbForTest();
     kiloclawClientMock.KiloClawInternalClient.mockClear();
     kiloclawClientMock.__getStatusMock.mockReset();
+    kiloclawClientMock.__startMock.mockReset();
     kiloclawClientMock.__destroyMock.mockReset();
   });
 
@@ -388,6 +400,111 @@ describe('kiloclawRouter getStatus', () => {
   });
 });
 
+describe('kiloclawRouter start', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.KiloClawInternalClient.mockClear();
+    kiloclawClientMock.__startMock.mockReset();
+  });
+
+  it('clears the inactivity marker after a successful personal trial start', async () => {
+    kiloclawClientMock.__startMock.mockResolvedValue({
+      ok: true,
+      started: true,
+      previousStatus: 'stopped',
+      currentStatus: 'running',
+      startedAt: 1_776_885_000_000,
+    });
+
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-start-test-${Math.random()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+      inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z',
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'trialing',
+      trial_ends_at: '2026-12-31T23:59:59.000Z',
+    });
+
+    const caller = createCaller({ user });
+    const result = await caller.start();
+
+    expect(result).toEqual({
+      ok: true,
+      started: true,
+      previousStatus: 'stopped',
+      currentStatus: 'running',
+      startedAt: 1_776_885_000_000,
+    });
+    expect(kiloclawClientMock.__startMock).toHaveBeenCalledWith(user.id, instanceId, {
+      reason: 'manual_user_request',
+    });
+
+    const [updatedInstance] = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instanceId))
+      .limit(1);
+    expect(updatedInstance?.inactive_trial_stopped_at).toBeNull();
+  });
+
+  it('does not clear the inactivity marker when start is a no-op', async () => {
+    kiloclawClientMock.__startMock.mockResolvedValue({
+      ok: true,
+      started: false,
+      previousStatus: 'stopped',
+      currentStatus: 'stopped',
+      startedAt: null,
+    });
+
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-start-noop-test-${Math.random()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+      inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z',
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'trialing',
+      trial_ends_at: '2026-12-31T23:59:59.000Z',
+    });
+
+    const caller = createCaller({ user });
+    const result = await caller.start();
+
+    expect(result).toEqual({
+      ok: true,
+      started: false,
+      previousStatus: 'stopped',
+      currentStatus: 'stopped',
+      startedAt: null,
+    });
+
+    const [updatedInstance] = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instanceId))
+      .limit(1);
+    expect(new Date(String(updatedInstance?.inactive_trial_stopped_at)).toISOString()).toBe(
+      '2026-04-20T12:00:00.000Z'
+    );
+  });
+});
+
 describe('kiloclawRouter destroy', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
@@ -425,6 +542,9 @@ describe('kiloclawRouter destroy', () => {
     const result = await caller.destroy();
 
     expect(result).toEqual({ ok: true });
+    expect(kiloclawClientMock.__destroyMock).toHaveBeenCalledWith(user.id, instanceId, {
+      reason: 'manual_user_request',
+    });
 
     const [subscription] = await db
       .select()

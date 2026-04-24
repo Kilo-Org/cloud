@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
@@ -143,6 +144,7 @@ function RecentBlocksTab() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [unblockTarget, setUnblockTarget] = useState<RecentBlockRow | null>(null);
+  const [showSingleUserGroups, setShowSingleUserGroups] = useState(false);
 
   const { data, isLoading } = useQuery(trpc.admin.bulkBlock.recentBlocks.queryOptions());
 
@@ -161,7 +163,9 @@ function RecentBlocksTab() {
     })
   );
 
-  const rows = data ?? [];
+  const allRows = data ?? [];
+  const rows = showSingleUserGroups ? allRows : allRows.filter(row => row.blocked_count > 1);
+  const hiddenCount = allRows.length - rows.length;
 
   return (
     <>
@@ -173,10 +177,29 @@ function RecentBlocksTab() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex items-center gap-2">
+            <Checkbox
+              id="show-single-user-groups"
+              checked={showSingleUserGroups}
+              onCheckedChange={checked => setShowSingleUserGroups(checked === true)}
+            />
+            <Label htmlFor="show-single-user-groups" className="text-sm font-normal">
+              Show single-user groups
+              {hiddenCount > 0 && !showSingleUserGroups && (
+                <span className="text-muted-foreground ml-1">
+                  ({hiddenCount.toLocaleString()} hidden)
+                </span>
+              )}
+            </Label>
+          </div>
           {isLoading ? (
             <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
           ) : rows.length === 0 ? (
-            <div className="text-muted-foreground py-8 text-center">No blocked accounts found</div>
+            <div className="text-muted-foreground py-8 text-center">
+              {allRows.length === 0
+                ? 'No blocked accounts found'
+                : 'No multi-user block groups found'}
+            </div>
           ) : (
             <div className="rounded-md border">
               <Table>

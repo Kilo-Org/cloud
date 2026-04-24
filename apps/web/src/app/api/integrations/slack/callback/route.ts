@@ -4,9 +4,11 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import type { Owner } from '@/lib/integrations/core/types';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { exchangeSlackCode, upsertSlackInstallation } from '@/lib/integrations/slack-service';
-import { syncOldSlackInstallationToSdk } from '@/lib/bot/slack-installation-sync';
+import { upsertSlackInstallation } from '@/lib/integrations/slack-service';
 import { APP_URL } from '@/lib/constants';
+import { bot } from '@/lib/bot';
+
+const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
 
 const buildSlackRedirectPath = (state: string | null, queryParam: string): string => {
   if (state?.startsWith('org_')) {
@@ -92,27 +94,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 5. Exchange code for access token
-    const oauthData = await exchangeSlackCode(code);
+    // 5. Let the Chat SDK exchange the code and seed its installation state
+    await bot.initialize();
+    const slackAdapter = bot.getAdapter('slack');
+    const url = new URL(request.url);
+    url.searchParams.set('redirect_uri', SLACK_REDIRECT_URI);
+    const patchedRequest = new Request(url, request);
+    const { teamId, installation } = await slackAdapter.handleOAuthCallback(patchedRequest);
 
     // 6. Store installation in database
-    await upsertSlackInstallation(owner, oauthData);
+    await upsertSlackInstallation({ owner, teamId, installation });
 
-    // 7. Best-effort seed Chat SDK state for future migration
-    try {
-      await syncOldSlackInstallationToSdk(oauthData);
-    } catch (syncError) {
-      captureException(syncError, {
-        tags: { endpoint: 'slack/callback', source: 'slack_sdk_sync' },
-        extra: {
-          teamId: oauthData.team?.id,
-          ownerType: owner.type,
-          ownerId: owner.id,
-        },
-      });
-    }
-
-    // 8. Redirect to success page
+    // 7. Redirect to success page
     const successPath =
       owner.type === 'org'
         ? `/organizations/${owner.id}/integrations/slack?success=installed`

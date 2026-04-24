@@ -356,7 +356,7 @@ describe('TownDO', () => {
   // ── Review Queue ───────────────────────────────────────────────────────
 
   describe('review queue', () => {
-    it('should submit to and pop from review queue', async () => {
+    it('should submit to review queue and create an open merge_request bead', async () => {
       const agent = await town.registerAgent({
         role: 'polecat',
         name: 'P1',
@@ -373,40 +373,12 @@ describe('TownDO', () => {
         summary: 'Fixed the widget',
       });
 
-      const entry = await town.popReviewQueue();
-      expect(entry).toBeDefined();
-      expect(entry?.branch).toBe('feature/fix-widget');
-      expect(entry?.pr_url).toBe('https://github.com/org/repo/pull/1');
-      expect(entry?.status).toBe('running');
-
-      // Pop again should return null (nothing pending)
-      const empty = await town.popReviewQueue();
-      expect(empty).toBeNull();
-    });
-
-    it('should complete a review', async () => {
-      const agent = await town.registerAgent({
-        role: 'polecat',
-        name: 'P1',
-        identity: `complete-review-${townName}`,
-      });
-      const bead = await town.createBead({ type: 'issue', title: 'Review complete' });
-
-      await town.submitToReviewQueue({
-        agent_id: agent.id,
-        bead_id: bead.bead_id,
-        rig_id: 'test-rig',
-        branch: 'feature/fix',
-      });
-
-      const entry = await town.popReviewQueue();
-      expect(entry).toBeDefined();
-
-      await town.completeReview(entry!.id, 'merged');
-
-      // Pop again should be null
-      const empty = await town.popReviewQueue();
-      expect(empty).toBeNull();
+      // submitToReviewQueue creates an open merge_request bead
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      expect(mrBeads).toHaveLength(1);
+      expect(mrBeads[0].status).toBe('open');
+      expect(mrBeads[0].metadata?.pr_url).toBe('https://github.com/org/repo/pull/1');
+      expect(mrBeads[0].metadata?.source_bead_id).toBe(bead.bead_id);
     });
 
     it('should close bead on successful merge via completeReviewWithResult', async () => {
@@ -424,11 +396,12 @@ describe('TownDO', () => {
         branch: 'feature/merge-test',
       });
 
-      const entry = await town.popReviewQueue();
-      expect(entry).toBeDefined();
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      expect(mrBeads).toHaveLength(1);
+      const mrBeadId = mrBeads[0].bead_id;
 
       await town.completeReviewWithResult({
-        entry_id: entry!.id,
+        entry_id: mrBeadId,
         status: 'merged',
         message: 'Merge successful',
         commit_sha: 'abc123',
@@ -439,9 +412,9 @@ describe('TownDO', () => {
       expect(updatedBead?.status).toBe('closed');
       expect(updatedBead?.closed_at).toBeDefined();
 
-      // Review queue should be empty
-      const empty = await town.popReviewQueue();
-      expect(empty).toBeNull();
+      // MR bead should be closed
+      const updatedMr = await town.getBeadAsync(mrBeadId);
+      expect(updatedMr?.status).toBe('closed');
     });
 
     it('should create escalation bead on merge conflict via completeReviewWithResult', async () => {
@@ -459,11 +432,12 @@ describe('TownDO', () => {
         branch: 'feature/conflict-test',
       });
 
-      const entry = await town.popReviewQueue();
-      expect(entry).toBeDefined();
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      expect(mrBeads).toHaveLength(1);
+      const mrBeadId = mrBeads[0].bead_id;
 
       await town.completeReviewWithResult({
-        entry_id: entry!.id,
+        entry_id: mrBeadId,
         status: 'conflict',
         message: 'CONFLICT (content): Merge conflict in src/index.ts',
       });
@@ -484,9 +458,9 @@ describe('TownDO', () => {
         agent_id: agent.id,
       });
 
-      // Review queue entry should be marked as failed
-      const empty = await town.popReviewQueue();
-      expect(empty).toBeNull();
+      // MR bead should be marked as failed
+      const updatedMr = await town.getBeadAsync(mrBeadId);
+      expect(updatedMr?.status).toBe('failed');
     });
   });
 

@@ -61,6 +61,7 @@ function inferSupportedChatApis(
   }
   if (
     aiSdkProvider === 'openai-compatible' ||
+    aiSdkProvider === 'alibaba' ||
     aiSdkProvider === 'openrouter' ||
     openClawApiAdapter === 'openai-completions' ||
     result.length === 0

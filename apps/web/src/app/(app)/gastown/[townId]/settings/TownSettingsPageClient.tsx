@@ -33,6 +33,8 @@ import {
   Key,
   MessageSquareText,
   X,
+  Bug,
+  Copy,
 } from 'lucide-react';
 import {
   Accordion,
@@ -75,6 +77,7 @@ const SECTIONS = [
   { id: 'refinery', label: 'Refinery', icon: Shield },
   { id: 'container', label: 'Container', icon: Container },
   { id: 'custom-instructions', label: 'Custom Instructions', icon: MessageSquareText },
+  { id: 'debug', label: 'Debug', icon: Bug },
   { id: 'danger-zone', label: 'Danger Zone', icon: Trash2 },
 ] as const;
 
@@ -177,6 +180,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   const townQuery = useQuery(trpc.gastown.getTown.queryOptions({ townId }));
   const configQuery = useQuery(trpc.gastown.getTownConfig.queryOptions({ townId }));
   const adminAccessQuery = useQuery(trpc.gastown.checkAdminAccess.queryOptions({ townId }));
+  const rigsQuery = useQuery(trpc.gastown.listRigs.queryOptions({ townId }));
 
   // Admin viewing another user's town → force read-only
   const isAdminViewing = adminAccessQuery.data?.isAdminViewing ?? false;
@@ -275,6 +279,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   const [refineryCodeReview, setRefineryCodeReview] = useState(true);
   const [reviewMode, setReviewMode] = useState<'rework' | 'comments'>('rework');
   const [autoResolvePrFeedback, setAutoResolvePrFeedback] = useState(false);
+  const [autoResolveMergeConflicts, setAutoResolveMergeConflicts] = useState(true);
   const [autoMergeDelayMinutes, setAutoMergeDelayMinutes] = useState<number | null>(null);
   const [mergeStrategy, setMergeStrategy] = useState<'direct' | 'pr'>('direct');
   const [stagedConvoysDefault, setStagedConvoysDefault] = useState(false);
@@ -311,6 +316,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     setRefineryCodeReview(cfg.refinery?.code_review ?? true);
     setReviewMode(cfg.refinery?.review_mode === 'comments' ? 'comments' : 'rework');
     setAutoResolvePrFeedback(cfg.refinery?.auto_resolve_pr_feedback ?? false);
+    setAutoResolveMergeConflicts(cfg.refinery?.auto_resolve_merge_conflicts ?? true);
     setAutoMergeDelayMinutes(cfg.refinery?.auto_merge_delay_minutes ?? null);
     setMergeStrategy(cfg.merge_strategy === 'pr' ? 'pr' : 'direct');
     setStagedConvoysDefault(cfg.staged_convoys_default ?? false);
@@ -376,6 +382,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           review_mode: reviewMode,
           require_clean_merge: true,
           auto_resolve_pr_feedback: autoResolvePrFeedback,
+          auto_resolve_merge_conflicts: autoResolveMergeConflicts,
           auto_merge_delay_minutes: autoMergeDelayMinutes,
         },
         convoy_merge_mode: convoyMergeMode,
@@ -386,6 +393,87 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
         },
       },
     });
+  }
+
+  function handleCopyDebugInfo() {
+    const cfg = configQuery.data;
+    const debugInfo = {
+      town_id: townId,
+      user_id: currentUser?.id ?? null,
+      organization_id: organizationId ?? cfg?.organization_id ?? null,
+
+      rigs: (rigsQuery.data ?? []).map(r => {
+        let git_url_sanitized: string | null = null;
+        if (r.git_url) {
+          try {
+            const u = new URL(r.git_url);
+            u.username = '';
+            u.password = '';
+            git_url_sanitized = u.toString();
+          } catch {
+            // not a parseable URL — omit entirely to avoid leaking anything
+          }
+        }
+        return {
+          id: r.id,
+          name: r.name,
+          git_url: git_url_sanitized,
+          default_branch: r.default_branch,
+        };
+      }),
+
+      settings: cfg
+        ? {
+            default_model: cfg.default_model ?? null,
+            small_model: cfg.small_model ?? null,
+            role_models: {
+              mayor: cfg.role_models?.mayor ?? null,
+              refinery: cfg.role_models?.refinery ?? null,
+              polecat: cfg.role_models?.polecat ?? null,
+            },
+
+            max_polecats_per_rig: cfg.max_polecats_per_rig ?? null,
+
+            github_token_set: !!cfg.git_auth?.github_token,
+            gitlab_token_set: !!cfg.git_auth?.gitlab_token,
+            gitlab_instance_url: cfg.git_auth?.gitlab_instance_url || null,
+            github_cli_pat_set: !!cfg.github_cli_pat,
+            git_author_name_set: !!cfg.git_author_name,
+            // git_author_name and git_author_email intentionally omitted (PII)
+            disable_ai_coauthor: cfg.disable_ai_coauthor ?? false,
+
+            env_var_keys: Object.keys(cfg.env_vars ?? {}),
+
+            merge_strategy: cfg.merge_strategy ?? 'direct',
+            convoy_merge_mode: cfg.convoy_merge_mode ?? 'review-then-land',
+            staged_convoys_default: cfg.staged_convoys_default ?? false,
+
+            refinery: {
+              code_review: cfg.refinery?.code_review ?? true,
+              auto_merge: cfg.refinery?.auto_merge ?? true,
+              review_mode: cfg.refinery?.review_mode ?? 'rework',
+              auto_resolve_pr_feedback: cfg.refinery?.auto_resolve_pr_feedback ?? false,
+              auto_merge_delay_minutes: cfg.refinery?.auto_merge_delay_minutes ?? null,
+              gates: cfg.refinery?.gates ?? [],
+            },
+
+            custom_instructions: {
+              mayor_set: !!cfg.custom_instructions?.mayor,
+              polecat_set: !!cfg.custom_instructions?.polecat,
+              refinery_set: !!cfg.custom_instructions?.refinery,
+            },
+
+            alarm_interval_active: cfg.alarm_interval_active ?? null,
+            alarm_interval_idle: cfg.alarm_interval_idle ?? null,
+          }
+        : null,
+
+      generated_at: new Date().toISOString(),
+      url: window.location.href,
+    };
+
+    void navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2));
+    toast.success('Debug info copied to clipboard');
   }
 
   function addEnvVar() {
@@ -989,6 +1077,20 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                   />
                 </div>
 
+                <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <div className="flex-1">
+                    <Label className="text-sm text-white/70">Auto-resolve merge conflicts</Label>
+                    <p className="text-[11px] text-white/30">
+                      When a PR has merge conflicts, automatically dispatch an agent to rebase and
+                      resolve them.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={autoResolveMergeConflicts}
+                    onCheckedChange={setAutoResolveMergeConflicts}
+                  />
+                </div>
+
                 {autoResolvePrFeedback && (
                   <div className="mt-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
                     <Label className="mb-1.5 block text-sm text-white/70">Auto-merge delay</Label>
@@ -1147,13 +1249,38 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                 </div>
               </SettingsSection>
 
+              {/* ── Debug ──────────────────────────────────────────── */}
+              <SettingsSection
+                id="debug"
+                title="Debug"
+                description="Copy diagnostic information to share with support. No sensitive data is included."
+                icon={Bug}
+                index={11}
+              >
+                <div className="space-y-3">
+                  <p className="text-xs text-white/40">
+                    Copies a JSON snapshot of your town configuration for troubleshooting. API
+                    tokens, email addresses, and custom instruction contents are excluded.
+                  </p>
+                  <Button
+                    onClick={handleCopyDebugInfo}
+                    variant="secondary"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Copy className="size-3.5" />
+                    Copy debug info
+                  </Button>
+                </div>
+              </SettingsSection>
+
               {/* ── Danger Zone ──────────────────────────────────────── */}
               <SettingsSection
                 id="danger-zone"
                 title="Danger Zone"
                 description="Irreversible actions for this town."
                 icon={Trash2}
-                index={11}
+                index={12}
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3">

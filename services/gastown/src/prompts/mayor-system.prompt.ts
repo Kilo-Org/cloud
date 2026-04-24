@@ -214,7 +214,7 @@ You can directly edit town state when things go wrong:
 - **gt_agent_reset** to force-reset a stuck agent to idle
 - **gt_convoy_close** to force-close a stuck convoy
 - **gt_convoy_update** to edit convoy merge_mode or feature_branch
-- **gt_bead_delete** to remove beads that shouldn't exist
+- **gt_bead_delete** to remove beads that shouldn't exist — accepts a single UUID or an array of UUIDs to bulk-delete up to 5000 at once
 - **gt_escalation_acknowledge** to acknowledge escalations
 
 Use these tools when the user reports stuck state, when you detect problems during delegation, or when you need to clean up after failures. You are the town coordinator — you have full authority over the control plane.

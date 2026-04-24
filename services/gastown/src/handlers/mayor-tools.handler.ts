@@ -392,6 +392,7 @@ const BeadUpdateBody = z
     metadata: z.record(z.string(), z.unknown()).optional(),
     rig_id: z.string().min(1).nullable().optional(),
     parent_bead_id: z.string().min(1).nullable().optional(),
+    depends_on: z.array(z.string().uuid()).optional(),
   })
   .refine(
     data =>
@@ -402,7 +403,8 @@ const BeadUpdateBody = z
       data.status !== undefined ||
       data.metadata !== undefined ||
       data.rig_id !== undefined ||
-      data.parent_bead_id !== undefined,
+      data.parent_bead_id !== undefined ||
+      data.depends_on !== undefined,
     { message: 'At least one field must be provided' }
   );
 
@@ -630,9 +632,76 @@ export async function handleMayorBeadDelete(
     return c.json(resError('Bead does not belong to this rig'), 403);
   }
 
-  await town.deleteBead(params.beadId);
+  // Pass rigId as a defense-in-depth rig check in the DO delete path.
+  await town.deleteBead(params.beadId, params.rigId);
 
   return c.json(resSuccess({ deleted: true }));
+}
+
+const MayorBulkDeleteBeadsBody = z.object({
+  bead_ids: z.array(z.string().uuid()).min(1).max(5000),
+});
+
+export async function handleMayorBulkDeleteBeads(
+  c: Context<GastownEnv>,
+  params: { townId: string; rigId: string }
+) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  const parsed = MayorBulkDeleteBeadsBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(resError(`Invalid request body: ${parsed.error.message}`), 400);
+  }
+
+  const { bead_ids } = parsed.data;
+
+  console.log(
+    `${HANDLER_LOG} handleMayorBulkDeleteBeads: townId=${params.townId} rigId=${params.rigId} count=${bead_ids.length}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  // Pass rigId so the DO filters to beads actually belonging to this rig —
+  // prevents a mayor tool from deleting beads from a sibling rig by
+  // passing their IDs alongside an authorized rig.
+  const count = await town.deleteBeads(bead_ids, params.rigId);
+
+  return c.json(resSuccess({ deleted: count }));
+}
+
+const MayorDeleteBeadsByStatusBody = z.object({
+  status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']),
+  type: z
+    .enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent'])
+    .optional(),
+});
+
+export async function handleMayorDeleteBeadsByStatus(
+  c: Context<GastownEnv>,
+  params: { townId: string; rigId: string }
+) {
+  const rigOwned = await verifyRigBelongsToTown(c, params.townId, params.rigId);
+  if (!rigOwned) {
+    return c.json(resError('Rig not found in this town'), 403);
+  }
+
+  const parsed = MayorDeleteBeadsByStatusBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(resError(`Invalid request body: ${parsed.error.message}`), 400);
+  }
+
+  const { status, type } = parsed.data;
+
+  console.log(
+    `${HANDLER_LOG} handleMayorDeleteBeadsByStatus: townId=${params.townId} rigId=${params.rigId} status=${status}${type ? ` type=${type}` : ''}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const count = await town.deleteBeadsByStatus(status, type, params.rigId);
+
+  return c.json(resSuccess({ deleted: count }));
 }
 
 /**
@@ -682,6 +751,69 @@ export async function handleMayorConvoyStart(
     `${HANDLER_LOG} handleMayorConvoyStart: completed, convoy=${result.convoy.id} beads=${result.beads.length}`
   );
 
+  return c.json(resSuccess(result));
+}
+
+const ConvoyAddBeadBody = z.object({
+  bead_id: z.string().uuid(),
+  depends_on: z.array(z.string().uuid()).optional(),
+});
+
+/**
+ * POST /api/mayor/:townId/tools/convoys/:convoyId/add-bead
+ * Add an existing bead to a convoy's tracking.
+ */
+export async function handleMayorConvoyAddBead(
+  c: Context<GastownEnv>,
+  params: { townId: string; convoyId: string }
+) {
+  const parsed = ConvoyAddBeadBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorConvoyAddBead: townId=${params.townId} convoyId=${params.convoyId} beadId=${parsed.data.bead_id}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const result = await town.convoyAddBead(
+    params.convoyId,
+    parsed.data.bead_id,
+    parsed.data.depends_on
+  );
+  return c.json(resSuccess(result));
+}
+
+const ConvoyRemoveBeadBody = z.object({
+  bead_id: z.string().uuid(),
+});
+
+/**
+ * POST /api/mayor/:townId/tools/convoys/:convoyId/remove-bead
+ * Remove a bead from a convoy's tracking.
+ */
+export async function handleMayorConvoyRemoveBead(
+  c: Context<GastownEnv>,
+  params: { townId: string; convoyId: string }
+) {
+  const parsed = ConvoyRemoveBeadBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+
+  console.log(
+    `${HANDLER_LOG} handleMayorConvoyRemoveBead: townId=${params.townId} convoyId=${params.convoyId} beadId=${parsed.data.bead_id}`
+  );
+
+  const town = getTownDOStub(c.env, params.townId);
+  const result = await town.convoyRemoveBead(params.convoyId, parsed.data.bead_id);
   return c.json(resSuccess(result));
 }
 

@@ -174,6 +174,8 @@ ${diffSection}
 export const GitHubPRStatusSchema = z.object({
   state: z.string(),
   merged: z.boolean().optional(),
+  mergeable: z.boolean().nullable().optional(),
+  mergeable_state: z.string().optional(), // 'clean', 'dirty', 'blocked', 'unknown', 'unstable'
 });
 
 /** Schema for GitLab MR status responses (used by checkPRStatus). */

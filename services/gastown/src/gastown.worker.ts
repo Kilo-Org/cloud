@@ -1082,7 +1082,7 @@ export default withSentry(
   (env: Env) => ({
     dsn: env.SENTRY_DSN ?? '',
     release: env.SENTRY_RELEASE || env.CF_VERSION_METADATA?.id,
-    tracesSampleRate: 0.1,
+    tracesSampleRate: 0,
     enabled: !!env.SENTRY_DSN,
   }),
   {

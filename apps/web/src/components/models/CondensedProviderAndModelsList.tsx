@@ -57,7 +57,8 @@ export function CondensedProviderAndModelsList({
     return <div className="text-muted-foreground text-sm">Loading providers...</div>;
   }
 
-  if (!selections || providersWithSelections.length === 0) {
+  // When selections is an empty array, all models are blocked — nothing to show
+  if (selections !== null && providersWithSelections.length === 0) {
     return null;
   }
 

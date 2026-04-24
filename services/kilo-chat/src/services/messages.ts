@@ -176,9 +176,16 @@ async function postCommitFanOut(
   }
 
   const now = Date.now();
+
+  // Update last activity for all members. For the sender (who is human),
+  // combine with markRead to avoid a second RPC to the same DO.
+  const isSenderHuman = humanMemberIds.includes(callerId);
   const results = await Promise.allSettled(
     info.members.map(member => {
       const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
+      if (isSenderHuman && member.id === callerId) {
+        return stub.updateLastActivityAndMarkRead(conversationId, now);
+      }
       return stub.updateLastActivity(conversationId, now);
     })
   );
@@ -189,12 +196,6 @@ async function postCommitFanOut(
   }
   if (sandboxId) {
     const otherHumans = humanMemberIds.filter(id => id !== callerId);
-
-    // The sender's own conversation is implicitly read — they just sent a message.
-    if (humanMemberIds.includes(callerId)) {
-      const senderStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(callerId));
-      await senderStub.markRead(conversationId, now).catch(() => {});
-    }
 
     // Push message.created on conversation context; capture delivery map for presence check below.
     const deliveryMap = await pushEventToHumanMembers(

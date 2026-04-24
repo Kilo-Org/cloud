@@ -124,6 +124,25 @@ describe('MembershipDO', () => {
     expect(result.conversations[0].conversationId).toBe('conv-c');
   });
 
+  it('updateLastActivityAndMarkRead - updates both fields atomically', async () => {
+    const stub = getStub('user-atomic-1');
+    await stub.addConversation({
+      conversationId: 'conv-atomic',
+      conversationTitle: 'Atomic Test',
+      sandboxId: 'sandbox-x',
+      joinedAt: 1000,
+    });
+
+    const now = 5000;
+    await stub.updateLastActivityAndMarkRead('conv-atomic', now);
+
+    const { conversations } = await stub.listConversations();
+    const entry = conversations.find(c => c.conversationId === 'conv-atomic');
+    expect(entry).toBeDefined();
+    expect(entry!.lastActivityAt).toBe(now);
+    expect(entry!.lastReadAt).toBe(now);
+  });
+
   it('removeConversationsBySandbox - no-op when sandbox has no conversations', async () => {
     const stub = getStub('user-sandbox-noop');
     await stub.addConversation({

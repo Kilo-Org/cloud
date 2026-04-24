@@ -806,6 +806,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       session_id: 'session',
       mode: null,
       auto_model: null,
+      ttfb_ms: null,
       ...overrides,
     }) satisfies MicrodollarUsageContext;
 

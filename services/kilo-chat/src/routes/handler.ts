@@ -260,13 +260,6 @@ export async function handleListMessages(c: HonoCtx) {
   const convId = parseConversationId(c);
   if (!convId.ok) return convId.response;
 
-  const callerId = c.get('callerId');
-  const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
-
-  if (!(await convStub.isMember(callerId))) {
-    return c.json({ error: 'Forbidden' }, 403);
-  }
-
   const query = listMessagesQuerySchema.safeParse({
     limit: c.req.query('limit'),
     before: c.req.query('before'),
@@ -275,10 +268,19 @@ export async function handleListMessages(c: HonoCtx) {
     return c.json({ error: 'Invalid query parameters', issues: query.error.issues }, 400);
   }
 
-  const result = await convStub.listMessages({
+  const callerId = c.get('callerId');
+  const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
+
+  // Single RPC: membership check + message fetch combined.
+  const result = await convStub.listMessagesIfMember(callerId, {
     limit: query.data.limit,
     before: query.data.before,
   });
+
+  if (result === null) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
+
   return c.json({ messages: result.messages } satisfies MessageListResponse);
 }
 

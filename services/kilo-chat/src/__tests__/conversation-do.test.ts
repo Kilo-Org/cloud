@@ -587,6 +587,22 @@ describe('ConversationDO', () => {
     expect(messages.messages).toHaveLength(0);
   });
 
+  it('listMessagesIfMember - returns messages for member, null for non-member', async () => {
+    const stub = getStub('conv-list-member-1');
+    await stub.initialize(BASE_PARAMS);
+    await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Hello!' }],
+    });
+
+    const result = await stub.listMessagesIfMember('user-alice', { limit: 10 });
+    expect(result).not.toBeNull();
+    expect(result!.messages).toHaveLength(1);
+
+    const rejected = await stub.listMessagesIfMember('user-stranger', { limit: 10 });
+    expect(rejected).toBeNull();
+  });
+
   it('destroy - is idempotent on an already-empty DO', async () => {
     const stub = getStub('conv-destroy-empty');
     await stub.destroy();

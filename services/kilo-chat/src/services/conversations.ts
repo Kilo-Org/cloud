@@ -176,27 +176,26 @@ export async function renameConversationFor(
   const { conversationId, title } = params;
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
 
-  if (!(await convStub.isMember(userId))) {
+  // Single getInfo() call: membership check + member list for fan-out.
+  const info = await convStub.getInfo();
+  if (!info || !info.members.some(m => m.id === userId)) {
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }
 
   await convStub.updateTitle(title);
 
-  const info = await convStub.getInfo();
-  if (info) {
-    await Promise.all(
-      info.members.map(member => {
-        const memberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
-        return memberStub.updateConversationTitle(conversationId, title);
-      })
-    );
-    const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
-    if (sandboxId) {
-      await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
-        conversationId,
-        title,
-      });
-    }
+  await Promise.all(
+    info.members.map(member => {
+      const memberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
+      return memberStub.updateConversationTitle(conversationId, title);
+    })
+  );
+  const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
+  if (sandboxId) {
+    await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
+      conversationId,
+      title,
+    });
   }
 
   return { ok: true };

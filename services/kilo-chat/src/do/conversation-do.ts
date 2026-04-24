@@ -308,6 +308,15 @@ export class ConversationDO extends DurableObject<Env> {
     };
   }
 
+  /**
+   * Combined membership check + listMessages in a single RPC call.
+   * Returns null if the caller is not a member (i.e. 403).
+   */
+  listMessagesIfMember(memberId: string, params: ListMessagesParams): ListMessagesResult | null {
+    if (!this.isMember(memberId)) return null;
+    return this.listMessages(params);
+  }
+
   editMessage(params: EditMessageParams): EditMessageResult {
     const row = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
     if (!row || row.deleted === 1) {

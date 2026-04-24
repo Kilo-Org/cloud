@@ -99,13 +99,10 @@ export function registerConversationRoutes(
     const callerId = c.get('callerId');
     const stub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId));
 
-    if (!(await stub.isMember(callerId))) {
-      return c.json({ error: 'Forbidden' }, 403);
-    }
-
+    // Single RPC: getInfo returns members, so we check membership from the result.
     const info = await stub.getInfo();
-    if (!info) {
-      return c.json({ error: 'Not found' }, 404);
+    if (!info || !info.members.some(m => m.id === callerId)) {
+      return c.json({ error: 'Forbidden' }, 403);
     }
     return c.json(info satisfies ConversationDetailResponse);
   });

@@ -1,0 +1,146 @@
+{
+  "dialect": "sqlite",
+  "id": "878ab46c-3f3b-4b31-949b-88ef03ae6244",
+  "prevIds": ["50819fc4-8ebb-46ff-837b-3f7390c1be38"],
+  "version": "7",
+  "ddl": [
+    {
+      "name": "ingest_items",
+      "entityType": "tables"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": true,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "table": "ingest_items",
+      "entityType": "columns"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "ingest_items_pk",
+      "table": "ingest_items",
+      "entityType": "pks"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "item_id",
+      "table": "ingest_items",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "item_type",
+      "table": "ingest_items",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "item_data",
+      "table": "ingest_items",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "item_data_r2_key",
+      "table": "ingest_items",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "ingested_at",
+      "table": "ingest_items",
+      "entityType": "columns"
+    },
+    {
+      "columns": [
+        {
+          "value": "item_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "ingest_items_item_id_unique",
+      "table": "ingest_items",
+      "entityType": "indexes"
+    },
+    {
+      "name": "ingest_meta",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "key",
+      "table": "ingest_meta",
+      "entityType": "columns"
+    },
+    {
+      "columns": ["key"],
+      "nameExplicit": false,
+      "name": "ingest_meta_pk",
+      "table": "ingest_meta",
+      "entityType": "pks"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "value",
+      "table": "ingest_meta",
+      "entityType": "columns"
+    },
+    {
+      "name": "sessions",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "session_id",
+      "table": "sessions",
+      "entityType": "columns"
+    },
+    {
+      "columns": ["session_id"],
+      "nameExplicit": false,
+      "name": "sessions_pk",
+      "table": "sessions",
+      "entityType": "pks"
+    }
+  ],
+  "renames": []
+}

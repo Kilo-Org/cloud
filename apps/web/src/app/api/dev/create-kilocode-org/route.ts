@@ -115,7 +115,7 @@ export async function POST(_request: NextRequest): Promise<NextResponse> {
     console.log('[DEV CREATE KILOCODE ORG] Stripe customer ID created');
 
     // Verify membership was created
-    const newMembership = await db.query.organization_memberships.findFirst({
+    const newMembership = await db._query.organization_memberships.findFirst({
       where: and(
         eq(organization_memberships.organization_id, DEV_ORG_ID),
         eq(organization_memberships.kilo_user_id, user.id)

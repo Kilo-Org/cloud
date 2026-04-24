@@ -12,13 +12,14 @@ Each worker root contains a `drizzle.config.ts` that configures `drizzle-kit` wi
 
 1. Edit `src/db/sqlite-schema.ts` in the relevant worker.
 2. From the worker directory, run:
-   ```
+   ```sh
    pnpm drizzle-kit generate
    ```
-3. Commit the three generated/updated artifacts:
-   - The new `.sql` file in `drizzle/`
-   - The updated `drizzle/migrations.js` (barrel file)
-   - The updated snapshot in `drizzle/meta/`
+3. Commit the generated/updated artifacts under `drizzle/`:
+   - A new timestamped migration folder named like `YYYYMMDDHHmmss_descriptive_name/`
+   - The SQL file inside that migration folder
+   - The snapshot file inside that migration folder
+   - The updated `drizzle/migrations.js` barrel file, plus `drizzle/migrations.d.ts` when generated
 
 ## How migrations run
 
@@ -29,6 +30,16 @@ migrate(db, migrations);
 ```
 
 This checks the `__drizzle_migrations` table in the DO's SQLite database and applies any pending SQL files in order. No migration runs twice; the table tracks what has already been applied.
+
+## Upgrading old migration folders
+
+Drizzle v1 uses the folders v3 migration layout. If a worker still has old top-level SQL files plus `drizzle/meta/_journal.json`, convert it from the worker directory with:
+
+```sh
+pnpm drizzle-kit up
+```
+
+Review the resulting timestamped migration folders and `migrations.js` diff before merging, because Durable Object migrations are bundled into the Worker and run per instance after deploy.
 
 ## Important caveat
 

@@ -70,7 +70,7 @@ describe('recomputeUserBalances', () => {
     }
 
     // Verify no adjustment transaction
-    const adjustmentTx = await db.query.credit_transactions.findFirst({
+    const adjustmentTx = await db._query.credit_transactions.findFirst({
       where: and(
         eq(credit_transactions.kilo_user_id, user.id),
         eq(credit_transactions.credit_category, 'accounting_adjustment')
@@ -110,7 +110,7 @@ describe('recomputeUserBalances', () => {
     }
 
     // Verify adjustment transaction
-    const adjustmentTx = await db.query.credit_transactions.findFirst({
+    const adjustmentTx = await db._query.credit_transactions.findFirst({
       where: and(
         eq(credit_transactions.kilo_user_id, user.id),
         eq(credit_transactions.credit_category, 'accounting_adjustment')
@@ -120,7 +120,7 @@ describe('recomputeUserBalances', () => {
     expect(adjustmentTx?.amount_microdollars).toBe(2_000_000);
 
     // Verify user total acquired is updated to include adjustment (should match original user total)
-    const updatedUser = await db.query.kilocode_users.findFirst({
+    const updatedUser = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(updatedUser?.total_microdollars_acquired).toBe(12_000_000);
@@ -170,7 +170,7 @@ describe('recomputeUserBalances', () => {
     expect(result.success).toBe(true);
 
     // Verify baselines
-    const tx = await db.query.credit_transactions.findFirst({
+    const tx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.kilo_user_id, user.id),
     });
     expect(tx?.original_baseline_microdollars_used).toBe(1_000_000);
@@ -205,7 +205,7 @@ describe('recomputeUserBalances', () => {
     }
 
     // Verify NO adjustment transaction
-    const adjustmentTx = await db.query.credit_transactions.findFirst({
+    const adjustmentTx = await db._query.credit_transactions.findFirst({
       where: and(
         eq(credit_transactions.kilo_user_id, user.id),
         eq(credit_transactions.credit_category, 'accounting_adjustment')
@@ -485,7 +485,7 @@ describe('recomputeUserBalances', () => {
     expect(result.success).toBe(true);
 
     // Recomputed microdollars_used should be LLM ($2) + Exa ($3) = $5
-    const updatedUser = await db.query.kilocode_users.findFirst({
+    const updatedUser = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(updatedUser!.microdollars_used).toBe(5_000_000);
@@ -525,7 +525,7 @@ describe('recomputeUserBalances', () => {
     expect(result.success).toBe(true);
 
     // Only LLM usage (none) should count — org Exa is excluded
-    const updatedUser = await db.query.kilocode_users.findFirst({
+    const updatedUser = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(updatedUser!.microdollars_used).toBe(0);

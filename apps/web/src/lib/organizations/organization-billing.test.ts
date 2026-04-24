@@ -188,7 +188,7 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
 
     expect(result).toBe('cus_test_preserve');
 
-    const updated = await db.query.organizations.findFirst({
+    const updated = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
     expect(updated?.stripe_customer_id).toBe('cus_test_preserve');
@@ -240,7 +240,7 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
     expect(result).toBe('cus_fresh_123');
 
     // Verify the database was actually updated
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, freshOrg.id),
     });
     expect(updatedOrg?.stripe_customer_id).toBe('cus_fresh_123');
@@ -456,7 +456,7 @@ describe('processTopupForOrganization', () => {
     await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, config);
 
     // Verify organization balance was updated
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
 
@@ -469,7 +469,7 @@ describe('processTopupForOrganization', () => {
     );
 
     // Verify credit transaction was created
-    const creditTransaction = await db.query.credit_transactions.findFirst({
+    const creditTransaction = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, stripePaymentId),
     });
 
@@ -504,7 +504,7 @@ describe('processTopupForOrganization', () => {
     });
 
     // Verify final balance
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
 
@@ -517,7 +517,7 @@ describe('processTopupForOrganization', () => {
     );
 
     // Verify both credit transactions were created
-    const transactions = await db.query.credit_transactions.findMany({
+    const transactions = await db._query.credit_transactions.findMany({
       where: eq(credit_transactions.organization_id, testOrganization.id),
     });
 
@@ -542,7 +542,7 @@ describe('processTopupForOrganization', () => {
     });
 
     // Verify balance was added to existing balance
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
 
@@ -564,7 +564,7 @@ describe('processTopupForOrganization', () => {
       stripe_payment_id: 'pi_test_timestamp',
     });
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
 
@@ -584,7 +584,7 @@ describe('processTopupForOrganization', () => {
     });
 
     // Verify balance remains unchanged
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
 
@@ -593,7 +593,7 @@ describe('processTopupForOrganization', () => {
     expect(computedBalanceZero).toBe(initialBalance);
 
     // Verify credit transaction was still created with zero amount
-    const creditTransaction = await db.query.credit_transactions.findFirst({
+    const creditTransaction = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, 'pi_test_zero_amount'),
     });
 
@@ -609,7 +609,7 @@ describe('processTopupForOrganization', () => {
       stripe_payment_id: 'pi_test_preserve_fields',
     });
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
 

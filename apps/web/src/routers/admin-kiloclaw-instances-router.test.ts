@@ -333,7 +333,7 @@ describe('admin.kiloclawInstances.machineStart', () => {
       reason: 'admin_request',
     });
 
-    const updatedInstance = await db.query.kiloclaw_instances.findFirst({
+    const updatedInstance = await db._query.kiloclaw_instances.findFirst({
       where: eq(kiloclaw_instances.id, instance.id),
     });
     expect(updatedInstance?.inactive_trial_stopped_at).toBeNull();
@@ -379,7 +379,7 @@ describe('admin.kiloclawInstances.machineStart', () => {
       startedAt: null,
     });
 
-    const updatedInstance = await db.query.kiloclaw_instances.findFirst({
+    const updatedInstance = await db._query.kiloclaw_instances.findFirst({
       where: eq(kiloclaw_instances.id, instance.id),
     });
     expect(new Date(String(updatedInstance?.inactive_trial_stopped_at)).toISOString()).toBe(

@@ -231,7 +231,7 @@ export class CloudAgentSession extends DurableObject {
     this.leaseQueries = createLeaseQueries(db, rawSql);
 
     void ctx.blockConcurrencyWhile(async () => {
-      await migrate(db, migrations);
+      migrate(db, migrations);
       await this.ensureAlarmScheduled();
     });
   }

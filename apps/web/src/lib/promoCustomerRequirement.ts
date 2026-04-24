@@ -39,7 +39,7 @@ export const has_stytchApprovedOrHoldOrPayment: SyncCustomerRequirement = custom
   );
 
 export const has_githubAuthAndWelcomeCredits: CustomerRequirement = async customerInfo => {
-  const has_github_auth = await db.query.user_auth_provider.findFirst({
+  const has_github_auth = await db._query.user_auth_provider.findFirst({
     where: and(
       eq(user_auth_provider.kilo_user_id, customerInfo.user.id),
       eq(user_auth_provider.provider, 'github')
@@ -62,7 +62,7 @@ export function created_before(cutoff: Date): SyncCustomerRequirement {
 }
 
 export const has_githubAuth: CustomerRequirement = async customerInfo => {
-  const has_github_auth = await db.query.user_auth_provider.findFirst({
+  const has_github_auth = await db._query.user_auth_provider.findFirst({
     where: and(
       eq(user_auth_provider.kilo_user_id, customerInfo.user.id),
       eq(user_auth_provider.provider, 'github')

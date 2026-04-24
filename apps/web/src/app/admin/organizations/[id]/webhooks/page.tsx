@@ -18,7 +18,7 @@ export default async function AdminOrganizationWebhooksPage({
   const { id } = await params;
   const organizationId = decodeURIComponent(id);
 
-  const organization = await db.query.organizations.findFirst({
+  const organization = await db._query.organizations.findFirst({
     columns: {
       id: true,
       name: true,

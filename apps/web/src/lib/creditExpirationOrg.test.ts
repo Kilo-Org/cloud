@@ -17,7 +17,7 @@ async function createTestOrg(
   if (Object.keys(overrides).length > 0) {
     await db.update(organizations).set(overrides).where(eq(organizations.id, org.id));
   }
-  return await db.query.organizations.findFirst({ where: eq(organizations.id, org.id) });
+  return await db._query.organizations.findFirst({ where: eq(organizations.id, org.id) });
 }
 
 describe('fetchExpiringTransactionsForOrganization', () => {
@@ -203,7 +203,7 @@ describe('processOrganizationExpirations', () => {
     expect(expirations[0].kilo_user_id).toBe('system');
 
     // Verify org columns updated
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, orgId),
     });
     expect(updatedOrg!.total_microdollars_acquired).toBe(3_000_000);
@@ -245,7 +245,7 @@ describe('processOrganizationExpirations', () => {
       new Date('2024-01-15T00:00:00Z')
     );
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, orgId),
     });
     expect(new Date(updatedOrg!.next_credit_expiration_at!).toISOString()).toBe(
@@ -302,7 +302,7 @@ describe('processOrganizationExpirations', () => {
     expect(result1).not.toBeNull();
 
     // Re-fetch org for second call
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, orgId),
     });
     const result2 = await processOrganizationExpirations(

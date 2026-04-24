@@ -1,11 +1,9 @@
-import journal from './meta/_journal.json';
-import m0000 from './0000_high_mimic.sql';
-import m0001 from './0001_add_entity_id.sql';
+import m0000 from './20260228013146_high_mimic/migration.sql';
+import m0001 from './20260228013146_z_add_entity_id/migration.sql';
 
 export default {
-  journal,
   migrations: {
-    m0000,
-    m0001,
+    '20260228013146_high_mimic': m0000,
+    '20260228013146_z_add_entity_id': m0001,
   },
 };

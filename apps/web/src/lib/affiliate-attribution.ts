@@ -48,7 +48,7 @@ export async function recordAffiliateAttribution(params: {
 }
 
 export async function getAffiliateAttribution(userId: string, provider: AffiliateProvider) {
-  return await db.query.user_affiliate_attributions.findFirst({
+  return await db._query.user_affiliate_attributions.findFirst({
     where: and(
       eq(user_affiliate_attributions.user_id, userId),
       eq(user_affiliate_attributions.provider, provider)

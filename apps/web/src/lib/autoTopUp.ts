@@ -65,7 +65,7 @@ async function shouldWaitForKiloPassBonusCredits(kiloUserId: string): Promise<bo
     return true;
   }
 
-  const unlockedItem = await db.query.kilo_pass_issuance_items.findFirst({
+  const unlockedItem = await db._query.kilo_pass_issuance_items.findFirst({
     columns: { id: true },
     where: and(
       eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
@@ -215,7 +215,7 @@ async function performAutoTopUpForEntity(
   if (!config) {
     // Either no config exists, or concurrent attempt in progress
     // Check which case it is
-    const existingConfig = await db.query.auto_top_up_configs.findFirst({
+    const existingConfig = await db._query.auto_top_up_configs.findFirst({
       where: eq(ownerColumn, ownerId),
     });
 

@@ -19,8 +19,8 @@ export class SessionAccessCacheDO extends DurableObject<Env> {
     super(state, env);
     this.db = drizzle(state.storage, { logger: false });
 
-    void state.blockConcurrencyWhile(() => {
-      return migrate(this.db, migrations);
+    void state.blockConcurrencyWhile(async () => {
+      migrate(this.db, migrations);
     });
   }
 

@@ -20,8 +20,8 @@ catalog:
   '@typescript/native-preview': 7.0.0-dev.20260319.1
   '@workos-inc/node': ^8.9.0
   aws4fetch: ^1.0.20
-  drizzle-kit: ^0.31.9
-  drizzle-orm: ^0.45.1
+  drizzle-kit: 1.0.0-beta.22
+  drizzle-orm: 1.0.0-beta.22
   hono: ^4.12.7
   jose: ^6.2.1
   jsonwebtoken: ^9.0.3

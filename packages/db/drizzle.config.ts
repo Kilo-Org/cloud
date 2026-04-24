@@ -8,14 +8,12 @@ export default defineConfig({
   schema: './src/schema.ts',
   out: './src/migrations',
   dialect: 'postgresql',
-  // Feels nasty to use `as` here but the type of dbCredentials is not compatible with the one from pg
-  dbCredentials: getDatabaseClientConfig(computeDatabaseUrl()) as {
-    user: string;
-    password: string;
-    host: string;
-    port: number;
-    database: string;
+  schemaFilter: ['public'],
+  migrations: {
+    table: '__drizzle_migrations',
+    schema: 'drizzle',
   },
+  dbCredentials: getDatabaseClientConfig(computeDatabaseUrl()),
   verbose: !!process.env.DEBUG_QUERY_LOGGING,
   strict: true,
 });

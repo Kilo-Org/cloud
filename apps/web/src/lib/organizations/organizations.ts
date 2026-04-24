@@ -32,7 +32,7 @@ export async function getOrganizationById(
   txn?: DrizzleTransaction
 ): Promise<Organization | null> {
   return (
-    (await (txn || db).query.organizations.findFirst({
+    (await (txn || db)._query.organizations.findFirst({
       where: and(eq(organizations.id, id), isNull(organizations.deleted_at)),
     })) || null
   );
@@ -43,7 +43,7 @@ export async function findOrganizationByStripeCustomerId(
   txn?: DrizzleTransaction
 ): Promise<Organization | null> {
   return (
-    (await (txn || db).query.organizations.findFirst({
+    (await (txn || db)._query.organizations.findFirst({
       where: and(
         eq(organizations.stripe_customer_id, stripeCustomerId),
         isNull(organizations.deleted_at)
@@ -611,7 +611,7 @@ export async function isOrganizationMember(
   userId: User['id'],
   fromDb: typeof db = db
 ) {
-  const result = await fromDb.query.organization_memberships.findFirst({
+  const result = await fromDb._query.organization_memberships.findFirst({
     where: and(
       eq(organization_memberships.organization_id, organizationId),
       eq(organization_memberships.kilo_user_id, userId)
@@ -651,7 +651,7 @@ export async function doesOrgWithSSODomainExist(domain: string): Promise<string 
   const d = OrganizationSSODomainSchema.safeParse(domain);
   if (!d.success) return false;
 
-  const result = await db.query.organizations.findFirst({
+  const result = await db._query.organizations.findFirst({
     where: and(eq(organizations.sso_domain, d.data), isNull(organizations.deleted_at)),
     columns: { id: true },
   });

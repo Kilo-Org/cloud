@@ -1,0 +1,106 @@
+{
+  "dialect": "sqlite",
+  "id": "8aed7615-cb24-49da-abcc-52237caf0e11",
+  "prevIds": ["00000000-0000-0000-0000-000000000000"],
+  "version": "7",
+  "ddl": [
+    {
+      "name": "git_objects",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "path",
+      "table": "git_objects",
+      "entityType": "columns"
+    },
+    {
+      "columns": ["path"],
+      "nameExplicit": false,
+      "name": "git_objects_pk",
+      "table": "git_objects",
+      "entityType": "pks"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "name": "parent_path",
+      "table": "git_objects",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "data",
+      "table": "git_objects",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "is_dir",
+      "table": "git_objects",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "mtime",
+      "table": "git_objects",
+      "entityType": "columns"
+    },
+    {
+      "columns": [
+        {
+          "value": "parent_path",
+          "isExpression": false
+        },
+        {
+          "value": "path",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_git_objects_parent",
+      "table": "git_objects",
+      "entityType": "indexes"
+    },
+    {
+      "columns": [
+        {
+          "value": "is_dir",
+          "isExpression": false
+        },
+        {
+          "value": "path",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_git_objects_is_dir",
+      "table": "git_objects",
+      "entityType": "indexes"
+    }
+  ],
+  "renames": []
+}

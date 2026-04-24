@@ -24,7 +24,7 @@ export class AttributionTrackerDO extends DurableObject<Env> {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
     void this.ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
+      migrate(this.db, migrations);
       logger.info('Database migrated');
     });
   }

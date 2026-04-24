@@ -128,7 +128,7 @@ async function resolveRecipientEmails(deployment: {
 }
 
 async function sendDeploymentFailureNotification(deploymentId: string) {
-  const deployment = await db.query.deployments.findFirst({
+  const deployment = await db._query.deployments.findFirst({
     where: eq(deployments.id, deploymentId),
   });
 

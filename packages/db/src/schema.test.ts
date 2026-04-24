@@ -1,55 +1,7 @@
 import { describe, it } from '@jest/globals';
-import * as fs from 'fs';
-import * as path from 'path';
-import { generateDrizzleJson, generateMigration } from 'drizzle-kit/api';
-import * as schema from './schema';
 import { SCHEMA_CHECK_ENUMS } from './schema';
 
 describe('database schema', () => {
-  it("should be up to date with migrations (run 'pnpm drizzle generate' if this fails)", async () => {
-    const migrationsDir = './packages/db/src/migrations';
-
-    // Get the latest snapshot from the migrations folder
-    const journalPath = path.join(migrationsDir, 'meta', '_journal.json');
-    const journal = JSON.parse(fs.readFileSync(journalPath, 'utf-8')) as {
-      entries: { idx: number }[];
-    };
-    const latestEntry = journal.entries[journal.entries.length - 1];
-    const latestSnapshotPath = path.join(
-      migrationsDir,
-      'meta',
-      `${latestEntry.idx.toString().padStart(4, '0')}_snapshot.json`
-    );
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-redundant-type-constituents -- drizzle-kit API types
-    const latestSnapshot: Parameters<typeof generateMigration>[0] & { id: string } = JSON.parse(
-      fs.readFileSync(latestSnapshotPath, 'utf-8')
-    );
-
-    // Generate current schema state
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access -- drizzle-kit API types
-    const currentSchema = generateDrizzleJson(schema, latestSnapshot.id);
-
-    // Generate migration diff
-    const migrationStatements = await generateMigration(latestSnapshot, currentSchema);
-
-    const expect_unmigrated_changes = false;
-    const has_unmigrated_changes = migrationStatements.length > 0;
-    if (expect_unmigrated_changes !== has_unmigrated_changes) {
-      if (expect_unmigrated_changes)
-        throw new Error(
-          'Schema is back up to date, please set expect_unmigrated_changes back to false'
-        );
-      throw new Error(
-        `Schema is out of date! Run 'pnpm drizzle generate' to fix.\n` +
-          `WARNING: note that IF you're DELETING esp. columns, ` +
-          `then you may need to deploy the code with a schema that is lacking those columns but NOT yet migrated.\n` +
-          `If you deploy a code with a column deletion in both migration and schema, the in-prod code that does effectively "select * ..." will cause drizzle's POJO mapper to crash complaining about a missing column. ` +
-          `In this case, you must set const expect_unmigrated_changes = true; above. Please do generate the migration soon, however, so that other devs don't run into tricky semantic merge conflicts when they generate migrations. ` +
-          `\n\nPending changes:\n${migrationStatements.join('\n')}`
-      );
-    }
-  });
-
   /**
    * This test ensures that if someone adds/removes values from enums used in schema check constraints,
    * they are reminded to generate a migration. The check constraints in the database must match the

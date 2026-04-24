@@ -29,7 +29,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
   }),
 
   upsert: adminProcedure.input(UpsertCustomLlmSchema).mutation(async ({ input }) => {
-    const existing = await db.query.custom_llm2.findFirst({
+    const existing = await db._query.custom_llm2.findFirst({
       where: eq(custom_llm2.public_id, input.public_id),
     });
 

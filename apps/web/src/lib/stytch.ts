@@ -54,7 +54,7 @@ export const getStytchStatus = async (
 };
 
 export async function getStoredFingerprint(kiloUserId: string) {
-  return await db.query.stytch_fingerprints.findFirst({
+  return await db._query.stytch_fingerprints.findFirst({
     where: eq(stytch_fingerprints.kilo_user_id, kiloUserId),
   });
 }
@@ -63,7 +63,7 @@ export async function isKnownFingerprintOfOtherUser(
   kiloUserId: string,
   visitorFingerprint: string
 ): Promise<boolean> {
-  const existingFingerprints = await db.query.stytch_fingerprints.findMany({
+  const existingFingerprints = await db._query.stytch_fingerprints.findMany({
     where: eq(stytch_fingerprints.visitor_fingerprint, visitorFingerprint),
     columns: { kilo_user_id: true },
   });

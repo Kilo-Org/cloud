@@ -178,7 +178,7 @@ async function getOrCreateIssuanceForYearlyCadence(
     stripeInvoiceId: null,
   });
 
-  const issuanceRow = await tx.query.kilo_pass_issuances.findFirst({
+  const issuanceRow = await tx._query.kilo_pass_issuances.findFirst({
     columns: { stripe_invoice_id: true },
     where: eq(kilo_pass_issuances.id, issuanceHeader.issuanceId),
   });
@@ -216,7 +216,7 @@ async function maybeIssueBonusFromUsageThreshold(
     return;
   }
 
-  const baseItem = await tx.query.kilo_pass_issuance_items.findFirst({
+  const baseItem = await tx._query.kilo_pass_issuance_items.findFirst({
     columns: { id: true },
     where: and(
       eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.issuanceId),
@@ -228,7 +228,7 @@ async function maybeIssueBonusFromUsageThreshold(
     return;
   }
 
-  const alreadyIssuedItem = await tx.query.kilo_pass_issuance_items.findFirst({
+  const alreadyIssuedItem = await tx._query.kilo_pass_issuance_items.findFirst({
     columns: { id: true },
     where: and(
       eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.issuanceId),

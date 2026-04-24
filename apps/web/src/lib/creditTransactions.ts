@@ -67,7 +67,7 @@ export async function summarizeUserPayments(kiloUserId: string, fromDb: typeof d
 }
 
 export async function getCreditTransactionsForOrganization(organizationId: Organization['id']) {
-  const res = await db.query.credit_transactions.findMany({
+  const res = await db._query.credit_transactions.findMany({
     where: eq(credit_transactions.organization_id, organizationId),
     orderBy: desc(credit_transactions.created_at),
     limit: 100,
@@ -76,7 +76,7 @@ export async function getCreditTransactionsForOrganization(organizationId: Organ
 }
 
 export async function hasUserEverPaid(kiloUserId: string): Promise<boolean> {
-  const result = await db.query.credit_transactions.findFirst({
+  const result = await db._query.credit_transactions.findFirst({
     where: and(
       eq(credit_transactions.kilo_user_id, kiloUserId),
       eq(credit_transactions.is_free, false),
@@ -90,7 +90,7 @@ export async function hasUserEverPaid(kiloUserId: string): Promise<boolean> {
 export async function hasOrganizationEverPaid(
   organizationId: Organization['id']
 ): Promise<boolean> {
-  const result = await db.query.credit_transactions.findFirst({
+  const result = await db._query.credit_transactions.findFirst({
     where: and(
       eq(credit_transactions.organization_id, organizationId),
       eq(credit_transactions.is_free, false)

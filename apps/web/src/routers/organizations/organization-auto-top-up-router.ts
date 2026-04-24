@@ -24,7 +24,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
   getConfig: organizationBillingProcedure.query(async ({ input }) => {
     const { organizationId } = input;
 
-    const config = await db.query.auto_top_up_configs.findFirst({
+    const config = await db._query.auto_top_up_configs.findFirst({
       where: eq(auto_top_up_configs.owned_by_organization_id, organizationId),
     });
 
@@ -58,7 +58,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
         return { enabled: false } as const;
       } else {
         // Enabling auto-top-up
-        const config = await db.query.auto_top_up_configs.findFirst({
+        const config = await db._query.auto_top_up_configs.findFirst({
           where: eq(auto_top_up_configs.owned_by_organization_id, organizationId),
         });
 

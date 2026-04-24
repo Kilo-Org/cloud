@@ -41,7 +41,7 @@ beforeAll(async () => {
     connectionString: testDbUrl.replace('sslmode=require&', ''),
   });
   try {
-    const testDb = drizzle(testPool);
+    const testDb = drizzle({ client: testPool });
     await migrate(testDb, { migrationsFolder: '../../packages/db/src/migrations' });
   } finally {
     await testPool.end();

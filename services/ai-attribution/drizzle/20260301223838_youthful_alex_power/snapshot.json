@@ -1,0 +1,342 @@
+{
+  "dialect": "sqlite",
+  "id": "b9a13810-a423-474f-9be4-28e037b617eb",
+  "prevIds": ["00000000-0000-0000-0000-000000000000"],
+  "version": "7",
+  "ddl": [
+    {
+      "name": "attributions_metadata",
+      "entityType": "tables"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": true,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "table": "attributions_metadata",
+      "entityType": "columns"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "attributions_metadata_pk",
+      "table": "attributions_metadata",
+      "entityType": "pks"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "user_id",
+      "table": "attributions_metadata",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "project_id",
+      "table": "attributions_metadata",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "organization_id",
+      "table": "attributions_metadata",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "branch",
+      "table": "attributions_metadata",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "file_path",
+      "table": "attributions_metadata",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "status",
+      "table": "attributions_metadata",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "task_id",
+      "table": "attributions_metadata",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "current_timestamp",
+      "generated": null,
+      "name": "created_at",
+      "table": "attributions_metadata",
+      "entityType": "columns"
+    },
+    {
+      "columns": [
+        {
+          "value": "file_path",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_file_path",
+      "table": "attributions_metadata",
+      "entityType": "indexes"
+    },
+    {
+      "columns": [
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_created_at",
+      "table": "attributions_metadata",
+      "entityType": "indexes"
+    },
+    {
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        },
+        {
+          "value": "organization_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_user_org",
+      "table": "attributions_metadata",
+      "entityType": "indexes"
+    },
+    {
+      "value": "status in ('accepted', 'rejected')",
+      "name": "status_check",
+      "table": "attributions_metadata",
+      "entityType": "checks"
+    },
+    {
+      "name": "lines_added",
+      "entityType": "tables"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": true,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "table": "lines_added",
+      "entityType": "columns"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "lines_added_pk",
+      "table": "lines_added",
+      "entityType": "pks"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "attributions_metadata_id",
+      "table": "lines_added",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "line_number",
+      "table": "lines_added",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "line_hash",
+      "table": "lines_added",
+      "entityType": "columns"
+    },
+    {
+      "columns": [
+        {
+          "value": "attributions_metadata_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_attribution_added",
+      "table": "lines_added",
+      "entityType": "indexes"
+    },
+    {
+      "columns": [
+        {
+          "value": "line_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_hash_added",
+      "table": "lines_added",
+      "entityType": "indexes"
+    },
+    {
+      "columns": ["attributions_metadata_id"],
+      "tableTo": "attributions_metadata",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "lines_added_attributions_metadata_id_attributions_metadata_id_fk",
+      "table": "lines_added",
+      "entityType": "fks"
+    },
+    {
+      "name": "lines_removed",
+      "entityType": "tables"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": true,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "table": "lines_removed",
+      "entityType": "columns"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "lines_removed_pk",
+      "table": "lines_removed",
+      "entityType": "pks"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "attributions_metadata_id",
+      "table": "lines_removed",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "line_number",
+      "table": "lines_removed",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "line_hash",
+      "table": "lines_removed",
+      "entityType": "columns"
+    },
+    {
+      "columns": [
+        {
+          "value": "attributions_metadata_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_attribution_removed",
+      "table": "lines_removed",
+      "entityType": "indexes"
+    },
+    {
+      "columns": [
+        {
+          "value": "line_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_hash_removed",
+      "table": "lines_removed",
+      "entityType": "indexes"
+    },
+    {
+      "columns": ["attributions_metadata_id"],
+      "tableTo": "attributions_metadata",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "lines_removed_attributions_metadata_id_attributions_metadata_id_fk",
+      "table": "lines_removed",
+      "entityType": "fks"
+    }
+  ],
+  "renames": []
+}

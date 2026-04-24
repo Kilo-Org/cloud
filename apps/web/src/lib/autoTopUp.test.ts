@@ -134,7 +134,7 @@ describe('autoTopUp', () => {
       await maybePerformAutoTopUp(user);
 
       // Verify no config was created
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
       });
       expect(config).toBeUndefined();
@@ -152,7 +152,7 @@ describe('autoTopUp', () => {
       await maybePerformAutoTopUp(user);
 
       // Verify no config was created (no lock acquired)
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
       });
       expect(config).toBeUndefined();
@@ -175,7 +175,7 @@ describe('autoTopUp', () => {
       await maybePerformAutoTopUp(user);
 
       // Verify auto_top_up_enabled was set to false
-      const updatedUser = await db.query.kilocode_users.findFirst({
+      const updatedUser = await db._query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, testUser.id),
       });
       expect(updatedUser?.auto_top_up_enabled).toBe(false);
@@ -206,7 +206,7 @@ describe('autoTopUp', () => {
       await maybePerformAutoTopUp(user);
 
       // Verify the lock is still held (attempt_started_at not cleared)
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
       });
       expect(config?.attempt_started_at).not.toBeNull();
@@ -254,13 +254,13 @@ describe('autoTopUp', () => {
       await maybePerformAutoTopUp(user);
 
       // Verify lock was released
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_user_id, testUser.id),
       });
       expect(config?.attempt_started_at).toBeNull();
 
       // Verify auto-top-up is still enabled (not disabled)
-      const updatedUser = await db.query.kilocode_users.findFirst({
+      const updatedUser = await db._query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, testUser.id),
       });
       expect(updatedUser?.auto_top_up_enabled).toBe(true);
@@ -292,7 +292,7 @@ describe('autoTopUp', () => {
       await maybePerformOrganizationAutoTopUp(org);
 
       // Verify no config was created
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config).toBeUndefined();
@@ -310,7 +310,7 @@ describe('autoTopUp', () => {
       await maybePerformOrganizationAutoTopUp(org);
 
       // Verify no config was created (no lock acquired)
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config).toBeUndefined();
@@ -333,7 +333,7 @@ describe('autoTopUp', () => {
       await maybePerformOrganizationAutoTopUp(org);
 
       // Verify auto_top_up_enabled was set to false
-      const updatedOrg = await db.query.organizations.findFirst({
+      const updatedOrg = await db._query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
       expect(updatedOrg?.auto_top_up_enabled).toBe(false);
@@ -364,7 +364,7 @@ describe('autoTopUp', () => {
       await maybePerformOrganizationAutoTopUp(org);
 
       // Verify the lock is still held (attempt_started_at not cleared)
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config?.attempt_started_at).not.toBeNull();
@@ -400,13 +400,13 @@ describe('autoTopUp', () => {
       await maybePerformOrganizationAutoTopUp(org);
 
       // Verify auto_top_up_enabled was set to false
-      const updatedOrg = await db.query.organizations.findFirst({
+      const updatedOrg = await db._query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
       expect(updatedOrg?.auto_top_up_enabled).toBe(false);
 
       // Verify disabled_reason was set
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config?.disabled_reason).toBe('no_stripe_customer');
@@ -449,13 +449,13 @@ describe('autoTopUp', () => {
       await maybePerformOrganizationAutoTopUp(org);
 
       // Verify lock was released
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config?.attempt_started_at).toBeNull();
 
       // Verify auto-top-up is still enabled (not disabled)
-      const updatedOrg = await db.query.organizations.findFirst({
+      const updatedOrg = await db._query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
       expect(updatedOrg?.auto_top_up_enabled).toBe(true);
@@ -491,7 +491,7 @@ describe('autoTopUp', () => {
       await maybePerformOrganizationAutoTopUp(org);
 
       // Should have attempted (and failed due to no config), disabling auto-top-up
-      const updatedOrg = await db.query.organizations.findFirst({
+      const updatedOrg = await db._query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
       expect(updatedOrg?.auto_top_up_enabled).toBe(false);
@@ -516,7 +516,7 @@ describe('autoTopUp', () => {
       await maybePerformOrganizationAutoTopUp(org);
 
       // Should NOT have attempted - auto_top_up_enabled should still be true
-      const updatedOrg = await db.query.organizations.findFirst({
+      const updatedOrg = await db._query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
       expect(updatedOrg?.auto_top_up_enabled).toBe(true);

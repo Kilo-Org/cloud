@@ -92,7 +92,7 @@ export async function findUserById(
   userId: string,
   fromDb: typeof db = db
 ): Promise<User | undefined> {
-  return await fromDb.query.kilocode_users.findFirst({
+  return await fromDb._query.kilocode_users.findFirst({
     where: eq(kilocode_users.id, userId),
   });
 }
@@ -100,7 +100,7 @@ export async function findUserById(
 export async function findUsersByIds(userIds: string[]): Promise<Map<string, User>> {
   if (userIds.length === 0) return new Map();
   const uniqueUserIds = [...new Set(userIds)];
-  const users = await db.query.kilocode_users.findMany({
+  const users = await db._query.kilocode_users.findMany({
     where: inArray(kilocode_users.id, uniqueUserIds),
   });
 
@@ -110,7 +110,7 @@ export async function findUsersByIds(userIds: string[]): Promise<Map<string, Use
 export async function findUserByStripeCustomerId(
   stripeCustomerId: string
 ): Promise<User | undefined> {
-  return await db.query.kilocode_users.findFirst({
+  return await db._query.kilocode_users.findFirst({
     where: eq(kilocode_users.stripe_customer_id, stripeCustomerId),
   });
 }
@@ -243,7 +243,7 @@ export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
 }
 
 export async function findUserByEmail(email: string): Promise<User | undefined> {
-  return await db.query.kilocode_users.findFirst({
+  return await db._query.kilocode_users.findFirst({
     where: eq(kilocode_users.google_user_email, email),
   });
 }
@@ -953,7 +953,7 @@ export async function findUserIdByAuthProvider(
   provider: AuthProviderId,
   providerAccountId: string
 ) {
-  const result = await db.query.user_auth_provider.findFirst({
+  const result = await db._query.user_auth_provider.findFirst({
     where: and(
       eq(user_auth_provider.provider, provider),
       eq(user_auth_provider.provider_account_id, providerAccountId)

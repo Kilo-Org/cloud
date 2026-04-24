@@ -267,7 +267,7 @@ export const adminAppBuilderRouter = createTRPCRouter({
     const { id: projectId } = input;
 
     // Verify project exists
-    const project = await db.query.app_builder_projects.findFirst({
+    const project = await db._query.app_builder_projects.findFirst({
       where: eq(app_builder_projects.id, projectId),
       columns: {
         id: true,

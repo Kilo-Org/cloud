@@ -29,7 +29,7 @@ export const getCustomerInfo = async (
   });
 
   const paymentEligblePromise = (async () => {
-    const result = await db.query.payment_methods.findFirst({
+    const result = await db._query.payment_methods.findFirst({
       columns: { id: true },
       where: and(
         eq(payment_methods.user_id, kiloUserId),

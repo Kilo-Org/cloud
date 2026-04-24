@@ -18,7 +18,7 @@ export async function GET(
 
   if (!kilo_user_id) throw new Error('kilo_user_id is required');
 
-  const methods = await db.query.payment_methods.findMany({
+  const methods = await db._query.payment_methods.findMany({
     where: eq(payment_methods.user_id, kilo_user_id),
     orderBy: desc(payment_methods.created_at),
   });

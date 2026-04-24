@@ -437,7 +437,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   let applied = false;
 
   await db.transaction(async tx => {
-    const user = await tx.query.kilocode_users.findFirst({
+    const user = await tx._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, userId),
     });
 

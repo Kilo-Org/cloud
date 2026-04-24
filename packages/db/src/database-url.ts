@@ -1,5 +1,14 @@
 import type { ClientConfig } from 'pg';
 
+export type DatabaseClientConfig = {
+  user: string;
+  password: string;
+  host: string;
+  port: number;
+  database: string;
+  ssl: NonNullable<ClientConfig['ssl']>;
+};
+
 export function computeDatabaseUrl(): string {
   // Check if we should use production database
   const useProductionDb = process.env.USE_PRODUCTION_DB === 'true';
@@ -19,22 +28,21 @@ export function computeDatabaseUrl(): string {
     : postgresUrl;
 }
 
-export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
+export function getDatabaseClientConfig(postgresUrl: string): DatabaseClientConfig {
   const databaseUrl = new URL(postgresUrl);
-  const clientConfig: ClientConfig = {
+  const clientConfig: DatabaseClientConfig = {
     user: databaseUrl.username,
     password: databaseUrl.password,
     host: databaseUrl.hostname,
     port: Number(databaseUrl.port),
     database: databaseUrl.pathname.slice(1),
+    ssl: false,
   };
 
   if (process.env.DATABASE_CA) {
     clientConfig.ssl = {
       ca: process.env.DATABASE_CA,
     };
-  } else {
-    clientConfig.ssl = false;
   }
 
   return clientConfig;

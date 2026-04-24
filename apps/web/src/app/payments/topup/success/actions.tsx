@@ -33,7 +33,7 @@ export async function fetchCreditTransactionIdForStripeSession(sessionId: string
   }
 
   // Note: This is a bit ugly, because for some reason we sometimes store py_ ids (charges), and sometimes pi_ ids (payment intents)
-  const creditTransaction = await db.query.credit_transactions.findFirst({
+  const creditTransaction = await db._query.credit_transactions.findFirst({
     where: inArray(credit_transactions.stripe_payment_id, [
       paymentIntent.id,
       paymentIntent.latest_charge as string,

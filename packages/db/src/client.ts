@@ -29,7 +29,7 @@ export function createDrizzleClient(options: CreateDrizzleClientOptions) {
     ...poolConfig,
   });
 
-  const db = drizzle(pool, { schema, logger });
+  const db = drizzle({ client: pool, schema, logger });
 
   return { db, pool, schema };
 }
@@ -43,7 +43,7 @@ export type GetWorkerDbOptions = Omit<pg.PoolConfig, 'connectionString' | 'max'>
  */
 export function getWorkerDb(connectionString: string, options: GetWorkerDbOptions = {}) {
   const pool = new pg.Pool({ connectionString, max: 1, ...options });
-  return drizzle(pool, { schema });
+  return drizzle({ client: pool, schema });
 }
 
 export type WorkerDb = ReturnType<typeof getWorkerDb>;

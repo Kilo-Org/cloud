@@ -537,7 +537,7 @@ describe('processStripePaymentEventHook', () => {
 
     await processStripePaymentEventHook(event);
 
-    const storedPaymentMethod = await db.query.payment_methods.findFirst({
+    const storedPaymentMethod = await db._query.payment_methods.findFirst({
       where: and(
         eq(payment_methods.stripe_id, mockStripePaymentMethod.id),
         eq(payment_methods.user_id, testUser.id)
@@ -566,7 +566,7 @@ describe('processStripePaymentEventHook', () => {
 
     await processStripePaymentEventHook(event);
 
-    const storedPaymentMethod = await db.query.payment_methods.findFirst({
+    const storedPaymentMethod = await db._query.payment_methods.findFirst({
       where: and(
         eq(payment_methods.stripe_id, mockStripePaymentMethod.id),
         eq(payment_methods.user_id, testUser.id)
@@ -597,7 +597,7 @@ describe('processStripePaymentEventHook', () => {
 
     await processStripePaymentEventHook(event);
 
-    const storedPaymentMethod = await db.query.payment_methods.findMany({
+    const storedPaymentMethod = await db._query.payment_methods.findMany({
       where: and(eq(payment_methods.user_id, testUser.id)),
     });
 
@@ -617,7 +617,7 @@ describe('processStripePaymentEventHook', () => {
 
     await processStripePaymentEventHook(event);
 
-    const paymentMethodExists = await db.query.payment_methods.findFirst({
+    const paymentMethodExists = await db._query.payment_methods.findFirst({
       where: eq(payment_methods.user_id, testUser.id),
     });
 
@@ -638,7 +638,7 @@ describe('processStripePaymentEventHook', () => {
 
     await processStripePaymentEventHook(event);
 
-    const paymentMethodExists = await db.query.payment_methods.findFirst({
+    const paymentMethodExists = await db._query.payment_methods.findFirst({
       where: eq(payment_methods.stripe_id, mockStripePaymentMethod.id),
     });
 
@@ -659,7 +659,7 @@ describe('processStripePaymentEventHook', () => {
 
     await processStripePaymentEventHook(event);
 
-    const paymentMethodExists = await db.query.payment_methods.findFirst({
+    const paymentMethodExists = await db._query.payment_methods.findFirst({
       where: eq(payment_methods.stripe_id, mockStripePaymentMethod.id),
     });
 
@@ -972,13 +972,13 @@ describe('processStripePaymentEventHook', () => {
 
       await processStripePaymentEventHook(event);
 
-      const updatedRow = await db.query.kilo_pass_scheduled_changes.findFirst({
+      const updatedRow = await db._query.kilo_pass_scheduled_changes.findFirst({
         where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
       });
       expect(updatedRow?.status).toBe(KiloPassScheduledChangeStatus.NotStarted);
 
       const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
-      const creditTx = await db.query.credit_transactions.findFirst({
+      const creditTx = await db._query.credit_transactions.findFirst({
         where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
       });
 
@@ -1033,7 +1033,7 @@ describe('processStripePaymentEventHook', () => {
 
       await processStripePaymentEventHook(event);
 
-      const updatedRow = await db.query.kilo_pass_scheduled_changes.findFirst({
+      const updatedRow = await db._query.kilo_pass_scheduled_changes.findFirst({
         where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
       });
       expect(updatedRow).toBeTruthy();
@@ -1087,7 +1087,7 @@ describe('processStripePaymentEventHook', () => {
 
       await processStripePaymentEventHook(event);
 
-      const updatedRow = await db.query.kilo_pass_scheduled_changes.findFirst({
+      const updatedRow = await db._query.kilo_pass_scheduled_changes.findFirst({
         where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
       });
       expect(updatedRow).toBeTruthy();
@@ -1141,7 +1141,7 @@ describe('processStripePaymentEventHook', () => {
 
       await processStripePaymentEventHook(releasedEvent);
 
-      const afterReleased = await db.query.kilo_pass_scheduled_changes.findFirst({
+      const afterReleased = await db._query.kilo_pass_scheduled_changes.findFirst({
         where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
       });
       expect(afterReleased).toBeTruthy();
@@ -1164,7 +1164,7 @@ describe('processStripePaymentEventHook', () => {
 
       await processStripePaymentEventHook(notStartedEvent);
 
-      const afterOutOfOrder = await db.query.kilo_pass_scheduled_changes.findFirst({
+      const afterOutOfOrder = await db._query.kilo_pass_scheduled_changes.findFirst({
         where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
       });
 
@@ -1230,7 +1230,7 @@ describe('releaseScheduledChangeForSubscription', () => {
       })
     ).rejects.toThrow('stripe release failed');
 
-    const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+    const row = await db._query.kilo_pass_scheduled_changes.findFirst({
       where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
     });
     expect(row).toBeTruthy();
@@ -1295,14 +1295,14 @@ describe('releaseScheduledChangeForSubscription', () => {
     expect(release).toHaveBeenCalledWith(orphanScheduleId);
     expect(release).not.toHaveBeenCalledWith(activeScheduleId);
 
-    const row = await db.query.kilo_pass_scheduled_changes.findFirst({
+    const row = await db._query.kilo_pass_scheduled_changes.findFirst({
       where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
     });
     expect(row).toBeTruthy();
     expect(row?.deleted_at).toBeNull();
     expect(row?.status).toBe(KiloPassScheduledChangeStatus.NotStarted);
 
-    const auditLog = await db.query.kilo_pass_audit_log.findFirst({
+    const auditLog = await db._query.kilo_pass_audit_log.findFirst({
       where: eq(kilo_pass_audit_log.stripe_event_id, 'evt_release_helper_mismatch'),
     });
     expect(auditLog?.payload_json).toEqual(
@@ -1427,7 +1427,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
 
     await handleSuccessfulChargeWithPayment(charge, paymentIntent);
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, org.id),
     });
     const expectedIncrease = amountInCents * 10_000;
@@ -1436,7 +1436,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       (updatedOrg?.total_microdollars_acquired ?? 0) - (updatedOrg?.microdollars_used ?? 0);
     expect(updatedComputedBalance).toBe(orgComputedBalance + expectedIncrease);
 
-    const creditTx = await db.query.credit_transactions.findFirst({
+    const creditTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, piId),
     });
 
@@ -1469,7 +1469,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     await handleSuccessfulChargeWithPayment(charge, paymentIntent);
 
     // Should NOT create a credit transaction
-    const creditTx = await db.query.credit_transactions.findFirst({
+    const creditTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, chId),
     });
 
@@ -1497,7 +1497,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     await handleSuccessfulChargeWithPayment(charge, paymentIntent);
 
     // For user top-ups, handleSuccessfulChargeWithPayment passes config.stripe_payment_id = charge.id
-    const creditTx = await db.query.credit_transactions.findFirst({
+    const creditTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, chargeId),
     });
 
@@ -1510,7 +1510,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     expect(creditTx?.description).toBe('Top-up via stripe');
 
     // Verify user aggregate balance fields updated
-    const updatedUser = await db.query.kilocode_users.findFirst({
+    const updatedUser = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(updatedUser?.total_microdollars_acquired).toBe(amountInCents * 10_000);
@@ -1530,10 +1530,10 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
 
     await handleSuccessfulChargeWithPayment(charge, paymentIntent);
 
-    const txByPi = await db.query.credit_transactions.findFirst({
+    const txByPi = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, piId),
     });
-    const txByCh = await db.query.credit_transactions.findFirst({
+    const txByCh = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, chId),
     });
 
@@ -1566,7 +1566,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
 
     await handleSuccessfulChargeWithPayment(charge, firstPaymentIntent);
 
-    const configAfterFirst = await db.query.auto_top_up_configs.findFirst({
+    const configAfterFirst = await db._query.auto_top_up_configs.findFirst({
       where: eq(auto_top_up_configs.owned_by_user_id, user.id),
     });
 
@@ -1576,7 +1576,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     expect(configAfterFirst?.amount_cents).toBe(2000);
     expect(configAfterFirst?.disabled_reason).toBeNull();
 
-    const userAfterFirst = await db.query.kilocode_users.findFirst({
+    const userAfterFirst = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(userAfterFirst?.auto_top_up_enabled).toBe(true);
@@ -1601,7 +1601,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       .where(eq(auto_top_up_configs.owned_by_user_id, user.id));
     expect(configsForUser[0]?.count).toBe(1);
 
-    const configAfterSecond = await db.query.auto_top_up_configs.findFirst({
+    const configAfterSecond = await db._query.auto_top_up_configs.findFirst({
       where: eq(auto_top_up_configs.owned_by_user_id, user.id),
     });
     expect(configAfterSecond?.stripe_payment_method_id).toBe(secondPaymentIntent.payment_method);
@@ -1655,7 +1655,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     try {
       await handleSuccessfulChargeWithPayment(charge, firstPaymentIntent);
 
-      const configAfterFirst = await db.query.auto_top_up_configs.findFirst({
+      const configAfterFirst = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, org.id),
       });
 
@@ -1665,7 +1665,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       expect(configAfterFirst?.amount_cents).toBe(2000);
       expect(configAfterFirst?.disabled_reason).toBeNull();
 
-      const orgAfterFirst = await db.query.organizations.findFirst({
+      const orgAfterFirst = await db._query.organizations.findFirst({
         where: eq(organizations.id, org.id),
       });
       expect(orgAfterFirst?.auto_top_up_enabled).toBe(true);
@@ -1691,7 +1691,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         .where(eq(auto_top_up_configs.owned_by_organization_id, org.id));
       expect(configsForOrg[0]?.count).toBe(1);
 
-      const configAfterSecond = await db.query.auto_top_up_configs.findFirst({
+      const configAfterSecond = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, org.id),
       });
       expect(configAfterSecond?.stripe_payment_method_id).toBe(secondPaymentIntent.payment_method);
@@ -1746,7 +1746,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     try {
       await handleSuccessfulChargeWithPayment(charge, paymentIntent);
 
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, org.id),
       });
 
@@ -1793,7 +1793,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         'processTopUp test error'
       );
 
-      const userConfig = await db.query.auto_top_up_configs.findFirst({
+      const userConfig = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_user_id, user.id),
       });
       expect(userConfig?.attempt_started_at).toBeNull();
@@ -1842,7 +1842,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         'processTopupForOrganization test error'
       );
 
-      const orgConfig = await db.query.auto_top_up_configs.findFirst({
+      const orgConfig = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, org.id),
       });
       expect(orgConfig?.attempt_started_at).toBeNull();

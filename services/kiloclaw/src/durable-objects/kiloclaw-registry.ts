@@ -50,7 +50,7 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
     void ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
+      migrate(this.db, migrations);
       this.ownerKey = (await ctx.storage.get<string>('owner_key')) ?? null;
       this.migrated = (await ctx.storage.get<boolean>('migrated')) ?? false;
     });

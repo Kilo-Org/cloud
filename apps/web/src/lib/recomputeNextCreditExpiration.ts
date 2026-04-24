@@ -20,7 +20,7 @@ export async function recomputeNextCreditExpiration(
 ): Promise<RecomputeNextCreditExpirationResult> {
   const { dryRun = false } = options;
 
-  const user = await db.query.kilocode_users.findFirst({
+  const user = await db._query.kilocode_users.findFirst({
     where: eq(kilocode_users.id, kiloUserId),
     columns: { next_credit_expiration_at: true },
   });

@@ -1,11 +1,9 @@
-import journal from './meta/_journal.json';
-import m0000 from './0000_redundant_slyde.sql';
-import m0001 from './0001_common_blackheart.sql';
+import m0000 from './20260228012927_redundant_slyde/migration.sql';
+import m0001 from './20260306122101_common_blackheart/migration.sql';
 
 export default {
-  journal,
   migrations: {
-    m0000,
-    m0001,
+    '20260228012927_redundant_slyde': m0000,
+    '20260306122101_common_blackheart': m0001,
   },
 };

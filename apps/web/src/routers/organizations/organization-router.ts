@@ -318,7 +318,7 @@ export const organizationsRouter = createTRPCRouter({
     const org = await getOrganizationById(organizationId);
     if (!org) throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
 
-    const transactions = await db.query.credit_transactions.findMany({
+    const transactions = await db._query.credit_transactions.findMany({
       where: eq(credit_transactions.organization_id, organizationId),
     });
 

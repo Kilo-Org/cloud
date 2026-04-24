@@ -34,8 +34,8 @@ export class AlertConfigDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
-    void ctx.blockConcurrencyWhile(() => {
-      return migrate(this.db, migrations);
+    void ctx.blockConcurrencyWhile(async () => {
+      migrate(this.db, migrations);
     });
   }
 

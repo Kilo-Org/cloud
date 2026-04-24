@@ -1,10 +1,17 @@
+import type { Env } from './env';
+import type { IngestQueueMessage } from './queue-consumer';
+
 export { SessionIngestDO } from './dos/SessionIngestDO';
 export { SessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 export { UserConnectionDO } from './dos/UserConnectionDO';
-export { SessionIngestRPC } from './session-ingest-rpc';
-export { app } from './app';
 
-import { app } from './app';
-import { queue } from './queue-consumer';
-
-export default { fetch: app.fetch, queue };
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const { app } = await import('./app');
+    return app.fetch(request, env);
+  },
+  async queue(batch: MessageBatch<IngestQueueMessage>, env: Env): Promise<void> {
+    const { queue } = await import('./queue-consumer');
+    await queue(batch, env);
+  },
+};

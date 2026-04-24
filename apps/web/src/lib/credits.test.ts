@@ -39,7 +39,7 @@ describe('processTopUp', () => {
     expect(result2).toBe(false);
 
     // Only one transaction with this stripe_payment_id should exist
-    const transactions = await db.query.credit_transactions.findMany({
+    const transactions = await db._query.credit_transactions.findMany({
       where: and(
         eq(credit_transactions.kilo_user_id, user.id),
         eq(credit_transactions.stripe_payment_id, stripePaymentId)

@@ -145,7 +145,7 @@ export const organizationAdminRouter = createTRPCRouter({
     const { organizationId, userId } = input;
 
     // Validate that the organization exists
-    const organization = await db.query.organizations.findFirst({
+    const organization = await db._query.organizations.findFirst({
       where: eq(organizations.id, organizationId),
     });
 
@@ -158,7 +158,7 @@ export const organizationAdminRouter = createTRPCRouter({
 
     // If userId is provided, validate that the user exists
     if (userId !== null) {
-      const user = await db.query.kilocode_users.findFirst({
+      const user = await db._query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, userId),
       });
 
@@ -184,7 +184,7 @@ export const organizationAdminRouter = createTRPCRouter({
       const { organizationId, free_trial_end_at } = input;
 
       // Validate that the organization exists
-      const organization = await db.query.organizations.findFirst({
+      const organization = await db._query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
       });
       if (!organization) {
@@ -205,7 +205,7 @@ export const organizationAdminRouter = createTRPCRouter({
       const { organizationId, suppress_trial_messaging } = input;
 
       // Validate that the organization exists
-      const organization = await db.query.organizations.findFirst({
+      const organization = await db._query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
       });
       if (!organization) {

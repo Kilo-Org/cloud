@@ -27,7 +27,7 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
     return null;
   }
 
-  const notes = await db.query.user_admin_notes.findMany({
+  const notes = await db._query.user_admin_notes.findMany({
     where: eq(user_admin_notes.kilo_user_id, userId),
     orderBy: desc(user_admin_notes.created_at),
   });
@@ -36,7 +36,7 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
 
   const admins =
     adminIds.length > 0
-      ? await db.query.kilocode_users.findMany({
+      ? await db._query.kilocode_users.findMany({
           where: inArray(kilocode_users.id, adminIds),
           limit: 50,
         })
@@ -68,7 +68,7 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
 
   // Fetch auto-top-up config
   const autoTopUpConfig =
-    (await db.query.auto_top_up_configs.findFirst({
+    (await db._query.auto_top_up_configs.findFirst({
       where: eq(auto_top_up_configs.owned_by_user_id, userId),
     })) ?? null;
 

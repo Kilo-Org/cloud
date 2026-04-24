@@ -1,9 +1,7 @@
-import journal from './meta/_journal.json';
-import m0000 from './0000_serious_ser_duncan.sql';
+import m0000 from './20260228013328_serious_ser_duncan/migration.sql';
 
 export default {
-  journal,
   migrations: {
-    m0000,
+    '20260228013328_serious_ser_duncan': m0000,
   },
 };

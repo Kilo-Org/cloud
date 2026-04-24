@@ -266,7 +266,7 @@ async function updateEligibleTrialFixture(provisioned: ProvisionResponse): Promi
     trial_ends_at: isoFromNow(4 * 24 * 60 * 60 * 1000),
   });
 
-  const currentInstance = await db.query.kiloclaw_instances.findFirst({
+  const currentInstance = await db._query.kiloclaw_instances.findFirst({
     where: eq(kiloclaw_instances.id, ELIGIBLE_INSTANCE_ID),
   });
 
@@ -330,7 +330,7 @@ async function loadEligibleFixtureSummary(): Promise<{
   subscriptionId: string;
 }> {
   const db = getSeedDb();
-  const subscription = await db.query.kiloclaw_subscriptions.findFirst({
+  const subscription = await db._query.kiloclaw_subscriptions.findFirst({
     where: eq(kiloclaw_subscriptions.id, ELIGIBLE_SUBSCRIPTION_ID),
   });
 
@@ -338,7 +338,7 @@ async function loadEligibleFixtureSummary(): Promise<{
     throw new Error('Eligible fixture summary could not find the provisioned subscription');
   }
 
-  const instance = await db.query.kiloclaw_instances.findFirst({
+  const instance = await db._query.kiloclaw_instances.findFirst({
     where: eq(kiloclaw_instances.id, ELIGIBLE_INSTANCE_ID),
   });
 

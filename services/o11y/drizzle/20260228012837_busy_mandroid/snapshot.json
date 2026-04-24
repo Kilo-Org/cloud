@@ -1,0 +1,141 @@
+{
+  "dialect": "sqlite",
+  "id": "9fd9fb7a-9ba5-40ed-a145-0a7c3827e5cc",
+  "prevIds": ["00000000-0000-0000-0000-000000000000"],
+  "version": "7",
+  "ddl": [
+    {
+      "name": "alert_config",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "model",
+      "table": "alert_config",
+      "entityType": "columns"
+    },
+    {
+      "columns": ["model"],
+      "nameExplicit": false,
+      "name": "alert_config_pk",
+      "table": "alert_config",
+      "entityType": "pks"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "enabled",
+      "table": "alert_config",
+      "entityType": "columns"
+    },
+    {
+      "type": "real",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "error_rate_slo",
+      "table": "alert_config",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "min_requests_per_window",
+      "table": "alert_config",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "table": "alert_config",
+      "entityType": "columns"
+    },
+    {
+      "name": "ttfb_alert_config",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "model",
+      "table": "ttfb_alert_config",
+      "entityType": "columns"
+    },
+    {
+      "columns": ["model"],
+      "nameExplicit": false,
+      "name": "ttfb_alert_config_pk",
+      "table": "ttfb_alert_config",
+      "entityType": "pks"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "enabled",
+      "table": "ttfb_alert_config",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "ttfb_threshold_ms",
+      "table": "ttfb_alert_config",
+      "entityType": "columns"
+    },
+    {
+      "type": "real",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "ttfb_slo",
+      "table": "ttfb_alert_config",
+      "entityType": "columns"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "min_requests_per_window",
+      "table": "ttfb_alert_config",
+      "entityType": "columns"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "table": "ttfb_alert_config",
+      "entityType": "columns"
+    }
+  ],
+  "renames": []
+}

@@ -278,7 +278,7 @@ async function isFirstUsage(
 ): Promise<boolean> {
   if (prior_microdollar_usage || usage.organization_id) return false;
   //perf: we only pay the costs for querying prior microdollar usage for non-org users that have incurred zero cost so far.
-  return !(await db.query.microdollar_usage.findFirst({
+  return !(await db._query.microdollar_usage.findFirst({
     where: eq(microdollar_usage.kilo_user_id, usage.kilo_user_id),
     columns: { created_at: true },
   }));

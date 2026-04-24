@@ -115,4 +115,29 @@ describe('deliverToBot', () => {
     expect(payload.inReplyToBody).toBeUndefined();
     expect(payload.inReplyToSender).toBeUndefined();
   });
+
+  it('uses provided convContext on permanent failure instead of re-fetching', async () => {
+    const deliverChatWebhook = vi.fn().mockRejectedValue(new Error('boom'));
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const env = {
+      KILOCLAW: { deliverChatWebhook },
+      EVENT_SERVICE: { pushEvent },
+      CONVERSATION_DO: {
+        idFromName: vi.fn().mockReturnValue('id'),
+        get: vi.fn().mockReturnValue({
+          getInfo: vi.fn().mockResolvedValue(null),
+        }),
+      },
+    } as unknown as Env;
+    const convStub = { notifyDeliveryFailed: vi.fn().mockResolvedValue(undefined) };
+
+    await deliverToBot(env, convStub, makeMsg(), {
+      humanMemberIds: ['user-1'],
+      sandboxId: 'sandbox-1',
+    });
+
+    // Should NOT have called getInfo via getConversationContext since we passed context
+    expect(env.CONVERSATION_DO.get).not.toHaveBeenCalled();
+    expect(convStub.notifyDeliveryFailed).toHaveBeenCalledWith('msg-1', 'user-1');
+  });
 });

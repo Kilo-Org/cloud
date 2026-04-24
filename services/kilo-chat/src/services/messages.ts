@@ -121,17 +121,22 @@ async function postCommitFanOut(
 
     await Promise.all(
       botMembers.map(bot =>
-        deliverToBot(env, convStub, {
-          targetBotId: bot.id,
-          conversationId,
-          messageId,
-          from: callerId,
-          content,
-          sentAt,
-          ...(inReplyToMessageId !== undefined && { inReplyToMessageId }),
-          ...(inReplyToBody !== undefined && { inReplyToBody }),
-          ...(inReplyToSender !== undefined && { inReplyToSender }),
-        })
+        deliverToBot(
+          env,
+          convStub,
+          {
+            targetBotId: bot.id,
+            conversationId,
+            messageId,
+            from: callerId,
+            content,
+            sentAt,
+            ...(inReplyToMessageId !== undefined && { inReplyToMessageId }),
+            ...(inReplyToBody !== undefined && { inReplyToBody }),
+            ...(inReplyToSender !== undefined && { inReplyToSender }),
+          },
+          { humanMemberIds, sandboxId }
+        )
       )
     );
   }

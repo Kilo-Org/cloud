@@ -56,7 +56,8 @@ const MAX_RETRIES = 2;
 export async function deliverToBot(
   env: Env,
   convStub: ConversationStub,
-  msg: WebhookMessage
+  msg: WebhookMessage,
+  convContext?: { humanMemberIds: string[]; sandboxId: string | null }
 ): Promise<void> {
   const payload = buildPayload(msg);
   const rpcPayload = chatWebhookRpcSchema.parse({
@@ -83,13 +84,13 @@ export async function deliverToBot(
     await convStub.notifyDeliveryFailed(msg.messageId, msg.from);
 
     // Push delivery_failed event to human members
-    const convContext = await getConversationContext(env, msg.conversationId);
-    if (convContext?.sandboxId) {
+    const ctx = convContext ?? (await getConversationContext(env, msg.conversationId));
+    if (ctx?.sandboxId) {
       await pushEventToHumanMembers(
         env,
         msg.conversationId,
-        convContext.sandboxId,
-        convContext.humanMemberIds,
+        ctx.sandboxId,
+        ctx.humanMemberIds,
         'message.delivery_failed',
         { messageId: msg.messageId }
       );

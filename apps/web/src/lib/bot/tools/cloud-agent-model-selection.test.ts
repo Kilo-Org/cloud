@@ -96,41 +96,115 @@ describe('resolveCloudAgentModel', () => {
     expect(calledSelector).toBe(false);
   });
 
-  test.each(['opus', 'latest version of opus'])(
-    'simple family request %s selects the latest matching model without calling selector',
-    async modelRequest => {
-      let calledSelector = false;
-      const opus3Model = {
-        id: 'anthropic/claude-3-opus',
-        name: 'Claude 3 Opus',
-      };
-      const opus4Model = {
-        id: 'anthropic/claude-opus-4',
-        name: 'Claude Opus 4',
-      };
-      const selectModel: SelectCloudAgentModel = async () => {
+  test('natural-language family request delegates to selector for multilingual matching', async () => {
+    let calledSelector = false;
+    const result = await resolveCloudAgentModel({
+      modelRequest: 'usa el modelo opus mas reciente',
+      defaultModel: baseSonnetModel.id,
+      prompt: 'Fix the bug',
+      owner: userOwner,
+      selectModel: async () => {
         calledSelector = true;
         return {
-          selectedModelId: opus3Model.id,
-          confidence: 'low',
-          reason: 'not called',
+          selectedModelId: baseOpusModel.id,
+          confidence: 'high',
+          reason: 'latest opus requested in Spanish',
           alternatives: [],
         };
-      };
+      },
+      catalogDeps: createDeps({ baseModels: [baseSonnetModel, baseOpusModel] }),
+    });
 
-      const result = await resolveCloudAgentModel({
-        modelRequest,
-        defaultModel: baseSonnetModel.id,
-        prompt: 'Fix the bug',
-        owner: userOwner,
-        selectModel,
-        catalogDeps: createDeps({ baseModels: [opus3Model, opus4Model, baseOpusModel] }),
-      });
+    expect(result).toEqual({ ok: true, model: baseOpusModel.id });
+    expect(calledSelector).toBe(true);
+  });
 
-      expect(result).toEqual({ ok: true, model: baseOpusModel.id });
-      expect(calledSelector).toBe(false);
-    }
-  );
+  test('falls back to direct catalog matching when selector is low confidence', async () => {
+    let calledSelector = false;
+    const opus3Model = {
+      id: 'anthropic/claude-3-opus',
+      name: 'Claude 3 Opus',
+    };
+    const opus4Model = {
+      id: 'anthropic/claude-opus-4',
+      name: 'Claude Opus 4',
+    };
+
+    const result = await resolveCloudAgentModel({
+      modelRequest: 'latest version of opus',
+      defaultModel: baseSonnetModel.id,
+      prompt: 'Fix the bug',
+      owner: userOwner,
+      selectModel: async () => {
+        calledSelector = true;
+        return {
+          selectedModelId: null,
+          confidence: 'low',
+          reason: 'fallback test',
+          alternatives: [],
+        };
+      },
+      catalogDeps: createDeps({ baseModels: [opus3Model, opus4Model, baseOpusModel] }),
+    });
+
+    expect(result).toEqual({ ok: true, model: baseOpusModel.id });
+    expect(calledSelector).toBe(true);
+  });
+
+  test('falls back to exact version-like catalog matching when selector is low confidence', async () => {
+    const minimaxM25Model = {
+      id: 'minimax/minimax-m2.5',
+      name: 'MiniMax M2.5',
+    };
+    const minimaxM27Model = {
+      id: 'minimax/minimax-m2.7',
+      name: 'MiniMax M2.7',
+    };
+
+    const result = await resolveCloudAgentModel({
+      modelRequest: 'minimax m2.5',
+      defaultModel: baseSonnetModel.id,
+      prompt: 'Fix the bug',
+      owner: userOwner,
+      selectModel: async () => ({
+        selectedModelId: null,
+        confidence: 'low',
+        reason: 'fallback test',
+        alternatives: [],
+      }),
+      catalogDeps: createDeps({ baseModels: [minimaxM27Model, minimaxM25Model] }),
+    });
+
+    expect(result).toEqual({ ok: true, model: minimaxM25Model.id });
+  });
+
+  test('falls back to current family model when requested version is unavailable', async () => {
+    const minimaxM27Model = {
+      id: 'minimax/minimax-m2.7',
+      name: 'MiniMax M2.7',
+      preferredIndex: 0,
+    };
+    const minimaxM1Model = {
+      id: 'minimax/minimax-m1',
+      name: 'MiniMax M1',
+    };
+
+    const result = await resolveCloudAgentModel({
+      modelRequest: 'minimax m2.5',
+      defaultModel: baseSonnetModel.id,
+      prompt: 'Fix the bug',
+      owner: userOwner,
+      selectModel: async () => ({
+        selectedModelId: null,
+        confidence: 'low',
+        reason: 'fallback test',
+        alternatives: [],
+      }),
+      catalogDeps: createDeps({ baseModels: [minimaxM1Model, minimaxM27Model] }),
+    });
+
+    expect(result).toEqual({ ok: true, model: minimaxM27Model.id });
+  });
 
   test('rejects an LLM-selected model that is not in the catalog', async () => {
     const result = await resolveCloudAgentModel({

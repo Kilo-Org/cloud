@@ -269,11 +269,10 @@ function compareCatalogMatches(a: SelectableCloudAgentModel, b: SelectableCloudA
   return compareVersionParts(getVersionParts(b), getVersionParts(a));
 }
 
-function findDirectCatalogMatch(
-  request: string,
+function findBestCatalogMatchForTerms(
+  terms: string[],
   catalog: SelectableCloudAgentModel[]
 ): SelectableCloudAgentModel | undefined {
-  const terms = getCatalogMatchTerms(request);
   if (terms.length === 0 || terms.length > 3) {
     return undefined;
   }
@@ -288,6 +287,28 @@ function findDirectCatalogMatch(
   }
 
   return [...matches].sort(compareCatalogMatches)[0];
+}
+
+function isVersionLikeTerm(term: string): boolean {
+  return /^(?:v?\d+(?:\.\d+)*|[a-z]\d+(?:\.\d+)*)$/.test(term);
+}
+
+function findCatalogFallbackMatch(
+  request: string,
+  catalog: SelectableCloudAgentModel[]
+): SelectableCloudAgentModel | undefined {
+  const terms = getCatalogMatchTerms(request);
+  const directMatch = findBestCatalogMatchForTerms(terms, catalog);
+  if (directMatch) {
+    return directMatch;
+  }
+
+  const familyTerms = terms.filter(term => !isVersionLikeTerm(term));
+  if (familyTerms.length === terms.length) {
+    return undefined;
+  }
+
+  return findBestCatalogMatchForTerms(familyTerms, catalog);
 }
 
 function findModelSuggestions(
@@ -318,14 +339,20 @@ export function buildCloudAgentModelSelectionPrompt(input: {
   return `Choose the best exact Cloud Agent model ID for the user's request.
 
 Rules:
+- Understand the model request in any language.
 - Return selectedModelId as one exact id from the catalog, or null if there is no good match.
 - Do not invent model ids or aliases.
+- If the request names a model family, provider, or nickname, choose the latest/current matching catalog entry by default.
+- For example, "opus" should choose the latest Claude Opus model, and "minimax" should choose the latest MiniMax model.
+- If the user gives a model family with a version-like label, such as "minimax m2.5", choose the matching exact catalog entry when available.
+- If that exact version is unavailable but the same family has a newer current catalog entry, choose the newer current entry instead of asking the user to choose.
+- Do not ask the user to choose between current and legacy versions unless they explicitly requested a legacy version that is available.
 - Prefer current, high-quality coding models when the request asks for quality or coding ability.
 - Prefer free or low-cost models only when the request explicitly asks for cheap, low-cost, or free.
 - Prefer faster/smaller models only when the request asks for fast, quick, small, or lightweight.
-- Use high confidence only when the request clearly maps to one catalog entry.
+- Use high confidence when a family/provider/name request has one best current match.
 - Use medium confidence when there are several reasonable matches but one is clearly best.
-- Use low confidence with selectedModelId null when the request is ambiguous or unavailable.
+- Use low confidence with selectedModelId null only when there is no relevant catalog match or the request is genuinely impossible to disambiguate.
 
 Model request: ${input.modelRequest}
 
@@ -354,11 +381,6 @@ export async function resolveCloudAgentModel(
     return { ok: true, model: modelRequest };
   }
 
-  const directCatalogMatch = findDirectCatalogMatch(modelRequest, catalog);
-  if (directCatalogMatch) {
-    return { ok: true, model: directCatalogMatch.id };
-  }
-
   if (modelRequest.includes('/')) {
     return {
       ok: false,
@@ -372,6 +394,17 @@ export async function resolveCloudAgentModel(
     catalog,
   });
 
+  if (selection.selectedModelId && selection.confidence !== 'low') {
+    if (catalogIds.has(selection.selectedModelId)) {
+      return { ok: true, model: selection.selectedModelId };
+    }
+  }
+
+  const catalogFallbackMatch = findCatalogFallbackMatch(modelRequest, catalog);
+  if (catalogFallbackMatch) {
+    return { ok: true, model: catalogFallbackMatch.id };
+  }
+
   if (!selection.selectedModelId || selection.confidence === 'low') {
     return {
       ok: false,
@@ -379,12 +412,8 @@ export async function resolveCloudAgentModel(
     };
   }
 
-  if (!catalogIds.has(selection.selectedModelId)) {
-    return {
-      ok: false,
-      response: `Error selecting Cloud Agent model: the selector chose unavailable model \`${selection.selectedModelId}\`. ${formatModelList(findModelSuggestions(modelRequest, catalog, selection.alternatives))}`,
-    };
-  }
-
-  return { ok: true, model: selection.selectedModelId };
+  return {
+    ok: false,
+    response: `Error selecting Cloud Agent model: the selector chose unavailable model \`${selection.selectedModelId}\`. ${formatModelList(findModelSuggestions(modelRequest, catalog, selection.alternatives))}`,
+  };
 }

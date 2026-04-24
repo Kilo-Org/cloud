@@ -71,6 +71,16 @@ export function RigDetailPageClient({
     })
   );
 
+  const startBead = useMutation(
+    trpc.gastown.startBead.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.gastown.listBeads.queryKey() });
+        toast.success('Bead started');
+      },
+      onError: err => toast.error(err.message),
+    })
+  );
+
   const deleteAgent = useMutation(
     trpc.gastown.deleteAgent.mutationOptions({
       onSuccess: () => {
@@ -228,6 +238,7 @@ export function RigDetailPageClient({
                 }
               }}
               onSelectBead={bead => openDrawer({ type: 'bead', beadId: bead.bead_id, rigId })}
+              onStartBead={beadId => startBead.mutate({ rigId, beadId })}
               agentNameById={agentNameById}
             />
           </div>

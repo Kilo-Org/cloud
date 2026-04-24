@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { BeadEventTimeline, extractPrUrl } from '@/components/gastown/ActivityFeed';
 import type { ResourceRef } from '@/components/gastown/DrawerStack';
 
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import {
   Clock,
   ExternalLink,
@@ -33,6 +33,8 @@ import {
   X,
   Save,
   Loader2,
+  Play,
+  MessageCircle,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -151,6 +153,16 @@ export function BeadPanel({
     })
   );
 
+  const { mutate: doStartBead, isPending: isStartPending } = useMutation(
+    trpc.gastown.startBead.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.listBeads.queryKey({ rigId }),
+        });
+      },
+    })
+  );
+
   const handleSave = useCallback(() => {
     if (!bead) return;
 
@@ -232,6 +244,14 @@ export function BeadPanel({
     c => c.id === beadConvoyId || c.beads.some(b => b.bead_id === bead.bead_id)
   );
 
+  // Held bead detection
+  const isHeld = bead.labels.includes('gt:held');
+
+  // Mayor responses: message-type child beads
+  const mayorResponses = allBeads.filter(
+    b => b.type === 'message' && b.parent_bead_id === bead.bead_id
+  );
+
   return (
     <div className="flex flex-col gap-0">
       {/* Title area */}
@@ -291,11 +311,18 @@ export function BeadPanel({
           </div>
         ) : (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span
-              className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[bead.status] ?? 'border-white/10 text-white/50'}`}
-            >
-              {bead.status.replace('_', ' ')}
-            </span>
+            {isHeld ? (
+              <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                <Clock className="size-2.5" />
+                Held
+              </span>
+            ) : (
+              <span
+                className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium ${STATUS_STYLES[bead.status] ?? 'border-white/10 text-white/50'}`}
+              >
+                {bead.status.replace('_', ' ')}
+              </span>
+            )}
             <Badge variant="outline" className="text-[10px]">
               {bead.type}
             </Badge>
@@ -305,6 +332,21 @@ export function BeadPanel({
               <Flag className="size-2.5" />
               {bead.priority}
             </span>
+            {isHeld && (
+              <Button
+                size="sm"
+                onClick={() => doStartBead({ rigId, beadId: bead.bead_id })}
+                disabled={isStartPending}
+                className="ml-auto h-6 gap-1 border border-emerald-500/30 bg-emerald-500/10 px-2.5 text-[10px] font-medium text-emerald-300 hover:bg-emerald-500/20"
+              >
+                {isStartPending ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Play className="size-3" />
+                )}
+                Start now
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -523,6 +565,45 @@ export function BeadPanel({
           </div>
           <div className="prose prose-sm prose-invert prose-headings:text-white/80 prose-p:text-white/65 prose-a:text-[color:oklch(95%_0.15_108)] prose-strong:text-white/80 prose-code:rounded prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:text-[11px] prose-code:text-white/70 prose-pre:bg-white/[0.04] prose-pre:border prose-pre:border-white/[0.06] prose-li:text-white/65 max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{bead.body}</ReactMarkdown>
+          </div>
+        </div>
+      )}
+
+      {/* Mayor responses thread */}
+      {mayorResponses.length > 0 && (
+        <div className="border-b border-white/[0.06] px-5 py-4">
+          <div className="mb-3 flex items-center gap-1.5">
+            <MessageCircle className="size-3 text-violet-400/60" />
+            <span className="text-[10px] font-medium tracking-wide text-white/30 uppercase">
+              Mayor Responses
+            </span>
+          </div>
+          <div className="flex flex-col gap-3">
+            {mayorResponses.map(msg => (
+              <div
+                key={msg.bead_id}
+                className="flex gap-3 rounded-lg border border-white/[0.05] bg-white/[0.02] p-3"
+              >
+                <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-[10px] font-bold text-violet-300">
+                  M
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="text-[10px] font-medium text-violet-300/80">Mayor</span>
+                    <span className="text-[10px] text-white/25">
+                      {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                    </span>
+                  </div>
+                  {msg.body ? (
+                    <div className="prose prose-sm prose-invert prose-headings:text-white/80 prose-p:text-white/65 prose-a:text-[color:oklch(95%_0.15_108)] prose-strong:text-white/80 prose-code:rounded prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:text-[11px] prose-code:text-white/70 prose-li:text-white/65 max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.body}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-white/30 italic">No content</span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -54,16 +54,15 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
+// Timeouts are expected under load and callers handle them (typically via
+// `createCachedFetch`, which returns the last-known-good value). Logging to
+// Sentry on every timeout produces noise without actionable signal; connection-
+// level issues are still reported via the `error` event handler above.
 export async function redisGet(key: RedisKey): Promise<string | null> {
   const c = getOrCreateClient();
   if (!c) return null;
-  try {
-    await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
-    return await withTimeout(c.get(key), COMMAND_TIMEOUT_MS);
-  } catch (err) {
-    captureException(err, { tags: { service: 'redis', operation: 'get' }, extra: { key } });
-    throw err;
-  }
+  await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
+  return await withTimeout(c.get(key), COMMAND_TIMEOUT_MS);
 }
 
 /** Returns false if Redis is not configured (REDIS_URL unset). */
@@ -74,16 +73,11 @@ export async function redisSet(
 ): Promise<boolean> {
   const c = getOrCreateClient();
   if (!c) return false;
-  try {
-    await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
-    if (ttlSeconds) {
-      await withTimeout(c.set(key, value, { EX: ttlSeconds }), COMMAND_TIMEOUT_MS);
-    } else {
-      await withTimeout(c.set(key, value), COMMAND_TIMEOUT_MS);
-    }
-    return true;
-  } catch (err) {
-    captureException(err, { tags: { service: 'redis', operation: 'set' }, extra: { key } });
-    throw err;
+  await withTimeout(ensureConnected(c), CONNECT_TIMEOUT_MS);
+  if (ttlSeconds) {
+    await withTimeout(c.set(key, value, { EX: ttlSeconds }), COMMAND_TIMEOUT_MS);
+  } else {
+    await withTimeout(c.set(key, value), COMMAND_TIMEOUT_MS);
   }
+  return true;
 }

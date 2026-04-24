@@ -16,12 +16,16 @@ const clientMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('context.unsubscribe'),
     contexts: z.array(contextSchema).max(MAX_CONTEXTS_PER_MESSAGE),
   }),
-  z.object({ type: z.literal('presence.ping') }),
 ]);
 
 type SerializedState = { contexts: string[] };
 
 export class UserSessionDO extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
+  }
+
   async fetch(request: Request): Promise<Response> {
     const upgradeHeader = request.headers.get('Upgrade');
     if (upgradeHeader !== 'websocket') {
@@ -68,9 +72,6 @@ export class UserSessionDO extends DurableObject<Env> {
         const state = this.getState(ws);
         for (const ctx of msg.contexts) state.contexts.delete(ctx);
         this.saveState(ws, state);
-        break;
-      }
-      case 'presence.ping': {
         break;
       }
     }

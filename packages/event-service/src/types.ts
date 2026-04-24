@@ -9,14 +9,7 @@ export type ContextUnsubscribeMessage = {
   contexts: string[];
 };
 
-export type PresencePingMessage = {
-  type: 'presence.ping';
-};
-
-export type ClientMessage =
-  | ContextSubscribeMessage
-  | ContextUnsubscribeMessage
-  | PresencePingMessage;
+export type ClientMessage = ContextSubscribeMessage | ContextUnsubscribeMessage;
 
 // Server → Client
 export type EventMessage = {

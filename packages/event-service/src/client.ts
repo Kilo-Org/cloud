@@ -172,6 +172,8 @@ export class EventServiceClient {
   }
 
   private handleMessage(data: string): void {
+    if (data === 'pong') return;
+
     let parsed: unknown;
     try {
       parsed = JSON.parse(data);
@@ -195,7 +197,9 @@ export class EventServiceClient {
   private startPing(): void {
     this.stopPing();
     this.pingTimer = setInterval(() => {
-      this.send({ type: 'presence.ping' });
+      if (this.ws && this.ws.readyState === 1) {
+        this.ws.send('ping');
+      }
     }, 15000);
   }
 

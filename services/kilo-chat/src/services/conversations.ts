@@ -6,7 +6,8 @@
 import { ulid } from 'ulid';
 import { withDORetry } from '@kilocode/worker-utils';
 import { extractConversationContext, extractSandboxId, pushInstanceEvent } from './event-push';
-import { getSandboxOwner, userOwnsSandbox } from './sandbox-ownership';
+import { getSandboxOwner } from './sandbox-ownership';
+import { cachedUserOwnsSandbox } from './sandbox-ownership-cached';
 import { validateUserIds } from './user-lookup';
 
 // ─── createConversation ────────────────────────────────────────────────────
@@ -25,7 +26,11 @@ export async function createConversationFor(
   userId: string,
   params: CreateConversationParams
 ): Promise<CreateConversationResult> {
-  const owns = await userOwnsSandbox(env.HYPERDRIVE.connectionString, userId, params.sandboxId);
+  const owns = await cachedUserOwnsSandbox(
+    env.HYPERDRIVE.connectionString,
+    userId,
+    params.sandboxId
+  );
   if (!owns) {
     return { ok: false, code: 'forbidden', error: 'You do not have access to this sandbox' };
   }

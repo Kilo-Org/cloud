@@ -611,4 +611,65 @@ describe('ConversationDO', () => {
     const info = await stub.getInfo();
     expect(info).toBeNull();
   });
+
+  it('updateTitleIfMember - updates title for member, returns members', async () => {
+    const stub = getStub('conv-title-member-1');
+    await stub.initialize(BASE_PARAMS);
+    const result = await stub.updateTitleIfMember('user-alice', 'New Title');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.members).toHaveLength(2);
+    }
+    const info = await stub.getInfo();
+    expect(info!.title).toBe('New Title');
+  });
+
+  it('updateTitleIfMember - rejects non-member', async () => {
+    const stub = getStub('conv-title-member-2');
+    await stub.initialize(BASE_PARAMS);
+    const result = await stub.updateTitleIfMember('user-stranger', 'Hacked');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('forbidden');
+    const info = await stub.getInfo();
+    expect(info!.title).toBe('Test Chat');
+  });
+
+  it('leaveMemberIfMember - leaves and returns remaining members', async () => {
+    const stub = getStub('conv-leave-member-1');
+    await stub.initialize(BASE_PARAMS);
+    const result = await stub.leaveMemberIfMember('user-alice');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.remainingUsers).toEqual([]);
+      expect(result.botMembers).toHaveLength(1);
+    }
+  });
+
+  it('leaveMemberIfMember - rejects non-member', async () => {
+    const stub = getStub('conv-leave-member-2');
+    await stub.initialize(BASE_PARAMS);
+    const result = await stub.leaveMemberIfMember('user-stranger');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe('forbidden');
+  });
+
+  it('destroyAndReturnMembers - returns members then wipes data', async () => {
+    const stub = getStub('conv-destroyret-1');
+    await stub.initialize(BASE_PARAMS);
+    await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'hello' }],
+    });
+    const result = await stub.destroyAndReturnMembers();
+    expect(result).not.toBeNull();
+    expect(result!.members).toHaveLength(2);
+    const info = await stub.getInfo();
+    expect(info).toBeNull();
+  });
+
+  it('destroyAndReturnMembers - returns null for empty DO', async () => {
+    const stub = getStub('conv-destroyret-2');
+    const result = await stub.destroyAndReturnMembers();
+    expect(result).toBeNull();
+  });
 });

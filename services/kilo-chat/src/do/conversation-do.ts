@@ -46,6 +46,22 @@ export type ConversationInfo = {
   members: Array<{ id: string; kind: 'user' | 'bot' }>;
 };
 
+export type UpdateTitleIfMemberResult =
+  | { ok: true; members: Array<{ id: string; kind: 'user' | 'bot' }> }
+  | { ok: false; code: 'forbidden'; error: string };
+
+export type LeaveMemberIfMemberResult =
+  | {
+      ok: true;
+      remainingUsers: Array<{ id: string }>;
+      botMembers: Array<{ id: string }>;
+    }
+  | { ok: false; code: 'forbidden'; error: string };
+
+export type DestroyResult = {
+  members: Array<{ id: string; kind: 'user' | 'bot' }>;
+} | null;
+
 export type CreateMessageParams = {
   senderId: string;
   content: ContentBlock[];
@@ -593,5 +609,51 @@ export class ConversationDO extends DurableObject<Env> {
       remainingUsers: active.filter(m => m.kind === 'user'),
       botMembers: active.filter(m => m.kind === 'bot'),
     };
+  }
+
+  updateTitleIfMember(memberId: string, title: string): UpdateTitleIfMemberResult {
+    if (!this.isMember(memberId)) {
+      return { ok: false, code: 'forbidden', error: 'Not a member' };
+    }
+    this.db.update(conversation).set({ title }).run();
+    const activeMembers = this.db
+      .select({ id: members.id, kind: members.kind })
+      .from(members)
+      .where(sql`${members.left_at} IS NULL`)
+      .all();
+    return {
+      ok: true,
+      members: activeMembers.map(m => ({ id: m.id, kind: m.kind as 'user' | 'bot' })),
+    };
+  }
+
+  leaveMemberIfMember(memberId: string): LeaveMemberIfMemberResult {
+    if (!this.isMember(memberId)) {
+      return { ok: false, code: 'forbidden', error: 'Not a member' };
+    }
+    this.db.update(members).set({ left_at: Date.now() }).where(eq(members.id, memberId)).run();
+    const active = this.db
+      .select({ id: members.id, kind: members.kind })
+      .from(members)
+      .where(sql`${members.left_at} IS NULL`)
+      .all();
+    return {
+      ok: true,
+      remainingUsers: active.filter(m => m.kind === 'user'),
+      botMembers: active.filter(m => m.kind === 'bot'),
+    };
+  }
+
+  destroyAndReturnMembers(): DestroyResult {
+    const info = this.getInfo();
+    if (!info) return null;
+    const membersCopy = info.members;
+    this.db.transaction(tx => {
+      tx.delete(reactions).run();
+      tx.delete(messages).run();
+      tx.delete(conversation).run();
+      tx.delete(members).run();
+    });
+    return { members: membersCopy };
   }
 }

@@ -106,16 +106,15 @@ export default class extends WorkerEntrypoint<Env> {
     const results = await Promise.allSettled(
       allConversationIds.map(conversationId =>
         limit(async () => {
-          const info = await withDORetry(
+          const destroyed = await withDORetry(
             () => this.env.CONVERSATION_DO.get(this.env.CONVERSATION_DO.idFromName(conversationId)),
-            stub => stub.getInfo(),
-            'ConversationDO.getInfo'
+            stub => stub.destroyAndReturnMembers(),
+            'ConversationDO.destroyAndReturnMembers'
           );
 
-          if (info) {
-            // Remove this conversation from every member's MembershipDO.
+          if (destroyed) {
             await Promise.all(
-              info.members.map(member =>
+              destroyed.members.map(member =>
                 withDORetry(
                   () => this.env.MEMBERSHIP_DO.get(this.env.MEMBERSHIP_DO.idFromName(member.id)),
                   stub => stub.removeConversation(conversationId),
@@ -124,12 +123,6 @@ export default class extends WorkerEntrypoint<Env> {
               )
             );
           }
-
-          await withDORetry(
-            () => this.env.CONVERSATION_DO.get(this.env.CONVERSATION_DO.idFromName(conversationId)),
-            stub => stub.destroy(),
-            'ConversationDO.destroy'
-          );
         })
       )
     );

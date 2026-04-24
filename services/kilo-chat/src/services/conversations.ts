@@ -10,6 +10,8 @@ import { getSandboxOwner } from './sandbox-ownership';
 import { cachedUserOwnsSandbox } from './sandbox-ownership-cached';
 import { validateUserIds } from './user-lookup';
 
+type DeferCtx = { waitUntil: (p: Promise<unknown>) => void } | undefined;
+
 // ─── createConversation ────────────────────────────────────────────────────
 
 export type CreateConversationParams = {
@@ -177,41 +179,43 @@ export type RenameConversationResult =
 export async function renameConversationFor(
   env: Env,
   userId: string,
-  params: RenameConversationParams
+  params: RenameConversationParams,
+  ctx?: DeferCtx
 ): Promise<RenameConversationResult> {
   const { conversationId, title } = params;
 
-  // Single getInfo() call: membership check + member list for fan-out.
-  const info = await withDORetry(
+  const result = await withDORetry(
     () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-    stub => stub.getInfo(),
-    'ConversationDO.getInfo'
+    stub => stub.updateTitleIfMember(userId, title),
+    'ConversationDO.updateTitleIfMember'
   );
-  if (!info || !info.members.some(m => m.id === userId)) {
+  if (!result.ok) {
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }
 
-  await withDORetry(
-    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-    stub => stub.updateTitle(title),
-    'ConversationDO.updateTitle'
-  );
-
-  await Promise.all(
-    info.members.map(member =>
-      withDORetry(
-        () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
-        stub => stub.updateConversationTitle(conversationId, title),
-        'MembershipDO.updateConversationTitle'
+  const fanOut = async () => {
+    await Promise.all(
+      result.members.map(member =>
+        withDORetry(
+          () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
+          stub => stub.updateConversationTitle(conversationId, title),
+          'MembershipDO.updateConversationTitle'
+        )
       )
-    )
-  );
-  const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
-  if (sandboxId) {
-    await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
-      conversationId,
-      title,
-    });
+    );
+    const { humanMemberIds, sandboxId } = extractConversationContext(result.members);
+    if (sandboxId) {
+      await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
+        conversationId,
+        title,
+      });
+    }
+  };
+
+  if (ctx) {
+    ctx.waitUntil(fanOut());
+  } else {
+    await fanOut();
   }
 
   return { ok: true };
@@ -230,42 +234,43 @@ export type LeaveConversationResult =
 export async function leaveConversationFor(
   env: Env,
   userId: string,
-  params: LeaveConversationParams
+  params: LeaveConversationParams,
+  ctx?: DeferCtx
 ): Promise<LeaveConversationResult> {
   const { conversationId } = params;
 
-  const isMember = await withDORetry(
-    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-    stub => stub.isMember(userId),
-    'ConversationDO.isMember'
-  );
-  if (!isMember) {
+  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
+  const result = await convStub.leaveMemberIfMember(userId);
+  if (!result.ok) {
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }
 
-  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
+  const fanOut = async () => {
+    const callerMembership = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
+    await callerMembership.removeConversation(conversationId);
 
-  const { remainingUsers, botMembers } = await convStub.leaveMember(userId);
+    if (result.remainingUsers.length === 0) {
+      await Promise.all(
+        result.botMembers.map(member => {
+          const memberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
+          return memberStub.removeConversation(conversationId);
+        })
+      );
+    }
 
-  const callerMembership = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
-  await callerMembership.removeConversation(conversationId);
+    const botMember = result.botMembers[0];
+    const sandboxId = botMember ? extractSandboxId(botMember.id) : null;
+    if (sandboxId) {
+      await pushInstanceEvent(env, sandboxId, [userId], 'conversation.left', {
+        conversationId,
+      });
+    }
+  };
 
-  if (remainingUsers.length === 0) {
-    await Promise.all(
-      botMembers.map(member => {
-        const memberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id));
-        return memberStub.removeConversation(conversationId);
-      })
-    );
-  }
-
-  // Notify the user's other clients so their conversation list updates.
-  const botMember = botMembers[0];
-  const sandboxId = botMember ? extractSandboxId(botMember.id) : null;
-  if (sandboxId) {
-    await pushInstanceEvent(env, sandboxId, [userId], 'conversation.left', {
-      conversationId,
-    });
+  if (ctx) {
+    ctx.waitUntil(fanOut());
+  } else {
+    await fanOut();
   }
 
   return { ok: true };

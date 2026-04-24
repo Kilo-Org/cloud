@@ -5,7 +5,7 @@ import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react';
 import { useSession } from 'next-auth/react';
 import { Suspense, useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { sanitizeAnalyticsUrl } from '@/lib/sanitize-analytics-url';
+import { sanitizeAnalyticsUrl, sanitizeAnalyticsUrlValue } from '@/lib/sanitize-analytics-url';
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -26,6 +26,18 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       disable_web_experiments: false,
       capture_pageview: false, // We capture pageviews manually
       capture_pageleave: true, // Enable pageleave capture
+      before_send: event => {
+        if (!event?.properties) return event;
+        return {
+          ...event,
+          properties: {
+            ...event.properties,
+            $current_url: sanitizeAnalyticsUrlValue(event.properties.$current_url),
+            $referrer: sanitizeAnalyticsUrlValue(event.properties.$referrer),
+            $referring_domain: sanitizeAnalyticsUrlValue(event.properties.$referring_domain),
+          },
+        };
+      },
       loaded: function (ph) {
         if (!isProduction) {
           // Opt out of capturing in non-production environments

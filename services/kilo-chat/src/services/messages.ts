@@ -420,6 +420,7 @@ export async function executeActionFor(
           executedAt: new Date().toISOString(),
         });
         if (ctx) ctx.waitUntil(deliverPromise);
+        else await deliverPromise;
       }
     }
   }

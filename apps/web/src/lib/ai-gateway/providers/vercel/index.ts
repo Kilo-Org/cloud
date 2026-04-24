@@ -153,15 +153,21 @@ export function applyVercelSettings(
   }
 
   if (requestToMutate.body.providerOptions) {
+    const anthropicOptions: Record<string, unknown> = {};
     if (requestToMutate.kind === 'chat_completions' && requestToMutate.body.verbosity) {
-      requestToMutate.body.providerOptions.anthropic = {
-        effort: requestToMutate.body.verbosity,
-      };
+      anthropicOptions.effort = requestToMutate.body.verbosity;
     }
     if (requestToMutate.kind === 'responses' && requestToMutate.body.text?.verbosity) {
-      requestToMutate.body.providerOptions.anthropic = {
-        effort: requestToMutate.body.text.verbosity,
-      };
+      anthropicOptions.effort = requestToMutate.body.text.verbosity;
+    }
+    // Workaround for Vercel not displaying thinking by default, unlike OpenRouter.
+    if (requestedModel.includes('opus-4.7')) {
+      anthropicOptions.thinking = isReasoningExplicitlyDisabled(requestToMutate)
+        ? { type: 'disabled' }
+        : { type: 'adaptive', display: 'summarized' };
+    }
+    if (Object.keys(anthropicOptions).length > 0) {
+      requestToMutate.body.providerOptions.anthropic = anthropicOptions;
     }
   }
 

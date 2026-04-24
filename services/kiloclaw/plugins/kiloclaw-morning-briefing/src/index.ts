@@ -942,7 +942,9 @@ export default definePluginEntry({
     let reconcileInFlight: Promise<void> | null = null;
     let queuedReconcileAction: 'enable' | 'disable' | null = null;
 
-    const reconcileDesiredState = async (action: 'enable' | 'disable'): Promise<void> => {
+    const reconcileDesiredState = async (
+      action: 'enable' | 'disable'
+    ): Promise<'succeeded' | 'failed'> => {
       const paths = getStatePaths(api);
       await ensureStorage(paths);
       const startedAt = Date.now();
@@ -972,7 +974,7 @@ export default definePluginEntry({
             lastReconcileDurationMs: Date.now() - startedAt,
             lastReconcileAction: action,
           });
-          return;
+          return 'succeeded';
         }
 
         const jobs = await listBriefingCronJobs(api);
@@ -1013,6 +1015,7 @@ export default definePluginEntry({
           lastReconcileDurationMs: Date.now() - startedAt,
           lastReconcileAction: action,
         });
+        return 'succeeded';
       } catch (error) {
         await patchStoredStatus(paths, {
           reconcileState: 'failed',
@@ -1021,6 +1024,7 @@ export default definePluginEntry({
           lastReconcileDurationMs: Date.now() - startedAt,
           lastReconcileAction: action,
         });
+        return 'failed';
       }
     };
 
@@ -1033,7 +1037,7 @@ export default definePluginEntry({
         let nextAction: 'enable' | 'disable' | null = initialAction;
 
         while (nextAction) {
-          await reconcileDesiredState(nextAction);
+          const reconcileResult = await reconcileDesiredState(nextAction);
 
           const queuedAction = queuedReconcileAction;
           queuedReconcileAction = null;
@@ -1045,11 +1049,14 @@ export default definePluginEntry({
             readStoredStatus(paths),
           ]);
 
-          nextAction = resolveNextReconcileAction({
-            queuedAction,
-            desiredEnabled: config.enabled,
-            observedEnabled: status.observedEnabled,
-          });
+          nextAction =
+            reconcileResult === 'failed'
+              ? queuedAction
+              : resolveNextReconcileAction({
+                  queuedAction,
+                  desiredEnabled: config.enabled,
+                  observedEnabled: status.observedEnabled,
+                });
         }
       };
 

@@ -496,6 +496,7 @@ function MorningBriefingCard({
   mutations,
   briefingStatus,
   fallbackReadiness,
+  isRunning,
   actionsReady,
 }: {
   mutations: ClawMutations;
@@ -522,6 +523,7 @@ function MorningBriefingCard({
     linearConfigured: boolean;
     webConfigured: boolean;
   };
+  isRunning: boolean;
   actionsReady: boolean;
 }) {
   const [requestedDay, setRequestedDay] = useState<'today' | 'yesterday' | null>(null);
@@ -555,7 +557,10 @@ function MorningBriefingCard({
   const observedEnabled = briefingStatus?.observedEnabled ?? briefingStatus?.enabled ?? false;
   const reconcileState = briefingStatus?.reconcileState ?? 'idle';
   const lastReconcileAction = briefingStatus?.lastReconcileAction ?? null;
-  const isWarmupState = briefingStatus?.code === 'gateway_warming_up' || !actionsReady;
+  const isWarmupState =
+    isRunning &&
+    (briefingStatus?.code === 'gateway_warming_up' ||
+      (actionsReady === false && reconcileState === 'in_progress'));
   const isTransitioning =
     reconcileState === 'in_progress' ||
     mutations.enableMorningBriefing.isPending ||
@@ -564,6 +569,10 @@ function MorningBriefingCard({
   const statusLabel = (() => {
     if (isWarmupState) {
       return 'Instance Warming Up';
+    }
+
+    if (!isRunning) {
+      return 'Instance Stopped';
     }
 
     if (mutations.enableMorningBriefing.isPending) {
@@ -591,7 +600,11 @@ function MorningBriefingCard({
     return observedEnabled ? 'Enabled' : 'Disabled';
   })();
   const statusVariant =
-    observedEnabled || (isTransitioning && desiredEnabled) ? 'default' : 'secondary';
+    statusLabel === 'Instance Stopped'
+      ? 'secondary'
+      : observedEnabled || (isTransitioning && desiredEnabled)
+        ? 'default'
+        : 'secondary';
 
   const readySources = [
     sourceReadiness.github.configured ? 'GitHub' : null,
@@ -1853,6 +1866,7 @@ export function SettingsTab({
             <MorningBriefingCard
               mutations={mutations}
               briefingStatus={morningBriefingStatus}
+              isRunning={isRunning}
               actionsReady={
                 isRunning && gatewayReady?.ready === true && gatewayReady?.settled === true
               }

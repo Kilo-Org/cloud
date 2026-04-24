@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory';
-import { extractBearerToken } from '@kilocode/worker-utils';
+import { extractBearerToken, getCachedSecret } from '@kilocode/worker-utils';
 import { deriveGatewayToken } from './lib/gateway-token';
 import type { AuthContext } from './auth';
 import { sandboxIdSchema } from './routes/schemas';
@@ -55,10 +55,7 @@ export const botAuthMiddleware = createMiddleware<{
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
-  const secret = await c.env.GATEWAY_TOKEN_SECRET.get();
-  if (!secret) {
-    return c.json({ error: 'Configuration error' }, 503);
-  }
+  const secret = await getCachedSecret(c.env.GATEWAY_TOKEN_SECRET, 'GATEWAY_TOKEN_SECRET');
 
   const expected = await deriveGatewayToken(sandboxId, secret);
   if (!(await timingSafeEqual(token, expected))) {

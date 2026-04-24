@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory';
-import { extractBearerToken, verifyKiloToken } from '@kilocode/worker-utils';
+import { extractBearerToken, getCachedSecret, verifyKiloToken } from '@kilocode/worker-utils';
 
 export type AuthContext = {
   callerId: string;
@@ -24,10 +24,7 @@ export const authMiddleware = createMiddleware<{
   }
 
   try {
-    const jwtSecret = await c.env.NEXTAUTH_SECRET.get();
-    if (!jwtSecret) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    const jwtSecret = await getCachedSecret(c.env.NEXTAUTH_SECRET, 'NEXTAUTH_SECRET');
     const payload = await verifyKiloToken(token, jwtSecret);
     c.set('callerId', payload.kiloUserId);
     c.set('callerKind', 'user');

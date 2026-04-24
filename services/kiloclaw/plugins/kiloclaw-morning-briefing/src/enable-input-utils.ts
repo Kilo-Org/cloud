@@ -1,5 +1,14 @@
 export type EnableInput = { cron?: string; timezone?: string };
 
+export function isValidTimezone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date(0));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function parseEnableArgs(args: string | undefined): EnableInput {
   const text = (args ?? '').trim();
   if (!text) {

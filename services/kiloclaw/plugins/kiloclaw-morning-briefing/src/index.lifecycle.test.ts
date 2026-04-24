@@ -335,4 +335,35 @@ describe('morning briefing lifecycle', () => {
     const response = await harness.commandHandler({ args: 'today' });
     expect(response.text).toBe('tokyo briefing');
   });
+
+  it('rejects enable when timezone is invalid', async () => {
+    const harness = await createHarness();
+
+    await expect(
+      harness.commandHandler({ args: 'enable 0 7 * * * America/Chcago' })
+    ).rejects.toThrow('Invalid timezone: America/Chcago');
+  });
+
+  it('falls back to UTC date key when persisted timezone is invalid', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-23T00:30:00.000Z'));
+
+    const now = new Date().toISOString();
+    const harness = await createHarness({
+      preloadedConfig: {
+        enabled: false,
+        cronJobId: null,
+        cron: '0 7 * * *',
+        timezone: 'America/Chcago',
+        updatedAt: now,
+      },
+    });
+
+    const briefingsDir = path.join(harness.stateDir, 'morning-briefing', 'briefings');
+    await fs.mkdir(briefingsDir, { recursive: true });
+    await fs.writeFile(path.join(briefingsDir, '2026-04-23.md'), 'utc fallback briefing', 'utf8');
+
+    const response = await harness.commandHandler({ args: 'today' });
+    expect(response.text).toBe('utc fallback briefing');
+  });
 });

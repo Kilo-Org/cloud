@@ -9,7 +9,7 @@ import {
   selectMorningBriefingJobs,
 } from './cron-utils';
 import { extractBriefingArgsFromText } from './command-fallback-utils';
-import { type EnableInput, parseEnableArgs } from './enable-input-utils';
+import { type EnableInput, isValidTimezone, parseEnableArgs } from './enable-input-utils';
 import { normalizeLinearIssues, summarizeLinearCallFailure } from './linear-utils';
 import { resolveNextReconcileAction } from './reconcile-queue-utils';
 import { normalizeWebResults } from './web-utils';
@@ -885,12 +885,19 @@ async function resolveDateKeyForOffset(
       };
     };
     pluginConfig?: Record<string, unknown>;
+    logger: { warn?: (message: string) => void };
   },
   offset: number
 ): Promise<string> {
   const paths = getStatePaths(api);
   await ensureStorage(paths);
   const config = await readStoredConfig(api, paths);
+  if (!isValidTimezone(config.timezone)) {
+    api.logger.warn?.(
+      `Morning briefing: invalid configured timezone \"${config.timezone}\", falling back to ${DEFAULT_TIMEZONE}`
+    );
+    return offsetDateKey(new Date(), offset, DEFAULT_TIMEZONE);
+  }
   return offsetDateKey(new Date(), offset, config.timezone);
 }
 
@@ -1102,11 +1109,15 @@ export default definePluginEntry({
       await ensureStorage(paths);
 
       const current = await readStoredConfig(api, paths);
+      const requestedTimezone = input.timezone?.trim();
+      if (requestedTimezone && !isValidTimezone(requestedTimezone)) {
+        throw new Error(`Invalid timezone: ${requestedTimezone}`);
+      }
       const nextConfig: StoredConfig = {
         ...current,
         enabled: true,
         cron: input.cron?.trim() || current.cron,
-        timezone: input.timezone?.trim() || current.timezone,
+        timezone: requestedTimezone || current.timezone,
         updatedAt: new Date().toISOString(),
       };
 

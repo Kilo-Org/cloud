@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseEnableArgs } from './enable-input-utils';
+import { isValidTimezone, parseEnableArgs } from './enable-input-utils';
 
 describe('enable-input-utils', () => {
   it('parses simple command args with cron only', () => {
@@ -22,5 +22,10 @@ describe('enable-input-utils', () => {
 
   it('returns empty object for blank input', () => {
     expect(parseEnableArgs('')).toEqual({});
+  });
+
+  it('validates IANA timezone names', () => {
+    expect(isValidTimezone('America/Chicago')).toBe(true);
+    expect(isValidTimezone('America/Chcago')).toBe(false);
   });
 });

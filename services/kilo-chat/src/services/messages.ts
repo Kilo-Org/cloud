@@ -15,6 +15,7 @@ import {
   pushInstanceEvent,
 } from './event-push';
 import type { ConversationInfo } from '../do/conversation-do';
+import type { ConversationDO } from '../index';
 
 type DeferCtx = { waitUntil: (p: Promise<unknown>) => void } | undefined;
 
@@ -85,7 +86,7 @@ export async function createMessageFor(
 
 async function postCommitFanOut(
   env: Env,
-  convStub: DurableObjectStub<import('../index').ConversationDO>,
+  convStub: DurableObjectStub<ConversationDO>,
   info: ConversationInfo,
   callerId: string,
   conversationId: string,

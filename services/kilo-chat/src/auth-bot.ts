@@ -26,7 +26,12 @@ export const botAuthMiddleware = createMiddleware<{
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
-  const secret = await getCachedSecret(c.env.GATEWAY_TOKEN_SECRET, 'GATEWAY_TOKEN_SECRET');
+  let secret: string;
+  try {
+    secret = await getCachedSecret(c.env.GATEWAY_TOKEN_SECRET, 'GATEWAY_TOKEN_SECRET');
+  } catch {
+    return c.json({ error: 'Configuration error' }, 503);
+  }
 
   const expected = await deriveGatewayToken(sandboxId, secret);
   if (!timingSafeEqual(token, expected)) {

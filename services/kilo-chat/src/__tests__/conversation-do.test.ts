@@ -367,12 +367,12 @@ describe('ConversationDO', () => {
       expect(result).toEqual({ ok: false, code: 'not_found', error: 'Message not found' });
     });
 
-    it('rejects reactions from non-member (FK)', async () => {
+    it('rejects reactions from non-member', async () => {
       const { stub, messageId } = await seed('conv-rx-bad-mem');
       const result = await stub.addReaction({ messageId, memberId: 'user-nonmember', emoji: '👍' });
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(result.error).toMatch(/constraint|foreign key/i);
+        expect(result.code).toBe('forbidden');
       }
     });
   });

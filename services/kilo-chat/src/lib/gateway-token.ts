@@ -14,7 +14,8 @@ const tokenCache = new LRUCache<string, string>({
  * and the secret doesn't change within an isolate's lifetime.
  */
 export async function deriveGatewayToken(sandboxId: string, secret: string): Promise<string> {
-  const cached = tokenCache.get(sandboxId);
+  const cacheKey = `${sandboxId}\0${secret}`;
+  const cached = tokenCache.get(cacheKey);
   if (cached) return cached;
 
   const key = await crypto.subtle.importKey(
@@ -29,6 +30,6 @@ export async function deriveGatewayToken(sandboxId: string, secret: string): Pro
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 
-  tokenCache.set(sandboxId, token);
+  tokenCache.set(cacheKey, token);
   return token;
 }

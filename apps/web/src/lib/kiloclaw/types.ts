@@ -416,11 +416,18 @@ export type MorningBriefingStatusResponse = {
   cronJobId?: string | null;
   lastGeneratedDate?: string | null;
   lastGeneratedAt?: string | null;
+  reconcileState?: 'idle' | 'in_progress' | 'succeeded' | 'failed';
+  desiredEnabled?: boolean;
+  observedEnabled?: boolean | null;
+  lastReconcileAt?: string | null;
+  lastReconcileError?: string | null;
   sourceReadiness?: {
     github: MorningBriefingSourceReadiness;
     linear: MorningBriefingSourceReadiness;
     web: MorningBriefingSourceReadiness;
   };
+  code?: string;
+  retryAfterSec?: number;
   error?: string;
 };
 
@@ -433,6 +440,8 @@ export type MorningBriefingActionResponse = {
   date?: string;
   filePath?: string;
   failures?: string[];
+  code?: string;
+  retryAfterSec?: number;
   error?: string;
 };
 

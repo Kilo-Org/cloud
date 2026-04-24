@@ -30,6 +30,7 @@ import {
   useClawConfig,
   useClawMyPin,
   useClawGoogleSetupCommand,
+  useClawGatewayReady,
   useClawMorningBriefingStatus,
   useClawReadMorningBriefing,
 } from '../hooks/useClawHooks';
@@ -83,6 +84,37 @@ type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 const EXA_SEARCH_UI_MIN_CONTROLLER_VERSION = '2026.4.14';
 const MEMORY_MIN_OPENCLAW_VERSION = '2026.4.5';
 const OPENCLAW_IMPORT_UI_MIN_CONTROLLER_VERSION = '2026.4.22';
+
+function formatMorningBriefingSchedule(cron: string, timezone: string): string {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) {
+    return `Schedule: ${cron} (${timezone})`;
+  }
+
+  const [minuteRaw, hourRaw, dayOfMonth, month, dayOfWeek] = parts;
+  const minute = Number.parseInt(minuteRaw, 10);
+  const hour24 = Number.parseInt(hourRaw, 10);
+
+  const isDaily = dayOfMonth === '*' && month === '*' && dayOfWeek === '*';
+  const isValidTime =
+    Number.isInteger(minute) &&
+    Number.isInteger(hour24) &&
+    minute >= 0 &&
+    minute <= 59 &&
+    hour24 >= 0 &&
+    hour24 <= 23;
+
+  if (!isDaily || !isValidTime) {
+    return `Schedule: ${cron} (${timezone})`;
+  }
+
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const meridiem = hour24 >= 12 ? 'PM' : 'AM';
+  const timeLabel = `${hour12}:${String(minute).padStart(2, '0')} ${meridiem}`;
+  const timezoneLabel = timezone === 'America/Chicago' ? 'CT' : timezone;
+
+  return `Automatically runs daily at ${timeLabel} ${timezoneLabel}`;
+}
 
 // ---------------------------------------------------------------------------
 // 1Password setup guide dialog
@@ -457,6 +489,7 @@ function MorningBriefingCard({
   mutations,
   briefingStatus,
   fallbackReadiness,
+  actionsReady,
 }: {
   mutations: ClawMutations;
   briefingStatus:
@@ -477,6 +510,7 @@ function MorningBriefingCard({
     linearConfigured: boolean;
     webConfigured: boolean;
   };
+  actionsReady: boolean;
 }) {
   const [requestedDay, setRequestedDay] = useState<'today' | 'yesterday' | null>(null);
   const { data: readData, isFetching: isReading } = useClawReadMorningBriefing(requestedDay, true);
@@ -516,7 +550,7 @@ function MorningBriefingCard({
           </div>
           <p className="text-muted-foreground text-xs">
             {briefingStatus?.cron && briefingStatus?.timezone
-              ? `Schedule: ${briefingStatus.cron} (${briefingStatus.timezone})`
+              ? formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)
               : 'Schedule not configured'}
           </p>
           <p className="text-muted-foreground text-xs">
@@ -527,7 +561,7 @@ function MorningBriefingCard({
           <Button
             size="sm"
             variant="outline"
-            disabled={mutations.enableMorningBriefing.isPending}
+            disabled={!actionsReady || mutations.enableMorningBriefing.isPending}
             onClick={() => {
               mutations.enableMorningBriefing.mutate(
                 {},
@@ -543,7 +577,7 @@ function MorningBriefingCard({
           <Button
             size="sm"
             variant="outline"
-            disabled={mutations.disableMorningBriefing.isPending}
+            disabled={!actionsReady || mutations.disableMorningBriefing.isPending}
             onClick={() => {
               mutations.disableMorningBriefing.mutate(undefined, {
                 onSuccess: () => toast.success('Morning Briefing disabled'),
@@ -556,7 +590,7 @@ function MorningBriefingCard({
           <Button
             size="sm"
             variant="outline"
-            disabled={mutations.runMorningBriefing.isPending}
+            disabled={!actionsReady || mutations.runMorningBriefing.isPending}
             onClick={() => {
               mutations.runMorningBriefing.mutate(undefined, {
                 onSuccess: data => {
@@ -577,6 +611,13 @@ function MorningBriefingCard({
           </Button>
         </div>
       </div>
+
+      {!actionsReady && (
+        <p className="text-muted-foreground mt-2 text-xs">
+          Instance is still warming up. Morning Briefing actions will enable once the gateway is
+          fully ready.
+        </p>
+      )}
 
       <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
         <div className="rounded border px-2 py-1">
@@ -1181,6 +1222,7 @@ export function SettingsTab({
   } = useClawUpdateAvailable(status);
   const { data: myPin } = useClawMyPin();
   const { data: morningBriefingStatus } = useClawMorningBriefingStatus(true);
+  const { data: gatewayReady } = useClawGatewayReady(isRunning);
   const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
   const hasModelSelectionError = isRunning && isControllerVersionError;
@@ -1729,6 +1771,9 @@ export function SettingsTab({
           <MorningBriefingCard
             mutations={mutations}
             briefingStatus={morningBriefingStatus}
+            actionsReady={
+              isRunning && gatewayReady?.ready === true && gatewayReady?.settled === true
+            }
             fallbackReadiness={{
               githubConfigured: configuredSecrets.github ?? false,
               linearConfigured: configuredSecrets.linear ?? false,

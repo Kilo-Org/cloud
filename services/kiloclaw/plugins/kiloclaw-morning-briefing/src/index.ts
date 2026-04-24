@@ -39,6 +39,12 @@ type StoredStatus = {
   lastPath: string | null;
   sourceSummary: Array<{ source: string; configured: boolean; ok: boolean; summary: string }>;
   failures: string[];
+  observedEnabled: boolean | null;
+  reconcileState: 'idle' | 'in_progress' | 'succeeded' | 'failed';
+  lastReconcileAt: string | null;
+  lastReconcileError: string | null;
+  lastReconcileDurationMs: number | null;
+  lastReconcileAction: 'enable' | 'disable' | null;
 };
 
 type SourceCollectionResult = {
@@ -307,6 +313,12 @@ async function readStoredStatus(paths: { statusPath: string }): Promise<StoredSt
       lastPath: null,
       sourceSummary: [],
       failures: [],
+      observedEnabled: null,
+      reconcileState: 'idle',
+      lastReconcileAt: null,
+      lastReconcileError: null,
+      lastReconcileDurationMs: null,
+      lastReconcileAction: null,
     };
   }
   return {
@@ -320,7 +332,39 @@ async function readStoredStatus(paths: { statusPath: string }): Promise<StoredSt
     failures: Array.isArray(existing.failures)
       ? existing.failures.filter(value => typeof value === 'string')
       : [],
+    observedEnabled:
+      typeof existing.observedEnabled === 'boolean' ? existing.observedEnabled : null,
+    reconcileState:
+      existing.reconcileState === 'in_progress' ||
+      existing.reconcileState === 'succeeded' ||
+      existing.reconcileState === 'failed'
+        ? existing.reconcileState
+        : 'idle',
+    lastReconcileAt: typeof existing.lastReconcileAt === 'string' ? existing.lastReconcileAt : null,
+    lastReconcileError:
+      typeof existing.lastReconcileError === 'string' ? existing.lastReconcileError : null,
+    lastReconcileDurationMs:
+      typeof existing.lastReconcileDurationMs === 'number'
+        ? existing.lastReconcileDurationMs
+        : null,
+    lastReconcileAction:
+      existing.lastReconcileAction === 'enable' || existing.lastReconcileAction === 'disable'
+        ? existing.lastReconcileAction
+        : null,
   };
+}
+
+async function patchStoredStatus(
+  paths: { statusPath: string },
+  patch: Partial<StoredStatus>
+): Promise<StoredStatus> {
+  const current = await readStoredStatus(paths);
+  const next: StoredStatus = {
+    ...current,
+    ...patch,
+  };
+  await writeJsonFile(paths.statusPath, next);
+  return next;
 }
 
 async function ensureCronJob(
@@ -768,6 +812,7 @@ async function generateBriefing(
 
   const dateKey = formatDateKey(date);
   await writeJsonFile(paths.statusPath, {
+    ...(await readStoredStatus(paths)),
     lastGeneratedDate: dateKey,
     lastGeneratedAt: new Date().toISOString(),
     lastPath: filePath,
@@ -847,25 +892,25 @@ async function getStatusSnapshot(api: {
     linear: { configured: boolean; summary: string };
     web: { configured: boolean; summary: string };
   };
+  reconcileState: 'idle' | 'in_progress' | 'succeeded' | 'failed';
+  lastReconcileAt: string | null;
+  lastReconcileError: string | null;
+  desiredEnabled: boolean;
+  observedEnabled: boolean | null;
 }> {
   const paths = getStatePaths(api);
   await ensureStorage(paths);
   const config = await readStoredConfig(api, paths);
   const status = await readStoredStatus(paths);
-  const [github, web, cronJobs] = await Promise.all([
-    resolveGithubReady(api),
-    resolveWebSearchReady(api),
-    listBriefingCronJobs(api),
-  ]);
+  const [github, web] = await Promise.all([resolveGithubReady(api), resolveWebSearchReady(api)]);
   const linear = resolveLinearReady();
-  const canonicalJobId = pickCanonicalCronJobId(cronJobs, config.cronJobId);
-  const hasEnabledJob = cronJobs.some(job => job.enabled);
+  const enabled = status.observedEnabled ?? config.enabled;
 
   return {
-    enabled: hasEnabledJob,
+    enabled,
     cron: config.cron,
     timezone: config.timezone,
-    cronJobId: canonicalJobId,
+    cronJobId: config.cronJobId,
     lastGeneratedDate: status.lastGeneratedDate,
     lastGeneratedAt: status.lastGeneratedAt,
     sourceReadiness: {
@@ -873,6 +918,11 @@ async function getStatusSnapshot(api: {
       linear,
       web,
     },
+    reconcileState: status.reconcileState,
+    lastReconcileAt: status.lastReconcileAt,
+    lastReconcileError: status.lastReconcileError,
+    desiredEnabled: config.enabled,
+    observedEnabled: status.observedEnabled,
   };
 }
 
@@ -899,6 +949,102 @@ export default definePluginEntry({
   name: 'KiloClawMorningBriefing',
   description: 'Morning briefing plugin for KiloClaw-hosted OpenClaw instances',
   register(api) {
+    let reconcileInFlight: Promise<void> | null = null;
+
+    const reconcileDesiredState = async (action: 'enable' | 'disable'): Promise<void> => {
+      const paths = getStatePaths(api);
+      await ensureStorage(paths);
+      const startedAt = Date.now();
+
+      await patchStoredStatus(paths, {
+        reconcileState: 'in_progress',
+        lastReconcileError: null,
+        lastReconcileAction: action,
+      });
+
+      try {
+        const config = await readStoredConfig(api, paths);
+
+        if (config.enabled) {
+          const ensured = await ensureCronJob(api, config);
+          const finalConfig: StoredConfig = {
+            ...config,
+            cronJobId: ensured.cronJobId,
+            updatedAt: new Date().toISOString(),
+          };
+          await writeJsonFile(paths.configPath, finalConfig);
+          await patchStoredStatus(paths, {
+            observedEnabled: true,
+            reconcileState: 'succeeded',
+            lastReconcileAt: new Date().toISOString(),
+            lastReconcileError: null,
+            lastReconcileDurationMs: Date.now() - startedAt,
+            lastReconcileAction: action,
+          });
+          return;
+        }
+
+        const jobs = await listBriefingCronJobs(api);
+        const disableErrors: string[] = [];
+        for (const job of jobs) {
+          try {
+            await runCronCommand(api, ['disable', job.id]);
+          } catch (error) {
+            disableErrors.push(
+              `Failed to disable cron ${job.id}: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        }
+        const remainingEnabledJobs = await listBriefingCronJobs(api);
+        if (disableErrors.length > 0 || remainingEnabledJobs.length > 0) {
+          const issues: string[] = [];
+          issues.push(...disableErrors);
+          if (remainingEnabledJobs.length > 0) {
+            issues.push(
+              `Cron jobs still enabled after disable: ${remainingEnabledJobs.map(job => job.id).join(', ')}`
+            );
+          }
+          throw new Error(issues.join(' | '));
+        }
+
+        const finalConfig: StoredConfig = {
+          ...config,
+          enabled: false,
+          cronJobId: null,
+          updatedAt: new Date().toISOString(),
+        };
+        await writeJsonFile(paths.configPath, finalConfig);
+        await patchStoredStatus(paths, {
+          observedEnabled: false,
+          reconcileState: 'succeeded',
+          lastReconcileAt: new Date().toISOString(),
+          lastReconcileError: null,
+          lastReconcileDurationMs: Date.now() - startedAt,
+          lastReconcileAction: action,
+        });
+      } catch (error) {
+        await patchStoredStatus(paths, {
+          reconcileState: 'failed',
+          lastReconcileAt: new Date().toISOString(),
+          lastReconcileError: error instanceof Error ? error.message : String(error),
+          lastReconcileDurationMs: Date.now() - startedAt,
+          lastReconcileAction: action,
+        });
+      }
+    };
+
+    const triggerReconcile = (action: 'enable' | 'disable') => {
+      if (reconcileInFlight) {
+        return;
+      }
+      reconcileInFlight = reconcileDesiredState(action).finally(() => {
+        reconcileInFlight = null;
+      });
+      void reconcileInFlight.catch(error => {
+        api.logger.warn?.(`Morning briefing reconcile failed: ${String(error)}`);
+      });
+    };
+
     const enableFromCommand = async (args: string | undefined) => {
       const paths = getStatePaths(api);
       await ensureStorage(paths);
@@ -913,52 +1059,46 @@ export default definePluginEntry({
         updatedAt: new Date().toISOString(),
       };
 
-      const ensured = await ensureCronJob(api, nextConfig);
-      const finalConfig: StoredConfig = {
-        ...nextConfig,
-        cronJobId: ensured.cronJobId,
-      };
-      await writeJsonFile(paths.configPath, finalConfig);
-      return finalConfig;
+      await writeJsonFile(paths.configPath, nextConfig);
+      await patchStoredStatus(paths, {
+        reconcileState: 'in_progress',
+        lastReconcileError: null,
+        lastReconcileAction: 'enable',
+      });
+      triggerReconcile('enable');
+      return nextConfig;
     };
 
     const disableFromCommand = async () => {
       const paths = getStatePaths(api);
       await ensureStorage(paths);
       const current = await readStoredConfig(api, paths);
-      const jobs = await listBriefingCronJobs(api);
-      const disableErrors: string[] = [];
-      for (const job of jobs) {
-        try {
-          await runCronCommand(api, ['disable', job.id]);
-        } catch (error) {
-          disableErrors.push(
-            `Failed to disable cron ${job.id}: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-      }
-
-      const remainingEnabledJobs = await listBriefingCronJobs(api);
-      if (disableErrors.length > 0 || remainingEnabledJobs.length > 0) {
-        const issues: string[] = [];
-        issues.push(...disableErrors);
-        if (remainingEnabledJobs.length > 0) {
-          issues.push(
-            `Cron jobs still enabled after disable: ${remainingEnabledJobs.map(job => job.id).join(', ')}`
-          );
-        }
-        throw new Error(issues.join(' | '));
-      }
-
       const nextConfig: StoredConfig = {
         ...current,
         enabled: false,
-        cronJobId: null,
         updatedAt: new Date().toISOString(),
       };
       await writeJsonFile(paths.configPath, nextConfig);
+      await patchStoredStatus(paths, {
+        reconcileState: 'in_progress',
+        lastReconcileError: null,
+        lastReconcileAction: 'disable',
+      });
+      triggerReconcile('disable');
       return nextConfig;
     };
+
+    void (async () => {
+      const paths = getStatePaths(api);
+      await ensureStorage(paths);
+      const [config, status] = await Promise.all([
+        readStoredConfig(api, paths),
+        readStoredStatus(paths),
+      ]);
+      if (status.reconcileState === 'in_progress' || status.observedEnabled !== config.enabled) {
+        triggerReconcile(config.enabled ? 'enable' : 'disable');
+      }
+    })();
 
     const runBriefingCommand = async (argsText: string) => {
       const args = argsText.trim();
@@ -967,19 +1107,22 @@ export default definePluginEntry({
       if (subcommand === 'enable') {
         const trailing = args.replace(/^enable\s*/, '');
         const config = await enableFromCommand(trailing);
+        const status = await readStoredStatus(getStatePaths(api));
         return [
-          'Morning Briefing enabled.',
+          'Morning Briefing enable requested.',
           `- schedule: ${config.cron}`,
           `- timezone: ${config.timezone}`,
-          `- cron job id: ${config.cronJobId ?? '(unknown)'}`,
+          `- apply state: ${status.reconcileState}`,
         ].join('\n');
       }
 
       if (subcommand === 'disable') {
         const config = await disableFromCommand();
+        const status = await readStoredStatus(getStatePaths(api));
         return [
-          'Morning Briefing disabled.',
+          'Morning Briefing disable requested.',
           `- schedule retained: ${config.cron} (${config.timezone})`,
+          `- apply state: ${status.reconcileState}`,
         ].join('\n');
       }
 
@@ -1007,6 +1150,8 @@ export default definePluginEntry({
         `- enabled: ${status.enabled ? 'yes' : 'no'}`,
         `- schedule: ${status.cron} (${status.timezone})`,
         `- cron job id: ${status.cronJobId ?? '(none)'}`,
+        `- desired enabled: ${status.desiredEnabled ? 'yes' : 'no'}`,
+        `- reconcile state: ${status.reconcileState}`,
         `- last generated: ${status.lastGeneratedDate ?? '(none)'}`,
         `- github: ${status.sourceReadiness.github.configured ? 'ready' : 'not ready'} (${status.sourceReadiness.github.summary})`,
         `- linear: ${status.sourceReadiness.linear.configured ? 'configured' : 'not configured'} (${status.sourceReadiness.linear.summary})`,
@@ -1174,12 +1319,15 @@ export default definePluginEntry({
           const timezone = typeof body.timezone === 'string' ? body.timezone.trim() : undefined;
           const suffix = [cron, timezone].filter(Boolean).join(' ');
           const result = await enableFromCommand(suffix);
+          const status = await readStoredStatus(getStatePaths(api));
           sendJson(res, 200, {
             ok: true,
             enabled: result.enabled,
             cron: result.cron,
             timezone: result.timezone,
             cronJobId: result.cronJobId,
+            reconcileState: status.reconcileState,
+            message: 'Enable requested. Reconciliation is running in background.',
           });
         } catch (error) {
           sendJson(res, 500, {
@@ -1197,11 +1345,14 @@ export default definePluginEntry({
       handler: async (_req, res) => {
         try {
           const result = await disableFromCommand();
+          const status = await readStoredStatus(getStatePaths(api));
           sendJson(res, 200, {
             ok: true,
             enabled: result.enabled,
             cron: result.cron,
             timezone: result.timezone,
+            reconcileState: status.reconcileState,
+            message: 'Disable requested. Reconciliation is running in background.',
           });
         } catch (error) {
           sendJson(res, 500, {

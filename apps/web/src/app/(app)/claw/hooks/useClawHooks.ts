@@ -97,9 +97,18 @@ export function useClawMorningBriefingStatus(enabled: boolean) {
   const trpc = useTRPC();
   const { organizationId } = useClawContext();
 
+  const getRefetchInterval = (data: unknown): number => {
+    const maybeCode =
+      typeof data === 'object' && data !== null && 'code' in data
+        ? (data as { code?: unknown }).code
+        : undefined;
+    return maybeCode === 'gateway_warming_up' ? 10_000 : 30_000;
+  };
+
   const personal = useQuery({
     ...trpc.kiloclaw.getMorningBriefingStatus.queryOptions(undefined, {
-      refetchInterval: enabled ? 30_000 : false,
+      refetchInterval: query => (enabled ? getRefetchInterval(query.state.data) : false),
+      retry: false,
     }),
     enabled: enabled && !organizationId,
   });
@@ -107,7 +116,10 @@ export function useClawMorningBriefingStatus(enabled: boolean) {
   const org = useQuery({
     ...trpc.organizations.kiloclaw.getMorningBriefingStatus.queryOptions(
       { organizationId: organizationId ?? '' },
-      { refetchInterval: enabled ? 30_000 : false }
+      {
+        refetchInterval: query => (enabled ? getRefetchInterval(query.state.data) : false),
+        retry: false,
+      }
     ),
     enabled: enabled && !!organizationId,
   });

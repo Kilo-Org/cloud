@@ -69,7 +69,8 @@ export async function callGatewayController<T>(
   path: string,
   method: 'GET' | 'POST',
   responseSchema: ZodType<T>,
-  jsonBody?: unknown
+  jsonBody?: unknown,
+  options?: { timeoutMs?: number }
 ): Promise<T> {
   const { routingTarget, sandboxId } = await requireGatewayControllerContext(state, env);
 
@@ -90,11 +91,14 @@ export async function callGatewayController<T>(
   }
 
   let response: Response;
+  const timeoutMs = options?.timeoutMs ?? 30_000;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
   try {
     response = await fetch(url, {
       method,
       headers,
       body: jsonBody !== undefined ? JSON.stringify(jsonBody) : undefined,
+      signal: timeoutSignal,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -481,7 +485,9 @@ export async function getMorningBriefingStatus(
       env,
       '/_kilo/morning-briefing/status',
       'GET',
-      MorningBriefingStatusResponseSchema
+      MorningBriefingStatusResponseSchema,
+      undefined,
+      { timeoutMs: 3_000 }
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;
@@ -501,7 +507,8 @@ export async function enableMorningBriefing(
       '/_kilo/morning-briefing/enable',
       'POST',
       MorningBriefingActionResponseSchema,
-      input
+      input,
+      { timeoutMs: 8_000 }
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;
@@ -520,7 +527,8 @@ export async function disableMorningBriefing(
       '/_kilo/morning-briefing/disable',
       'POST',
       MorningBriefingActionResponseSchema,
-      {}
+      {},
+      { timeoutMs: 8_000 }
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

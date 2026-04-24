@@ -112,6 +112,11 @@ export const MorningBriefingStatusResponseSchema = z.object({
   cronJobId: z.string().nullable().optional(),
   lastGeneratedDate: z.string().nullable().optional(),
   lastGeneratedAt: z.string().nullable().optional(),
+  reconcileState: z.enum(['idle', 'in_progress', 'succeeded', 'failed']).optional(),
+  desiredEnabled: z.boolean().optional(),
+  observedEnabled: z.boolean().nullable().optional(),
+  lastReconcileAt: z.string().nullable().optional(),
+  lastReconcileError: z.string().nullable().optional(),
   sourceReadiness: z
     .object({
       github: MorningBriefingSourceReadinessSchema,
@@ -119,6 +124,8 @@ export const MorningBriefingStatusResponseSchema = z.object({
       web: MorningBriefingSourceReadinessSchema,
     })
     .optional(),
+  code: z.string().optional(),
+  retryAfterSec: z.number().int().positive().optional(),
   error: z.string().optional(),
 });
 
@@ -131,6 +138,8 @@ export const MorningBriefingActionResponseSchema = z.object({
   date: z.string().optional(),
   filePath: z.string().optional(),
   failures: z.array(z.string()).optional(),
+  code: z.string().optional(),
+  retryAfterSec: z.number().int().positive().optional(),
   error: z.string().optional(),
 });
 

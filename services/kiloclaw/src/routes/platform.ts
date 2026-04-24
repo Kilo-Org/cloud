@@ -1917,6 +1917,42 @@ const MorningBriefingSetupSchema = z.object({
   timezone: z.string().min(1).optional(),
 });
 
+function isMorningBriefingWarmupError(err: unknown): boolean {
+  const raw = err instanceof Error ? err.message : String(err);
+  const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
+  return (
+    normalized.includes('Gateway not running') ||
+    normalized.includes('Failed to reach gateway') ||
+    normalized.includes('Gateway controller request failed (401)')
+  );
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function withMorningBriefingWarmupRetry<T>(operation: () => Promise<T>): Promise<T> {
+  const delaysMs = [0, 750, 1500];
+  let lastError: unknown = null;
+
+  for (const delayMs of delaysMs) {
+    if (delayMs > 0) {
+      await sleep(delayMs);
+    }
+
+    try {
+      return await operation();
+    } catch (err) {
+      lastError = err;
+      if (!isMorningBriefingWarmupError(err)) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Gateway warming up');
+}
+
 // GET /api/platform/morning-briefing/status?userId=...
 platform.get('/morning-briefing/status', async c => {
   const userId = setValidatedQueryUserId(c);
@@ -1944,6 +1980,19 @@ platform.get('/morning-briefing/status', async c => {
     }
     return c.json(result, 200);
   } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return c.json(
+        {
+          ok: true,
+          enabled: false,
+          reconcileState: 'in_progress',
+          error: 'Gateway warming up, retrying shortly.',
+          code: 'gateway_warming_up',
+          retryAfterSec: 2,
+        },
+        200
+      );
+    }
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/status');
     return jsonError(message, status, code);
   }
@@ -1959,12 +2008,14 @@ platform.post('/morning-briefing/enable', async c => {
 
   const { userId, cron, timezone } = result.data;
   try {
-    const response = await withResolvedDORetry(
-      c.env,
-      userId,
-      iidResult.instanceId,
-      stub => stub.enableMorningBriefing({ cron, timezone }),
-      'enableMorningBriefing'
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.enableMorningBriefing({ cron, timezone }),
+        'enableMorningBriefing'
+      )
     );
     if (!response) {
       return jsonError(
@@ -1975,6 +2026,9 @@ platform.post('/morning-briefing/enable', async c => {
     }
     return c.json(response, 200);
   } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/enable');
     return jsonError(message, status, code);
   }
@@ -1989,12 +2043,14 @@ platform.post('/morning-briefing/disable', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const response = await withResolvedDORetry(
-      c.env,
-      result.data.userId,
-      iidResult.instanceId,
-      stub => stub.disableMorningBriefing(),
-      'disableMorningBriefing'
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        result.data.userId,
+        iidResult.instanceId,
+        stub => stub.disableMorningBriefing(),
+        'disableMorningBriefing'
+      )
     );
     if (!response) {
       return jsonError(
@@ -2005,6 +2061,9 @@ platform.post('/morning-briefing/disable', async c => {
     }
     return c.json(response, 200);
   } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/disable');
     return jsonError(message, status, code);
   }

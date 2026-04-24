@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
 import type { AuthContext } from '../auth';
+import type { OkResponse } from '@kilocode/kilo-chat';
 import { sandboxIdSchema } from '../routes/schemas';
 import { extractSandboxId, pushBotStatusEvent } from './event-push';
 
@@ -63,5 +64,5 @@ export async function handleBotStatus(c: HonoCtx): Promise<Response> {
     return c.json({ error: 'Bad Gateway' }, 502);
   }
 
-  return c.json({ ok: true });
+  return c.json({ ok: true } satisfies OkResponse);
 }

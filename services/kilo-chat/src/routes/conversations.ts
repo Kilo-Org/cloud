@@ -1,6 +1,12 @@
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AuthContext } from '../auth';
+import type {
+  CreateConversationResponse,
+  ConversationListResponse,
+  ConversationDetailResponse,
+  OkResponse,
+} from '@kilocode/kilo-chat';
 import {
   createConversationFor,
   renameConversationFor,
@@ -49,7 +55,10 @@ export function registerConversationRoutes(
       return c.json({ error: result.error }, 500);
     }
 
-    return c.json({ conversationId: result.conversationId }, 201);
+    return c.json(
+      { conversationId: result.conversationId } satisfies CreateConversationResponse,
+      201
+    );
   });
 
   // GET /v1/conversations — list my conversations, optionally filtered by sandboxId
@@ -77,7 +86,7 @@ export function registerConversationRoutes(
 
     const stub = c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId));
     const { conversations, hasMore } = await stub.listConversations(sandboxId, limit, offset);
-    return c.json({ conversations, hasMore, limit, offset });
+    return c.json({ conversations, hasMore, limit, offset } satisfies ConversationListResponse);
   });
 
   // GET /v1/conversations/:id — get conversation details
@@ -98,7 +107,7 @@ export function registerConversationRoutes(
     if (!info) {
       return c.json({ error: 'Not found' }, 404);
     }
-    return c.json(info);
+    return c.json(info satisfies ConversationDetailResponse);
   });
 
   // PATCH /v1/conversations/:id — rename
@@ -130,7 +139,7 @@ export function registerConversationRoutes(
       return c.json({ error: result.error }, 403);
     }
 
-    return c.json({ ok: true });
+    return c.json({ ok: true } satisfies OkResponse);
   });
 
   // POST /v1/conversations/:id/leave — leave conversation

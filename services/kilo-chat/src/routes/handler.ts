@@ -20,6 +20,16 @@ import {
 import { addReactionFor, removeReactionFor } from '../services/reactions';
 import { setTypingFor, stopTypingFor } from '../services/typing';
 import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
+import type {
+  CreateMessageResponse,
+  EditMessageResponse,
+  OkResponse,
+  AddReactionResponse,
+  MessageListResponse,
+  BotGetMembersResponse,
+  BotListConversationsResponse,
+  CreateConversationResponse,
+} from '@kilocode/kilo-chat';
 import {
   ulidSchema,
   sandboxIdSchema,
@@ -103,7 +113,7 @@ export async function handleCreateMessage(c: HonoCtx) {
     return c.json({ error: result.error }, 500);
   }
   return c.json(
-    { messageId: result.messageId, ...(result.clientId ? { clientId: result.clientId } : {}) },
+    { messageId: result.messageId, clientId: result.clientId } satisfies CreateMessageResponse,
     201
   );
 }
@@ -130,7 +140,7 @@ export async function handleEditMessage(c: HonoCtx) {
   if (result.stale) {
     return c.json({ error: 'Edit conflict', messageId: result.messageId }, 409);
   }
-  return c.json({ messageId: result.messageId });
+  return c.json({ messageId: result.messageId } satisfies EditMessageResponse);
 }
 
 // ─── deleteMessage ──────────────────────────────────────────────────────────
@@ -190,7 +200,7 @@ export async function handleExecuteAction(c: HonoCtx) {
     return c.json({ error: result.error }, 500);
   }
 
-  return c.json({ ok: true });
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 // ─── addReaction ─────────────────────────────────────────────────────────────
@@ -213,7 +223,7 @@ export async function handleAddReaction(c: HonoCtx) {
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
     return c.json({ error: result.error }, 500);
   }
-  return c.json({ id: result.id }, result.added ? 201 : 200);
+  return c.json({ id: result.id } satisfies AddReactionResponse, result.added ? 201 : 200);
 }
 
 // ─── removeReaction ──────────────────────────────────────────────────────────
@@ -269,7 +279,7 @@ export async function handleListMessages(c: HonoCtx) {
     limit: query.data.limit,
     before: query.data.before,
   });
-  return c.json({ messages: result.messages });
+  return c.json({ messages: result.messages } satisfies MessageListResponse);
 }
 
 // ─── getMembers ──────────────────────────────────────────────────────────────
@@ -298,7 +308,7 @@ export async function handleGetMembers(c: HonoCtx) {
     avatarUrl: displayInfo.get(m.id)?.avatarUrl ?? null,
   }));
 
-  return c.json({ members: enrichedMembers });
+  return c.json({ members: enrichedMembers } satisfies BotGetMembersResponse);
 }
 
 // ─── setTyping ───────────────────────────────────────────────────────────────
@@ -388,7 +398,12 @@ export async function handleListBotConversations(c: HonoCtx) {
     })),
   }));
 
-  return c.json({ conversations: enriched, hasMore, limit, offset });
+  return c.json({
+    conversations: enriched,
+    hasMore,
+    limit,
+    offset,
+  } satisfies BotListConversationsResponse);
 }
 
 // ─── createBotConversation ──────────────────────────────────────────────────
@@ -415,7 +430,10 @@ export async function handleCreateBotConversation(c: HonoCtx) {
     return c.json({ error: result.error }, 500);
   }
 
-  return c.json({ conversationId: result.conversationId }, 201);
+  return c.json(
+    { conversationId: result.conversationId } satisfies CreateConversationResponse,
+    201
+  );
 }
 
 // ─── renameConversation ─────────────────────────────────────────────────────
@@ -436,5 +454,5 @@ export async function handleRenameConversation(c: HonoCtx) {
     return c.json({ error: result.error }, 403);
   }
 
-  return c.json({ ok: true });
+  return c.json({ ok: true } satisfies OkResponse);
 }

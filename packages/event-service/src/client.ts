@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import type { ClientMessage, EventServiceConfig, ServerMessage } from './types';
+import type {
+  ClientMessage,
+  ConnectTicketResponse,
+  EventServiceConfig,
+  ServerMessage,
+} from './types';
 
 const serverMessageSchema: z.ZodType<ServerMessage> = z.object({
   type: z.literal('event'),
@@ -62,7 +67,7 @@ export class EventServiceClient {
     if (!res.ok) {
       throw new Error(`Ticket request failed: ${res.status}`);
     }
-    const { ticket, userId } = (await res.json()) as { ticket: string; userId: string };
+    const { ticket, userId } = (await res.json()) as ConnectTicketResponse;
 
     // Step 2: Connect WebSocket using the ticket
     return new Promise((resolve, reject) => {

@@ -157,7 +157,7 @@ export function KiloChatLayout({
             if (!old) return old;
             const filtered = old.conversations.filter(c => c.conversationId !== e.conversationId);
             if (filtered.length === old.conversations.length) return old;
-            return { ...old, conversations: filtered, total: old.total - 1 };
+            return { ...old, conversations: filtered };
           }
         );
       }),

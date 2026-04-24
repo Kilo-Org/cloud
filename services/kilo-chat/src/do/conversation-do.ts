@@ -43,7 +43,7 @@ export type ConversationInfo = {
   title: string | null;
   createdBy: string;
   createdAt: number;
-  members: Array<{ id: string; kind: string }>;
+  members: Array<{ id: string; kind: 'user' | 'bot' }>;
 };
 
 export type CreateMessageParams = {
@@ -187,7 +187,7 @@ export class ConversationDO extends DurableObject<Env> {
       title: convRow.title,
       createdBy: convRow.created_by,
       createdAt: convRow.created_at,
-      members: memberRows.map(m => ({ id: m.id, kind: m.kind })),
+      members: memberRows.map(m => ({ id: m.id, kind: m.kind as 'user' | 'bot' })),
     };
   }
 

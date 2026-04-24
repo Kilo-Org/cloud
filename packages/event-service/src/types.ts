@@ -1,3 +1,10 @@
+// ── HTTP response types ────────────────────────────────────────────
+
+export type ConnectTicketResponse = {
+  ticket: string;
+  userId: string;
+};
+
 // Client → Server
 export type ContextSubscribeMessage = {
   type: 'context.subscribe';

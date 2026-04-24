@@ -2,6 +2,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { z } from 'zod';
+import type { ConnectTicketResponse } from '@kilocode/event-service';
 import { authenticateToken } from './auth';
 
 const connectQuerySchema = z.object({
@@ -31,7 +32,7 @@ app.post('/connect/ticket', async c => {
 
   const ticketDO = c.env.TICKET_DO.get(c.env.TICKET_DO.idFromName(auth.userId));
   const ticket = await ticketDO.create(auth.userId);
-  return c.json({ ticket, userId: auth.userId });
+  return c.json({ ticket, userId: auth.userId } satisfies ConnectTicketResponse);
 });
 
 // Step 2: Connect WebSocket using the ticket.

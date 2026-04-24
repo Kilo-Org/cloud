@@ -22,6 +22,9 @@ import type {
   conversationListResponseSchema,
   messageListResponseSchema,
   conversationDetailResponseSchema,
+  okResponseSchema,
+  addReactionResponseSchema,
+  executeActionRequestSchema,
   botListConversationsResponseSchema,
   botListMessagesResponseSchema,
   botGetMembersResponseSchema,
@@ -96,6 +99,9 @@ export type EditMessageRequest = z.infer<typeof editMessageRequestSchema>;
 export type EditMessageResponse = z.infer<typeof editMessageResponseSchema>;
 export type DeleteMessageRequest = z.infer<typeof deleteMessageRequestSchema>;
 export type RenameConversationRequest = z.infer<typeof renameConversationRequestSchema>;
+export type OkResponse = z.infer<typeof okResponseSchema>;
+export type AddReactionResponse = z.infer<typeof addReactionResponseSchema>;
+export type ExecuteActionRequest = z.infer<typeof executeActionRequestSchema>;
 export type ConversationListResponse = z.infer<typeof conversationListResponseSchema>;
 export type MessageListResponse = z.infer<typeof messageListResponseSchema>;
 export type ConversationDetailResponse = z.infer<typeof conversationDetailResponseSchema>;

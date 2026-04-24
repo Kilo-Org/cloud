@@ -174,7 +174,7 @@ export const addReactionResponseSchema = z.object({
 
 export const conversationListResponseSchema = z.object({
   conversations: z.array(conversationListItemSchema),
-  total: z.number(),
+  hasMore: z.boolean(),
   limit: z.number(),
   offset: z.number(),
 });
@@ -215,7 +215,7 @@ export const botConversationSummarySchema = z.object({
 
 export const botListConversationsResponseSchema = z.object({
   conversations: z.array(botConversationSummarySchema),
-  total: z.number(),
+  hasMore: z.boolean(),
   limit: z.number(),
   offset: z.number(),
 });

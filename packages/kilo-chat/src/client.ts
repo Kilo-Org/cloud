@@ -58,6 +58,12 @@ export class KiloChatClient {
   private readonly baseUrl: string;
   private readonly getToken: () => Promise<string>;
   private readonly fetchFn: typeof globalThis.fetch;
+  // Per-conversation send queues. Each sendMessage call chains onto the tail
+  // of its conversation's queue so concurrent callers cannot race ahead of
+  // earlier sends and get a lower server-assigned ULID than a later send.
+  // See services/kilo-chat/src/do/conversation-do.ts (nextUlid is monotonic
+  // in DO arrival order, not caller send order).
+  private readonly sendQueues = new Map<string, Promise<unknown>>();
 
   constructor(config: KiloChatClientConfig) {
     this.es = config.eventService;
@@ -69,11 +75,32 @@ export class KiloChatClient {
   // ── Mutations via HTTP ────────────────────────────────────────────────────
 
   async sendMessage(req: CreateMessageRequest): Promise<CreateMessageResponse> {
-    return this.httpRequest('/v1/messages', {
-      method: 'POST',
-      body: req,
-      schema: createMessageResponseSchema,
+    const prev = this.sendQueues.get(req.conversationId) ?? Promise.resolve();
+    const next = prev.then(
+      () =>
+        this.httpRequest('/v1/messages', {
+          method: 'POST',
+          body: req,
+          schema: createMessageResponseSchema,
+        }),
+      // A failed prior send must not block subsequent sends — swallow the
+      // rejection on the chain; the original caller already received it.
+      () =>
+        this.httpRequest('/v1/messages', {
+          method: 'POST',
+          body: req,
+          schema: createMessageResponseSchema,
+        })
+    );
+    this.sendQueues.set(req.conversationId, next);
+    // Best-effort cleanup so the map doesn't grow unbounded for long-lived
+    // clients. Only clear if this send is still the tail.
+    void next.finally(() => {
+      if (this.sendQueues.get(req.conversationId) === next) {
+        this.sendQueues.delete(req.conversationId);
+      }
     });
+    return next;
   }
 
   async editMessage(messageId: string, req: EditMessageRequest): Promise<EditMessageResponse> {

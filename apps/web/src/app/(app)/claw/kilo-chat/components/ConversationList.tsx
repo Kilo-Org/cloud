@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
@@ -46,6 +46,9 @@ function groupConversations(
 type ConversationListProps = {
   conversations: ConversationListItem[];
   isLoading: boolean;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
   onNewConversation: () => void;
   onRename: (id: string, title: string) => void;
   onLeave: (id: string) => void;
@@ -54,6 +57,9 @@ type ConversationListProps = {
 export function ConversationList({
   conversations,
   isLoading,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
   onNewConversation,
   onRename,
   onLeave,
@@ -61,6 +67,17 @@ export function ConversationList({
   const params = useParams<{ conversationId?: string }>();
   const activeId = params?.conversationId;
   const groups = useMemo(() => groupConversations(conversations), [conversations]);
+
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      if (!hasNextPage || isFetchingNextPage || !onLoadMore) return;
+      const el = e.currentTarget;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
+        onLoadMore();
+      }
+    },
+    [hasNextPage, isFetchingNextPage, onLoadMore]
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -75,7 +92,7 @@ export function ConversationList({
         </button>
       </div>
 
-      <div className="flex-1 space-y-0.5 overflow-y-auto px-2">
+      <div className="flex-1 space-y-0.5 overflow-y-auto px-2" onScroll={handleScroll}>
         {isLoading ? (
           <div className="text-muted-foreground px-3 py-4 text-center text-xs">Loading...</div>
         ) : conversations.length === 0 ? (
@@ -83,22 +100,27 @@ export function ConversationList({
             No conversations yet
           </div>
         ) : (
-          groups.map(group => (
-            <div key={group.label}>
-              <div className="text-muted-foreground px-3 pt-3 pb-1 text-[11px] font-medium uppercase">
-                {group.label}
+          <>
+            {groups.map(group => (
+              <div key={group.label}>
+                <div className="text-muted-foreground px-3 pt-3 pb-1 text-[11px] font-medium uppercase">
+                  {group.label}
+                </div>
+                {group.items.map(conv => (
+                  <ConversationItem
+                    key={conv.conversationId}
+                    conversation={conv}
+                    isActive={conv.conversationId === activeId}
+                    onRename={onRename}
+                    onLeave={onLeave}
+                  />
+                ))}
               </div>
-              {group.items.map(conv => (
-                <ConversationItem
-                  key={conv.conversationId}
-                  conversation={conv}
-                  isActive={conv.conversationId === activeId}
-                  onRename={onRename}
-                  onLeave={onLeave}
-                />
-              ))}
-            </div>
-          ))
+            ))}
+            {isFetchingNextPage && (
+              <div className="text-muted-foreground px-3 py-2 text-center text-xs">Loading...</div>
+            )}
+          </>
         )}
       </div>
     </div>

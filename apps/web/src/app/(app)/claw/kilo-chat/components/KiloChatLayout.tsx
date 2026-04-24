@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import type { EventServiceClient } from '@kilocode/event-service';
-import type { KiloChatClient, ConversationListResponse } from '@kilocode/kilo-chat';
+import type { KiloChatClient } from '@kilocode/kilo-chat';
 import type { BotPresence } from './BotStatus';
 import { InstanceSwitcher } from './InstanceSwitcher';
 import { ConversationList } from './ConversationList';
@@ -15,6 +15,9 @@ import {
   useCreateConversation,
   useRenameConversation,
   useLeaveConversation,
+  updateConversationPages,
+  filterConversationPages,
+  type ConversationListInfiniteData,
 } from '../hooks/useConversations';
 
 // ── Context for child pages ─────────────────────────────────────────
@@ -124,26 +127,23 @@ export function KiloChatLayout({
   const queryClient = useQueryClient();
   const params = useParams<{ conversationId?: string }>();
   const [leavingConversationId, setLeavingConversationId] = useState<string | null>(null);
-  const { data, isLoading } = useConversations(kiloChatClient, selectedSandboxId);
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useConversations(
+    kiloChatClient,
+    selectedSandboxId
+  );
 
   // Update conversation list cache in-place when activity events arrive
   useEffect(() => {
+    const queryKey = ['kilo-chat', 'conversations'];
     const offs = [
       kiloChatClient.onConversationCreated(() => {
-        void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
+        void queryClient.invalidateQueries({ queryKey });
       }),
       kiloChatClient.onConversationRenamed((_ctx, e) => {
-        queryClient.setQueriesData<ConversationListResponse>(
-          { queryKey: ['kilo-chat', 'conversations'] },
-          old => {
-            if (!old) return old;
-            return {
-              ...old,
-              conversations: old.conversations.map(c =>
-                c.conversationId === e.conversationId ? { ...c, conversationTitle: e.title } : c
-              ),
-            };
-          }
+        queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
+          updateConversationPages(old, c =>
+            c.conversationId === e.conversationId ? { ...c, conversationTitle: e.title } : c
+          )
         );
         // Also update the conversation detail cache if it's loaded
         void queryClient.invalidateQueries({
@@ -151,44 +151,22 @@ export function KiloChatLayout({
         });
       }),
       kiloChatClient.onConversationLeft((_ctx, e) => {
-        queryClient.setQueriesData<ConversationListResponse>(
-          { queryKey: ['kilo-chat', 'conversations'] },
-          old => {
-            if (!old) return old;
-            const filtered = old.conversations.filter(c => c.conversationId !== e.conversationId);
-            if (filtered.length === old.conversations.length) return old;
-            return { ...old, conversations: filtered };
-          }
+        queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
+          filterConversationPages(old, c => c.conversationId !== e.conversationId)
         );
       }),
       kiloChatClient.onConversationRead((_ctx, e) => {
-        queryClient.setQueriesData<ConversationListResponse>(
-          { queryKey: ['kilo-chat', 'conversations'] },
-          old => {
-            if (!old) return old;
-            return {
-              ...old,
-              conversations: old.conversations.map(c =>
-                c.conversationId === e.conversationId ? { ...c, lastReadAt: e.lastReadAt } : c
-              ),
-            };
-          }
+        queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
+          updateConversationPages(old, c =>
+            c.conversationId === e.conversationId ? { ...c, lastReadAt: e.lastReadAt } : c
+          )
         );
       }),
       kiloChatClient.onConversationActivity((_ctx, e) => {
-        queryClient.setQueriesData<ConversationListResponse>(
-          { queryKey: ['kilo-chat', 'conversations'] },
-          old => {
-            if (!old) return old;
-            return {
-              ...old,
-              conversations: old.conversations.map(c =>
-                c.conversationId === e.conversationId
-                  ? { ...c, lastActivityAt: e.lastActivityAt }
-                  : c
-              ),
-            };
-          }
+        queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
+          updateConversationPages(old, c =>
+            c.conversationId === e.conversationId ? { ...c, lastActivityAt: e.lastActivityAt } : c
+          )
         );
       }),
     ];
@@ -272,6 +250,9 @@ export function KiloChatLayout({
           <ConversationList
             conversations={data?.conversations ?? []}
             isLoading={isLoading}
+            hasNextPage={!!hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={() => void fetchNextPage()}
             onNewConversation={handleNewConversation}
             onRename={handleRename}
             onLeave={handleLeave}

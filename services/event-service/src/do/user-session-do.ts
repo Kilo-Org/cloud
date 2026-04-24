@@ -2,19 +2,18 @@ import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import type { ServerMessage } from '../types';
 
-const MAX_CONTEXTS_PER_MESSAGE = 100;
-const MAX_CONTEXTS_PER_SOCKET = 200;
+const MAX_CONTEXTS = 200;
 const MAX_CONTEXT_LENGTH = 256;
 
 const contextSchema = z.string().min(1).max(MAX_CONTEXT_LENGTH);
 const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('context.subscribe'),
-    contexts: z.array(contextSchema).max(MAX_CONTEXTS_PER_MESSAGE),
+    contexts: z.array(contextSchema).max(MAX_CONTEXTS),
   }),
   z.object({
     type: z.literal('context.unsubscribe'),
-    contexts: z.array(contextSchema).max(MAX_CONTEXTS_PER_MESSAGE),
+    contexts: z.array(contextSchema).max(MAX_CONTEXTS),
   }),
 ]);
 
@@ -60,7 +59,7 @@ export class UserSessionDO extends DurableObject<Env> {
         const state = this.getState(ws);
         for (const ctx of msg.contexts) {
           state.contexts.add(ctx);
-          if (state.contexts.size > MAX_CONTEXTS_PER_SOCKET) {
+          if (state.contexts.size > MAX_CONTEXTS) {
             ws.close(1008, 'Too many contexts');
             return;
           }

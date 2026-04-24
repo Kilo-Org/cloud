@@ -130,7 +130,7 @@ RUN GOBIN=/usr/local/bin go install github.com/steipete/gogcli/cmd/gog@v0.12.0 \
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv --version
 
-# ── Builder stage: package customizer plugin ───────────────────────────
+# ── Builder stage: package custom plugins ───────────────────────────
 # Build the vendored plugin tarball in an isolated stage so dev-time
 # dependencies do not inflate the runtime image layers.
 FROM runtime AS customizer-builder
@@ -142,6 +142,16 @@ RUN cd /tmp/kiloclaw-customizer \
     && mv "${PKG_TGZ}" /tmp/kiloclaw-customizer.tgz \
     && cd / \
     && rm -rf /tmp/kiloclaw-customizer /root/.npm
+
+FROM runtime AS morning-briefing-builder
+
+COPY plugins/kiloclaw-morning-briefing/ /tmp/kiloclaw-morning-briefing/
+RUN cd /tmp/kiloclaw-morning-briefing \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kiloclaw-morning-briefing.tgz \
+    && cd / \
+    && rm -rf /tmp/kiloclaw-morning-briefing /root/.npm
 
 # ── Builder stage: compile the controller with Bun ────────────────────
 # Bun is only needed to bundle the controller TypeScript into a single JS
@@ -175,8 +185,10 @@ FROM runtime AS final
 # Also drop /etc/gitconfig (set earlier for the build's ssh→https rewrite) so
 # it doesn't persist in the runtime image.
 COPY --from=customizer-builder /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-customizer.tgz
-RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz \
+COPY --from=morning-briefing-builder /tmp/kiloclaw-morning-briefing.tgz /tmp/kiloclaw-morning-briefing.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-morning-briefing.tgz \
     && rm -f /tmp/kiloclaw-customizer.tgz \
+    && rm -f /tmp/kiloclaw-morning-briefing.tgz \
     && rm -f /etc/gitconfig \
     && rm -rf /root/.npm
 

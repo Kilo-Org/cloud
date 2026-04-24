@@ -43,6 +43,7 @@ describe('processOpenRouterUsage', () => {
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: 200,
   };
 
   test('should correctly process usage for a non-byok case', () => {
@@ -180,6 +181,28 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     expect(result.model).toBe('anthropic/claude-3-5-sonnet');
     expect(result.responseContent).toBe('Hello world');
     expect(result.hasError).toBe(true); // Should be marked as error due to abort
+  });
+
+  test('captures numeric error.code from in-stream error event as status_code_override', async () => {
+    const errorChunk = `data: {"id":"gen-1","object":"chat.completion.chunk","created":1,"model":"","provider":"Amazon Bedrock","choices":[],"error":{"code":502,"message":"Internal server error","metadata":{"error_type":"provider_unavailable"}}}\n\n`;
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(errorChunk));
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.hasError).toBe(true);
+    expect(result.status_code).toBe(502);
   });
 });
 
@@ -328,6 +351,7 @@ describe('logMicrodollarUsage', () => {
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: 200,
   };
   const createBaseUsageContext = (user: {
     id: string;
@@ -770,6 +794,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: 200,
   };
 
   // Node's Headers constructor rejects values containing NUL bytes (invalid

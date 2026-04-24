@@ -17,5 +17,6 @@
   "moderation_latency": null,
   "generation_time": 7793,
   "streamed": true,
-  "cancelled": false
+  "cancelled": false,
+  "status_code": 200
 }

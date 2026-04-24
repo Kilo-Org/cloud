@@ -13,7 +13,13 @@ const ALLOWED_EMAILS = new Set([
   'git@github.com',
   'git@gitlab.com',
 ]);
-const PLACEHOLDER_DOMAINS = ['example.com', 'example.test', 'test.local', 'admin.example.com'];
+const PLACEHOLDER_DOMAINS = [
+  'example.com',
+  'example.co.uk',
+  'example.test',
+  'test.local',
+  'admin.example.com',
+];
 const EXCLUDED_PATH_PARTS = new Set(['tests', 'scripts']);
 
 function listProductionSourceFiles(dir: string): string[] {
@@ -41,7 +47,9 @@ function listProductionSourceFiles(dir: string): string[] {
 function isAllowedEmail(email: string): boolean {
   const normalized = email.toLowerCase();
   if (ALLOWED_EMAILS.has(normalized)) return true;
-  return PLACEHOLDER_DOMAINS.some(domain => normalized.endsWith(`@${domain}`));
+  return PLACEHOLDER_DOMAINS.some(
+    domain => normalized.endsWith(`@${domain}`) || normalized.endsWith(`.${domain}`)
+  );
 }
 
 describe('email literal guardrail', () => {

@@ -48,6 +48,9 @@ catalogs:
     jsonwebtoken:
       specifier: ^9.0.3
       version: 9.0.3
+    p-limit:
+      specifier: ^7.3.0
+      version: 7.3.0
     stream-chat:
       specifier: ^9.38.0
       version: 9.38.0
@@ -739,6 +742,9 @@ importers:
       openai:
         specifier: ^6.29.0
         version: 6.29.0(ws@8.19.0)(zod@4.3.6)
+      p-limit:
+        specifier: 'catalog:'
+        version: 7.3.0
       posthog-js:
         specifier: ^1.360.2
         version: 1.360.2
@@ -866,9 +872,6 @@ importers:
       madge:
         specifier: ^8.0.0
         version: 8.0.0(typescript@5.9.3)
-      p-limit:
-        specifier: ^7.3.0
-        version: 7.3.0
       postcss:
         specifier: ^8.5.8
         version: 8.5.8
@@ -1786,6 +1789,9 @@ importers:
       lru-cache:
         specifier: ^11.2.7
         version: 11.2.7
+      p-limit:
+        specifier: 'catalog:'
+        version: 7.3.0
       ulid:
         specifier: 3.0.1
         version: 3.0.1

@@ -1,5 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
+import pLimit from 'p-limit';
 import { cors } from 'hono/cors';
 import { authMiddleware } from './auth';
 import { botAuthMiddleware } from './auth-bot';
@@ -68,26 +69,37 @@ export default class extends WorkerEntrypoint<Env> {
       offset += PAGE_SIZE;
     }
 
-    // Fan out: for each conversation, clean up member MembershipDOs then destroy ConversationDO.
-    for (const conversationId of allConversationIds) {
-      const convStub = this.env.CONVERSATION_DO.get(
-        this.env.CONVERSATION_DO.idFromName(conversationId)
-      );
-      const info = await convStub.getInfo();
+    // Fan out with concurrency limit: for each conversation, clean up
+    // member MembershipDOs then destroy ConversationDO.
+    const limit = pLimit(10);
+    const results = await Promise.allSettled(
+      allConversationIds.map(conversationId =>
+        limit(async () => {
+          const convStub = this.env.CONVERSATION_DO.get(
+            this.env.CONVERSATION_DO.idFromName(conversationId)
+          );
+          const info = await convStub.getInfo();
 
-      if (info) {
-        // Remove this conversation from every member's MembershipDO.
-        await Promise.all(
-          info.members.map(member => {
-            const memberStub = this.env.MEMBERSHIP_DO.get(
-              this.env.MEMBERSHIP_DO.idFromName(member.id)
+          if (info) {
+            // Remove this conversation from every member's MembershipDO.
+            await Promise.all(
+              info.members.map(member => {
+                const memberStub = this.env.MEMBERSHIP_DO.get(
+                  this.env.MEMBERSHIP_DO.idFromName(member.id)
+                );
+                return memberStub.removeConversation(conversationId);
+              })
             );
-            return memberStub.removeConversation(conversationId);
-          })
-        );
-      }
+          }
 
-      await convStub.destroy();
+          await convStub.destroy();
+        })
+      )
+    );
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        console.error('destroySandboxData: conversation cleanup failed:', r.reason);
+      }
     }
 
     // Final sweep: bulk-delete any remaining entries in the bot's MembershipDO.

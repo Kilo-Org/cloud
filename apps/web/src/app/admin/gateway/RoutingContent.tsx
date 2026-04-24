@@ -70,9 +70,10 @@ export function RoutingContent() {
         <CardHeader>
           <CardTitle>Vercel Routing Percentage</CardTitle>
           <CardDescription>
-            Control the percentage of traffic routed to the Vercel AI Gateway (vs OpenRouter). Leave
-            empty to use the default ({DEFAULT_VERCEL_PERCENTAGE}%). Stored in Redis for
-            sub-millisecond reads on the hot path.
+            For models available on the Vercel AI Gateway, controls the percentage of traffic routed
+            to Vercel (vs OpenRouter). Models not available on Vercel always go to OpenRouter, so
+            overall traffic may still be skewed towards OpenRouter. Leave empty to use the default (
+            {DEFAULT_VERCEL_PERCENTAGE}%).
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

@@ -1,6 +1,6 @@
 import * as z from 'zod';
 
-export const DEFAULT_VERCEL_PERCENTAGE = 10;
+export const DEFAULT_VERCEL_PERCENTAGE = 50;
 
 const vercelRoutingPercentage = z.number().int().min(0).max(100);
 

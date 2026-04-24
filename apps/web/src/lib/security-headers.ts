@@ -1,13 +1,3 @@
-type CspDirective =
-  | 'script-src'
-  | 'connect-src'
-  | 'img-src'
-  | 'style-src'
-  | 'font-src'
-  | 'frame-src'
-  | 'worker-src'
-  | 'media-src';
-
 export type ContentSecurityPolicyOptions = {
   isDevelopment?: boolean;
   connectSrcUrls?: Array<string | undefined>;
@@ -18,17 +8,6 @@ export type ContentSecurityPolicyMode = 'enforce' | 'report-only' | 'off';
 
 const CSP_REPORTING_GROUP = 'csp-endpoint';
 const SENTRY_SECURITY_REPORT_MAX_AGE_SECONDS = 10886400;
-
-const ADDITIONAL_SOURCE_ENV_BY_DIRECTIVE = {
-  'script-src': 'CSP_ADDITIONAL_SCRIPT_SRC',
-  'connect-src': 'CSP_ADDITIONAL_CONNECT_SRC',
-  'img-src': 'CSP_ADDITIONAL_IMG_SRC',
-  'style-src': 'CSP_ADDITIONAL_STYLE_SRC',
-  'font-src': 'CSP_ADDITIONAL_FONT_SRC',
-  'frame-src': 'CSP_ADDITIONAL_FRAME_SRC',
-  'worker-src': 'CSP_ADDITIONAL_WORKER_SRC',
-  'media-src': 'CSP_ADDITIONAL_MEDIA_SRC',
-} satisfies Record<CspDirective, string>;
 
 function compactUnique(values: Array<string | null | undefined>): string[] {
   const compacted = values.filter((value): value is string => Boolean(value && value.length > 0));
@@ -112,23 +91,6 @@ export function getSecurityPolicyReportingHeaders(
   };
 }
 
-function parseAdditionalCspSources(value: string | undefined): string[] {
-  if (!value || value.includes(';')) return [];
-  return compactUnique(
-    value
-      .split(/[\s,]+/)
-      .map(source => source.trim())
-      .filter(source => source.length > 0)
-  );
-}
-
-function getAdditionalCspSources(
-  directive: CspDirective,
-  env: Record<string, string | undefined>
-): string[] {
-  return parseAdditionalCspSources(env[ADDITIONAL_SOURCE_ENV_BY_DIRECTIVE[directive]]);
-}
-
 export function getConfiguredConnectSrcOrigins(
   env: Record<string, string | undefined> = process.env
 ): string[] {
@@ -177,7 +139,6 @@ export function buildContentSecurityPolicy({
     'https://challenges.cloudflare.com',
     'https://widget.usepylon.com',
     'https://assets.churnkey.co',
-    ...getAdditionalCspSources('script-src', env),
   ]);
 
   const connectSrc = compactUnique([
@@ -201,7 +162,6 @@ export function buildContentSecurityPolicy({
     isDevelopment ? 'http://localhost:*' : null,
     isDevelopment ? 'ws://localhost:*' : null,
     ...configuredConnectSrcUrls.map(originFromUrl),
-    ...getAdditionalCspSources('connect-src', env),
   ]);
 
   const reportUri = getSentrySecurityReportUri(env);
@@ -229,10 +189,9 @@ export function buildContentSecurityPolicy({
       'https://*.churnkey.co',
       'https://www.gravatar.com',
       'https://openrouter.ai',
-      ...getAdditionalCspSources('img-src', env),
     ],
-    'style-src': ["'self'", "'unsafe-inline'", ...getAdditionalCspSources('style-src', env)],
-    'font-src': ["'self'", 'data:', ...getAdditionalCspSources('font-src', env)],
+    'style-src': ["'self'", "'unsafe-inline'"],
+    'font-src': ["'self'", 'data:'],
     'frame-src': [
       "'self'",
       'https://js.stripe.com',
@@ -245,10 +204,9 @@ export function buildContentSecurityPolicy({
       'https://assets.churnkey.co',
       'https://*.churnkey.co',
       'https://*.d.kiloapps.io',
-      ...getAdditionalCspSources('frame-src', env),
     ],
-    'worker-src': ["'self'", 'blob:', ...getAdditionalCspSources('worker-src', env)],
-    'media-src': ["'self'", 'blob:', ...getAdditionalCspSources('media-src', env)],
+    'worker-src': ["'self'", 'blob:'],
+    'media-src': ["'self'", 'blob:'],
     'manifest-src': ["'self'"],
     ...(reportUri ? { 'report-uri': [reportUri], 'report-to': [CSP_REPORTING_GROUP] } : {}),
   };

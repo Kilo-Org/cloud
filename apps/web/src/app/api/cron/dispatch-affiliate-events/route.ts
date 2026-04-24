@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 
 import { CRON_SECRET } from '@/lib/config.server';
 import { dispatchQueuedAffiliateEvents } from '@/lib/affiliate-events';
+import { dispatchQueuedImpactAdvocateRegistrationAttempts } from '@/lib/impact-referral';
+import {
+  dispatchQueuedImpactConversionReports,
+  processQueuedKiloClawReferralRewards,
+} from '@/lib/kiloclaw-referrals';
 import { sentryLogger } from '@/lib/utils.server';
 
 if (!CRON_SECRET) {
@@ -22,12 +27,27 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const summary = await dispatchQueuedAffiliateEvents();
+  const [
+    affiliateSummary,
+    impactAdvocateRegistrationSummary,
+    impactConversionSummary,
+    referralRewardSummary,
+  ] = await Promise.all([
+    dispatchQueuedAffiliateEvents(),
+    dispatchQueuedImpactAdvocateRegistrationAttempts(),
+    dispatchQueuedImpactConversionReports(),
+    processQueuedKiloClawReferralRewards(),
+  ]);
 
   return NextResponse.json(
     {
       success: true,
-      summary,
+      summary: {
+        affiliateEvents: affiliateSummary,
+        impactAdvocateRegistrations: impactAdvocateRegistrationSummary,
+        impactConversionReports: impactConversionSummary,
+        referralRewards: referralRewardSummary,
+      },
       timestamp: new Date().toISOString(),
     },
     { status: 200 }

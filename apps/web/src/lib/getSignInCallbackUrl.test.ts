@@ -217,6 +217,19 @@ describe('getSignInCallbackUrl', () => {
 
       expect(result).toBe('/users/after-sign-in?source=extension&im_ref=impact-click-id-123');
     });
+
+    test('preserves referral query params through the auth callback', () => {
+      const result = getSignInCallbackUrl({
+        _saasquatch: 'opaque-referral-cookie',
+        rsCode: 'ref-code',
+        rsShareMedium: 'email',
+        rsEngagementMedium: 'link',
+      });
+
+      expect(result).toBe(
+        '/users/after-sign-in?_saasquatch=opaque-referral-cookie&rsCode=ref-code&rsShareMedium=email&rsEngagementMedium=link'
+      );
+    });
   });
 
   describe('stripHost', () => {

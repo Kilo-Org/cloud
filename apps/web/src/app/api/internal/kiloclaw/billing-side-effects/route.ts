@@ -15,6 +15,7 @@ import { ensureAutoIntroSchedule } from '@/lib/kiloclaw/stripe-handlers';
 import { isIntroPriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { client as stripe } from '@/lib/stripe-client';
 import { enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
+import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
 import { projectPendingKiloPassBonusMicrodollars } from '@/lib/kiloclaw/credit-billing';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 
@@ -131,6 +132,20 @@ const BodySchema = z.discriminatedUnion('action', [
     }),
   }),
   z.object({
+    action: z.literal('process_paid_conversion'),
+    input: z.object({
+      userId: z.string().min(1),
+      dedupeKey: z.string().min(1),
+      eventDateIso: z.string().datetime(),
+      orderId: z.string().min(1),
+      amount: z.number().nonnegative(),
+      currencyCode: z.string().min(1),
+      itemCategory: z.string().min(1),
+      itemName: z.string().min(1),
+      itemSku: z.string().min(1).optional(),
+    }),
+  }),
+  z.object({
     action: z.literal('project_pending_kilo_pass_bonus'),
     input: z.object({
       userId: z.string().min(1),
@@ -168,6 +183,8 @@ function getActionLogFields(body: z.infer<typeof BodySchema>): {
         stripeSubscriptionId: body.input.stripeSubscriptionId,
       };
     case 'enqueue_affiliate_event':
+      return { userId: body.input.userId };
+    case 'process_paid_conversion':
       return { userId: body.input.userId };
     case 'project_pending_kilo_pass_bonus':
       return { userId: body.input.userId };
@@ -220,6 +237,12 @@ export async function POST(request: NextRequest) {
       | { ok: true }
       | { repaired: boolean }
       | { enqueued: boolean }
+      | {
+          affiliateSaleEnqueued: boolean;
+          winningTouchType: 'referral' | 'affiliate' | 'none';
+          conversionId: string | null;
+          disqualificationReason: string | null;
+        }
       | { projectedBonusMicrodollars: number };
 
     switch (parsed.data.action) {
@@ -265,6 +288,44 @@ export async function POST(request: NextRequest) {
         });
         payload = { enqueued: true };
         break;
+
+      case 'process_paid_conversion': {
+        const disposition = await processPersonalKiloClawPaidConversion({
+          userId: parsed.data.input.userId,
+          sourcePaymentId: parsed.data.input.orderId,
+          orderId: parsed.data.input.orderId,
+          amount: parsed.data.input.amount,
+          currencyCode: parsed.data.input.currencyCode,
+          itemCategory: parsed.data.input.itemCategory,
+          itemName: parsed.data.input.itemName,
+          itemSku: parsed.data.input.itemSku,
+          convertedAt: new Date(parsed.data.input.eventDateIso),
+        });
+
+        if (disposition.shouldEnqueueAffiliateSale) {
+          await enqueueAffiliateEventForUser({
+            userId: parsed.data.input.userId,
+            provider: 'impact',
+            eventType: 'sale',
+            dedupeKey: parsed.data.input.dedupeKey,
+            eventDate: new Date(parsed.data.input.eventDateIso),
+            orderId: parsed.data.input.orderId,
+            amount: parsed.data.input.amount,
+            currencyCode: parsed.data.input.currencyCode,
+            itemCategory: parsed.data.input.itemCategory,
+            itemName: parsed.data.input.itemName,
+            itemSku: parsed.data.input.itemSku,
+          });
+        }
+
+        payload = {
+          affiliateSaleEnqueued: disposition.shouldEnqueueAffiliateSale,
+          winningTouchType: disposition.winningTouchType,
+          conversionId: disposition.conversionId,
+          disqualificationReason: disposition.disqualificationReason,
+        };
+        break;
+      }
 
       case 'project_pending_kilo_pass_bonus':
         payload = {

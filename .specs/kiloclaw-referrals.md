@@ -298,172 +298,175 @@ interventions, and non-KiloClaw purchases are out of scope.
     reward pending so it can be applied when the referrer starts or reactivates an eligible personal KiloClaw
     subscription.
 
-64. A pending referrer reward MUST NOT apply to a KiloClaw trial. It MUST apply to the next unpaid renewal boundary after
+64. A pending inactive-referrer reward MUST expire and be canceled 12 months after it is earned if the referrer has not
+    started or reactivated an eligible paid personal KiloClaw subscription.
+
+65. A pending referrer reward MUST NOT apply to a KiloClaw trial. It MUST apply to the next unpaid renewal boundary after
     the referrer starts or reactivates a paid personal KiloClaw subscription.
 
-65. A referrer MUST NOT receive more than 12 total free-month rewards from the referral program.
+66. A referrer MUST NOT receive more than 12 total free-month rewards from the referral program.
 
-66. The referrer cap MUST be enforced before granting a referrer reward.
+67. The referrer cap MUST be enforced before granting a referrer reward.
 
-67. The 12-month referrer cap MUST be enforced atomically across concurrent reward grants. Concurrent processing MUST NOT
+68. The 12-month referrer cap MUST be enforced atomically across concurrent reward grants. Concurrent processing MUST NOT
     produce more than 12 granted referrer reward months.
 
-68. When a qualified referral occurs after the referrer has reached the 12-month cap, the system MUST record that the
+69. When a qualified referral occurs after the referrer has reached the 12-month cap, the system MUST record that the
     referrer reward was cap-limited and MUST NOT grant another referrer free month.
 
-69. Referee rewards MUST NOT count against the referrer's 12-month cap.
+70. Referee rewards MUST NOT count against the referrer's 12-month cap.
 
 ### Reward Granting
 
-70. A qualified referral conversion MUST grant one free-month reward to the referee.
+71. A qualified referral conversion MUST grant one free-month reward to the referee.
 
-71. A qualified referral conversion MUST grant one free-month reward to the referrer. The reward MUST be marked
+72. A qualified referral conversion MUST grant one free-month reward to the referrer. The reward MUST be marked
     cap-limited instead of granted when the referrer cap has been reached or another referrer eligibility rule prevents
     it.
 
-72. Referral reward granting MUST be idempotent. Processing the same qualifying conversion multiple times MUST NOT create
+73. Referral reward granting MUST be idempotent. Processing the same qualifying conversion multiple times MUST NOT create
     duplicate rewards for the same beneficiary role.
 
-73. For a qualified referral, reward grant processing MUST be atomic across both beneficiary reward decisions. Both
+74. For a qualified referral, reward grant processing MUST be atomic across both beneficiary reward decisions. Both
     beneficiary outcomes MUST be recorded together, including granted, cap-limited, and disqualified outcomes.
 
-74. Reward records MUST identify the source referral, source conversion, beneficiary user, beneficiary role, number of
+75. Reward records MUST identify the source referral, source conversion, beneficiary user, beneficiary role, number of
     months granted, status, and relevant timestamps.
 
-75. Reward records MUST support the reward states defined in this spec.
+76. Reward records MUST support the reward states defined in this spec.
 
-76. A reward MUST NOT be considered fulfilled until KiloClaw billing state and any required Stripe state have been
+77. A reward MUST NOT be considered fulfilled until KiloClaw billing state and any required Stripe state have been
     successfully updated so the corresponding KiloClaw renewal is delayed.
 
-77. Impact Advocate reward state MAY be used for reconciliation, support, or reporting. It MUST NOT be the source of
+78. Impact Advocate reward state MAY be used for reconciliation, support, or reporting. It MUST NOT be the source of
     truth for local free-month fulfillment.
 
 ### Reward Fulfillment and Billing
 
-78. Free-month rewards MUST be fulfilled by delaying a KiloClaw renewal by one calendar month per reward.
+79. Free-month rewards MUST be fulfilled by delaying a KiloClaw renewal by one calendar month per reward.
 
-79. An earned reward applies to the beneficiary's next unpaid renewal boundary after the reward is earned. It MUST NOT
+80. An earned reward applies to the beneficiary's next unpaid renewal boundary after the reward is earned. It MUST NOT
     modify already-finalized invoices or already-funded periods.
 
-80. Free-month rewards MUST NOT be fulfilled as general account credits.
+81. Free-month rewards MUST NOT be fulfilled as general account credits.
 
-81. Free-month rewards MUST apply to KiloClaw billing only. They MUST NOT apply to inference usage, Kilo Pass, team plans,
+82. Free-month rewards MUST apply to KiloClaw billing only. They MUST NOT apply to inference usage, Kilo Pass, team plans,
     or non-KiloClaw purchases.
 
-82. Multiple free-month rewards MAY stack. Each applied reward MUST delay renewal by exactly one calendar month.
+83. Multiple free-month rewards MAY stack. Each applied reward MUST delay renewal by exactly one calendar month.
 
-83. For month-to-month KiloClaw subscriptions, one reward MUST delay the next monthly renewal by one calendar month.
+84. For month-to-month KiloClaw subscriptions, one reward MUST delay the next monthly renewal by one calendar month.
 
-84. For six-month commitment KiloClaw subscriptions, one reward MUST delay the next six-month renewal by one calendar
+85. For six-month commitment KiloClaw subscriptions, one reward MUST delay the next six-month renewal by one calendar
     month. The reward MUST NOT convert the subscription to month-to-month and MUST NOT reduce the next invoice by one
     sixth.
 
-85. For pure-credit KiloClaw subscriptions, reward application MUST update local renewal state so the credit renewal sweep
+86. For pure-credit KiloClaw subscriptions, reward application MUST update local renewal state so the credit renewal sweep
     does not deduct KiloClaw hosting credits until the extended renewal time.
 
-86. For Stripe-funded or hybrid KiloClaw subscriptions, reward application MUST keep local billing state and Stripe
+87. For Stripe-funded or hybrid KiloClaw subscriptions, reward application MUST keep local billing state and Stripe
     billing state consistent. The system MUST NOT create a local-only renewal delay for a Stripe-funded subscription
     while allowing Stripe to charge on the original schedule.
 
-87. Reward application MUST be idempotent. Retrying reward application MUST NOT extend the same subscription more than
+88. Reward application MUST be idempotent. Retrying reward application MUST NOT extend the same subscription more than
     once for the same reward.
 
-88. Reward application MUST record an audit trail containing the reward, beneficiary, affected subscription, previous
+89. Reward application MUST record an audit trail containing the reward, beneficiary, affected subscription, previous
     renewal or period boundary, new renewal or period boundary, and any external billing operation identifiers.
 
-89. Reward application MUST NOT break existing KiloClaw billing invariants for trials, pure-credit renewal, hybrid invoice
+90. Reward application MUST NOT break existing KiloClaw billing invariants for trials, pure-credit renewal, hybrid invoice
     settlement, commit plans, plan switching, cancellation, reactivation, past-due recovery, suspension, or destruction.
 
-90. Reward application MUST respect cancellation state. If a subscription is canceled or canceling before reward
+91. Reward application MUST respect cancellation state. If a subscription is canceled or canceling before reward
     application, the reward MUST remain pending until the beneficiary has an active eligible personal KiloClaw
     subscription.
 
 ### Impact Conversion Reporting
 
-91. Impact Advocate referral conversion MUST be driven by the existing Impact Performance conversion events.
+92. Impact Advocate referral conversion MUST be driven by the existing Impact Performance conversion events.
 
-92. `Sale (71659)` MUST be the paid KiloClaw conversion event used for referral conversion and renewal reporting.
+93. `Sale (71659)` MUST be the paid KiloClaw conversion event used for referral conversion and renewal reporting.
 
-93. The system MUST NOT dispatch client-side `trackConversion` for referrals while server-side Performance conversion is
+94. The system MUST NOT dispatch client-side `trackConversion` for referrals while server-side Performance conversion is
     the configured reporting mechanism.
 
-94. When a referral wins attribution and the first paid conversion qualifies, the system MUST ensure Impact receives the
+95. When a referral wins attribution and the first paid conversion qualifies, the system MUST ensure Impact receives the
     required Performance conversion data for Advocate conversion reporting.
 
-95. Conversion reporting MUST use deterministic order identifiers where possible so retries do not create duplicate Impact
+96. Conversion reporting MUST use deterministic order identifiers where possible so retries do not create duplicate Impact
     actions.
 
-96. Conversion reporting failures MUST NOT block billing settlement, reward ledger creation, or user access. Failures MUST
+97. Conversion reporting failures MUST NOT block billing settlement, reward ledger creation, or user access. Failures MUST
     leave the conversion report in a retryable state until it succeeds, is superseded by a corrected payload, or is marked
     permanently failed by an operator-visible terminal state.
 
 ### Impact Reconciliation
 
-97. The system MUST NOT rely on Impact Advocate webhooks for referral eligibility, reward granting, billing fulfillment,
+98. The system MUST NOT rely on Impact Advocate webhooks for referral eligibility, reward granting, billing fulfillment,
     or reconciliation.
 
-98. The system MAY use Impact dashboard exports or API reads for manual reconciliation and support investigations.
+99. The system MAY use Impact dashboard exports or API reads for manual reconciliation and support investigations.
 
-99. Impact reconciliation data MAY update local Impact-facing status fields, but it MUST NOT bypass local eligibility,
-    cap, attribution, or billing fulfillment rules.
+100.  Impact reconciliation data MAY update local Impact-facing status fields, but it MUST NOT bypass local eligibility,
+      cap, attribution, or billing fulfillment rules.
 
 ### Refunds, Reversals, and Fraud
 
-100. Rewards from a qualifying Stripe payment MUST be canceled if Stripe reports a chargeback for that payment.
+101. Rewards from a qualifying Stripe payment MUST be canceled if Stripe reports a chargeback for that payment.
 
-101. Pending or earned-but-unapplied rewards MUST be canceled when the qualifying Stripe payment is charged back.
+102. Pending or earned-but-unapplied rewards MUST be canceled when the qualifying Stripe payment is charged back.
 
-102. Already-applied rewards from a charged-back Stripe payment MUST be marked for support review and MUST NOT be
+103. Already-applied rewards from a charged-back Stripe payment MUST be marked for support review and MUST NOT be
      automatically canceled or clawed back.
 
-103. Rewards from refunded or fraud-marked payments MUST be canceled before application. Already-applied rewards from
+104. Rewards from refunded or fraud-marked payments MUST be canceled before application. Already-applied rewards from
      refunded or fraud-marked payments MUST be marked for support review and MUST NOT be automatically canceled or clawed
      back.
 
-104. If a qualifying Impact action must be reversed, the system SHOULD use Impact's reverse-action mechanism instead of
+105. If a qualifying Impact action must be reversed, the system SHOULD use Impact's reverse-action mechanism instead of
      creating an unrelated negative conversion.
 
-105. Reversal and reward-cancellation handling MUST be idempotent.
+106. Reversal and reward-cancellation handling MUST be idempotent.
 
 ### GDPR and PII
 
-106. Referral tables that store user IDs, emails, referral relationships, IP addresses, referral cookies, Impact IDs, or
+107. Referral tables that store user IDs, emails, referral relationships, IP addresses, referral cookies, Impact IDs, or
      reconciliation payloads MUST be included in GDPR soft-delete or anonymization flows.
 
-107. GDPR deletion MUST delete or anonymize referral participant records, referral touch records, referral relationship
+108. GDPR deletion MUST delete or anonymize referral participant records, referral touch records, referral relationship
      records, reconciliation payloads containing PII, and reward records to the extent required by policy.
 
-108. Plain email stored for Impact Advocate compatibility MUST be deleted or anonymized during GDPR deletion.
+109. Plain email stored for Impact Advocate compatibility MUST be deleted or anonymized during GDPR deletion.
 
-109. Previously deleted user disqualification MUST use a legal-approved non-PII tombstone or irreversible hash. The system
+110. Previously deleted user disqualification MUST use a legal-approved non-PII tombstone or irreversible hash. The system
      MUST NOT retain PII solely for this purpose.
 
-110. Referral tracking values MUST NOT be logged in a way that exposes secrets, auth headers, cookies, or unnecessary PII.
+111. Referral tracking values MUST NOT be logged in a way that exposes secrets, auth headers, cookies, or unnecessary PII.
 
 ### Reliability and Isolation
 
-111. Referral touch capture, participant registration, conversion reporting, reconciliation processing, and reward
+112. Referral touch capture, participant registration, conversion reporting, reconciliation processing, and reward
      fulfillment failures MUST NOT break unrelated product functionality.
 
-112. Reward ledger operations MUST be transactional where needed to prevent duplicate grants, partial grants, or missing
+113. Reward ledger operations MUST be transactional where needed to prevent duplicate grants, partial grants, or missing
      audit records.
 
-113. Reward fulfillment failures MUST leave rewards in a retryable state unless the failure is a permanent eligibility or
+114. Reward fulfillment failures MUST leave rewards in a retryable state unless the failure is a permanent eligibility or
      configuration failure.
 
-114. The system MUST expose enough operational state to distinguish pending Impact registration, pending Impact conversion
+115. The system MUST expose enough operational state to distinguish pending Impact registration, pending Impact conversion
      reporting, pending local reward application, applied rewards, reversed rewards, canceled rewards, review-required
      rewards, and disqualified referrals.
 
-115. Admin-only subscription interventions, internal test conversions, and support adjustments MUST NOT emit referral
+116. Admin-only subscription interventions, internal test conversions, and support adjustments MUST NOT emit referral
      rewards or Impact referral conversions unless explicitly marked as eligible by an authorized operator.
 
 ### Existing Internal Referral System
 
-116. The existing internal referral-code system MUST NOT grant additional KiloClaw referral rewards for conversions already
+117. The existing internal referral-code system MUST NOT grant additional KiloClaw referral rewards for conversions already
      governed by this spec.
 
-117. Before launch, the existing internal referral system MUST be scoped away from KiloClaw, disabled for KiloClaw, or
+118. Before launch, the existing internal referral system MUST be scoped away from KiloClaw, disabled for KiloClaw, or
      migrated into this program's rules to prevent double rewards.
 
 ## Error Handling

@@ -57,6 +57,11 @@ prevention.
 This integration applies only to personal KiloClaw subscriptions. Organization-scoped KiloClaw instances are not
 eligible for affiliate tracking.
 
+For KiloClaw conversions that are also governed by `.specs/kiloclaw-referrals.md`, that referral spec's
+conversion-time referral-priority rules override this document's default first-touch affiliate behavior for the initial
+paid conversion decision. This document remains authoritative for Impact Performance event shapes, delivery sequencing,
+and affiliate renewal reporting after the winning attribution has been established.
+
 ## Rules
 
 ### Affiliate Attribution

@@ -1,0 +1,526 @@
+import 'server-only';
+
+import { createHash } from 'crypto';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import {
+  buildImpactAdvocateRegisterParticipantPayload,
+  isImpactAdvocateConfigured,
+  sendImpactAdvocateRegisterParticipantPayload,
+  type ImpactAdvocateRegisterParticipantPayload,
+} from '@/lib/impact-advocate';
+import type {
+  ParsedImpactAffiliateTouch,
+  ParsedImpactReferralTouch,
+} from '@/lib/impact-referral-utils';
+import {
+  deleted_user_email_tombstones,
+  impact_advocate_participants,
+  impact_advocate_registration_attempts,
+  kiloclaw_attribution_touches,
+  type User,
+} from '@kilocode/db/schema';
+import {
+  ImpactAdvocateAttemptDeliveryState,
+  ImpactAdvocateRegistrationState,
+  KiloClawAttributionTouchProvider,
+  KiloClawAttributionTouchType,
+} from '@kilocode/db/schema-types';
+import { and, asc, eq, lte, or, sql } from 'drizzle-orm';
+
+type DatabaseClient = typeof db | DrizzleTransaction;
+
+type AttributionActor = {
+  userId?: string | null;
+  anonymousId?: string | null;
+};
+
+export type ImpactAdvocateRegistrationDispatchSummary = {
+  claimed: number;
+  delivered: number;
+  retried: number;
+  failed: number;
+};
+
+function getDatabaseClient(database?: DatabaseClient): DatabaseClient {
+  return database ?? db;
+}
+
+function buildHashedDedupeKey(parts: Array<string | null | undefined>): string {
+  const normalized = parts.map(part => part?.trim() ?? '').join('|');
+  return createHash('sha256').update(normalized, 'utf8').digest('hex');
+}
+
+function touchMinuteBucket(touchedAt: Date): string {
+  return touchedAt.toISOString().slice(0, 16);
+}
+
+function touchIdentity(actor: AttributionActor): string {
+  if (actor.userId) return `user:${actor.userId}`;
+  if (actor.anonymousId) return `anon:${actor.anonymousId}`;
+  return 'anonymous:missing';
+}
+
+function isImpactAdvocateRegisterParticipantPayload(
+  value: Record<string, unknown> | null
+): value is ImpactAdvocateRegisterParticipantPayload {
+  if (!value) {
+    return false;
+  }
+
+  return (
+    typeof value.id === 'string' &&
+    typeof value.accountId === 'string' &&
+    typeof value.programId === 'string' &&
+    typeof value.email === 'string' &&
+    typeof value.cookies === 'string' &&
+    (value.locale === undefined || typeof value.locale === 'string') &&
+    (value.countryCode === undefined || typeof value.countryCode === 'string')
+  );
+}
+
+export function hashNormalizedEmailForDeletionTombstone(normalizedEmail: string): string {
+  return createHash('sha256').update(normalizedEmail.trim().toLowerCase(), 'utf8').digest('hex');
+}
+
+export async function recordImpactAffiliateTouch(params: {
+  database?: DatabaseClient;
+  userId?: string | null;
+  anonymousId?: string | null;
+  touch: ParsedImpactAffiliateTouch;
+}): Promise<void> {
+  const database = getDatabaseClient(params.database);
+  const dedupeKey = buildHashedDedupeKey([
+    touchIdentity(params),
+    KiloClawAttributionTouchType.Affiliate,
+    KiloClawAttributionTouchProvider.ImpactPerformance,
+    params.touch.trackingId,
+    params.touch.landingPath,
+    touchMinuteBucket(params.touch.touchedAt),
+  ]);
+
+  await database
+    .insert(kiloclaw_attribution_touches)
+    .values({
+      dedupe_key: dedupeKey,
+      anonymous_id: params.anonymousId ?? null,
+      user_id: params.userId ?? null,
+      touch_type: KiloClawAttributionTouchType.Affiliate,
+      provider: KiloClawAttributionTouchProvider.ImpactPerformance,
+      opaque_tracking_value: params.touch.trackingId,
+      tracking_value_length: params.touch.trackingValueLength,
+      is_tracking_value_accepted: params.touch.isTrackingValueAccepted,
+      im_ref: params.touch.trackingId,
+      landing_path: params.touch.landingPath,
+      utm_source: params.touch.utmSource,
+      utm_medium: params.touch.utmMedium,
+      utm_campaign: params.touch.utmCampaign,
+      utm_term: params.touch.utmTerm,
+      utm_content: params.touch.utmContent,
+      touched_at: params.touch.touchedAt.toISOString(),
+      expires_at: params.touch.expiresAt.toISOString(),
+    })
+    .onConflictDoNothing({ target: [kiloclaw_attribution_touches.dedupe_key] });
+}
+
+export async function recordImpactReferralTouch(params: {
+  database?: DatabaseClient;
+  userId?: string | null;
+  anonymousId?: string | null;
+  touch: ParsedImpactReferralTouch;
+}): Promise<void> {
+  const database = getDatabaseClient(params.database);
+  const dedupeKey = buildHashedDedupeKey([
+    touchIdentity(params),
+    KiloClawAttributionTouchType.Referral,
+    KiloClawAttributionTouchProvider.ImpactAdvocate,
+    params.touch.opaqueTrackingValue,
+    params.touch.rsCode,
+    params.touch.landingPath,
+    touchMinuteBucket(params.touch.touchedAt),
+  ]);
+
+  await database
+    .insert(kiloclaw_attribution_touches)
+    .values({
+      dedupe_key: dedupeKey,
+      anonymous_id: params.anonymousId ?? null,
+      user_id: params.userId ?? null,
+      touch_type: KiloClawAttributionTouchType.Referral,
+      provider: KiloClawAttributionTouchProvider.ImpactAdvocate,
+      opaque_tracking_value: params.touch.opaqueTrackingValue,
+      tracking_value_length: params.touch.trackingValueLength,
+      is_tracking_value_accepted: params.touch.isTrackingValueAccepted,
+      rs_code: params.touch.rsCode,
+      rs_share_medium: params.touch.rsShareMedium,
+      rs_engagement_medium: params.touch.rsEngagementMedium,
+      landing_path: params.touch.landingPath,
+      utm_source: params.touch.utmSource,
+      utm_medium: params.touch.utmMedium,
+      utm_campaign: params.touch.utmCampaign,
+      utm_term: params.touch.utmTerm,
+      utm_content: params.touch.utmContent,
+      touched_at: params.touch.touchedAt.toISOString(),
+      expires_at: params.touch.expiresAt.toISOString(),
+    })
+    .onConflictDoNothing({ target: [kiloclaw_attribution_touches.dedupe_key] });
+}
+
+export async function ensureImpactAdvocateParticipantProfile(params: {
+  database?: DatabaseClient;
+  user: Pick<User, 'id' | 'google_user_email'>;
+  locale?: string | null;
+  countryCode?: string | null;
+  opaqueReferralIdentifier?: string | null;
+}): Promise<{ id: string }> {
+  const database = getDatabaseClient(params.database);
+
+  const [insertedParticipant] = await database
+    .insert(impact_advocate_participants)
+    .values({
+      user_id: params.user.id,
+      advocate_id: params.user.id,
+      advocate_account_id: params.user.id,
+      opaque_referral_identifier: params.opaqueReferralIdentifier ?? null,
+      contact_email: params.user.google_user_email,
+      locale: params.locale ?? null,
+      country_code: params.countryCode ?? null,
+      registration_state: isImpactAdvocateConfigured()
+        ? ImpactAdvocateRegistrationState.Pending
+        : ImpactAdvocateRegistrationState.Failed,
+      last_error_code: isImpactAdvocateConfigured() ? null : 'missing_configuration',
+      last_error_message: isImpactAdvocateConfigured()
+        ? null
+        : 'Impact Advocate configuration is incomplete',
+    })
+    .onConflictDoNothing({ target: [impact_advocate_participants.user_id] })
+    .returning({ id: impact_advocate_participants.id });
+
+  const participant =
+    insertedParticipant ??
+    (await database.query.impact_advocate_participants.findFirst({
+      where: eq(impact_advocate_participants.user_id, params.user.id),
+      columns: { id: true },
+    }));
+
+  if (!participant) {
+    throw new Error(`Impact Advocate participant missing for user ${params.user.id}`);
+  }
+
+  await database
+    .update(impact_advocate_participants)
+    .set({
+      advocate_id: params.user.id,
+      advocate_account_id: params.user.id,
+      contact_email: params.user.google_user_email,
+      locale: params.locale ?? null,
+      country_code: params.countryCode ?? null,
+      ...(params.opaqueReferralIdentifier
+        ? { opaque_referral_identifier: params.opaqueReferralIdentifier }
+        : {}),
+    })
+    .where(eq(impact_advocate_participants.id, participant.id));
+
+  return { id: participant.id };
+}
+
+export async function queueImpactAdvocateParticipantRegistration(params: {
+  database?: DatabaseClient;
+  user: Pick<User, 'id' | 'google_user_email'>;
+  referralTouch: ParsedImpactReferralTouch;
+  locale?: string | null;
+  countryCode?: string | null;
+}): Promise<void> {
+  if (!params.referralTouch.opaqueTrackingValue) {
+    return;
+  }
+
+  const database = getDatabaseClient(params.database);
+  const payload = buildImpactAdvocateRegisterParticipantPayload({
+    user: params.user,
+    referralCookieValue: params.referralTouch.opaqueTrackingValue,
+    locale: params.locale,
+    countryCode: params.countryCode,
+  });
+  const nowIso = new Date().toISOString();
+  const participant = await ensureImpactAdvocateParticipantProfile({
+    database,
+    user: params.user,
+    locale: params.locale,
+    countryCode: params.countryCode,
+  });
+
+  await database
+    .update(impact_advocate_participants)
+    .set({
+      registration_state: isImpactAdvocateConfigured()
+        ? ImpactAdvocateRegistrationState.Pending
+        : ImpactAdvocateRegistrationState.Failed,
+      last_error_code: isImpactAdvocateConfigured() ? null : 'missing_configuration',
+      last_error_message: isImpactAdvocateConfigured()
+        ? null
+        : 'Impact Advocate configuration is incomplete',
+      last_registration_attempt_at: nowIso,
+    })
+    .where(eq(impact_advocate_participants.id, participant.id));
+
+  const attemptDedupeKey = buildHashedDedupeKey([
+    'impact-advocate-registration',
+    params.user.id,
+    params.referralTouch.opaqueTrackingValue,
+  ]);
+
+  await database
+    .insert(impact_advocate_registration_attempts)
+    .values({
+      participant_id: participant.id,
+      dedupe_key: attemptDedupeKey,
+      opaque_cookie_value: params.referralTouch.opaqueTrackingValue,
+      cookie_value_length: params.referralTouch.trackingValueLength,
+      delivery_state: isImpactAdvocateConfigured()
+        ? ImpactAdvocateAttemptDeliveryState.Queued
+        : ImpactAdvocateAttemptDeliveryState.Failed,
+      request_payload: payload satisfies Record<string, unknown>,
+      response_payload: isImpactAdvocateConfigured()
+        ? null
+        : ({ error: 'missing_configuration' } satisfies Record<string, unknown>),
+      response_status_code: isImpactAdvocateConfigured() ? null : 503,
+    })
+    .onConflictDoNothing({ target: [impact_advocate_registration_attempts.dedupe_key] });
+}
+
+export async function createDeletedUserEmailTombstone(params: {
+  database?: DatabaseClient;
+  normalizedEmail: string | null;
+}): Promise<void> {
+  if (!params.normalizedEmail) {
+    return;
+  }
+
+  const database = getDatabaseClient(params.database);
+  await database
+    .insert(deleted_user_email_tombstones)
+    .values({
+      normalized_email_hash: hashNormalizedEmailForDeletionTombstone(params.normalizedEmail),
+    })
+    .onConflictDoNothing({ target: [deleted_user_email_tombstones.normalized_email_hash] });
+}
+
+export function localeFromHeaders(headers?: Headers): string | null {
+  const acceptLanguage = headers?.get('accept-language')?.trim();
+  if (!acceptLanguage) return null;
+  return acceptLanguage.split(',')[0]?.trim() || null;
+}
+
+export function countryCodeFromHeaders(headers?: Headers): string | null {
+  const countryCode = headers?.get('x-vercel-ip-country')?.trim();
+  return countryCode ? countryCode : null;
+}
+
+function registrationBackoffDelayMs(attemptCount: number): number {
+  const maxDelayMs = 60 * 60 * 1000;
+  const initialDelayMs = 60 * 1000;
+  return Math.min(initialDelayMs * 2 ** Math.max(attemptCount, 0), maxDelayMs);
+}
+
+function nextRegistrationRetryAt(attemptCount: number): string {
+  return new Date(Date.now() + registrationBackoffDelayMs(attemptCount)).toISOString();
+}
+
+async function dispatchImpactAdvocateRegistrationAttemptById(
+  attemptId: string
+): Promise<'delivered' | 'retried' | 'failed'> {
+  const attempt = await db.query.impact_advocate_registration_attempts.findFirst({
+    where: eq(impact_advocate_registration_attempts.id, attemptId),
+  });
+  if (!attempt) {
+    return 'failed';
+  }
+
+  const participant = await db.query.impact_advocate_participants.findFirst({
+    where: eq(impact_advocate_participants.id, attempt.participant_id),
+  });
+  if (!participant) {
+    return 'failed';
+  }
+
+  const payload = attempt.request_payload;
+  if (!isImpactAdvocateRegisterParticipantPayload(payload)) {
+    const failedAt = new Date().toISOString();
+    await db.transaction(async tx => {
+      await tx
+        .update(impact_advocate_registration_attempts)
+        .set({
+          delivery_state: ImpactAdvocateAttemptDeliveryState.Failed,
+          attempt_count: attempt.attempt_count + 1,
+          next_retry_at: null,
+          claimed_at: failedAt,
+          response_payload: {
+            error: 'missing_request_payload',
+          } satisfies Record<string, unknown>,
+        })
+        .where(eq(impact_advocate_registration_attempts.id, attempt.id));
+
+      await tx
+        .update(impact_advocate_participants)
+        .set({
+          registration_state: ImpactAdvocateRegistrationState.Failed,
+          last_error_code: 'missing_request_payload',
+          last_error_message: 'Impact Advocate registration attempt is missing request_payload',
+          last_registration_attempt_at: failedAt,
+        })
+        .where(eq(impact_advocate_participants.id, participant.id));
+    });
+    return 'failed';
+  }
+
+  const sendingAt = new Date().toISOString();
+  await db
+    .update(impact_advocate_registration_attempts)
+    .set({
+      delivery_state: ImpactAdvocateAttemptDeliveryState.Sending,
+      claimed_at: sendingAt,
+    })
+    .where(eq(impact_advocate_registration_attempts.id, attempt.id));
+
+  const result = await sendImpactAdvocateRegisterParticipantPayload(payload);
+  const attemptCount = attempt.attempt_count + 1;
+  const completedAt = new Date().toISOString();
+
+  if (result.ok) {
+    await db.transaction(async tx => {
+      await tx
+        .update(impact_advocate_registration_attempts)
+        .set({
+          delivery_state: ImpactAdvocateAttemptDeliveryState.Succeeded,
+          attempt_count: attemptCount,
+          next_retry_at: null,
+          claimed_at: completedAt,
+          response_status_code: result.statusCode ?? null,
+          response_payload: {
+            responseBody: result.responseBody ?? null,
+          } satisfies Record<string, unknown>,
+        })
+        .where(eq(impact_advocate_registration_attempts.id, attempt.id));
+
+      await tx
+        .update(impact_advocate_participants)
+        .set({
+          registration_state: ImpactAdvocateRegistrationState.Registered,
+          registered_at: completedAt,
+          last_registration_attempt_at: completedAt,
+          last_error_code: null,
+          last_error_message: null,
+        })
+        .where(eq(impact_advocate_participants.id, participant.id));
+    });
+    return 'delivered';
+  }
+
+  const isTerminalFailure = result.failureKind === 'http_4xx';
+  if (isTerminalFailure) {
+    console.error('[impact-referral] Impact Advocate participant registration failed permanently', {
+      attemptId: attempt.id,
+      participantId: participant.id,
+      userId: participant.user_id,
+      statusCode: result.statusCode ?? null,
+      failureKind: result.failureKind,
+    });
+  }
+
+  await db.transaction(async tx => {
+    await tx
+      .update(impact_advocate_registration_attempts)
+      .set({
+        delivery_state: ImpactAdvocateAttemptDeliveryState.Failed,
+        attempt_count: attemptCount,
+        next_retry_at: isTerminalFailure ? null : nextRegistrationRetryAt(attemptCount),
+        claimed_at: completedAt,
+        response_status_code: result.statusCode ?? null,
+        response_payload: {
+          failureKind: result.failureKind,
+          responseBody: result.responseBody ?? null,
+          error: result.error ?? null,
+        } satisfies Record<string, unknown>,
+      })
+      .where(eq(impact_advocate_registration_attempts.id, attempt.id));
+
+    await tx
+      .update(impact_advocate_participants)
+      .set({
+        registration_state: isTerminalFailure
+          ? ImpactAdvocateRegistrationState.Failed
+          : ImpactAdvocateRegistrationState.Retrying,
+        last_registration_attempt_at: completedAt,
+        last_error_code: isTerminalFailure ? 'http_4xx' : result.failureKind,
+        last_error_message:
+          result.error ??
+          (result.statusCode
+            ? `Impact Advocate registration failed with status ${result.statusCode}`
+            : 'Impact Advocate registration failed'),
+      })
+      .where(eq(impact_advocate_participants.id, participant.id));
+  });
+
+  return isTerminalFailure ? 'failed' : 'retried';
+}
+
+export async function dispatchQueuedImpactAdvocateRegistrationAttempts(params?: {
+  limit?: number;
+}): Promise<ImpactAdvocateRegistrationDispatchSummary> {
+  const limit = params?.limit ?? 100;
+  const nowIso = new Date().toISOString();
+  const rows = await db
+    .select({ id: impact_advocate_registration_attempts.id })
+    .from(impact_advocate_registration_attempts)
+    .innerJoin(
+      impact_advocate_participants,
+      eq(impact_advocate_participants.id, impact_advocate_registration_attempts.participant_id)
+    )
+    .where(
+      or(
+        eq(
+          impact_advocate_registration_attempts.delivery_state,
+          ImpactAdvocateAttemptDeliveryState.Queued
+        ),
+        and(
+          eq(
+            impact_advocate_participants.registration_state,
+            ImpactAdvocateRegistrationState.Retrying
+          ),
+          eq(
+            impact_advocate_registration_attempts.delivery_state,
+            ImpactAdvocateAttemptDeliveryState.Failed
+          ),
+          or(
+            sql`${impact_advocate_registration_attempts.next_retry_at} IS NULL`,
+            lte(impact_advocate_registration_attempts.next_retry_at, nowIso)
+          )
+        )
+      )
+    )
+    .orderBy(
+      asc(impact_advocate_registration_attempts.created_at),
+      asc(impact_advocate_registration_attempts.id)
+    )
+    .limit(limit);
+
+  const summary: ImpactAdvocateRegistrationDispatchSummary = {
+    claimed: rows.length,
+    delivered: 0,
+    retried: 0,
+    failed: 0,
+  };
+
+  for (const row of rows) {
+    const outcome = await dispatchImpactAdvocateRegistrationAttemptById(row.id);
+    if (outcome === 'delivered') {
+      summary.delivered++;
+    } else if (outcome === 'retried') {
+      summary.retried++;
+    } else {
+      summary.failed++;
+    }
+  }
+
+  return summary;
+}

@@ -1140,11 +1140,19 @@ describe('credit renewal sweep affiliate tracking', () => {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });
-        case 'enqueue_affiliate_event':
-          return new Response(JSON.stringify({ enqueued: true }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          });
+        case 'process_paid_conversion':
+          return new Response(
+            JSON.stringify({
+              affiliateSaleEnqueued: true,
+              winningTouchType: 'affiliate',
+              conversionId: null,
+              disqualificationReason: null,
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }
+          );
         default:
           throw new Error(`Unexpected side effect action: ${body.action}`);
       }
@@ -1195,14 +1203,12 @@ describe('credit renewal sweep affiliate tracking', () => {
             input: Record<string, unknown>;
           }
       )
-      .find(call => call.action === 'enqueue_affiliate_event');
+      .find(call => call.action === 'process_paid_conversion');
 
     expect(saleCall).toEqual({
-      action: 'enqueue_affiliate_event',
+      action: 'process_paid_conversion',
       input: {
         userId: 'user-1',
-        provider: 'impact',
-        eventType: 'sale',
         dedupeKey: 'affiliate:impact:sale:kiloclaw-subscription:instance-1:2026-04',
         eventDateIso: renewalAt,
         orderId: 'kiloclaw-subscription:instance-1:2026-04',
@@ -1264,11 +1270,19 @@ describe('credit renewal sweep affiliate tracking', () => {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });
-        case 'enqueue_affiliate_event':
-          return new Response(JSON.stringify({ enqueued: true }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          });
+        case 'process_paid_conversion':
+          return new Response(
+            JSON.stringify({
+              affiliateSaleEnqueued: true,
+              winningTouchType: 'affiliate',
+              conversionId: null,
+              disqualificationReason: null,
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }
+          );
         default:
           throw new Error(`Unexpected side effect action: ${body.action}`);
       }
@@ -1308,11 +1322,9 @@ describe('credit renewal sweep affiliate tracking', () => {
         },
       },
       {
-        action: 'enqueue_affiliate_event',
+        action: 'process_paid_conversion',
         input: {
           userId: 'user-1',
-          provider: 'impact',
-          eventType: 'sale',
           dedupeKey: 'affiliate:impact:sale:kiloclaw-subscription:instance-1:2026-04',
           eventDateIso: renewalAt,
           orderId: 'kiloclaw-subscription:instance-1:2026-04',

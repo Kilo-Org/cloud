@@ -25,6 +25,7 @@ import { after } from 'next/server';
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import { client as stripe } from '@/lib/stripe-client';
 import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
+import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
 import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -1505,24 +1506,38 @@ export async function handleKiloClawInvoicePaid(params: {
         invoice.status_transitions?.paid_at != null
           ? new Date(invoice.status_transitions.paid_at * 1000)
           : new Date();
-      await enqueueAffiliateEventForUser({
+      const conversionDisposition = await processPersonalKiloClawPaidConversion({
         userId: metadata.kiloUserId,
-        provider: 'impact',
-        eventType: 'sale',
-        dedupeKey: buildAffiliateEventDedupeKey({
-          provider: 'impact',
-          eventType: 'sale',
-          entityId: invoice.id,
-        }),
+        sourcePaymentId: invoice.id,
         orderId: invoice.id,
         amount: invoice.amount_paid / 100,
         currencyCode: invoice.currency ?? 'usd',
-        eventDate,
+        convertedAt: eventDate,
         itemCategory: getImpactItemCategory(plan),
         itemName: getImpactItemName(plan),
         itemSku: matchingPriceId,
-        stripeChargeId: chargeId,
       });
+
+      if (conversionDisposition.shouldEnqueueAffiliateSale) {
+        await enqueueAffiliateEventForUser({
+          userId: metadata.kiloUserId,
+          provider: 'impact',
+          eventType: 'sale',
+          dedupeKey: buildAffiliateEventDedupeKey({
+            provider: 'impact',
+            eventType: 'sale',
+            entityId: invoice.id,
+          }),
+          orderId: invoice.id,
+          amount: invoice.amount_paid / 100,
+          currencyCode: invoice.currency ?? 'usd',
+          eventDate,
+          itemCategory: getImpactItemCategory(plan),
+          itemName: getImpactItemName(plan),
+          itemSku: matchingPriceId,
+          stripeChargeId: chargeId,
+        });
+      }
     } catch (error) {
       logWarning('Affiliate sale enqueue failed', {
         stripe_event_id: eventId,

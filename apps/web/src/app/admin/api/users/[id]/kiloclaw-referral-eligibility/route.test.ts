@@ -1,0 +1,160 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+
+import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
+import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
+import { getUserFromAuth } from '@/lib/user.server';
+
+jest.mock('@/lib/user.server', () => ({
+  getUserFromAuth: jest.fn(),
+}));
+
+jest.mock('@/lib/kiloclaw/current-personal-subscription', () => ({
+  resolveCurrentPersonalSubscriptionRow: jest.fn(),
+}));
+
+jest.mock('@/lib/kiloclaw-referrals', () => ({
+  processPersonalKiloClawPaidConversion: jest.fn(),
+}));
+
+jest.mock('@kilocode/db', () => ({
+  insertKiloClawSubscriptionChangeLog: jest.fn(),
+}));
+
+import { POST } from './route';
+
+const mockGetUserFromAuth = jest.mocked(getUserFromAuth);
+const mockResolveCurrentPersonalSubscriptionRow = jest.mocked(
+  resolveCurrentPersonalSubscriptionRow
+);
+const mockProcessPersonalKiloClawPaidConversion = jest.mocked(
+  processPersonalKiloClawPaidConversion
+);
+const mockInsertKiloClawSubscriptionChangeLog = jest.mocked(insertKiloClawSubscriptionChangeLog);
+
+function createRequest(body: unknown) {
+  return new NextRequest(
+    'http://localhost:3000/admin/api/users/user_123/kiloclaw-referral-eligibility',
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: {
+        'content-type': 'application/json',
+      },
+    }
+  );
+}
+
+describe('POST /admin/api/users/[id]/kiloclaw-referral-eligibility', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetUserFromAuth.mockResolvedValue({
+      user: { id: 'admin_123' } as never,
+      authFailedResponse: null,
+    });
+    mockResolveCurrentPersonalSubscriptionRow.mockResolvedValue({
+      subscription: {
+        id: 'subscription_123',
+        user_id: 'user_123',
+        plan: 'standard',
+        status: 'active',
+      },
+    } as never);
+    mockInsertKiloClawSubscriptionChangeLog.mockResolvedValue(undefined);
+    mockProcessPersonalKiloClawPaidConversion.mockResolvedValue({
+      shouldEnqueueAffiliateSale: false,
+      winningTouchType: 'referral',
+      conversionId: 'conversion_123',
+      disqualificationReason: null,
+    });
+  });
+
+  it('returns authFailedResponse for unauthorized operators', async () => {
+    mockGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) as never,
+    });
+
+    const response = await POST(createRequest({}), { params: Promise.resolve({ id: 'user_123' }) });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+  });
+
+  it('records an admin override and processes the conversion with overrideEligible=true', async () => {
+    const response = await POST(
+      createRequest({
+        sourcePaymentId: 'invoice_123',
+        orderId: 'invoice_123',
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+        convertedAt: '2026-04-09T00:00:00.000Z',
+        sourceType: 'manual_adjustment',
+      }),
+      { params: Promise.resolve({ id: 'user_123' }) }
+    );
+
+    expect(mockInsertKiloClawSubscriptionChangeLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        subscriptionId: 'subscription_123',
+        actor: {
+          actorType: 'user',
+          actorId: 'admin_123',
+        },
+        action: 'admin_override',
+        reason: 'referral_eligibility_override:manual_adjustment:invoice_123',
+      })
+    );
+
+    expect(mockProcessPersonalKiloClawPaidConversion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user_123',
+        sourcePaymentId: 'invoice_123',
+        qualificationContext: {
+          sourceType: 'manual_adjustment',
+          overrideEligible: true,
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      disposition: {
+        shouldEnqueueAffiliateSale: false,
+        winningTouchType: 'referral',
+        conversionId: 'conversion_123',
+        disqualificationReason: null,
+      },
+    });
+  });
+
+  it('returns 409 when no current personal subscription exists for the override target', async () => {
+    mockResolveCurrentPersonalSubscriptionRow.mockResolvedValue(null);
+
+    const response = await POST(
+      createRequest({
+        sourcePaymentId: 'invoice_123',
+        orderId: 'invoice_123',
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        convertedAt: '2026-04-09T00:00:00.000Z',
+        sourceType: 'test',
+      }),
+      { params: Promise.resolve({ id: 'user_123' }) }
+    );
+
+    expect(mockInsertKiloClawSubscriptionChangeLog).not.toHaveBeenCalled();
+    expect(mockProcessPersonalKiloClawPaidConversion).not.toHaveBeenCalled();
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: 'No current personal KiloClaw subscription found for referral override',
+    });
+  });
+});

@@ -55,6 +55,7 @@ import {
   handleKiloClawInvoicePaid,
 } from '@/lib/kiloclaw/stripe-handlers';
 import { enqueueImpactSaleReversalForCharge } from '@/lib/affiliate-events';
+import { markPersonalKiloClawReferralPaymentAdverse } from '@/lib/kiloclaw-referrals';
 import { invoiceLooksLikeKiloClawByPriceId } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import {
   STRIPE_TEAMS_MONTHLY_PRICE_ID,
@@ -66,16 +67,23 @@ import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organiz
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 import { successResult } from '@/lib/maybe-result';
 
-async function isKiloClawCharge(chargeId: string): Promise<boolean> {
-  // The `invoice` field is present at runtime on charges but removed from newer
-  // Stripe TypeScript definitions. Read the response as a structural type.
-  // Errors (Stripe outage, network) propagate so the webhook returns non-2xx and
-  // Stripe retries delivery — avoids both silent drops and false backlog.
+type KiloClawChargeContext = {
+  chargeId: string;
+  invoiceId: string;
+};
+
+async function getKiloClawChargeContext(chargeId: string): Promise<KiloClawChargeContext | null> {
   const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
     await client.charges.retrieve(chargeId, { expand: ['invoice'] });
   const invoice = charge.invoice;
-  if (!invoice || typeof invoice === 'string') return false;
-  return invoiceLooksLikeKiloClawByPriceId(invoice);
+  if (!invoice || typeof invoice === 'string' || !invoiceLooksLikeKiloClawByPriceId(invoice)) {
+    return null;
+  }
+
+  return {
+    chargeId,
+    invoiceId: invoice.id,
+  };
 }
 
 if (!APP_URL) throw new Error('APP_URL constant is not set');
@@ -786,20 +794,63 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
-      // Only enqueue reversals for KiloClaw charges — those are the only ones
-      // that produce affiliate sale events. Non-KiloClaw disputes (Kilo Pass,
-      // top-ups, etc.) would otherwise accumulate in pending_impact_sale_reversals
-      // forever because they will never have a matching sale row.
-      if (!(await isKiloClawCharge(chargeId))) {
+      const kiloClawCharge = await getKiloClawChargeContext(chargeId);
+      if (!kiloClawCharge) {
         break;
       }
 
       await enqueueImpactSaleReversalForCharge({
-        stripeChargeId: chargeId,
+        stripeChargeId: kiloClawCharge.chargeId,
         disputeId: dispute.id,
         amount: dispute.amount / 100,
         currency: dispute.currency,
         eventDate: new Date(dispute.created * 1000),
+      });
+      await markPersonalKiloClawReferralPaymentAdverse({
+        sourcePaymentId: kiloClawCharge.invoiceId,
+        reason: 'chargeback',
+        occurredAt: new Date(dispute.created * 1000),
+      });
+      break;
+    }
+
+    case 'charge.refunded': {
+      const charge = event.data.object;
+      if (charge.amount_refunded <= 0) {
+        break;
+      }
+
+      const kiloClawCharge = await getKiloClawChargeContext(charge.id);
+      if (!kiloClawCharge) {
+        break;
+      }
+
+      await markPersonalKiloClawReferralPaymentAdverse({
+        sourcePaymentId: kiloClawCharge.invoiceId,
+        reason: 'refund',
+        occurredAt: new Date(charge.created * 1000),
+      });
+      break;
+    }
+
+    case 'charge.updated': {
+      const charge = event.data.object;
+      const isFraudMarked =
+        charge.fraud_details?.user_report === 'fraudulent' ||
+        charge.fraud_details?.stripe_report === 'fraudulent';
+      if (!isFraudMarked) {
+        break;
+      }
+
+      const kiloClawCharge = await getKiloClawChargeContext(charge.id);
+      if (!kiloClawCharge) {
+        break;
+      }
+
+      await markPersonalKiloClawReferralPaymentAdverse({
+        sourcePaymentId: kiloClawCharge.invoiceId,
+        reason: 'fraud',
+        occurredAt: new Date(charge.created * 1000),
       });
       break;
     }

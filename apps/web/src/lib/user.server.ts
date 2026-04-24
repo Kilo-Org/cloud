@@ -4,7 +4,7 @@ import { validateAuthorizationHeader, JWT_TOKEN_VERSION } from './tokens';
 import { NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 
-import type { CreateOrUpdateUserArgs } from './user';
+import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from './user';
 import { findUserById, createOrUpdateUser, findAndSyncExistingUser } from './user';
 import { db, readDb } from '@/lib/drizzle';
 import type {
@@ -30,6 +30,11 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
 import { IMPACT_CLICK_ID_COOKIE } from '@/lib/impact-affiliate-utils';
+import { countryCodeFromHeaders, localeFromHeaders } from '@/lib/impact-referral';
+import {
+  parseImpactAffiliateTouchFromUrl,
+  parseImpactReferralTouchFromUrl,
+} from '@/lib/impact-referral-utils';
 import { isOrganizationHardLocked } from '@/lib/organizations/trial-utils';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
 import { secondsInDay } from 'date-fns/constants';
@@ -403,10 +408,12 @@ async function getSignInRedirectContext(): Promise<SignInRedirectContext> {
   return parseSignInRedirectContext(raw);
 }
 
-async function getAffiliateTrackingIdFromAuthFlow(): Promise<string | null> {
+async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): Promise<{
+  affiliateTrackingId: string | null;
+  trackingContext: CreateOrUpdateUserTrackingContext;
+}> {
   const cookieStore = await cookies();
 
-  // Prefer im_ref from the callback URL (explicitly passed through the auth flow)
   const callbackUrlCookie =
     cookieStore.get('__Secure-next-auth.callback-url')?.value ??
     cookieStore.get('next-auth.callback-url')?.value;
@@ -414,17 +421,38 @@ async function getAffiliateTrackingIdFromAuthFlow(): Promise<string | null> {
   if (callbackUrlCookie) {
     try {
       const callbackUrl = new URL(callbackUrlCookie, 'http://localhost');
-      const imRef = callbackUrl.searchParams.get('im_ref')?.trim();
-      if (imRef) return imRef;
+      const affiliateTouch = parseImpactAffiliateTouchFromUrl(callbackUrl);
+      const referralTouch = parseImpactReferralTouchFromUrl(callbackUrl);
+
+      return {
+        affiliateTrackingId: affiliateTouch?.trackingId ?? null,
+        trackingContext: {
+          affiliateTouch,
+          referralTouch,
+          locale: localeFromHeaders(requestHeaders),
+          countryCode: countryCodeFromHeaders(requestHeaders),
+        },
+      };
     } catch {
       // fall through to cookie fallback
     }
   }
 
-  // Fall back to the shared parent-domain cookie written by kilo.ai. This is
-  // our bridge cookie for auth redirects, not the native IR_<campaignId> UTT
-  // cookie set by Impact itself.
-  return cookieStore.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null;
+  const cookieTrackingId = cookieStore.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null;
+  const fallbackUrl = new URL('http://localhost/users/after-sign-in');
+  const affiliateTouch = cookieTrackingId
+    ? parseImpactAffiliateTouchFromUrl(fallbackUrl, cookieTrackingId)
+    : null;
+
+  return {
+    affiliateTrackingId: cookieTrackingId,
+    trackingContext: {
+      affiliateTouch,
+      referralTouch: null,
+      locale: localeFromHeaders(requestHeaders),
+      countryCode: countryCodeFromHeaders(requestHeaders),
+    },
+  };
 }
 
 type ExtendedProfile = Profile & {
@@ -709,8 +737,10 @@ const authOptions: NextAuthOptions = {
         // For email (magic link) auth, we auto-link to existing users since magic link
         // is verified by email ownership
         const autoLinkToExistingUser = isEmailAuth || isFakeLogin;
-        const affiliateTrackingId =
-          !isAccountLinking && !isFakeLogin ? await getAffiliateTrackingIdFromAuthFlow() : null;
+        const { affiliateTrackingId, trackingContext } =
+          !isAccountLinking && !isFakeLogin
+            ? await getImpactTrackingContextFromAuthFlow(requestHeaders)
+            : { affiliateTrackingId: null, trackingContext: {} };
         const result =
           isAccountLinking && linkingSession
             ? whenOk(
@@ -722,7 +752,8 @@ const authOptions: NextAuthOptions = {
                 verifiedToken?.guid,
                 autoLinkToExistingUser,
                 requestHeaders,
-                affiliateTrackingId
+                affiliateTrackingId,
+                trackingContext
               );
 
         if (result.success === false) {

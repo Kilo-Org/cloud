@@ -9,6 +9,17 @@ import {
   IMPACT_CLICK_ID_COOKIE,
   resolveImpactAffiliateTrackingId,
 } from '@/lib/impact-affiliate-utils';
+import {
+  countryCodeFromHeaders,
+  localeFromHeaders,
+  queueImpactAdvocateParticipantRegistration,
+  recordImpactAffiliateTouch,
+  recordImpactReferralTouch,
+} from '@/lib/impact-referral';
+import {
+  parseImpactAffiliateTouchFromUrl,
+  parseImpactReferralTouchFromUrl,
+} from '@/lib/impact-referral-utils';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';
@@ -118,17 +129,69 @@ export async function GET(request: NextRequest) {
       request.cookies.get(IMPACT_APP_TRACKED_CLICK_ID_COOKIE)?.value?.trim() || null,
   });
 
+  const affiliateTouch = parseImpactAffiliateTouchFromUrl(url, affiliateTrackingId);
+  const referralTouch = parseImpactReferralTouchFromUrl(url);
+
+  if (user && affiliateTouch) {
+    try {
+      await recordImpactAffiliateTouch({
+        userId: user.id,
+        touch: affiliateTouch,
+      });
+    } catch (error) {
+      console.error('[after-sign-in] failed to record affiliate touch', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (user && referralTouch) {
+    try {
+      await recordImpactReferralTouch({
+        userId: user.id,
+        touch: referralTouch,
+      });
+    } catch (error) {
+      console.error('[after-sign-in] failed to record referral touch', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    try {
+      await queueImpactAdvocateParticipantRegistration({
+        user,
+        referralTouch,
+        locale: localeFromHeaders(request.headers),
+        countryCode: countryCodeFromHeaders(request.headers),
+      });
+    } catch (error) {
+      console.error('[after-sign-in] failed to enqueue Impact Advocate registration', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   if (user && affiliateTrackingId) {
     const existingAttribution = await getAffiliateAttribution(user.id, 'impact');
 
     if (!existingAttribution) {
-      await recordAffiliateAttributionAndQueueParentEvent({
-        userId: user.id,
-        provider: 'impact',
-        trackingId: affiliateTrackingId,
-        customerEmail: user.google_user_email,
-        eventDate: new Date(),
-      });
+      try {
+        await recordAffiliateAttributionAndQueueParentEvent({
+          userId: user.id,
+          provider: 'impact',
+          trackingId: affiliateTrackingId,
+          customerEmail: user.google_user_email,
+          eventDate: new Date(),
+        });
+      } catch (error) {
+        console.error('[after-sign-in] failed to persist affiliate attribution', {
+          userId: user.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 

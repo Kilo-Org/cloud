@@ -212,6 +212,20 @@ type SideEffectRequest =
       };
     }
   | {
+      action: 'process_paid_conversion';
+      input: {
+        userId: string;
+        dedupeKey: string;
+        eventDateIso: string;
+        orderId: string;
+        amount: number;
+        currencyCode: string;
+        itemCategory: string;
+        itemName: string;
+        itemSku?: string;
+      };
+    }
+  | {
       action: 'project_pending_kilo_pass_bonus';
       input: {
         userId: string;
@@ -232,9 +246,16 @@ type SideEffectResponse<T extends SideEffectRequest> = T['action'] extends 'send
       ? { repaired: boolean }
       : T['action'] extends 'enqueue_affiliate_event'
         ? { enqueued: boolean }
-        : T['action'] extends 'project_pending_kilo_pass_bonus'
-          ? { projectedBonusMicrodollars: number }
-          : { ok: true };
+        : T['action'] extends 'process_paid_conversion'
+          ? {
+              affiliateSaleEnqueued: boolean;
+              winningTouchType: 'referral' | 'affiliate' | 'none';
+              conversionId: string | null;
+              disqualificationReason: string | null;
+            }
+          : T['action'] extends 'project_pending_kilo_pass_bonus'
+            ? { projectedBonusMicrodollars: number }
+            : { ok: true };
 
 export class KiloClawApiError extends Error {
   readonly statusCode: number;
@@ -1004,6 +1025,32 @@ async function enqueueAffiliateEvent(
   );
 }
 
+async function processPaidConversion(
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  params: {
+    userId: string;
+    dedupeKey: string;
+    eventDateIso: string;
+    orderId: string;
+    amount: number;
+    currencyCode: string;
+    itemCategory: string;
+    itemName: string;
+    itemSku?: string;
+  }
+): Promise<void> {
+  await callBillingSideEffect(
+    env,
+    context,
+    {
+      action: 'process_paid_conversion',
+      input: params,
+    },
+    { userId: params.userId }
+  );
+}
+
 async function autoResumeIfSuspended(
   env: BillingWorkerEnv,
   database: WorkerDb,
@@ -1302,10 +1349,8 @@ async function processCreditRenewalRow(
     });
 
     if (!deductionIsNew) {
-      await enqueueAffiliateEvent(env, context, {
+      await processPaidConversion(env, context, {
         userId,
-        provider: 'impact',
-        eventType: 'sale',
         dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
         eventDateIso: renewalAt,
         orderId: deductionCategory,
@@ -1357,10 +1402,8 @@ async function processCreditRenewalRow(
       });
     }
 
-    await enqueueAffiliateEvent(env, context, {
+    await processPaidConversion(env, context, {
       userId,
-      provider: 'impact',
-      eventType: 'sale',
       dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
       eventDateIso: renewalAt,
       orderId: deductionCategory,

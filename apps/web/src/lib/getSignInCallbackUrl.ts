@@ -40,6 +40,22 @@ export default function getSignInCallbackUrl(searchParams?: NextAppSearchParams)
     callbackParams.set('im_ref', searchParams.im_ref);
   }
 
+  if (typeof searchParams?._saasquatch === 'string' && searchParams?._saasquatch) {
+    callbackParams.set('_saasquatch', searchParams._saasquatch);
+  }
+
+  if (typeof searchParams?.rsCode === 'string' && searchParams?.rsCode) {
+    callbackParams.set('rsCode', searchParams.rsCode);
+  }
+
+  if (typeof searchParams?.rsShareMedium === 'string' && searchParams?.rsShareMedium) {
+    callbackParams.set('rsShareMedium', searchParams.rsShareMedium);
+  }
+
+  if (typeof searchParams?.rsEngagementMedium === 'string' && searchParams?.rsEngagementMedium) {
+    callbackParams.set('rsEngagementMedium', searchParams.rsEngagementMedium);
+  }
+
   // Always route through /users/after-sign-in to ensure stytch verification check
   if (
     typeof searchParams?.callbackPath === 'string' &&

@@ -23,8 +23,8 @@
     ],
   },
   "migrations": [
-    { "tag": "v1", "new_classes": ["UserSessionDO"] },
-    { "tag": "v2", "new_classes": ["TicketDO"] },
+    { "tag": "v1", "new_sqlite_classes": ["UserSessionDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["TicketDO"] },
   ],
 
   "secrets_store_secrets": [

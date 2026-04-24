@@ -42,6 +42,7 @@ type MessageBubbleProps = {
   onAddReaction: (messageId: string, emoji: string) => void;
   onRemoveReaction: (messageId: string, emoji: string) => void;
   onExecuteAction: (messageId: string, groupId: string, value: string) => void;
+  actionPending?: boolean;
   currentUserId: string;
 };
 
@@ -58,6 +59,7 @@ export const MessageBubble = memo(function MessageBubble({
   onAddReaction,
   onRemoveReaction,
   onExecuteAction,
+  actionPending,
   currentUserId,
 }: MessageBubbleProps) {
   const { assistantName } = useKiloChatContext();
@@ -324,10 +326,11 @@ export const MessageBubble = memo(function MessageBubble({
                       {actionsBlock.actions.map(action => (
                         <button
                           key={action.value}
+                          disabled={actionPending}
                           onClick={() =>
                             onExecuteAction(message.id, actionsBlock.groupId, action.value)
                           }
-                          className={`rounded-md px-3 py-1 text-xs font-medium cursor-pointer transition-colors ${
+                          className={`rounded-md px-3 py-1 text-xs font-medium cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                             action.style === 'primary'
                               ? 'bg-green-600 hover:bg-green-700 text-white'
                               : action.style === 'danger'

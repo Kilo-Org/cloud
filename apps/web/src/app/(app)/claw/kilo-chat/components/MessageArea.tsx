@@ -362,6 +362,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
               onAddReaction={handleAddReaction}
               onRemoveReaction={handleRemoveReaction}
               onExecuteAction={handleExecuteAction}
+              actionPending={executeAction.isPending}
               currentUserId={currentUserId}
             />
           ))}

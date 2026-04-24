@@ -184,10 +184,7 @@ export function applyVercelSettings(
   }
 
   if (requestToMutate.body.providerOptions) {
-    const anthropicOptions = getAnthropicProviderOptionsForVercel(
-      requestedModel,
-      requestToMutate
-    );
+    const anthropicOptions = getAnthropicProviderOptionsForVercel(requestedModel, requestToMutate);
     if (anthropicOptions) {
       requestToMutate.body.providerOptions.anthropic = anthropicOptions;
     }

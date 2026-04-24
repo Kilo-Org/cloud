@@ -8,14 +8,14 @@ import type { Env } from './env';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { withDORetry } from '@kilocode/worker-utils';
-import { app } from './app';
 
 const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
 export class SessionIngestRPC extends WorkerEntrypoint<Env> {
   // Delegate HTTP requests to the Hono app so callers using the service
   // binding can `.fetch()` against this entrypoint (not just call RPC methods).
-  fetch(request: Request): Response | Promise<Response> {
+  async fetch(request: Request): Promise<Response> {
+    const { app } = await import('./app');
     return app.fetch(request, this.env, this.ctx);
   }
 

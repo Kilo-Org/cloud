@@ -4,6 +4,7 @@ import type { IngestQueueMessage } from './queue-consumer';
 export { SessionIngestDO } from './dos/SessionIngestDO';
 export { SessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 export { UserConnectionDO } from './dos/UserConnectionDO';
+export { SessionIngestRPC } from './session-ingest-rpc';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

@@ -398,8 +398,12 @@ export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
         ? rawType.data.type
         : undefined;
 
+    // Ack quickly then process in the background. The client (kiloclaw) has a
+    // short (~15s) timeout on webhook delivery; agent dispatch and approval
+    // resolution can easily exceed that on a cold machine. If we awaited
+    // completion before responding, the client would mark the message
+    // "delivery failed" even when the bot actually processed it.
     if (type === 'action.executed') {
-      // Resolve an approval via a button click in kilo-chat.
       const actionPayload = parseActionExecutedPayload(parsed);
       if (!actionPayload) {
         res.statusCode = 400;
@@ -407,18 +411,10 @@ export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
         res.end(JSON.stringify({ error: 'Invalid action payload' }));
         return true;
       }
-      try {
-        await handleActionExecuted(deps.api, actionPayload);
-      } catch (err) {
+      ackAccepted(res);
+      void handleActionExecuted(deps.api, actionPayload).catch(err => {
         console.error('[kilo-chat] action.executed failed:', err);
-        res.statusCode = 500;
-        res.setHeader('content-type', 'application/json');
-        res.end(JSON.stringify({ error: 'Action execution failed' }));
-        return true;
-      }
-      res.statusCode = 200;
-      res.setHeader('content-type', 'application/json');
-      res.end('{}');
+      });
       return true;
     }
 
@@ -439,19 +435,16 @@ export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
       return true;
     }
 
-    try {
-      await dispatchInbound(deps.api, payload);
-    } catch (err) {
+    ackAccepted(res);
+    void dispatchInbound(deps.api, payload).catch(err => {
       console.error('[kilo-chat] dispatch failed:', err);
-      res.statusCode = 500;
-      res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ error: 'Dispatch failed' }));
-      return true;
-    }
-
-    res.statusCode = 200;
-    res.setHeader('content-type', 'application/json');
-    res.end('{}');
+    });
     return true;
   };
+}
+
+function ackAccepted(res: ServerResponse): void {
+  res.statusCode = 202;
+  res.setHeader('content-type', 'application/json');
+  res.end('{}');
 }

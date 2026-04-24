@@ -29,6 +29,11 @@ describe('security headers', () => {
     expect(policy).toContain('https://api.churnkey.co');
     expect(policy).toContain('https://*.churnkey.co');
     expect(policy).toContain('https://www.gravatar.com');
+    expect(policy).toContain('https://secure.gravatar.com');
+    expect(policy).toContain('https://gravatar.com');
+    expect(policy).toContain('https://media.licdn.com');
+    expect(policy).toContain('https://cdn.discordapp.com');
+    expect(policy).toContain('https://gitlab.com');
     expect(policy).toContain('https://openrouter.ai');
     expect(policy).toContain('https://cdn.jsdelivr.net');
     expect(policy).toContain('https://unpkg.com');

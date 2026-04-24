@@ -962,8 +962,9 @@ app.all('*', async c => {
             { status: 503, headers: { 'Retry-After': '5' } }
           );
         }
+        const refreshedDoKey = refreshedInstance.doKey;
         const getRefreshedStub = () =>
-          c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(refreshedInstance.doKey!));
+          c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(refreshedDoKey));
         const refreshedRoutingTarget = await withDORetry(
           getRefreshedStub,
           stub => stub.getRoutingTarget(),
@@ -1135,8 +1136,9 @@ app.all('*', async c => {
           { status: 503, headers: { 'Retry-After': '5' } }
         );
       }
+      const refreshedHttpDoKey = refreshedInstance.doKey;
       const getRefreshedHttpStub = () =>
-        c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(refreshedInstance.doKey!));
+        c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(refreshedHttpDoKey));
       const refreshedRoutingTarget = await withDORetry(
         getRefreshedHttpStub,
         stub => stub.getRoutingTarget(),

@@ -40,10 +40,10 @@ export async function handleBotStatus(c: HonoCtx): Promise<Response> {
   }
 
   // When a conversationId is provided, verify it actually belongs to this sandbox.
-  if (parsed.data.conversationId) {
+  const conversationId = parsed.data.conversationId;
+  if (conversationId) {
     const info = await withDORetry(
-      () =>
-        c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(parsed.data.conversationId!)),
+      () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
       stub => stub.getInfo(),
       'ConversationDO.getInfo'
     );

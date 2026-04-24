@@ -272,6 +272,20 @@ export function isErrorUnknownRoute(error: unknown): boolean {
   );
 }
 
+function isMorningBriefingWarmupControllerError(error: unknown): boolean {
+  if (!(error instanceof GatewayControllerError)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('gateway not running') ||
+    message.includes('failed to reach gateway') ||
+    message.includes('operation was aborted due to timeout') ||
+    message.includes('gateway controller request failed (401)')
+  );
+}
+
 export async function getControllerVersion(
   state: InstanceMutableState,
   env: KiloClawEnv
@@ -491,6 +505,16 @@ export async function getMorningBriefingStatus(
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;
+    if (isMorningBriefingWarmupControllerError(error)) {
+      return {
+        ok: true,
+        enabled: false,
+        reconcileState: 'in_progress',
+        error: 'Gateway warming up, retrying shortly.',
+        code: 'gateway_warming_up',
+        retryAfterSec: 2,
+      };
+    }
     throw error;
   }
 }

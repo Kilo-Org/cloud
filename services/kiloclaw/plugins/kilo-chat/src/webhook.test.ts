@@ -85,11 +85,15 @@ describe('parseActionExecutedPayload', () => {
   it('parses a well-formed action.executed payload', () => {
     const parsed = parseActionExecutedPayload({
       type: 'action.executed',
+      conversationId: 'c1',
+      messageId: 'm1',
       groupId: 'approval-123',
       value: 'allow-once',
       executedBy: 'user-1',
     });
     expect(parsed).toEqual({
+      conversationId: 'c1',
+      messageId: 'm1',
       groupId: 'approval-123',
       value: 'allow-once',
       executedBy: 'user-1',
@@ -311,24 +315,34 @@ describe('buildDeliverWiring', () => {
     }
   });
 
-  it('subsequent blocks after the first call createMessage directly', async () => {
-    const calls: { type: string; args: unknown }[] = [];
-    const wiring = buildDeliverWiring({
-      client: fakeClient(calls),
-      conversationId: 'c1',
-      warn: () => {},
-    });
-    // First deliver finalizes the preview (or POSTs if never streamed).
-    await wiring.deliver({ text: 'primary' });
-    // Second deliver should create a separate message.
-    await wiring.deliver({ text: 'second block' });
-    await wiring.finalize();
-    const createCalls = calls.filter(c => c.type === 'create');
-    expect(createCalls.length).toBeGreaterThanOrEqual(2);
-    const allContent = createCalls.map(
-      c => (c.args as { content: Array<{ type: string; text: string }> }).content
-    );
-    expect(allContent.some(blocks => blocks.some(b => b.text === 'second block'))).toBe(true);
+  it('subsequent blocks append to the same preview message', async () => {
+    vi.useFakeTimers();
+    try {
+      const calls: { type: string; args: unknown }[] = [];
+      const wiring = buildDeliverWiring({
+        client: fakeClient(calls),
+        conversationId: 'c1',
+        warn: () => {},
+      });
+      // First deliver POSTs the preview with the first block's text.
+      await wiring.deliver({ text: 'primary' });
+      await vi.advanceTimersByTimeAsync(0);
+      // Second deliver should edit the same message, appending the new block.
+      await wiring.deliver({ text: 'second block' });
+      await vi.advanceTimersByTimeAsync(1000);
+      await wiring.finalize();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      const createCalls = calls.filter(c => c.type === 'create');
+      const editCalls = calls.filter(c => c.type === 'edit');
+      expect(createCalls).toHaveLength(1);
+      expect(editCalls.length).toBeGreaterThanOrEqual(1);
+      const lastEdit = editCalls.at(-1)!;
+      const content = (lastEdit.args as { content: Array<{ type: string; text: string }> }).content;
+      expect(content).toEqual([{ type: 'text', text: 'primary\n\nsecond block' }]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('passes inReplyToMessageId to preview stream on first create', async () => {

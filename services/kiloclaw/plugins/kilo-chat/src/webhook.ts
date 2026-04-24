@@ -148,34 +148,42 @@ export function buildDeliverWiring(params: {
     inReplyToMessageId: params.inReplyToMessageId,
     onWarn: params.warn,
   });
-  let firstDelivered = false;
+
+  // The SDK's block pipeline splits each agent reply into N payloads (paragraph
+  // boundaries, maxChars, tool-result breaks, idle gaps). To present this as a
+  // single chat message we accumulate committed block text plus the current
+  // block's streaming partial, and keep editing the same preview message.
+  const committedBlocks: string[] = [];
+  let partialBlockText = '';
+  let delivered = false;
+
+  const BLOCK_JOINER = '\n\n';
+  const accumulated = (): string => {
+    const parts = partialBlockText ? [...committedBlocks, partialBlockText] : committedBlocks;
+    return parts.join(BLOCK_JOINER);
+  };
 
   return {
     replyOptions: {
       onPartialReply: async payload => {
-        if (payload.text) stream.update(payload.text);
+        if (!payload.text) return;
+        partialBlockText = payload.text;
+        stream.update(accumulated());
       },
     },
     deliver: async payload => {
       if (!payload.text) return;
-      if (!firstDelivered) {
-        firstDelivered = true;
-        await stream.finalize(payload.text);
-        return;
-      }
-      // Subsequent blocks: plain create.
-      await params.client.createMessage({
-        conversationId: params.conversationId,
-        content: [{ type: 'text', text: payload.text }],
-      });
+      committedBlocks.push(payload.text);
+      partialBlockText = '';
+      delivered = true;
+      stream.update(accumulated());
     },
     finalize: async err => {
-      // Abort the preview only when dispatch errored or nothing was delivered
-      // (both indicate the preview should NOT remain visible). A successful
-      // first delivery finalized the stream, so abort would be a no-op anyway.
-      if (err !== undefined || !firstDelivered) {
+      if (err !== undefined || !delivered) {
         await stream.abort(err);
+        return;
       }
+      await stream.finalize(accumulated());
     },
   };
 }

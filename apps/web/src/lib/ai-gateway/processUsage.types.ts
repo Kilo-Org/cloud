@@ -65,6 +65,10 @@ export type NotYetCostedUsageStats = {
   generation_time: number | null;
   streamed: boolean | null;
   cancelled: boolean | null;
+  /** Numeric HTTP-like code extracted from an in-stream error payload. When set,
+   *  overrides the HTTP status code recorded in usage metadata (e.g. a 200
+   *  response that turns out to contain a 502 error event). */
+  status_code_override?: number | null;
 };
 
 export type JustTheCostsUsageStats = {
@@ -171,7 +175,7 @@ export type UsageMetaData = {
 
 export type OpenRouterError = {
   message: string;
-  code: string;
+  code: number | string;
   metadata?: Record<string, unknown>;
   provider_name?: string;
 };

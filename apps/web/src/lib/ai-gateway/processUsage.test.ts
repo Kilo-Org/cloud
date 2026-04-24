@@ -181,6 +181,28 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     expect(result.responseContent).toBe('Hello world');
     expect(result.hasError).toBe(true); // Should be marked as error due to abort
   });
+
+  test('captures numeric error.code from in-stream error event as status_code_override', async () => {
+    const errorChunk = `data: {"id":"gen-1","object":"chat.completion.chunk","created":1,"model":"","provider":"Amazon Bedrock","choices":[],"error":{"code":502,"message":"Internal server error","metadata":{"error_type":"provider_unavailable"}}}\n\n`;
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(errorChunk));
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.hasError).toBe(true);
+    expect(result.status_code_override).toBe(502);
+  });
 });
 
 const sampleReqDir = join(process.cwd(), 'src/tests/req_sample');

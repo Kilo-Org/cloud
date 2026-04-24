@@ -696,6 +696,7 @@ export async function parseMicrodollarUsageFromStream(
   let model: string | null = null;
   let responseContent = ''; // for abuse investigation
   let reportedError = statusCode >= 400;
+  let statusCodeOverride: number | null = null;
   const startedAt = performance.now();
   let firstTokenReceived = false;
   let usage: OpenRouterUsage | null = null;
@@ -729,6 +730,9 @@ export async function parseMicrodollarUsageFromStream(
       if ('error' in json) {
         const error = json.error as OpenRouterError;
         reportedError = true;
+        if (typeof error.code === 'number') {
+          statusCodeOverride = error.code;
+        }
         captureException(new Error(`OpenRouter error: ${error.message}`), {
           tags: { source: 'sse_processing' },
           extra: { json, event },
@@ -780,6 +784,7 @@ export async function parseMicrodollarUsageFromStream(
     generation_time: null,
     streamed: true,
     cancelled: null,
+    status_code_override: statusCodeOverride,
   };
 
   const costs = processOpenRouterUsage(usage, coreProps);
@@ -892,6 +897,7 @@ async function processTokenData(
 
     genStats.model = usageStats.model; // openrouter bug?
     genStats.hasError = usageStats.hasError; // retain by choice
+    genStats.status_code_override = usageStats.status_code_override; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
     if (genStats.cost_mUsd !== usageStats.cost_mUsd) {
       console.warn(
@@ -911,6 +917,10 @@ async function processTokenData(
 
   if (usageStats.inputTokens - usageStats.cacheHitTokens > 100000)
     console.warn(`Abuse?: Large uncached token request detected:`, usageStats);
+
+  if (usageStats.status_code_override != null) {
+    usageContext.status_code = usageStats.status_code_override;
+  }
 
   if (
     !usageStats.model || // fallback for failure cases

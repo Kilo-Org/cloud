@@ -12,33 +12,51 @@ export type BriefingDocumentSection = {
   lines: string[];
 };
 
-export function formatDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+function readPart(parts: Intl.DateTimeFormatPart[], partType: 'year' | 'month' | 'day'): string {
+  const match = parts.find(part => part.type === partType);
+  if (!match) {
+    throw new Error(`Unable to format ${partType} from date`);
+  }
+  return match.value;
+}
+
+export function formatDateKey(date: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const year = readPart(parts, 'year');
+  const month = readPart(parts, 'month');
+  const day = readPart(parts, 'day');
   return `${year}-${month}-${day}`;
 }
 
-export function offsetDays(base: Date, offset: number): Date {
-  const copy = new Date(base.getTime());
-  copy.setDate(copy.getDate() + offset);
-  return copy;
+export function offsetDateKey(base: Date, offset: number, timezone: string): string {
+  const [year, month, day] = formatDateKey(base, timezone).split('-').map(Number);
+  const copy = new Date(Date.UTC(year, month - 1, day));
+  copy.setUTCDate(copy.getUTCDate() + offset);
+  const offsetYear = copy.getUTCFullYear();
+  const offsetMonth = String(copy.getUTCMonth() + 1).padStart(2, '0');
+  const offsetDay = String(copy.getUTCDate()).padStart(2, '0');
+  return `${offsetYear}-${offsetMonth}-${offsetDay}`;
 }
 
-export function resolveBriefingPath(briefingsDir: string, date: Date): string {
-  return path.join(briefingsDir, `${formatDateKey(date)}.md`);
+export function resolveBriefingPath(briefingsDir: string, dateKey: string): string {
+  return path.join(briefingsDir, `${dateKey}.md`);
 }
 
 export function buildBriefingMarkdown(params: {
-  date: Date;
+  dateKey: string;
   generatedAt: Date;
   statuses: BriefingSourceStatus[];
   sections: BriefingDocumentSection[];
   failures: string[];
 }): string {
-  const dateKey = formatDateKey(params.date);
   const lines: string[] = [];
-  lines.push(`# Morning Briefing - ${dateKey}`);
+  lines.push(`# Morning Briefing - ${params.dateKey}`);
 
   for (const section of params.sections) {
     if (section.lines.length === 0) {

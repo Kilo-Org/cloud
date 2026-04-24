@@ -216,6 +216,7 @@ async function waitForReconcileState(
 }
 
 afterEach(async () => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -310,5 +311,28 @@ describe('morning briefing lifecycle', () => {
     expect(payload.ok).toBe(true);
     expect(payload.reconcileState).toBe('failed');
     expect(typeof payload.lastReconcileError).toBe('string');
+  });
+
+  it('uses configured timezone for /briefing today', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-23T16:30:00.000Z'));
+
+    const now = new Date().toISOString();
+    const harness = await createHarness({
+      preloadedConfig: {
+        enabled: false,
+        cronJobId: null,
+        cron: '0 7 * * *',
+        timezone: 'Asia/Tokyo',
+        updatedAt: now,
+      },
+    });
+
+    const briefingsDir = path.join(harness.stateDir, 'morning-briefing', 'briefings');
+    await fs.mkdir(briefingsDir, { recursive: true });
+    await fs.writeFile(path.join(briefingsDir, '2026-04-24.md'), 'tokyo briefing', 'utf8');
+
+    const response = await harness.commandHandler({ args: 'today' });
+    expect(response.text).toBe('tokyo briefing');
   });
 });

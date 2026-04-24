@@ -2,12 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Type } from '@sinclair/typebox';
 import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
-import {
-  buildBriefingMarkdown,
-  formatDateKey,
-  offsetDays,
-  resolveBriefingPath,
-} from './briefing-utils';
+import { buildBriefingMarkdown, offsetDateKey, resolveBriefingPath } from './briefing-utils';
 import {
   filterEnabledBriefingJobs,
   pickCanonicalCronJobId,
@@ -25,6 +20,7 @@ const CRON_PROMPT =
   'Call the tool morning_briefing_generate exactly once with no arguments. Do not call any other tool.';
 const DEFAULT_CRON = '0 7 * * *';
 const DEFAULT_TIMEZONE = 'UTC';
+const statusWriteQueueByPath = new Map<string, Promise<unknown>>();
 
 type BriefingPluginConfig = {
   defaultCron?: string;
@@ -360,17 +356,32 @@ async function readStoredStatus(paths: { statusPath: string }): Promise<StoredSt
   };
 }
 
+async function queueStatusWrite<T>(statusPath: string, work: () => Promise<T>): Promise<T> {
+  const previous = statusWriteQueueByPath.get(statusPath) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(work);
+  statusWriteQueueByPath.set(statusPath, next);
+  try {
+    return await next;
+  } finally {
+    if (statusWriteQueueByPath.get(statusPath) === next) {
+      statusWriteQueueByPath.delete(statusPath);
+    }
+  }
+}
+
 async function patchStoredStatus(
   paths: { statusPath: string },
   patch: Partial<StoredStatus>
 ): Promise<StoredStatus> {
-  const current = await readStoredStatus(paths);
-  const next: StoredStatus = {
-    ...current,
-    ...patch,
-  };
-  await writeJsonFile(paths.statusPath, next);
-  return next;
+  return queueStatusWrite(paths.statusPath, async () => {
+    const current = await readStoredStatus(paths);
+    const next: StoredStatus = {
+      ...current,
+      ...patch,
+    };
+    await writeJsonFile(paths.statusPath, next);
+    return next;
+  });
 }
 
 async function ensureCronJob(
@@ -768,7 +779,7 @@ async function generateBriefing(
     };
     config: unknown;
   },
-  date: Date
+  dateKey: string
 ): Promise<{
   dateKey: string;
   filePath: string;
@@ -797,7 +808,7 @@ async function generateBriefing(
     .filter(source => !source.ok)
     .map(source => `${source.source}: ${source.summary}`);
   const markdown = buildBriefingMarkdown({
-    date,
+    dateKey,
     generatedAt: new Date(),
     statuses: sources.map(source => ({
       source: source.source,
@@ -813,12 +824,10 @@ async function generateBriefing(
     failures,
   });
 
-  const filePath = resolveBriefingPath(paths.briefingsDir, date);
+  const filePath = resolveBriefingPath(paths.briefingsDir, dateKey);
   await fs.writeFile(filePath, markdown, 'utf8');
 
-  const dateKey = formatDateKey(date);
-  await writeJsonFile(paths.statusPath, {
-    ...(await readStoredStatus(paths)),
+  await patchStoredStatus(paths, {
     lastGeneratedDate: dateKey,
     lastGeneratedAt: new Date().toISOString(),
     lastPath: filePath,
@@ -829,7 +838,7 @@ async function generateBriefing(
       summary: source.summary,
     })),
     failures,
-  } satisfies StoredStatus);
+  });
 
   return {
     dateKey,
@@ -840,29 +849,49 @@ async function generateBriefing(
   };
 }
 
-async function readBriefingByDate(
+async function readBriefingByDateKey(
   api: { runtime: { state: { resolveStateDir: () => string } } },
-  date: Date
+  dateKey: string
 ): Promise<{ dateKey: string; filePath: string; exists: boolean; markdown: string | null }> {
   const paths = getStatePaths(api);
   await ensureStorage(paths);
-  const filePath = resolveBriefingPath(paths.briefingsDir, date);
+  const filePath = resolveBriefingPath(paths.briefingsDir, dateKey);
   try {
     const markdown = await fs.readFile(filePath, 'utf8');
     return {
-      dateKey: formatDateKey(date),
+      dateKey,
       filePath,
       exists: true,
       markdown,
     };
   } catch {
     return {
-      dateKey: formatDateKey(date),
+      dateKey,
       filePath,
       exists: false,
       markdown: null,
     };
   }
+}
+
+async function resolveDateKeyForOffset(
+  api: {
+    runtime: { state: { resolveStateDir: () => string } };
+    config: {
+      agents?: {
+        defaults?: {
+          userTimezone?: string;
+        };
+      };
+    };
+    pluginConfig?: Record<string, unknown>;
+  },
+  offset: number
+): Promise<string> {
+  const paths = getStatePaths(api);
+  await ensureStorage(paths);
+  const config = await readStoredConfig(api, paths);
+  return offsetDateKey(new Date(), offset, config.timezone);
 }
 
 async function getStatusSnapshot(api: {
@@ -1157,7 +1186,8 @@ export default definePluginEntry({
       }
 
       if (subcommand === 'run') {
-        const result = await generateBriefing(api, new Date());
+        const dateKey = await resolveDateKeyForOffset(api, 0);
+        const result = await generateBriefing(api, dateKey);
         return [
           `Generated briefing for ${result.dateKey}.`,
           `- file: ${result.filePath}`,
@@ -1166,8 +1196,8 @@ export default definePluginEntry({
       }
 
       if (subcommand === 'today' || subcommand === 'yesterday') {
-        const targetDate = offsetDays(new Date(), subcommand === 'today' ? 0 : -1);
-        const briefing = await readBriefingByDate(api, targetDate);
+        const targetDateKey = await resolveDateKeyForOffset(api, subcommand === 'today' ? 0 : -1);
+        const briefing = await readBriefingByDateKey(api, targetDateKey);
         if (!briefing.exists || !briefing.markdown) {
           return `No saved briefing for ${briefing.dateKey}.`;
         }
@@ -1256,8 +1286,8 @@ export default definePluginEntry({
       ),
       async execute(_toolCallId, params) {
         const dateValue = typeof params.date === 'string' ? params.date : undefined;
-        const targetDate = dateValue ? new Date(`${dateValue}T08:00:00`) : new Date();
-        const result = await generateBriefing(api, targetDate);
+        const targetDateKey = dateValue ?? (await resolveDateKeyForOffset(api, 0));
+        const result = await generateBriefing(api, targetDateKey);
         return {
           content: [
             {
@@ -1290,13 +1320,13 @@ export default definePluginEntry({
       ),
       async execute(_toolCallId, params) {
         const rawDay = typeof params.day === 'string' ? params.day : 'today';
-        const date =
+        const dateKey =
           rawDay === 'yesterday'
-            ? offsetDays(new Date(), -1)
+            ? await resolveDateKeyForOffset(api, -1)
             : rawDay === 'today'
-              ? new Date()
-              : new Date(`${rawDay}T08:00:00`);
-        const briefing = await readBriefingByDate(api, date);
+              ? await resolveDateKeyForOffset(api, 0)
+              : rawDay;
+        const briefing = await readBriefingByDateKey(api, dateKey);
         if (!briefing.exists || !briefing.markdown) {
           return {
             content: [
@@ -1398,7 +1428,8 @@ export default definePluginEntry({
       match: 'exact',
       handler: async (_req, res) => {
         try {
-          const result = await generateBriefing(api, new Date());
+          const dateKey = await resolveDateKeyForOffset(api, 0);
+          const result = await generateBriefing(api, dateKey);
           sendJson(res, 200, {
             ok: true,
             date: result.dateKey,
@@ -1420,7 +1451,8 @@ export default definePluginEntry({
       match: 'exact',
       handler: async (_req, res) => {
         try {
-          const result = await readBriefingByDate(api, new Date());
+          const dateKey = await resolveDateKeyForOffset(api, 0);
+          const result = await readBriefingByDateKey(api, dateKey);
           sendJson(res, 200, {
             ok: true,
             ...result,
@@ -1440,7 +1472,8 @@ export default definePluginEntry({
       match: 'exact',
       handler: async (_req, res) => {
         try {
-          const result = await readBriefingByDate(api, offsetDays(new Date(), -1));
+          const dateKey = await resolveDateKeyForOffset(api, -1);
+          const result = await readBriefingByDateKey(api, dateKey);
           sendJson(res, 200, {
             ok: true,
             ...result,

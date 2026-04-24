@@ -107,10 +107,9 @@ describe('detectContextOverflow', () => {
     });
   });
 
-  it('does not double-encode an unknown-shape JSON body into our response', async () => {
-    // The body is valid JSON but does not match our error schema. Even though
-    // the raw text contains the overflow phrase, we must not embed the JSON
-    // blob as a string in our own JSON response.
+  it('leaves unknown-shape JSON bodies alone', async () => {
+    // Valid JSON but no recognized error field — we intentionally do not
+    // rewrite, even though the raw text contains the overflow phrase.
     const response = new Response(
       JSON.stringify({ detail: 'maximum context length is 128 tokens exceeded' }),
       { status: 400 }
@@ -125,9 +124,12 @@ describe('detectContextOverflow', () => {
     expect(result).toBeNull();
   });
 
-  it('uses a plain-text upstream body verbatim', async () => {
-    const rawMessage = 'Server says: maximum context length is 128 tokens exceeded.';
-    const response = new Response(rawMessage, { status: 400 });
+  it('leaves plain-text upstream bodies alone', async () => {
+    // Only JSON bodies are rewritten; a plain-text body is forwarded as-is
+    // by the caller so we return null here.
+    const response = new Response('maximum context length is 128 tokens exceeded.', {
+      status: 400,
+    });
 
     const result = await detectContextOverflow({
       requestedModel: 'some-unknown-model',
@@ -135,9 +137,7 @@ describe('detectContextOverflow', () => {
       response,
     });
 
-    if (!result) throw new Error('expected a response');
-    const json = await result.json();
-    expect(json.message).toBe(rawMessage);
+    expect(result).toBeNull();
   });
 
   it('also recognizes overflow messages where upstream.error is a plain string', async () => {

@@ -3,7 +3,7 @@ import { extractBriefingArgsFromText } from './command-fallback-utils';
 
 describe('command-fallback-utils', () => {
   it('extracts subcommand args from a plain slash command', () => {
-    expect(extractBriefingArgsFromText('/briefing setup')).toBe('setup');
+    expect(extractBriefingArgsFromText('/briefing enable')).toBe('enable');
   });
 
   it('extracts args from control-ui wrapped inbound metadata text', () => {

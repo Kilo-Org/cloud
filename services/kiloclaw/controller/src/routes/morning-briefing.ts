@@ -15,6 +15,7 @@ async function readJsonBody(c: { req: { json: () => Promise<unknown> } }): Promi
 
 async function proxyMorningBriefingRoute(params: {
   supervisor: Supervisor;
+  gatewayToken: string;
   path: string;
   method: 'GET' | 'POST';
   body?: unknown;
@@ -30,6 +31,7 @@ async function proxyMorningBriefingRoute(params: {
     return await fetch(`http://127.0.0.1:3001${MORNING_BRIEFING_PREFIX}${params.path}`, {
       method: params.method,
       headers: {
+        authorization: `Bearer ${params.gatewayToken}`,
         'content-type': 'application/json',
       },
       body: params.body !== undefined ? JSON.stringify(params.body) : undefined,
@@ -59,17 +61,19 @@ export function registerMorningBriefingRoutes(
   app.get('/_kilo/morning-briefing/status', async c => {
     const response = await proxyMorningBriefingRoute({
       supervisor,
+      gatewayToken: expectedToken,
       path: '/status',
       method: 'GET',
     });
     return response;
   });
 
-  app.post('/_kilo/morning-briefing/setup', async c => {
+  app.post('/_kilo/morning-briefing/enable', async c => {
     const body = await readJsonBody(c);
     const response = await proxyMorningBriefingRoute({
       supervisor,
-      path: '/setup',
+      gatewayToken: expectedToken,
+      path: '/enable',
       method: 'POST',
       body,
     });
@@ -79,6 +83,7 @@ export function registerMorningBriefingRoutes(
   app.post('/_kilo/morning-briefing/disable', async c => {
     const response = await proxyMorningBriefingRoute({
       supervisor,
+      gatewayToken: expectedToken,
       path: '/disable',
       method: 'POST',
       body: {},
@@ -89,6 +94,7 @@ export function registerMorningBriefingRoutes(
   app.post('/_kilo/morning-briefing/run', async c => {
     const response = await proxyMorningBriefingRoute({
       supervisor,
+      gatewayToken: expectedToken,
       path: '/run',
       method: 'POST',
       body: {},
@@ -99,6 +105,7 @@ export function registerMorningBriefingRoutes(
   app.get('/_kilo/morning-briefing/read/today', async c => {
     const response = await proxyMorningBriefingRoute({
       supervisor,
+      gatewayToken: expectedToken,
       path: '/read/today',
       method: 'GET',
     });
@@ -108,6 +115,7 @@ export function registerMorningBriefingRoutes(
   app.get('/_kilo/morning-briefing/read/yesterday', async c => {
     const response = await proxyMorningBriefingRoute({
       supervisor,
+      gatewayToken: expectedToken,
       path: '/read/yesterday',
       method: 'GET',
     });

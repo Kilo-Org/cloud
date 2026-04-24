@@ -4,7 +4,7 @@ Bundled OpenClaw plugin for daily issue/news briefings in KiloClaw instances.
 
 ## Commands
 
-- `/briefing setup`
+- `/briefing enable`
 - `/briefing status`
 - `/briefing run`
 - `/briefing today`

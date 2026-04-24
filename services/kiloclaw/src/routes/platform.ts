@@ -1949,8 +1949,8 @@ platform.get('/morning-briefing/status', async c => {
   }
 });
 
-// POST /api/platform/morning-briefing/setup
-platform.post('/morning-briefing/setup', async c => {
+// POST /api/platform/morning-briefing/enable
+platform.post('/morning-briefing/enable', async c => {
   const result = await parseBody(c, MorningBriefingSetupSchema);
   if ('error' in result) return result.error;
 
@@ -1963,8 +1963,8 @@ platform.post('/morning-briefing/setup', async c => {
       c.env,
       userId,
       iidResult.instanceId,
-      stub => stub.setupMorningBriefing({ cron, timezone }),
-      'setupMorningBriefing'
+      stub => stub.enableMorningBriefing({ cron, timezone }),
+      'enableMorningBriefing'
     );
     if (!response) {
       return jsonError(
@@ -1975,7 +1975,7 @@ platform.post('/morning-briefing/setup', async c => {
     }
     return c.json(response, 200);
   } catch (err) {
-    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/setup');
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/enable');
     return jsonError(message, status, code);
   }
 });

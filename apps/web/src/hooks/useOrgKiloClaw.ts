@@ -433,8 +433,8 @@ export function useOrgKiloClawMutations(
   const rawCancelKiloCliRun = useMutation(
     trpc.organizations.kiloclaw.cancelKiloCliRun.mutationOptions({ onSuccess: invalidateStatus })
   );
-  const rawSetupMorningBriefing = useMutation(
-    trpc.organizations.kiloclaw.setupMorningBriefing.mutationOptions({
+  const rawEnableMorningBriefing = useMutation(
+    trpc.organizations.kiloclaw.enableMorningBriefing.mutationOptions({
       onSuccess: async () => {
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
@@ -494,7 +494,7 @@ export function useOrgKiloClawMutations(
     patchOpenclawConfig: bind(rawPatchOpenclawConfig),
     disconnectGoogle: bindVoid(rawDisconnectGoogle),
     setGmailNotifications: bind(rawSetGmailNotifications),
-    setupMorningBriefing: bind(rawSetupMorningBriefing),
+    enableMorningBriefing: bind(rawEnableMorningBriefing),
     disableMorningBriefing: bindVoid(rawDisableMorningBriefing),
     runMorningBriefing: bindVoid(rawRunMorningBriefing),
     startKiloCliRun: bind(rawStartKiloCliRun),

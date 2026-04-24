@@ -3084,9 +3084,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.getMorningBriefingStatus(this.s, this.env);
   }
 
-  async setupMorningBriefing(input: { cron?: string; timezone?: string }) {
+  async enableMorningBriefing(input: { cron?: string; timezone?: string }) {
     await this.loadState();
-    return gateway.setupMorningBriefing(this.s, this.env, input);
+    return gateway.enableMorningBriefing(this.s, this.env, input);
   }
 
   async disableMorningBriefing() {

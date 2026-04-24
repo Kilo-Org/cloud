@@ -288,14 +288,14 @@ export class KiloClawInternalClient {
     });
   }
 
-  async setupMorningBriefing(
+  async enableMorningBriefing(
     userId: string,
     input?: { cron?: string; timezone?: string },
     instanceId?: string
   ): Promise<MorningBriefingActionResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      `/api/platform/morning-briefing/setup${params}`,
+      `/api/platform/morning-briefing/enable${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId, ...input }),

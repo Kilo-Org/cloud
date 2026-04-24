@@ -1160,7 +1160,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
     return client.getMorningBriefingStatus(ctx.user.id, workerInstanceId(instance));
   }),
 
-  setupMorningBriefing: organizationMemberMutationProcedure
+  enableMorningBriefing: organizationMemberMutationProcedure
     .input(
       z.object({
         organizationId: z.uuid(),
@@ -1171,7 +1171,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
-      return client.setupMorningBriefing(
+      return client.enableMorningBriefing(
         ctx.user.id,
         {
           cron: input.cron,

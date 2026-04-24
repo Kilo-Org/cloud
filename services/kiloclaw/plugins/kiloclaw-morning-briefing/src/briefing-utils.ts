@@ -39,12 +39,6 @@ export function buildBriefingMarkdown(params: {
   const dateKey = formatDateKey(params.date);
   const lines: string[] = [];
   lines.push(`# Morning Briefing - ${dateKey}`);
-  lines.push('');
-  lines.push('## Source Status');
-  for (const status of params.statuses) {
-    const marker = status.ok ? '[ok]' : status.configured ? '[error]' : '[skipped]';
-    lines.push(`- ${status.source}: ${marker} ${status.summary}`);
-  }
 
   for (const section of params.sections) {
     if (section.lines.length === 0) {
@@ -61,6 +55,13 @@ export function buildBriefingMarkdown(params: {
     for (const failure of params.failures) {
       lines.push(`- ${failure}`);
     }
+  }
+
+  lines.push('');
+  lines.push('## Source Status');
+  for (const status of params.statuses) {
+    const marker = status.ok ? '[ok]' : status.configured ? '[error]' : '[skipped]';
+    lines.push(`- ${status.source}: ${marker} ${status.summary}`);
   }
 
   lines.push('');

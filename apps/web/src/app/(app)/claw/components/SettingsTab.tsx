@@ -527,9 +527,9 @@ function MorningBriefingCard({
           <Button
             size="sm"
             variant="outline"
-            disabled={mutations.setupMorningBriefing.isPending}
+            disabled={mutations.enableMorningBriefing.isPending}
             onClick={() => {
-              mutations.setupMorningBriefing.mutate(
+              mutations.enableMorningBriefing.mutate(
                 {},
                 {
                   onSuccess: () => toast.success('Morning Briefing enabled'),
@@ -538,7 +538,7 @@ function MorningBriefingCard({
               );
             }}
           >
-            {mutations.setupMorningBriefing.isPending ? 'Enabling...' : 'Enable / Setup'}
+            {mutations.enableMorningBriefing.isPending ? 'Enabling...' : 'Enable'}
           </Button>
           <Button
             size="sm"

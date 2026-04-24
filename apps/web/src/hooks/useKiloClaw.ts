@@ -357,8 +357,8 @@ export function useKiloClawMutations() {
     setGmailNotifications: useMutation(
       trpc.kiloclaw.setGmailNotifications.mutationOptions({ onSuccess: invalidateStatus })
     ),
-    setupMorningBriefing: useMutation(
-      trpc.kiloclaw.setupMorningBriefing.mutationOptions({
+    enableMorningBriefing: useMutation(
+      trpc.kiloclaw.enableMorningBriefing.mutationOptions({
         onSuccess: async () => {
           await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey(),

@@ -489,7 +489,7 @@ export async function getMorningBriefingStatus(
   }
 }
 
-export async function setupMorningBriefing(
+export async function enableMorningBriefing(
   state: InstanceMutableState,
   env: KiloClawEnv,
   input: { cron?: string; timezone?: string }
@@ -498,7 +498,7 @@ export async function setupMorningBriefing(
     return await callGatewayController(
       state,
       env,
-      '/_kilo/morning-briefing/setup',
+      '/_kilo/morning-briefing/enable',
       'POST',
       MorningBriefingActionResponseSchema,
       input

@@ -2469,7 +2469,7 @@ export const kiloclawRouter = createTRPCRouter({
     return client.getMorningBriefingStatus(ctx.user.id, workerInstanceId(instance));
   }),
 
-  setupMorningBriefing: clawAccessProcedure
+  enableMorningBriefing: clawAccessProcedure
     .input(
       z.object({
         cron: z.string().min(1).optional(),
@@ -2479,7 +2479,7 @@ export const kiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      return client.setupMorningBriefing(ctx.user.id, input, workerInstanceId(instance));
+      return client.enableMorningBriefing(ctx.user.id, input, workerInstanceId(instance));
     }),
 
   disableMorningBriefing: clawAccessProcedure.mutation(async ({ ctx }) => {

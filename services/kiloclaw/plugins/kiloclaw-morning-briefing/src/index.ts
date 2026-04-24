@@ -389,7 +389,7 @@ async function ensureCronJob(
   const nestedId = typeof createdJob.id === 'string' ? createdJob.id : '';
   const resolvedId = topLevelId || nestedId;
   if (!resolvedId) {
-    throw new Error('Unable to resolve cron job id after setup');
+    throw new Error('Unable to resolve cron job id after enable');
   }
 
   await removeDuplicateBriefingCronJobs(api, resolvedId);
@@ -899,7 +899,7 @@ export default definePluginEntry({
   name: 'KiloClawMorningBriefing',
   description: 'Morning briefing plugin for KiloClaw-hosted OpenClaw instances',
   register(api) {
-    const setupFromCommand = async (args: string | undefined) => {
+    const enableFromCommand = async (args: string | undefined) => {
       const paths = getStatePaths(api);
       await ensureStorage(paths);
 
@@ -964,9 +964,9 @@ export default definePluginEntry({
       const args = argsText.trim();
       const [subcommand = 'status'] = args.split(/\s+/).filter(Boolean);
 
-      if (subcommand === 'setup') {
-        const trailing = args.replace(/^setup\s*/, '');
-        const config = await setupFromCommand(trailing);
+      if (subcommand === 'enable') {
+        const trailing = args.replace(/^enable\s*/, '');
+        const config = await enableFromCommand(trailing);
         return [
           'Morning Briefing enabled.',
           `- schedule: ${config.cron}`,
@@ -1164,7 +1164,7 @@ export default definePluginEntry({
     });
 
     api.registerHttpRoute({
-      path: '/api/plugins/kiloclaw-morning-briefing/setup',
+      path: '/api/plugins/kiloclaw-morning-briefing/enable',
       auth: 'gateway',
       match: 'exact',
       handler: async (req, res) => {
@@ -1173,7 +1173,7 @@ export default definePluginEntry({
           const cron = typeof body.cron === 'string' ? body.cron.trim() : undefined;
           const timezone = typeof body.timezone === 'string' ? body.timezone.trim() : undefined;
           const suffix = [cron, timezone].filter(Boolean).join(' ');
-          const result = await setupFromCommand(suffix);
+          const result = await enableFromCommand(suffix);
           sendJson(res, 200, {
             ok: true,
             enabled: result.enabled,
@@ -1277,7 +1277,7 @@ export default definePluginEntry({
     api.on('before_prompt_build', () => ({
       appendSystemContext: [
         'Morning Briefing plugin is installed.',
-        'Use /briefing setup|status|run|today|yesterday|disable for command-driven control.',
+        'Use /briefing enable|status|run|today|yesterday|disable for command-driven control.',
         'If inbound text contains /briefing but command routing did not execute, call morning_briefing_handle_command exactly once with the full raw inbound message.',
         'Never emulate /briefing by manually calling generic cron/file tools.',
       ].join('\n'),

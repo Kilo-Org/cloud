@@ -689,6 +689,85 @@ describe('usageAnalytics router', () => {
     });
   });
 
+  describe('date window boundary', () => {
+    it('daily tier includes today when endDate is mid-day (not midnight-aligned)', async () => {
+      // Regression: before the fix, `buildWhereCommon` sliced endDate to
+      // YYYY-MM-DD and used `lt(day, endDate)`, which excluded the day
+      // matching endDate's calendar day (i.e. today). The UI computes
+      // endDate via `new Date().toISOString()` for "30d"/"7d"/"1y"
+      // selections, so the window always had a mid-day timestamp and the
+      // current day's rollup row was silently missing.
+      const today = await getTodayIsoDate();
+      const oneHourAgo = await dateAt(1);
+
+      await insertUsageWithOverrides({
+        kilo_user_id: orgMember.id,
+        organization_id: testOrg.id,
+        cost: 4242,
+        input_tokens: 10,
+        output_tokens: 5,
+        created_at: oneHourAgo,
+        model: 'gpt-4',
+      });
+
+      await processDay(today);
+
+      const caller = await createCallerForUser(orgMember.id);
+      const now = new Date();
+      const start = new Date(now);
+      start.setUTCDate(start.getUTCDate() - 31);
+      // Pass a mid-day endDate (now) so the daily tier must include today.
+      const summary = await caller.usageAnalytics.getSummary({
+        startDate: start.toISOString(),
+        endDate: now.toISOString(),
+        granularity: 'day',
+        organizationId: testOrg.id,
+      });
+
+      expect(summary.costMicrodollars).toBe(4242);
+      expect(summary.requestCount).toBe(1);
+    });
+
+    it('monthly tier includes the current partial month for "past year" windows', async () => {
+      // Regression: `gte(month, startDate.slice(0, 10))` used to exclude
+      // the first calendar month when startDate was mid-month (e.g. for
+      // "past year"), and the current partial month needs to be included
+      // even though its rollup row has day-of-month = 01.
+      const today = await getTodayIsoDate();
+      const oneHourAgo = await dateAt(1);
+      const monthIso = `${today.slice(0, 7)}-01`;
+
+      await insertUsageWithOverrides({
+        kilo_user_id: orgMember.id,
+        organization_id: testOrg.id,
+        cost: 9999,
+        input_tokens: 10,
+        output_tokens: 5,
+        created_at: oneHourAgo,
+        model: 'gpt-4',
+      });
+
+      await processDay(today);
+      await processMonth(monthIso);
+
+      const caller = await createCallerForUser(orgMember.id);
+      const now = new Date();
+      // startDate mid-month one year ago; endDate mid-day now.
+      const startDate = new Date(now);
+      startDate.setUTCFullYear(startDate.getUTCFullYear() - 1);
+
+      const summary = await caller.usageAnalytics.getSummary({
+        startDate: startDate.toISOString(),
+        endDate: now.toISOString(),
+        granularity: 'month',
+        organizationId: testOrg.id,
+      });
+
+      expect(summary.costMicrodollars).toBe(9999);
+      expect(summary.requestCount).toBe(1);
+    });
+  });
+
   describe('project dimension', () => {
     it('breakdown groups by project_id with "none" sentinel for NULL', async () => {
       const today = await getTodayIsoDate();

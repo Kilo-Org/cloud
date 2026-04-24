@@ -1426,6 +1426,14 @@ export const microdollar_usage_metadata = pgTable(
 //   - mode: COALESCE(mode.mode, 'unknown')
 //   - provider: COALESCE(provider, 'unknown')
 //   - project_id: COALESCE(project_id, 'none')
+//
+// GDPR / soft-delete: these are aggregated billing records keyed by
+// `kilo_user_id`. They are intentionally retained on user soft-delete for the
+// same reason `microdollar_usage` is retained (financial records), and are
+// NOT touched by `softDeleteUser` in `apps/web/src/lib/user.ts`. The rollup
+// rows contain no direct PII (no email/name/IP) — only internal identifiers
+// and numeric aggregates. If this policy changes, both `softDeleteUser` and
+// `apps/web/src/lib/user.test.ts` must be updated in the same commit.
 // =============================================================================
 
 export const usage_rollup_hourly = pgTable(

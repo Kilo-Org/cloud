@@ -33,7 +33,21 @@ type OrganizationSummary = {
   organizationName: string;
 };
 
-export type PersonalView = 'personal-only' | 'all-usage' | string;
+export const PERSONAL_VIEW_PERSONAL_ONLY = 'personal-only';
+export const PERSONAL_VIEW_ALL_USAGE = 'all-usage';
+
+/**
+ * Personal-scope selector value. Semantically it is one of:
+ *   - `'personal-only'` — personal usage only (default)
+ *   - `'all-usage'` — personal + all org memberships
+ *   - any other string — treated as an organization id
+ *
+ * This is modeled as plain `string` because a `'personal-only' | 'all-usage' | string`
+ * union collapses to `string` in TypeScript and adds no narrowing. Callers
+ * should compare against the exported constants first and treat any other
+ * value as an org id.
+ */
+export type PersonalView = string;
 
 export type ViewAs = 'self' | 'org-wide';
 
@@ -150,8 +164,8 @@ export function UsageAnalyticsSidebar({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="personal-only">Personal Only</SelectItem>
-                <SelectItem value="all-usage">All Usage</SelectItem>
+                <SelectItem value={PERSONAL_VIEW_PERSONAL_ONLY}>Personal Only</SelectItem>
+                <SelectItem value={PERSONAL_VIEW_ALL_USAGE}>All Usage</SelectItem>
                 {organizations.map(o => (
                   <SelectItem key={o.organizationId} value={o.organizationId}>
                     {o.organizationName}

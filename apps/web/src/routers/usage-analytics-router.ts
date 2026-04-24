@@ -209,14 +209,87 @@ function getTotalsTable(tier: GranularityTier): TotalsTable {
   }
 }
 
+/**
+ * Returns the tier-specific time column. Drizzle's column type for `hour`
+ * (timestamp) and `day`/`month` (date with mode:'string') both carry their
+ * literal data type as `string`, so callers can compare against string values
+ * without further narrowing.
+ */
 function getTimeColumn(tier: GranularityTier, table: WideTable | TotalsTable) {
   if (tier === 'hourly') {
-    return (table as typeof usage_rollup_hourly).hour;
+    if (isHourlyTable(table)) return table.hour;
+    throw new Error(`Expected hourly table for tier 'hourly'`);
   }
   if (tier === 'daily') {
-    return (table as typeof usage_rollup_daily).day;
+    if (isDailyTable(table)) return table.day;
+    throw new Error(`Expected daily table for tier 'daily'`);
   }
-  return (table as typeof usage_rollup_monthly).month;
+  if (isMonthlyTable(table)) return table.month;
+  throw new Error(`Expected monthly table for tier 'monthly'`);
+}
+
+// Identity-based guards (vs. structural `'hour' in table`) so a future rename
+// or new rollup table that happens to share a column name can't silently
+// mis-narrow.
+function isHourlyTable(
+  table: WideTable | TotalsTable
+): table is typeof usage_rollup_hourly | typeof usage_rollup_hourly_totals {
+  return table === usage_rollup_hourly || table === usage_rollup_hourly_totals;
+}
+
+function isDailyTable(
+  table: WideTable | TotalsTable
+): table is typeof usage_rollup_daily | typeof usage_rollup_daily_totals {
+  return table === usage_rollup_daily || table === usage_rollup_daily_totals;
+}
+
+function isMonthlyTable(
+  table: WideTable | TotalsTable
+): table is typeof usage_rollup_monthly | typeof usage_rollup_monthly_totals {
+  return table === usage_rollup_monthly || table === usage_rollup_monthly_totals;
+}
+
+/**
+ * Rollup buckets are aligned to UTC calendar day/month boundaries. When the
+ * caller supplies an `endDate` with a time-of-day (e.g. `2026-04-10T15:32:00Z`
+ * for "past 7d"), slicing to YYYY-MM-DD and using `lt` would silently drop
+ * today's partially-complete daily/monthly row. This function returns the
+ * exclusive calendar-day boundary that includes today when endDate has any
+ * time-of-day, and matches the midnight-aligned boundary exactly when endDate
+ * is already at UTC midnight (e.g. the "yesterday" preset).
+ */
+function ceilIsoToUtcDayExclusive(iso: string): string {
+  const d = new Date(iso);
+  const dayStartMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  if (d.getTime() === dayStartMs) {
+    return iso.slice(0, 10);
+  }
+  return new Date(dayStartMs + 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Floor an ISO date/datetime to the first day of its UTC calendar month.
+ * Used for the monthly tier's lower bound so that the month containing the
+ * start of the window is included, even when startDate is not itself the
+ * first of the month.
+ */
+function floorIsoToUtcMonth(iso: string): string {
+  return `${iso.slice(0, 7)}-01`;
+}
+
+/**
+ * Ceil an ISO date/datetime to the first day of the next UTC calendar month,
+ * used as an exclusive upper bound. Matches the month exactly when iso is
+ * already at the first of the month at UTC midnight.
+ */
+function ceilIsoToUtcMonthExclusive(iso: string): string {
+  const d = new Date(iso);
+  const firstOfMonthMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+  if (d.getTime() === firstOfMonthMs) {
+    return iso.slice(0, 10);
+  }
+  const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+  return next.toISOString().slice(0, 10);
 }
 
 // ---------------------------------------------------------------------------
@@ -248,51 +321,49 @@ function buildWhereCommon(
   tier: GranularityTier
 ) {
   const conditions = [];
-  const timeCol = getTimeColumn(tier, table);
 
-  if (tier === 'monthly') {
-    // For monthly, startDate/endDate are date strings — the time column is also a date.
-    const startDate = filters.startDate.slice(0, 10);
-    const endDate = filters.endDate.slice(0, 10);
-    conditions.push(gte(timeCol as unknown as (typeof usage_rollup_monthly)['month'], startDate));
-    conditions.push(lt(timeCol as unknown as (typeof usage_rollup_monthly)['month'], endDate));
-  } else if (tier === 'daily') {
-    const startDate = filters.startDate.slice(0, 10);
-    const endDate = filters.endDate.slice(0, 10);
-    conditions.push(gte(timeCol as unknown as (typeof usage_rollup_daily)['day'], startDate));
-    conditions.push(lt(timeCol as unknown as (typeof usage_rollup_daily)['day'], endDate));
+  if (tier === 'monthly' && isMonthlyTable(table)) {
+    // Floor startDate to its month (include months that contain startDate) and
+    // ceil endDate to the first of the next month so partial months at both
+    // ends are visible to the caller.
+    conditions.push(gte(table.month, floorIsoToUtcMonth(filters.startDate)));
+    conditions.push(lt(table.month, ceilIsoToUtcMonthExclusive(filters.endDate)));
+  } else if (tier === 'daily' && isDailyTable(table)) {
+    // startDate at the daily tier is always UTC-midnight aligned by the UI,
+    // so date-only slicing is lossless. endDate is usually mid-day ("now"),
+    // so ceil to the next UTC day to include today's partial rollup row.
+    conditions.push(gte(table.day, filters.startDate.slice(0, 10)));
+    conditions.push(lt(table.day, ceilIsoToUtcDayExclusive(filters.endDate)));
+  } else if (tier === 'hourly' && isHourlyTable(table)) {
+    conditions.push(gte(table.hour, filters.startDate));
+    conditions.push(lt(table.hour, filters.endDate));
   } else {
-    conditions.push(
-      gte(timeCol as unknown as (typeof usage_rollup_hourly)['hour'], filters.startDate)
-    );
-    conditions.push(
-      lt(timeCol as unknown as (typeof usage_rollup_hourly)['hour'], filters.endDate)
-    );
+    // Unreachable under correct (tier, table) pairing; kept as a defense-in-depth
+    // check so a future bug in getWideTable/getTotalsTable fails loudly rather
+    // than silently returning no rows.
+    throw new Error(`Unexpected table/tier combination: tier=${tier}`);
   }
 
-  // Scope filter: either org or personal user
-  const tableWithOrg = table as unknown as {
-    organization_id: typeof usage_rollup_hourly.organization_id;
-    kilo_user_id: typeof usage_rollup_hourly.kilo_user_id;
-  };
+  // Scope filter: either org or personal user. All rollup tables share
+  // structural `organization_id` / `kilo_user_id` columns.
   if (filters.organizationId) {
-    conditions.push(eq(tableWithOrg.organization_id, filters.organizationId));
+    conditions.push(eq(table.organization_id, filters.organizationId));
     // 'self' mode: unconditionally restrict to the caller. This is the server-side
     // enforcement that prevents a member from seeing other members' usage.
     if (filters.viewAs === 'self') {
-      conditions.push(eq(tableWithOrg.kilo_user_id, ctxUserId));
+      conditions.push(eq(table.kilo_user_id, ctxUserId));
     } else {
       if (filters.userIds && filters.userIds.length > 0) {
-        conditions.push(inArray(tableWithOrg.kilo_user_id, filters.userIds));
+        conditions.push(inArray(table.kilo_user_id, filters.userIds));
       }
       if (filters.excludedUserIds && filters.excludedUserIds.length > 0) {
-        conditions.push(notInArray(tableWithOrg.kilo_user_id, filters.excludedUserIds));
+        conditions.push(notInArray(table.kilo_user_id, filters.excludedUserIds));
       }
     }
   } else {
-    conditions.push(eq(tableWithOrg.kilo_user_id, ctxUserId));
+    conditions.push(eq(table.kilo_user_id, ctxUserId));
     if (filters.personalScope === 'personal-only') {
-      conditions.push(isNull(tableWithOrg.organization_id));
+      conditions.push(isNull(table.organization_id));
     }
     // excludedUserIds in personal scope is already restricted to ctxUserId by
     // ensureScopeAccess, so it would exclude the user's own data — no-op filter.
@@ -848,8 +919,12 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const requestedDims = input.groupBy;
       const groupByCols = [bucketExpr, ...requestedDims.map(d => getDimensionColumn(table, d))];
 
-      // Use NULL::text for dimension columns not being grouped by (so their
-      // values fold into the aggregation).
+      // For dimensions not in input.groupBy, emit a constant empty string in
+      // the SELECT projection so the row shape stays stable. Using a constant
+      // scalar sidesteps "column must appear in GROUP BY" without widening
+      // the result type to nullable. The client-side mapping below only reads
+      // dimensions listed in `requestedDims`, so the constants are invisible
+      // to callers.
       const feat = requestedDims.includes('feature') ? dimAliases.dim_feature : sql<string>`''`;
       const model = requestedDims.includes('model') ? dimAliases.dim_model : sql<string>`''`;
       const mode = requestedDims.includes('mode') ? dimAliases.dim_mode : sql<string>`''`;

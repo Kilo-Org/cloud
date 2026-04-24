@@ -258,6 +258,17 @@ describe('formatIsoDateString_UsaDateOnlyFormat', () => {
     }).format(date);
     expect(formatIsoDateString_UsaDateOnlyFormat(date)).toBe(expected);
   });
+
+  it('returns em-dash for malformed string inputs', () => {
+    // Regression: previously fell through to toLocaleDateString which emits
+    // the literal "Invalid Date" for malformed inputs.
+    expect(formatIsoDateString_UsaDateOnlyFormat('not-a-date')).toBe('—');
+    expect(formatIsoDateString_UsaDateOnlyFormat('2026-13-45')).toBe('—');
+  });
+
+  it('returns em-dash for an Invalid Date object', () => {
+    expect(formatIsoDateString_UsaDateOnlyFormat(new Date('invalid'))).toBe('—');
+  });
 });
 
 describe('requireNotNull', () => {

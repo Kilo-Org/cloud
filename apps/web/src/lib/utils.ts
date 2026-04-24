@@ -108,7 +108,11 @@ export function formatIsoDateString_UsaDateOnlyFormat(dateString: string | Date 
   if (isDateOnlyString(dateString)) {
     formatOptions.timeZone = 'UTC';
   }
-  return new Date(dateString).toLocaleDateString('en-US', formatOptions);
+  const date = new Date(dateString);
+  // Malformed strings (e.g. "not-a-date") produce an Invalid Date; fall back
+  // to the em-dash so the UI never renders a literal "Invalid Date".
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-US', formatOptions);
 }
 
 export function formatIsoDateTime_IsoOrderNoSeconds(dateString: string | Date | null): string {

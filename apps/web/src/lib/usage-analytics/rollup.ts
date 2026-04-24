@@ -66,7 +66,7 @@ type TotalsRollupRow = {
  *
  * Safety: this function only ever returns one of three hard-coded string
  * literals, selected via a typed `Granularity` union. The returned value is
- * splicef into SQL via `sql.raw()` downstream, which is safe here because
+ * spliced into SQL via `sql.raw()` downstream, which is safe here because
  * no user input ever reaches this string. Do NOT change this function to
  * interpolate external values without switching to a parameterized
  * representation.

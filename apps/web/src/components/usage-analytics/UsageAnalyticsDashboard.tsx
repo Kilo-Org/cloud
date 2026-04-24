@@ -16,7 +16,12 @@ import { PrimaryChart } from './PrimaryChart';
 import { BreakdownPieChart } from './BreakdownPieChart';
 import { BreakdownBarChart } from './BreakdownBarChart';
 import { AIAdoptionScoreCard } from './AIAdoptionScoreCard';
-import { UsageAnalyticsSidebar, type PersonalView } from './UsageAnalyticsSidebar';
+import {
+  PERSONAL_VIEW_ALL_USAGE,
+  PERSONAL_VIEW_PERSONAL_ONLY,
+  UsageAnalyticsSidebar,
+  type PersonalView,
+} from './UsageAnalyticsSidebar';
 import {
   EMPTY_FILTERS,
   defaultGranularityForPeriod,
@@ -96,7 +101,7 @@ export function UsageAnalyticsDashboard({
   const [chartMetric, setChartMetric] = useState<MetricKey>('cost');
   const [filters, setFilters] = useState<UsageFilters>(EMPTY_FILTERS);
   const [groupBy, setGroupBy] = useState<Dimension | 'none'>('none');
-  const [personalView, setPersonalView] = useState<PersonalView>('personal-only');
+  const [personalView, setPersonalView] = useState<PersonalView>(PERSONAL_VIEW_PERSONAL_ONLY);
   const [viewAs, setViewAs] = useState<ViewAs>('self');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -115,11 +120,13 @@ export function UsageAnalyticsDashboard({
   const effectiveOrgId =
     context === 'organization'
       ? organizationId
-      : personalView !== 'personal-only' && personalView !== 'all-usage'
+      : personalView !== PERSONAL_VIEW_PERSONAL_ONLY && personalView !== PERSONAL_VIEW_ALL_USAGE
         ? personalView
         : null;
   const effectivePersonalScope: 'personal-only' | 'include-orgs' =
-    context === 'organization' || personalView === 'all-usage' ? 'include-orgs' : 'personal-only';
+    context === 'organization' || personalView === PERSONAL_VIEW_ALL_USAGE
+      ? 'include-orgs'
+      : 'personal-only';
 
   // Role in the effective org drives whether the caller may see all users.
   // - Organization context: prop `callerRole` from the server layout.
@@ -234,14 +241,18 @@ export function UsageAnalyticsDashboard({
     limit: 500,
   });
 
-  // Resolve user ID -> email for labels (org context only)
+  // Resolve user ID -> email for labels whenever there is an effective org
+  // scope. Key off `effectiveOrgId` (not the prop `organizationId`) so that
+  // future paths which surface user-dimension data in personal-with-org mode
+  // resolve labels correctly; today that path is hidden in the UI, but the
+  // resolver should not depend on UI gating.
   const userIds = useMemo(() => {
-    if (context !== 'organization') return [];
+    if (!effectiveOrgId) return [];
     const fromBreakdown = userBreakdown?.breakdown.map(b => b.key) ?? [];
     const fromFilters = [...filters.userIds, ...filters.excludedUserIds];
     return Array.from(new Set([...fromBreakdown, ...fromFilters]));
-  }, [userBreakdown, context, filters.userIds, filters.excludedUserIds]);
-  const { data: userResolution } = useResolveOrgUsers(organizationId, userIds);
+  }, [userBreakdown, effectiveOrgId, filters.userIds, filters.excludedUserIds]);
+  const { data: userResolution } = useResolveOrgUsers(effectiveOrgId, userIds);
   const userLabelFor = useCallback(
     (value: string) => {
       const match = userResolution?.users.find(u => u.id === value);
@@ -256,13 +267,13 @@ export function UsageAnalyticsDashboard({
 
   const labelForDimensionValue = useCallback(
     (dim: Dimension, value: string): string => {
-      if (dim === 'user' && organizationId) return userLabelFor(value);
+      if (dim === 'user' && effectiveOrgId) return userLabelFor(value);
       if (dim === 'feature') return featureLabelFor(value);
       if (dim === 'mode') return modeLabelFor(value);
       if (dim === 'project') return projectLabelFor(value);
       return value;
     },
-    [organizationId, userLabelFor, featureLabelFor, modeLabelFor, projectLabelFor]
+    [effectiveOrgId, userLabelFor, featureLabelFor, modeLabelFor, projectLabelFor]
   );
 
   const activeFilters = useMemo((): ActiveFilter[] => {

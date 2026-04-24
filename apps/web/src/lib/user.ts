@@ -697,6 +697,8 @@ export class SoftDeletePreconditionError extends Error {
  * - The kilocode_users row (anonymized)
  * - Stripe link (stripe_customer_id unchanged)
  * - credit_transactions, microdollar_usage (billing records)
+ * - usage_rollup_* tables (aggregated billing records keyed by kilo_user_id;
+ *   contain no direct PII — only internal identifiers and numeric aggregates)
  * - kilo_pass_subscriptions/issuances/issuance_items (financial)
  * - cli_sessions, shared_cli_sessions, cli_sessions_v2 (session history)
  * - deployments, app_builder_projects (user assets)

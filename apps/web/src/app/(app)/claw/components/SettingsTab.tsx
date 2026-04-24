@@ -558,9 +558,7 @@ function MorningBriefingCard({
   const reconcileState = briefingStatus?.reconcileState ?? 'idle';
   const lastReconcileAction = briefingStatus?.lastReconcileAction ?? null;
   const isWarmupState =
-    isRunning &&
-    (briefingStatus?.code === 'gateway_warming_up' ||
-      (actionsReady === false && reconcileState === 'in_progress'));
+    isRunning && (actionsReady === false || briefingStatus?.code === 'gateway_warming_up');
   const isTransitioning =
     reconcileState === 'in_progress' ||
     mutations.enableMorningBriefing.isPending ||

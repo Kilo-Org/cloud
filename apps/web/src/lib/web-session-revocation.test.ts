@@ -33,4 +33,18 @@ describe('web session revocation', () => {
     expect(updated?.web_session_version).toBe(5);
     expect(updated?.api_token_pepper).toBe('pepper');
   });
+
+  it('can increment web_session_version in a transaction', async () => {
+    const user = await insertTestUser({ web_session_version: 4 });
+
+    await db.transaction(async tx => {
+      await revokeWebSession(user.id, tx);
+    });
+
+    const updated = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+
+    expect(updated?.web_session_version).toBe(5);
+  });
 });

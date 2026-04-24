@@ -3,7 +3,12 @@ import { NextResponse } from 'next/server';
 import { withAuthenticatedAdminApiRoutes } from './middleware/withAuthenticatedAdminApiRoutes';
 import { withBlockedClients } from './middleware/withBlockedClients';
 import { withKiloEditorCookie } from './middleware/withKiloEditorCookie';
-import { buildContentSecurityPolicy, getConfiguredConnectSrcOrigins } from '@/lib/security-headers';
+import {
+  buildContentSecurityPolicy,
+  getConfiguredConnectSrcOrigins,
+  getContentSecurityPolicyHeaderName,
+  getContentSecurityPolicyMode,
+} from '@/lib/security-headers';
 
 function baseProxy(request: NextRequestWithAuth) {
   const requestHeaders = new Headers(request.headers);
@@ -20,13 +25,16 @@ function baseProxy(request: NextRequestWithAuth) {
     response.headers.set('X-Robots-Tag', 'noindex, noarchive, nofollow');
   }
 
-  response.headers.set(
-    'Content-Security-Policy',
-    buildContentSecurityPolicy({
-      isDevelopment: process.env.NODE_ENV === 'development',
-      connectSrcUrls: getConfiguredConnectSrcOrigins(),
-    })
-  );
+  const cspHeaderName = getContentSecurityPolicyHeaderName(getContentSecurityPolicyMode());
+  if (cspHeaderName) {
+    response.headers.set(
+      cspHeaderName,
+      buildContentSecurityPolicy({
+        isDevelopment: process.env.NODE_ENV === 'development',
+        connectSrcUrls: getConfiguredConnectSrcOrigins(),
+      })
+    );
+  }
 
   return response;
 }

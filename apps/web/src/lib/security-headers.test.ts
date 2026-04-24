@@ -1,4 +1,9 @@
-import { buildContentSecurityPolicy, getConfiguredConnectSrcOrigins } from '@/lib/security-headers';
+import {
+  buildContentSecurityPolicy,
+  getConfiguredConnectSrcOrigins,
+  getContentSecurityPolicyHeaderName,
+  getContentSecurityPolicyMode,
+} from '@/lib/security-headers';
 
 describe('security headers', () => {
   it('builds CSP with required third-party sources', () => {
@@ -17,6 +22,12 @@ describe('security headers', () => {
     expect(policy).toContain('https://www.googletagmanager.com');
     expect(policy).toContain('https://utt.impactcdn.com');
     expect(policy).toContain('https://challenges.cloudflare.com');
+    expect(policy).toContain('https://widget.usepylon.com');
+    expect(policy).toContain('https://assets.churnkey.co');
+    expect(policy).toContain('https://api.churnkey.co');
+    expect(policy).toContain('https://*.churnkey.co');
+    expect(policy).toContain('https://www.gravatar.com');
+    expect(policy).toContain('https://openrouter.ai');
     expect(policy).toContain('https://cdn.jsdelivr.net');
     expect(policy).toContain('https://unpkg.com');
     expect(policy).toContain('https://*.d.kiloapps.io');
@@ -49,6 +60,18 @@ describe('security headers', () => {
       'wss://ingest.example.com',
       'https://gastown.example.com',
     ]);
+  });
+
+  it('supports enforcement, report-only, and off modes', () => {
+    expect(getContentSecurityPolicyMode({})).toBe('enforce');
+    expect(getContentSecurityPolicyHeaderName('enforce')).toBe('Content-Security-Policy');
+    expect(getContentSecurityPolicyMode({ CSP_MODE: 'report-only' })).toBe('report-only');
+    expect(getContentSecurityPolicyHeaderName('report-only')).toBe(
+      'Content-Security-Policy-Report-Only'
+    );
+    expect(getContentSecurityPolicyMode({ CSP_MODE: 'off' })).toBe('off');
+    expect(getContentSecurityPolicyHeaderName('off')).toBeNull();
+    expect(getContentSecurityPolicyMode({ CSP_MODE: 'unexpected' })).toBe('enforce');
   });
 
   it('allows extra CSP sources through directive-specific env vars', () => {

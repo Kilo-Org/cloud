@@ -14,6 +14,8 @@ export type ContentSecurityPolicyOptions = {
   env?: Record<string, string | undefined>;
 };
 
+export type ContentSecurityPolicyMode = 'enforce' | 'report-only' | 'off';
+
 const ADDITIONAL_SOURCE_ENV_BY_DIRECTIVE = {
   'script-src': 'CSP_ADDITIONAL_SCRIPT_SRC',
   'connect-src': 'CSP_ADDITIONAL_CONNECT_SRC',
@@ -67,6 +69,20 @@ export function getConfiguredConnectSrcOrigins(
   ]);
 }
 
+export function getContentSecurityPolicyMode(
+  env: Record<string, string | undefined> = process.env
+): ContentSecurityPolicyMode {
+  const configuredMode = env.CSP_MODE?.trim().toLowerCase();
+  if (configuredMode === 'off' || configuredMode === 'report-only') return configuredMode;
+  return 'enforce';
+}
+
+export function getContentSecurityPolicyHeaderName(mode: ContentSecurityPolicyMode): string | null {
+  if (mode === 'off') return null;
+  if (mode === 'report-only') return 'Content-Security-Policy-Report-Only';
+  return 'Content-Security-Policy';
+}
+
 export function buildContentSecurityPolicy({
   isDevelopment = false,
   connectSrcUrls,
@@ -86,6 +102,8 @@ export function buildContentSecurityPolicy({
     'https://*.js.stripe.com',
     'https://checkout.stripe.com',
     'https://challenges.cloudflare.com',
+    'https://widget.usepylon.com',
+    'https://assets.churnkey.co',
     ...getAdditionalCspSources('script-src', env),
   ]);
 
@@ -102,6 +120,10 @@ export function buildContentSecurityPolicy({
     'https://challenges.cloudflare.com',
     'https://cdn.jsdelivr.net',
     'https://unpkg.com',
+    'https://widget.usepylon.com',
+    'https://assets.churnkey.co',
+    'https://api.churnkey.co',
+    'https://*.churnkey.co',
     'https://*.d.kiloapps.io',
     isDevelopment ? 'http://localhost:*' : null,
     isDevelopment ? 'ws://localhost:*' : null,
@@ -127,6 +149,11 @@ export function buildContentSecurityPolicy({
       'https://www.googletagmanager.com',
       'https://utt.impactcdn.com',
       'https://challenges.cloudflare.com',
+      'https://widget.usepylon.com',
+      'https://assets.churnkey.co',
+      'https://*.churnkey.co',
+      'https://www.gravatar.com',
+      'https://openrouter.ai',
       ...getAdditionalCspSources('img-src', env),
     ],
     'style-src': ["'self'", "'unsafe-inline'", ...getAdditionalCspSources('style-src', env)],
@@ -139,6 +166,9 @@ export function buildContentSecurityPolicy({
       'https://checkout.stripe.com',
       'https://challenges.cloudflare.com',
       'https://www.youtube.com',
+      'https://widget.usepylon.com',
+      'https://assets.churnkey.co',
+      'https://*.churnkey.co',
       'https://*.d.kiloapps.io',
       ...getAdditionalCspSources('frame-src', env),
     ],

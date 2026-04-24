@@ -622,7 +622,8 @@ function MorningBriefingCard({
         ? 'No sources are connected yet. Configure GitHub, Linear, or Web Search to generate richer briefings.'
         : `Connected sources: ${joinFriendlyList(readySources)}. Disconnected sources: ${joinFriendlyList(missingSources)}.`;
   const showScheduleDetails = !isWarmupState && hasSchedule && desiredEnabled;
-  const canUseBriefingControls = actionsReady && desiredEnabled;
+  const controlsEnabled = actionsReady && !isWarmupState;
+  const canUseBriefingControls = controlsEnabled && desiredEnabled;
 
   return (
     <div className="rounded-lg border px-4 py-3">
@@ -647,7 +648,9 @@ function MorningBriefingCard({
           <Button
             size="sm"
             variant="outline"
-            disabled={!actionsReady || desiredEnabled || mutations.enableMorningBriefing.isPending}
+            disabled={
+              !controlsEnabled || desiredEnabled || mutations.enableMorningBriefing.isPending
+            }
             onClick={() => {
               mutations.enableMorningBriefing.mutate(
                 {},
@@ -664,7 +667,7 @@ function MorningBriefingCard({
             size="sm"
             variant="outline"
             disabled={
-              !actionsReady || !desiredEnabled || mutations.disableMorningBriefing.isPending
+              !controlsEnabled || !desiredEnabled || mutations.disableMorningBriefing.isPending
             }
             onClick={() => {
               mutations.disableMorningBriefing.mutate(undefined, {

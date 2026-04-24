@@ -95,6 +95,23 @@ function parseSandboxId(c: HonoCtx) {
   return { ok: true as const, data: result.data };
 }
 
+/**
+ * Verifies the authenticated caller is a member of the given conversation.
+ * Used by bot-facing routes that would otherwise accept any valid gateway
+ * token regardless of whether the conversation belongs to that sandbox.
+ */
+async function assertCallerIsMember(c: HonoCtx, conversationId: string, callerId: string) {
+  const info = await withDORetry(
+    () => c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.getInfo(),
+    'ConversationDO.getInfo'
+  );
+  if (!info || !info.members.some(m => m.id === callerId)) {
+    return { ok: false as const, response: c.json({ error: 'Forbidden' }, 403) };
+  }
+  return { ok: true as const };
+}
+
 export function makeSchedule(c: HonoCtx): DeferCtx {
   try {
     // Probe for executionCtx — absent in unit-test (app.request) mode.
@@ -230,6 +247,10 @@ export async function handleMessageDeliveryFailed(c: HonoCtx) {
   const msgId = parseMessageId(c);
   if (!msgId.ok) return msgId.response;
 
+  const callerId = c.get('callerId');
+  const membership = await assertCallerIsMember(c, convId.data, callerId);
+  if (!membership.ok) return membership.response;
+
   // Accept empty body. Validate when present but never fail on shape.
   let body: unknown = {};
   try {
@@ -242,7 +263,7 @@ export async function handleMessageDeliveryFailed(c: HonoCtx) {
   await notifyMessageDeliveryFailed(c.env, {
     conversationId: convId.data,
     messageId: msgId.data,
-    senderId: c.get('callerId'),
+    senderId: callerId,
   });
   return c.json({}, 202);
 }
@@ -268,6 +289,10 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
   if (!parsed.success) {
     return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400);
   }
+
+  const callerId = c.get('callerId');
+  const membership = await assertCallerIsMember(c, convId.data, callerId);
+  if (!membership.ok) return membership.response;
 
   const { messageId } = parsed.data;
   const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));

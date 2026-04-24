@@ -12,7 +12,10 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import {
+  isReasoningExplicitlyDisabled,
+  isReasoningExplicitlyEnabled,
+} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { redisGet } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
@@ -23,6 +26,7 @@ import {
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -153,18 +157,18 @@ export function applyVercelSettings(
   }
 
   if (requestToMutate.body.providerOptions) {
-    const anthropicOptions: Record<string, unknown> = {};
+    const anthropicOptions: AnthropicProviderOptions = {};
+    // Workaround for Vercel not displaying thinking by default, unlike OpenRouter.
+    const isOpus47Thinking =
+      requestedModel.includes('opus-4.7') && isReasoningExplicitlyEnabled(requestToMutate);
+    if (isOpus47Thinking) {
+      anthropicOptions.thinking = { type: 'adaptive', display: 'summarized' };
+    }
     if (requestToMutate.kind === 'chat_completions' && requestToMutate.body.verbosity) {
       anthropicOptions.effort = requestToMutate.body.verbosity;
     }
     if (requestToMutate.kind === 'responses' && requestToMutate.body.text?.verbosity) {
       anthropicOptions.effort = requestToMutate.body.text.verbosity;
-    }
-    // Workaround for Vercel not displaying thinking by default, unlike OpenRouter.
-    if (requestedModel.includes('opus-4.7')) {
-      anthropicOptions.thinking = isReasoningExplicitlyDisabled(requestToMutate)
-        ? { type: 'disabled' }
-        : { type: 'adaptive', display: 'summarized' };
     }
     if (Object.keys(anthropicOptions).length > 0) {
       requestToMutate.body.providerOptions.anthropic = anthropicOptions;

@@ -90,6 +90,7 @@ export function extractSandboxId(botMemberId: string): string | null {
 
 /**
  * Gets human member IDs and sandboxId for a conversation.
+ * Used by webhook delivery failure notification.
  */
 export async function getConversationContext(
   env: Env,

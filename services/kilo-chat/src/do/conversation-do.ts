@@ -25,6 +25,11 @@ import { conversation, members, messages, reactions } from '../db/conversation-s
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
 
+export type MemberContext = {
+  humanMemberIds: string[];
+  sandboxId: string | null;
+};
+
 export type InitializeParams = {
   id: string;
   title: string | null;
@@ -79,7 +84,7 @@ export type EditMessageParams = {
 };
 
 export type EditMessageResult =
-  | { ok: true; stale: false; messageId: string }
+  | { ok: true; stale: false; messageId: string; memberContext: MemberContext }
   | { ok: true; stale: true; messageId: string }
   | { ok: false; code: 'not_found' | 'forbidden'; error: string };
 
@@ -89,7 +94,7 @@ export type DeleteMessageParams = {
 };
 
 export type DeleteMessageResult =
-  | { ok: true }
+  | { ok: true; memberContext: MemberContext }
   | { ok: false; code: 'not_found' | 'forbidden'; error: string };
 
 export type ExecuteActionParams = {
@@ -109,11 +114,12 @@ export type ExecuteActionResult =
 
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
-  | { ok: true; added: boolean; id: string }
+  | { ok: true; added: true; id: string; memberContext: MemberContext }
+  | { ok: true; added: false; id: string }
   | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 export type RemoveReactionParams = { messageId: string; memberId: string; emoji: string };
 export type RemoveReactionResult =
-  | { ok: true; removed: true; removed_id: string }
+  | { ok: true; removed: true; removed_id: string; memberContext: MemberContext }
   | { ok: true; removed: false }
   | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
@@ -192,6 +198,20 @@ export class ConversationDO extends DurableObject<Env> {
       .where(and(eq(members.id, memberId), sql`${members.left_at} IS NULL`))
       .get();
     return row !== undefined;
+  }
+
+  private getMemberContext(): MemberContext {
+    const activeMembers = this.db
+      .select({ id: members.id, kind: members.kind })
+      .from(members)
+      .where(sql`${members.left_at} IS NULL`)
+      .all();
+
+    const humanMemberIds = activeMembers.filter(m => m.kind === 'user').map(m => m.id);
+    const botMember = activeMembers.find(m => m.kind === 'bot');
+    const sandboxId = botMember ? (botMember.id.match(/^bot:kiloclaw:(.+)$/)?.[1] ?? null) : null;
+
+    return { humanMemberIds, sandboxId };
   }
 
   createMessage(params: CreateMessageParams): CreateMessageResult {
@@ -324,14 +344,21 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(messages.id, params.messageId))
       .run();
 
-    return { ok: true, stale: false, messageId: params.messageId };
+    return {
+      ok: true,
+      stale: false,
+      messageId: params.messageId,
+      memberContext: this.getMemberContext(),
+    };
   }
 
-  setTyping(memberId: string): { ok: true } | { ok: false; error: string } {
+  setTyping(
+    memberId: string
+  ): { ok: true; memberContext: MemberContext } | { ok: false; error: string } {
     if (!this.isMember(memberId)) {
       return { ok: false, error: 'Not a member' };
     }
-    return { ok: true };
+    return { ok: true, memberContext: this.getMemberContext() };
   }
 
   deleteMessage(params: DeleteMessageParams): DeleteMessageResult {
@@ -354,7 +381,7 @@ export class ConversationDO extends DurableObject<Env> {
 
     // Already deleted — idempotent success (only for the original sender)
     if (row.deleted === 1) {
-      return { ok: true };
+      return { ok: true, memberContext: this.getMemberContext() };
     }
 
     this.db
@@ -363,7 +390,7 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(messages.id, params.messageId))
       .run();
 
-    return { ok: true };
+    return { ok: true, memberContext: this.getMemberContext() };
   }
 
   executeAction(params: ExecuteActionParams): ExecuteActionResult {
@@ -448,7 +475,7 @@ export class ConversationDO extends DurableObject<Env> {
             removed_id: null,
           })
           .run();
-        return { ok: true, added: true, id };
+        return { ok: true, added: true, id, memberContext: this.getMemberContext() };
       }
 
       if (existing.deleted_at === null) {
@@ -468,7 +495,7 @@ export class ConversationDO extends DurableObject<Env> {
           )
         )
         .run();
-      return { ok: true, added: true, id };
+      return { ok: true, added: true, id, memberContext: this.getMemberContext() };
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
         return { ok: false, code: 'internal', error: err.message };
@@ -514,7 +541,12 @@ export class ConversationDO extends DurableObject<Env> {
           )
         )
         .run();
-      return { ok: true, removed: true, removed_id: removedId };
+      return {
+        ok: true,
+        removed: true,
+        removed_id: removedId,
+        memberContext: this.getMemberContext(),
+      };
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
         return { ok: false, code: 'internal', error: err.message };

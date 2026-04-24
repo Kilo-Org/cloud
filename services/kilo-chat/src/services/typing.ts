@@ -1,6 +1,6 @@
 /** Identity-agnostic typing indicators. See services/messages.ts for rationale. */
 
-import { getConversationContext, pushEventToHumanMembers } from './event-push';
+import { pushEventToHumanMembers } from './event-push';
 
 export type TypingParams = { conversationId: string };
 
@@ -34,13 +34,12 @@ async function pushTypingEvent(
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }
 
-  const convContext = await getConversationContext(env, params.conversationId);
-  if (convContext?.sandboxId) {
+  if (result.memberContext.sandboxId) {
     await pushEventToHumanMembers(
       env,
       params.conversationId,
-      convContext.sandboxId,
-      convContext.humanMemberIds,
+      result.memberContext.sandboxId,
+      result.memberContext.humanMemberIds,
       event,
       { memberId: callerId }
     );

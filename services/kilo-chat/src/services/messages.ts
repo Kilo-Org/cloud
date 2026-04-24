@@ -11,7 +11,6 @@ import type { ContentBlock } from '@kilocode/kilo-chat';
 import { deliverToBot, deliverActionExecutedToBot } from '../webhook/deliver';
 import {
   extractConversationContext,
-  getConversationContext,
   pushEventToHumanMembers,
   pushInstanceEvent,
   isUserPresentInConversation,
@@ -259,13 +258,12 @@ export async function editMessageFor(
     return { ok: true, stale: true, messageId: result.messageId };
   }
 
-  const convContext = await getConversationContext(env, conversationId);
-  if (convContext?.sandboxId) {
+  if (result.memberContext.sandboxId) {
     await pushEventToHumanMembers(
       env,
       conversationId,
-      convContext.sandboxId,
-      convContext.humanMemberIds,
+      result.memberContext.sandboxId,
+      result.memberContext.humanMemberIds,
       'message.updated',
       { messageId: result.messageId, content, clientUpdatedAt: timestamp }
     );
@@ -305,13 +303,12 @@ export async function deleteMessageFor(
     return { ok: false, code: 'internal', error: result.error };
   }
 
-  const convContext = await getConversationContext(env, conversationId);
-  if (convContext?.sandboxId) {
+  if (result.memberContext.sandboxId) {
     await pushEventToHumanMembers(
       env,
       conversationId,
-      convContext.sandboxId,
-      convContext.humanMemberIds,
+      result.memberContext.sandboxId,
+      result.memberContext.humanMemberIds,
       'message.deleted',
       { messageId }
     );

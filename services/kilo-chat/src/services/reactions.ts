@@ -1,6 +1,6 @@
 /** Identity-agnostic reaction operations. See services/messages.ts for rationale. */
 
-import { getConversationContext, pushEventToHumanMembers } from './event-push';
+import { pushEventToHumanMembers } from './event-push';
 
 export type AddReactionParams = {
   conversationId: string;
@@ -28,13 +28,12 @@ export async function addReactionFor(
   }
 
   if (result.added) {
-    const convContext = await getConversationContext(env, params.conversationId);
-    if (convContext?.sandboxId) {
+    if (result.memberContext.sandboxId) {
       await pushEventToHumanMembers(
         env,
         params.conversationId,
-        convContext.sandboxId,
-        convContext.humanMemberIds,
+        result.memberContext.sandboxId,
+        result.memberContext.humanMemberIds,
         'reaction.added',
         { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
       );
@@ -70,13 +69,12 @@ export async function removeReactionFor(
   }
 
   if (result.removed) {
-    const convContext = await getConversationContext(env, params.conversationId);
-    if (convContext?.sandboxId) {
+    if (result.memberContext.sandboxId) {
       await pushEventToHumanMembers(
         env,
         params.conversationId,
-        convContext.sandboxId,
-        convContext.humanMemberIds,
+        result.memberContext.sandboxId,
+        result.memberContext.humanMemberIds,
         'reaction.removed',
         { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
       );

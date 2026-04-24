@@ -162,6 +162,9 @@ export class EventServiceClient {
     handlers.add(handler);
     return () => {
       handlers?.delete(handler);
+      if (handlers?.size === 0) {
+        this.eventHandlers.delete(event);
+      }
     };
   }
 

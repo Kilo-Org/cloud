@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
+import type { WastelandOutputs } from '@/lib/wasteland/trpc';
+import { parseDoltDate } from '@/lib/wasteland/date';
 import { useUser } from '@/hooks/useUser';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,6 +15,11 @@ import { useSetWastelandPageHeader } from '../WastelandPageHeaderContext';
 import { useDrawerStack } from '@/components/wasteland/drawer/WastelandDrawerStack';
 
 type TrustFilter = number | null;
+type Rig = WastelandOutputs['wasteland']['listUpstreamRigs']['rigs'][number];
+
+// Stable empty-array reference so memos that depend on the fallback
+// don't re-run on every loading-state render.
+const EMPTY_RIGS: Rig[] = [];
 
 export function RigsClient({ wastelandId }: { wastelandId: string }) {
   const trpc = useWastelandTRPC();
@@ -50,7 +57,7 @@ export function RigsClient({ wastelandId }: { wastelandId: string }) {
     onError: err => toast.error(`Failed to update trust: ${err.message}`),
   });
 
-  const rigs = rigsQuery.data?.rigs ?? [];
+  const rigs = rigsQuery.data?.rigs ?? EMPTY_RIGS;
 
   const trustCounts = useMemo(() => {
     const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
@@ -222,12 +229,18 @@ export function RigsClient({ wastelandId }: { wastelandId: string }) {
                       <p className="truncate font-mono text-sm text-white/70">{rig.rig_handle}</p>
                       <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-white/30">
                         {rig.display_name && <span>{rig.display_name}</span>}
-                        {rig.registered_at && (
-                          <span>Joined {formatDistanceToNow(new Date(rig.registered_at))} ago</span>
-                        )}
-                        {rig.last_seen_at && (
-                          <span>Seen {formatDistanceToNow(new Date(rig.last_seen_at))} ago</span>
-                        )}
+                        {(() => {
+                          const registered = parseDoltDate(rig.registered_at);
+                          return registered ? (
+                            <span>Joined {formatDistanceToNow(registered)} ago</span>
+                          ) : null;
+                        })()}
+                        {(() => {
+                          const lastSeen = parseDoltDate(rig.last_seen_at);
+                          return lastSeen ? (
+                            <span>Seen {formatDistanceToNow(lastSeen)} ago</span>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                     <ChevronRight className="size-3.5 shrink-0 text-white/15 transition-colors group-hover:text-white/40" />

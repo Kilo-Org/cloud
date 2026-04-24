@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, Hand, ThumbsDown, ThumbsUp, UserMinus, XCircle } from 'lucide-react';
 import type { DrawerStackHelpers } from '@/components/drawer';
 import { MarkdownProse } from '@/components/security-agent/MarkdownProse';
+import { parseDoltDate } from '@/lib/wasteland/date';
 import type { WantedItem, WantedPanelActions, WastelandDrawerRef } from './types';
 import { RigLink } from './CrossRefs';
 
@@ -198,19 +199,6 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
       <span className={`text-white/60 ${mono ? 'font-mono text-[10px]' : ''}`}>{value}</span>
     </div>
   );
-}
-
-/**
- * Parses MySQL DATETIME strings coming from DoltHub, which omit timezone
- * markers but are actually UTC. Without this, `new Date()` parses them in
- * local time and produces values that look hours off.
- */
-function parseDoltDate(value: unknown): Date | null {
-  if (typeof value !== 'string' || value.length === 0) return null;
-  if (/[Zz]|[+-]\d{2}:?\d{2}$/.test(value)) return new Date(value);
-  const normalized = value.includes('T') ? `${value}Z` : `${value.replace(' ', 'T')}Z`;
-  const d = new Date(normalized);
-  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function formatTimestamp(iso: string | null): string {

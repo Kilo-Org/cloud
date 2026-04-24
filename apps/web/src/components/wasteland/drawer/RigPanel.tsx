@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import type { DrawerStackHelpers } from '@/components/drawer';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
+import { parseDoltDate } from '@/lib/wasteland/date';
 import type { WastelandDrawerRef, RigActivity } from './types';
 import { WantedItemLink } from './CrossRefs';
 
@@ -181,22 +182,8 @@ export function RigPanel({
             fullWidth
           />
         )}
-        <MetaCell
-          label="Registered"
-          value={
-            rig.registered_at
-              ? formatDistanceToNow(new Date(rig.registered_at), { addSuffix: true })
-              : '—'
-          }
-        />
-        <MetaCell
-          label="Last seen"
-          value={
-            rig.last_seen_at
-              ? formatDistanceToNow(new Date(rig.last_seen_at), { addSuffix: true })
-              : '—'
-          }
-        />
+        <MetaCell label="Registered" value={formatRelative(rig.registered_at)} />
+        <MetaCell label="Last seen" value={formatRelative(rig.last_seen_at)} />
       </div>
 
       {/* Activity sections */}
@@ -525,6 +512,11 @@ function MetaCell({
       <div className="mt-0.5 truncate text-sm text-white/70">{value}</div>
     </div>
   );
+}
+
+function formatRelative(iso: string | null): string {
+  const d = parseDoltDate(iso);
+  return d ? formatDistanceToNow(d, { addSuffix: true }) : '—';
 }
 
 function LoadingState({ label }: { label: string }) {

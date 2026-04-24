@@ -1538,15 +1538,25 @@ export const wastelandRouter = router({
       const stampsAuthoredSql = `SELECT s.id AS stamp_id, s.author, s.subject, s.valence, s.confidence, s.severity, s.skill_tags, s.message, s.context_id, s.context_type, c.wanted_id, w.title AS wanted_title FROM stamps s LEFT JOIN completions c ON c.id = s.context_id LEFT JOIN wanted w ON w.id = c.wanted_id WHERE s.author = '${handle}' ORDER BY s.id DESC LIMIT ${limit}`;
       const stampsReceivedSql = `SELECT s.id AS stamp_id, s.author, s.subject, s.valence, s.confidence, s.severity, s.skill_tags, s.message, s.context_id, s.context_type, c.wanted_id, w.title AS wanted_title FROM stamps s LEFT JOIN completions c ON c.id = s.context_id LEFT JOIN wanted w ON w.id = c.wanted_id WHERE s.subject = '${handle}' ORDER BY s.id DESC LIMIT ${limit}`;
 
-      async function runOrEmpty<T>(sql: string, parser: (rows: unknown[]) => T[]): Promise<T[]> {
+      async function runOrEmpty<T>(
+        sql: string,
+        parser: (rows: unknown[]) => T[],
+        label: string
+      ): Promise<T[]> {
         try {
           const result = await doltApi.runUnsafeSql(upstream, token, 'main', sql);
           return parser(result.rows ?? []);
         } catch (err) {
           if (err instanceof doltApi.DoltHubApiError) {
             // A missing table (e.g. no stamps yet on a new upstream) shouldn't
-            // nuke the whole response — log via status and return empty.
-            if (err.status === 404 || err.status === 400) return [];
+            // nuke the whole response. Log the status + label so an empty
+            // section doesn't silently hide a real failure.
+            if (err.status === 404 || err.status === 400) {
+              console.warn(
+                `[listRigActivity] ${label} returned ${err.status} (${err.message}); treating as empty`
+              );
+              return [];
+            }
           }
           throw err;
         }
@@ -1554,28 +1564,32 @@ export const wastelandRouter = router({
 
       try {
         const [posted, claimed, completions, stampsAuthored, stampsReceived] = await Promise.all([
-          runOrEmpty(postedSql, parseWantedBoardRows),
-          runOrEmpty(claimedSql, parseWantedBoardRows),
-          runOrEmpty(completionsSql, rows => {
-            const parsed = z
-              .array(
-                z.object({
-                  completion_id: z.string(),
-                  wanted_id: z.string(),
-                  wanted_title: z.string().nullable().default(null),
-                  completed_by: z.string().nullable().default(null),
-                  evidence: z.string().nullable().default(null),
-                  hop_uri: z.string().nullable().default(null),
-                  validated_by: z.string().nullable().default(null),
-                  stamp_id: z.string().nullable().default(null),
-                  completed_at: z.string().nullable().default(null),
-                })
-              )
-              .safeParse(rows);
-            return parsed.success ? parsed.data : [];
-          }),
-          runOrEmpty(stampsAuthoredSql, rows => parseStampRows(rows)),
-          runOrEmpty(stampsReceivedSql, rows => parseStampRows(rows)),
+          runOrEmpty(postedSql, parseWantedBoardRows, 'posted'),
+          runOrEmpty(claimedSql, parseWantedBoardRows, 'claimed'),
+          runOrEmpty(
+            completionsSql,
+            rows => {
+              const parsed = z
+                .array(
+                  z.object({
+                    completion_id: z.string(),
+                    wanted_id: z.string(),
+                    wanted_title: z.string().nullable().default(null),
+                    completed_by: z.string().nullable().default(null),
+                    evidence: z.string().nullable().default(null),
+                    hop_uri: z.string().nullable().default(null),
+                    validated_by: z.string().nullable().default(null),
+                    stamp_id: z.string().nullable().default(null),
+                    completed_at: z.string().nullable().default(null),
+                  })
+                )
+                .safeParse(rows);
+              return parsed.success ? parsed.data : [];
+            },
+            'completions'
+          ),
+          runOrEmpty(stampsAuthoredSql, rows => parseStampRows(rows), 'stamps_authored'),
+          runOrEmpty(stampsReceivedSql, rows => parseStampRows(rows), 'stamps_received'),
         ]);
         return {
           posted,

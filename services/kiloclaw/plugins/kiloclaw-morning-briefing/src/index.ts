@@ -8,9 +8,15 @@ import {
   offsetDays,
   resolveBriefingPath,
 } from './briefing-utils';
-import { pickCanonicalCronJobId, selectMorningBriefingJobs } from './cron-utils';
+import {
+  filterEnabledBriefingJobs,
+  pickCanonicalCronJobId,
+  selectMorningBriefingJobs,
+} from './cron-utils';
 import { extractBriefingArgsFromText } from './command-fallback-utils';
+import { type EnableInput, parseEnableArgs } from './enable-input-utils';
 import { normalizeLinearIssues, summarizeLinearCallFailure } from './linear-utils';
+import { resolveNextReconcileAction } from './reconcile-queue-utils';
 import { normalizeWebResults } from './web-utils';
 
 const PLUGIN_ID = 'kiloclaw-morning-briefing';
@@ -928,30 +934,13 @@ async function getStatusSnapshot(api: {
   };
 }
 
-function parseSetupArgs(args: string | undefined): { cron?: string; timezone?: string } {
-  const text = (args ?? '').trim();
-  if (!text) {
-    return {};
-  }
-  const tokens = text.split(/\s+/).filter(Boolean);
-  if (tokens.length === 1) {
-    return { cron: tokens[0] };
-  }
-  if (tokens.length >= 2) {
-    return {
-      cron: tokens[0],
-      timezone: tokens[1],
-    };
-  }
-  return {};
-}
-
 export default definePluginEntry({
   id: PLUGIN_ID,
   name: 'KiloClawMorningBriefing',
   description: 'Morning briefing plugin for KiloClaw-hosted OpenClaw instances',
   register(api) {
     let reconcileInFlight: Promise<void> | null = null;
+    let queuedReconcileAction: 'enable' | 'disable' | null = null;
 
     const reconcileDesiredState = async (action: 'enable' | 'disable'): Promise<void> => {
       const paths = getStatePaths(api);
@@ -997,7 +986,7 @@ export default definePluginEntry({
             );
           }
         }
-        const remainingEnabledJobs = await listBriefingCronJobs(api);
+        const remainingEnabledJobs = filterEnabledBriefingJobs(await listBriefingCronJobs(api));
         if (disableErrors.length > 0 || remainingEnabledJobs.length > 0) {
           const issues: string[] = [];
           issues.push(...disableErrors);
@@ -1037,9 +1026,34 @@ export default definePluginEntry({
 
     const triggerReconcile = (action: 'enable' | 'disable') => {
       if (reconcileInFlight) {
+        queuedReconcileAction = action;
         return;
       }
-      reconcileInFlight = reconcileDesiredState(action).finally(() => {
+      const runReconcileLoop = async (initialAction: 'enable' | 'disable') => {
+        let nextAction: 'enable' | 'disable' | null = initialAction;
+
+        while (nextAction) {
+          await reconcileDesiredState(nextAction);
+
+          const queuedAction = queuedReconcileAction;
+          queuedReconcileAction = null;
+
+          const paths = getStatePaths(api);
+          await ensureStorage(paths);
+          const [config, status] = await Promise.all([
+            readStoredConfig(api, paths),
+            readStoredStatus(paths),
+          ]);
+
+          nextAction = resolveNextReconcileAction({
+            queuedAction,
+            desiredEnabled: config.enabled,
+            observedEnabled: status.observedEnabled,
+          });
+        }
+      };
+
+      reconcileInFlight = runReconcileLoop(action).finally(() => {
         reconcileInFlight = null;
       });
       void reconcileInFlight.catch(error => {
@@ -1047,17 +1061,16 @@ export default definePluginEntry({
       });
     };
 
-    const enableFromCommand = async (args: string | undefined) => {
+    const enableFromInput = async (input: EnableInput) => {
       const paths = getStatePaths(api);
       await ensureStorage(paths);
 
       const current = await readStoredConfig(api, paths);
-      const parsed = parseSetupArgs(args);
       const nextConfig: StoredConfig = {
         ...current,
         enabled: true,
-        cron: parsed.cron?.trim() || current.cron,
-        timezone: parsed.timezone?.trim() || current.timezone,
+        cron: input.cron?.trim() || current.cron,
+        timezone: input.timezone?.trim() || current.timezone,
         updatedAt: new Date().toISOString(),
       };
 
@@ -1069,6 +1082,10 @@ export default definePluginEntry({
       });
       triggerReconcile('enable');
       return nextConfig;
+    };
+
+    const enableFromCommand = async (args: string | undefined) => {
+      return enableFromInput(parseEnableArgs(args));
     };
 
     const disableFromCommand = async () => {
@@ -1323,8 +1340,7 @@ export default definePluginEntry({
           const body = asObject(await readRequestBody(req));
           const cron = typeof body.cron === 'string' ? body.cron.trim() : undefined;
           const timezone = typeof body.timezone === 'string' ? body.timezone.trim() : undefined;
-          const suffix = [cron, timezone].filter(Boolean).join(' ');
-          const result = await enableFromCommand(suffix);
+          const result = await enableFromInput({ cron, timezone });
           const status = await readStoredStatus(getStatePaths(api));
           sendJson(res, 200, {
             ok: true,

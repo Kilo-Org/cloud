@@ -64,3 +64,9 @@ export function pickCanonicalCronJobId(
 
   return sorted[0]?.id ?? null;
 }
+
+export function filterEnabledBriefingJobs(
+  jobs: MorningBriefingCronJob[]
+): MorningBriefingCronJob[] {
+  return jobs.filter(job => job.enabled);
+}

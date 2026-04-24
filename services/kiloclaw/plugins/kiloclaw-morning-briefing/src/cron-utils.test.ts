@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { pickCanonicalCronJobId, selectMorningBriefingJobs } from './cron-utils';
+import {
+  filterEnabledBriefingJobs,
+  pickCanonicalCronJobId,
+  selectMorningBriefingJobs,
+} from './cron-utils';
 
 describe('cron-utils', () => {
   it('selects only briefing jobs with matching tool allowlist', () => {
@@ -49,5 +53,14 @@ describe('cron-utils', () => {
     );
 
     expect(canonical).toBe('new');
+  });
+
+  it('filters only enabled briefing jobs', () => {
+    const filtered = filterEnabledBriefingJobs([
+      { id: 'enabled', enabled: true, updatedAtMs: 1, createdAtMs: 1 },
+      { id: 'disabled', enabled: false, updatedAtMs: 1, createdAtMs: 1 },
+    ]);
+
+    expect(filtered.map(job => job.id)).toEqual(['enabled']);
   });
 });

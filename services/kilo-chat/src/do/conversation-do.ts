@@ -110,12 +110,12 @@ export type ExecuteActionResult =
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
   | { ok: true; added: boolean; id: string }
-  | { ok: false; code: 'not_found' | 'internal'; error: string };
+  | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 export type RemoveReactionParams = { messageId: string; memberId: string; emoji: string };
 export type RemoveReactionResult =
   | { ok: true; removed: true; removed_id: string }
   | { ok: true; removed: false }
-  | { ok: false; code: 'not_found' | 'internal'; error: string };
+  | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
 export class ConversationDO extends DurableObject<Env> {
   private db;
@@ -411,6 +411,9 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   addReaction(params: AddReactionParams): AddReactionResult {
+    if (!this.isMember(params.memberId)) {
+      return { ok: false, code: 'forbidden' as const, error: 'Not a member' };
+    }
     const message = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
     if (!message || message.deleted === 1) {
       return { ok: false, code: 'not_found', error: 'Message not found' };
@@ -475,6 +478,9 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   removeReaction(params: RemoveReactionParams): RemoveReactionResult {
+    if (!this.isMember(params.memberId)) {
+      return { ok: false, code: 'forbidden' as const, error: 'Not a member' };
+    }
     const message = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
     if (!message || message.deleted === 1) {
       return { ok: false, code: 'not_found', error: 'Message not found' };

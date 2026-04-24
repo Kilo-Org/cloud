@@ -244,10 +244,6 @@ export async function editMessageFor(
   const { conversationId, messageId, content, timestamp } = params;
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
 
-  if (!(await convStub.isMember(callerId))) {
-    return { ok: false, code: 'forbidden', error: 'Forbidden' };
-  }
-
   const result = await convStub.editMessage({
     messageId,
     senderId: callerId,
@@ -301,10 +297,6 @@ export async function deleteMessageFor(
 ): Promise<DeleteMessageResult> {
   const { conversationId, messageId } = params;
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
-
-  if (!(await convStub.isMember(callerId))) {
-    return { ok: false, code: 'forbidden', error: 'Forbidden' };
-  }
 
   const result = await convStub.deleteMessage({ messageId, senderId: callerId });
   if (!result.ok) {

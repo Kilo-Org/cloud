@@ -79,9 +79,32 @@ describe('detectContextOverflow', () => {
     if (!result) throw new Error('expected a response');
     const json = await result.json();
     expect(json.error_type).toBe(ProxyErrorType.context_length_exceeded);
-    expect(String(json.message)).toMatch(/maximum context length/i);
-    // Upstream already wrote a reasonable message — pass it through unchanged.
-    expect(json.message).toBe(upstreamMessage);
+    // Upstream body is passed through verbatim at the top level; we only
+    // attach `error_type` alongside the original `error` field.
+    expect(json.error).toEqual({ message: upstreamMessage });
+    expect(json.message).toBeUndefined();
+  });
+
+  it('preserves unrelated top-level fields from the upstream body', async () => {
+    const upstreamMessage = "maximum context length is 128000 tokens. That's too many.";
+    const response = new Response(
+      JSON.stringify({ error: { message: upstreamMessage, code: 'ctx_overflow' }, foo: 42 }),
+      { status: 400 }
+    );
+
+    const result = await detectContextOverflow({
+      requestedModel: 'some-unknown-model',
+      request: emptyRequest,
+      response,
+    });
+
+    if (!result) throw new Error('expected a response');
+    const json = await result.json();
+    expect(json).toEqual({
+      error: { message: upstreamMessage, code: 'ctx_overflow' },
+      foo: 42,
+      error_type: ProxyErrorType.context_length_exceeded,
+    });
   });
 
   it('does not double-encode an unknown-shape JSON body into our response', async () => {
@@ -130,7 +153,8 @@ describe('detectContextOverflow', () => {
     if (!result) throw new Error('expected a response');
     const json = await result.json();
     expect(json.error_type).toBe(ProxyErrorType.context_length_exceeded);
-    expect(json.message).toBe(upstreamMessage);
+    expect(json.error).toBe(upstreamMessage);
+    expect(json.message).toBeUndefined();
   });
 
   it('triggers on a generic 500 when our estimate exceeds the window', async () => {

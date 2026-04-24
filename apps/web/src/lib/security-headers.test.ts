@@ -23,7 +23,8 @@ describe('security headers', () => {
     expect(policy).toContain('https://login-test.kilo.ai');
     expect(policy).toContain('https://www.googletagmanager.com');
     expect(policy).toContain('https://utt.impactcdn.com');
-    expect(policy).toContain('https://challenges.cloudflare.com');
+    expect(policy).toMatch(/script-src [^;]*https:\/\/challenges\.cloudflare\.com/);
+    expect(policy).toMatch(/frame-src [^;]*https:\/\/challenges\.cloudflare\.com/);
     expect(policy).toContain('https://widget.usepylon.com');
     expect(policy).toContain('https://assets.churnkey.co');
     expect(policy).toContain('https://api.churnkey.co');
@@ -41,6 +42,16 @@ describe('security headers', () => {
     expect(policy).toContain('https://www.youtube.com');
     expect(policy).toContain("'wasm-unsafe-eval'");
     expect(policy).toContain('wss://cloud-agent.example.com');
+  });
+
+  it('aligns Turnstile CSP sources with Cloudflare documentation', () => {
+    const policy = buildContentSecurityPolicy();
+
+    expect(policy).toMatch(/script-src [^;]*https:\/\/challenges\.cloudflare\.com/);
+    expect(policy).toMatch(/frame-src [^;]*https:\/\/challenges\.cloudflare\.com/);
+    expect(policy).toMatch(/connect-src [^;]*'self'/);
+    expect(policy).not.toMatch(/connect-src [^;]*https:\/\/challenges\.cloudflare\.com/);
+    expect(policy).not.toMatch(/img-src [^;]*https:\/\/challenges\.cloudflare\.com/);
   });
 
   it('adds development-only sources only in development mode', () => {

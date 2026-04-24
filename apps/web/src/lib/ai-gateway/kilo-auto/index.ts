@@ -5,7 +5,7 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
+import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 
 type AutoModel = {
@@ -19,7 +19,6 @@ type AutoModel = {
   input_cache_read_price: string | undefined;
   input_cache_write_price: string | undefined;
   supports_images: boolean;
-  roocode_settings: ModelSettings | undefined;
   opencode_settings: OpenCodeSettings | undefined;
 };
 
@@ -110,7 +109,6 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   input_cache_read_price: '0.0000005',
   input_cache_write_price: '0.00000625',
   supports_images: true,
-  roocode_settings: undefined,
   opencode_settings: {
     family: 'claude',
     prompt: 'anthropic',
@@ -129,7 +127,6 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   input_cache_read_price: '0',
   input_cache_write_price: '0',
   supports_images: false,
-  roocode_settings: undefined,
   opencode_settings: undefined,
 };
 
@@ -144,7 +141,6 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   input_cache_read_price: '0.0000000325',
   input_cache_write_price: '0.00000040625',
   supports_images: true,
-  roocode_settings: undefined,
   opencode_settings: {
     ai_sdk_provider: 'openai-compatible',
   },
@@ -161,7 +157,6 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   input_cache_read_price: '0.000000005',
   input_cache_write_price: undefined,
   supports_images: true,
-  roocode_settings: undefined,
   opencode_settings: undefined,
 };
 

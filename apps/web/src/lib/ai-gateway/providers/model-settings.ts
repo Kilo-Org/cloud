@@ -1,6 +1,5 @@
 import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
-import { isGemini3Model, isGeminiModel, isGemmaModel } from '@/lib/ai-gateway/providers/google';
-import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
+import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
@@ -8,40 +7,10 @@ import { isXaiModel } from '@/lib/ai-gateway/providers/xai';
 import { isZaiModel } from '@/lib/ai-gateway/providers/zai';
 import type {
   CustomLlmProvider,
-  ModelSettings,
   OpenClawModelSettings,
   OpenCodeSettings,
-  VersionedSettings,
 } from '@kilocode/db/schema-types';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
-
-export function getModelSettings(model: string): ModelSettings | undefined {
-  if (isOpenAiModel(model)) {
-    return {
-      included_tools: ['apply_patch'],
-      excluded_tools: ['apply_diff', 'delete_file', 'edit_file', 'write_to_file'],
-    };
-  }
-  if (isMinimaxModel(model)) {
-    return {
-      included_tools: ['search_and_replace'],
-      excluded_tools: ['apply_diff', 'edit_file'],
-    };
-  }
-  return undefined;
-}
-
-export function getVersionedModelSettings(model: string): VersionedSettings | undefined {
-  if (isGeminiModel(model) || isZaiModel(model)) {
-    return {
-      '4.146.0': {
-        included_tools: ['write_file', 'edit_file'],
-        excluded_tools: ['apply_diff'],
-      },
-    };
-  }
-  return undefined;
-}
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },

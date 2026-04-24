@@ -10,10 +10,8 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { convertFromKiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import {
-  getModelSettings,
   getOpenClawSettings,
   getOpenCodeSettings,
-  getVersionedModelSettings,
 } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/kilo-auto';
 
@@ -48,7 +46,6 @@ function buildAutoModels(): OpenRouterModel[] {
     },
     context_length: m.context_length,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
-    settings: m.roocode_settings,
     opencode: m.opencode_settings,
   }));
 }
@@ -76,8 +73,6 @@ function enhancedModelList(models: OpenRouterModel[]) {
         name: skipSuffix ? model.name : isNew ? model.name + ' (new)' : model.name,
         preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
         isFree: isFreeModel(model.id),
-        settings: model.settings ?? getModelSettings(model.id),
-        versioned_settings: model.versioned_settings ?? getVersionedModelSettings(model.id),
         opencode: model.opencode ?? getOpenCodeSettings(model.id),
         openclaw: model.openclaw ?? getOpenClawSettings(model.id),
       };

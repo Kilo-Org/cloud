@@ -15,6 +15,7 @@ export function ImpactAdvocateReferralCard() {
 
   useEffect(() => {
     let cancelled = false;
+    delete window.impactToken;
 
     const loadWidgetToken = async () => {
       try {
@@ -37,6 +38,7 @@ export function ImpactAdvocateReferralCard() {
         }
 
         if (!response.ok || !payload?.token || !payload.widgetId) {
+          delete window.impactToken;
           setState({
             status: 'unavailable',
             message:
@@ -59,6 +61,7 @@ export function ImpactAdvocateReferralCard() {
           return;
         }
 
+        delete window.impactToken;
         setState({
           status: 'unavailable',
           message: error instanceof Error ? error.message : 'Failed to load referral sharing.',
@@ -70,6 +73,7 @@ export function ImpactAdvocateReferralCard() {
 
     return () => {
       cancelled = true;
+      delete window.impactToken;
     };
   }, []);
 

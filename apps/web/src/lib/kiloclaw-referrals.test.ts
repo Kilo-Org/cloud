@@ -1036,6 +1036,80 @@ describe('kiloclaw referrals', () => {
       expect(referrerReward.status).toBe('applied');
     });
 
+    it('leaves local reward state unchanged when Stripe reward application fails', async () => {
+      const referrer = await insertTestUser({
+        google_user_email: 'stripe-failure-referrer@example.com',
+        normalized_email: 'stripe-failure-referrer@example.com',
+      });
+      const referee = await insertTestUser({
+        google_user_email: 'stripe-failure-referee@example.com',
+        normalized_email: 'stripe-failure-referee@example.com',
+      });
+      const opaqueReferralIdentifier = await insertImpactAdvocateParticipant(referrer.id);
+      const sourcePaymentId = 'kiloclaw-subscription:instance-stripe-failure:2026-04';
+
+      mockStripeSubscriptionUpdate.mockRejectedValueOnce(new Error('stripe exploded'));
+
+      await insertActivePersonalSubscription(referee.id, {
+        stripe_subscription_id: 'sub_referee_failure_123',
+      });
+      await db.insert(credit_transactions).values({
+        kilo_user_id: referee.id,
+        amount_microdollars: -9_000_000,
+        is_free: false,
+        description: 'KiloClaw standard enrollment',
+        credit_category: sourcePaymentId,
+      });
+      await db.insert(kiloclaw_attribution_touches).values({
+        id: '54545454-5454-4545-8545-545454545454',
+        dedupe_key: 'stripe-failure-referral-touch',
+        user_id: referee.id,
+        touch_type: 'referral',
+        provider: 'impact_advocate',
+        opaque_tracking_value: 'sq-cookie',
+        tracking_value_length: 9,
+        is_tracking_value_accepted: true,
+        rs_code: opaqueReferralIdentifier,
+        touched_at: '2026-03-31T00:00:00.000Z',
+        expires_at: '2026-04-30T00:00:00.000Z',
+      });
+
+      await processPersonalKiloClawPaidConversion({
+        userId: referee.id,
+        sourcePaymentId,
+        orderId: sourcePaymentId,
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+        convertedAt: new Date('2026-04-09T00:00:00.000Z'),
+      });
+
+      const [subscription] = await db
+        .select()
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.user_id, referee.id));
+      expect(subscription.current_period_end).toBe('2026-05-01 00:00:00+00');
+
+      const refereeRewards = await db
+        .select({
+          status: kiloclaw_referral_rewards.status,
+          appliedAt: kiloclaw_referral_rewards.applied_at,
+        })
+        .from(kiloclaw_referral_rewards)
+        .where(eq(kiloclaw_referral_rewards.beneficiary_user_id, referee.id));
+      expect(refereeRewards).toEqual([
+        {
+          status: 'earned',
+          appliedAt: null,
+        },
+      ]);
+
+      const applications = await db.select().from(kiloclaw_referral_reward_applications);
+      expect(applications).toHaveLength(0);
+    });
+
     it('keeps stripe-funded reward application in sync with Stripe trial-end billing delays', async () => {
       const referrer = await insertTestUser({
         google_user_email: 'stripe-referrer@example.com',

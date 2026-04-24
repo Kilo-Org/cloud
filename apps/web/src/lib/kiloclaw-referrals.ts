@@ -623,19 +623,6 @@ async function applyReferralRewardById(
     const localOperationId = `kiloclaw-referral-reward:${reward.id}:apply`;
     const stripeIdempotencyKey = `kiloclaw-referral-reward:${reward.id}:stripe-apply`;
 
-    if (subscription.stripe_subscription_id) {
-      await stripe.subscriptions.update(
-        subscription.stripe_subscription_id,
-        {
-          trial_end: Math.floor(new Date(newBoundary).getTime() / 1000),
-          proration_behavior: 'none',
-        },
-        {
-          idempotencyKey: stripeIdempotencyKey,
-        }
-      );
-    }
-
     const [beforeSubscription] = await tx
       .select()
       .from(kiloclaw_subscriptions)
@@ -710,6 +697,19 @@ async function applyReferralRewardById(
         stripe_idempotency_key: subscription.stripe_subscription_id ? stripeIdempotencyKey : null,
         applied_at: appliedAt,
       });
+    }
+
+    if (subscription.stripe_subscription_id) {
+      await stripe.subscriptions.update(
+        subscription.stripe_subscription_id,
+        {
+          trial_end: Math.floor(new Date(newBoundary).getTime() / 1000),
+          proration_behavior: 'none',
+        },
+        {
+          idempotencyKey: stripeIdempotencyKey,
+        }
+      );
     }
 
     return 'applied';

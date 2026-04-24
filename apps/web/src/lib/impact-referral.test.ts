@@ -186,6 +186,75 @@ describe('impact referral participant registration dispatch', () => {
     expect(registeredParticipant.registration_state).toBe('registered');
   });
 
+  it('does not regress a registered participant when the same referral touch is queued again', async () => {
+    const fetchMock = jest
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ participantId: 'impact-participant-1' }), { status: 200 })
+      );
+    global.fetch = fetchMock;
+
+    const user = await insertTestUser({
+      google_user_email: 'already-registered@example.com',
+      normalized_email: 'already-registered@example.com',
+    });
+
+    const {
+      dispatchQueuedImpactAdvocateRegistrationAttempts,
+      queueImpactAdvocateParticipantRegistration,
+    } = await import('@/lib/impact-referral');
+
+    const referralTouch = {
+      opaqueTrackingValue: 'sq-cookie',
+      trackingValueLength: 9,
+      isTrackingValueAccepted: true,
+      rsCode: 'ref-code',
+      rsShareMedium: 'email',
+      rsEngagementMedium: 'link',
+      landingPath: '/get-started?_saasquatch=sq-cookie',
+      utmSource: null,
+      utmMedium: null,
+      utmCampaign: null,
+      utmTerm: null,
+      utmContent: null,
+      touchedAt: new Date('2026-04-23T00:00:00.000Z'),
+      expiresAt: new Date('2026-05-23T00:00:00.000Z'),
+    } as const;
+
+    await queueImpactAdvocateParticipantRegistration({
+      user,
+      referralTouch,
+      locale: 'en-US',
+      countryCode: 'US',
+    });
+
+    const firstSummary = await dispatchQueuedImpactAdvocateRegistrationAttempts();
+    expect(firstSummary).toEqual({
+      claimed: 1,
+      delivered: 1,
+      retried: 0,
+      failed: 0,
+    });
+
+    const [registeredParticipant] = await db.select().from(impact_advocate_participants);
+    expect(registeredParticipant.registration_state).toBe('registered');
+
+    await queueImpactAdvocateParticipantRegistration({
+      user,
+      referralTouch,
+      locale: 'en-US',
+      countryCode: 'US',
+    });
+
+    const participants = await db.select().from(impact_advocate_participants);
+    expect(participants).toHaveLength(1);
+    expect(participants[0]?.registration_state).toBe('registered');
+
+    const attempts = await db.select().from(impact_advocate_registration_attempts);
+    expect(attempts).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('marks 4xx failures terminal, logs them, and does not retry unchanged payloads', async () => {
     const fetchMock = jest
       .fn<typeof fetch>()

@@ -242,6 +242,7 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
     countryCode: params.countryCode,
   });
   const nowIso = new Date().toISOString();
+  const isConfigured = isImpactAdvocateConfigured();
   const participant = await ensureImpactAdvocateParticipantProfile({
     database,
     user: params.user,
@@ -249,43 +250,46 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
     countryCode: params.countryCode,
   });
 
-  await database
-    .update(impact_advocate_participants)
-    .set({
-      registration_state: isImpactAdvocateConfigured()
-        ? ImpactAdvocateRegistrationState.Pending
-        : ImpactAdvocateRegistrationState.Failed,
-      last_error_code: isImpactAdvocateConfigured() ? null : 'missing_configuration',
-      last_error_message: isImpactAdvocateConfigured()
-        ? null
-        : 'Impact Advocate configuration is incomplete',
-      last_registration_attempt_at: nowIso,
-    })
-    .where(eq(impact_advocate_participants.id, participant.id));
-
   const attemptDedupeKey = buildHashedDedupeKey([
     'impact-advocate-registration',
     params.user.id,
     params.referralTouch.opaqueTrackingValue,
   ]);
 
-  await database
+  const [insertedAttempt] = await database
     .insert(impact_advocate_registration_attempts)
     .values({
       participant_id: participant.id,
       dedupe_key: attemptDedupeKey,
       opaque_cookie_value: params.referralTouch.opaqueTrackingValue,
       cookie_value_length: params.referralTouch.trackingValueLength,
-      delivery_state: isImpactAdvocateConfigured()
+      delivery_state: isConfigured
         ? ImpactAdvocateAttemptDeliveryState.Queued
         : ImpactAdvocateAttemptDeliveryState.Failed,
       request_payload: payload satisfies Record<string, unknown>,
-      response_payload: isImpactAdvocateConfigured()
+      response_payload: isConfigured
         ? null
         : ({ error: 'missing_configuration' } satisfies Record<string, unknown>),
-      response_status_code: isImpactAdvocateConfigured() ? null : 503,
+      response_status_code: isConfigured ? null : 503,
     })
-    .onConflictDoNothing({ target: [impact_advocate_registration_attempts.dedupe_key] });
+    .onConflictDoNothing({ target: [impact_advocate_registration_attempts.dedupe_key] })
+    .returning({ id: impact_advocate_registration_attempts.id });
+
+  if (!insertedAttempt) {
+    return;
+  }
+
+  await database
+    .update(impact_advocate_participants)
+    .set({
+      registration_state: isConfigured
+        ? ImpactAdvocateRegistrationState.Pending
+        : ImpactAdvocateRegistrationState.Failed,
+      last_error_code: isConfigured ? null : 'missing_configuration',
+      last_error_message: isConfigured ? null : 'Impact Advocate configuration is incomplete',
+      last_registration_attempt_at: nowIso,
+    })
+    .where(eq(impact_advocate_participants.id, participant.id));
 }
 
 export async function createDeletedUserEmailTombstone(params: {

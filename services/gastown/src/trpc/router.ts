@@ -878,16 +878,18 @@ export const gastownRouter = router({
       });
 
       if (input.startImmediately) {
-        await townStub.startHeldBead(bead.bead_id, rig.id);
-      } else {
-        // Mayor notification can start a container — use waitUntil so the Worker
-        // stays alive until the RPC completes without blocking the HTTP response.
-        ctx.executionCtx.waitUntil(
-          townStub
-            .notifyMayorOfNewBead(bead.bead_id, rig.id, input.title, input.body)
-            .catch(err => console.warn('[gastown-trpc] createBead: mayor notification failed', err))
-        );
+        // Return the post-start bead so callers see the removed gt:held label
+        // and any status changes from dispatch.
+        return townStub.startHeldBead(bead.bead_id, rig.id);
       }
+
+      // Mayor notification can start a container — use waitUntil so the Worker
+      // stays alive until the RPC completes without blocking the HTTP response.
+      ctx.executionCtx.waitUntil(
+        townStub
+          .notifyMayorOfNewBead(bead.bead_id, rig.id, input.title, input.body)
+          .catch(err => console.warn('[gastown-trpc] createBead: mayor notification failed', err))
+      );
 
       return bead;
     }),

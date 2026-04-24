@@ -40,6 +40,13 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
   // Tracks the sequence number of the most recently fired enrichment request.
   // When a response arrives we compare against this to discard stale results.
   const enrichSeqRef = useRef(0);
+  // Mirror of userEditedTitle read inside async callbacks so the response
+  // handler sees edits that happened after the request started.
+  const userEditedTitleRef = useRef(false);
+
+  useEffect(() => {
+    userEditedTitleRef.current = userEditedTitle;
+  }, [userEditedTitle]);
 
   const createBead = useMutation(
     trpc.gastown.createBead.mutationOptions({
@@ -65,6 +72,7 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
       setShowLabelInput(false);
       setStartImmediately(false);
       setUserEditedTitle(false);
+      userEditedTitleRef.current = false;
       setIsEnriching(false);
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
@@ -93,7 +101,7 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
               if (seq !== enrichSeqRef.current) return;
               setIsEnriching(false);
               if (result) {
-                if (!userEditedTitle) {
+                if (!userEditedTitleRef.current) {
                   setTitle(result.title);
                 }
                 setAiLabels(result.labels);
@@ -113,7 +121,7 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
         clearTimeout(debounceRef.current);
       }
     };
-  }, [body, townId, userEditedTitle]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [body, townId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleClose = () => {
     onClose();

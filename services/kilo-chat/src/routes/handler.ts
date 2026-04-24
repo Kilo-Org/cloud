@@ -88,14 +88,16 @@ function parseSandboxId(c: HonoCtx) {
   return { ok: true as const, data: result.data };
 }
 
-function makeSchedule(c: HonoCtx) {
-  return (p: Promise<unknown>) => {
-    try {
-      c.executionCtx.waitUntil(p);
-    } catch {
-      // executionCtx unavailable (e.g. unit tests); drop the waitUntil.
-    }
-  };
+function makeSchedule(c: HonoCtx): { waitUntil: (p: Promise<unknown>) => void } | undefined {
+  try {
+    // Probe for executionCtx — absent in unit-test (app.request) mode.
+    const ectx = c.executionCtx;
+    return { waitUntil: p => ectx.waitUntil(p) };
+  } catch {
+    // executionCtx unavailable (e.g. unit tests); return undefined so callers
+    // fall through to awaiting the promise instead of dropping it.
+    return undefined;
+  }
 }
 
 // ─── createMessage ──────────────────────────────────────────────────────────
@@ -105,9 +107,7 @@ export async function handleCreateMessage(c: HonoCtx) {
   if (!body.ok) return body.response;
 
   const callerId = c.get('callerId');
-  const result = await createMessageFor(c.env, callerId, body.data, {
-    waitUntil: makeSchedule(c),
-  });
+  const result = await createMessageFor(c.env, callerId, body.data, makeSchedule(c));
   if (!result.ok) {
     if (result.code === 'forbidden') return c.json({ error: result.error }, 403);
     return c.json({ error: result.error }, 500);
@@ -189,7 +189,7 @@ export async function handleExecuteAction(c: HonoCtx) {
       groupId: body.data.groupId,
       value: body.data.value,
     },
-    { waitUntil: makeSchedule(c) }
+    makeSchedule(c)
   );
 
   if (!result.ok) {

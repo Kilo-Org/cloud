@@ -44,6 +44,9 @@ export default defineWorkersConfig({
                   async fetch(request) {
                     return new Response('ok');
                   }
+                  async pushEvent(userId, context, event, payload) {
+                    return false;
+                  }
                 }
               `,
             },

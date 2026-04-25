@@ -294,7 +294,14 @@ async function mirrorToRedis(values: {
   if (values.openrouterProviders) {
     entries.push([GATEWAY_METADATA_REDIS_KEYS.openrouterProviders, values.openrouterProviders]);
   }
-  await Promise.all(entries.map(([key, value]) => redisSet(key, JSON.stringify(value))));
+  const results = await Promise.all(
+    entries.map(([key, value]) => redisSet(key, JSON.stringify(value)))
+  );
+  if (results.some(ok => !ok)) {
+    throw new Error(
+      'mirrorToRedis: one or more Redis writes did not persist (is REDIS_URL configured?)'
+    );
+  }
 }
 
 export async function syncAndStoreProviders() {

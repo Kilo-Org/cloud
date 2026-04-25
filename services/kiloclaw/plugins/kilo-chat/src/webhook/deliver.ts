@@ -37,17 +37,28 @@ export function buildDeliverWiring(params: {
     onWarn: params.warn,
   });
 
-  // The SDK's block pipeline splits each agent reply into N payloads (paragraph
-  // boundaries, maxChars, tool-result breaks, idle gaps). To present this as a
-  // single chat message we accumulate committed block text plus the current
-  // block's streaming partial, and keep editing the same preview message.
-  const committedBlocks: string[] = [];
-  let partialBlockText = '';
+  // Aggregates the agent's reply into a single preview message:
+  //
+  //   committedMessages: closed-out messages from earlier iterations of this turn
+  //                      (e.g., an assistant message preceding a tool call).
+  //   currentText:       cumulative text of the in-progress assistant message.
+  //
+  // The SDK emits onPartialReply with the FULL cumulative text of the current
+  // assistant message (not a delta) and onBlockReply with a chunk — a slice of
+  // that cumulative text at chunker boundaries (paragraph break, maxChars,
+  // idle gap, text_end flush). When a chunker boundary fires mid-message, the
+  // next partial still carries the cumulative text that already contains the
+  // delivered chunk as a prefix, so naïvely concatenating the two produces a
+  // duplicated prefix. The logic below treats the partial as the authoritative
+  // cumulative view of the current message and only folds a deliver chunk in
+  // when it isn't already represented.
+  const committedMessages: string[] = [];
+  let currentText = '';
   let delivered = false;
 
   const BLOCK_JOINER = '\n\n';
   const accumulated = (): string => {
-    const parts = partialBlockText ? [...committedBlocks, partialBlockText] : committedBlocks;
+    const parts = currentText ? [...committedMessages, currentText] : committedMessages;
     return parts.join(BLOCK_JOINER);
   };
 
@@ -55,14 +66,30 @@ export function buildDeliverWiring(params: {
     replyOptions: {
       onPartialReply: async payload => {
         if (!payload.text) return;
-        partialBlockText = payload.text;
+        // A new partial that doesn't extend the previous one signals a new
+        // assistant message (e.g., after a tool call). Close out the previous.
+        if (currentText && !payload.text.startsWith(currentText)) {
+          committedMessages.push(currentText);
+        }
+        currentText = payload.text;
         stream.update(accumulated());
       },
     },
     deliver: async payload => {
       if (!payload.text) return;
-      committedBlocks.push(payload.text);
-      partialBlockText = '';
+      if (!currentText) {
+        // No partial for this message yet — the chunk is all we have.
+        currentText = payload.text;
+      } else if (currentText.includes(payload.text)) {
+        // Chunk is already part of the cumulative partial — nothing to add.
+      } else if (payload.text.includes(currentText)) {
+        // Partial lagged behind the final chunk (e.g., text_end flushed without
+        // a trailing partial) — the chunk is the authoritative text.
+        currentText = payload.text;
+      } else {
+        // Unrelated chunk (tool-result block without partials, etc.) — append.
+        currentText = `${currentText}${BLOCK_JOINER}${payload.text}`;
+      }
       delivered = true;
       stream.update(accumulated());
     },

@@ -409,6 +409,73 @@ describe('buildDeliverWiring', () => {
       vi.useRealTimers();
     }
   });
+
+  // Regression: the SDK emits onPartialReply with the FULL cumulative message text
+  // (pi-embedded-subscribe.handlers.messages.ts: `text: cleanedText`, where cleanedText
+  // is the whole current assistant message), while onBlockReply emits a *chunk* (a
+  // slice of that text, produced by the block chunker's drain). When a block boundary
+  // fires mid-message (paragraph break, maxChars, idle gap), the next partial reply
+  // still carries the cumulative text that already contains the delivered chunk as a
+  // prefix. The old accumulator concatenated the two as if both were deltas, producing
+  // a duplicated prefix in the preview message — exactly the symptom observed in prod
+  // where PATCH bodies contained the whole message twice separated by "\n\n".
+  it('partial-after-mid-message-block does not duplicate the already-delivered prefix', async () => {
+    vi.useFakeTimers();
+    try {
+      const calls: { type: string; args: unknown }[] = [];
+      const wiring = buildDeliverWiring({
+        client: fakeClient(calls),
+        conversationId: 'c1',
+        warn: () => {},
+      });
+
+      const PREFIX = 'Hello world.';
+      const FULL = 'Hello world. Second sentence continues.';
+
+      // Streaming partials carry cumulative text (SDK invariant).
+      await wiring.replyOptions.onPartialReply({ text: 'Hello' });
+      await vi.advanceTimersByTimeAsync(0);
+      await wiring.replyOptions.onPartialReply({ text: PREFIX });
+      await vi.advanceTimersByTimeAsync(600);
+
+      // Block chunker fires at a paragraph boundary mid-message with a *chunk*
+      // (a slice of the cumulative text — i.e. a delta, not the full text).
+      await wiring.deliver({ text: PREFIX });
+      await vi.advanceTimersByTimeAsync(600);
+
+      // SDK keeps streaming: the next partial is still the full cumulative text,
+      // which now includes the chunk already delivered above.
+      await wiring.replyOptions.onPartialReply({ text: FULL });
+      await vi.advanceTimersByTimeAsync(600);
+
+      // Final block flush at text_end with the remaining chunk.
+      await wiring.deliver({ text: ' Second sentence continues.' });
+      await wiring.finalize();
+      await vi.advanceTimersByTimeAsync(600);
+
+      const edits = calls.filter(c => c.type === 'edit');
+      expect(edits.length).toBeGreaterThan(0);
+
+      // No PATCH — intermediate or final — should ever contain the prefix twice.
+      // The real prod log showed "Hello world.\n\nHello world. ...more" mid-stream
+      // which is exactly what `committedBlocks.join('\n\n') + '\n\n' + partialBlockText`
+      // produces when partial carries cumulative text.
+      for (const edit of edits) {
+        const text = (edit.args as { content: Array<{ text: string }> }).content[0]!.text;
+        const prefixOccurrences = text.match(/Hello world\./g)?.length ?? 0;
+        expect(prefixOccurrences, `duplicated prefix in edit body: ${JSON.stringify(text)}`).toBe(
+          1
+        );
+      }
+
+      // The final preview should equal the message's true cumulative text.
+      const lastText = (edits.at(-1)!.args as { content: Array<{ text: string }> }).content[0]!
+        .text;
+      expect(lastText).toBe(FULL);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('buildTypingParams', () => {

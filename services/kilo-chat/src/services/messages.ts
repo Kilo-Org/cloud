@@ -88,6 +88,7 @@ async function postCommitFanOut(
   const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
   const botMembers = info.members.filter(m => m.kind === 'bot' && m.id !== callerId);
   const now = Date.now();
+  const isSenderHuman = humanMemberIds.includes(callerId);
 
   // ── Block A: Deliver webhook to bot members ──────────────────────────
   const webhookDelivery = async () => {
@@ -135,9 +136,10 @@ async function postCommitFanOut(
     );
   };
 
-  // ── Block B: Auto-title unnamed conversations ────────────────────────
-  const autoTitle = async () => {
-    if (info.title !== null) return;
+  // Compute an auto-title only when the conversation has none. This is a
+  // pure computation; the write lives inside the combined fan-out below.
+  const computeAutoTitle = (): string | null => {
+    if (info.title !== null) return null;
     const text = content
       .filter(
         (b): b is { type: 'text'; text: string } => b.type === 'text' && typeof b.text === 'string'
@@ -146,64 +148,28 @@ async function postCommitFanOut(
       .join(' ')
       .replace(/\n/g, ' ')
       .trim();
-    if (text.length === 0) return;
+    if (text.length === 0) return null;
+    return text.length > 80 ? text.slice(0, 77) + '...' : text;
+  };
+  const autoTitle = computeAutoTitle();
 
-    const title = text.length > 80 ? text.slice(0, 77) + '...' : text;
+  // Persist the auto-title on the ConversationDO in parallel with fan-out.
+  const conversationDoTitleWrite = async () => {
+    if (autoTitle === null) return;
     try {
       await withDORetry(
         () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-        stub => stub.updateTitleInternal(title),
+        stub => stub.updateTitleInternal(autoTitle),
         'ConversationDO.updateTitleInternal'
       );
-      await Promise.allSettled(
-        info.members.map(member =>
-          withDORetry(
-            () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
-            stub => stub.updateConversationTitle(conversationId, title),
-            'MembershipDO.updateConversationTitle'
-          )
-        )
-      );
-      if (sandboxId) {
-        await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
-          conversationId,
-          title,
-        });
-      }
     } catch (err) {
-      logger.error('Failed to auto-title conversation', formatError(err));
+      logger.error('Failed to auto-title conversation on ConversationDO', formatError(err));
     }
   };
 
-  // ── Block C: Update membership lastActivity ──────────────────────────
-  const membershipUpdates = async () => {
-    const isSenderHuman = humanMemberIds.includes(callerId);
-    const results = await Promise.allSettled(
-      info.members.map(member => {
-        if (isSenderHuman && member.id === callerId) {
-          return withDORetry(
-            () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
-            stub => stub.updateLastActivityAndMarkRead(conversationId, now),
-            'MembershipDO.updateLastActivityAndMarkRead'
-          );
-        }
-        return withDORetry(
-          () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
-          stub => stub.updateLastActivity(conversationId, now),
-          'MembershipDO.updateLastActivity'
-        );
-      })
-    );
-    for (const r of results) {
-      if (r.status === 'rejected') {
-        logger.error('Failed to update MembershipDO lastActivityAt', formatError(r.reason));
-      }
-    }
-  };
-
-  // ── Block D: Push events + auto-mark-read ────────────────────────────
-  const eventPushAndMarkRead = async () => {
-    if (!sandboxId) return;
+  // ── Block B: Push message.created + typing.stop; returns delivery map ─
+  const pushMessageEvents = async (): Promise<Map<string, boolean>> => {
+    if (!sandboxId) return new Map();
 
     const deliveryMap = await pushEventToHumanMembers(
       env,
@@ -220,39 +186,90 @@ async function postCommitFanOut(
       }
     );
 
-    if (humanMemberIds.includes(callerId)) {
+    if (isSenderHuman) {
       await pushEventToHumanMembers(env, conversationId, sandboxId, humanMemberIds, 'typing.stop', {
         memberId: callerId,
       });
     }
 
-    const otherHumans = humanMemberIds.filter(id => id !== callerId);
-    await Promise.allSettled(
-      otherHumans.map(async userId => {
-        const present = deliveryMap.get(userId) ?? false;
-        if (present) {
-          await withDORetry(
-            () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId)),
-            stub => stub.markRead(conversationId, now),
-            'MembershipDO.markRead'
-          );
-          await pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
+    return deliveryMap;
+  };
+
+  // Run webhook delivery, ConversationDO title write, and event push in
+  // parallel; the MembershipDO fan-out needs the delivery map, so it runs
+  // after pushMessageEvents resolves.
+  const [, , deliveryMap] = await Promise.all([
+    webhookDelivery(),
+    conversationDoTitleWrite(),
+    pushMessageEvents(),
+  ]);
+
+  // ── Block C: Single MembershipDO RPC per member ──────────────────────
+  // Combines autoTitle, lastActivityAt, and lastReadAt into one round-trip.
+  //
+  // Per-member semantics:
+  // - title      : autoTitle string for every member when auto-titling applied.
+  // - activityAt : always `now`.
+  // - markRead   : true when the member's own WS received the event
+  //                (sender for human-sent messages, or a human recipient with
+  //                an active WS for the delivered message.created event).
+  const postCommitUpdates = await Promise.allSettled(
+    info.members.map(member => {
+      const isSender = isSenderHuman && member.id === callerId;
+      const delivered = deliveryMap.get(member.id) === true;
+      const markRead = isSender || delivered;
+      return withDORetry(
+        () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
+        stub =>
+          stub.applyPostCommit({
+            conversationId,
+            ...(autoTitle !== null && { title: autoTitle }),
+            activityAt: now,
+            markRead,
+          }),
+        'MembershipDO.applyPostCommit'
+      );
+    })
+  );
+  for (const r of postCommitUpdates) {
+    if (r.status === 'rejected') {
+      logger.error('Failed to apply MembershipDO post-commit update', formatError(r.reason));
+    }
+  }
+
+  // ── Block D: Instance-level conversation events ──────────────────────
+  if (sandboxId) {
+    const instanceEvents: Promise<unknown>[] = [];
+    if (autoTitle !== null) {
+      instanceEvents.push(
+        pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
+          conversationId,
+          title: autoTitle,
+        })
+      );
+    }
+    for (const userId of humanMemberIds) {
+      if (userId === callerId) continue;
+      const present = deliveryMap.get(userId) === true;
+      if (present) {
+        instanceEvents.push(
+          pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
             conversationId,
             memberId: userId,
             lastReadAt: now,
-          });
-        } else {
-          await pushInstanceEvent(env, sandboxId, [userId], 'conversation.activity', {
+          })
+        );
+      } else {
+        instanceEvents.push(
+          pushInstanceEvent(env, sandboxId, [userId], 'conversation.activity', {
             conversationId,
             lastActivityAt: now,
-          });
-        }
-      })
-    );
-  };
-
-  // Run all four blocks concurrently. Each handles its own errors.
-  await Promise.all([webhookDelivery(), autoTitle(), membershipUpdates(), eventPushAndMarkRead()]);
+          })
+        );
+      }
+    }
+    await Promise.allSettled(instanceEvents);
+  }
 }
 
 // ─── editMessage ────────────────────────────────────────────────────────────

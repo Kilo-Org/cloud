@@ -103,6 +103,38 @@ export class MembershipDO extends DurableObject<Env> {
       .run();
   }
 
+  /**
+   * Combined post-commit update for a single message. Always updates
+   * `last_activity_at`; optionally updates `conversation_title` and
+   * `last_read_at` in the same statement so each member DO receives one
+   * round-trip per message instead of three.
+   *
+   * Semantics:
+   * - `title === undefined` → do not touch the title column.
+   * - `title === null`      → clear the title (rare; auto-title always passes a string).
+   * - `markRead === true`   → set `last_read_at = activityAt` (user had active WS).
+   */
+  applyPostCommit(params: {
+    conversationId: string;
+    title?: string | null;
+    activityAt: number;
+    markRead: boolean;
+  }): void {
+    const set: {
+      last_activity_at: number;
+      conversation_title?: string | null;
+      last_read_at?: number;
+    } = { last_activity_at: params.activityAt };
+    if (params.title !== undefined) set.conversation_title = params.title;
+    if (params.markRead) set.last_read_at = params.activityAt;
+
+    this.db
+      .update(conversations)
+      .set(set)
+      .where(eq(conversations.conversation_id, params.conversationId))
+      .run();
+  }
+
   removeConversation(conversationId: string): void {
     this.db.delete(conversations).where(eq(conversations.conversation_id, conversationId)).run();
   }

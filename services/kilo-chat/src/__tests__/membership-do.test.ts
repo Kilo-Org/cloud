@@ -143,6 +143,87 @@ describe('MembershipDO', () => {
     expect(entry!.lastReadAt).toBe(now);
   });
 
+  describe('applyPostCommit', () => {
+    it('updates only last_activity_at when markRead=false and title omitted', async () => {
+      const stub = getStub('user-apc-1');
+      await stub.addConversation({
+        conversationId: 'conv-apc',
+        title: 'Original',
+        sandboxId: 'sandbox-1',
+        joinedAt: 1000,
+      });
+
+      await stub.applyPostCommit({ conversationId: 'conv-apc', activityAt: 5000, markRead: false });
+
+      const { conversations } = await stub.listConversations();
+      const entry = conversations.find(c => c.conversationId === 'conv-apc');
+      expect(entry).toBeDefined();
+      expect(entry!.lastActivityAt).toBe(5000);
+      expect(entry!.lastReadAt).toBeNull();
+      expect(entry!.title).toBe('Original');
+    });
+
+    it('sets last_read_at = activityAt when markRead=true', async () => {
+      const stub = getStub('user-apc-2');
+      await stub.addConversation({
+        conversationId: 'conv-apc',
+        title: null,
+        sandboxId: 'sandbox-1',
+        joinedAt: 1000,
+      });
+
+      await stub.applyPostCommit({ conversationId: 'conv-apc', activityAt: 7000, markRead: true });
+
+      const { conversations } = await stub.listConversations();
+      const entry = conversations.find(c => c.conversationId === 'conv-apc');
+      expect(entry!.lastActivityAt).toBe(7000);
+      expect(entry!.lastReadAt).toBe(7000);
+    });
+
+    it('writes title when provided alongside activityAt and markRead', async () => {
+      const stub = getStub('user-apc-3');
+      await stub.addConversation({
+        conversationId: 'conv-apc',
+        title: null,
+        sandboxId: 'sandbox-1',
+        joinedAt: 1000,
+      });
+
+      await stub.applyPostCommit({
+        conversationId: 'conv-apc',
+        title: 'Auto-titled',
+        activityAt: 9000,
+        markRead: true,
+      });
+
+      const { conversations } = await stub.listConversations();
+      const entry = conversations.find(c => c.conversationId === 'conv-apc');
+      expect(entry!.title).toBe('Auto-titled');
+      expect(entry!.lastActivityAt).toBe(9000);
+      expect(entry!.lastReadAt).toBe(9000);
+    });
+
+    it('leaves title untouched when title is omitted', async () => {
+      const stub = getStub('user-apc-4');
+      await stub.addConversation({
+        conversationId: 'conv-apc',
+        title: 'Keep me',
+        sandboxId: 'sandbox-1',
+        joinedAt: 1000,
+      });
+
+      await stub.applyPostCommit({
+        conversationId: 'conv-apc',
+        activityAt: 2000,
+        markRead: false,
+      });
+
+      const { conversations } = await stub.listConversations();
+      const entry = conversations.find(c => c.conversationId === 'conv-apc');
+      expect(entry!.title).toBe('Keep me');
+    });
+  });
+
   it('removeConversationsBySandbox - no-op when sandbox has no conversations', async () => {
     const stub = getStub('user-sandbox-noop');
     await stub.addConversation({

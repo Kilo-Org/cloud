@@ -2,10 +2,9 @@ import type { Context } from 'hono';
 import type { z } from 'zod';
 import type { AuthContext } from '../auth';
 import type { OkResponse } from '@kilocode/kilo-chat';
-import { botStatusRequestSchema } from '@kilocode/kilo-chat';
+import { botStatusRequestSchema, sandboxIdSchema } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
-import { sandboxIdSchema } from '../routes/schemas';
 import { extractSandboxId, pushBotStatusEvent } from './event-push';
 
 type HonoCtx = Context<{ Bindings: Env; Variables: AuthContext }>;

@@ -15,10 +15,10 @@ import {
 } from '../services/conversations';
 import {
   ulidSchema,
-  createConversationSchema,
+  createConversationRequestSchema,
   listConversationsQuerySchema,
-  renameConversationSchema,
-} from './schemas';
+  renameConversationRequestSchema,
+} from '@kilocode/kilo-chat';
 import { makeSchedule } from './handler';
 
 export function registerConversationRoutes(
@@ -38,7 +38,7 @@ export function registerConversationRoutes(
       return c.json({ error: 'Invalid JSON' }, 400);
     }
 
-    const body = createConversationSchema.safeParse(rawBody);
+    const body = createConversationRequestSchema.safeParse(rawBody);
     if (!body.success) {
       return c.json({ error: 'Invalid request', issues: body.error.issues }, 400);
     }
@@ -115,7 +115,7 @@ export function registerConversationRoutes(
       return c.json({ error: 'Invalid JSON' }, 400);
     }
 
-    const body = renameConversationSchema.safeParse(rawBody);
+    const body = renameConversationRequestSchema.safeParse(rawBody);
     if (!body.success) {
       return c.json({ error: 'Invalid request', issues: body.error.issues }, 400);
     }

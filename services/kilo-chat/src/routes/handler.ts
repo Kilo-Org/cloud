@@ -37,18 +37,18 @@ import type {
 import {
   ulidSchema,
   sandboxIdSchema,
-  createMessageSchema,
-  createBotConversationSchema,
-  editMessageSchema,
-  executeActionSchema,
+  createMessageRequestSchema,
+  createBotConversationRequestSchema,
+  editMessageRequestSchema,
+  executeActionRequestSchema,
   listMessagesQuerySchema,
   paginationQuerySchema,
-  reactionBodySchema,
-  renameConversationSchema,
+  reactionRequestBodySchema,
+  renameConversationRequestSchema,
   deleteMessageQuerySchema,
   messageDeliveryFailedRequestSchema,
   actionDeliveryFailedRequestSchema,
-} from './schemas';
+} from '@kilocode/kilo-chat';
 
 type HonoCtx = Context<{ Bindings: Env; Variables: AuthContext }>;
 
@@ -119,7 +119,7 @@ export function makeSchedule(c: HonoCtx): DeferCtx {
 // ─── createMessage ──────────────────────────────────────────────────────────
 
 export async function handleCreateMessage(c: HonoCtx) {
-  const body = await parseBody(c, createMessageSchema);
+  const body = await parseBody(c, createMessageRequestSchema);
   if (!body.ok) return body.response;
 
   const callerId = c.get('callerId');
@@ -140,7 +140,7 @@ export async function handleEditMessage(c: HonoCtx) {
   const msgId = parseMessageId(c);
   if (!msgId.ok) return msgId.response;
 
-  const body = await parseBody(c, editMessageSchema);
+  const body = await parseBody(c, editMessageRequestSchema);
   if (!body.ok) return body.response;
 
   const callerId = c.get('callerId');
@@ -204,7 +204,7 @@ export async function handleExecuteAction(c: HonoCtx) {
   const msgId = parseMessageId(c);
   if (!msgId.ok) return msgId.response;
 
-  const body = await parseBody(c, executeActionSchema);
+  const body = await parseBody(c, executeActionRequestSchema);
   if (!body.ok) return body.response;
 
   const callerId = c.get('callerId');
@@ -313,7 +313,7 @@ export async function handleAddReaction(c: HonoCtx) {
   const msgId = parseMessageId(c);
   if (!msgId.ok) return msgId.response;
 
-  const body = await parseBody(c, reactionBodySchema);
+  const body = await parseBody(c, reactionRequestBodySchema);
   if (!body.ok) return body.response;
 
   const callerId = c.get('callerId');
@@ -341,7 +341,7 @@ export async function handleRemoveReaction(c: HonoCtx) {
   const msgId = parseMessageId(c);
   if (!msgId.ok) return msgId.response;
 
-  const parsed = reactionBodySchema.safeParse({
+  const parsed = reactionRequestBodySchema.safeParse({
     conversationId: c.req.query('conversationId'),
     emoji: c.req.query('emoji'),
   });
@@ -536,7 +536,7 @@ export async function handleCreateBotConversation(c: HonoCtx) {
   if (!sbx.ok) return sbx.response;
   const sandboxId = sbx.data;
 
-  const body = await parseBody(c, createBotConversationSchema);
+  const body = await parseBody(c, createBotConversationRequestSchema);
   if (!body.ok) return body.response;
 
   const result = await createBotConversationFor(c.env, {
@@ -565,7 +565,7 @@ export async function handleRenameConversation(c: HonoCtx) {
   const convId = parseConversationId(c);
   if (!convId.ok) return convId.response;
 
-  const body = await parseBody(c, renameConversationSchema);
+  const body = await parseBody(c, renameConversationRequestSchema);
   if (!body.ok) return body.response;
 
   const callerId = c.get('callerId');

@@ -4,7 +4,7 @@ import { logger } from './util/logger';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { deriveGatewayToken } from './lib/gateway-token';
 import type { AuthContext } from './auth';
-import { sandboxIdSchema } from './routes/schemas';
+import { sandboxIdSchema } from '@kilocode/kilo-chat';
 
 /**
  * Bot HTTP auth — verifies per-sandbox HMAC gateway token.

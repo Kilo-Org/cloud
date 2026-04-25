@@ -90,16 +90,15 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const sendTyping = useTypingSender(kiloChatClient, conversationId);
 
   const markRead = useMarkConversationRead(kiloChatClient);
-  const markReadRef = useRef(markRead.mutate);
-  markReadRef.current = markRead.mutate;
   const lastMarkedRef = useRef<string | null>(null);
 
-  // Mark conversation as read when opened
+  // Mark conversation as read when opened. react-query's mutate is stable
+  // across renders, so including it in deps is safe.
   useEffect(() => {
     if (lastMarkedRef.current === conversationId) return;
     lastMarkedRef.current = conversationId;
-    markReadRef.current(conversationId);
-  }, [conversationId]);
+    markRead.mutate(conversationId);
+  }, [conversationId, markRead.mutate]);
 
   // Register side-effect handlers that don't mutate the message cache
   // (cache updates are handled by useMessageCacheUpdater).

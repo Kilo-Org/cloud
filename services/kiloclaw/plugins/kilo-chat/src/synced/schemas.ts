@@ -32,7 +32,7 @@ export const emojiSchema = z
 export const actionItemSchema = z.object({
   label: z.string().min(1).max(200),
   style: z.enum(['primary', 'danger', 'secondary']),
-  value: z.string().min(1).max(200),
+  value: execApprovalDecisionSchema,
 });
 
 export const actionsBlockSchema = z
@@ -42,7 +42,7 @@ export const actionsBlockSchema = z
     actions: z.array(actionItemSchema).max(10),
     resolved: z
       .object({
-        value: z.string(),
+        value: execApprovalDecisionSchema,
         resolvedBy: z.string(),
         resolvedAt: z.number(),
       })

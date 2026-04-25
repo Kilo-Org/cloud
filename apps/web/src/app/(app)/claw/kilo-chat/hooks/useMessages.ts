@@ -13,6 +13,7 @@ import type {
   ActionDeliveryFailedEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
+  ExecApprovalDecision,
 } from '@kilocode/kilo-chat';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
@@ -277,7 +278,7 @@ export function useExecuteAction(
     }: {
       messageId: string;
       groupId: string;
-      value: string;
+      value: ExecApprovalDecision;
     }) => client.executeAction(conversationId ?? '', messageId, { groupId, value }),
     onMutate: async variables => {
       if (!conversationId) return;

@@ -7,7 +7,7 @@ import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile, Copy } from 'lucid
 import { EmojiQuickPick } from './EmojiQuickPick';
 import { EmojiPicker } from './EmojiPicker';
 import { ReactionPills } from './ReactionPills';
-import type { Message, ContentBlock } from '@kilocode/kilo-chat';
+import type { Message, ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './KiloChatLayout';
 import { toast } from 'sonner';
@@ -41,7 +41,7 @@ type MessageBubbleProps = {
   onReply: (message: Message) => void;
   onAddReaction: (messageId: string, emoji: string) => void;
   onRemoveReaction: (messageId: string, emoji: string) => void;
-  onExecuteAction: (messageId: string, groupId: string, value: string) => void;
+  onExecuteAction: (messageId: string, groupId: string, value: ExecApprovalDecision) => void;
   actionPending?: boolean;
   currentUserId: string;
 };

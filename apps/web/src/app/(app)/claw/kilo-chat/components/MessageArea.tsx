@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ulid } from 'ulid';
-import type { Message, ContentBlock } from '@kilocode/kilo-chat';
+import type { Message, ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
 import {
   useMessages,
   useSendMessage,
@@ -249,7 +249,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   );
 
   const handleExecuteAction = useCallback(
-    (messageId: string, groupId: string, value: string) => {
+    (messageId: string, groupId: string, value: ExecApprovalDecision) => {
       executeAction.mutate(
         { messageId, groupId, value },
         { onError: () => toast.error('Failed to execute action') }

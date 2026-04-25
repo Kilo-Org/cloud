@@ -151,10 +151,13 @@ if (config.tunnelName) {
   if (config.tunnelHostname) {
     const apiUrl = `https://${config.tunnelHostname}/api/gateway/`;
     const checkinUrl = `https://${config.tunnelHostname}/api/controller/checkin`;
+    const kiloChatUrl = `https://${config.tunnelHostname}`;
     updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
     updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
+    updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', kiloChatUrl);
     console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
     console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
+    console.log(`Set KILOCHAT_BASE_URL=${kiloChatUrl}`);
   }
 
   child.stdout.on('data', data => prefixAndWrite(label, data));

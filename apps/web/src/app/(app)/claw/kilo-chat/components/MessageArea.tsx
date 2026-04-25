@@ -51,6 +51,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const queryClient = useQueryClient();
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -134,16 +135,20 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     });
   }, [eventService, queryClient, conversationId]);
 
-  // Auto-scroll whenever content height changes (new messages or streaming updates)
+  // Auto-scroll whenever content height changes (new messages, streaming
+  // updates, image loads). A ResizeObserver on the inner content fires only
+  // on actual height deltas, so emoji-picker toggles and reaction-pill
+  // updates that don't change layout no longer trigger a scroll.
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const observer = new MutationObserver(() => {
+    const scrollEl = scrollRef.current;
+    const contentEl = contentRef.current;
+    if (!scrollEl || !contentEl) return;
+    const observer = new ResizeObserver(() => {
       if (autoScrollRef.current) {
-        el.scrollTop = el.scrollHeight;
+        scrollEl.scrollTop = scrollEl.scrollHeight;
       }
     });
-    observer.observe(el, { childList: true, subtree: true });
+    observer.observe(contentEl);
     return () => observer.disconnect();
   }, []);
 
@@ -331,44 +336,46 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       {/* Messages */}
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} className="h-full overflow-y-auto py-4" onScroll={handleScroll}>
-          {isFetchingNextPage && (
-            <div className="text-muted-foreground py-2 text-center text-xs">
-              Loading older messages...
-            </div>
-          )}
-          {messages.length === 0 && !isFetchingNextPage && (
-            <div className="flex h-full flex-col items-center justify-center px-6">
-              <div className="border-border bg-muted/50 flex flex-col items-center gap-3 rounded-lg border px-8 py-6">
-                <MessageCircle className="text-muted-foreground/60 h-8 w-8" />
-                <p className="text-muted-foreground text-sm">
-                  Ask {assistantName ?? 'KiloClaw'} to draft a message, make a checklist,
-                  <br />
-                  or help you think through a decision.
-                </p>
+          <div ref={contentRef}>
+            {isFetchingNextPage && (
+              <div className="text-muted-foreground py-2 text-center text-xs">
+                Loading older messages...
               </div>
-            </div>
-          )}
-          {messages.map(msg => (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              isOwn={msg.senderId === currentUserId}
-              replyToMessage={
-                msg.inReplyToMessageId ? (messageMap.get(msg.inReplyToMessageId) ?? null) : null
-              }
-              pendingDeleteId={pendingDeleteId}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onConfirmDelete={handleConfirmDelete}
-              onCancelDelete={handleCancelDelete}
-              onReply={setReplyingTo}
-              onAddReaction={handleAddReaction}
-              onRemoveReaction={handleRemoveReaction}
-              onExecuteAction={handleExecuteAction}
-              actionPending={executeAction.isPending}
-              currentUserId={currentUserId}
-            />
-          ))}
+            )}
+            {messages.length === 0 && !isFetchingNextPage && (
+              <div className="flex h-full flex-col items-center justify-center px-6">
+                <div className="border-border bg-muted/50 flex flex-col items-center gap-3 rounded-lg border px-8 py-6">
+                  <MessageCircle className="text-muted-foreground/60 h-8 w-8" />
+                  <p className="text-muted-foreground text-sm">
+                    Ask {assistantName ?? 'KiloClaw'} to draft a message, make a checklist,
+                    <br />
+                    or help you think through a decision.
+                  </p>
+                </div>
+              </div>
+            )}
+            {messages.map(msg => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                isOwn={msg.senderId === currentUserId}
+                replyToMessage={
+                  msg.inReplyToMessageId ? (messageMap.get(msg.inReplyToMessageId) ?? null) : null
+                }
+                pendingDeleteId={pendingDeleteId}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onConfirmDelete={handleConfirmDelete}
+                onCancelDelete={handleCancelDelete}
+                onReply={setReplyingTo}
+                onAddReaction={handleAddReaction}
+                onRemoveReaction={handleRemoveReaction}
+                onExecuteAction={handleExecuteAction}
+                actionPending={executeAction.isPending}
+                currentUserId={currentUserId}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Scroll to bottom button */}

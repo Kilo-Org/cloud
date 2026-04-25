@@ -1,10 +1,36 @@
 import { env } from 'cloudflare:test';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { ConversationDO } from '../do/conversation-do';
 import { makeApp } from './helpers';
 
 function getConvStub(convId: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(convId));
+}
+
+// Test-only recording surface added to the miniflare `kiloclaw-stub` worker
+// (see vitest.config.mts). The stub buffers every `deliverChatWebhook` call
+// in module scope; tests read and reset the buffer through these RPCs.
+type RecordingKiloclaw = typeof env.KILOCLAW & {
+  __recordedWebhookCalls(): Promise<Array<Record<string, unknown>>>;
+  __clearWebhookCalls(): Promise<void>;
+};
+const recordingKiloclaw = env.KILOCLAW as RecordingKiloclaw;
+
+async function waitForWebhookCalls(
+  predicate: (calls: Array<Record<string, unknown>>) => boolean,
+  timeoutMs = 2000
+): Promise<Array<Record<string, unknown>>> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const calls = await recordingKiloclaw.__recordedWebhookCalls();
+    if (predicate(calls)) return calls;
+    if (Date.now() > deadline) {
+      throw new Error(
+        `Timed out waiting on deliverChatWebhook; last calls: ${JSON.stringify(calls)}`
+      );
+    }
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
 }
 
 /**
@@ -497,12 +523,41 @@ describe('Webhook queue enqueue', () => {
     const body = await res.json<{ messageId: string }>();
     expect(body.messageId).toBeTruthy();
   });
+
+  it('delivers webhooks to the bot in ConversationDO commit order', async () => {
+    await recordingKiloclaw.__clearWebhookCalls();
+    const { conversationId, userApp } = await createConversation('msg-webhook-order');
+
+    const sentTexts: string[] = [];
+    const sentIds: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const text = `msg-${i}`;
+      sentTexts.push(text);
+      const res = await userApp.request(
+        '/v1/messages',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ conversationId, content: [{ type: 'text', text }] }),
+        },
+        env
+      );
+      expect(res.status).toBe(201);
+      const { messageId } = await res.json<{ messageId: string }>();
+      sentIds.push(messageId);
+    }
+
+    const calls = await waitForWebhookCalls(cs => cs.length >= sentTexts.length);
+    const observedIds = calls
+      .filter(c => c.conversationId === conversationId)
+      .map(c => c.messageId as string);
+    expect(observedIds).toEqual(sentIds);
+  });
 });
 
 describe('Webhook reply context', () => {
   it('includes inReplyToBody and inReplyToSender when replying to an existing message', async () => {
-    const deliverChatWebhook = vi.fn().mockResolvedValue(undefined);
-    const testEnv = { ...env, KILOCLAW: { deliverChatWebhook } } as unknown as Env;
+    await recordingKiloclaw.__clearWebhookCalls();
 
     const userId = 'user-reply-context-1';
     const sandboxId = 'sandbox-reply-context-1';
@@ -516,7 +571,7 @@ describe('Webhook reply context', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sandboxId, title: 'Reply context test' }),
       },
-      testEnv
+      env
     );
     expect(convRes.status).toBe(201);
     const { conversationId } = await convRes.json<{ conversationId: string }>();
@@ -532,7 +587,7 @@ describe('Webhook reply context', () => {
           content: [{ type: 'text', text: 'Parent message text' }],
         }),
       },
-      testEnv
+      env
     );
     expect(parentRes.status).toBe(201);
     const { messageId: parentMessageId } = await parentRes.json<{ messageId: string }>();
@@ -549,17 +604,17 @@ describe('Webhook reply context', () => {
           inReplyToMessageId: parentMessageId,
         }),
       },
-      testEnv
+      env
     );
     expect(replyRes.status).toBe(201);
 
-    // deliverChatWebhook should have been called for each message (2 total)
-    // The second call (for the reply) should include reply context
-    const replyCall = deliverChatWebhook.mock.calls.find(
-      call => (call[0] as { inReplyToMessageId?: string }).inReplyToMessageId === parentMessageId
+    // Webhook delivery runs in the ConversationDO's waitUntil; poll the
+    // recording stub for the reply call.
+    const calls = await waitForWebhookCalls(cs =>
+      cs.some(c => c.inReplyToMessageId === parentMessageId)
     );
-    expect(replyCall).toBeDefined();
-    expect(replyCall![0]).toMatchObject({
+    const replyCall = calls.find(c => c.inReplyToMessageId === parentMessageId);
+    expect(replyCall).toMatchObject({
       inReplyToMessageId: parentMessageId,
       inReplyToBody: 'Parent message text',
       inReplyToSender: userId,
@@ -567,8 +622,7 @@ describe('Webhook reply context', () => {
   });
 
   it('delivers webhook without inReplyToBody or inReplyToSender when the parent message is deleted', async () => {
-    const deliverChatWebhook = vi.fn().mockResolvedValue(undefined);
-    const testEnv = { ...env, KILOCLAW: { deliverChatWebhook } } as unknown as Env;
+    await recordingKiloclaw.__clearWebhookCalls();
 
     const userId = 'user-reply-deleted-1';
     const sandboxId = 'sandbox-reply-deleted-1';
@@ -582,7 +636,7 @@ describe('Webhook reply context', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sandboxId, title: 'Reply deleted parent test' }),
       },
-      testEnv
+      env
     );
     expect(convRes.status).toBe(201);
     const { conversationId } = await convRes.json<{ conversationId: string }>();
@@ -598,7 +652,7 @@ describe('Webhook reply context', () => {
           content: [{ type: 'text', text: 'This will be deleted' }],
         }),
       },
-      testEnv
+      env
     );
     expect(parentRes.status).toBe(201);
     const { messageId: deletedParentId } = await parentRes.json<{ messageId: string }>();
@@ -610,11 +664,13 @@ describe('Webhook reply context', () => {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
       },
-      testEnv
+      env
     );
 
-    // Reset mock so we only track the reply call
-    deliverChatWebhook.mockClear();
+    // Drain the parent message's webhook then reset so only the reply call
+    // remains visible to the assertion.
+    await waitForWebhookCalls(cs => cs.some(c => c.messageId === deletedParentId));
+    await recordingKiloclaw.__clearWebhookCalls();
 
     // Create message replying to the deleted parent
     const res = await userApp.request(
@@ -628,16 +684,18 @@ describe('Webhook reply context', () => {
           inReplyToMessageId: deletedParentId,
         }),
       },
-      testEnv
+      env
     );
     expect(res.status).toBe(201);
 
-    // Webhook should have been delivered without body/sender (parent was deleted)
-    expect(deliverChatWebhook).toHaveBeenCalled();
-    const call = deliverChatWebhook.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(call.inReplyToMessageId).toBe(deletedParentId);
-    expect(call.inReplyToBody).toBeUndefined();
-    expect(call.inReplyToSender).toBeUndefined();
+    // Webhook should have been delivered without body/sender (parent was deleted).
+    const calls = await waitForWebhookCalls(cs =>
+      cs.some(c => c.inReplyToMessageId === deletedParentId)
+    );
+    const call = calls.find(c => c.inReplyToMessageId === deletedParentId);
+    expect(call).toBeDefined();
+    expect(call!.inReplyToBody).toBeUndefined();
+    expect(call!.inReplyToSender).toBeUndefined();
   });
 });
 

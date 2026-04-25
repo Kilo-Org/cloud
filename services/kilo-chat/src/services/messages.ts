@@ -10,7 +10,6 @@
 import type { ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
-import { deliverToBot, deliverActionExecutedToBot } from '../webhook/deliver';
 import {
   extractConversationContext,
   pushEventToHumanMembers,
@@ -113,6 +112,10 @@ async function postCommitFanOut(
   const isSenderHuman = humanMemberIds.includes(callerId);
 
   // ── Block A: Deliver webhook to bot members ──────────────────────────
+  // Webhook delivery is enqueued on the ConversationDO's per-conversation
+  // chain so back-to-back sends land on the bot in the same order the DO
+  // assigned their ULIDs. The DO returns as soon as the delivery is chained;
+  // the actual fetch runs in the DO's own `ctx.waitUntil`.
   const webhookDelivery = async () => {
     if (botMembers.length === 0) return;
     const sentAt = new Date().toISOString();
@@ -139,20 +142,24 @@ async function postCommitFanOut(
 
     await Promise.all(
       botMembers.map(bot =>
-        deliverToBot(
-          env,
-          {
-            targetBotId: bot.id,
-            conversationId,
-            messageId,
-            from: callerId,
-            content,
-            sentAt,
-            ...(inReplyToMessageId !== undefined && { inReplyToMessageId }),
-            ...(inReplyToBody !== undefined && { inReplyToBody }),
-            ...(inReplyToSender !== undefined && { inReplyToSender }),
-          },
-          { humanMemberIds, sandboxId }
+        withDORetry(
+          () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+          stub =>
+            stub.enqueueMessageWebhook(
+              {
+                targetBotId: bot.id,
+                conversationId,
+                messageId,
+                from: callerId,
+                content,
+                sentAt,
+                ...(inReplyToMessageId !== undefined && { inReplyToMessageId }),
+                ...(inReplyToBody !== undefined && { inReplyToBody }),
+                ...(inReplyToSender !== undefined && { inReplyToSender }),
+              },
+              { humanMemberIds, sandboxId }
+            ),
+          'ConversationDO.enqueueMessageWebhook'
         )
       )
     );
@@ -461,19 +468,25 @@ export async function executeActionFor(
         // Deliver action.executed webhook only to the bot that authored the
         // message holding the resolved actions block. Other bots in the
         // conversation did not present these buttons and must not see the user's
-        // decision.
+        // decision. Enqueued on the ConversationDO's chain so it's ordered
+        // relative to any message webhooks in the same conversation.
         const author = info.members.find(m => m.id === result.messageSenderId && m.kind === 'bot');
         if (author) {
-          await deliverActionExecutedToBot(env, {
-            type: 'action.executed',
-            targetBotId: author.id,
-            conversationId,
-            messageId,
-            groupId,
-            value,
-            executedBy: callerId,
-            executedAt: new Date().toISOString(),
-          });
+          await withDORetry(
+            () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+            stub =>
+              stub.enqueueActionExecutedWebhook({
+                type: 'action.executed',
+                targetBotId: author.id,
+                conversationId,
+                messageId,
+                groupId,
+                value,
+                executedBy: callerId,
+                executedAt: new Date().toISOString(),
+              }),
+            'ConversationDO.enqueueActionExecutedWebhook'
+          );
         }
       }
     };

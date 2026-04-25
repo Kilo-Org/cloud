@@ -4,9 +4,12 @@ import type {
   Message,
   ReactionSummary,
   ExecApprovalDecision,
+  actionExecutedWebhookSchema,
 } from '@kilocode/kilo-chat';
+import type { z } from 'zod';
 import { DurableObject } from 'cloudflare:workers';
 import { logger } from '../util/logger';
+import { deliverToBot, deliverActionExecutedToBot, type WebhookMessage } from '../webhook/deliver';
 
 /**
  * Parses stored message content JSON. Content was validated by Zod at write
@@ -153,10 +156,45 @@ export class ConversationDO extends DurableObject<Env> {
   private db;
   private nextUlid = monotonicFactory();
 
+  // Per-conversation serializer for outbound bot webhooks. createMessage
+  // RPCs are already serialized by the DO's single-threaded model, so the
+  // ULIDs are monotonic on arrival. But the original fan-out spawned each
+  // delivery in an independent worker-level `ctx.waitUntil`, letting rapid
+  // sends reorder in flight. Chaining all deliveries through this promise
+  // guarantees the bot sees messages in DO-arrival order. A rejection on
+  // the chain is swallowed so a single failed delivery doesn't block
+  // subsequent ones (matches the client-side send queue's policy in
+  // packages/kilo-chat/src/client.ts).
+  //
+  // If the DO is evicted mid-burst, any in-flight delivery continues under
+  // its own `ctx.waitUntil` and the next-session chain starts fresh. That
+  // window is rare and doesn't affect the common case.
+  private webhookChain: Promise<unknown> = Promise.resolve();
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.db = drizzle(ctx.storage, { logger: false });
     void ctx.blockConcurrencyWhile(() => migrate(this.db, migrations));
+  }
+
+  async enqueueMessageWebhook(msg: WebhookMessage, convContext: MemberContext): Promise<void> {
+    const next = this.webhookChain.then(
+      () => deliverToBot(this.env, msg, convContext),
+      () => deliverToBot(this.env, msg, convContext)
+    );
+    this.webhookChain = next;
+    this.ctx.waitUntil(next);
+  }
+
+  async enqueueActionExecutedWebhook(
+    msg: z.infer<typeof actionExecutedWebhookSchema> & { targetBotId: string }
+  ): Promise<void> {
+    const next = this.webhookChain.then(
+      () => deliverActionExecutedToBot(this.env, msg),
+      () => deliverActionExecutedToBot(this.env, msg)
+    );
+    this.webhookChain = next;
+    this.ctx.waitUntil(next);
   }
 
   notifyDeliveryFailed(messageId: string): void {

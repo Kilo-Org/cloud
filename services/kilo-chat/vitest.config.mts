@@ -28,9 +28,18 @@ export default defineWorkersConfig({
               modules: true,
               script: `
                 import { WorkerEntrypoint } from 'cloudflare:workers';
+                // Recorded calls are kept in module scope so both the stub and
+                // tests (via service-binding RPC) see the same array.
+                const recorded = [];
                 export default class KiloclawStub extends WorkerEntrypoint {
-                  async deliverChatWebhook(_payload) {
-                    // no-op stub — webhook delivery is not tested here
+                  async deliverChatWebhook(payload) {
+                    recorded.push(payload);
+                  }
+                  async __recordedWebhookCalls() {
+                    return recorded.slice();
+                  }
+                  async __clearWebhookCalls() {
+                    recorded.length = 0;
                   }
                 }
               `,

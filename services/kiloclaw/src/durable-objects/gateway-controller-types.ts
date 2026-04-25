@@ -104,14 +104,21 @@ const MorningBriefingSourceReadinessSchema = z.object({
   summary: z.string(),
 });
 
+const DELIVERY_CHANNELS = ['telegram', 'discord', 'slack'] as const;
+const DELIVERY_STATUSES = ['sent', 'skipped', 'failed'] as const;
+const DELIVERY_REASONS = [
+  'missing_target',
+  'ambiguous_target',
+  'send_failed',
+  'config_unavailable',
+] as const;
+
 const MorningBriefingDeliverySchema = z.object({
-  channel: z.enum(['telegram', 'discord', 'slack']),
-  status: z.enum(['sent', 'skipped', 'failed']),
+  channel: z.enum(DELIVERY_CHANNELS),
+  status: z.enum(DELIVERY_STATUSES),
   target: z.string().optional(),
   accountId: z.string().optional(),
-  reason: z
-    .enum(['missing_target', 'ambiguous_target', 'send_failed', 'config_unavailable'])
-    .optional(),
+  reason: z.enum(DELIVERY_REASONS).optional(),
   error: z.string().optional(),
 });
 

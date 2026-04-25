@@ -417,6 +417,21 @@ export type MorningBriefingDeliveryResult = {
   error?: string;
 };
 
+export type MorningBriefingStatusLite = Pick<
+  MorningBriefingStatusResponse,
+  | 'enabled'
+  | 'desiredEnabled'
+  | 'observedEnabled'
+  | 'reconcileState'
+  | 'lastReconcileAction'
+  | 'code'
+  | 'cron'
+  | 'timezone'
+  | 'lastGeneratedDate'
+  | 'sourceReadiness'
+  | 'lastDelivery'
+>;
+
 export type MorningBriefingStatusResponse = {
   ok: boolean;
   enabled?: boolean;

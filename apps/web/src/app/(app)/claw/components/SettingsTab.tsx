@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import type { KiloClawDashboardStatus, MorningBriefingStatusLite } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
@@ -500,31 +500,7 @@ function MorningBriefingCard({
   actionsReady,
 }: {
   mutations: ClawMutations;
-  briefingStatus:
-    | {
-        enabled?: boolean;
-        desiredEnabled?: boolean;
-        observedEnabled?: boolean | null;
-        reconcileState?: 'idle' | 'in_progress' | 'succeeded' | 'failed';
-        lastReconcileAction?: 'enable' | 'disable' | null;
-        code?: string;
-        cron?: string;
-        timezone?: string;
-        lastGeneratedDate?: string | null;
-        sourceReadiness?: {
-          github: { configured: boolean; summary: string };
-          linear: { configured: boolean; summary: string };
-          web: { configured: boolean; summary: string };
-        };
-        lastDelivery?: Array<{
-          channel: 'telegram' | 'discord' | 'slack';
-          status: 'sent' | 'skipped' | 'failed';
-          reason?: 'missing_target' | 'ambiguous_target' | 'send_failed' | 'config_unavailable';
-          error?: string;
-          target?: string;
-        }>;
-      }
-    | undefined;
+  briefingStatus: MorningBriefingStatusLite | undefined;
   fallbackReadiness: {
     githubConfigured: boolean;
     linearConfigured: boolean;

@@ -107,6 +107,12 @@ function routeParam(c: Context, name: string): string {
   return c.req.param(name) ?? '';
 }
 
+/** Append `?search` from the incoming request to the given suffix. */
+function withSearch(c: Context, suffix: string): string {
+  const { search } = new URL(c.req.url);
+  return `${suffix}${search}`;
+}
+
 /** Pass through an upstream response verbatim (status + body + content-type). */
 function relay(upstream: Response): Response {
   if (upstream.status === 204 || upstream.status === 205) {
@@ -121,38 +127,74 @@ function relay(upstream: Response): Response {
   });
 }
 
+type RelayConfig = {
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  upstreamSuffix: (c: Context) => string;
+  /**
+   * Body handling:
+   *  - `{ kind: 'none' }`: do not forward a body (GET/DELETE/no-body POST).
+   *  - `{ kind: 'forward', limit }`: stream the request body up to `limit`
+   *    bytes and forward it verbatim with the client's content-type.
+   *  - `{ kind: 'fixed', body, contentType }`: forward a caller-supplied
+   *    string body (e.g. after the route has already parsed+consumed the
+   *    inbound request body for routing purposes).
+   */
+  body:
+    | { kind: 'none' }
+    | { kind: 'forward'; limit: number }
+    | { kind: 'fixed'; body: string | undefined; contentType?: string };
+};
+
 /**
- * Shared relay for routes that forward the plugin's body verbatim to the
- * kiloclaw worker. The 5 body-forwarding routes (send / edit / delete /
- * reaction add / reaction remove) are all this shape.
+ * Shared `fetch upstream → relay` core. Used by `relayRoute` and by routes
+ * that need to do their own preprocessing (auth + body parsing) before
+ * deciding the upstream URL.
  */
-async function relayBodyRoute(
+async function relayRequest(
   c: Context,
   options: KiloChatRouteOptions,
-  config: {
-    method: 'POST' | 'PATCH' | 'DELETE';
-    upstreamSuffix: (c: Context) => string;
-    bodyLimit: number;
-  }
+  config: RelayConfig
 ): Promise<Response> {
-  const unauthorized = authorize(c, options);
-  if (unauthorized) return unauthorized;
-
-  const read = await readBodyWithLimit(c, config.bodyLimit);
-  if (!read.ok) return read.response;
+  let body: string | undefined;
+  let contentType: string | undefined;
+  if (config.body.kind === 'forward') {
+    const read = await readBodyWithLimit(c, config.body.limit);
+    if (!read.ok) return read.response;
+    body = read.body || undefined;
+    contentType = c.req.header('content-type');
+  } else if (config.body.kind === 'fixed') {
+    body = config.body.body;
+    contentType = config.body.contentType;
+  }
 
   const fetchImpl = options.fetchImpl ?? fetch;
   let upstream: Response;
   try {
     upstream = await fetchImpl(upstreamUrl(options, config.upstreamSuffix(c)), {
       method: config.method,
-      headers: outboundHeaders(options, c.req.header('content-type')),
-      body: read.body || undefined,
+      headers: outboundHeaders(options, contentType),
+      body,
     });
   } catch {
     return c.json({ error: 'Bad Gateway' }, 502);
   }
   return relay(upstream);
+}
+
+/**
+ * Shared relay for every `authorize → fetch upstream → relay` route.
+ * Body-forwarding and bodyless routes share this path; the only difference
+ * is whether we read the incoming body and pass a content-type header
+ * through to the upstream request.
+ */
+async function relayRoute(
+  c: Context,
+  options: KiloChatRouteOptions,
+  config: RelayConfig
+): Promise<Response> {
+  const unauthorized = authorize(c, options);
+  if (unauthorized) return unauthorized;
+  return relayRequest(c, options, config);
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -161,54 +203,42 @@ async function relayBodyRoute(
 
 export function registerKiloChatSendRoute(app: Hono, options: KiloChatRouteOptions): void {
   app.post('/_kilo/kilo-chat/send', c =>
-    relayBodyRoute(c, options, {
+    relayRoute(c, options, {
       method: 'POST',
       upstreamSuffix: () => '/messages',
-      bodyLimit: MAX_BODY_BYTES,
+      body: { kind: 'forward', limit: MAX_BODY_BYTES },
     })
   );
 }
 
 export function registerKiloChatEditRoute(app: Hono, options: KiloChatRouteOptions): void {
   app.patch('/_kilo/kilo-chat/messages/:messageId', c =>
-    relayBodyRoute(c, options, {
+    relayRoute(c, options, {
       method: 'PATCH',
       upstreamSuffix: ctx => `/messages/${encodeURIComponent(routeParam(ctx, 'messageId'))}`,
-      bodyLimit: MAX_BODY_BYTES,
+      body: { kind: 'forward', limit: MAX_BODY_BYTES },
     })
   );
 }
 
 export function registerKiloChatDeleteRoute(app: Hono, options: KiloChatRouteOptions): void {
-  const fetchImpl = options.fetchImpl ?? fetch;
-
-  app.delete('/_kilo/kilo-chat/messages/:messageId', async c => {
-    const unauthorized = authorize(c, options);
-    if (unauthorized) return unauthorized;
-
-    const messageId = routeParam(c, 'messageId');
-    const { search } = new URL(c.req.url);
-
-    let upstream: Response;
-    try {
-      upstream = await fetchImpl(
-        upstreamUrl(options, `/messages/${encodeURIComponent(messageId)}${search}`),
-        { method: 'DELETE', headers: outboundHeaders(options) }
-      );
-    } catch {
-      return c.json({ error: 'Bad Gateway' }, 502);
-    }
-    return relay(upstream);
-  });
+  app.delete('/_kilo/kilo-chat/messages/:messageId', c =>
+    relayRoute(c, options, {
+      method: 'DELETE',
+      upstreamSuffix: ctx =>
+        withSearch(ctx, `/messages/${encodeURIComponent(routeParam(ctx, 'messageId'))}`),
+      body: { kind: 'none' },
+    })
+  );
 }
 
 export function registerKiloChatReactionPostRoute(app: Hono, options: KiloChatRouteOptions): void {
   app.post('/_kilo/kilo-chat/messages/:messageId/reactions', c =>
-    relayBodyRoute(c, options, {
+    relayRoute(c, options, {
       method: 'POST',
       upstreamSuffix: ctx =>
         `/messages/${encodeURIComponent(routeParam(ctx, 'messageId'))}/reactions`,
-      bodyLimit: MAX_SMALL_BODY_BYTES,
+      body: { kind: 'forward', limit: MAX_SMALL_BODY_BYTES },
     })
   );
 }
@@ -217,26 +247,14 @@ export function registerKiloChatReactionDeleteRoute(
   app: Hono,
   options: KiloChatRouteOptions
 ): void {
-  const fetchImpl = options.fetchImpl ?? fetch;
-
-  app.delete('/_kilo/kilo-chat/messages/:messageId/reactions', async c => {
-    const unauthorized = authorize(c, options);
-    if (unauthorized) return unauthorized;
-
-    const messageId = routeParam(c, 'messageId');
-    const { search } = new URL(c.req.url);
-
-    let upstream: Response;
-    try {
-      upstream = await fetchImpl(
-        upstreamUrl(options, `/messages/${encodeURIComponent(messageId)}/reactions${search}`),
-        { method: 'DELETE', headers: outboundHeaders(options) }
-      );
-    } catch {
-      return c.json({ error: 'Bad Gateway' }, 502);
-    }
-    return relay(upstream);
-  });
+  app.delete('/_kilo/kilo-chat/messages/:messageId/reactions', c =>
+    relayRoute(c, options, {
+      method: 'DELETE',
+      upstreamSuffix: ctx =>
+        withSearch(ctx, `/messages/${encodeURIComponent(routeParam(ctx, 'messageId'))}/reactions`),
+      body: { kind: 'none' },
+    })
+  );
 }
 
 /**
@@ -244,87 +262,55 @@ export function registerKiloChatReactionDeleteRoute(
  * upstream URL and forwards with no body of its own.
  */
 export function registerKiloChatTypingRoute(app: Hono, options: KiloChatRouteOptions): void {
-  const fetchImpl = options.fetchImpl ?? fetch;
-
-  app.post('/_kilo/kilo-chat/typing', async c => {
+  const typingRoute = (verb: '' | '/stop') => async (c: Context) => {
     const unauthorized = authorize(c, options);
     if (unauthorized) return unauthorized;
 
     const convId = await parseConversationId(c);
     if (typeof convId !== 'string') return convId;
 
-    let upstream: Response;
-    try {
-      upstream = await fetchImpl(
-        upstreamUrl(options, `/conversations/${encodeURIComponent(convId)}/typing`),
-        { method: 'POST', headers: outboundHeaders(options) }
-      );
-    } catch {
-      return c.json({ error: 'Bad Gateway' }, 502);
-    }
-    return relay(upstream);
-  });
+    return relayRequest(c, options, {
+      method: 'POST',
+      upstreamSuffix: () => `/conversations/${encodeURIComponent(convId)}/typing${verb}`,
+      body: { kind: 'none' },
+    });
+  };
 
-  app.post('/_kilo/kilo-chat/typing/stop', async c => {
-    const unauthorized = authorize(c, options);
-    if (unauthorized) return unauthorized;
-
-    const convId = await parseConversationId(c);
-    if (typeof convId !== 'string') return convId;
-
-    let upstream: Response;
-    try {
-      upstream = await fetchImpl(
-        upstreamUrl(options, `/conversations/${encodeURIComponent(convId)}/typing/stop`),
-        { method: 'POST', headers: outboundHeaders(options) }
-      );
-    } catch {
-      return c.json({ error: 'Bad Gateway' }, 502);
-    }
-    return relay(upstream);
-  });
+  app.post('/_kilo/kilo-chat/typing', typingRoute(''));
+  app.post('/_kilo/kilo-chat/typing/stop', typingRoute('/stop'));
 }
 
 export function registerKiloChatListMessagesRoute(app: Hono, options: KiloChatRouteOptions): void {
-  const fetchImpl = options.fetchImpl ?? fetch;
-
-  app.get('/_kilo/kilo-chat/conversations/:conversationId/messages', async c => {
-    const unauthorized = authorize(c, options);
-    if (unauthorized) return unauthorized;
-
-    const convId = routeParam(c, 'conversationId');
-    const { search } = new URL(c.req.url);
-
-    let upstream: Response;
-    try {
-      upstream = await fetchImpl(
-        upstreamUrl(options, `/conversations/${encodeURIComponent(convId)}/messages${search}`),
-        { method: 'GET', headers: outboundHeaders(options) }
-      );
-    } catch {
-      return c.json({ error: 'Bad Gateway' }, 502);
-    }
-    return relay(upstream);
-  });
+  app.get('/_kilo/kilo-chat/conversations/:conversationId/messages', c =>
+    relayRoute(c, options, {
+      method: 'GET',
+      upstreamSuffix: ctx =>
+        withSearch(
+          ctx,
+          `/conversations/${encodeURIComponent(routeParam(ctx, 'conversationId'))}/messages`
+        ),
+      body: { kind: 'none' },
+    })
+  );
 }
 
 export function registerKiloChatRenameRoute(app: Hono, options: KiloChatRouteOptions): void {
   app.patch('/_kilo/kilo-chat/conversations/:conversationId', c =>
-    relayBodyRoute(c, options, {
+    relayRoute(c, options, {
       method: 'PATCH',
       upstreamSuffix: ctx =>
         `/conversations/${encodeURIComponent(routeParam(ctx, 'conversationId'))}`,
-      bodyLimit: MAX_SMALL_BODY_BYTES,
+      body: { kind: 'forward', limit: MAX_SMALL_BODY_BYTES },
     })
   );
 }
 
 export function registerKiloChatBotStatusRoute(app: Hono, options: KiloChatRouteOptions): void {
   app.post('/_kilo/kilo-chat/bot-status', c =>
-    relayBodyRoute(c, options, {
+    relayRoute(c, options, {
       method: 'POST',
       upstreamSuffix: () => '/bot-status',
-      bodyLimit: MAX_SMALL_BODY_BYTES,
+      body: { kind: 'forward', limit: MAX_SMALL_BODY_BYTES },
     })
   );
 }
@@ -334,10 +320,10 @@ export function registerKiloChatCreateConversationRoute(
   options: KiloChatRouteOptions
 ): void {
   app.post('/_kilo/kilo-chat/conversations', c =>
-    relayBodyRoute(c, options, {
+    relayRoute(c, options, {
       method: 'POST',
       upstreamSuffix: () => '/conversations',
-      bodyLimit: MAX_SMALL_BODY_BYTES,
+      body: { kind: 'forward', limit: MAX_SMALL_BODY_BYTES },
     })
   );
 }
@@ -346,47 +332,24 @@ export function registerKiloChatListConversationsRoute(
   app: Hono,
   options: KiloChatRouteOptions
 ): void {
-  const fetchImpl = options.fetchImpl ?? fetch;
-
-  app.get('/_kilo/kilo-chat/conversations', async c => {
-    const unauthorized = authorize(c, options);
-    if (unauthorized) return unauthorized;
-
-    const { search } = new URL(c.req.url);
-
-    let upstream: Response;
-    try {
-      upstream = await fetchImpl(upstreamUrl(options, `/conversations${search}`), {
-        method: 'GET',
-        headers: outboundHeaders(options),
-      });
-    } catch {
-      return c.json({ error: 'Bad Gateway' }, 502);
-    }
-    return relay(upstream);
-  });
+  app.get('/_kilo/kilo-chat/conversations', c =>
+    relayRoute(c, options, {
+      method: 'GET',
+      upstreamSuffix: ctx => withSearch(ctx, '/conversations'),
+      body: { kind: 'none' },
+    })
+  );
 }
 
 export function registerKiloChatGetMembersRoute(app: Hono, options: KiloChatRouteOptions): void {
-  const fetchImpl = options.fetchImpl ?? fetch;
-
-  app.get('/_kilo/kilo-chat/conversations/:conversationId/members', async c => {
-    const unauthorized = authorize(c, options);
-    if (unauthorized) return unauthorized;
-
-    const convId = routeParam(c, 'conversationId');
-
-    let upstream: Response;
-    try {
-      upstream = await fetchImpl(
-        upstreamUrl(options, `/conversations/${encodeURIComponent(convId)}/members`),
-        { method: 'GET', headers: outboundHeaders(options) }
-      );
-    } catch {
-      return c.json({ error: 'Bad Gateway' }, 502);
-    }
-    return relay(upstream);
-  });
+  app.get('/_kilo/kilo-chat/conversations/:conversationId/members', c =>
+    relayRoute(c, options, {
+      method: 'GET',
+      upstreamSuffix: ctx =>
+        `/conversations/${encodeURIComponent(routeParam(ctx, 'conversationId'))}/members`,
+      body: { kind: 'none' },
+    })
+  );
 }
 
 export function registerKiloChatMessageDeliveryFailedRoute(
@@ -396,13 +359,13 @@ export function registerKiloChatMessageDeliveryFailedRoute(
   app.post(
     '/_kilo/kilo-chat/conversations/:conversationId/messages/:messageId/delivery-failed',
     c =>
-      relayBodyRoute(c, options, {
+      relayRoute(c, options, {
         method: 'POST',
         upstreamSuffix: ctx =>
           `/conversations/${encodeURIComponent(
             routeParam(ctx, 'conversationId')
           )}/messages/${encodeURIComponent(routeParam(ctx, 'messageId'))}/delivery-failed`,
-        bodyLimit: MAX_SMALL_BODY_BYTES,
+        body: { kind: 'forward', limit: MAX_SMALL_BODY_BYTES },
       })
   );
 }
@@ -412,18 +375,18 @@ export function registerKiloChatActionDeliveryFailedRoute(
   options: KiloChatRouteOptions
 ): void {
   app.post('/_kilo/kilo-chat/conversations/:conversationId/actions/:groupId/delivery-failed', c =>
-    relayBodyRoute(c, options, {
+    relayRoute(c, options, {
       method: 'POST',
       upstreamSuffix: ctx =>
         `/conversations/${encodeURIComponent(
           routeParam(ctx, 'conversationId')
         )}/actions/${encodeURIComponent(routeParam(ctx, 'groupId'))}/delivery-failed`,
-      bodyLimit: MAX_SMALL_BODY_BYTES,
+      body: { kind: 'forward', limit: MAX_SMALL_BODY_BYTES },
     })
   );
 }
 
-async function parseConversationId(c: import('hono').Context): Promise<string | Response> {
+async function parseConversationId(c: Context): Promise<string | Response> {
   const read = await readBodyWithLimit(c, MAX_SMALL_BODY_BYTES);
   if (!read.ok) return read.response;
 

@@ -5,7 +5,7 @@ import type { AuthContext } from '../auth';
 import { botAuthMiddleware } from '../auth-bot';
 import { registerBotRoutes } from '../routes/bot-messages';
 import { registerConversationRoutes } from '../routes/conversations';
-import { registerMessageRoutes } from '../routes/messages';
+import { handleCreateMessage, handleExecuteAction } from '../routes/handler';
 import { deriveGatewayToken } from '../lib/gateway-token';
 
 const ownershipMap = new Map<string, Set<string>>();
@@ -55,8 +55,8 @@ async function tokenFor(sandboxId: string): Promise<string> {
 }
 
 /** Helper to create a conversation + optionally a message as a user.
- *  Uses registerConversationRoutes and registerMessageRoutes directly with a
- *  mock-auth app so we don't need a real JWT. */
+ *  Registers the message create handler directly with a mock-auth app so we
+ *  don't need a real JWT. */
 async function setupData(suffix: string) {
   const userId = `user-${suffix}`;
   const sandboxId = `sandbox-${suffix}`;
@@ -71,7 +71,7 @@ async function setupData(suffix: string) {
     await next();
   });
   registerConversationRoutes(setupApp);
-  registerMessageRoutes(setupApp);
+  setupApp.post('/v1/messages', handleCreateMessage);
 
   const testEnv = makeEnv();
 
@@ -214,7 +214,11 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       await next();
     });
     registerConversationRoutes(setupApp);
-    registerMessageRoutes(setupApp);
+    setupApp.post('/v1/messages', handleCreateMessage);
+    setupApp.post(
+      '/v1/conversations/:conversationId/messages/:messageId/execute-action',
+      handleExecuteAction
+    );
 
     const testEnv = makeEnv();
 

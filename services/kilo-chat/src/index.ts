@@ -11,9 +11,17 @@ import { authMiddleware } from './auth';
 import { botAuthMiddleware } from './auth-bot';
 import type { AuthContext } from './auth';
 import { registerConversationRoutes } from './routes/conversations';
-import { registerMessageRoutes } from './routes/messages';
-import { registerReactionsRoutes } from './routes/reactions';
-import { registerTypingRoutes } from './routes/typing';
+import {
+  handleAddReaction,
+  handleCreateMessage,
+  handleDeleteMessage,
+  handleEditMessage,
+  handleExecuteAction,
+  handleListMessages,
+  handleRemoveReaction,
+  handleSetTyping,
+  handleStopTyping,
+} from './routes/handler';
 import { registerBotRoutes } from './routes/bot-messages';
 export { MembershipDO } from './do/membership-do';
 export { ConversationDO } from './do/conversation-do';
@@ -65,9 +73,24 @@ app.get('/health', c => c.json({ ok: true }));
 
 app.use('/v1/*', authMiddleware);
 registerConversationRoutes(app);
-registerMessageRoutes(app);
-registerReactionsRoutes(app);
-registerTypingRoutes(app);
+
+// Messages
+app.post('/v1/messages', handleCreateMessage);
+app.get('/v1/conversations/:conversationId/messages', handleListMessages);
+app.patch('/v1/messages/:messageId', handleEditMessage);
+app.delete('/v1/messages/:messageId', handleDeleteMessage);
+app.post(
+  '/v1/conversations/:conversationId/messages/:messageId/execute-action',
+  handleExecuteAction
+);
+
+// Reactions
+app.post('/v1/messages/:messageId/reactions', handleAddReaction);
+app.delete('/v1/messages/:messageId/reactions', handleRemoveReaction);
+
+// Typing
+app.post('/v1/conversations/:conversationId/typing', handleSetTyping);
+app.post('/v1/conversations/:conversationId/typing/stop', handleStopTyping);
 
 // Bot HTTP routes — gateway-token auth, called directly by Fly controllers.
 app.use('/bot/v1/sandboxes/:sandboxId/*', botAuthMiddleware);

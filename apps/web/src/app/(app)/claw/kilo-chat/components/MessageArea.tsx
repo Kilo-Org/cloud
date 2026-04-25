@@ -295,25 +295,26 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="border-border flex items-center justify-between border-b px-4 py-3">
-        <input
-          ref={renamingTitleRef => {
-            if (isRenamingTitle && renamingTitleRef) renamingTitleRef.focus();
-          }}
-          readOnly={!isRenamingTitle}
-          className={`text-sm font-medium bg-transparent outline-none min-w-0 flex-1 mr-2 ${
-            isRenamingTitle
-              ? 'border-b border-current/20'
-              : 'cursor-pointer hover:opacity-70 transition-opacity border-b border-transparent'
-          }`}
-          value={isRenamingTitle ? renameText : title}
-          onChange={e => setRenameText(e.target.value)}
-          onKeyDown={handleRenameKeyDown}
-          onBlur={handleRenameBlur}
-          onClick={() => {
-            if (!isRenamingTitle) handleTitleClick();
-          }}
-          title={isRenamingTitle ? undefined : 'Click to rename'}
-        />
+        {isRenamingTitle ? (
+          <input
+            // eslint-disable-next-line jsx-a11y/no-autofocus
+            autoFocus
+            className="text-sm font-medium bg-transparent outline-none min-w-0 flex-1 mr-2 border-b border-current/20"
+            value={renameText}
+            onChange={e => setRenameText(e.target.value)}
+            onKeyDown={handleRenameKeyDown}
+            onBlur={handleRenameBlur}
+          />
+        ) : (
+          <button
+            type="button"
+            className="text-sm font-medium bg-transparent outline-none min-w-0 flex-1 mr-2 text-left cursor-pointer hover:opacity-70 transition-opacity border-b border-transparent"
+            onClick={handleTitleClick}
+            title="Click to rename"
+          >
+            {title}
+          </button>
+        )}
         <div className="flex items-center gap-3">
           {ctxUsage && (
             <ContextUsageRing

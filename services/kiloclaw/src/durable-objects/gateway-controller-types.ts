@@ -1,4 +1,9 @@
 import { z, type ZodType } from 'zod';
+import {
+  MORNING_BRIEFING_DELIVERY_CHANNELS,
+  MORNING_BRIEFING_DELIVERY_REASONS,
+  MORNING_BRIEFING_DELIVERY_STATUSES,
+} from './morning-briefing-delivery-constants';
 
 export type GatewayProcessStatus = {
   state: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'shutting_down';
@@ -104,21 +109,12 @@ const MorningBriefingSourceReadinessSchema = z.object({
   summary: z.string(),
 });
 
-const DELIVERY_CHANNELS = ['telegram', 'discord', 'slack'] as const;
-const DELIVERY_STATUSES = ['sent', 'skipped', 'failed'] as const;
-const DELIVERY_REASONS = [
-  'missing_target',
-  'ambiguous_target',
-  'send_failed',
-  'config_unavailable',
-] as const;
-
 const MorningBriefingDeliverySchema = z.object({
-  channel: z.enum(DELIVERY_CHANNELS),
-  status: z.enum(DELIVERY_STATUSES),
+  channel: z.enum(MORNING_BRIEFING_DELIVERY_CHANNELS),
+  status: z.enum(MORNING_BRIEFING_DELIVERY_STATUSES),
   target: z.string().optional(),
   accountId: z.string().optional(),
-  reason: z.enum(DELIVERY_REASONS).optional(),
+  reason: z.enum(MORNING_BRIEFING_DELIVERY_REASONS).optional(),
   error: z.string().optional(),
 });
 

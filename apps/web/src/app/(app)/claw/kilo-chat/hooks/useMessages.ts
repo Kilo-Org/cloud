@@ -49,6 +49,64 @@ function applyReactionRemoved(
     .filter(r => r.count > 0);
 }
 
+/**
+ * Splice a snapshotted message back into the current cache state. If the
+ * message no longer exists in any page (e.g. a concurrent delete event), the
+ * cache is left unchanged so we do not resurrect it.
+ */
+function restoreMessageInCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  queryKey: readonly unknown[],
+  snapshot: Message
+): void {
+  queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+    if (!old) return old;
+    let replaced = false;
+    const pages = old.pages.map(page =>
+      page.map(msg => {
+        if (msg.id !== snapshot.id) return msg;
+        replaced = true;
+        return snapshot;
+      })
+    );
+    if (!replaced) return old;
+    return { ...old, pages };
+  });
+}
+
+/**
+ * Remove a message by id from the current cache state. Used to roll back the
+ * optimistic insert performed by `useSendMessage` without touching any other
+ * concurrently-optimistic messages.
+ */
+function removeMessageFromCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  queryKey: readonly unknown[],
+  messageId: string
+): void {
+  queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+    if (!old) return old;
+    return {
+      ...old,
+      pages: old.pages.map(page => page.filter(msg => msg.id !== messageId)),
+    };
+  });
+}
+
+function findMessageInCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  queryKey: readonly unknown[],
+  messageId: string
+): Message | undefined {
+  const data = queryClient.getQueryData<InfiniteData<Message[]>>(queryKey);
+  if (!data) return undefined;
+  for (const page of data.pages) {
+    const match = page.find(msg => msg.id === messageId);
+    if (match) return match;
+  }
+  return undefined;
+}
+
 export function useMessages(client: KiloChatClient, conversationId: string | null) {
   return useInfiniteQuery({
     queryKey: ['kilo-chat', 'messages', conversationId],
@@ -82,9 +140,9 @@ export function useSendMessage(
       if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData(queryKey);
+      const pendingId = `pending-${variables.clientId}`;
       const optimisticMessage: Message = {
-        id: `pending-${variables.clientId}`,
+        id: pendingId,
         senderId: currentUserId,
         content: variables.content,
         inReplyToMessageId: variables.inReplyToMessageId ?? null,
@@ -99,12 +157,12 @@ export function useSendMessage(
         const firstPage = old.pages[0] ?? [];
         return { ...old, pages: [[optimisticMessage, ...firstPage], ...old.pages.slice(1)] };
       });
-      return { previous, queryKey, clientId: variables.clientId };
+      return { queryKey, pendingId };
     },
     onSuccess: (response, _variables, context) => {
-      if (!context?.queryKey) return;
-      const pendingId = `pending-${context.clientId}`;
-      queryClient.setQueryData<InfiniteData<Message[]>>(context.queryKey, old => {
+      if (!context) return;
+      const { queryKey, pendingId } = context;
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return {
           ...old,
@@ -115,9 +173,8 @@ export function useSendMessage(
       });
     },
     onError: (_err, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(context.queryKey, context.previous);
-      }
+      if (!context) return;
+      removeMessageFromCache(queryClient, context.queryKey, context.pendingId);
     },
   });
 }
@@ -131,7 +188,7 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
       if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData(queryKey);
+      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return {
@@ -145,12 +202,11 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
           ),
         };
       });
-      return { previous, queryKey };
+      return { queryKey, snapshot };
     },
     onError: (_err, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(context.queryKey, context.previous);
-      }
+      if (!context?.snapshot) return;
+      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
   });
 }
@@ -164,7 +220,7 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
       if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData(queryKey);
+      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return {
@@ -174,12 +230,11 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
           ),
         };
       });
-      return { previous, queryKey };
+      return { queryKey, snapshot };
     },
     onError: (_err, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(context.queryKey, context.previous);
-      }
+      if (!context?.snapshot) return;
+      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
   });
 }
@@ -197,7 +252,7 @@ export function useAddReaction(
       if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData(queryKey);
+      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return {
@@ -214,12 +269,11 @@ export function useAddReaction(
           ),
         };
       });
-      return { previous, queryKey };
+      return { queryKey, snapshot };
     },
     onError: (_err, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(context.queryKey, context.previous);
-      }
+      if (!context?.snapshot) return;
+      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
   });
 }
@@ -237,7 +291,7 @@ export function useRemoveReaction(
       if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData(queryKey);
+      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return {
@@ -254,12 +308,11 @@ export function useRemoveReaction(
           ),
         };
       });
-      return { previous, queryKey };
+      return { queryKey, snapshot };
     },
     onError: (_err, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(context.queryKey, context.previous);
-      }
+      if (!context?.snapshot) return;
+      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
   });
 }
@@ -284,7 +337,7 @@ export function useExecuteAction(
       if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData(queryKey);
+      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       // Optimistically mark the action as resolved
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
@@ -312,12 +365,11 @@ export function useExecuteAction(
           ),
         };
       });
-      return { previous, queryKey };
+      return { queryKey, snapshot };
     },
     onError: (_err, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(context.queryKey, context.previous);
-      }
+      if (!context?.snapshot) return;
+      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
   });
 }

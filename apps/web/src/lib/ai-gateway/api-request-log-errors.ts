@@ -4,12 +4,20 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { createParser } from 'eventsource-parser';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
-export const toolCallArgumentErrorSchema = z.object({
-  tool_call_id: z.string(),
-  tool_name: z.string(),
-  kind: z.enum(['unparseable_json', 'schema_mismatch']),
-  details: z.string().optional(),
-});
+export const toolCallArgumentErrorSchema = z.discriminatedUnion('kind', [
+  z.object({
+    tool_call_id: z.string(),
+    tool_name: z.string(),
+    kind: z.literal('unparseable_json'),
+    details: z.string(),
+  }),
+  z.object({
+    tool_call_id: z.string(),
+    tool_name: z.string(),
+    kind: z.literal('schema_mismatch'),
+    details: z.unknown(),
+  }),
+]);
 
 export const apiRequestLogErrorSchema = z.object({
   invalid_tool_call_arguments: z.array(toolCallArgumentErrorSchema),
@@ -40,7 +48,7 @@ function validateAgainstSchema(
       tool_call_id: toolCallId,
       tool_name: toolName,
       kind: 'schema_mismatch',
-      details: result.error.message,
+      details: z.treeifyError(result.error),
     });
   }
 }

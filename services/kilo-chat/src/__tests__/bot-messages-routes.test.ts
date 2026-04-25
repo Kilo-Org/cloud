@@ -7,6 +7,7 @@ import { registerBotRoutes } from '../routes/bot-messages';
 import { registerConversationRoutes } from '../routes/conversations';
 import { handleCreateMessage, handleExecuteAction } from '../routes/handler';
 import { deriveGatewayToken } from '../lib/gateway-token';
+import { withTestExecutionCtx } from './helpers';
 
 const ownershipMap = new Map<string, Set<string>>();
 const sandboxOwnerMap = new Map<string, string>();
@@ -46,7 +47,7 @@ function makeBotApp() {
   const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
   app.use('/bot/v1/sandboxes/:sandboxId/*', botAuthMiddleware);
   registerBotRoutes(app);
-  return app;
+  return withTestExecutionCtx(app);
 }
 
 /** Auth token for a given sandboxId. */
@@ -64,14 +65,15 @@ async function setupData(suffix: string) {
   grantSandbox(userId, sandboxId);
 
   // Minimal app with mock auth for setup
-  const setupApp = new Hono<{ Bindings: Env; Variables: AuthContext }>();
-  setupApp.use('*', async (c, next) => {
+  const setupAppBase = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+  setupAppBase.use('*', async (c, next) => {
     c.set('callerId', userId);
     c.set('callerKind', 'user');
     await next();
   });
-  registerConversationRoutes(setupApp);
-  setupApp.post('/v1/messages', handleCreateMessage);
+  registerConversationRoutes(setupAppBase);
+  setupAppBase.post('/v1/messages', handleCreateMessage);
+  const setupApp = withTestExecutionCtx(setupAppBase);
 
   const testEnv = makeEnv();
 
@@ -206,19 +208,20 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
     const sandboxId = `sandbox-${suffix}`;
     grantSandbox(userId, sandboxId);
 
-    const setupApp = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+    const setupAppBase = new Hono<{ Bindings: Env; Variables: AuthContext }>();
     // user app for conv + message creation
-    setupApp.use('*', async (c, next) => {
+    setupAppBase.use('*', async (c, next) => {
       c.set('callerId', userId);
       c.set('callerKind', 'user');
       await next();
     });
-    registerConversationRoutes(setupApp);
-    setupApp.post('/v1/messages', handleCreateMessage);
-    setupApp.post(
+    registerConversationRoutes(setupAppBase);
+    setupAppBase.post('/v1/messages', handleCreateMessage);
+    setupAppBase.post(
       '/v1/conversations/:conversationId/messages/:messageId/execute-action',
       handleExecuteAction
     );
+    const setupApp = withTestExecutionCtx(setupAppBase);
 
     const testEnv = makeEnv();
 

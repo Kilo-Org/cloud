@@ -17,7 +17,7 @@ export async function addReactionFor(
   env: Env,
   callerId: string,
   params: AddReactionParams,
-  ctx?: DeferCtx
+  ctx: DeferCtx
 ): Promise<AddReactionResult> {
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId));
   const result = await convStub.addReaction({
@@ -39,8 +39,7 @@ export async function addReactionFor(
         'reaction.added',
         { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
       );
-      if (ctx) ctx.waitUntil(pushPromise);
-      else await pushPromise;
+      ctx.waitUntil(pushPromise);
     }
   }
 
@@ -61,7 +60,7 @@ export async function removeReactionFor(
   env: Env,
   callerId: string,
   params: RemoveReactionParams,
-  ctx?: DeferCtx
+  ctx: DeferCtx
 ): Promise<RemoveReactionResult> {
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId));
   const result = await convStub.removeReaction({
@@ -83,8 +82,7 @@ export async function removeReactionFor(
         'reaction.removed',
         { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
       );
-      if (ctx) ctx.waitUntil(pushPromise);
-      else await pushPromise;
+      ctx.waitUntil(pushPromise);
     }
   }
 

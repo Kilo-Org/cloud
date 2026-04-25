@@ -113,15 +113,7 @@ async function assertCallerIsMember(c: HonoCtx, conversationId: string, callerId
 }
 
 export function makeSchedule(c: HonoCtx): DeferCtx {
-  try {
-    // Probe for executionCtx — absent in unit-test (app.request) mode.
-    const ectx = c.executionCtx;
-    return { waitUntil: p => ectx.waitUntil(p) };
-  } catch {
-    // executionCtx unavailable (e.g. unit tests); return undefined so callers
-    // fall through to awaiting the promise instead of dropping it.
-    return undefined;
-  }
+  return { waitUntil: p => c.executionCtx.waitUntil(p) };
 }
 
 // ─── createMessage ──────────────────────────────────────────────────────────

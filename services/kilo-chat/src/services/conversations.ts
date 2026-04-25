@@ -175,7 +175,7 @@ export async function renameConversationFor(
   env: Env,
   userId: string,
   params: RenameConversationParams,
-  ctx?: DeferCtx
+  ctx: DeferCtx
 ): Promise<RenameConversationResult> {
   const { conversationId, title } = params;
 
@@ -207,11 +207,7 @@ export async function renameConversationFor(
     }
   };
 
-  if (ctx) {
-    ctx.waitUntil(fanOut());
-  } else {
-    await fanOut();
-  }
+  ctx.waitUntil(fanOut());
 
   return { ok: true };
 }
@@ -230,7 +226,7 @@ export async function leaveConversationFor(
   env: Env,
   userId: string,
   params: LeaveConversationParams,
-  ctx?: DeferCtx
+  ctx: DeferCtx
 ): Promise<LeaveConversationResult> {
   const { conversationId } = params;
 
@@ -262,11 +258,7 @@ export async function leaveConversationFor(
     }
   };
 
-  if (ctx) {
-    ctx.waitUntil(fanOut());
-  } else {
-    await fanOut();
-  }
+  ctx.waitUntil(fanOut());
 
   return { ok: true };
 }
@@ -283,7 +275,7 @@ export async function markReadFor(
   env: Env,
   userId: string,
   params: MarkReadParams,
-  ctx?: DeferCtx
+  ctx: DeferCtx
 ): Promise<MarkReadResult> {
   const { conversationId } = params;
 
@@ -311,8 +303,7 @@ export async function markReadFor(
       memberId: userId,
       lastReadAt: now,
     });
-    if (ctx) ctx.waitUntil(pushPromise);
-    else await pushPromise;
+    ctx.waitUntil(pushPromise);
   }
 
   return { ok: true };

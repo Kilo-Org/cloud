@@ -18,7 +18,7 @@ import {
 } from './event-push';
 import type { ConversationInfo } from '../do/conversation-do';
 
-export type DeferCtx = { waitUntil: (p: Promise<unknown>) => void } | undefined;
+export type DeferCtx = { waitUntil: (p: Promise<unknown>) => void };
 
 // ─── createMessage ──────────────────────────────────────────────────────────
 
@@ -70,11 +70,7 @@ export async function createMessageFor(
     clientId
   );
 
-  if (ctx) {
-    ctx.waitUntil(fanOut);
-  } else {
-    await fanOut;
-  }
+  ctx.waitUntil(fanOut);
 
   return { ok: true, messageId, clientId };
 }
@@ -289,7 +285,7 @@ export async function editMessageFor(
   env: Env,
   callerId: string,
   params: EditMessageParams,
-  ctx?: DeferCtx
+  ctx: DeferCtx
 ): Promise<EditMessageResult> {
   const { conversationId, messageId, content, timestamp } = params;
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
@@ -318,8 +314,7 @@ export async function editMessageFor(
       'message.updated',
       { messageId: result.messageId, content, clientUpdatedAt: timestamp }
     );
-    if (ctx) ctx.waitUntil(pushPromise);
-    else await pushPromise;
+    ctx.waitUntil(pushPromise);
   }
 
   return {
@@ -345,7 +340,7 @@ export async function deleteMessageFor(
   env: Env,
   callerId: string,
   params: DeleteMessageParams,
-  ctx?: DeferCtx
+  ctx: DeferCtx
 ): Promise<DeleteMessageResult> {
   const { conversationId, messageId } = params;
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
@@ -366,8 +361,7 @@ export async function deleteMessageFor(
       'message.deleted',
       { messageId }
     );
-    if (ctx) ctx.waitUntil(pushPromise);
-    else await pushPromise;
+    ctx.waitUntil(pushPromise);
   }
 
   return { ok: true };
@@ -444,8 +438,7 @@ export async function executeActionFor(
         }
       }
     };
-    if (ctx) ctx.waitUntil(fanOut());
-    else await fanOut();
+    ctx.waitUntil(fanOut());
   }
 
   return { ok: true };

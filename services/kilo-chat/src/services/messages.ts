@@ -277,25 +277,30 @@ async function postCommitFanOut(
         })
       );
     }
+    // Every member — including the sender — gets a `conversation.activity`
+    // event so their sidebar row's `lastActivityAt` advances across tabs.
+    // Independently, anyone who has "read" this message (the sender, who
+    // authored it, or a recipient whose WS subscribed to the conversation
+    // context and delivered `message.created`) gets a `conversation.read`
+    // with their own `memberId`. The client filters `.read` by memberId so
+    // Alice's read marker never leaks into Bob's sidebar.
+    instanceEvents.push(
+      pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.activity', {
+        conversationId,
+        lastActivityAt: now,
+      })
+    );
     for (const userId of humanMemberIds) {
-      if (userId === callerId) continue;
+      const isSender = userId === callerId;
       const present = deliveryMap.get(userId) === true;
-      if (present) {
-        instanceEvents.push(
-          pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
-            conversationId,
-            memberId: userId,
-            lastReadAt: now,
-          })
-        );
-      } else {
-        instanceEvents.push(
-          pushInstanceEvent(env, sandboxId, [userId], 'conversation.activity', {
-            conversationId,
-            lastActivityAt: now,
-          })
-        );
-      }
+      if (!isSender && !present) continue;
+      instanceEvents.push(
+        pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
+          conversationId,
+          memberId: userId,
+          lastReadAt: now,
+        })
+      );
     }
     await Promise.allSettled(instanceEvents);
   }

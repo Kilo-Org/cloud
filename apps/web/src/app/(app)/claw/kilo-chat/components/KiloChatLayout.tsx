@@ -190,6 +190,11 @@ export function KiloChatLayout({
         );
       }),
       kiloChatClient.onConversationRead((_ctx, e) => {
+        // `.read` is broadcast to every human in the conversation with the
+        // `memberId` of whose read-marker moved. Only the actual reader
+        // should see their own sidebar row's `lastReadAt` advance — without
+        // this filter, Alice marking read would also move Bob's `lastReadAt`.
+        if (e.memberId !== currentUserId) return;
         queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
           updateConversationPages(old, c =>
             c.conversationId === e.conversationId ? { ...c, lastReadAt: e.lastReadAt } : c

@@ -15,7 +15,7 @@ import {
   Square,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { OpenclawImportCard } from './OpenclawImportCard';
 
 import { usePostHog } from 'posthog-js/react';
@@ -536,11 +536,15 @@ function MorningBriefingCard({
     } as const);
 
   const hasSchedule = Boolean(briefingStatus?.cron && briefingStatus?.timezone);
-  const desiredEnabled = briefingStatus?.desiredEnabled ?? briefingStatus?.enabled ?? false;
-  const observedEnabled = briefingStatus?.observedEnabled ?? briefingStatus?.enabled ?? false;
+  const desiredEnabledValue = briefingStatus?.desiredEnabled ?? briefingStatus?.enabled;
+  const observedEnabledValue = briefingStatus?.observedEnabled ?? briefingStatus?.enabled;
+  const hasResolvedBriefingToggleState =
+    typeof desiredEnabledValue === 'boolean' && typeof observedEnabledValue === 'boolean';
+  const desiredEnabled = desiredEnabledValue ?? false;
+  const observedEnabled = observedEnabledValue ?? false;
   const reconcileState = briefingStatus?.reconcileState ?? 'idle';
   const lastReconcileAction = briefingStatus?.lastReconcileAction ?? null;
-  const isWarmupState = isRunning && actionsReady === false;
+  const isWarmupState = isRunning && (actionsReady === false || !hasResolvedBriefingToggleState);
   const isTransitioning =
     reconcileState === 'in_progress' ||
     mutations.enableMorningBriefing.isPending ||
@@ -579,8 +583,9 @@ function MorningBriefingCard({
 
     return observedEnabled ? 'Enabled' : 'Disabled';
   })();
-  const statusVariant =
-    statusLabel === 'Instance Stopped'
+  const statusVariant = isWarmupState
+    ? 'default'
+    : statusLabel === 'Instance Stopped'
       ? 'secondary'
       : observedEnabled || (isTransitioning && desiredEnabled)
         ? 'default'
@@ -1315,10 +1320,40 @@ export function SettingsTab({
     isControllerVersionError,
   } = useClawUpdateAvailable(status);
   const { data: myPin } = useClawMyPin();
-  const { data: morningBriefingStatus } = useClawMorningBriefingStatus(true);
-  const { data: gatewayReady } = useClawGatewayReady(isRunning);
+  const morningBriefingStatusQuery = useClawMorningBriefingStatus(isRunning);
+  const morningBriefingStatus = morningBriefingStatusQuery.data;
+  const gatewayReadyQuery = useClawGatewayReady(isRunning);
+  const gatewayReady = gatewayReadyQuery.data;
   const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
+  const [bootStartedAtMs, setBootStartedAtMs] = useState<number | null>(null);
+  const previousStatusRef = useRef(status.status);
+
+  useEffect(() => {
+    const previousStatus = previousStatusRef.current;
+    if (status.status === 'running' && previousStatus !== 'running') {
+      setBootStartedAtMs(Date.now());
+    }
+    if (status.status !== 'running' && previousStatus === 'running') {
+      setBootStartedAtMs(null);
+    }
+    previousStatusRef.current = status.status;
+  }, [status.status]);
+
+  const hasFreshGatewayReady =
+    isRunning &&
+    (bootStartedAtMs === null || gatewayReadyQuery.dataUpdatedAt >= bootStartedAtMs) &&
+    gatewayReadyQuery.dataUpdatedAt > 0;
+  const hasFreshMorningBriefingStatus =
+    isRunning &&
+    (bootStartedAtMs === null || morningBriefingStatusQuery.dataUpdatedAt >= bootStartedAtMs) &&
+    morningBriefingStatusQuery.dataUpdatedAt > 0;
+  const morningBriefingActionsReady =
+    isRunning &&
+    hasFreshGatewayReady &&
+    hasFreshMorningBriefingStatus &&
+    gatewayReady?.ready === true &&
+    gatewayReady?.settled === true;
   const hasModelSelectionError = isRunning && isControllerVersionError;
   const modelSelectionError = hasModelSelectionError
     ? 'Failed to load the running OpenClaw version. Retry before changing the default model.'
@@ -1868,9 +1903,7 @@ export function SettingsTab({
               mutations={mutations}
               briefingStatus={morningBriefingStatus}
               isRunning={isRunning}
-              actionsReady={
-                isRunning && gatewayReady?.ready === true && gatewayReady?.settled === true
-              }
+              actionsReady={morningBriefingActionsReady}
               fallbackReadiness={{
                 githubConfigured: configuredSecrets.github ?? false,
                 linearConfigured: configuredSecrets.linear ?? false,

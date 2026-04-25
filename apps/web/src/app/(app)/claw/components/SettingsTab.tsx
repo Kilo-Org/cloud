@@ -67,6 +67,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DetailTile } from './DetailTile';
 import { EMBEDDING_MODELS, DEFAULT_EMBEDDING_MODEL } from './embeddingModels';
+import { deriveMorningBriefingCardState } from './morning-briefing-card-state';
 
 import { getEntriesByCategory } from '@kilocode/kiloclaw-secret-catalog';
 import { SecretEntrySection } from './SecretEntrySection';
@@ -537,18 +538,14 @@ function MorningBriefingCard({
     } as const);
 
   const hasSchedule = Boolean(briefingStatus?.cron && briefingStatus?.timezone);
-  const desiredEnabledValue = briefingStatus?.desiredEnabled ?? briefingStatus?.enabled;
-  const observedEnabledValue = briefingStatus?.observedEnabled ?? briefingStatus?.enabled;
-  const isGatewayWarmupStatus = briefingStatus?.code === 'gateway_warming_up';
-  const hasResolvedBriefingToggleState =
-    typeof desiredEnabledValue === 'boolean' && typeof observedEnabledValue === 'boolean';
-  const desiredEnabled = desiredEnabledValue ?? false;
-  const observedEnabled = observedEnabledValue ?? false;
+  const { desiredEnabled, observedEnabled, hasResolvedBriefingToggleState, isWarmupState } =
+    deriveMorningBriefingCardState({
+      isRunning,
+      actionsReady,
+      briefingStatus,
+    });
   const reconcileState = briefingStatus?.reconcileState ?? 'idle';
   const lastReconcileAction = briefingStatus?.lastReconcileAction ?? null;
-  const isWarmupState =
-    isRunning &&
-    (actionsReady === false || isGatewayWarmupStatus || !hasResolvedBriefingToggleState);
   const isTransitioning =
     reconcileState === 'in_progress' ||
     mutations.enableMorningBriefing.isPending ||

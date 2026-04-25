@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d193cc91-5072-49e3-ae66-2fad4d942df7",
+  "id": "b8a241df-218d-4cde-a9de-1509bc7a8d51",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "conversations": {
@@ -51,10 +51,11 @@
         }
       },
       "indexes": {
-        "conversations_sandbox_id_idx": {
-          "name": "conversations_sandbox_id_idx",
+        "conversations_sandbox_activity_idx": {
+          "name": "conversations_sandbox_activity_idx",
           "columns": [
-            "sandbox_id"
+            "sandbox_id",
+            "coalesce(\"last_activity_at\", \"joined_at\") desc"
           ],
           "isUnique": false
         }
@@ -73,6 +74,14 @@
     "columns": {}
   },
   "internal": {
-    "indexes": {}
+    "indexes": {
+      "conversations_sandbox_activity_idx": {
+        "columns": {
+          "coalesce(\"last_activity_at\", \"joined_at\") desc": {
+            "isExpression": true
+          }
+        }
+      }
+    }
   }
 }

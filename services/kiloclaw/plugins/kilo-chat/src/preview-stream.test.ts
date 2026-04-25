@@ -291,8 +291,8 @@ describe('createPreviewStream', () => {
   it('splits text exceeding the per-block cap into multiple content blocks', async () => {
     const { client, createMessage } = makeClientSpies();
     const stream = createPreviewStream({ client, conversationId: 'c1', throttleMs: 100 });
-    // 16 000 chars -> 7500 + 7500 + 1000 = 3 blocks (cap 7500 per block).
-    const longText = 'a'.repeat(16_000);
+    // 20 000 chars -> 8000 + 8000 + 4000 = 3 blocks (cap 8000 per block).
+    const longText = 'a'.repeat(20_000);
     await stream.finalize(longText);
     expect(createMessage).toHaveBeenCalledTimes(1);
     const { content } = createMessage.mock.calls[0]![0] as {

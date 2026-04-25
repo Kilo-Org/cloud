@@ -4,10 +4,11 @@ import type { ContentBlock, KiloChatClient } from './client.js';
  * Backend caps each text block at 8000 chars and each message at 20 content
  * blocks (see packages/kilo-chat/src/schemas.ts). Long streaming replies
  * accumulate more text than a single block can hold, so we split the text
- * into multiple text blocks before each POST/PATCH. Cap well below 8000 to
- * leave headroom; 20 × 7500 = 150 000 chars per message is ample.
+ * into multiple text blocks before each POST/PATCH. Both this splitter and
+ * the backend schema measure JS string length in UTF-16 code units, so we
+ * can fill blocks to the exact cap.
  */
-const TEXT_BLOCK_MAX = 7500;
+const TEXT_BLOCK_MAX = 8000;
 
 function buildTextContent(text: string): ContentBlock[] {
   if (text.length <= TEXT_BLOCK_MAX) return [{ type: 'text', text }];

@@ -12,9 +12,6 @@ import {
   OpenRouterProvidersResponse,
   OpenRouterSearchResponse,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { modelsByProvider } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { lt } from 'drizzle-orm';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@/lib/ai-gateway/providers/vercel/types';
@@ -323,19 +320,6 @@ export async function syncAndStoreProviders() {
     throw new Error(`Suspicious: total number of models is ${providers.total_models} < 100`);
   }
 
-  const result = await db.transaction(async tx => {
-    const results = await tx
-      .insert(modelsByProvider)
-      .values({
-        data: providers,
-        openrouter: openrouter_data,
-        vercel: vercel_data,
-      })
-      .returning();
-    await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
-    return results[0];
-  });
-
   await mirrorToRedis({
     providers,
     openrouter: openrouter_data,
@@ -344,10 +328,9 @@ export async function syncAndStoreProviders() {
   });
 
   return {
-    id: result.id,
-    generated_at: result.data.generated_at,
-    total_models: result.data.total_models,
-    total_providers: result.data.total_providers,
+    generated_at: providers.generated_at,
+    total_models: providers.total_models,
+    total_providers: providers.total_providers,
     time: performance.now() - startTime,
   };
 }

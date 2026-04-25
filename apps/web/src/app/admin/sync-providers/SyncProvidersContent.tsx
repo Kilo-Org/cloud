@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 type SyncResult = {
-  id: number;
   generated_at: string;
   total_providers: number;
   total_models: number;
@@ -42,8 +41,8 @@ export function SyncProvidersContent() {
 
       <p className="text-muted-foreground">
         Fetches provider and model data from OpenRouter and the Vercel AI Gateway, then stores the
-        result in the database. This runs automatically via cron but can be triggered manually here.
-        Mainly intended for local development use.
+        result in Redis. This runs automatically via cron but can be triggered manually here. Mainly
+        intended for local development use.
       </p>
 
       <Card>
@@ -70,7 +69,6 @@ export function SyncProvidersContent() {
             <div className="rounded-lg border p-4 text-sm">
               <p className="font-medium">Last sync result</p>
               <ul className="text-muted-foreground mt-2 space-y-1">
-                <li>Row ID: {lastResult.id}</li>
                 <li>Generated at: {new Date(lastResult.generated_at).toLocaleString()}</li>
                 <li>Providers: {lastResult.total_providers}</li>
                 <li>Models: {lastResult.total_models}</li>

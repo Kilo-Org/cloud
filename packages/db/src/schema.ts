@@ -2421,6 +2421,16 @@ export const contributor_champion_sync_state = pgTable('contributor_champion_syn
 
 export type ContributorChampionSyncState = typeof contributor_champion_sync_state.$inferSelect;
 
+/**
+ * @deprecated Obsolete. The canonical storage for the provider/model
+ * metadata this table used to hold is now Redis (see
+ * `GATEWAY_METADATA_REDIS_KEYS` in `apps/web/src/lib/redis-keys.ts`).
+ *
+ * No code writes to this table anymore. The definition is kept only so the
+ * Drizzle schema still matches the existing database; the table can be
+ * dropped in a future migration once we're confident nothing external
+ * depends on it.
+ */
 export const modelsByProvider = pgTable('models_by_provider', {
   id: serial().notNull().primaryKey(),
   data: jsonb('data').$type<NormalizedOpenRouterResponse>().notNull(),

@@ -1,8 +1,7 @@
-import { modelsByProvider } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import type { NormalizedOpenRouterResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { desc } from 'drizzle-orm';
+import { redisGet } from '@/lib/redis';
+import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
 
 export type ModelIdToProviderSlugsIndex = ReadonlyMap<string, ReadonlySet<string>>;
 
@@ -85,22 +84,18 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
   };
 }
 
-export async function fetchLatestModelsByProviderSnapshotFromDb(): Promise<
+export async function fetchLatestModelsByProviderSnapshotFromRedis(): Promise<
   NormalizedOpenRouterResponse | undefined
 > {
-  const result = await db
-    .select({ data: modelsByProvider.data })
-    .from(modelsByProvider)
-    .orderBy(desc(modelsByProvider.id))
-    .limit(1);
-
-  return result[0]?.data;
+  const raw = await redisGet(GATEWAY_METADATA_REDIS_KEYS.allProviders);
+  if (raw === null) return undefined;
+  return JSON.parse(raw) as NormalizedOpenRouterResponse;
 }
 
 const DEFAULT_TTL_MS = 30_000;
 
 const defaultLoader = createModelsByProviderIndexLoader({
-  fetchSnapshot: fetchLatestModelsByProviderSnapshotFromDb,
+  fetchSnapshot: fetchLatestModelsByProviderSnapshotFromRedis,
   ttlMs: DEFAULT_TTL_MS,
   nowMs: () => Date.now(),
 });

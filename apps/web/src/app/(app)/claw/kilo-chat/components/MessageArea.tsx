@@ -395,8 +395,10 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
         {/* Scroll to bottom button */}
         {showScrollButton && (
           <button
+            type="button"
             onClick={scrollToBottom}
             className="bg-muted hover:bg-accent border-border absolute bottom-0 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border shadow-md cursor-pointer transition-colors"
+            aria-label="Scroll to latest message"
             title="Scroll to bottom"
           >
             <ArrowDown className="h-4 w-4" />

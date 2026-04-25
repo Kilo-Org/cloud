@@ -84,9 +84,11 @@ export function ConversationList({
       <div className="flex items-center justify-between px-3 py-2">
         <span className="text-muted-foreground text-xs font-medium uppercase">Conversations</span>
         <button
+          type="button"
           onClick={onNewConversation}
-          className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+          aria-label="New conversation"
           title="New conversation"
+          className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
         >
           <Plus className="h-4 w-4" />
         </button>

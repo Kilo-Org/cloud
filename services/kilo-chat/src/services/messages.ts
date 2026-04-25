@@ -20,6 +20,28 @@ import type { ConversationInfo } from '../do/conversation-do';
 
 export type DeferCtx = { waitUntil: (p: Promise<unknown>) => void };
 
+/**
+ * Grapheme-aware truncation for auto-titles. `String.prototype.slice` indexes
+ * UTF-16 code units, so the naive `text.slice(0, 77) + '...'` can split
+ * surrogate pairs and grapheme clusters (emoji with modifiers, flags, ZWJ
+ * sequences). We use Intl.Segmenter to count and cut on grapheme boundaries.
+ */
+function truncateByGrapheme(text: string, maxGraphemes: number): string {
+  const segmenter = new Intl.Segmenter('und', { granularity: 'grapheme' });
+  let count = 0;
+  let cutIndex = text.length;
+  for (const { index } of segmenter.segment(text)) {
+    if (count === maxGraphemes - 3) {
+      cutIndex = index;
+    }
+    count++;
+    if (count > maxGraphemes) {
+      return text.slice(0, cutIndex) + '...';
+    }
+  }
+  return text;
+}
+
 // ─── createMessage ──────────────────────────────────────────────────────────
 
 export type CreateMessageParams = {
@@ -149,7 +171,7 @@ async function postCommitFanOut(
       .replace(/\n/g, ' ')
       .trim();
     if (text.length === 0) return null;
-    return text.length > 80 ? text.slice(0, 77) + '...' : text;
+    return truncateByGrapheme(text, 80);
   };
   const autoTitle = computeAutoTitle();
 

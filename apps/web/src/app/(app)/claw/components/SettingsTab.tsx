@@ -722,7 +722,7 @@ function MorningBriefingCard({
               if (entry.status === 'skipped') {
                 return `${entry.channel}: skipped (${entry.reason ?? 'missing_target'})`;
               }
-              return `${entry.channel}: failed${entry.error ? ` (${entry.error})` : ''}`;
+              return `${entry.channel}: failed (${entry.reason ?? 'send_failed'})`;
             })
             .join(' • ')}
         </p>

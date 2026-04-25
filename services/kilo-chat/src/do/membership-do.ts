@@ -1,7 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { eq, desc, sql } from 'drizzle-orm';
+import { and, eq, desc, sql } from 'drizzle-orm';
+import { encodeConversationCursor, type ConversationCursor } from '@kilocode/kilo-chat';
 import { conversations } from '../db/membership-schema';
 import migrations from '../../drizzle/membership/migrations';
 
@@ -20,6 +21,18 @@ export type AddConversationParams = {
   joinedAt: number;
 };
 
+export type ListConversationsParams = {
+  sandboxId?: string;
+  limit?: number;
+  cursor?: ConversationCursor | null;
+};
+
+export type ListConversationsResult = {
+  conversations: ConversationEntry[];
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
 export class MembershipDO extends DurableObject<Env> {
   private db;
 
@@ -29,20 +42,35 @@ export class MembershipDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(() => migrate(this.db, migrations));
   }
 
-  listConversations(
-    sandboxId?: string,
-    limit: number = 50,
-    offset: number = 0
-  ): { conversations: ConversationEntry[]; hasMore: boolean } {
-    const where = sandboxId ? eq(conversations.sandbox_id, sandboxId) : undefined;
+  listConversations(params: ListConversationsParams = {}): ListConversationsResult {
+    const { sandboxId, cursor } = params;
+    const limit = params.limit ?? 50;
+
+    // Sort key: coalesce(last_activity_at, joined_at) DESC, conversation_id DESC.
+    // Tie-break on conversation_id so cursor comparisons are strictly monotonic.
+    const sortKey = sql`coalesce(${conversations.last_activity_at}, ${conversations.joined_at})`;
+
+    const sandboxFilter = sandboxId ? eq(conversations.sandbox_id, sandboxId) : undefined;
+    const cursorFilter = cursor
+      ? sql`(${sortKey} < ${cursor.t} OR (${sortKey} = ${cursor.t} AND ${conversations.conversation_id} < ${cursor.c}))`
+      : undefined;
+
+    const whereClauses = [sandboxFilter, cursorFilter].filter(
+      (c): c is NonNullable<typeof c> => c !== undefined
+    );
+    const where =
+      whereClauses.length === 0
+        ? undefined
+        : whereClauses.length === 1
+          ? whereClauses[0]
+          : and(...whereClauses);
 
     const rows = this.db
       .select()
       .from(conversations)
       .where(where)
-      .orderBy(desc(sql`coalesce(${conversations.last_activity_at}, ${conversations.joined_at})`))
+      .orderBy(desc(sortKey), desc(conversations.conversation_id))
       .limit(limit + 1)
-      .offset(offset)
       .all()
       .map(row => ({
         conversationId: row.conversation_id,
@@ -55,7 +83,16 @@ export class MembershipDO extends DurableObject<Env> {
     const hasMore = rows.length > limit;
     if (hasMore) rows.pop();
 
-    return { conversations: rows, hasMore };
+    const last = rows[rows.length - 1];
+    const nextCursor =
+      hasMore && last
+        ? encodeConversationCursor({
+            t: last.lastActivityAt ?? last.joinedAt,
+            c: last.conversationId,
+          })
+        : null;
+
+    return { conversations: rows, hasMore, nextCursor };
   }
 
   addConversation(params: AddConversationParams): void {

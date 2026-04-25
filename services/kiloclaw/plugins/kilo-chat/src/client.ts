@@ -10,12 +10,12 @@ import {
   createConversationResponseSchema,
   createMessageRequestSchema,
   createMessageResponseSchema,
+  cursorPaginationQuerySchema,
   deleteMessageQuerySchema,
   editMessageRequestSchema,
   editMessageResponseSchema,
   listMessagesQuerySchema,
   messageDeliveryFailedRequestSchema,
-  paginationQuerySchema,
   reactionRequestBodySchema,
   renameConversationRequestSchema,
   type botConversationSummarySchema,
@@ -58,7 +58,7 @@ export type RenameConversationParams = { conversationId: string } & z.input<
   typeof renameConversationRequestSchema
 >;
 
-export type ListConversationsParams = z.input<typeof paginationQuerySchema>;
+export type ListConversationsParams = z.input<typeof cursorPaginationQuerySchema>;
 export type ConversationMember = EnrichedConversationMember;
 export type ConversationSummary = BotConversationSummary;
 export type ListConversationsResult = BotListConversationsResponse;
@@ -326,7 +326,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
   ): Promise<ListConversationsResult> {
     const qs = new URLSearchParams();
     if (params.limit !== undefined) qs.set('limit', String(params.limit));
-    if (params.offset !== undefined) qs.set('offset', String(params.offset));
+    if (params.cursor !== undefined) qs.set('cursor', params.cursor);
     const query = qs.toString();
     const url = `${base}/_kilo/kilo-chat/conversations${query ? `?${query}` : ''}`;
     const response = await fetchImpl(url, { method: 'GET', headers });

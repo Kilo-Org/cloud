@@ -10,6 +10,7 @@ import { formatError } from '@kilocode/worker-utils';
 import { authMiddleware } from './auth';
 import { botAuthMiddleware } from './auth-bot';
 import type { AuthContext } from './auth';
+import { decodeConversationCursor, type ConversationCursor } from '@kilocode/kilo-chat';
 import { registerConversationRoutes } from './routes/conversations';
 import {
   handleAddReaction,
@@ -108,18 +109,19 @@ export class KiloChatService extends WorkerEntrypoint<Env> {
     // Discover all conversations for this sandbox, paginating through all results.
     const allConversationIds: string[] = [];
     const PAGE_SIZE = 100;
-    let offset = 0;
+    let cursor: ConversationCursor | null = null;
     while (true) {
       const page = await withDORetry(
         () => this.env.MEMBERSHIP_DO.get(this.env.MEMBERSHIP_DO.idFromName(botId)),
-        stub => stub.listConversations(sandboxId, PAGE_SIZE, offset),
+        stub => stub.listConversations({ sandboxId, limit: PAGE_SIZE, cursor }),
         'MembershipDO.listConversations'
       );
       for (const c of page.conversations) {
         allConversationIds.push(c.conversationId);
       }
-      if (!page.hasMore) break;
-      offset += PAGE_SIZE;
+      if (!page.hasMore || !page.nextCursor) break;
+      cursor = decodeConversationCursor(page.nextCursor);
+      if (!cursor) break;
     }
 
     // Fan out with concurrency limit: for each conversation, clean up

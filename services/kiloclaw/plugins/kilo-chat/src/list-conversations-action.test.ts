@@ -17,8 +17,7 @@ function mockClient(overrides: Partial<KiloChatClient> = {}): KiloChatClient {
     listConversations: vi.fn().mockResolvedValue({
       conversations: [],
       hasMore: false,
-      limit: 50,
-      offset: 0,
+      nextCursor: null,
     }),
     ...overrides,
   } as KiloChatClient;
@@ -42,8 +41,7 @@ describe('handleKiloChatListConversationsAction', () => {
           },
         ],
         hasMore: false,
-        limit: 50,
-        offset: 0,
+        nextCursor: null,
       }),
     });
 
@@ -91,8 +89,7 @@ describe('handleKiloChatListConversationsAction', () => {
           },
         ],
         hasMore: false,
-        limit: 50,
-        offset: 0,
+        nextCursor: null,
       }),
     });
 
@@ -117,8 +114,7 @@ describe('handleKiloChatListConversationsAction', () => {
           },
         ],
         hasMore: true,
-        limit: 1,
-        offset: 0,
+        nextCursor: 'eyJ0IjoxMDAwLCJjIjoiMDFBQkMifQ',
       }),
     });
 

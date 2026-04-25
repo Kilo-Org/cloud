@@ -536,7 +536,7 @@ describe('listConversations', () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
-      return new Response(JSON.stringify({ conversations, hasMore: false, limit: 50, offset: 0 }), {
+      return new Response(JSON.stringify({ conversations, hasMore: false, nextCursor: null }), {
         status: 200,
       });
     }) as typeof fetch;
@@ -554,14 +554,13 @@ describe('listConversations', () => {
     expect(calls[0].init.method).toBe('GET');
   });
 
-  it('passes limit and offset as query params', async () => {
+  it('passes limit and cursor as query params', async () => {
     const calls: Array<string> = [];
     const fetchImpl = (async (url: string | URL) => {
       calls.push(String(url));
-      return new Response(
-        JSON.stringify({ conversations: [], hasMore: false, limit: 10, offset: 5 }),
-        { status: 200 }
-      );
+      return new Response(JSON.stringify({ conversations: [], hasMore: false, nextCursor: null }), {
+        status: 200,
+      });
     }) as typeof fetch;
 
     const client = createKiloChatClient({
@@ -570,8 +569,10 @@ describe('listConversations', () => {
       fetchImpl,
     });
 
-    await client.listConversations({ limit: 10, offset: 5 });
-    expect(calls[0]).toBe('http://ctrl/_kilo/kilo-chat/conversations?limit=10&offset=5');
+    await client.listConversations({ limit: 10, cursor: 'opaque-cursor' });
+    expect(calls[0]).toBe(
+      'http://ctrl/_kilo/kilo-chat/conversations?limit=10&cursor=opaque-cursor'
+    );
   });
 
   it('throws on non-2xx response', async () => {

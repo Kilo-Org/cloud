@@ -148,11 +148,28 @@ export function KiloChatLayout({
     selectedSandboxId
   );
 
-  // Update conversation list cache in-place when activity events arrive
+  // Update conversation list cache in-place when activity events arrive.
+  // For cursor pagination, events targeting conversations outside page 1 are
+  // ignored by an in-place patch, so the list appears stale. Invalidate the
+  // cache so the affected conversation either appears at the top (new/active)
+  // or re-sorts correctly once refetched.
   useEffect(() => {
     const queryKey = ['kilo-chat', 'conversations'];
+
+    function isOnFirstPage(conversationId: string): boolean {
+      const entries = queryClient.getQueriesData<ConversationListInfiniteData>({ queryKey });
+      for (const [, data] of entries) {
+        const firstPage = data?.pages[0];
+        if (firstPage?.conversations.some(c => c.conversationId === conversationId)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     const offs = [
-      kiloChatClient.onConversationCreated(() => {
+      kiloChatClient.onConversationCreated((_ctx, e) => {
+        if (isOnFirstPage(e.conversationId)) return;
         void queryClient.invalidateQueries({ queryKey });
       }),
       kiloChatClient.onConversationRenamed((_ctx, e) => {
@@ -179,11 +196,15 @@ export function KiloChatLayout({
         );
       }),
       kiloChatClient.onConversationActivity((_ctx, e) => {
-        queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
-          updateConversationPages(old, c =>
-            c.conversationId === e.conversationId ? { ...c, lastActivityAt: e.lastActivityAt } : c
-          )
-        );
+        if (isOnFirstPage(e.conversationId)) {
+          queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
+            updateConversationPages(old, c =>
+              c.conversationId === e.conversationId ? { ...c, lastActivityAt: e.lastActivityAt } : c
+            )
+          );
+          return;
+        }
+        void queryClient.invalidateQueries({ queryKey });
       }),
     ];
     return () => offs.forEach(off => off());

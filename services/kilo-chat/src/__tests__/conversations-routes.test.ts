@@ -202,14 +202,12 @@ describe('GET /v1/conversations', () => {
     const body = await res.json<{
       conversations: Array<{ conversationId: string; title: string | null }>;
       hasMore: boolean;
-      limit: number;
-      offset: number;
+      nextCursor: string | null;
     }>();
     expect(Array.isArray(body.conversations)).toBe(true);
     expect(body.conversations.length).toBeGreaterThanOrEqual(2);
     expect(body.hasMore).toBe(false);
-    expect(body.limit).toBe(50);
-    expect(body.offset).toBe(0);
+    expect(body.nextCursor).toBeNull();
     const titles = body.conversations.map(c => c.title);
     expect(titles).toContain('First');
     expect(titles).toContain('Second');

@@ -12,11 +12,10 @@ export function useConversations(client: KiloChatClient, sandboxId: string | nul
       client.listConversations({
         sandboxId: sandboxId ?? undefined,
         limit: CONVERSATIONS_PAGE_SIZE,
-        offset: pageParam,
+        cursor: pageParam ?? undefined,
       }),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) =>
-      lastPage.hasMore ? allPages.length * CONVERSATIONS_PAGE_SIZE : undefined,
+    initialPageParam: null as string | null,
+    getNextPageParam: lastPage => lastPage.nextCursor,
     enabled: !!sandboxId,
     select: data => ({
       ...data,
@@ -66,7 +65,7 @@ export function useLeaveConversation(client: KiloChatClient) {
   });
 }
 
-export type ConversationListInfiniteData = InfiniteData<ConversationListResponse, number>;
+export type ConversationListInfiniteData = InfiniteData<ConversationListResponse, string | null>;
 
 export function updateConversationPages(
   data: ConversationListInfiniteData | undefined,

@@ -42,12 +42,13 @@ import {
   editMessageRequestSchema,
   executeActionRequestSchema,
   listMessagesQuerySchema,
-  paginationQuerySchema,
+  cursorPaginationQuerySchema,
   reactionRequestBodySchema,
   renameConversationRequestSchema,
   deleteMessageQuerySchema,
   messageDeliveryFailedRequestSchema,
   actionDeliveryFailedRequestSchema,
+  decodeConversationCursor,
 } from '@kilocode/kilo-chat';
 
 type HonoCtx = Context<{ Bindings: Env; Variables: AuthContext }>;
@@ -466,20 +467,24 @@ export async function handleListBotConversations(c: HonoCtx) {
   if (!sbx.ok) return sbx.response;
   const sandboxId = sbx.data;
 
-  const query = paginationQuerySchema.safeParse({
+  const query = cursorPaginationQuerySchema.safeParse({
     limit: c.req.query('limit'),
-    offset: c.req.query('offset'),
+    cursor: c.req.query('cursor'),
   });
   if (!query.success) {
     return c.json({ error: 'Invalid query parameters', issues: query.error.issues }, 400);
   }
 
   const botCallerId = `bot:kiloclaw:${sandboxId}`;
-  const { limit, offset } = query.data;
+  const { limit, cursor: cursorRaw } = query.data;
+  const cursor = cursorRaw ? decodeConversationCursor(cursorRaw) : null;
+  if (cursorRaw && !cursor) {
+    return c.json({ error: 'Invalid cursor' }, 400);
+  }
 
-  const { conversations, hasMore } = await withDORetry(
+  const { conversations, hasMore, nextCursor } = await withDORetry(
     () => c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(botCallerId)),
-    stub => stub.listConversations(sandboxId, limit, offset),
+    stub => stub.listConversations({ sandboxId, limit, cursor }),
     'MembershipDO.listConversations'
   );
 
@@ -523,8 +528,7 @@ export async function handleListBotConversations(c: HonoCtx) {
   return c.json({
     conversations: enriched,
     hasMore,
-    limit,
-    offset,
+    nextCursor,
   } satisfies BotListConversationsResponse);
 }
 

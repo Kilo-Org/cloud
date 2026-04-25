@@ -26,8 +26,7 @@ describe('KiloChatClient', () => {
       const fetch = mockFetch(200, {
         conversations: [],
         hasMore: false,
-        limit: 50,
-        offset: 0,
+        nextCursor: null,
       });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.listConversations();
@@ -38,7 +37,7 @@ describe('KiloChatClient', () => {
           headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
         })
       );
-      expect(res).toEqual({ conversations: [], hasMore: false, limit: 50, offset: 0 });
+      expect(res).toEqual({ conversations: [], hasMore: false, nextCursor: null });
     });
   });
 
@@ -174,7 +173,7 @@ describe('KiloChatClient', () => {
     });
 
     it('calls getToken before each request', async () => {
-      const fetch = mockFetch(200, { conversations: [], hasMore: false, limit: 50, offset: 0 });
+      const fetch = mockFetch(200, { conversations: [], hasMore: false, nextCursor: null });
       const config = createMockConfig(fetch);
       const client = new KiloChatClient(config);
       await client.listConversations();

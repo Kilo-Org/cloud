@@ -179,8 +179,7 @@ export const addReactionResponseSchema = z.object({
 export const conversationListResponseSchema = z.object({
   conversations: z.array(conversationListItemSchema),
   hasMore: z.boolean(),
-  limit: z.number(),
-  offset: z.number(),
+  nextCursor: z.string().nullable(),
 });
 
 export const messageListResponseSchema = z.object({
@@ -194,7 +193,12 @@ export const paginationQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-export const listConversationsQuerySchema = paginationQuerySchema.extend({
+export const cursorPaginationQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  cursor: z.string().min(1).optional(),
+});
+
+export const listConversationsQuerySchema = cursorPaginationQuerySchema.extend({
   sandboxId: sandboxIdSchema.optional(),
 });
 
@@ -248,8 +252,7 @@ export const botConversationSummarySchema = z.object({
 export const botListConversationsResponseSchema = z.object({
   conversations: z.array(botConversationSummarySchema),
   hasMore: z.boolean(),
-  limit: z.number(),
-  offset: z.number(),
+  nextCursor: z.string().nullable(),
 });
 
 export const botListMessagesResponseSchema = z.object({

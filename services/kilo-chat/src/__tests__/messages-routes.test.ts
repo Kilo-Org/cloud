@@ -648,7 +648,7 @@ describe('sender conversation read state after sending', () => {
 
     // Check initial state — both should be null
     const memberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
-    const before = await memberStub.listConversations(sandboxId);
+    const before = await memberStub.listConversations({ sandboxId });
     const convBefore = before.conversations.find(c => c.conversationId === conversationId);
     expect(convBefore).toBeDefined();
     expect(convBefore!.lastActivityAt).toBeNull();
@@ -667,7 +667,7 @@ describe('sender conversation read state after sending', () => {
     expect(res.status).toBe(201);
 
     // Check sender's MembershipDO — both should be bumped
-    const after = await memberStub.listConversations(sandboxId);
+    const after = await memberStub.listConversations({ sandboxId });
     const convAfter = after.conversations.find(c => c.conversationId === conversationId);
     expect(convAfter).toBeDefined();
     expect(convAfter!.lastActivityAt).not.toBeNull();

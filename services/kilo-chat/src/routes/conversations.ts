@@ -18,6 +18,7 @@ import {
   createConversationRequestSchema,
   listConversationsQuerySchema,
   renameConversationRequestSchema,
+  decodeConversationCursor,
 } from '@kilocode/kilo-chat';
 import { makeSchedule } from './handler';
 
@@ -64,19 +65,23 @@ export function registerConversationRoutes(
     const query = listConversationsQuerySchema.safeParse({
       sandboxId: c.req.query('sandboxId'),
       limit: c.req.query('limit'),
-      offset: c.req.query('offset'),
+      cursor: c.req.query('cursor'),
     });
     if (!query.success) {
       return c.json({ error: 'Invalid query parameters', issues: query.error.issues }, 400);
     }
-    const { sandboxId, limit, offset } = query.data;
+    const { sandboxId, limit, cursor: cursorRaw } = query.data;
+    const cursor = cursorRaw ? decodeConversationCursor(cursorRaw) : null;
+    if (cursorRaw && !cursor) {
+      return c.json({ error: 'Invalid cursor' }, 400);
+    }
 
-    const { conversations, hasMore } = await withDORetry(
+    const { conversations, hasMore, nextCursor } = await withDORetry(
       () => c.env.MEMBERSHIP_DO.get(c.env.MEMBERSHIP_DO.idFromName(callerId)),
-      stub => stub.listConversations(sandboxId, limit, offset),
+      stub => stub.listConversations({ sandboxId, limit, cursor }),
       'MembershipDO.listConversations'
     );
-    return c.json({ conversations, hasMore, limit, offset } satisfies ConversationListResponse);
+    return c.json({ conversations, hasMore, nextCursor } satisfies ConversationListResponse);
   });
 
   // GET /v1/conversations/:id — get conversation details

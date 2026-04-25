@@ -207,7 +207,7 @@ export class KiloChatClient {
     opts?: z.input<typeof listConversationsQuerySchema>
   ): Promise<ConversationListResponse> {
     return this.httpRequest('/v1/conversations', {
-      query: { sandboxId: opts?.sandboxId, limit: opts?.limit, offset: opts?.offset },
+      query: { sandboxId: opts?.sandboxId, limit: opts?.limit, cursor: opts?.cursor },
       schema: conversationListResponseSchema,
     });
   }

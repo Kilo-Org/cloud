@@ -1191,13 +1191,13 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations', () => {
     expect(res.status).toBe(401);
   });
 
-  it('respects limit and offset query params', async () => {
+  it('respects limit and cursor query params', async () => {
     const { sandboxId, testEnv } = await setupData('bot-list-convs-page');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
     const res = await app.request(
-      `/bot/v1/sandboxes/${sandboxId}/conversations?limit=1&offset=0`,
+      `/bot/v1/sandboxes/${sandboxId}/conversations?limit=1`,
       {
         method: 'GET',
         headers: { authorization: `Bearer ${token}` },
@@ -1208,12 +1208,11 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations', () => {
     expect(res.status).toBe(200);
     const body = await res.json<{
       conversations: unknown[];
-      limit: number;
-      offset: number;
+      hasMore: boolean;
+      nextCursor: string | null;
     }>();
-    expect(body.limit).toBe(1);
-    expect(body.offset).toBe(0);
     expect(body.conversations.length).toBeLessThanOrEqual(1);
+    expect(typeof body.hasMore).toBe('boolean');
   });
 });
 

@@ -299,7 +299,7 @@ function fakeClient(calls: { type: string; args: unknown }[]): KiloChatClient {
     },
     listConversations: async args => {
       calls.push({ type: 'listConversations', args });
-      return { conversations: [], total: 0, limit: 50, offset: 0 };
+      return { conversations: [], hasMore: false, nextCursor: null };
     },
     createConversation: async args => {
       calls.push({ type: 'createConversation', args });

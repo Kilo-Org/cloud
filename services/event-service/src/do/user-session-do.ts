@@ -86,7 +86,11 @@ export class UserSessionDO extends DurableObject<Env> {
 
   // ── Event push ─────────────────────────────────────────────────────
 
-  async pushEvent(context: string, event: string, payload: unknown): Promise<boolean> {
+  async pushEvent<Name extends string>(
+    context: string,
+    event: Name,
+    payload: unknown
+  ): Promise<boolean> {
     return withLogTags({ source: 'UserSessionDO.pushEvent' }, () => {
       logger.setTags({ userId: this.ctx.id.name, context, event });
 

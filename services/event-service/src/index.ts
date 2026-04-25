@@ -66,10 +66,13 @@ export default class extends WorkerEntrypoint<Env> {
     return app.fetch(request, this.env, this.ctx);
   }
 
-  async pushEvent(
+  // Generic over the event-name type so domain packages (e.g. kilo-chat) can
+  // constrain their own producer bindings to a known event-name union while
+  // event-service itself stays domain-agnostic.
+  async pushEvent<Name extends string>(
     userId: string,
     context: string,
-    event: string,
+    event: Name,
     payload: unknown
   ): Promise<boolean> {
     logger.setTags({ userId, context, event });

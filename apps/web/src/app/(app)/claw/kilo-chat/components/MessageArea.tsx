@@ -169,19 +169,22 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }
 
-  function handleSend(text: string, inReplyToMessageId?: string) {
-    autoScrollRef.current = true;
-    setShowScrollButton(false);
-    sendMessage.mutate(
-      {
-        conversationId,
-        content: [{ type: 'text', text }],
-        inReplyToMessageId,
-        clientId: ulid(),
-      },
-      { onError: () => toast.error('Failed to send message') }
-    );
-  }
+  const handleSend = useCallback(
+    (text: string, inReplyToMessageId?: string) => {
+      autoScrollRef.current = true;
+      setShowScrollButton(false);
+      sendMessage.mutate(
+        {
+          conversationId,
+          content: [{ type: 'text', text }],
+          inReplyToMessageId,
+          clientId: ulid(),
+        },
+        { onError: () => toast.error('Failed to send message') }
+      );
+    },
+    [sendMessage.mutate, conversationId]
+  );
 
   const handleEdit = useCallback(
     (messageId: string, content: ContentBlock[]) => {

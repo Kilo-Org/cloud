@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 export type BotPresence = {
   online: boolean;
   lastAt: number;
@@ -40,8 +42,9 @@ type BotStatusProps = {
 };
 
 export function BotStatus({ instanceStatus, presence }: BotStatusProps) {
-  const display = computeBotDisplay({ instanceStatus, presence, now: Date.now() });
-  const tooltip = buildTooltip(display.state, presence);
+  const now = useNowTicker(10_000);
+  const display = computeBotDisplay({ instanceStatus, presence, now });
+  const tooltip = buildTooltip(display.state, presence, now);
   return (
     <div className="flex items-center gap-1.5" title={tooltip}>
       <div className={`h-2 w-2 rounded-full ${DOT_CLASS[display.state]}`} />
@@ -50,10 +53,25 @@ export function BotStatus({ instanceStatus, presence }: BotStatusProps) {
   );
 }
 
-function buildTooltip(state: BotDisplayState, presence: BotPresence | undefined): string {
+// Local staleness ticker: keeps re-renders scoped to BotStatus so the rest of
+// the chat UI (memoized message bubbles, etc.) is not invalidated every 10s.
+function useNowTicker(intervalMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+function buildTooltip(
+  state: BotDisplayState,
+  presence: BotPresence | undefined,
+  now: number
+): string {
   if (state === 'unknown' || !presence) return 'Bot status unknown';
   if (state === 'offline') return 'Bot is offline';
-  const seconds = Math.max(0, Math.round((Date.now() - presence.lastAt) / 1000));
+  const seconds = Math.max(0, Math.round((now - presence.lastAt) / 1000));
   const bits = [`Last heartbeat ${seconds}s ago`];
   if (presence.model) bits.push(`model: ${presence.model}`);
   return bits.join(' · ');

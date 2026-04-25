@@ -130,6 +130,36 @@ RUN GOBIN=/usr/local/bin go install github.com/steipete/gogcli/cmd/gog@v0.12.0 \
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv --version
 
+# ── Pipelock (optional agent firewall sidecar) ─────────────────────────
+# Installed unconditionally so the per-instance opt-in via
+# KILOCLAW_PIPELOCK_ENABLED does not require a rebuild. The controller
+# ignores the binary entirely when the flag is unset.
+#
+# Upstream release: https://github.com/luckyPipewrench/pipelock/releases
+# Artifact naming: pipelock_<version>_linux_<arch>.tar.gz (no `v` in filename,
+# even though the tag is `vX.Y.Z`; confirmed in the goreleaser archive
+# name_template).
+#
+# SHA256 checksums are published in `checksums.txt` on the release page.
+# Update all three ARGs together when bumping the pinned version.
+ARG PIPELOCK_VERSION=v2.3.0
+ARG PIPELOCK_SHA256_AMD64=2723df194492bf07ef5c7f329d97eb03d48d712eed3360e6086cc1783ca5668b
+ARG PIPELOCK_SHA256_ARM64=7bcc4170159718d7ddfb6bb035b352bf90949c995e9208d8e6982f912bac5983
+RUN set -e \
+    && VERSION_NO_V="${PIPELOCK_VERSION#v}" \
+    && ARCH="$(dpkg --print-architecture)" \
+    && case "${ARCH}" in \
+         amd64) PIPELOCK_ARCH="linux_amd64"; PIPELOCK_SHA256="${PIPELOCK_SHA256_AMD64}" ;; \
+         arm64) PIPELOCK_ARCH="linux_arm64"; PIPELOCK_SHA256="${PIPELOCK_SHA256_ARM64}" ;; \
+         *) echo "pipelock: unsupported architecture ${ARCH}" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL "https://github.com/luckyPipewrench/pipelock/releases/download/${PIPELOCK_VERSION}/pipelock_${VERSION_NO_V}_${PIPELOCK_ARCH}.tar.gz" \
+         -o /tmp/pipelock.tar.gz \
+    && echo "${PIPELOCK_SHA256}  /tmp/pipelock.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/pipelock.tar.gz -C /usr/local/bin pipelock \
+    && rm /tmp/pipelock.tar.gz \
+    && pipelock version
+
 # ── Builder stage: package customizer plugin ───────────────────────────
 # Build the vendored plugin tarball in an isolated stage so dev-time
 # dependencies do not inflate the runtime image layers.

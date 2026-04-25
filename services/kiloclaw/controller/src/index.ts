@@ -35,6 +35,19 @@ import { getOpenclawVersion } from './openclaw-version';
 import { startCheckin } from './checkin';
 import { collectProductTelemetry } from './product-telemetry';
 import { GoogleOAuthTokenProvider } from './google-oauth-token-provider';
+import {
+  ensurePipelockCa,
+  ensurePipelockCaBundle,
+  ensurePipelockConfig,
+  getOpenClawProxyEnv,
+  getPipelockChildEnv,
+  getPipelockSupervisorOptions,
+  isPipelockEnabled,
+  PIPELOCK_LISTEN_HOST,
+  PIPELOCK_LISTEN_PORT,
+  waitForPipelockReady,
+  waitForSupervisorAlive,
+} from './pipelock';
 
 export type RuntimeConfig = {
   port: number;
@@ -243,6 +256,10 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   // eslint-disable-next-line prefer-const -- assigned after critical bootstrap completes
   let supervisor: Supervisor | undefined;
   let gmailWatchSupervisor: Supervisor | undefined;
+  // Pipelock sidecar supervisor. Created and started only when
+  // KILOCLAW_PIPELOCK_ENABLED is set; remains undefined otherwise so the
+  // shutdown path can skip it cleanly.
+  let pipelockSupervisor: Supervisor | undefined;
   // eslint-disable-next-line prefer-const -- assigned after pairing cache is created
   let pairingCache: ReturnType<typeof createPairingCache> | undefined;
   let stopCheckin: (() => void) | undefined;
@@ -260,10 +277,13 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     pairingCache?.cleanup();
     stopCheckin?.();
     stopWatchRenewal();
-    const shutdowns: Promise<void>[] = [];
-    if (supervisor) shutdowns.push(supervisor.shutdown(signal));
-    if (gmailWatchSupervisor) shutdowns.push(gmailWatchSupervisor.shutdown(signal));
-    await Promise.all(shutdowns);
+    await Promise.all([
+      supervisor?.shutdown(signal) ?? Promise.resolve(),
+      gmailWatchSupervisor?.shutdown(signal) ?? Promise.resolve(),
+    ]);
+    // Pipelock last: OpenClaw's in-flight fetches should get a chance to
+    // drain through the proxy before the proxy itself exits.
+    if (pipelockSupervisor) await pipelockSupervisor.shutdown(signal);
     await new Promise<void>(resolve => {
       server.close(() => resolve());
     });
@@ -330,8 +350,17 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
       }),
   });
 
+  // When Pipelock is enabled, route the OpenClaw child's outbound fetches
+  // through the local forward proxy by injecting HTTPS_PROXY and friends.
+  // The controller's own env is untouched so pipelock does not recurse
+  // through itself.
+  const gatewayChildEnv: NodeJS.ProcessEnv | undefined = isPipelockEnabled(env)
+    ? { ...env, ...getOpenClawProxyEnv(env) }
+    : undefined;
+
   supervisor = createSupervisor({
     args: ['gateway', ...config.gatewayArgs],
+    env: gatewayChildEnv,
     onStdoutLine: line => pc.onPairingLogLine(line),
   });
 
@@ -481,7 +510,94 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     console.error('[gog] Failed to install shim:', err);
   }
 
-  // ── Phase 7: Start gateway ──────────────────────────────────────────
+  // ── Phase 7: Start Pipelock sidecar (if enabled) ────────────────────
+  // Fail-closed: any failure here leaves the controller in degraded mode
+  // without starting OpenClaw. Running OpenClaw unproxied when the
+  // operator asked for scanning would silently undo the security model.
+  if (isPipelockEnabled(env)) {
+    try {
+      ensurePipelockCa();
+      ensurePipelockCaBundle();
+      ensurePipelockConfig(env);
+    } catch (err) {
+      const fullError = err instanceof Error ? err.message : String(err);
+      controllerState.current = {
+        state: 'degraded',
+        error: toPublicDegradedError('pipelock-init'),
+      };
+      console.error('[controller] Pipelock init failed, running in degraded mode:', fullError);
+      return;
+    }
+
+    const pipelockOptions = getPipelockSupervisorOptions(env);
+    if (pipelockOptions) {
+      // Capability separation: the sidecar runs with an explicit allowlist
+      // env, NOT the controller's process.env. After bootstrap.ts decryption,
+      // process.env carries the agent's API key, gateway token, and channel
+      // secrets; none of those belong in the proxy's trust zone. The same
+      // allowlist also strips HTTPS_PROXY/CA env vars so pipelock cannot
+      // recurse through itself if a future caller mutates env upstream.
+      pipelockSupervisor = createSupervisor({
+        command: pipelockOptions.command,
+        args: pipelockOptions.args,
+        env: getPipelockChildEnv(env),
+      });
+
+      try {
+        await pipelockSupervisor.start();
+      } catch (err) {
+        const fullError = err instanceof Error ? err.message : String(err);
+        controllerState.current = {
+          state: 'degraded',
+          error: toPublicDegradedError('pipelock-start'),
+        };
+        console.error(
+          '[controller] Pipelock supervisor start failed, running in degraded mode:',
+          fullError
+        );
+        return;
+      }
+
+      // supervisor.start() returns before the spawn outcome is known. Surface
+      // ENOENT / EPERM (binary missing or non-executable) as pipelock-start
+      // within ~2s rather than waiting out the full readiness ceiling.
+      const alive = await waitForSupervisorAlive(pipelockSupervisor, 2_000);
+      if (!alive) {
+        controllerState.current = {
+          state: 'degraded',
+          error: toPublicDegradedError('pipelock-start'),
+        };
+        console.error(
+          '[controller] Pipelock child failed to spawn (binary missing or non-executable), running in degraded mode'
+        );
+        await pipelockSupervisor.shutdown('SIGTERM');
+        return;
+      }
+
+      // 30s ceiling matches the gateway healthy-threshold in supervisor.ts.
+      // Pipelock's steady-state startup is sub-second; only a misconfigured
+      // or broken binary should exhaust this budget.
+      const ready = await waitForPipelockReady(PIPELOCK_LISTEN_HOST, PIPELOCK_LISTEN_PORT, 30_000);
+      if (!ready) {
+        controllerState.current = {
+          state: 'degraded',
+          error: toPublicDegradedError('pipelock-listen'),
+        };
+        console.error(
+          `[controller] Pipelock did not report healthy forward proxy + TLS interception on ${PIPELOCK_LISTEN_HOST}:${PIPELOCK_LISTEN_PORT} within 30s, running in degraded mode`
+        );
+        // Best-effort cleanup so we do not leak a half-started child.
+        await pipelockSupervisor.shutdown('SIGTERM');
+        return;
+      }
+
+      console.log(
+        `[controller] Pipelock ready, listening on ${PIPELOCK_LISTEN_HOST}:${PIPELOCK_LISTEN_PORT}`
+      );
+    }
+  }
+
+  // ── Phase 8: Start gateway ──────────────────────────────────────────
   controllerState.current = { state: 'starting' };
   console.log('[controller] Bootstrap complete, starting gateway...');
 

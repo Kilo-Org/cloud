@@ -46,6 +46,16 @@ type TimerLike = ReturnType<typeof setTimeout>;
 type SupervisorOptions = {
   args: string[];
   command?: string;
+  /**
+   * Environment variables to pass to the spawned child. Defaults to the
+   * controller's own `process.env` when unset, preserving the pre-existing
+   * behavior for all pre-pipelock callers (gateway, gmail-watch).
+   *
+   * Used by the Pipelock integration to inject proxy env vars into the
+   * OpenClaw child while keeping the Pipelock sidecar itself on the
+   * controller's untouched env (so it does not recurse through itself).
+   */
+  env?: NodeJS.ProcessEnv;
   backoffInitialMs?: number;
   backoffMaxMs?: number;
   backoffMultiplier?: number;
@@ -62,6 +72,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
   const {
     args,
     command = 'openclaw',
+    env: childEnv,
     backoffInitialMs = BACKOFF_INITIAL_MS,
     backoffMaxMs = BACKOFF_MAX_MS,
     backoffMultiplier = BACKOFF_MULTIPLIER,
@@ -185,7 +196,7 @@ export function createSupervisor(options: SupervisorOptions): Supervisor {
 
     const spawned = spawnImpl(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: process.env,
+      env: childEnv ?? process.env,
     });
 
     child = spawned;

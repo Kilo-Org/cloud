@@ -20,6 +20,7 @@ These are non-negotiable. Do not reintroduce shared/fallback paths.
 - **Two-phase destroy.** Fly resource IDs (`pendingDestroyMachineId`, `pendingDestroyVolumeId`) are persisted before deletion attempts. DO state is only cleared when both are confirmed deleted. The alarm retries on failure.
 - **No machine recreation on transient errors.** `startExistingMachine()` only creates a new machine on 404 (confirmed gone). Transient Fly API errors (500, timeout) are re-thrown, not masked by duplicate creation.
 - **Machine ID persisted before waiting.** `createNewMachine()` writes `flyMachineId` to durable storage immediately after `fly.createMachine()`, before `waitForState()`. This prevents orphaning machines if the wait times out.
+- **Pipelock proxy env vars go only to the OpenClaw child.** When `KILOCLAW_PIPELOCK_ENABLED` is set, the controller injects `HTTPS_PROXY` and friends into the gateway supervisor's child env only. The Pipelock sidecar must receive a scrubbed allowlist env with no agent secrets and no proxy/CA env vars, so Pipelock does not recurse through itself or cross the capability boundary. See [`docs/pipelock.md`](docs/pipelock.md).
 
 ## Architecture
 

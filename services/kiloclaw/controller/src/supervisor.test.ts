@@ -274,6 +274,62 @@ describe('createSupervisor', () => {
     expect(spawnImpl).toHaveBeenCalledTimes(1);
     expect(supervisor.getState()).toBe('shutting_down');
   });
+
+  it('passes options.env to the spawned child (used by the pipelock integration)', async () => {
+    // Spread process.env so the object satisfies the full augmented
+    // NodeJS.ProcessEnv shape the worker types expect. The pipelock
+    // integration in index.ts builds the env the same way, so this mirrors
+    // real usage rather than constructing a synthetic partial.
+    const customEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      HTTPS_PROXY: 'http://127.0.0.1:8888',
+      NODE_EXTRA_CA_CERTS: '/root/.pipelock/ca.pem',
+    };
+    const recorded: Array<NodeJS.ProcessEnv | undefined> = [];
+    const spawnImpl = vi.fn(
+      (_cmd: string, _args: readonly string[], opts?: { env?: NodeJS.ProcessEnv }) => {
+        recorded.push(opts?.env);
+        const child = new FakeChildProcess(4000);
+        queueMicrotask(() => child.emit('spawn'));
+        return child as never;
+      }
+    );
+
+    const supervisor = createSupervisor({
+      args: ['gateway', '--port', '3001'],
+      spawnImpl: spawnImpl as never,
+      env: customEnv,
+    });
+
+    await supervisor.start();
+    await flushMicrotasks();
+
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toBe(customEnv);
+  });
+
+  it('defaults to process.env when options.env is not provided (backward compat)', async () => {
+    const recorded: Array<NodeJS.ProcessEnv | undefined> = [];
+    const spawnImpl = vi.fn(
+      (_cmd: string, _args: readonly string[], opts?: { env?: NodeJS.ProcessEnv }) => {
+        recorded.push(opts?.env);
+        const child = new FakeChildProcess(5000);
+        queueMicrotask(() => child.emit('spawn'));
+        return child as never;
+      }
+    );
+
+    const supervisor = createSupervisor({
+      args: ['gateway', '--port', '3001'],
+      spawnImpl: spawnImpl as never,
+    });
+
+    await supervisor.start();
+    await flushMicrotasks();
+
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toBe(process.env);
+  });
 });
 
 class FakeChildProcessWithStdout extends EventEmitter {

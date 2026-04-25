@@ -85,7 +85,6 @@ export async function deliverToBot(
       await notifyMessageDeliveryFailed(env, {
         conversationId: msg.conversationId,
         messageId: msg.messageId,
-        senderId: msg.from,
         convContext,
       });
     } catch (err) {
@@ -104,13 +103,12 @@ export async function notifyMessageDeliveryFailed(
   params: {
     conversationId: string;
     messageId: string;
-    senderId: string;
     convContext?: { humanMemberIds: string[]; sandboxId: string | null };
   }
 ): Promise<void> {
   await withDORetry(
     () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId)),
-    stub => stub.notifyDeliveryFailed(params.messageId, params.senderId),
+    stub => stub.notifyDeliveryFailed(params.messageId),
     'ConversationDO.notifyDeliveryFailed'
   );
 

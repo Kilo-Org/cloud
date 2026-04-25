@@ -56,7 +56,7 @@ describe('deliverToBot', () => {
 
     // 1 initial + 2 retries = 3 calls
     expect(deliverChatWebhook).toHaveBeenCalledTimes(3);
-    expect(notifyDeliveryFailed).toHaveBeenCalledWith('msg-1', 'user-1');
+    expect(notifyDeliveryFailed).toHaveBeenCalledWith('msg-1');
   });
 
   it('succeeds on retry without notifying failure', async () => {
@@ -149,6 +149,6 @@ describe('deliverToBot', () => {
     // notifyDeliveryFailed is now called via withDORetry which calls env.CONVERSATION_DO.get
     // But getConversationContext should NOT have been called since we passed context
     // The get() call comes from withDORetry for notifyDeliveryFailed, not from getConversationContext
-    expect(notifyDeliveryFailed).toHaveBeenCalledWith('msg-1', 'user-1');
+    expect(notifyDeliveryFailed).toHaveBeenCalledWith('msg-1');
   });
 });

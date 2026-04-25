@@ -159,7 +159,7 @@ export class ConversationDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(() => migrate(this.db, migrations));
   }
 
-  notifyDeliveryFailed(messageId: string, _senderId: string): void {
+  notifyDeliveryFailed(messageId: string): void {
     this.db.update(messages).set({ delivery_failed: 1 }).where(eq(messages.id, messageId)).run();
   }
 

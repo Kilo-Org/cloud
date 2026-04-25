@@ -255,7 +255,6 @@ export async function handleMessageDeliveryFailed(c: HonoCtx) {
   await notifyMessageDeliveryFailed(c.env, {
     conversationId: convId.data,
     messageId: msgId.data,
-    senderId: callerId,
   });
   return c.json({}, 202);
 }

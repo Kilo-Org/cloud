@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
 
 export const conversations = sqliteTable(
   'conversations',
@@ -10,5 +11,10 @@ export const conversations = sqliteTable(
     last_read_at: integer('last_read_at'),
     joined_at: integer('joined_at').notNull(),
   },
-  table => [index('conversations_sandbox_id_idx').on(table.sandbox_id)]
+  table => [
+    index('conversations_sandbox_activity_idx').on(
+      table.sandbox_id,
+      sql`coalesce(${table.last_activity_at}, ${table.joined_at}) desc`
+    ),
+  ]
 );

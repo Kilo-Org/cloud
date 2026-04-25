@@ -41,7 +41,23 @@ describe('briefing-utils', () => {
     expect(markdown).toContain('- github: [ok] Fetched 3 issues');
     expect(markdown).toContain('## GitHub');
     expect(markdown).toContain('- Item 1');
-    expect(markdown).toContain('## Failures / Skipped');
+    expect(markdown).toContain('## Failures');
+  });
+
+  it('omits failures section when there are no failures', () => {
+    const markdown = buildBriefingMarkdown({
+      dateKey: '2026-04-23',
+      generatedAt: new Date('2026-04-23T07:00:01Z'),
+      statuses: [
+        { source: 'github', configured: true, ok: true, summary: 'Fetched 1 issue' },
+        { source: 'linear', configured: true, ok: true, summary: 'Fetched 1 issue' },
+        { source: 'web', configured: true, ok: true, summary: 'Fetched 1 result' },
+      ],
+      sections: [{ title: 'GitHub', lines: ['- Item 1'] }],
+      failures: [],
+    });
+
+    expect(markdown).not.toContain('## Failures');
   });
 
   it('builds date-based file paths', () => {

@@ -69,7 +69,7 @@ export function buildBriefingMarkdown(params: {
 
   if (params.failures.length > 0) {
     lines.push('');
-    lines.push('## Failures / Skipped');
+    lines.push('## Failures');
     for (const failure of params.failures) {
       lines.push(`- ${failure}`);
     }

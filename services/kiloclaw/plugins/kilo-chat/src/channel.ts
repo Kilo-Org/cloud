@@ -57,12 +57,12 @@ function inspectAccount(
   cfg: OpenClawConfig,
   _accountId?: string | null
 ): { enabled: boolean; configured: boolean } {
-  const channels = (cfg as { channels?: Record<string, unknown> }).channels;
-  const section = channels?.[CHANNEL_ID];
+  const section: unknown = cfg.channels?.[CHANNEL_ID];
   const enabled =
     typeof section === 'object' &&
     section !== null &&
-    (section as { enabled?: unknown }).enabled === true;
+    'enabled' in section &&
+    section.enabled === true;
   return { enabled, configured: enabled };
 }
 

@@ -90,8 +90,15 @@ export const MessageBubble = memo(function MessageBubble({
   }
 
   function handleSaveEdit() {
-    if (!editText.trim()) return;
-    onEdit(message.id, [{ type: 'text', text: editText.trim() }]);
+    const trimmed = editText.trim();
+    if (!trimmed) return;
+    // Short-circuit no-op edits so we don't bump updatedAt and flash the
+    // "(edited)" label when the user presses Enter without changes.
+    if (trimmed === textContent.trim()) {
+      setIsEditing(false);
+      return;
+    }
+    onEdit(message.id, [{ type: 'text', text: trimmed }]);
     setIsEditing(false);
   }
 

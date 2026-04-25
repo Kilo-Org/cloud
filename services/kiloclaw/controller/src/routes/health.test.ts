@@ -279,7 +279,6 @@ describe('startKiloChatHealthProbe', () => {
     });
 
     expect(probe.getHealth().status).toBe('ok');
-    expect(probe.getHealth().lastError).toBeUndefined();
     expect(mockFetch).toHaveBeenCalledWith(
       'https://chat.example.com/health',
       expect.objectContaining({ signal: expect.any(AbortSignal) })
@@ -303,7 +302,6 @@ describe('startKiloChatHealthProbe', () => {
     });
 
     expect(probe.getHealth().status).toBe('degraded');
-    expect(probe.getHealth().lastError).toBe('HTTP 500');
     probe.stop();
   });
 
@@ -321,7 +319,6 @@ describe('startKiloChatHealthProbe', () => {
     });
 
     expect(probe.getHealth().status).toBe('unreachable');
-    expect(probe.getHealth().lastError).toBe('Connection refused');
     probe.stop();
   });
 });

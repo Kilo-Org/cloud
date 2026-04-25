@@ -11,7 +11,6 @@ export { parseOpenclawVersion } from '../openclaw-version';
 export type KiloChatHealthState = {
   status: 'ok' | 'degraded' | 'unreachable';
   lastCheckedAt: number;
-  lastError?: string;
 };
 
 export type KiloChatHealthProbe = {
@@ -45,21 +44,17 @@ export function startKiloChatHealthProbe(options: {
         if (response.ok) {
           state = { status: 'ok', lastCheckedAt: Date.now() };
         } else {
-          state = {
-            status: 'degraded',
-            lastCheckedAt: Date.now(),
-            lastError: `HTTP ${response.status}`,
-          };
+          state = { status: 'degraded', lastCheckedAt: Date.now() };
+          console.warn(`[kilo-chat health] degraded: HTTP ${response.status}`);
         }
       } finally {
         clearTimeout(timeout);
       }
     } catch (err) {
-      state = {
-        status: 'unreachable',
-        lastCheckedAt: Date.now(),
-        lastError: err instanceof Error ? err.message : String(err),
-      };
+      state = { status: 'unreachable', lastCheckedAt: Date.now() };
+      console.warn(
+        `[kilo-chat health] unreachable: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
 

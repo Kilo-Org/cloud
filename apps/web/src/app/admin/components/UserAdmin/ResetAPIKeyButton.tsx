@@ -41,7 +41,7 @@ export default function ResetAPIKeyButton({ userId }: { userId: string }) {
           <DialogTitle>Reset API keys</DialogTitle>
           <DialogDescription>
             Are you sure that you want to reset the API keys for this user? This action can not be
-            undone!
+            undone. Browser sessions will stay signed in.
           </DialogDescription>
         </DialogHeader>
 

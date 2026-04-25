@@ -55,7 +55,7 @@ RUN npm install -g pnpm
 # Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g openclaw@2026.4.9 \
+RUN npm install -g openclaw@2026.4.15 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
     && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
@@ -100,7 +100,7 @@ RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#fix/plugin-name-r
 RUN npm install -g @steipete/summarize@0.12.0
 
 # Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.1.13
+RUN npm install -g @kilocode/cli@7.2.22
 
 # Install Go (available at runtime for users to `go install` additional tools)
 ENV GO_VERSION=1.26.0
@@ -160,7 +160,7 @@ RUN set -e \
     && rm /tmp/pipelock.tar.gz \
     && pipelock version
 
-# ── Builder stage: package customizer plugin ───────────────────────────
+# ── Builder stage: package custom plugins ───────────────────────────
 # Build the vendored plugin tarball in an isolated stage so dev-time
 # dependencies do not inflate the runtime image layers.
 FROM runtime AS customizer-builder
@@ -172,6 +172,16 @@ RUN cd /tmp/kiloclaw-customizer \
     && mv "${PKG_TGZ}" /tmp/kiloclaw-customizer.tgz \
     && cd / \
     && rm -rf /tmp/kiloclaw-customizer /root/.npm
+
+FROM runtime AS morning-briefing-builder
+
+COPY plugins/kiloclaw-morning-briefing/ /tmp/kiloclaw-morning-briefing/
+RUN cd /tmp/kiloclaw-morning-briefing \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kiloclaw-morning-briefing.tgz \
+    && cd / \
+    && rm -rf /tmp/kiloclaw-morning-briefing /root/.npm
 
 # ── Builder stage: compile the controller with Bun ────────────────────
 # Bun is only needed to bundle the controller TypeScript into a single JS
@@ -205,8 +215,10 @@ FROM runtime AS final
 # Also drop /etc/gitconfig (set earlier for the build's ssh→https rewrite) so
 # it doesn't persist in the runtime image.
 COPY --from=customizer-builder /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-customizer.tgz
-RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz \
+COPY --from=morning-briefing-builder /tmp/kiloclaw-morning-briefing.tgz /tmp/kiloclaw-morning-briefing.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-morning-briefing.tgz \
     && rm -f /tmp/kiloclaw-customizer.tgz \
+    && rm -f /tmp/kiloclaw-morning-briefing.tgz \
     && rm -f /etc/gitconfig \
     && rm -rf /root/.npm
 
@@ -220,8 +232,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-03-17-v65-remove-startup-script
-RUN echo "11"
+# Build cache bust: 2026-04-24-v66-openclaw-2026.4.15
+RUN echo "12"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

@@ -403,6 +403,58 @@ export type OpenclawConfigResponse = {
   etag: string;
 };
 
+export type MorningBriefingSourceReadiness = {
+  configured: boolean;
+  summary: string;
+};
+
+export type MorningBriefingStatusResponse = {
+  ok: boolean;
+  enabled?: boolean;
+  cron?: string;
+  timezone?: string;
+  cronJobId?: string | null;
+  lastGeneratedDate?: string | null;
+  lastGeneratedAt?: string | null;
+  reconcileState?: 'idle' | 'in_progress' | 'succeeded' | 'failed';
+  lastReconcileAction?: 'enable' | 'disable' | null;
+  desiredEnabled?: boolean;
+  observedEnabled?: boolean | null;
+  lastReconcileAt?: string | null;
+  lastReconcileError?: string | null;
+  sourceReadiness?: {
+    github: MorningBriefingSourceReadiness;
+    linear: MorningBriefingSourceReadiness;
+    web: MorningBriefingSourceReadiness;
+  };
+  code?: string;
+  retryAfterSec?: number;
+  error?: string;
+};
+
+export type MorningBriefingActionResponse = {
+  ok: boolean;
+  enabled?: boolean;
+  cron?: string;
+  timezone?: string;
+  cronJobId?: string | null;
+  date?: string;
+  filePath?: string;
+  failures?: string[];
+  code?: string;
+  retryAfterSec?: number;
+  error?: string;
+};
+
+export type MorningBriefingReadResponse = {
+  ok: boolean;
+  dateKey?: string;
+  filePath?: string;
+  exists?: boolean;
+  markdown?: string | null;
+  error?: string;
+};
+
 /** Input to POST /api/platform/google-credentials */
 export type GoogleCredentialsInput = {
   googleCredentials: {

@@ -31,6 +31,7 @@ const mockUser: User = {
   blocked_at: null,
   blocked_by_kilo_user_id: null,
   api_token_pepper: 'test-pepper-456',
+  web_session_pepper: null,
   auto_top_up_enabled: false,
   default_model: null,
   is_bot: false,

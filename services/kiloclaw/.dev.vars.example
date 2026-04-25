@@ -98,7 +98,7 @@ FLY_IMAGE_DIGEST=
 # Used by the worker to self-register the version → image tag mapping in KV,
 # enabling per-user version tracking. Without this, version tracking fields
 # will be null and instances fall back to FLY_IMAGE_TAG directly.
-OPENCLAW_VERSION=2026.4.5
+OPENCLAW_VERSION=2026.4.15
 
 # Legacy fallback for existing instances without per-user apps.
 # New instances get per-user apps (acct-{hash}) created automatically.

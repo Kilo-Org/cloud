@@ -37,6 +37,9 @@ import type {
   GatewayReadyResponse,
   ControllerVersionResponse,
   OpenclawConfigResponse,
+  MorningBriefingStatusResponse,
+  MorningBriefingActionResponse,
+  MorningBriefingReadResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
   GoogleOAuthConnectionInput,
@@ -270,6 +273,77 @@ export class KiloClawInternalClient {
         method: 'POST',
         body: JSON.stringify({ userId, message, instanceId }),
       },
+      { userId }
+    );
+  }
+
+  async getMorningBriefingStatus(
+    userId: string,
+    instanceId?: string
+  ): Promise<MorningBriefingStatusResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/morning-briefing/status?${params.toString()}`, undefined, {
+      userId,
+    });
+  }
+
+  async enableMorningBriefing(
+    userId: string,
+    input?: { cron?: string; timezone?: string },
+    instanceId?: string
+  ): Promise<MorningBriefingActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/enable${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...input }),
+      },
+      { userId }
+    );
+  }
+
+  async disableMorningBriefing(
+    userId: string,
+    instanceId?: string
+  ): Promise<MorningBriefingActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/disable${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async runMorningBriefing(
+    userId: string,
+    instanceId?: string
+  ): Promise<MorningBriefingActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/run${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async readMorningBriefing(
+    userId: string,
+    day: 'today' | 'yesterday',
+    instanceId?: string
+  ): Promise<MorningBriefingReadResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(
+      `/api/platform/morning-briefing/read/${day}?${params.toString()}`,
+      undefined,
       { userId }
     );
   }

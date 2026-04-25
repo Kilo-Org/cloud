@@ -172,9 +172,13 @@ describe('getOpenClawProxyEnv', () => {
     expect(result.no_proxy).toBe('127.0.0.1,localhost,::1');
   });
 
-  it('points NODE_EXTRA_CA_CERTS at the per-VM CA so intercepted TLS validates', () => {
+  it('points NODE_EXTRA_CA_CERTS at the combined bundle so customer Node trust roots survive', () => {
+    // The bundle includes system roots, customer-provided CA file content
+    // (read in by ensurePipelockCaBundle), and the per-VM Pipelock CA.
+    // Node appends NODE_EXTRA_CA_CERTS to its baked-in roots, so this
+    // expands rather than replaces Node's trust set.
     const result = getOpenClawProxyEnv({ KILOCLAW_PIPELOCK_ENABLED: '1' });
-    expect(result.NODE_EXTRA_CA_CERTS).toBe(PIPELOCK_CA_CERT);
+    expect(result.NODE_EXTRA_CA_CERTS).toBe(PIPELOCK_CA_BUNDLE);
   });
 
   it('points replacement-style CA env vars at the combined CA bundle', () => {
@@ -203,6 +207,37 @@ describe('getOpenClawProxyEnv', () => {
     });
     expect(result.NO_PROXY).toBe('kafka.internal,127.0.0.1,localhost,::1');
     expect(result.no_proxy).toBe('kafka.internal,127.0.0.1,localhost,::1');
+  });
+
+  it('combines entries from both upper- and lower-case NO_PROXY when both are set', () => {
+    const result = getOpenClawProxyEnv({
+      KILOCLAW_PIPELOCK_ENABLED: '1',
+      NO_PROXY: 'upper.internal',
+      no_proxy: 'lower.internal',
+    });
+    // Order: NO_PROXY first, then no_proxy (skipping duplicates), then our
+    // loopback entries (also de-duplicated against earlier values).
+    expect(result.NO_PROXY).toBe('upper.internal,lower.internal,127.0.0.1,localhost,::1');
+    expect(result.no_proxy).toBe('upper.internal,lower.internal,127.0.0.1,localhost,::1');
+  });
+
+  it('de-duplicates NO_PROXY entries so customer values that already include loopback do not repeat', () => {
+    const result = getOpenClawProxyEnv({
+      KILOCLAW_PIPELOCK_ENABLED: '1',
+      NO_PROXY: 'mydatabase.internal,127.0.0.1,localhost',
+    });
+    // 127.0.0.1 and localhost are already in the customer list, so they
+    // appear once. Only ::1 is appended from our loopback set.
+    expect(result.NO_PROXY).toBe('mydatabase.internal,127.0.0.1,localhost,::1');
+  });
+
+  it('trims whitespace and ignores empty entries in NO_PROXY values', () => {
+    const result = getOpenClawProxyEnv({
+      KILOCLAW_PIPELOCK_ENABLED: '1',
+      NO_PROXY: ' foo.internal , , bar.internal ',
+      no_proxy: '',
+    });
+    expect(result.NO_PROXY).toBe('foo.internal,bar.internal,127.0.0.1,localhost,::1');
   });
 });
 

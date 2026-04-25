@@ -184,10 +184,11 @@ export function ensurePipelockCa(env: EnvLike, deps: PipelockDeps = defaultDeps)
  * Build a combined trust bundle for clients that replace, rather than extend,
  * their CA roots when SSL_CERT_FILE/REQUESTS_CA_BUNDLE/CURL_CA_BUNDLE is set.
  *
- * NODE_EXTRA_CA_CERTS can point at the Pipelock CA alone because Node appends
- * that file to its built-in roots. Python requests, curl, git, npm, and Go
- * commonly treat their env var as the full bundle, so they get system roots
- * plus the per-VM interception CA here.
+ * NODE_EXTRA_CA_CERTS also points at this combined bundle so any
+ * customer-provided Node trust roots (read in below from the same env vars)
+ * survive while the per-VM interception CA is added. Python requests, curl,
+ * git, npm, and Go commonly treat their env var as the full bundle, so they
+ * get system roots plus customer roots plus the per-VM interception CA here.
  */
 export function ensurePipelockCaBundle(env: EnvLike, deps: PipelockDeps = defaultDeps): void {
   const systemBundle = deps.readFileSync(SYSTEM_CA_BUNDLE, 'utf8').trimEnd();
@@ -358,19 +359,28 @@ export function getOpenClawProxyEnv(env: EnvLike): Record<string, string> {
   if (!isPipelockEnabled(env)) return {};
   const proxyUrl = `http://${PIPELOCK_LISTEN_HOST}:${PIPELOCK_LISTEN_PORT}`;
 
-  // Merge NO_PROXY with any customer-set bypass list so that pre-existing
-  // entries (internal services, private hostnames) keep working when
-  // Pipelock is enabled. The customer's entries stay first; our loopback
-  // entries are appended.
-  const ourNoProxy = '127.0.0.1,localhost,::1';
-  const existingNoProxy = env.NO_PROXY ?? env.no_proxy ?? '';
-  const mergedNoProxy = existingNoProxy ? `${existingNoProxy},${ourNoProxy}` : ourNoProxy;
+  // Merge NO_PROXY with any customer-set bypass list so pre-existing entries
+  // (internal services, private hostnames) keep working when Pipelock is
+  // enabled. We collect entries from BOTH casings (uppercase NO_PROXY and
+  // lowercase no_proxy) so a customer that set only one variant does not
+  // lose their bypass list, and we de-duplicate entries so customers who
+  // already include loopback do not produce a longer-than-necessary value.
+  const mergedEntries = new Set<string>();
+  for (const source of [env.NO_PROXY, env.no_proxy, '127.0.0.1,localhost,::1']) {
+    if (typeof source !== 'string') continue;
+    for (const raw of source.split(',')) {
+      const entry = raw.trim();
+      if (entry) mergedEntries.add(entry);
+    }
+  }
+  const mergedNoProxy = [...mergedEntries].join(',');
 
-  // Customer-provided CA bundles (their values for SSL_CERT_FILE /
-  // REQUESTS_CA_BUNDLE / NODE_EXTRA_CA_CERTS / etc.) are concatenated into
-  // the combined CA bundle by ensurePipelockCaBundle, so pointing every
-  // env var at PIPELOCK_CA_BUNDLE preserves the customer's trust roots.
-
+  // CA bundle env vars point at /root/.pipelock/ca-bundle.pem. The bundle
+  // is built by ensurePipelockCaBundle to include system roots plus any
+  // customer-provided CA paths from these same env vars (read at boot, see
+  // ensurePipelockCaBundle), plus the per-VM Pipelock CA. Pointing all of
+  // them at PIPELOCK_CA_BUNDLE preserves customer trust roots whether the
+  // client treats the env var as APPEND (Node) or REPLACE (curl/python/etc).
   return {
     HTTPS_PROXY: proxyUrl,
     https_proxy: proxyUrl,
@@ -384,7 +394,7 @@ export function getOpenClawProxyEnv(env: EnvLike): Record<string, string> {
     GIT_SSL_CAINFO: PIPELOCK_CA_BUNDLE,
     NPM_CONFIG_CAFILE: PIPELOCK_CA_BUNDLE,
     PIP_CERT: PIPELOCK_CA_BUNDLE,
-    NODE_EXTRA_CA_CERTS: PIPELOCK_CA_CERT,
+    NODE_EXTRA_CA_CERTS: PIPELOCK_CA_BUNDLE,
   };
 }
 

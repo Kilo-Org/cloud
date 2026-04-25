@@ -23,6 +23,24 @@ cat > "$ROOTDIR/.openclaw/openclaw.json" <<'JSON'
 {}
 JSON
 
+# Seed a legacy auth-profiles.json with a plaintext kilocode key. The
+# migration in runOnboardOrDoctor (bootstrap.ts) must rewrite this to an
+# env-backed keyRef before the gateway starts, so the respawned gateway
+# never reads a stale literal from disk.
+mkdir -p "$ROOTDIR/.openclaw/agents/main/agent"
+cat > "$ROOTDIR/.openclaw/agents/main/agent/auth-profiles.json" <<'JSON'
+{
+  "version": 1,
+  "profiles": {
+    "kilocode:default": {
+      "type": "api_key",
+      "provider": "kilocode",
+      "key": "legacy-plaintext-must-be-rewritten"
+    }
+  }
+}
+JSON
+
 CID=""
 cleanup() {
   if [ -n "$CID" ]; then
@@ -103,6 +121,27 @@ echo "--- proxy token ---"
 
 CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT}/")
 check "root without proxy token (REQUIRE_PROXY_TOKEN=true) -> 401" "401" "$CODE"
+
+echo
+echo "--- auth-profiles migration (doctor path) ---"
+
+# The seeded file had a plaintext kilocode key. After bootstrap's migration
+# runs, the on-disk file must carry a keyRef and no plaintext.
+MIGRATED=$(cat "$ROOTDIR/.openclaw/agents/main/agent/auth-profiles.json" 2>/dev/null || echo "")
+
+if echo "$MIGRATED" | grep -q '"keyRef"'; then
+  check "legacy plaintext migrated to keyRef" "1" "1"
+else
+  check "legacy plaintext migrated to keyRef" "1" "0"
+  echo "  actual: $MIGRATED"
+fi
+
+if echo "$MIGRATED" | grep -q "legacy-plaintext-must-be-rewritten"; then
+  check "legacy plaintext removed from disk" "1" "0"
+  echo "  actual: $MIGRATED"
+else
+  check "legacy plaintext removed from disk" "1" "1"
+fi
 
 echo
 echo "=== Results: $PASS passed, $FAIL failed ==="

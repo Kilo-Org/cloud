@@ -93,6 +93,65 @@ export function useClawControllerVersion(enabled: boolean) {
   return organizationId ? org : personal;
 }
 
+export function useClawMorningBriefingStatus(enabled: boolean) {
+  const trpc = useTRPC();
+  const { organizationId } = useClawContext();
+
+  const getRefetchInterval = (data: unknown): number => {
+    const maybeCode =
+      typeof data === 'object' && data !== null && 'code' in data
+        ? (data as { code?: unknown }).code
+        : undefined;
+    return maybeCode === 'gateway_warming_up' ? 10_000 : 30_000;
+  };
+
+  const personal = useQuery({
+    ...trpc.kiloclaw.getMorningBriefingStatus.queryOptions(undefined, {
+      refetchInterval: query => (enabled ? getRefetchInterval(query.state.data) : false),
+      retry: false,
+    }),
+    enabled: enabled && !organizationId,
+  });
+
+  const org = useQuery({
+    ...trpc.organizations.kiloclaw.getMorningBriefingStatus.queryOptions(
+      { organizationId: organizationId ?? '' },
+      {
+        refetchInterval: query => (enabled ? getRefetchInterval(query.state.data) : false),
+        retry: false,
+      }
+    ),
+    enabled: enabled && !!organizationId,
+  });
+
+  return organizationId ? org : personal;
+}
+
+export function useClawReadMorningBriefing(day: 'today' | 'yesterday' | null, enabled: boolean) {
+  const trpc = useTRPC();
+  const { organizationId } = useClawContext();
+
+  const personal = useQuery({
+    ...trpc.kiloclaw.readMorningBriefing.queryOptions(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by enabled
+      { day: day! },
+      { refetchOnWindowFocus: false }
+    ),
+    enabled: enabled && day !== null && !organizationId,
+  });
+
+  const org = useQuery({
+    ...trpc.organizations.kiloclaw.readMorningBriefing.queryOptions(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by enabled
+      { organizationId: organizationId ?? '', day: day! },
+      { refetchOnWindowFocus: false }
+    ),
+    enabled: enabled && day !== null && !!organizationId,
+  });
+
+  return organizationId ? org : personal;
+}
+
 // Pairing
 
 export function useClawPairing(enabled = true) {

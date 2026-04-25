@@ -169,7 +169,7 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
   });
 
-  it('auto-assigns kilo-exa even when web search was explicitly disabled but provider is missing', () => {
+  it('does not auto-assign kilo-exa when web search is explicitly disabled and provider is missing', () => {
     const existing = JSON.stringify({
       tools: {
         web: {
@@ -182,9 +182,22 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps(existing);
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    expect(config.tools.web.search.provider).toBe('kilo-exa');
-    expect(config.tools.web.search.enabled).toBe(true);
-    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+    expect(config.tools.web.search.provider).toBeUndefined();
+    expect(config.tools.web.search.enabled).toBe(false);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBeUndefined();
+  });
+
+  it('does not auto-assign kilo-exa when BRAVE_API_KEY is configured and provider is missing', () => {
+    const existing = JSON.stringify({ tools: { web: { search: {} } } });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBeUndefined();
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBeUndefined();
   });
 
   it('preserves explicit kilo-exa provider when mode is unset', () => {
@@ -334,14 +347,14 @@ describe('generateBaseConfig', () => {
     expect(config.models).toBeUndefined();
   });
 
-  it('skips gateway-URL stale migration for org-scoped instances', () => {
+  it('keeps gateway provider for org-scoped instances but clears static models', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
           kilocode: {
             baseUrl: 'https://api.kilo.ai/api/gateway/',
             headers: { 'X-Custom': 'user-managed' },
-            models: [{ id: 'kept/model', name: 'Kept' }],
+            models: [{ id: 'kilo/auto', name: 'Kilo Auto' }],
           },
         },
       },
@@ -350,13 +363,12 @@ describe('generateBaseConfig', () => {
     const env = { ...minimalEnv(), KILOCODE_ORGANIZATION_ID: 'org_abc123' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
-    // Provider not nuked — user-managed settings preserved
     expect(config.models.providers.kilocode.headers['X-Custom']).toBe('user-managed');
     expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBe(
       'org_abc123'
     );
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('still removes openrouter stale provider for org-scoped instances', () => {
@@ -456,7 +468,7 @@ describe('generateBaseConfig', () => {
     expect(config.models).toBeUndefined();
   });
 
-  it('preserves existing kilocode config when adding org header', () => {
+  it('preserves existing kilocode baseUrl and headers when adding org header', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
@@ -477,7 +489,7 @@ describe('generateBaseConfig', () => {
     );
     expect(config.models.providers.kilocode.headers['X-Custom']).toBe('value');
     expect(config.models.providers.kilocode.baseUrl).toBe('https://tunnel.example.com/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('removes stale org header when KILOCODE_ORGANIZATION_ID is no longer set', () => {
@@ -602,15 +614,25 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.load.paths).toContain(
       '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'
     );
+    expect(config.plugins.entries['kiloclaw-morning-briefing'].enabled).toBe(true);
+    expect(config.plugins.load.paths).toContain(
+      '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing'
+    );
   });
 
   it('does not duplicate KiloClaw customizer plugin path on repeated generateBaseConfig calls', () => {
     const existing = JSON.stringify({
       plugins: {
         load: {
-          paths: ['/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'],
+          paths: [
+            '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer',
+            '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing',
+          ],
         },
-        entries: { 'kiloclaw-customizer': { enabled: true } },
+        entries: {
+          'kiloclaw-customizer': { enabled: true },
+          'kiloclaw-morning-briefing': { enabled: true },
+        },
       },
     });
     const { deps } = fakeDeps(existing);
@@ -619,6 +641,8 @@ describe('generateBaseConfig', () => {
     const pluginPath = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
     const paths = config.plugins.load.paths as string[];
     expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
+    const morningPluginPath = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing';
+    expect(paths.filter(p => p === morningPluginPath)).toHaveLength(1);
   });
 
   it('adds KiloClaw customizer to an existing plugin allowlist', () => {
@@ -631,6 +655,7 @@ describe('generateBaseConfig', () => {
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
     expect(config.plugins.allow).toContain('kiloclaw-customizer');
+    expect(config.plugins.allow).toContain('kiloclaw-morning-briefing');
   });
 
   it('configures Telegram channel', () => {
@@ -1347,6 +1372,8 @@ describe('writeBaseConfig', () => {
     expect(args).toContain('--skip-channels');
     expect(args).toContain('--skip-skills');
     expect(args).toContain('--skip-health');
+    expect(args).toContain('--secret-input-mode');
+    expect(args[args.indexOf('--secret-input-mode') + 1]).toBe('ref');
   });
 
   it('forces tools.profile to full even without KILOCLAW_FRESH_INSTALL', () => {
@@ -1373,6 +1400,20 @@ describe('writeBaseConfig', () => {
     const config = JSON.parse(written[0].data);
     expect(config.tools?.web?.search?.provider).toBe('kilo-exa');
     expect(config.tools?.web?.search?.enabled).toBe(true);
+  });
+
+  it('does not auto-assign Exa web search provider on restore path when BRAVE_API_KEY is configured', () => {
+    const { deps, written } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      ...minimalEnv(),
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    delete env.KILOCLAW_FRESH_INSTALL;
+
+    writeBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    const config = JSON.parse(written[0].data);
+    expect(config.tools?.web?.search?.provider).toBeUndefined();
   });
 
   it('throws if KILOCODE_API_KEY is missing', () => {

@@ -659,7 +659,7 @@ describe('ConversationDO', () => {
     });
     await stub.createMessage({ senderId: 'bot-1', content: [{ type: 'text', text: 'hi back' }] });
 
-    await stub.destroy();
+    await stub.destroyAndReturnMembers();
 
     const info = await stub.getInfo();
     expect(info).toBeNull();
@@ -683,9 +683,9 @@ describe('ConversationDO', () => {
     expect(rejected).toBeNull();
   });
 
-  it('destroy - is idempotent on an already-empty DO', async () => {
+  it('destroyAndReturnMembers - is idempotent on an already-empty DO', async () => {
     const stub = getStub('conv-destroy-empty');
-    await stub.destroy();
+    await stub.destroyAndReturnMembers();
     const info = await stub.getInfo();
     expect(info).toBeNull();
   });

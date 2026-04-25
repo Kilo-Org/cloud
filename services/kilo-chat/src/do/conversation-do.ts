@@ -624,15 +624,6 @@ export class ConversationDO extends DurableObject<Env> {
     return { ok: true };
   }
 
-  destroy(): void {
-    this.db.transaction(tx => {
-      tx.delete(reactions).run();
-      tx.delete(messages).run();
-      tx.delete(conversation).run();
-      tx.delete(members).run();
-    });
-  }
-
   leaveMember(memberId: string): {
     remainingUsers: Array<{ id: string }>;
     botMembers: Array<{ id: string }>;

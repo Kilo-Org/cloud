@@ -7,7 +7,7 @@ import {
   createKiloChatWebhookHandler,
   parseActionExecutedPayload,
   parseInboundPayload,
-} from './webhook.js';
+} from './webhook/index.js';
 import type { KiloChatClient } from './client.js';
 
 describe('parseInboundPayload', () => {

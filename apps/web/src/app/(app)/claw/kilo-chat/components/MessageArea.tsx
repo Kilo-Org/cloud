@@ -77,7 +77,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const removeReaction = useRemoveReaction(kiloChatClient, conversationId, currentUserId);
   const executeAction = useExecuteAction(kiloChatClient, conversationId, currentUserId);
 
-  const updateCache = useMessageCacheUpdater(conversationId);
+  useMessageCacheUpdater(kiloChatClient, conversationId);
   const { typingMembers, handleTypingEvent, clearTypingForMember } = useTypingState(currentUserId);
   const sendTyping = useTypingSender(kiloChatClient, conversationId);
 
@@ -93,24 +93,12 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     markReadRef.current(conversationId);
   }, [conversationId]);
 
-  // Register typed event handlers on the shared kiloChatClient
+  // Register side-effect handlers that don't mutate the message cache
+  // (cache updates are handled by useMessageCacheUpdater).
   useEffect(() => {
     const offs = [
-      kiloChatClient.onMessageCreated((_ctx, data) => {
-        updateCache({ type: 'message.created', data });
-      }),
-      kiloChatClient.onMessageUpdated((_ctx, data) => {
-        updateCache({ type: 'message.updated', data });
-      }),
-      kiloChatClient.onMessageDeleted((_ctx, data) => {
-        updateCache({ type: 'message.deleted', data });
-      }),
-      kiloChatClient.onMessageDeliveryFailed((_ctx, data) => {
-        updateCache({ type: 'message.delivery_failed', data });
+      kiloChatClient.onMessageDeliveryFailed(() => {
         toast.error('Message could not be delivered to the bot');
-      }),
-      kiloChatClient.onActionDeliveryFailed((_ctx, data) => {
-        updateCache({ type: 'action.delivery_failed', data });
       }),
       kiloChatClient.onTyping((_ctx, data) => {
         handleTypingEvent(data);
@@ -118,15 +106,9 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       kiloChatClient.onTypingStop((_ctx, data) => {
         clearTypingForMember(data.memberId);
       }),
-      kiloChatClient.onReactionAdded((_ctx, data) => {
-        updateCache({ type: 'reaction.added', data });
-      }),
-      kiloChatClient.onReactionRemoved((_ctx, data) => {
-        updateCache({ type: 'reaction.removed', data });
-      }),
     ];
     return () => offs.forEach(off => off());
-  }, [kiloChatClient, updateCache, handleTypingEvent, clearTypingForMember, conversationId]);
+  }, [kiloChatClient, handleTypingEvent, clearTypingForMember, conversationId]);
 
   // Refetch messages on WebSocket reconnect (events may have been missed)
   useEffect(() => {

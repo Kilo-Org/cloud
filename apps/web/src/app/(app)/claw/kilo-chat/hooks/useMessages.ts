@@ -15,7 +15,7 @@ import type {
   ReactionRemovedEvent,
   ExecApprovalDecision,
 } from '@kilocode/kilo-chat';
-import { useCallback } from 'react';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
 
 const PAGE_SIZE = 50;
@@ -375,163 +375,170 @@ export function useExecuteAction(
 }
 
 /**
- * Returns a callback that applies real-time events to the React Query message cache.
+ * Subscribes to real-time kilo-chat events on the shared client and applies
+ * them to the React Query message cache for the active conversation.
+ *
+ * Each subscription receives the fully validated typed payload from the
+ * client (Zod-checked inside `KiloChatClient.on`), so no casts are needed.
  */
-export function useMessageCacheUpdater(conversationId: string | null) {
+export function useMessageCacheUpdater(
+  client: KiloChatClient,
+  conversationId: string | null
+): void {
   const queryClient = useQueryClient();
-  return useCallback(
-    (event: { type: string; data: unknown }) => {
-      if (!conversationId) return;
-      const queryKey = ['kilo-chat', 'messages', conversationId];
-      switch (event.type) {
-        case 'message.created': {
-          const e = event.data as MessageCreatedEvent;
-          const newMessage: Message = {
-            id: e.messageId,
-            senderId: e.senderId,
-            content: e.content,
-            inReplyToMessageId: e.inReplyToMessageId,
-            updatedAt: null,
-            clientUpdatedAt: null,
-            deleted: false,
-            deliveryFailed: false,
-            reactions: [],
-          };
-          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-            if (!old) return old;
-            // Skip if this messageId already exists
-            for (const page of old.pages) {
-              if (page.some(msg => msg.id === e.messageId)) return old;
+
+  useEffect(() => {
+    if (!conversationId) return;
+    const queryKey = ['kilo-chat', 'messages', conversationId];
+
+    const onCreated = (_ctx: string, e: MessageCreatedEvent) => {
+      const newMessage: Message = {
+        id: e.messageId,
+        senderId: e.senderId,
+        content: e.content,
+        inReplyToMessageId: e.inReplyToMessageId,
+        updatedAt: null,
+        clientUpdatedAt: null,
+        deleted: false,
+        deliveryFailed: false,
+        reactions: [],
+      };
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        // Skip if this messageId already exists
+        for (const page of old.pages) {
+          if (page.some(msg => msg.id === e.messageId)) return old;
+        }
+        // Replace the matching pending optimistic message if clientId correlates
+        if (e.clientId) {
+          const pendingId = `pending-${e.clientId}`;
+          for (const page of old.pages) {
+            if (page.some(msg => msg.id === pendingId)) {
+              return {
+                ...old,
+                pages: old.pages.map(p => p.map(msg => (msg.id === pendingId ? newMessage : msg))),
+              };
             }
-            // Replace the matching pending optimistic message if clientId correlates
-            if (e.clientId) {
-              const pendingId = `pending-${e.clientId}`;
-              for (const page of old.pages) {
-                if (page.some(msg => msg.id === pendingId)) {
-                  return {
-                    ...old,
-                    pages: old.pages.map(p =>
-                      p.map(msg => (msg.id === pendingId ? newMessage : msg))
-                    ),
-                  };
-                }
-              }
-            }
-            const firstPage = old.pages[0] ?? [];
-            return { ...old, pages: [[newMessage, ...firstPage], ...old.pages.slice(1)] };
-          });
-          break;
+          }
         }
-        case 'message.updated': {
-          const e = event.data as MessageUpdatedEvent;
-          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-            if (!old) return old;
-            return {
-              ...old,
-              pages: old.pages.map(page =>
-                page.map(msg =>
-                  msg.id === e.messageId
-                    ? {
-                        ...msg,
-                        content: e.content,
-                        clientUpdatedAt: e.clientUpdatedAt,
-                      }
-                    : msg
-                )
-              ),
-            };
-          });
-          break;
-        }
-        case 'message.deleted': {
-          const e = event.data as MessageDeletedEvent;
-          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-            if (!old) return old;
-            return {
-              ...old,
-              pages: old.pages.map(page =>
-                page.map(msg => (msg.id === e.messageId ? { ...msg, deleted: true } : msg))
-              ),
-            };
-          });
-          break;
-        }
-        case 'message.delivery_failed': {
-          const e = event.data as MessageDeliveryFailedEvent;
-          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-            if (!old) return old;
-            return {
-              ...old,
-              pages: old.pages.map(page =>
-                page.map(msg => (msg.id === e.messageId ? { ...msg, deliveryFailed: true } : msg))
-              ),
-            };
-          });
-          break;
-        }
-        case 'action.delivery_failed': {
-          const e = event.data as ActionDeliveryFailedEvent;
-          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-            if (!old) return old;
-            return {
-              ...old,
-              pages: old.pages.map(page =>
-                page.map(msg => {
-                  if (msg.id !== e.messageId) return msg;
-                  return {
+        const firstPage = old.pages[0] ?? [];
+        return { ...old, pages: [[newMessage, ...firstPage], ...old.pages.slice(1)] };
+      });
+    };
+
+    const onUpdated = (_ctx: string, e: MessageUpdatedEvent) => {
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page =>
+            page.map(msg =>
+              msg.id === e.messageId
+                ? {
                     ...msg,
-                    content: msg.content.map(block => {
-                      if (block.type !== 'actions') return block;
-                      if (block.groupId !== e.groupId) return block;
-                      return { ...block, resolved: undefined };
-                    }),
-                  };
-                })
-              ),
-            };
-          });
-          toast.error("Couldn't reach the bot — please try again");
-          break;
-        }
-        case 'reaction.added': {
-          const e = event.data as ReactionAddedEvent;
-          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-            if (!old) return old;
-            return {
-              ...old,
-              pages: old.pages.map(page =>
-                page.map(msg =>
-                  msg.id !== e.messageId
-                    ? msg
-                    : { ...msg, reactions: applyReactionAdded(msg.reactions, e.emoji, e.memberId) }
-                )
-              ),
-            };
-          });
-          break;
-        }
-        case 'reaction.removed': {
-          const e = event.data as ReactionRemovedEvent;
-          queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-            if (!old) return old;
-            return {
-              ...old,
-              pages: old.pages.map(page =>
-                page.map(msg =>
-                  msg.id !== e.messageId
-                    ? msg
-                    : {
-                        ...msg,
-                        reactions: applyReactionRemoved(msg.reactions, e.emoji, e.memberId),
-                      }
-                )
-              ),
-            };
-          });
-          break;
-        }
-      }
-    },
-    [conversationId, queryClient]
-  );
+                    content: e.content,
+                    clientUpdatedAt: e.clientUpdatedAt,
+                  }
+                : msg
+            )
+          ),
+        };
+      });
+    };
+
+    const onDeleted = (_ctx: string, e: MessageDeletedEvent) => {
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page =>
+            page.map(msg => (msg.id === e.messageId ? { ...msg, deleted: true } : msg))
+          ),
+        };
+      });
+    };
+
+    const onDeliveryFailed = (_ctx: string, e: MessageDeliveryFailedEvent) => {
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page =>
+            page.map(msg => (msg.id === e.messageId ? { ...msg, deliveryFailed: true } : msg))
+          ),
+        };
+      });
+    };
+
+    const onActionFailed = (_ctx: string, e: ActionDeliveryFailedEvent) => {
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page =>
+            page.map(msg => {
+              if (msg.id !== e.messageId) return msg;
+              return {
+                ...msg,
+                content: msg.content.map(block => {
+                  if (block.type !== 'actions') return block;
+                  if (block.groupId !== e.groupId) return block;
+                  return { ...block, resolved: undefined };
+                }),
+              };
+            })
+          ),
+        };
+      });
+      toast.error("Couldn't reach the bot — please try again");
+    };
+
+    const onReactionAdded = (_ctx: string, e: ReactionAddedEvent) => {
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page =>
+            page.map(msg =>
+              msg.id !== e.messageId
+                ? msg
+                : { ...msg, reactions: applyReactionAdded(msg.reactions, e.emoji, e.memberId) }
+            )
+          ),
+        };
+      });
+    };
+
+    const onReactionRemoved = (_ctx: string, e: ReactionRemovedEvent) => {
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page =>
+            page.map(msg =>
+              msg.id !== e.messageId
+                ? msg
+                : {
+                    ...msg,
+                    reactions: applyReactionRemoved(msg.reactions, e.emoji, e.memberId),
+                  }
+            )
+          ),
+        };
+      });
+    };
+
+    const offs = [
+      client.onMessageCreated(onCreated),
+      client.onMessageUpdated(onUpdated),
+      client.onMessageDeleted(onDeleted),
+      client.onMessageDeliveryFailed(onDeliveryFailed),
+      client.onActionDeliveryFailed(onActionFailed),
+      client.onReactionAdded(onReactionAdded),
+      client.onReactionRemoved(onReactionRemoved),
+    ];
+    return () => {
+      for (const off of offs) off();
+    };
+  }, [client, conversationId, queryClient]);
 }

@@ -664,13 +664,12 @@ function MorningBriefingCard({
                   .map(entry => {
                     const channel = deliveryChannelLabel[entry.channel] ?? entry.channel;
                     const status = deliveryStatusLabel[entry.status] ?? entry.status;
-                    if (entry.status === 'sent') {
-                      return `${channel}: ${status}`;
-                    }
                     const reason = entry.reason
                       ? (deliveryReasonLabel[entry.reason] ?? entry.reason)
                       : undefined;
-                    return reason ? `${channel}: ${status} (${reason})` : `${channel}: ${status}`;
+                    return reason
+                      ? `${channel} (${status}: ${reason})`
+                      : `${channel} (${status})`;
                   })
                   .join(' • ')}
               </p>

@@ -6,15 +6,24 @@ import type { ContentBlock, KiloChatClient } from './client.js';
  * accumulate more text than a single block can hold, so we split the text
  * into multiple text blocks before each POST/PATCH. Both this splitter and
  * the backend schema measure JS string length in UTF-16 code units, so we
- * can fill blocks to the exact cap.
+ * can fill blocks to the exact cap. Messages that would exceed the 20-block
+ * budget get a trailing "…truncated" marker on the last block so the
+ * request stays valid and the user can tell the remote preview is partial.
  */
 const TEXT_BLOCK_MAX = 8000;
+const MAX_BLOCKS = 20;
+const TRUNCATION_MARKER = '\n\n[…truncated]';
 
 function buildTextContent(text: string): ContentBlock[] {
   if (text.length <= TEXT_BLOCK_MAX) return [{ type: 'text', text }];
   const blocks: ContentBlock[] = [];
-  for (let i = 0; i < text.length; i += TEXT_BLOCK_MAX) {
+  for (let i = 0; i < text.length && blocks.length < MAX_BLOCKS; i += TEXT_BLOCK_MAX) {
     blocks.push({ type: 'text', text: text.slice(i, i + TEXT_BLOCK_MAX) });
+  }
+  if (blocks.length === MAX_BLOCKS && blocks.length * TEXT_BLOCK_MAX < text.length) {
+    const last = blocks[MAX_BLOCKS - 1];
+    const keep = TEXT_BLOCK_MAX - TRUNCATION_MARKER.length;
+    blocks[MAX_BLOCKS - 1] = { type: 'text', text: last.text.slice(0, keep) + TRUNCATION_MARKER };
   }
   return blocks;
 }

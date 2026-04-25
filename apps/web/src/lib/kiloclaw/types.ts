@@ -408,6 +408,15 @@ export type MorningBriefingSourceReadiness = {
   summary: string;
 };
 
+export type MorningBriefingDeliveryResult = {
+  channel: 'telegram' | 'discord' | 'slack';
+  status: 'sent' | 'skipped' | 'failed';
+  target?: string;
+  accountId?: string;
+  reason?: 'missing_target' | 'ambiguous_target' | 'send_failed' | 'config_unavailable';
+  error?: string;
+};
+
 export type MorningBriefingStatusResponse = {
   ok: boolean;
   enabled?: boolean;
@@ -427,6 +436,7 @@ export type MorningBriefingStatusResponse = {
     linear: MorningBriefingSourceReadiness;
     web: MorningBriefingSourceReadiness;
   };
+  lastDelivery?: MorningBriefingDeliveryResult[];
   code?: string;
   retryAfterSec?: number;
   error?: string;
@@ -441,6 +451,7 @@ export type MorningBriefingActionResponse = {
   date?: string;
   filePath?: string;
   failures?: string[];
+  delivery?: MorningBriefingDeliveryResult[];
   code?: string;
   retryAfterSec?: number;
   error?: string;

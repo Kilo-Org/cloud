@@ -516,6 +516,13 @@ function MorningBriefingCard({
           linear: { configured: boolean; summary: string };
           web: { configured: boolean; summary: string };
         };
+        lastDelivery?: Array<{
+          channel: 'telegram' | 'discord' | 'slack';
+          status: 'sent' | 'skipped' | 'failed';
+          reason?: 'missing_target' | 'ambiguous_target' | 'send_failed' | 'config_unavailable';
+          error?: string;
+          target?: string;
+        }>;
       }
     | undefined;
   fallbackReadiness: {
@@ -623,6 +630,7 @@ function MorningBriefingCard({
   const showScheduleDetails = !isWarmupState && hasSchedule && desiredEnabled;
   const controlsEnabled = actionsReady && !isWarmupState;
   const canUseBriefingControls = controlsEnabled && desiredEnabled;
+  const lastDelivery = briefingStatus?.lastDelivery ?? [];
 
   return (
     <div className="rounded-lg border px-4 py-3">
@@ -726,6 +734,23 @@ function MorningBriefingCard({
       )}
 
       <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
+
+      {lastDelivery.length > 0 && (
+        <p className="text-muted-foreground mt-2 text-xs">
+          Last delivery:{' '}
+          {lastDelivery
+            .map(entry => {
+              if (entry.status === 'sent') {
+                return `${entry.channel}: sent`;
+              }
+              if (entry.status === 'skipped') {
+                return `${entry.channel}: skipped (${entry.reason ?? 'missing_target'})`;
+              }
+              return `${entry.channel}: failed${entry.error ? ` (${entry.error})` : ''}`;
+            })
+            .join(' • ')}
+        </p>
+      )}
 
       {requestedDay && (
         <div className="mt-3">

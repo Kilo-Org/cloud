@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildBriefingMarkdown,
+  formatBriefingMarkdownForMessage,
   formatDateKey,
   offsetDateKey,
   resolveBriefingPath,
@@ -46,5 +47,30 @@ describe('briefing-utils', () => {
   it('builds date-based file paths', () => {
     const filePath = resolveBriefingPath('/tmp/briefings', '2026-04-23');
     expect(filePath.endsWith('/briefings/2026-04-23.md')).toBe(true);
+  });
+
+  it('adapts briefing markdown into channel-friendly text', () => {
+    const markdown = [
+      '# Morning Briefing - 2026-04-23',
+      '',
+      '## GitHub',
+      '- [Fix flaky build](https://example.com/issue/1) (updated 2026-04-23)',
+      '',
+      '## Source Status',
+      '- github: [ok] Fetched 1 open issue',
+      '',
+      '_Generated at 2026-04-23T07:00:01.000Z_',
+    ].join('\n');
+
+    const message = formatBriefingMarkdownForMessage(markdown);
+
+    expect(message).toContain('Morning Briefing - 2026-04-23');
+    expect(message).toContain('GitHub');
+    expect(message).toContain(
+      '• Fix flaky build - https://example.com/issue/1 (updated 2026-04-23)'
+    );
+    expect(message).toContain('Generated at 2026-04-23T07:00:01.000Z');
+    expect(message).not.toContain('# ');
+    expect(message).not.toContain('[');
   });
 });

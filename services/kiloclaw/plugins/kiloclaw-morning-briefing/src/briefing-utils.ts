@@ -88,3 +88,43 @@ export function buildBriefingMarkdown(params: {
 
   return lines.join('\n');
 }
+
+function convertInlineMarkdownToText(line: string): string {
+  const withLinksExpanded = line.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 - $2');
+  return withLinksExpanded
+    .replace(/\[(ok|error|skipped)\]/gi, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1');
+}
+
+export function formatBriefingMarkdownForMessage(markdown: string): string {
+  const transformedLines = markdown.split(/\r?\n/).map(rawLine => {
+    const heading = /^#{1,2}\s+(.+)$/.exec(rawLine);
+    if (heading) {
+      return heading[1]?.trim() ?? '';
+    }
+
+    if (/^_.*_$/.test(rawLine.trim())) {
+      return rawLine.trim().slice(1, -1);
+    }
+
+    if (rawLine.startsWith('- ')) {
+      return `• ${convertInlineMarkdownToText(rawLine.slice(2))}`;
+    }
+
+    return convertInlineMarkdownToText(rawLine);
+  });
+
+  const compacted: string[] = [];
+  let previousBlank = false;
+  for (const line of transformedLines) {
+    const blank = line.trim().length === 0;
+    if (blank && previousBlank) {
+      continue;
+    }
+    compacted.push(line);
+    previousBlank = blank;
+  }
+
+  return compacted.join('\n').trim();
+}

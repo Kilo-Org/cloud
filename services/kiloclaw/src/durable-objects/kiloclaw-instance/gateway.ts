@@ -572,7 +572,8 @@ export async function runMorningBriefing(
       '/_kilo/morning-briefing/run',
       'POST',
       MorningBriefingActionResponseSchema,
-      {}
+      {},
+      { timeoutMs: 120_000 }
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

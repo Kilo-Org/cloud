@@ -2078,12 +2078,14 @@ platform.post('/morning-briefing/run', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const response = await withResolvedDORetry(
-      c.env,
-      result.data.userId,
-      iidResult.instanceId,
-      stub => stub.runMorningBriefing(),
-      'runMorningBriefing'
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        result.data.userId,
+        iidResult.instanceId,
+        stub => stub.runMorningBriefing(),
+        'runMorningBriefing'
+      )
     );
     if (!response) {
       return jsonError(
@@ -2094,6 +2096,9 @@ platform.post('/morning-briefing/run', async c => {
     }
     return c.json(response, 200);
   } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/run');
     return jsonError(message, status, code);
   }

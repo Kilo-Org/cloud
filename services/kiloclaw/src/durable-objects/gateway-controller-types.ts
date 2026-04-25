@@ -104,6 +104,17 @@ const MorningBriefingSourceReadinessSchema = z.object({
   summary: z.string(),
 });
 
+const MorningBriefingDeliverySchema = z.object({
+  channel: z.enum(['telegram', 'discord', 'slack']),
+  status: z.enum(['sent', 'skipped', 'failed']),
+  target: z.string().optional(),
+  accountId: z.string().optional(),
+  reason: z
+    .enum(['missing_target', 'ambiguous_target', 'send_failed', 'config_unavailable'])
+    .optional(),
+  error: z.string().optional(),
+});
+
 export const MorningBriefingStatusResponseSchema = z.object({
   ok: z.boolean(),
   enabled: z.boolean().optional(),
@@ -125,6 +136,7 @@ export const MorningBriefingStatusResponseSchema = z.object({
       web: MorningBriefingSourceReadinessSchema,
     })
     .optional(),
+  lastDelivery: z.array(MorningBriefingDeliverySchema).optional(),
   code: z.string().optional(),
   retryAfterSec: z.number().int().positive().optional(),
   error: z.string().optional(),
@@ -139,6 +151,7 @@ export const MorningBriefingActionResponseSchema = z.object({
   date: z.string().optional(),
   filePath: z.string().optional(),
   failures: z.array(z.string()).optional(),
+  delivery: z.array(MorningBriefingDeliverySchema).optional(),
   code: z.string().optional(),
   retryAfterSec: z.number().int().positive().optional(),
   error: z.string().optional(),

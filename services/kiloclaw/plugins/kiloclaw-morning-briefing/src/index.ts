@@ -2,7 +2,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Type } from '@sinclair/typebox';
 import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
-import { buildBriefingMarkdown, offsetDateKey, resolveBriefingPath } from './briefing-utils';
+import {
+  buildBriefingMarkdown,
+  formatBriefingMarkdownForMessage,
+  offsetDateKey,
+  resolveBriefingPath,
+} from './briefing-utils';
 import {
   filterEnabledBriefingJobs,
   pickCanonicalCronJobId,
@@ -41,6 +46,7 @@ type StoredStatus = {
   lastPath: string | null;
   sourceSummary: Array<{ source: string; configured: boolean; ok: boolean; summary: string }>;
   failures: string[];
+  lastDelivery: BriefingDeliveryResult[];
   observedEnabled: boolean | null;
   reconcileState: 'idle' | 'in_progress' | 'succeeded' | 'failed';
   lastReconcileAt: string | null;
@@ -56,6 +62,25 @@ type SourceCollectionResult = {
   summary: string;
   sectionLines: string[];
 };
+
+type DeliveryChannel = 'telegram' | 'discord' | 'slack';
+
+type BriefingDeliveryResult = {
+  channel: DeliveryChannel;
+  status: 'sent' | 'skipped' | 'failed';
+  target?: string;
+  accountId?: string;
+  reason?: 'missing_target' | 'ambiguous_target' | 'send_failed' | 'config_unavailable';
+  error?: string;
+};
+
+type DeliveryRoute = {
+  channel: DeliveryChannel;
+  target: string;
+  accountId?: string;
+};
+
+const DELIVERY_CHANNELS: DeliveryChannel[] = ['telegram', 'discord', 'slack'];
 
 function asObject(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -329,6 +354,7 @@ async function readStoredStatus(paths: { statusPath: string }): Promise<StoredSt
       lastPath: null,
       sourceSummary: [],
       failures: [],
+      lastDelivery: [],
       observedEnabled: null,
       reconcileState: 'idle',
       lastReconcileAt: null,
@@ -347,6 +373,40 @@ async function readStoredStatus(paths: { statusPath: string }): Promise<StoredSt
       : [],
     failures: Array.isArray(existing.failures)
       ? existing.failures.filter(value => typeof value === 'string')
+      : [],
+    lastDelivery: Array.isArray(existing.lastDelivery)
+      ? existing.lastDelivery
+          .map(entry => asObject(entry))
+          .map(entry => {
+            const channel =
+              entry.channel === 'telegram' ||
+              entry.channel === 'discord' ||
+              entry.channel === 'slack'
+                ? entry.channel
+                : null;
+            const status =
+              entry.status === 'sent' || entry.status === 'skipped' || entry.status === 'failed'
+                ? entry.status
+                : null;
+            if (!channel || !status) {
+              return null;
+            }
+            return {
+              channel,
+              status,
+              target: typeof entry.target === 'string' ? entry.target : undefined,
+              accountId: typeof entry.accountId === 'string' ? entry.accountId : undefined,
+              reason:
+                entry.reason === 'missing_target' ||
+                entry.reason === 'ambiguous_target' ||
+                entry.reason === 'send_failed' ||
+                entry.reason === 'config_unavailable'
+                  ? entry.reason
+                  : undefined,
+              error: typeof entry.error === 'string' ? entry.error : undefined,
+            } satisfies BriefingDeliveryResult;
+          })
+          .filter((entry): entry is BriefingDeliveryResult => entry !== null)
       : [],
     observedEnabled:
       typeof existing.observedEnabled === 'boolean' ? existing.observedEnabled : null,
@@ -396,6 +456,312 @@ async function patchStoredStatus(
     await writeJsonFile(paths.statusPath, next);
     return next;
   });
+}
+
+function normalizeDeliveryTarget(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+}
+
+function toEnabledObjectEntries(value: unknown): Array<[string, Record<string, unknown>]> {
+  const record = asObject(value);
+  return Object.entries(record)
+    .filter((entry): entry is [string, Record<string, unknown>] => {
+      const [key, raw] = entry;
+      if (key.trim() === '' || key === '*') {
+        return false;
+      }
+      return typeof raw === 'object' && raw !== null && !Array.isArray(raw);
+    })
+    .filter(([, raw]) => raw.enabled !== false);
+}
+
+function collectTelegramFallbackTargets(rawChannelConfig: Record<string, unknown>): string[] {
+  const groups = toEnabledObjectEntries(rawChannelConfig.groups).map(([groupId]) => groupId);
+  return groups;
+}
+
+function collectDiscordFallbackTargets(rawChannelConfig: Record<string, unknown>): string[] {
+  const guildEntries = toEnabledObjectEntries(rawChannelConfig.guilds);
+  const targets = guildEntries.flatMap(([, guildConfig]) => {
+    const channels = toEnabledObjectEntries(guildConfig.channels);
+    return channels.map(([channelId]) => `channel:${channelId}`);
+  });
+  return targets;
+}
+
+function collectSlackFallbackTargets(rawChannelConfig: Record<string, unknown>): string[] {
+  const channels = toEnabledObjectEntries(rawChannelConfig.channels);
+  return channels.map(([channelId]) => `channel:${channelId}`);
+}
+
+function collectFallbackTargets(
+  channel: DeliveryChannel,
+  rawChannelConfig: Record<string, unknown>
+): string[] {
+  if (channel === 'telegram') {
+    return collectTelegramFallbackTargets(rawChannelConfig);
+  }
+  if (channel === 'discord') {
+    return collectDiscordFallbackTargets(rawChannelConfig);
+  }
+  return collectSlackFallbackTargets(rawChannelConfig);
+}
+
+function resolveDeliveryRoute(params: {
+  channel: DeliveryChannel;
+  channelsConfig: Record<string, unknown>;
+}): {
+  configured: boolean;
+  route: DeliveryRoute | null;
+  skipReason?: 'missing_target' | 'ambiguous_target';
+} {
+  const rawChannelConfig = asObject(params.channelsConfig[params.channel]);
+  if (Object.keys(rawChannelConfig).length === 0) {
+    return { configured: false, route: null };
+  }
+
+  if (rawChannelConfig.enabled === false) {
+    return { configured: false, route: null };
+  }
+
+  const accountsConfig = asObject(rawChannelConfig.accounts);
+  const defaultAccount = asObject(accountsConfig.default);
+  const defaultAccountTarget = normalizeDeliveryTarget(defaultAccount.defaultTo);
+  if (defaultAccountTarget) {
+    return {
+      configured: true,
+      route: {
+        channel: params.channel,
+        target: defaultAccountTarget,
+        accountId: 'default',
+      },
+    };
+  }
+
+  const topLevelTarget = normalizeDeliveryTarget(rawChannelConfig.defaultTo);
+  if (topLevelTarget) {
+    return {
+      configured: true,
+      route: {
+        channel: params.channel,
+        target: topLevelTarget,
+      },
+    };
+  }
+
+  const fallbackTargets = collectFallbackTargets(params.channel, rawChannelConfig);
+  if (fallbackTargets.length === 1) {
+    return {
+      configured: true,
+      route: {
+        channel: params.channel,
+        target: fallbackTargets[0],
+      },
+    };
+  }
+
+  return {
+    configured: true,
+    route: null,
+    skipReason: fallbackTargets.length > 1 ? 'ambiguous_target' : 'missing_target',
+  };
+}
+
+function readChannelsConfigFromRuntimeConfig(config: unknown): Record<string, unknown> | null {
+  const rawConfig = asObject(config);
+  if (!Object.prototype.hasOwnProperty.call(rawConfig, 'channels')) {
+    return null;
+  }
+  return asObject(rawConfig.channels);
+}
+
+async function readChannelsConfig(api: {
+  config: unknown;
+  runtime: {
+    system: {
+      runCommandWithTimeout: (
+        argv: string[],
+        options: { timeoutMs: number; cwd?: string }
+      ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
+    };
+  };
+}): Promise<Record<string, unknown>> {
+  const fromRuntimeConfig = readChannelsConfigFromRuntimeConfig(api.config);
+  if (fromRuntimeConfig) {
+    return fromRuntimeConfig;
+  }
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const { stdout } = await runCommand(
+        api,
+        ['openclaw', 'config', 'get', 'channels', '--json'],
+        60_000
+      );
+      return asObject(JSON.parse(stdout));
+    } catch (error) {
+      const errorText = error instanceof Error ? error.message : String(error);
+      if (errorText.includes('Config path not found: channels')) {
+        return {};
+      }
+      lastError = error;
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  return {};
+}
+
+function formatDeliverySummary(delivery: BriefingDeliveryResult[]): string[] {
+  if (delivery.length === 0) {
+    return ['- delivery: no configured messaging channels found'];
+  }
+
+  return delivery.map(entry => {
+    const targetSuffix = entry.target ? ` (${entry.target})` : '';
+    if (entry.status === 'sent') {
+      return `- delivery: ${entry.channel} sent${targetSuffix}`;
+    }
+    if (entry.status === 'skipped') {
+      return `- delivery: ${entry.channel} skipped (${entry.reason ?? 'unknown'})`;
+    }
+    return `- delivery: ${entry.channel} failed${targetSuffix}${entry.error ? `: ${entry.error}` : ''}`;
+  });
+}
+
+function isLikelyTimeoutError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('operation was aborted due to timeout') ||
+    message.includes('timed out') ||
+    message.includes('ETIMEDOUT') ||
+    message.includes('Command failed')
+  );
+}
+
+async function deliverBriefingToConfiguredChannels(
+  api: {
+    config: unknown;
+    runtime: {
+      system: {
+        runCommandWithTimeout: (
+          argv: string[],
+          options: { timeoutMs: number; cwd?: string }
+        ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
+      };
+    };
+    logger: { warn?: (message: string) => void };
+  },
+  markdown: string
+): Promise<BriefingDeliveryResult[]> {
+  const messageText = formatBriefingMarkdownForMessage(markdown);
+  if (!messageText) {
+    return [];
+  }
+
+  let channelsConfig: Record<string, unknown>;
+  try {
+    channelsConfig = await readChannelsConfig(api);
+  } catch (error) {
+    const errorText = error instanceof Error ? error.message : String(error);
+    api.logger.warn?.(`Morning briefing delivery config read failed: ${errorText}`);
+    return DELIVERY_CHANNELS.map(channel => ({
+      channel,
+      status: 'failed',
+      reason: 'config_unavailable',
+      error: errorText,
+    }));
+  }
+
+  const delivery: BriefingDeliveryResult[] = [];
+  const routes: DeliveryRoute[] = [];
+
+  for (const channel of DELIVERY_CHANNELS) {
+    const resolution = resolveDeliveryRoute({ channel, channelsConfig });
+    if (!resolution.configured) {
+      continue;
+    }
+    if (!resolution.route) {
+      delivery.push({
+        channel,
+        status: 'skipped',
+        reason: resolution.skipReason ?? 'missing_target',
+      });
+      continue;
+    }
+    routes.push(resolution.route);
+  }
+
+  for (const route of routes) {
+    const argv = [
+      'openclaw',
+      'message',
+      'send',
+      '--channel',
+      route.channel,
+      '--target',
+      route.target,
+      '--message',
+      messageText,
+    ];
+    if (route.accountId) {
+      argv.push('--account', route.accountId);
+    }
+    try {
+      await runCommand(api, argv, 120_000);
+      delivery.push({
+        channel: route.channel,
+        status: 'sent',
+        target: route.target,
+        accountId: route.accountId,
+      });
+    } catch (error) {
+      if (isLikelyTimeoutError(error)) {
+        try {
+          await runCommand(api, argv, 120_000);
+          delivery.push({
+            channel: route.channel,
+            status: 'sent',
+            target: route.target,
+            accountId: route.accountId,
+          });
+          continue;
+        } catch (retryError) {
+          delivery.push({
+            channel: route.channel,
+            status: 'failed',
+            reason: 'send_failed',
+            target: route.target,
+            accountId: route.accountId,
+            error: retryError instanceof Error ? retryError.message : String(retryError),
+          });
+          continue;
+        }
+      }
+
+      delivery.push({
+        channel: route.channel,
+        status: 'failed',
+        reason: 'send_failed',
+        target: route.target,
+        accountId: route.accountId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return delivery;
 }
 
 async function ensureCronJob(
@@ -669,13 +1035,7 @@ async function collectWebSearch(api: {
       configured: true,
       ok: true,
       summary: `Fetched ${results.length} web results (${response.provider})`,
-      sectionLines: results
-        .slice(0, 6)
-        .map(item =>
-          item.summary.length > 0
-            ? `- [${item.title}](${item.url}) - ${item.summary}`
-            : `- [${item.title}](${item.url})`
-        ),
+      sectionLines: results.slice(0, 6).map(item => `- [${item.title}](${item.url})`),
     };
   } catch (error) {
     return {
@@ -793,6 +1153,7 @@ async function generateBriefing(
       };
     };
     config: unknown;
+    logger: { warn?: (message: string) => void };
   },
   dateKey: string
 ): Promise<{
@@ -801,6 +1162,7 @@ async function generateBriefing(
   markdown: string;
   sources: SourceCollectionResult[];
   failures: string[];
+  delivery: BriefingDeliveryResult[];
 }> {
   const paths = getStatePaths(api);
   await ensureStorage(paths);
@@ -841,6 +1203,19 @@ async function generateBriefing(
 
   const filePath = resolveBriefingPath(paths.briefingsDir, dateKey);
   await fs.writeFile(filePath, markdown, 'utf8');
+  let delivery: BriefingDeliveryResult[];
+  try {
+    delivery = await deliverBriefingToConfiguredChannels(api, markdown);
+  } catch (error) {
+    const errorText = error instanceof Error ? error.message : String(error);
+    api.logger.warn?.(`Morning briefing delivery failed unexpectedly: ${errorText}`);
+    delivery = DELIVERY_CHANNELS.map(channel => ({
+      channel,
+      status: 'failed',
+      reason: 'config_unavailable',
+      error: errorText,
+    }));
+  }
 
   await patchStoredStatus(paths, {
     lastGeneratedDate: dateKey,
@@ -853,6 +1228,7 @@ async function generateBriefing(
       summary: source.summary,
     })),
     failures,
+    lastDelivery: delivery,
   });
 
   return {
@@ -861,6 +1237,7 @@ async function generateBriefing(
     markdown,
     sources,
     failures,
+    delivery,
   };
 }
 
@@ -944,6 +1321,7 @@ async function getStatusSnapshot(api: {
     linear: { configured: boolean; summary: string };
     web: { configured: boolean; summary: string };
   };
+  lastDelivery: BriefingDeliveryResult[];
   reconcileState: 'idle' | 'in_progress' | 'succeeded' | 'failed';
   lastReconcileAt: string | null;
   lastReconcileError: string | null;
@@ -971,6 +1349,7 @@ async function getStatusSnapshot(api: {
       linear,
       web,
     },
+    lastDelivery: status.lastDelivery,
     reconcileState: status.reconcileState,
     lastReconcileAt: status.lastReconcileAt,
     lastReconcileError: status.lastReconcileError,
@@ -1218,6 +1597,7 @@ export default definePluginEntry({
           `Generated briefing for ${result.dateKey}.`,
           `- file: ${result.filePath}`,
           ...result.failures.map(failure => `- note: ${failure}`),
+          ...formatDeliverySummary(result.delivery),
         ].join('\n');
       }
 
@@ -1322,6 +1702,7 @@ export default definePluginEntry({
                 `Morning briefing generated for ${result.dateKey}.`,
                 `Saved to ${result.filePath}.`,
                 ...result.failures.map(failure => `Note: ${failure}`),
+                ...formatDeliverySummary(result.delivery).map(line => line.replace(/^- /, '')),
               ].join('\n'),
             },
           ],
@@ -1468,6 +1849,7 @@ export default definePluginEntry({
             date: result.dateKey,
             filePath: result.filePath,
             failures: result.failures,
+            delivery: result.delivery,
           });
         } catch (error) {
           sendJson(res, 500, {

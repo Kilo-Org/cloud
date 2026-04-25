@@ -17,7 +17,9 @@ export function ReplyPreview({
   assistantName,
   currentUserId,
 }: ReplyPreviewProps) {
-  const text = contentBlocksToText(message.content).slice(0, 100);
+  const text = message.deleted
+    ? 'original message deleted'
+    : contentBlocksToText(message.content).slice(0, 100);
 
   return (
     <div className="border-border bg-muted/50 flex items-center gap-2 border-t px-4 py-2">
@@ -31,7 +33,11 @@ export function ReplyPreview({
               ? 'yourself'
               : 'someone'}
         </p>
-        <p className="text-muted-foreground truncate text-xs">{text}</p>
+        <p
+          className={`text-muted-foreground truncate text-xs ${message.deleted ? 'italic opacity-70' : ''}`}
+        >
+          {text}
+        </p>
       </div>
       <button
         onClick={onCancel}

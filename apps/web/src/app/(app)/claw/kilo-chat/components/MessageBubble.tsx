@@ -197,12 +197,16 @@ export const MessageBubble = memo(function MessageBubble({
         {replyToMessage && (
           <div className="text-muted-foreground mb-1 flex items-center gap-1 px-1 text-xs">
             <Reply className="h-3 w-3" />
-            <span>
-              {(() => {
-                const preview = contentBlocksToText(replyToMessage.content);
-                return preview.length > 60 ? `${preview.slice(0, 60)}...` : preview;
-              })()}
-            </span>
+            {replyToMessage.deleted ? (
+              <span className="italic opacity-70">original message deleted</span>
+            ) : (
+              <span>
+                {(() => {
+                  const preview = contentBlocksToText(replyToMessage.content);
+                  return preview.length > 60 ? `${preview.slice(0, 60)}...` : preview;
+                })()}
+              </span>
+            )}
           </div>
         )}
 

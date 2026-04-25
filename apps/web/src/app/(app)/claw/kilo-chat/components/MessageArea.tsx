@@ -103,11 +103,17 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const removeReaction = useRemoveReaction(kiloChatClient, conversationId, currentUserId);
   const executeAction = useExecuteAction(kiloChatClient, conversationId, currentUserId);
 
-  useMessageCacheUpdater(kiloChatClient, sandboxId, conversationId);
   const { typingMembers, handleTypingEvent, clearTypingForMember } = useTypingState(
     currentUserId,
     expectedContext
   );
+  // When a human message arrives, end their typing indicator immediately
+  // rather than waiting for an explicit typing.stopped event (which can
+  // arrive late and let "Name is typing…" linger above the new message).
+  // Bots are excluded inside the hook because their streaming uses
+  // message.created for every token chunk and relies on typing.stopped to
+  // signal stream completion.
+  useMessageCacheUpdater(kiloChatClient, sandboxId, conversationId, clearTypingForMember);
   const sendTyping = useTypingSender(kiloChatClient, conversationId);
 
   const markRead = useMarkConversationRead(kiloChatClient);

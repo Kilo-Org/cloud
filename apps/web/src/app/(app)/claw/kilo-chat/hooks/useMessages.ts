@@ -389,7 +389,12 @@ export function useExecuteAction(
 export function useMessageCacheUpdater(
   client: KiloChatClient,
   sandboxId: string | null,
-  conversationId: string | null
+  conversationId: string | null,
+  // Called with the event context and sender id when a human sender's
+  // message lands. Bots stream tokens through message.created events and
+  // end their own typing state via explicit typing.stopped, so we must not
+  // clear on bot messages or the indicator disappears mid-stream.
+  onHumanMessageCreated?: (ctx: string, senderId: string) => void
 ): void {
   const queryClient = useQueryClient();
 
@@ -400,6 +405,9 @@ export function useMessageCacheUpdater(
 
     const onCreated = (ctx: string, e: MessageCreatedEvent) => {
       if (ctx !== expectedContext) return;
+      if (!e.senderId.startsWith('bot:')) {
+        onHumanMessageCreated?.(ctx, e.senderId);
+      }
       const newMessage: Message = {
         id: e.messageId,
         senderId: e.senderId,
@@ -554,5 +562,5 @@ export function useMessageCacheUpdater(
     return () => {
       for (const off of offs) off();
     };
-  }, [client, sandboxId, conversationId, queryClient]);
+  }, [client, sandboxId, conversationId, queryClient, onHumanMessageCreated]);
 }

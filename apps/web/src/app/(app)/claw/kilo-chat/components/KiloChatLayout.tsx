@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import type { EventServiceClient } from '@kilocode/event-service';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
+import { formatKiloChatError } from '@kilocode/kilo-chat';
 import type { BotPresence } from './BotStatus';
 import { InstanceSwitcher } from './InstanceSwitcher';
 import { ConversationList } from './ConversationList';
@@ -225,7 +226,7 @@ export function KiloChatLayout({
     (conversationId: string, title: string) => {
       renameConversation.mutate(
         { conversationId, title },
-        { onError: () => toast.error('Failed to rename conversation') }
+        { onError: err => toast.error(formatKiloChatError(err, 'Failed to rename conversation')) }
       );
     },
     [renameConversation.mutate]
@@ -240,8 +241,8 @@ export function KiloChatLayout({
       }
       leaveConversation.mutate(conversationId, {
         onSettled: () => setLeavingConversationId(null),
-        onError: () => {
-          toast.error('Failed to leave conversation');
+        onError: err => {
+          toast.error(formatKiloChatError(err, 'Failed to leave conversation'));
         },
       });
     },
@@ -256,7 +257,7 @@ export function KiloChatLayout({
         onSuccess: res => {
           router.push(`/claw/kilo-chat/${res.conversationId}`);
         },
-        onError: () => toast.error('Failed to create conversation'),
+        onError: err => toast.error(formatKiloChatError(err, 'Failed to create conversation')),
       }
     );
   }, [selectedSandboxId, createConversation.mutate, router]);

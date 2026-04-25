@@ -28,7 +28,7 @@ import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
 import { BotStatus, computeBotDisplay, useNowTicker } from './BotStatus';
 import { ContextUsageRing } from './ContextUsageRing';
-import { KiloChatApiError } from '@kilocode/kilo-chat';
+import { KiloChatApiError, formatKiloChatError } from '@kilocode/kilo-chat';
 import { MessageCircle, ArrowDown } from 'lucide-react';
 
 type MessageAreaProps = {
@@ -197,7 +197,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
           inReplyToMessageId,
           clientId: ulid(),
         },
-        { onError: () => toast.error('Failed to send message') }
+        { onError: err => toast.error(formatKiloChatError(err, 'Failed to send message')) }
       );
     },
     [sendMessage.mutate, conversationId]
@@ -211,9 +211,9 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
           onError: err => {
             if (err instanceof KiloChatApiError && err.status === 409) {
               toast.error('Message was edited by someone else — please try again');
-            } else {
-              toast.error('Failed to edit message');
+              return;
             }
+            toast.error(formatKiloChatError(err, 'Failed to edit message'));
           },
         }
       );
@@ -231,7 +231,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
         { messageId, conversationId },
         {
           onSettled: () => setPendingDeleteId(null),
-          onError: () => toast.error('Failed to delete message'),
+          onError: err => toast.error(formatKiloChatError(err, 'Failed to delete message')),
         }
       );
     },
@@ -246,7 +246,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     (messageId: string, emoji: string) => {
       addReaction.mutate(
         { messageId, emoji },
-        { onError: () => toast.error('Failed to add reaction') }
+        { onError: err => toast.error(formatKiloChatError(err, 'Failed to add reaction')) }
       );
     },
     [addReaction.mutate]
@@ -256,7 +256,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     (messageId: string, emoji: string) => {
       removeReaction.mutate(
         { messageId, emoji },
-        { onError: () => toast.error('Failed to remove reaction') }
+        { onError: err => toast.error(formatKiloChatError(err, 'Failed to remove reaction')) }
       );
     },
     [removeReaction.mutate]
@@ -266,7 +266,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     (messageId: string, groupId: string, value: ExecApprovalDecision) => {
       executeAction.mutate(
         { messageId, groupId, value },
-        { onError: () => toast.error('Failed to execute action') }
+        { onError: err => toast.error(formatKiloChatError(err, 'Failed to execute action')) }
       );
     },
     [executeAction.mutate]
@@ -287,7 +287,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       if (trimmed) {
         renameConversation.mutate(
           { conversationId, title: trimmed },
-          { onError: () => toast.error('Failed to rename conversation') }
+          { onError: err => toast.error(formatKiloChatError(err, 'Failed to rename conversation')) }
         );
       }
       setIsRenamingTitle(false);
@@ -302,7 +302,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     if (trimmed && trimmed !== title) {
       renameConversation.mutate(
         { conversationId, title: trimmed },
-        { onError: () => toast.error('Failed to rename conversation') }
+        { onError: err => toast.error(formatKiloChatError(err, 'Failed to rename conversation')) }
       );
     }
     setIsRenamingTitle(false);

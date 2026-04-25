@@ -1,5 +1,5 @@
 export { KiloChatClient } from './client';
-export { KiloChatApiError } from './errors';
+export { KiloChatApiError, formatKiloChatError } from './errors';
 export {
   ulidToTimestamp,
   contentBlocksToText,

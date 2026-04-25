@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+// ── Length caps (shared with the UI) ────────────────────────────────
+
+/** Maximum characters allowed in a single `text` content block. */
+export const MESSAGE_TEXT_MAX_CHARS = 8000;
+/** Maximum characters allowed in a conversation title (auto or user-set). */
+export const CONVERSATION_TITLE_MAX_CHARS = 200;
+/** Maximum characters allowed in an action button label or group id. */
+export const ACTION_LABEL_MAX_CHARS = 200;
+
 // ── Primitives ──────────────────────────────────────────────────────
 
 export const ulidSchema = z.string().ulid();
@@ -30,7 +39,7 @@ export const emojiSchema = z
 // ── Content blocks ──────────────────────────────────────────────────
 
 export const actionItemSchema = z.object({
-  label: z.string().min(1).max(200),
+  label: z.string().min(1).max(ACTION_LABEL_MAX_CHARS),
   style: z.enum(['primary', 'danger', 'secondary']),
   value: execApprovalDecisionSchema,
 });
@@ -38,7 +47,7 @@ export const actionItemSchema = z.object({
 export const actionsBlockSchema = z
   .object({
     type: z.literal('actions'),
-    groupId: z.string().min(1).max(200),
+    groupId: z.string().min(1).max(ACTION_LABEL_MAX_CHARS),
     actions: z.array(actionItemSchema).max(10),
     resolved: z
       .object({
@@ -55,7 +64,7 @@ export const actionsBlockSchema = z
 
 export const textBlockSchema = z.object({
   type: z.literal('text'),
-  text: z.string().min(1).max(8000),
+  text: z.string().min(1).max(MESSAGE_TEXT_MAX_CHARS),
 });
 
 export const contentBlockSchema = z.discriminatedUnion('type', [
@@ -123,7 +132,7 @@ export const conversationDetailSchema = z.object({
 
 export const createConversationRequestSchema = z.object({
   sandboxId: sandboxIdSchema,
-  title: z.string().max(200).optional(),
+  title: z.string().max(CONVERSATION_TITLE_MAX_CHARS).optional(),
 });
 
 export const createConversationResponseSchema = z.object({
@@ -159,11 +168,11 @@ export const deleteMessageRequestSchema = z.object({
 });
 
 export const renameConversationRequestSchema = z.object({
-  title: z.string().min(1).max(200),
+  title: z.string().min(1).max(CONVERSATION_TITLE_MAX_CHARS),
 });
 
 export const executeActionRequestSchema = z.object({
-  groupId: z.string().min(1).max(200),
+  groupId: z.string().min(1).max(ACTION_LABEL_MAX_CHARS),
   value: execApprovalDecisionSchema,
 });
 
@@ -232,7 +241,7 @@ export const actionDeliveryFailedRequestSchema = z.object({
 });
 
 export const createBotConversationRequestSchema = z.object({
-  title: z.string().max(200).optional(),
+  title: z.string().max(CONVERSATION_TITLE_MAX_CHARS).optional(),
   additionalMembers: z.array(z.string().min(1)).max(20).optional(),
 });
 

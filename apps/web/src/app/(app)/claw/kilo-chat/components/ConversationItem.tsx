@@ -52,18 +52,18 @@ export function ConversationItem({
   }, [menuOpen]);
 
   const handleStartRename = useCallback(() => {
-    setRenameValue(conversation.conversationTitle ?? '');
+    setRenameValue(conversation.title ?? '');
     setIsRenaming(true);
     setMenuOpen(false);
-  }, [conversation.conversationTitle]);
+  }, [conversation.title]);
 
   const handleConfirmRename = useCallback(() => {
     const trimmed = renameValue.trim();
-    if (trimmed && trimmed !== conversation.conversationTitle) {
+    if (trimmed && trimmed !== conversation.title) {
       onRename(conversation.conversationId, trimmed);
     }
     setIsRenaming(false);
-  }, [renameValue, conversation.conversationTitle, conversation.conversationId, onRename]);
+  }, [renameValue, conversation.title, conversation.conversationId, onRename]);
 
   const handleCancelRename = useCallback(() => {
     setIsRenaming(false);
@@ -84,7 +84,7 @@ export function ConversationItem({
     setIsConfirmingLeave(false);
   }, []);
 
-  const title = conversation.conversationTitle ?? 'Untitled';
+  const title = conversation.title ?? 'Untitled';
 
   const isUnread =
     !isActive &&

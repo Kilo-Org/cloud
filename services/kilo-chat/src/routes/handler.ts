@@ -511,7 +511,7 @@ export async function handleListBotConversations(c: HonoCtx) {
   // Step 3: Build enriched response
   const enriched = conversationsWithInfo.map(({ conv, members }) => ({
     conversationId: conv.conversationId,
-    title: conv.conversationTitle,
+    title: conv.title,
     lastActivityAt: conv.lastActivityAt,
     members: members.map(m => ({
       ...m,

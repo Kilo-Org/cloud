@@ -15,7 +15,7 @@ import type { ConversationDO, UpdateTitleIfMemberResult } from '../do/conversati
 
 type MemberAddParams = {
   conversationId: string;
-  conversationTitle: string | null;
+  title: string | null;
   sandboxId: string;
   joinedAt: number;
 };
@@ -106,7 +106,7 @@ export async function createConversationFor(
 
   const memberParams = {
     conversationId,
-    conversationTitle: params.title ?? null,
+    title: params.title ?? null,
     sandboxId: params.sandboxId,
     joinedAt: now,
   };
@@ -193,7 +193,7 @@ export async function createBotConversationFor(
 
   const memberParams = {
     conversationId,
-    conversationTitle: params.title ?? null,
+    title: params.title ?? null,
     sandboxId: params.sandboxId,
     joinedAt: now,
   };

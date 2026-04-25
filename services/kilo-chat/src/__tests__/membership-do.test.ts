@@ -18,7 +18,7 @@ describe('MembershipDO', () => {
     const stub = getStub('user-2');
     await stub.addConversation({
       conversationId: 'conv-1',
-      conversationTitle: 'Test Chat',
+      title: 'Test Chat',
       sandboxId: 'sandbox-1',
       joinedAt: 1000,
     });
@@ -27,7 +27,7 @@ describe('MembershipDO', () => {
     expect(result.conversations).toEqual([
       {
         conversationId: 'conv-1',
-        conversationTitle: 'Test Chat',
+        title: 'Test Chat',
         lastActivityAt: null,
         lastReadAt: null,
         joinedAt: 1000,
@@ -39,7 +39,7 @@ describe('MembershipDO', () => {
     const stub = getStub('user-3');
     await stub.addConversation({
       conversationId: 'conv-1',
-      conversationTitle: null,
+      title: null,
       sandboxId: 'sandbox-1',
       joinedAt: 1000,
     });
@@ -52,13 +52,13 @@ describe('MembershipDO', () => {
     const stub = getStub('user-4');
     await stub.addConversation({
       conversationId: 'conv-a',
-      conversationTitle: null,
+      title: null,
       sandboxId: 'sandbox-1',
       joinedAt: 1000,
     });
     await stub.addConversation({
       conversationId: 'conv-b',
-      conversationTitle: null,
+      title: null,
       sandboxId: 'sandbox-1',
       joinedAt: 2000,
     });
@@ -73,7 +73,7 @@ describe('MembershipDO', () => {
     const stub = getStub('user-mark-read');
     await stub.addConversation({
       conversationId: 'conv-1',
-      conversationTitle: null,
+      title: null,
       sandboxId: 'sandbox-1',
       joinedAt: 1000,
     });
@@ -87,7 +87,7 @@ describe('MembershipDO', () => {
     const stub = getStub('user-5');
     await stub.addConversation({
       conversationId: 'conv-1',
-      conversationTitle: null,
+      title: null,
       sandboxId: 'sandbox-1',
       joinedAt: 1000,
     });
@@ -100,19 +100,19 @@ describe('MembershipDO', () => {
     const stub = getStub('user-sandbox-cleanup');
     await stub.addConversation({
       conversationId: 'conv-a',
-      conversationTitle: 'Chat A',
+      title: 'Chat A',
       sandboxId: 'sandbox-doomed',
       joinedAt: 1000,
     });
     await stub.addConversation({
       conversationId: 'conv-b',
-      conversationTitle: 'Chat B',
+      title: 'Chat B',
       sandboxId: 'sandbox-doomed',
       joinedAt: 2000,
     });
     await stub.addConversation({
       conversationId: 'conv-c',
-      conversationTitle: 'Chat C',
+      title: 'Chat C',
       sandboxId: 'sandbox-keep',
       joinedAt: 3000,
     });
@@ -128,7 +128,7 @@ describe('MembershipDO', () => {
     const stub = getStub('user-atomic-1');
     await stub.addConversation({
       conversationId: 'conv-atomic',
-      conversationTitle: 'Atomic Test',
+      title: 'Atomic Test',
       sandboxId: 'sandbox-x',
       joinedAt: 1000,
     });
@@ -147,7 +147,7 @@ describe('MembershipDO', () => {
     const stub = getStub('user-sandbox-noop');
     await stub.addConversation({
       conversationId: 'conv-1',
-      conversationTitle: null,
+      title: null,
       sandboxId: 'sandbox-other',
       joinedAt: 1000,
     });

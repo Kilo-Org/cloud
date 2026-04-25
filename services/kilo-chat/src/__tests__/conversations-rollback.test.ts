@@ -199,7 +199,7 @@ describe('rollback does not block subsequent creation', () => {
 
     const afterRetry = await getMemberStub('user-rb5').listConversations();
     expect(afterRetry.conversations).toHaveLength(1);
-    expect(afterRetry.conversations[0].conversationTitle).toBe('retry-ok');
+    expect(afterRetry.conversations[0].title).toBe('retry-ok');
 
     if (retryResult.ok) {
       const info = await getConvStub(retryResult.conversationId).getInfo();

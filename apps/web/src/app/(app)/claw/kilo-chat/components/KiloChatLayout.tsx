@@ -158,7 +158,7 @@ export function KiloChatLayout({
       kiloChatClient.onConversationRenamed((_ctx, e) => {
         queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
           updateConversationPages(old, c =>
-            c.conversationId === e.conversationId ? { ...c, conversationTitle: e.title } : c
+            c.conversationId === e.conversationId ? { ...c, title: e.title } : c
           )
         );
         // Also update the conversation detail cache if it's loaded

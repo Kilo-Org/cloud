@@ -7,7 +7,7 @@ import migrations from '../../drizzle/membership/migrations';
 
 export type ConversationEntry = {
   conversationId: string;
-  conversationTitle: string | null;
+  title: string | null;
   lastActivityAt: number | null;
   lastReadAt: number | null;
   joinedAt: number;
@@ -15,7 +15,7 @@ export type ConversationEntry = {
 
 export type AddConversationParams = {
   conversationId: string;
-  conversationTitle: string | null;
+  title: string | null;
   sandboxId: string;
   joinedAt: number;
 };
@@ -46,7 +46,7 @@ export class MembershipDO extends DurableObject<Env> {
       .all()
       .map(row => ({
         conversationId: row.conversation_id,
-        conversationTitle: row.conversation_title,
+        title: row.conversation_title,
         lastActivityAt: row.last_activity_at,
         lastReadAt: row.last_read_at,
         joinedAt: row.joined_at,
@@ -63,7 +63,7 @@ export class MembershipDO extends DurableObject<Env> {
       .insert(conversations)
       .values({
         conversation_id: params.conversationId,
-        conversation_title: params.conversationTitle,
+        conversation_title: params.title,
         sandbox_id: params.sandboxId,
         joined_at: params.joinedAt,
       })

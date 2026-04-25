@@ -105,7 +105,7 @@ export const enrichedConversationMemberSchema = z.object({
 
 export const conversationListItemSchema = z.object({
   conversationId: z.string(),
-  conversationTitle: z.string().nullable(),
+  title: z.string().nullable(),
   lastActivityAt: z.number().nullable(),
   lastReadAt: z.number().nullable(),
   joinedAt: z.number(),

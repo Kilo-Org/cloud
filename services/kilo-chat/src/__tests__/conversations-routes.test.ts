@@ -76,7 +76,7 @@ describe('POST /v1/conversations', () => {
     const { conversations: list } = await userMembership.listConversations();
     const found = list.find(c => c.conversationId === conversationId);
     expect(found).toBeDefined();
-    expect(found!.conversationTitle).toBe('Bob Chat');
+    expect(found!.title).toBe('Bob Chat');
 
     // Verify bot MembershipDO has the conversation
     const botMembership = getMemberStub('bot:kiloclaw:sandbox-456');
@@ -200,7 +200,7 @@ describe('GET /v1/conversations', () => {
     const res = await app.request('/v1/conversations', {}, env);
     expect(res.status).toBe(200);
     const body = await res.json<{
-      conversations: Array<{ conversationId: string; conversationTitle: string | null }>;
+      conversations: Array<{ conversationId: string; title: string | null }>;
       hasMore: boolean;
       limit: number;
       offset: number;
@@ -210,7 +210,7 @@ describe('GET /v1/conversations', () => {
     expect(body.hasMore).toBe(false);
     expect(body.limit).toBe(50);
     expect(body.offset).toBe(0);
-    const titles = body.conversations.map(c => c.conversationTitle);
+    const titles = body.conversations.map(c => c.title);
     expect(titles).toContain('First');
     expect(titles).toContain('Second');
   });

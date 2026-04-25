@@ -41,7 +41,7 @@ async function seedConversation(
 
   const memberParams = {
     conversationId: convId,
-    conversationTitle: `Chat ${convId}`,
+    title: `Chat ${convId}`,
     sandboxId,
     joinedAt: Date.now(),
   };

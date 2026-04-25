@@ -32,10 +32,16 @@ type DeliveryRoute = {
 
 type DeliveryApi = CommandCapableRuntime & {
   config: unknown;
-  logger: { warn?: (message: string) => void };
+  logger: { info?: (message: string) => void; warn?: (message: string) => void };
 };
 
 type SkipReason = Extract<DeliveryReason, 'missing_target' | 'ambiguous_target'>;
+
+export type DeliveryRouteResolution = {
+  configured: boolean;
+  route: DeliveryRoute | null;
+  skipReason?: SkipReason;
+};
 
 function asObject(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -87,14 +93,10 @@ function collectFallbackTargets(
   return channels.map(([channelId]) => `channel:${channelId}`);
 }
 
-function resolveDeliveryRoute(params: {
+export function resolveDeliveryRoute(params: {
   channel: DeliveryChannel;
   channelsConfig: Record<string, unknown>;
-}): {
-  configured: boolean;
-  route: DeliveryRoute | null;
-  skipReason?: SkipReason;
-} {
+}): DeliveryRouteResolution {
   const rawChannelConfig = asObject(params.channelsConfig[params.channel]);
   if (Object.keys(rawChannelConfig).length === 0 || rawChannelConfig.enabled === false) {
     return { configured: false, route: null };
@@ -292,6 +294,29 @@ export function formatDeliverySummary(delivery: BriefingDeliveryResult[]): strin
     }
     return `- delivery: ${entry.channel} failed${targetSuffix}${entry.error ? `: ${entry.error}` : ''}`;
   });
+}
+
+export function logDeliveryOutcomeEvents(
+  api: Pick<DeliveryApi, 'logger'>,
+  delivery: BriefingDeliveryResult[]
+): void {
+  for (const entry of delivery) {
+    const reason = entry.reason ?? 'none';
+    const target = entry.target ?? 'none';
+    const eventLine =
+      `event=morning_briefing_delivery_outcome` +
+      ` outcome=${entry.status}` +
+      ` channel=${entry.channel}` +
+      ` reason=${reason}` +
+      ` target=${target}`;
+    api.logger.info?.(eventLine);
+    if (entry.status === 'failed') {
+      const detail = entry.error ?? 'unknown_error';
+      api.logger.warn?.(
+        `event=morning_briefing_delivery_failure channel=${entry.channel} detail=${detail}`
+      );
+    }
+  }
 }
 
 export async function deliverBriefingToConfiguredChannels(

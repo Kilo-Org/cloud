@@ -670,6 +670,13 @@ function MorningBriefingCard({
               </p>
             )}
 
+            {isWarmupState && (
+              <p className="text-muted-foreground mt-2 text-xs">
+                Instance is still warming up. Morning Briefing controls will become available once
+                the gateway is fully ready.
+              </p>
+            )}
+
             <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
           </div>
         </div>
@@ -741,13 +748,6 @@ function MorningBriefingCard({
           </Button>
         </div>
       </div>
-
-      {isWarmupState && (
-        <p className="text-muted-foreground mt-2 text-xs">
-          Instance is still warming up. Morning Briefing controls will become available once the
-          gateway is fully ready.
-        </p>
-      )}
 
       {!desiredEnabled && controlsEnabled && (
         <p className="text-muted-foreground mt-2 text-xs">

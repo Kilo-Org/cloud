@@ -210,7 +210,7 @@ describe('platform morning-briefing warm-up handling', () => {
     expect(runMorningBriefing).toHaveBeenCalledTimes(1);
   });
 
-  it('returns warm-up payload for run timeout instead of generic 500', async () => {
+  it('returns timeout code for run timeout instead of generic 500', async () => {
     const runMorningBriefing = vi
       .fn<() => Promise<unknown>>()
       .mockRejectedValue(

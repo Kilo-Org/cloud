@@ -41,6 +41,8 @@ type TestHarness = {
     accountId?: string;
     message: string;
   }>;
+  loggerInfo: ReturnType<typeof vi.fn>;
+  loggerWarn: ReturnType<typeof vi.fn>;
   runCommandWithTimeout: ReturnType<typeof vi.fn>;
 };
 
@@ -240,6 +242,8 @@ async function createHarness(options?: {
   let statusHttpHandler: ((_req: unknown, res: FakeResponse) => Promise<void>) | null = null;
   let enableHttpHandler: ((req: unknown, res: FakeResponse) => Promise<void>) | null = null;
   let runHttpHandler: ((_req: unknown, res: FakeResponse) => Promise<void>) | null = null;
+  const loggerInfo = vi.fn();
+  const loggerWarn = vi.fn();
 
   morningBriefingPlugin.register({
     runtime: {
@@ -254,7 +258,7 @@ async function createHarness(options?: {
       agents: { defaults: { userTimezone: 'America/Chicago' } },
       ...(options?.omitRuntimeChannelsConfig ? {} : { channels: options?.channelsConfig ?? {} }),
     },
-    logger: { warn: vi.fn() },
+    logger: { info: loggerInfo, warn: loggerWarn },
     registerCommand: (def: { handler: (ctx: { args?: string }) => Promise<{ text: string }> }) => {
       commandHandler = def.handler;
     },
@@ -286,6 +290,8 @@ async function createHarness(options?: {
     runHttpHandler,
     cronJobs,
     sentMessages,
+    loggerInfo,
+    loggerWarn,
     runCommandWithTimeout,
   };
 }
@@ -876,5 +882,64 @@ describe('morning briefing lifecycle', () => {
     expect(sendCalls).toHaveLength(2);
     expect(sendCalls[0]?.[1]).toMatchObject({ timeoutMs: 120_000 });
     expect(sendCalls[1]?.[1]).toMatchObject({ timeoutMs: 120_000 });
+  });
+
+  it('emits delivery outcome metric logs for sent/skipped/failed results', async () => {
+    const harness = await createHarness({
+      githubAuthReady: true,
+      githubIssues: [
+        {
+          title: 'Delivery observability smoke check',
+          url: 'https://github.com/Kilo-Org/cloud/issues/910',
+          updatedAt: '2026-04-25T00:10:00Z',
+        },
+      ],
+      channelsConfig: {
+        telegram: {
+          enabled: true,
+          defaultTo: '-5055658641',
+        },
+        discord: {
+          enabled: true,
+        },
+        slack: {
+          enabled: true,
+          defaultTo: 'channel:C123',
+        },
+      },
+      messageSendFailures: {
+        slack: 'slack send failed',
+      },
+    });
+
+    const response = new FakeResponse();
+    await harness.runHttpHandler({}, response);
+    expect(response.statusCode).toBe(200);
+
+    const infoMessages = harness.loggerInfo.mock.calls.map(call => String(call[0]));
+    expect(
+      infoMessages.some(message =>
+        message.includes('event=morning_briefing_delivery_outcome outcome=sent channel=telegram')
+      )
+    ).toBe(true);
+    expect(
+      infoMessages.some(message =>
+        message.includes('event=morning_briefing_delivery_outcome outcome=skipped channel=discord')
+      )
+    ).toBe(true);
+    expect(
+      infoMessages.some(message =>
+        message.includes('event=morning_briefing_delivery_outcome outcome=failed channel=slack')
+      )
+    ).toBe(true);
+
+    const warnMessages = harness.loggerWarn.mock.calls.map(call => String(call[0]));
+    expect(
+      warnMessages.some(message =>
+        message.includes(
+          'event=morning_briefing_delivery_failure channel=slack detail=slack send failed'
+        )
+      )
+    ).toBe(true);
   });
 });

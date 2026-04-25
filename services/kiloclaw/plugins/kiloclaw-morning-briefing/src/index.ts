@@ -8,6 +8,7 @@ import {
   type BriefingDeliveryResult,
   deliverBriefingToConfiguredChannels,
   formatDeliverySummary,
+  logDeliveryOutcomeEvents,
   parseStoredDelivery,
 } from './delivery-utils';
 import { CommandExecutionError, runCommand } from './command-utils';
@@ -226,7 +227,7 @@ async function removeDuplicateBriefingCronJobs(
         ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
       };
     };
-    logger: { warn?: (message: string) => void };
+    logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   canonicalId: string
 ): Promise<void> {
@@ -266,7 +267,7 @@ function resolveDefaults(api: {
 }
 
 function resolveEffectiveTimezone(
-  api: { logger: { warn?: (message: string) => void } },
+  api: { logger: { info?: (message: string) => void; warn?: (message: string) => void } },
   timezone: string,
   context: 'enable' | 'schedule' | 'date'
 ): string {
@@ -408,7 +409,7 @@ async function ensureCronJob(
         ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
       };
     };
-    logger: { warn?: (message: string) => void };
+    logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   config: StoredConfig
 ): Promise<{ cronJobId: string; cron: string; timezone: string }> {
@@ -787,7 +788,7 @@ async function generateBriefing(
       };
     };
     config: unknown;
-    logger: { warn?: (message: string) => void };
+    logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   dateKey: string
 ): Promise<{
@@ -850,6 +851,7 @@ async function generateBriefing(
       error: errorText,
     }));
   }
+  logDeliveryOutcomeEvents(api, delivery);
 
   await patchStoredStatus(paths, {
     lastGeneratedDate: dateKey,
@@ -911,7 +913,7 @@ async function resolveDateKeyForOffset(
       };
     };
     pluginConfig?: Record<string, unknown>;
-    logger: { warn?: (message: string) => void };
+    logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   offset: number
 ): Promise<string> {

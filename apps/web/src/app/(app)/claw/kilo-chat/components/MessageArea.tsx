@@ -328,15 +328,19 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
 
       {/* Messages */}
       <div className="relative min-h-0 flex-1">
-        <div ref={scrollRef} className="h-full overflow-y-auto py-4" onScroll={handleScroll}>
-          <div ref={contentRef}>
+        <div
+          ref={scrollRef}
+          className="flex h-full flex-col overflow-y-auto py-4"
+          onScroll={handleScroll}
+        >
+          <div ref={contentRef} className="flex flex-1 flex-col">
             {isFetchingNextPage && (
               <div className="text-muted-foreground py-2 text-center text-xs">
                 Loading older messages...
               </div>
             )}
             {messages.length === 0 && !isFetchingNextPage && (
-              <div className="flex h-full flex-col items-center justify-center px-6">
+              <div className="flex flex-1 flex-col items-center justify-center px-6">
                 <div className="border-border bg-muted/50 flex flex-col items-center gap-3 rounded-lg border px-8 py-6">
                   <MessageCircle className="text-muted-foreground/60 h-8 w-8" />
                   <p className="text-muted-foreground text-sm">

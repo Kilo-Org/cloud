@@ -6,8 +6,7 @@
 import { ulid } from 'ulid';
 import { withDORetry } from '@kilocode/worker-utils';
 import { extractConversationContext, extractSandboxId, pushInstanceEvent } from './event-push';
-import { getSandboxOwner } from './sandbox-ownership';
-import { cachedUserOwnsSandbox } from './sandbox-ownership-cached';
+import { lookupSandboxOwnerUserId, userOwnsSandbox } from './sandbox-ownership';
 import { validateUserIds } from './user-lookup';
 import type { DeferCtx } from './messages';
 import type { UpdateTitleIfMemberResult } from '../do/conversation-do';
@@ -28,11 +27,7 @@ export async function createConversationFor(
   userId: string,
   params: CreateConversationParams
 ): Promise<CreateConversationResult> {
-  const owns = await cachedUserOwnsSandbox(
-    env.HYPERDRIVE.connectionString,
-    userId,
-    params.sandboxId
-  );
+  const owns = await userOwnsSandbox(env, userId, params.sandboxId);
   if (!owns) {
     return { ok: false, code: 'forbidden', error: 'You do not have access to this sandbox' };
   }
@@ -100,7 +95,7 @@ export async function createBotConversationFor(
   env: Env,
   params: CreateBotConversationParams
 ): Promise<CreateBotConversationResult> {
-  const ownerId = await getSandboxOwner(env.HYPERDRIVE.connectionString, params.sandboxId);
+  const ownerId = await lookupSandboxOwnerUserId(env, params.sandboxId);
   if (!ownerId) {
     return { ok: false, code: 'not_found', error: 'Sandbox owner not found' };
   }

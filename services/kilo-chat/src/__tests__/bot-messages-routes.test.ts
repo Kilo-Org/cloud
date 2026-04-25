@@ -12,9 +12,9 @@ const ownershipMap = new Map<string, Set<string>>();
 const sandboxOwnerMap = new Map<string, string>();
 
 vi.mock('../services/sandbox-ownership', () => ({
-  userOwnsSandbox: async (_conn: string, userId: string, sandboxId: string) =>
+  userOwnsSandbox: async (_env: Env, userId: string, sandboxId: string) =>
     ownershipMap.get(userId)?.has(sandboxId) ?? false,
-  getSandboxOwner: async (_conn: string, sandboxId: string) =>
+  lookupSandboxOwnerUserId: async (_env: Env, sandboxId: string) =>
     sandboxOwnerMap.get(sandboxId) ?? null,
 }));
 

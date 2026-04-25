@@ -1,6 +1,6 @@
 import type { KiloChatEventName, KiloChatEventOf, BotStatusEvent } from '@kilocode/kilo-chat';
 import { withDORetry } from '@kilocode/worker-utils';
-import { lookupSandboxOwnerUserId } from './sandbox-owner';
+import { lookupSandboxOwnerUserId } from './sandbox-ownership';
 
 function getEventService(env: Env): Env['EVENT_SERVICE'] | null {
   return env.EVENT_SERVICE ?? null;

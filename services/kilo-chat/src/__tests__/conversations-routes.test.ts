@@ -8,7 +8,7 @@ import { makeApp } from './helpers';
 const ownershipMap = new Map<string, Set<string>>();
 
 vi.mock('../services/sandbox-ownership', () => ({
-  userOwnsSandbox: async (_conn: string, userId: string, sandboxId: string) =>
+  userOwnsSandbox: async (_env: Env, userId: string, sandboxId: string) =>
     ownershipMap.get(userId)?.has(sandboxId) ?? false,
 }));
 

@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 // files override with their own mocks to test specific logic.
 vi.mock('../services/sandbox-ownership', () => ({
   userOwnsSandbox: vi.fn(async () => true),
-  getSandboxOwner: vi.fn(async () => null),
+  lookupSandboxOwnerUserId: vi.fn(async () => null),
 }));
 
 vi.mock('../services/user-lookup', () => ({

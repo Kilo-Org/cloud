@@ -2,8 +2,25 @@ import { getWorkerDb } from '@kilocode/db';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 
-/** Returns true if the user owns an active (non-destroyed) instance for the given sandbox. */
-export async function userOwnsSandbox(
+const TTL_MS = 5 * 60 * 1000;
+
+type CacheEntry =
+  | { kind: 'owner'; value: string | null; expiresAt: number }
+  | { kind: 'owns'; value: boolean; expiresAt: number };
+
+const cache = new Map<string, CacheEntry>();
+
+function readFresh(key: string): CacheEntry | undefined {
+  const entry = cache.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return undefined;
+  }
+  return entry;
+}
+
+async function queryOwnsSandbox(
   connectionString: string,
   userId: string,
   sandboxId: string
@@ -23,11 +40,7 @@ export async function userOwnsSandbox(
   return rows.length > 0;
 }
 
-/**
- * Returns the user_id of the sandbox owner (active, non-destroyed instance),
- * or null if no active instance exists for the given sandboxId.
- */
-export async function getSandboxOwner(
+async function querySandboxOwner(
   connectionString: string,
   sandboxId: string
 ): Promise<string | null> {
@@ -40,4 +53,44 @@ export async function getSandboxOwner(
     )
     .limit(1);
   return rows[0]?.user_id ?? null;
+}
+
+/**
+ * Returns true if the user owns an active (non-destroyed) instance for the
+ * given sandbox. Cached in-memory for 5 minutes.
+ */
+export async function userOwnsSandbox(
+  env: Env,
+  userId: string,
+  sandboxId: string
+): Promise<boolean> {
+  const key = `owns:${userId}\0${sandboxId}`;
+  const hit = readFresh(key);
+  if (hit && hit.kind === 'owns') return hit.value;
+
+  const value = await queryOwnsSandbox(env.HYPERDRIVE.connectionString, userId, sandboxId);
+  cache.set(key, { kind: 'owns', value, expiresAt: Date.now() + TTL_MS });
+  return value;
+}
+
+/**
+ * Returns the user_id of the sandbox owner (active, non-destroyed instance),
+ * or null if no active instance exists. Cached in-memory for 5 minutes.
+ */
+export async function lookupSandboxOwnerUserId(
+  env: Env,
+  sandboxId: string
+): Promise<string | null> {
+  const key = `owner:${sandboxId}`;
+  const hit = readFresh(key);
+  if (hit && hit.kind === 'owner') return hit.value;
+
+  const value = await querySandboxOwner(env.HYPERDRIVE.connectionString, sandboxId);
+  cache.set(key, { kind: 'owner', value, expiresAt: Date.now() + TTL_MS });
+  return value;
+}
+
+/** Test-only: reset the shared ownership cache. */
+export function clearSandboxOwnershipCacheForTest(): void {
+  cache.clear();
 }

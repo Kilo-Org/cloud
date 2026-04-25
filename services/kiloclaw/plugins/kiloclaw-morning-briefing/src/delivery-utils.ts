@@ -221,6 +221,22 @@ function failedDeliveryForAllChannels(errorText: string): BriefingDeliveryResult
   }));
 }
 
+function summarizeDeliveryError(error: unknown): string {
+  if (error instanceof Error) {
+    const message = error.message;
+    const openclawSendPrefix = 'openclaw message send';
+    if (message.startsWith(openclawSendPrefix) && message.includes(' failed: ')) {
+      const detail = message.slice(message.indexOf(' failed: ') + ' failed: '.length).trim();
+      if (detail.length > 0) {
+        return detail;
+      }
+    }
+    return message;
+  }
+
+  return String(error);
+}
+
 export function parseStoredDelivery(entries: unknown): BriefingDeliveryResult[] {
   if (!Array.isArray(entries)) {
     return [];
@@ -334,7 +350,7 @@ export async function deliverBriefingToConfiguredChannels(
         reason: 'send_failed',
         target: route.target,
         accountId: route.accountId,
-        error: error instanceof Error ? error.message : String(error),
+        error: summarizeDeliveryError(error),
       });
     }
   }

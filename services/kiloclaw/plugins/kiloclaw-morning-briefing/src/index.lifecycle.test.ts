@@ -641,7 +641,7 @@ describe('morning briefing lifecycle', () => {
       ])
     );
     const slackFailure = payload.delivery?.find(entry => entry.channel === 'slack');
-    expect(slackFailure?.error).toContain('slack send failed');
+    expect(slackFailure?.error).toBe('slack send failed');
   });
 
   it('uses single configured telegram group as fallback target when defaultTo is missing', async () => {

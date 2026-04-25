@@ -538,13 +538,16 @@ function MorningBriefingCard({
   const hasSchedule = Boolean(briefingStatus?.cron && briefingStatus?.timezone);
   const desiredEnabledValue = briefingStatus?.desiredEnabled ?? briefingStatus?.enabled;
   const observedEnabledValue = briefingStatus?.observedEnabled ?? briefingStatus?.enabled;
+  const isGatewayWarmupStatus = briefingStatus?.code === 'gateway_warming_up';
   const hasResolvedBriefingToggleState =
     typeof desiredEnabledValue === 'boolean' && typeof observedEnabledValue === 'boolean';
   const desiredEnabled = desiredEnabledValue ?? false;
   const observedEnabled = observedEnabledValue ?? false;
   const reconcileState = briefingStatus?.reconcileState ?? 'idle';
   const lastReconcileAction = briefingStatus?.lastReconcileAction ?? null;
-  const isWarmupState = isRunning && (actionsReady === false || !hasResolvedBriefingToggleState);
+  const isWarmupState =
+    isRunning &&
+    (actionsReady === false || isGatewayWarmupStatus || !hasResolvedBriefingToggleState);
   const isTransitioning =
     reconcileState === 'in_progress' ||
     mutations.enableMorningBriefing.isPending ||
@@ -584,7 +587,7 @@ function MorningBriefingCard({
     return observedEnabled ? 'Enabled' : 'Disabled';
   })();
   const statusVariant = isWarmupState
-    ? 'default'
+    ? 'secondary'
     : statusLabel === 'Instance Stopped'
       ? 'secondary'
       : observedEnabled || (isTransitioning && desiredEnabled)
@@ -612,6 +615,8 @@ function MorningBriefingCard({
   const controlsEnabled = actionsReady && !isWarmupState;
   const canUseBriefingControls = controlsEnabled && desiredEnabled;
   const lastDelivery = briefingStatus?.lastDelivery ?? [];
+  const showLastDelivery =
+    !isWarmupState && actionsReady && hasResolvedBriefingToggleState && lastDelivery.length > 0;
 
   return (
     <div className="rounded-lg border px-4 py-3">
@@ -619,7 +624,9 @@ function MorningBriefingCard({
         <div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium">Morning Briefing</p>
-            <Badge variant={statusVariant}>{statusLabel}</Badge>
+            <Badge variant={statusVariant} className="px-1.5 py-0 text-[10px] leading-4">
+              {statusLabel}
+            </Badge>
           </div>
           {showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone && (
             <p className="text-muted-foreground text-xs">
@@ -716,7 +723,7 @@ function MorningBriefingCard({
 
       <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
 
-      {lastDelivery.length > 0 && (
+      {showLastDelivery && (
         <p className="text-muted-foreground mt-2 text-xs">
           Last delivery:{' '}
           {lastDelivery

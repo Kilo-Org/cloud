@@ -1984,7 +1984,6 @@ platform.get('/morning-briefing/status', async c => {
       return c.json(
         {
           ok: true,
-          enabled: false,
           reconcileState: 'in_progress',
           error: 'Gateway warming up, retrying shortly.',
           code: 'gateway_warming_up',

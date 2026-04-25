@@ -141,7 +141,6 @@ describe('gateway controller routing', () => {
 
     expect(result).toEqual({
       ok: true,
-      enabled: false,
       reconcileState: 'in_progress',
       error: 'Gateway warming up, retrying shortly.',
       code: 'gateway_warming_up',

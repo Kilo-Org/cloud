@@ -509,7 +509,6 @@ export async function getMorningBriefingStatus(
     if (isMorningBriefingWarmupControllerError(error)) {
       return {
         ok: true,
-        enabled: false,
         reconcileState: 'in_progress',
         error: 'Gateway warming up, retrying shortly.',
         code: 'gateway_warming_up',

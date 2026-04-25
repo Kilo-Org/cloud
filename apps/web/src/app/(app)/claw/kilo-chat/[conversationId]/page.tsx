@@ -24,8 +24,13 @@ export default function KiloChatConversationPage() {
         conversationDetail.error instanceof KiloChatApiError
           ? conversationDetail.error.status
           : undefined;
+      // 400 here can only be a malformed conversationId (the only input on
+      // this GET is the path param), so surface it as "not found" rather
+      // than the generic load-failure toast.
       const message =
-        status === 403 || status === 404 ? 'Conversation not found' : 'Failed to load conversation';
+        status === 400 || status === 403 || status === 404
+          ? 'Conversation not found'
+          : 'Failed to load conversation';
       toast.error(message);
       router.replace('/claw/kilo-chat');
     }

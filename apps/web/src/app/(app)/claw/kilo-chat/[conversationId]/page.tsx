@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { KiloChatApiError } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from '../components/KiloChatLayout';
 import { useConversationDetail } from '../hooks/useConversations';
 import { MessageArea } from '../components/MessageArea';
@@ -19,7 +20,10 @@ export default function KiloChatConversationPage() {
 
   useEffect(() => {
     if (conversationDetail.isError && !isLeaving) {
-      const status = (conversationDetail.error as { status?: number })?.status;
+      const status =
+        conversationDetail.error instanceof KiloChatApiError
+          ? conversationDetail.error.status
+          : undefined;
       const message =
         status === 403 || status === 404 ? 'Conversation not found' : 'Failed to load conversation';
       toast.error(message);

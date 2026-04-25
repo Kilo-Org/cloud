@@ -15,7 +15,10 @@ export function useTypingSender(client: KiloChatClient, conversationId: string |
     const now = Date.now();
     if (now - lastSentRef.current < TYPING_COOLDOWN) return;
     lastSentRef.current = now;
-    void client.sendTyping(conversationId);
+    // Typing is best-effort; a failed ping (offline, 5xx, etc.) is noise, not
+    // an error worth surfacing. Explicitly swallow so the floating promise
+    // doesn't bubble up to the browser's unhandledrejection handler.
+    client.sendTyping(conversationId).catch(() => {});
   }, [client, conversationId]);
 }
 

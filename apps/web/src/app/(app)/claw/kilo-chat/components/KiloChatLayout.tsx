@@ -241,17 +241,31 @@ export function KiloChatLayout({
     (conversationId: string) => {
       // Mark as leaving so child queries disable themselves immediately
       setLeavingConversationId(conversationId);
+      const queryKey = ['kilo-chat', 'conversations'];
+      // Optimistically remove the row before the router.push fires. When the
+      // user leaves the *active* conversation, router navigation concurrent
+      // with the mutation's onSuccess invalidateQueries left the row stale
+      // in the sidebar until a full page reload. Patching the cache up-front
+      // mirrors what onConversationLeft does for other members.
+      const previous = queryClient.getQueriesData<ConversationListInfiniteData>({ queryKey });
+      queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
+        filterConversationPages(old, c => c.conversationId !== conversationId)
+      );
       if (params?.conversationId === conversationId) {
         router.push('/claw/kilo-chat');
       }
       leaveConversation.mutate(conversationId, {
         onSettled: () => setLeavingConversationId(null),
         onError: err => {
+          // Restore the row on failure so the user can retry
+          for (const [key, data] of previous) {
+            queryClient.setQueryData(key, data);
+          }
           toast.error(formatKiloChatError(err, 'Failed to leave conversation'));
         },
       });
     },
-    [leaveConversation.mutate, params?.conversationId, router]
+    [leaveConversation.mutate, params?.conversationId, queryClient, router]
   );
 
   const handleNewConversation = useCallback(() => {

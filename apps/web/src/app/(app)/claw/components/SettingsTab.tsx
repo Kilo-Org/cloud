@@ -617,10 +617,26 @@ function MorningBriefingCard({
   const lastDelivery = briefingStatus?.lastDelivery ?? [];
   const showLastDelivery =
     !isWarmupState && actionsReady && hasResolvedBriefingToggleState && lastDelivery.length > 0;
+  const deliveryChannelLabel = {
+    telegram: 'Telegram',
+    discord: 'Discord',
+    slack: 'Slack',
+  } as const;
+  const deliveryStatusLabel = {
+    sent: 'Sent',
+    skipped: 'Skipped',
+    failed: 'Failed',
+  } as const;
+  const deliveryReasonLabel = {
+    missing_target: 'Missing target',
+    ambiguous_target: 'Ambiguous target',
+    send_failed: 'Send failed',
+    config_unavailable: 'Config unavailable',
+  } as const;
 
   return (
     <div className="rounded-lg border px-4 py-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium">Morning Briefing</p>
@@ -636,6 +652,24 @@ function MorningBriefingCard({
           {showScheduleDetails && (
             <p className="text-muted-foreground text-xs">
               Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
+            </p>
+          )}
+          {showLastDelivery && (
+            <p className="text-muted-foreground text-xs">
+              Last delivery:{' '}
+              {lastDelivery
+                .map(entry => {
+                  const channel = deliveryChannelLabel[entry.channel] ?? entry.channel;
+                  const status = deliveryStatusLabel[entry.status] ?? entry.status;
+                  if (entry.status === 'sent') {
+                    return `${channel}: ${status}`;
+                  }
+                  const reason = entry.reason
+                    ? (deliveryReasonLabel[entry.reason] ?? entry.reason)
+                    : undefined;
+                  return reason ? `${channel}: ${status} (${reason})` : `${channel}: ${status}`;
+                })
+                .join(' • ')}
             </p>
           )}
         </div>
@@ -722,23 +756,6 @@ function MorningBriefingCard({
       )}
 
       <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
-
-      {showLastDelivery && (
-        <p className="text-muted-foreground mt-2 text-xs">
-          Last delivery:{' '}
-          {lastDelivery
-            .map(entry => {
-              if (entry.status === 'sent') {
-                return `${entry.channel}: sent`;
-              }
-              if (entry.status === 'skipped') {
-                return `${entry.channel}: skipped (${entry.reason ?? 'missing_target'})`;
-              }
-              return `${entry.channel}: failed (${entry.reason ?? 'send_failed'})`;
-            })
-            .join(' • ')}
-        </p>
-      )}
 
       {requestedDay && (
         <div className="mt-3">

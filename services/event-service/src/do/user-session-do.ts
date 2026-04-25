@@ -43,14 +43,27 @@ export class UserSessionDO extends DurableObject<Env> {
     switch (msg.type) {
       case 'context.subscribe': {
         const state = this.getState(ws);
+        let overflowed = false;
         for (const ctx of msg.contexts) {
-          state.contexts.add(ctx);
-          if (state.contexts.size > MAX_CONTEXTS) {
-            ws.close(1008, 'Too many contexts');
-            return;
+          if (state.contexts.size >= MAX_CONTEXTS && !state.contexts.has(ctx)) {
+            overflowed = true;
+            continue;
           }
+          state.contexts.add(ctx);
         }
         this.saveState(ws, state);
+        if (overflowed) {
+          const errorMsg: ServerMessage = {
+            type: 'error',
+            code: 'too_many_contexts',
+            max: MAX_CONTEXTS,
+          };
+          try {
+            ws.send(JSON.stringify(errorMsg));
+          } catch {
+            // Connection dead — hibernation will clean up
+          }
+        }
         break;
       }
       case 'context.unsubscribe': {

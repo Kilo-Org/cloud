@@ -217,6 +217,14 @@ export class EventServiceClient {
           handler(message.context, message.payload);
         }
       }
+      return;
+    }
+
+    if (message.type === 'error') {
+      // Server reported a protocol-level error (e.g. too_many_contexts).
+      // The server keeps the socket open so we stay subscribed to what fit;
+      // log so consumers notice if they care.
+      console.warn('[event-service] server error', message.code, { max: message.max });
     }
   }
 

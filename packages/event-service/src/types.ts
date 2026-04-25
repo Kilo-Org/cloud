@@ -4,6 +4,7 @@ import type {
   contextSubscribeMessageSchema,
   contextUnsubscribeMessageSchema,
   clientMessageSchema,
+  errorMessageSchema,
   eventMessageSchema,
   serverMessageSchema,
 } from './schemas';
@@ -21,6 +22,7 @@ export type ClientMessage = z.infer<typeof clientMessageSchema>;
 // ── Server → Client ────────────────────────────────────────────────
 
 export type EventMessage = z.infer<typeof eventMessageSchema>;
+export type ErrorMessage = z.infer<typeof errorMessageSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
 
 // ── Config ─────────────────────────────────────────────────────────

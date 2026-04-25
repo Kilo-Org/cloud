@@ -42,4 +42,13 @@ export const eventMessageSchema = z.object({
   payload: z.unknown(),
 });
 
-export const serverMessageSchema = eventMessageSchema;
+export const errorMessageSchema = z.object({
+  type: z.literal('error'),
+  code: z.enum(['too_many_contexts']),
+  max: z.number().int().positive(),
+});
+
+export const serverMessageSchema = z.discriminatedUnion('type', [
+  eventMessageSchema,
+  errorMessageSchema,
+]);

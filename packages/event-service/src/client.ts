@@ -15,6 +15,15 @@ export class TicketRequestError extends Error {
   }
 }
 
+export class HandshakeTimeoutError extends Error {
+  constructor() {
+    super('WebSocket handshake timed out');
+    this.name = 'HandshakeTimeoutError';
+  }
+}
+
+const HANDSHAKE_TIMEOUT_MS = 10_000;
+
 export class EventServiceClient {
   private readonly url: string;
   private readonly getToken: () => Promise<string>;
@@ -30,6 +39,8 @@ export class EventServiceClient {
   private hasConnectedBefore = false;
   private reconnectHandlers = new Set<() => void>();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private handshakeTimer: ReturnType<typeof setTimeout> | null = null;
+  private abortHandshake: ((err: Error) => void) | null = null;
 
   constructor(config: EventServiceConfig) {
     this.url = config.url;
@@ -94,6 +105,37 @@ export class EventServiceClient {
       const ws = new WebSocket(`${this.url}/connect?${qs}`);
       this.ws = ws;
 
+      // Guard against double-resolution: the handshake timeout, the
+      // WebSocket 'error' event, and disconnect() can all try to settle
+      // this promise.
+      let settled = false;
+      const settleResolve = (): void => {
+        if (settled) return;
+        settled = true;
+        this.clearHandshakeTimer();
+        this.abortHandshake = null;
+        resolve();
+      };
+      const settleReject = (err: Error): void => {
+        if (settled) return;
+        settled = true;
+        this.clearHandshakeTimer();
+        this.abortHandshake = null;
+        reject(err);
+      };
+      this.abortHandshake = settleReject;
+
+      this.handshakeTimer = setTimeout(() => {
+        this.handshakeTimer = null;
+        if (this.ws === ws) {
+          // Close the stalled socket. The 'close' listener will fire and
+          // call scheduleReconnect(); scheduleReconnect() guards against
+          // double-scheduling, so the reject path below is safe.
+          ws.close(1000, 'handshake-timeout');
+        }
+        settleReject(new HandshakeTimeoutError());
+      }, HANDSHAKE_TIMEOUT_MS);
+
       ws.addEventListener('open', () => {
         const isReconnect = this.hasConnectedBefore;
         this.connected = true;
@@ -105,7 +147,7 @@ export class EventServiceClient {
             handler();
           }
         }
-        resolve();
+        settleResolve();
         this.startPing();
       });
 
@@ -117,6 +159,7 @@ export class EventServiceClient {
         if (this.ws !== ws) return;
         this.connected = false;
         this.stopPing();
+        this.clearHandshakeTimer();
         if (!this.destroyed) {
           this.scheduleReconnect();
         }
@@ -127,10 +170,17 @@ export class EventServiceClient {
         // error is always followed by close, so we only need to reject the
         // connect promise here if we never opened.
         if (!this.connected) {
-          reject(new Error('WebSocket connection failed'));
+          settleReject(new Error('WebSocket connection failed'));
         }
       });
     });
+  }
+
+  private clearHandshakeTimer(): void {
+    if (this.handshakeTimer !== null) {
+      clearTimeout(this.handshakeTimer);
+      this.handshakeTimer = null;
+    }
   }
 
   disconnect(): void {
@@ -138,6 +188,12 @@ export class EventServiceClient {
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+    this.clearHandshakeTimer();
+    // If a connect handshake is still in flight, reject it so callers
+    // awaiting connect() don't hang forever.
+    if (this.abortHandshake) {
+      this.abortHandshake(new Error('disconnected'));
     }
     if (this.ws) {
       this.ws.close();

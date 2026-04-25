@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EventServiceClient } from '../client';
+import { EventServiceClient, HandshakeTimeoutError } from '../client';
 
 class MockWebSocket {
   static OPEN = 1;
@@ -9,6 +9,8 @@ class MockWebSocket {
   readonly url: string;
   readyState = 1; // OPEN
   sent: string[] = [];
+  closeCode: number | undefined;
+  closeReason: string | undefined;
 
   private listeners = new Map<string, Set<(...args: unknown[]) => void>>();
 
@@ -29,7 +31,9 @@ class MockWebSocket {
     this.sent.push(data);
   }
 
-  close(): void {
+  close(code?: number, reason?: string): void {
+    this.closeCode = code;
+    this.closeReason = reason;
     this.readyState = 3; // CLOSED
   }
 
@@ -248,6 +252,146 @@ describe('EventServiceClient', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('rejects connect promise when handshake never opens (10s timeout)', async () => {
+    vi.useFakeTimers();
+    try {
+      // Override the WebSocket mock so the socket never opens and never
+      // fires error/close — i.e. stays in CONNECTING forever.
+      const WebSocketMock = function (url: string) {
+        lastMockWs = new MockWebSocket(url);
+        allMockWs.push(lastMockWs);
+        lastMockWs.readyState = 0; // CONNECTING
+        // no open, no error, no close — stall.
+        return lastMockWs;
+      };
+      WebSocketMock.OPEN = 1;
+      WebSocketMock.CLOSING = 2;
+      WebSocketMock.CLOSED = 3;
+      vi.stubGlobal('WebSocket', WebSocketMock);
+
+      const client = makeClient();
+      // client.connect() absorbs rejection and schedules reconnect, so we
+      // call the underlying connectOnce-returning promise via the public
+      // connect() and observe effects instead.
+      const connectPromise = client.connect();
+
+      // The handshake timer runs at HANDSHAKE_TIMEOUT_MS (10s).
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      // connect() resolves either way (it catches rejection), but the
+      // stalled socket should now be closed with our sentinel code/reason.
+      await connectPromise;
+      expect(lastMockWs.closeCode).toBe(1000);
+      expect(lastMockWs.closeReason).toBe('handshake-timeout');
+      expect(client.isConnected()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('normal open clears the handshake timer — no timeout close', async () => {
+    vi.useFakeTimers();
+    try {
+      const client = makeClient();
+      // Default mock fires open asynchronously (see beforeEach).
+      await client.connect();
+      expect(client.isConnected()).toBe(true);
+
+      // Advance past the handshake timeout. If the timer were still armed,
+      // it would call ws.close(1000, 'handshake-timeout'). It must not.
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(lastMockWs.closeCode).toBeUndefined();
+      expect(lastMockWs.closeReason).toBeUndefined();
+      expect(client.isConnected()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('disconnect() during CONNECTING cancels the in-flight handshake', async () => {
+    vi.useFakeTimers();
+    try {
+      const WebSocketMock = function (url: string) {
+        lastMockWs = new MockWebSocket(url);
+        allMockWs.push(lastMockWs);
+        lastMockWs.readyState = 0; // CONNECTING, never opens
+        return lastMockWs;
+      };
+      WebSocketMock.OPEN = 1;
+      WebSocketMock.CLOSING = 2;
+      WebSocketMock.CLOSED = 3;
+      vi.stubGlobal('WebSocket', WebSocketMock);
+
+      const client = makeClient();
+      const connectPromise = client.connect();
+      // Wait for the ticket fetch microtask and the WS construction.
+      await vi.advanceTimersByTimeAsync(0);
+
+      client.disconnect();
+
+      // The socket from disconnect() was close()'d without a code, because
+      // disconnect() uses plain close(). If the handshake timer were still
+      // armed, it would fire and overwrite closeCode/closeReason with the
+      // timeout sentinel. Advance past the timeout to prove it does not.
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(lastMockWs.closeCode).toBeUndefined();
+      expect(lastMockWs.closeReason).toBeUndefined();
+      expect(client.isConnected()).toBe(false);
+
+      await connectPromise;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reconnect is scheduled after handshake timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      let wsCount = 0;
+      const WebSocketMock = function (url: string) {
+        lastMockWs = new MockWebSocket(url);
+        allMockWs.push(lastMockWs);
+        wsCount++;
+        if (wsCount === 1) {
+          // First socket stalls in CONNECTING — handshake timeout fires.
+          lastMockWs.readyState = 0;
+        } else {
+          // Reconnect opens normally.
+          void Promise.resolve().then(() => lastMockWs.triggerOpen());
+        }
+        return lastMockWs;
+      };
+      WebSocketMock.OPEN = 1;
+      WebSocketMock.CLOSING = 2;
+      WebSocketMock.CLOSED = 3;
+      vi.stubGlobal('WebSocket', WebSocketMock);
+
+      const client = makeClient();
+      // Do not await: connect() hangs on the stalled handshake until the
+      // timeout fires. Kick it off, advance time, then await.
+      const connectPromise = client.connect();
+      await vi.advanceTimersByTimeAsync(10_000);
+      await connectPromise;
+
+      // Handshake timeout closed the first socket with the sentinel reason,
+      // and rejected the in-flight promise. Reconnect is scheduled on top of
+      // the initial backoff window (≤ 1s for the first attempt).
+      expect(allMockWs[0]?.closeReason).toBe('handshake-timeout');
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(allMockWs).toHaveLength(2);
+      expect(client.isConnected()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('exports HandshakeTimeoutError', () => {
+    // Sanity check on the public error type.
+    const err = new HandshakeTimeoutError();
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe('HandshakeTimeoutError');
   });
 
   it('schedules reconnect after initial ticket failure', async () => {

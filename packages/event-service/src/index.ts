@@ -1,3 +1,3 @@
-export { EventServiceClient, TicketRequestError } from './client';
+export { EventServiceClient, TicketRequestError, HandshakeTimeoutError } from './client';
 export * from './schemas';
 export type * from './types';

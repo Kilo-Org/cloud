@@ -89,4 +89,19 @@ describe('briefing-utils', () => {
     expect(message).not.toContain('# ');
     expect(message).not.toContain('[');
   });
+
+  it('keeps markdown links with nested parentheses intact when adapting for messages', () => {
+    const markdown = [
+      '# Morning Briefing - 2026-04-23',
+      '',
+      '## Web Search',
+      '- [Spec page](https://example.com/wiki/Foo_(bar))',
+      '- [Another page](https://example.com/docs/(deep)/(nested))',
+    ].join('\n');
+
+    const message = formatBriefingMarkdownForMessage(markdown);
+
+    expect(message).toContain('• Spec page - https://example.com/wiki/Foo_(bar)');
+    expect(message).toContain('• Another page - https://example.com/docs/(deep)/(nested)');
+  });
 });

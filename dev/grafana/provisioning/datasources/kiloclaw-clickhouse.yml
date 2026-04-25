@@ -4,6 +4,13 @@ datasources:
   - name: kilo-cloudflare-analytics-engine
     uid: kiloclaw-clickhouse
     type: vertamedia-clickhouse-datasource
+    # The top-level `url` is required by Grafana's built-in data-proxy path.
+    # Without it, queries routed through `/api/datasources/proxy/uid/...` fail
+    # with `http: no Host in request URL` → 502 Bad Gateway. The duplicated
+    # `jsonData.dataSourceUrl` below is the vertamedia plugin's own field and
+    # must match; older plugin versions used only dataSourceUrl, newer ones
+    # and Grafana's generic paths use `url`.
+    url: https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql
     access: proxy
     isDefault: true
     editable: true

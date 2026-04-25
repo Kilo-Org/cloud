@@ -66,7 +66,7 @@ export async function deliverToBot(
     const rpcPayload = {
       targetBotId: msg.targetBotId,
       ...payload,
-    } as z.infer<typeof chatWebhookRpcSchema>;
+    } satisfies z.infer<typeof chatWebhookRpcSchema>;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
@@ -143,7 +143,7 @@ export async function deliverActionExecutedToBot(
     });
 
     // Payload fields are already validated; skip redundant Zod parse.
-    const rpcPayload = msg as z.infer<typeof chatWebhookRpcSchema>;
+    const rpcPayload = msg satisfies z.infer<typeof chatWebhookRpcSchema>;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         await env.KILOCLAW.deliverChatWebhook(rpcPayload);

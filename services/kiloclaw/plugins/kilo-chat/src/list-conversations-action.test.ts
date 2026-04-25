@@ -16,7 +16,7 @@ function mockClient(overrides: Partial<KiloChatClient> = {}): KiloChatClient {
     renameConversation: vi.fn(),
     listConversations: vi.fn().mockResolvedValue({
       conversations: [],
-      total: 0,
+      hasMore: false,
       limit: 50,
       offset: 0,
     }),
@@ -41,7 +41,7 @@ describe('handleKiloChatListConversationsAction', () => {
             ],
           },
         ],
-        total: 1,
+        hasMore: false,
         limit: 50,
         offset: 0,
       }),
@@ -52,7 +52,7 @@ describe('handleKiloChatListConversationsAction', () => {
       client,
     });
 
-    expect(result.content[0].text).toMatch(/Conversations \(1 total\)/);
+    expect(result.content[0].text).toMatch(/Conversations \(1\)/);
     expect(result.content[0].text).toMatch(/"Project Discussion" \(01ABC\)/);
     expect(result.content[0].text).toMatch(/2 members/);
   });
@@ -90,7 +90,7 @@ describe('handleKiloChatListConversationsAction', () => {
             members: [],
           },
         ],
-        total: 1,
+        hasMore: false,
         limit: 50,
         offset: 0,
       }),
@@ -103,5 +103,30 @@ describe('handleKiloChatListConversationsAction', () => {
 
     expect(result.content[0].text).toMatch(/01XYZ/);
     expect(result.content[0].text).toMatch(/no activity/);
+  });
+
+  it('indicates when more conversations are available beyond the page', async () => {
+    const client = mockClient({
+      listConversations: vi.fn().mockResolvedValue({
+        conversations: [
+          {
+            conversationId: '01ABC',
+            title: 'First',
+            lastActivityAt: Date.now(),
+            members: [],
+          },
+        ],
+        hasMore: true,
+        limit: 1,
+        offset: 0,
+      }),
+    });
+
+    const result = await handleKiloChatListConversationsAction({
+      params: {},
+      client,
+    });
+
+    expect(result.content[0].text).toMatch(/Conversations \(showing 1, more available\)/);
   });
 });

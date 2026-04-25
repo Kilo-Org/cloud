@@ -21,7 +21,7 @@ export async function handleKiloChatListConversationsAction(
   args: HandleKiloChatListConversationsActionParams
 ): Promise<{ content: Array<{ type: 'text'; text: string }> }> {
   const limit = readNumberParam(args.params, 'limit');
-  const { conversations, total } = await args.client.listConversations({ limit });
+  const { conversations, hasMore } = await args.client.listConversations({ limit });
 
   if (conversations.length === 0) {
     return { content: [{ type: 'text', text: 'No conversations found.' }] };
@@ -35,6 +35,9 @@ export async function handleKiloChatListConversationsAction(
     return `- ${title}(${c.conversationId}) — ${c.members.length} members, ${activity}`;
   });
 
-  const text = `Conversations (${total} total):\n${lines.join('\n')}`;
+  const header = hasMore
+    ? `Conversations (showing ${conversations.length}, more available):`
+    : `Conversations (${conversations.length}):`;
+  const text = `${header}\n${lines.join('\n')}`;
   return { content: [{ type: 'text', text }] };
 }

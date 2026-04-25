@@ -667,9 +667,7 @@ function MorningBriefingCard({
                     const reason = entry.reason
                       ? (deliveryReasonLabel[entry.reason] ?? entry.reason)
                       : undefined;
-                    return reason
-                      ? `${channel} (${status}: ${reason})`
-                      : `${channel} (${status})`;
+                    return reason ? `${channel} (${status}: ${reason})` : `${channel} (${status})`;
                   })
                   .join(' • ')}
               </p>

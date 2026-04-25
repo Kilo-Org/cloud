@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import http from 'node:http';
-import type { Duplex } from 'node:stream';
+import { PassThrough, Readable, type Duplex } from 'node:stream';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Hono } from 'hono';
 import { createHttpProxy, handleWebSocketUpgrade } from './proxy';
@@ -13,6 +13,54 @@ function createMockSupervisor(state: string): Supervisor {
     start: vi.fn(),
     stop: vi.fn(),
   } as unknown as Supervisor;
+}
+
+type UpstreamCapture = {
+  options?: http.RequestOptions;
+};
+
+type UpstreamMock = {
+  requestSpy: ReturnType<typeof vi.spyOn>;
+  receivedChunks: Buffer[];
+  capture: UpstreamCapture;
+};
+
+function mockUpstream(res: {
+  statusCode: number;
+  headers?: http.IncomingHttpHeaders;
+  body?: Buffer;
+}): UpstreamMock {
+  const receivedChunks: Buffer[] = [];
+  const capture: UpstreamCapture = {};
+  const requestSpy = vi.spyOn(http, 'request').mockImplementation(((
+    options: http.RequestOptions
+  ) => {
+    capture.options = options;
+    const sink = new PassThrough();
+    sink.on('data', (chunk: Buffer) => {
+      receivedChunks.push(chunk);
+    });
+    const fakeReq = sink as unknown as http.ClientRequest & EventEmitter;
+    const bodyChunks: Buffer[] = [];
+    if (res.body) bodyChunks.push(res.body);
+    const upstreamRes = Readable.from(bodyChunks) as unknown as http.IncomingMessage;
+    (upstreamRes as unknown as { statusCode: number }).statusCode = res.statusCode;
+    (upstreamRes as unknown as { headers: http.IncomingHttpHeaders }).headers = res.headers ?? {};
+    setImmediate(() => {
+      fakeReq.emit('response', upstreamRes);
+    });
+    return fakeReq;
+  }) as never);
+  return { requestSpy, receivedChunks, capture };
+}
+
+function mockUpstreamError(error: Error): void {
+  vi.spyOn(http, 'request').mockImplementation((() => {
+    const sink = new PassThrough();
+    const fakeReq = sink as unknown as http.ClientRequest & EventEmitter;
+    setImmediate(() => fakeReq.emit('error', error));
+    return fakeReq;
+  }) as never);
 }
 
 afterEach(() => {
@@ -49,13 +97,12 @@ describe('HTTP proxy', () => {
     });
   });
 
-  it('proxies with valid token and strips x-kiloclaw-proxy-token', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
-    );
+  it('proxies with valid token, streams body, and strips x-kiloclaw-proxy-token', async () => {
+    const { requestSpy, receivedChunks, capture } = mockUpstream({
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: Buffer.from(JSON.stringify({ ok: true })),
+    });
 
     const app = new Hono();
     app.all(
@@ -69,20 +116,44 @@ describe('HTTP proxy', () => {
     );
 
     const resp = await app.request('/test?q=1', {
-      headers: { 'x-kiloclaw-proxy-token': 'token-1', 'x-test-header': 'yes' },
+      method: 'POST',
+      headers: {
+        'x-kiloclaw-proxy-token': 'token-1',
+        'x-test-header': 'yes',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ hello: 'world' }),
     });
     expect(resp.status).toBe(200);
     expect(await resp.json()).toEqual({ ok: true });
 
-    const call = fetchSpy.mock.calls[0];
-    expect(call[0].toString()).toBe('http://127.0.0.1:3001/test?q=1');
-    const headers = new Headers((call[1] as RequestInit).headers);
-    expect(headers.get('x-kiloclaw-proxy-token')).toBeNull();
-    expect(headers.get('x-test-header')).toBe('yes');
+    expect(requestSpy).toHaveBeenCalledTimes(1);
+    expect(capture.options?.hostname).toBe('127.0.0.1');
+    expect(capture.options?.port).toBe(3001);
+    expect(capture.options?.path).toBe('/test?q=1');
+    expect(capture.options?.method).toBe('POST');
+    const forwarded = capture.options?.headers as http.OutgoingHttpHeaders | undefined;
+    expect(forwarded?.['x-kiloclaw-proxy-token']).toBeUndefined();
+    expect(forwarded?.['x-test-header']).toBe('yes');
+    expect(forwarded?.['host']).toBe('127.0.0.1:3001');
+
+    expect(Buffer.concat(receivedChunks).toString('utf8')).toBe(JSON.stringify({ hello: 'world' }));
   });
 
-  it('returns 502 when backend fetch fails', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('backend down'));
+  it('does not send a body for GET requests', async () => {
+    const { receivedChunks, capture } = mockUpstream({ statusCode: 204 });
+
+    const app = new Hono();
+    app.all('*', createHttpProxy({ expectedToken: 'token-1', requireProxyToken: false }));
+
+    const resp = await app.request('/x');
+    expect(resp.status).toBe(204);
+    expect(capture.options?.method).toBe('GET');
+    expect(receivedChunks.length).toBe(0);
+  });
+
+  it('returns 502 when backend request errors', async () => {
+    mockUpstreamError(new Error('backend down'));
 
     const app = new Hono();
     app.all('*', createHttpProxy({ expectedToken: 'token-1', requireProxyToken: false }));
@@ -117,7 +188,7 @@ describe('HTTP proxy', () => {
   });
 
   it('proxies normally when supervisor is running', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+    mockUpstream({ statusCode: 204 });
 
     const app = new Hono();
     app.all(
@@ -134,7 +205,7 @@ describe('HTTP proxy', () => {
   });
 
   it('allows passthrough when proxy token is disabled', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+    mockUpstream({ statusCode: 204 });
 
     const app = new Hono();
     app.all('*', createHttpProxy({ expectedToken: 'token-1', requireProxyToken: false }));

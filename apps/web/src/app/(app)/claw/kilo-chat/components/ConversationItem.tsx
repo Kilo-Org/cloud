@@ -116,7 +116,16 @@ export function ConversationItem({
           className="absolute inset-0 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         />
       )}
-      <div className="relative flex items-center justify-between gap-2">
+      {/* While the link overlay is visible, the content row must be transparent
+          to pointer events so clicks reach the underlying <Link>. Interactive
+          controls below opt back in with `pointer-events-auto`. When renaming
+          or confirming leave, the overlay is gone and the row captures clicks
+          normally. */}
+      <div
+        className={`relative flex items-center justify-between gap-2 ${
+          showLinkOverlay ? 'pointer-events-none' : ''
+        }`}
+      >
         {isRenaming ? (
           <input
             ref={inputRef}
@@ -152,16 +161,22 @@ export function ConversationItem({
           </>
         ) : (
           <>
-            {/* Title column is pointer-events-none so clicks fall through to
-                the link overlay below. */}
-            <div className="pointer-events-none flex min-w-0 flex-1 items-center gap-1.5">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
               <p className="truncate text-sm font-medium">{title}</p>
               {isUnread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
             </div>
-            {/* Controls column wins clicks by sitting above the link overlay
-                in DOM order and owning pointer events. */}
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="text-muted-foreground pointer-events-none text-xs group-hover:hidden">
+            {/* Controls column opts back into pointer events so the kebab is
+                clickable; the time span stays transparent so clicks pass
+                through to the link overlay. While the menu is open we pin
+                the kebab visible (and the time hidden) so the row doesn't
+                reflow back to its unhovered layout underneath the open
+                dropdown when the mouse leaves. */}
+            <div className="pointer-events-auto flex shrink-0 items-center gap-1">
+              <span
+                className={`text-muted-foreground pointer-events-none text-xs ${
+                  menuOpen ? 'hidden' : 'group-hover:hidden'
+                }`}
+              >
                 {displayTime}
               </span>
               <div ref={menuRef} className="relative">
@@ -171,7 +186,9 @@ export function ConversationItem({
                   aria-haspopup="menu"
                   aria-expanded={menuOpen}
                   onClick={() => setMenuOpen(prev => !prev)}
-                  className="hover:bg-muted hidden rounded p-0.5 group-hover:block cursor-pointer transition-colors"
+                  className={`hover:bg-muted rounded p-0.5 cursor-pointer transition-colors ${
+                    menuOpen ? 'block' : 'hidden group-hover:block'
+                  }`}
                 >
                   <MoreVertical className="h-3.5 w-3.5" />
                 </button>

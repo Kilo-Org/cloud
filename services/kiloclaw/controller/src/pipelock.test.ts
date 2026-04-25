@@ -186,6 +186,24 @@ describe('getOpenClawProxyEnv', () => {
     expect(result.NPM_CONFIG_CAFILE).toBe(PIPELOCK_CA_BUNDLE);
     expect(result.PIP_CERT).toBe(PIPELOCK_CA_BUNDLE);
   });
+
+  it('merges NO_PROXY with any pre-existing customer bypass list', () => {
+    const result = getOpenClawProxyEnv({
+      KILOCLAW_PIPELOCK_ENABLED: '1',
+      NO_PROXY: 'mydatabase.internal,api.internal',
+    });
+    expect(result.NO_PROXY).toBe('mydatabase.internal,api.internal,127.0.0.1,localhost,::1');
+    expect(result.no_proxy).toBe('mydatabase.internal,api.internal,127.0.0.1,localhost,::1');
+  });
+
+  it('falls back to lowercase no_proxy when only that variant is set', () => {
+    const result = getOpenClawProxyEnv({
+      KILOCLAW_PIPELOCK_ENABLED: '1',
+      no_proxy: 'kafka.internal',
+    });
+    expect(result.NO_PROXY).toBe('kafka.internal,127.0.0.1,localhost,::1');
+    expect(result.no_proxy).toBe('kafka.internal,127.0.0.1,localhost,::1');
+  });
 });
 
 // ─── getPipelockChildEnv ────────────────────────────────────────────────────
@@ -324,7 +342,7 @@ describe('ensurePipelockCa', () => {
     state.files.set(PIPELOCK_CA_KEY, { data: 'existing key', mode: 0o600 });
     const deps = makeDeps(state);
 
-    ensurePipelockCa(deps);
+    ensurePipelockCa({}, deps);
 
     expect(state.execs).toEqual([]);
     expect(state.files.get(PIPELOCK_CA_CERT)?.data).toBe('existing cert');
@@ -335,7 +353,7 @@ describe('ensurePipelockCa', () => {
     const state = createFsState();
     const deps = makeDeps(state);
 
-    ensurePipelockCa(deps);
+    ensurePipelockCa({}, deps);
 
     expect(state.dirs.get(PIPELOCK_CA_DIR)).toEqual({ mode: 0o700 });
   });
@@ -344,7 +362,7 @@ describe('ensurePipelockCa', () => {
     const state = createFsState();
     const deps = makeDeps(state);
 
-    ensurePipelockCa(deps);
+    ensurePipelockCa({}, deps);
 
     expect(state.execs).toHaveLength(1);
     expect(state.execs[0]).toEqual({
@@ -367,7 +385,7 @@ describe('ensurePipelockCa', () => {
       },
     });
 
-    ensurePipelockCa(deps);
+    ensurePipelockCa({}, deps);
 
     expect(state.files.get(PIPELOCK_CA_KEY)?.mode).toBe(0o600);
   });
@@ -377,7 +395,7 @@ describe('ensurePipelockCa', () => {
     state.files.set(PIPELOCK_CA_CERT, { data: 'orphan cert', mode: 0o644 });
     const deps = makeDeps(state);
 
-    expect(() => ensurePipelockCa(deps)).toThrow(/inconsistent/i);
+    expect(() => ensurePipelockCa({}, deps)).toThrow(/inconsistent/i);
     expect(state.execs).toEqual([]);
   });
 
@@ -386,7 +404,7 @@ describe('ensurePipelockCa', () => {
     state.files.set(PIPELOCK_CA_KEY, { data: 'orphan key', mode: 0o600 });
     const deps = makeDeps(state);
 
-    expect(() => ensurePipelockCa(deps)).toThrow(/inconsistent/i);
+    expect(() => ensurePipelockCa({}, deps)).toThrow(/inconsistent/i);
     expect(state.execs).toEqual([]);
   });
 
@@ -398,7 +416,7 @@ describe('ensurePipelockCa', () => {
       },
     });
 
-    expect(() => ensurePipelockCa(deps)).toThrow(/exit 1/);
+    expect(() => ensurePipelockCa({}, deps)).toThrow(/exit 1/);
   });
 
   it('throws when init succeeds but post-conditions are not met (broken binary)', () => {
@@ -414,7 +432,46 @@ describe('ensurePipelockCa', () => {
       },
     });
 
-    expect(() => ensurePipelockCa(deps)).toThrow(/did not produce/i);
+    expect(() => ensurePipelockCa({}, deps)).toThrow(/did not produce/i);
+  });
+
+  it('passes a scrubbed allowlist env to `pipelock tls init` (not the controller env)', () => {
+    const state = createFsState();
+    const recordedEnvs: Array<NodeJS.ProcessEnv | undefined> = [];
+    const deps = makeDeps(state, {
+      execFileSync: (cmd, args, opts) => {
+        recordedEnvs.push(opts?.env);
+        state.execs.push({ cmd, args });
+        const outIdx = args.indexOf('--out');
+        const outDir = outIdx >= 0 ? args[outIdx + 1] : '';
+        state.files.set(`${outDir}/ca.pem`, { data: 'C', mode: 0o644 });
+        state.files.set(`${outDir}/ca-key.pem`, { data: 'K', mode: 0o600 });
+        return '';
+      },
+    });
+
+    ensurePipelockCa(
+      {
+        // Allowlisted: should pass through.
+        PATH: '/usr/local/bin:/usr/bin',
+        HOME: '/root',
+        // Agent secrets: must NOT reach the pipelock binary during CA init.
+        KILOCODE_API_KEY: 'sk-must-not-leak',
+        OPENCLAW_GATEWAY_TOKEN: 'gateway-secret',
+        KILOCLAW_HOOKS_TOKEN: 'hooks-secret',
+        TELEGRAM_BOT_TOKEN: 'tg-secret',
+      },
+      deps
+    );
+
+    expect(recordedEnvs).toHaveLength(1);
+    const initEnv = recordedEnvs[0];
+    expect(initEnv?.PATH).toBe('/usr/local/bin:/usr/bin');
+    expect(initEnv?.HOME).toBe('/root');
+    expect(initEnv?.KILOCODE_API_KEY).toBeUndefined();
+    expect(initEnv?.OPENCLAW_GATEWAY_TOKEN).toBeUndefined();
+    expect(initEnv?.KILOCLAW_HOOKS_TOKEN).toBeUndefined();
+    expect(initEnv?.TELEGRAM_BOT_TOKEN).toBeUndefined();
   });
 });
 
@@ -528,7 +585,7 @@ describe('ensurePipelockCaBundle', () => {
     state.files.set(PIPELOCK_CA_CERT, { data: 'PIPELOCK CA\n', mode: 0o644 });
     const deps = makeDeps(state);
 
-    ensurePipelockCaBundle(deps);
+    ensurePipelockCaBundle({}, deps);
 
     const bundle = state.files.get(PIPELOCK_CA_BUNDLE);
     expect(bundle).toEqual({
@@ -552,7 +609,7 @@ describe('ensurePipelockCaBundle', () => {
       renameSync: renameSpy,
     });
 
-    ensurePipelockCaBundle(deps);
+    ensurePipelockCaBundle({}, deps);
 
     expect(writeSpy).not.toHaveBeenCalled();
     expect(renameSpy).not.toHaveBeenCalled();
@@ -564,7 +621,69 @@ describe('ensurePipelockCaBundle', () => {
     state.files.set(PIPELOCK_CA_CERT, { data: 'PIPELOCK CA\n', mode: 0o644 });
     const deps = makeDeps(state);
 
-    expect(() => ensurePipelockCaBundle(deps)).toThrow(/ENOENT/);
+    expect(() => ensurePipelockCaBundle({}, deps)).toThrow(/ENOENT/);
+  });
+
+  it('concatenates customer-provided CA bundles from env so trust roots survive', () => {
+    const state = createFsState();
+    state.files.set(SYSTEM_CA_BUNDLE, { data: 'SYSTEM CA\n', mode: 0o644 });
+    state.files.set(PIPELOCK_CA_CERT, { data: 'PIPELOCK CA\n', mode: 0o644 });
+    state.files.set('/etc/customer/internal-ca.pem', {
+      data: 'CUSTOMER ROOT CA\n',
+      mode: 0o644,
+    });
+    const deps = makeDeps(state);
+
+    ensurePipelockCaBundle(
+      {
+        // Customer pre-set both env vars to the same path; we should de-dupe.
+        SSL_CERT_FILE: '/etc/customer/internal-ca.pem',
+        REQUESTS_CA_BUNDLE: '/etc/customer/internal-ca.pem',
+      },
+      deps
+    );
+
+    const bundle = state.files.get(PIPELOCK_CA_BUNDLE);
+    expect(bundle?.data).toBe('SYSTEM CA\n\nCUSTOMER ROOT CA\n\nPIPELOCK CA\n');
+    expect(bundle?.mode).toBe(0o644);
+  });
+
+  it('skips customer paths that point at our own bundle (no self-reference loop)', () => {
+    const state = createFsState();
+    state.files.set(SYSTEM_CA_BUNDLE, { data: 'SYSTEM CA\n', mode: 0o644 });
+    state.files.set(PIPELOCK_CA_CERT, { data: 'PIPELOCK CA\n', mode: 0o644 });
+    const deps = makeDeps(state);
+
+    ensurePipelockCaBundle(
+      {
+        // A subsequent boot might re-read the env we already set; the
+        // function must not concatenate our own files into themselves.
+        NODE_EXTRA_CA_CERTS: PIPELOCK_CA_CERT,
+        SSL_CERT_FILE: PIPELOCK_CA_BUNDLE,
+      },
+      deps
+    );
+
+    const bundle = state.files.get(PIPELOCK_CA_BUNDLE);
+    expect(bundle?.data).toBe('SYSTEM CA\n\nPIPELOCK CA\n');
+  });
+
+  it('skips customer paths that do not exist on disk (best-effort)', () => {
+    const state = createFsState();
+    state.files.set(SYSTEM_CA_BUNDLE, { data: 'SYSTEM CA\n', mode: 0o644 });
+    state.files.set(PIPELOCK_CA_CERT, { data: 'PIPELOCK CA\n', mode: 0o644 });
+    const deps = makeDeps(state);
+
+    ensurePipelockCaBundle(
+      {
+        SSL_CERT_FILE: '/etc/customer/missing.pem',
+        REQUESTS_CA_BUNDLE: '',
+      },
+      deps
+    );
+
+    const bundle = state.files.get(PIPELOCK_CA_BUNDLE);
+    expect(bundle?.data).toBe('SYSTEM CA\n\nPIPELOCK CA\n');
   });
 });
 

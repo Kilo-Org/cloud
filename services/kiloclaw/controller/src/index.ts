@@ -516,8 +516,8 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   // operator asked for scanning would silently undo the security model.
   if (isPipelockEnabled(env)) {
     try {
-      ensurePipelockCa();
-      ensurePipelockCaBundle();
+      ensurePipelockCa(env);
+      ensurePipelockCaBundle(env);
       ensurePipelockConfig(env);
     } catch (err) {
       const fullError = err instanceof Error ? err.message : String(err);

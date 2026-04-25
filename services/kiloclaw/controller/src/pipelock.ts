@@ -136,7 +136,7 @@ const defaultDeps: PipelockDeps = {
  * Otherwise runs `pipelock tls init --out /root/.pipelock` to generate both
  * files, then defensively re-applies mode 0o600 to the private key.
  */
-export function ensurePipelockCa(deps: PipelockDeps = defaultDeps): void {
+export function ensurePipelockCa(env: EnvLike, deps: PipelockDeps = defaultDeps): void {
   const certExists = deps.existsSync(PIPELOCK_CA_CERT);
   const keyExists = deps.existsSync(PIPELOCK_CA_KEY);
 
@@ -157,8 +157,13 @@ export function ensurePipelockCa(deps: PipelockDeps = defaultDeps): void {
   // Fresh init. Mode 0o700 on the directory so the private key inherits a
   // tight enclosing dir even before we chmod it explicitly.
   deps.mkdirSync(PIPELOCK_CA_DIR, { recursive: true, mode: 0o700 });
+  // Pass the same scrubbed allowlist env to `pipelock tls init` that the
+  // sidecar's spawn uses, so the binary cannot read decrypted agent secrets
+  // during synchronous CA generation. Closes the capability-separation gap
+  // that an inherited `process.env` would open here.
   deps.execFileSync(PIPELOCK_BINARY, ['tls', 'init', '--out', PIPELOCK_CA_DIR], {
     stdio: 'pipe',
+    env: getPipelockChildEnv(env),
   });
 
   // Post-conditions: both files must be present. Guard against a broken or
@@ -184,10 +189,50 @@ export function ensurePipelockCa(deps: PipelockDeps = defaultDeps): void {
  * commonly treat their env var as the full bundle, so they get system roots
  * plus the per-VM interception CA here.
  */
-export function ensurePipelockCaBundle(deps: PipelockDeps = defaultDeps): void {
+export function ensurePipelockCaBundle(env: EnvLike, deps: PipelockDeps = defaultDeps): void {
   const systemBundle = deps.readFileSync(SYSTEM_CA_BUNDLE, 'utf8').trimEnd();
   const pipelockCa = deps.readFileSync(PIPELOCK_CA_CERT, 'utf8').trimEnd();
-  const desired = `${systemBundle}\n\n${pipelockCa}\n`;
+
+  // Pull in any pre-existing customer-provided CA bundle so the customer's
+  // trust roots survive when our combined bundle replaces SSL_CERT_FILE /
+  // REQUESTS_CA_BUNDLE / etc. in the OpenClaw child env. Each unique path is
+  // read at most once; our own files are skipped to avoid duplication and
+  // self-reference loops.
+  const customerBundlePaths = new Set<string>();
+  const candidateKeys = [
+    'SSL_CERT_FILE',
+    'REQUESTS_CA_BUNDLE',
+    'CURL_CA_BUNDLE',
+    'NODE_EXTRA_CA_CERTS',
+    'GIT_SSL_CAINFO',
+    'NPM_CONFIG_CAFILE',
+    'PIP_CERT',
+  ];
+  for (const key of candidateKeys) {
+    const path = env[key];
+    if (
+      typeof path === 'string' &&
+      path !== '' &&
+      path !== PIPELOCK_CA_BUNDLE &&
+      path !== PIPELOCK_CA_CERT &&
+      deps.existsSync(path)
+    ) {
+      customerBundlePaths.add(path);
+    }
+  }
+  const customerBundles: string[] = [];
+  for (const path of customerBundlePaths) {
+    try {
+      customerBundles.push(deps.readFileSync(path, 'utf8').trimEnd());
+    } catch {
+      // Best-effort: skip unreadable customer bundles rather than failing
+      // the whole bundle generation. The system bundle and Pipelock CA
+      // remain present, so TLS validation still works for public roots.
+    }
+  }
+
+  const desired =
+    [systemBundle, ...customerBundles, pipelockCa].filter(s => s.length > 0).join('\n\n') + '\n';
 
   if (deps.existsSync(PIPELOCK_CA_BUNDLE)) {
     try {
@@ -312,14 +357,27 @@ export function getPipelockChildEnv(env: EnvLike): NodeJS.ProcessEnv {
 export function getOpenClawProxyEnv(env: EnvLike): Record<string, string> {
   if (!isPipelockEnabled(env)) return {};
   const proxyUrl = `http://${PIPELOCK_LISTEN_HOST}:${PIPELOCK_LISTEN_PORT}`;
-  const noProxy = '127.0.0.1,localhost,::1';
+
+  // Merge NO_PROXY with any customer-set bypass list so that pre-existing
+  // entries (internal services, private hostnames) keep working when
+  // Pipelock is enabled. The customer's entries stay first; our loopback
+  // entries are appended.
+  const ourNoProxy = '127.0.0.1,localhost,::1';
+  const existingNoProxy = env.NO_PROXY ?? env.no_proxy ?? '';
+  const mergedNoProxy = existingNoProxy ? `${existingNoProxy},${ourNoProxy}` : ourNoProxy;
+
+  // Customer-provided CA bundles (their values for SSL_CERT_FILE /
+  // REQUESTS_CA_BUNDLE / NODE_EXTRA_CA_CERTS / etc.) are concatenated into
+  // the combined CA bundle by ensurePipelockCaBundle, so pointing every
+  // env var at PIPELOCK_CA_BUNDLE preserves the customer's trust roots.
+
   return {
     HTTPS_PROXY: proxyUrl,
     https_proxy: proxyUrl,
     HTTP_PROXY: proxyUrl,
     http_proxy: proxyUrl,
-    NO_PROXY: noProxy,
-    no_proxy: noProxy,
+    NO_PROXY: mergedNoProxy,
+    no_proxy: mergedNoProxy,
     SSL_CERT_FILE: PIPELOCK_CA_BUNDLE,
     REQUESTS_CA_BUNDLE: PIPELOCK_CA_BUNDLE,
     CURL_CA_BUNDLE: PIPELOCK_CA_BUNDLE,

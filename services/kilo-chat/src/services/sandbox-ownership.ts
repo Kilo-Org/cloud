@@ -57,7 +57,9 @@ async function querySandboxOwner(
 
 /**
  * Returns true if the user owns an active (non-destroyed) instance for the
- * given sandbox. Cached in-memory for 5 minutes.
+ * given sandbox. Positive results are cached in-memory for 5 minutes; `false`
+ * is treated as a cache miss so a freshly-provisioned sandbox starts
+ * returning true as soon as the DB reflects it.
  */
 export async function userOwnsSandbox(
   env: Env,
@@ -69,13 +71,17 @@ export async function userOwnsSandbox(
   if (hit && hit.kind === 'owns') return hit.value;
 
   const value = await queryOwnsSandbox(env.HYPERDRIVE.connectionString, userId, sandboxId);
-  cache.set(key, { kind: 'owns', value, expiresAt: Date.now() + TTL_MS });
+  if (value) {
+    cache.set(key, { kind: 'owns', value, expiresAt: Date.now() + TTL_MS });
+  }
   return value;
 }
 
 /**
  * Returns the user_id of the sandbox owner (active, non-destroyed instance),
- * or null if no active instance exists. Cached in-memory for 5 minutes.
+ * or null if no active instance exists. Resolved owner ids are cached
+ * in-memory for 5 minutes; `null` is treated as a cache miss so a
+ * freshly-provisioned sandbox resolves its owner on the very next call.
  */
 export async function lookupSandboxOwnerUserId(
   env: Env,
@@ -86,7 +92,9 @@ export async function lookupSandboxOwnerUserId(
   if (hit && hit.kind === 'owner') return hit.value;
 
   const value = await querySandboxOwner(env.HYPERDRIVE.connectionString, sandboxId);
-  cache.set(key, { kind: 'owner', value, expiresAt: Date.now() + TTL_MS });
+  if (value !== null) {
+    cache.set(key, { kind: 'owner', value, expiresAt: Date.now() + TTL_MS });
+  }
   return value;
 }
 

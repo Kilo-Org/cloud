@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { MoreVertical } from 'lucide-react';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
+import { CONVERSATION_TITLE_MAX_CHARS } from '@kilocode/kilo-chat';
 
 type ConversationItemProps = {
   conversation: ConversationListItem;
@@ -127,7 +128,7 @@ export function ConversationItem({
             }}
             onBlur={handleConfirmRename}
             className="bg-transparent min-w-0 flex-1 text-sm font-medium outline-none border-b border-current/20"
-            maxLength={200}
+            maxLength={CONVERSATION_TITLE_MAX_CHARS}
           />
         ) : isConfirmingLeave ? (
           <>

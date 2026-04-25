@@ -28,7 +28,11 @@ import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
 import { BotStatus, computeBotDisplay, useNowTicker } from './BotStatus';
 import { ContextUsageRing } from './ContextUsageRing';
-import { KiloChatApiError, formatKiloChatError } from '@kilocode/kilo-chat';
+import {
+  KiloChatApiError,
+  formatKiloChatError,
+  CONVERSATION_TITLE_MAX_CHARS,
+} from '@kilocode/kilo-chat';
 import { MessageCircle, ArrowDown } from 'lucide-react';
 
 type MessageAreaProps = {
@@ -321,6 +325,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
             onChange={e => setRenameText(e.target.value)}
             onKeyDown={handleRenameKeyDown}
             onBlur={handleRenameBlur}
+            maxLength={CONVERSATION_TITLE_MAX_CHARS}
           />
         ) : (
           <button

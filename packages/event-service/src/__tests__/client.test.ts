@@ -65,13 +65,17 @@ beforeEach(() => {
       json: () => Promise.resolve({ ticket: 'test-ticket', userId: 'user-123' }),
     })
   );
-  vi.stubGlobal('WebSocket', function (url: string) {
+  const WebSocketMock = function (url: string) {
     lastMockWs = new MockWebSocket(url);
     allMockWs.push(lastMockWs);
     // Auto-trigger open asynchronously so connect() can attach handlers first
     void Promise.resolve().then(() => lastMockWs.triggerOpen());
     return lastMockWs;
-  });
+  };
+  WebSocketMock.OPEN = 1;
+  WebSocketMock.CLOSING = 2;
+  WebSocketMock.CLOSED = 3;
+  vi.stubGlobal('WebSocket', WebSocketMock);
 });
 
 afterEach(() => {
@@ -208,7 +212,7 @@ describe('EventServiceClient', () => {
       // Override the WebSocket mock so the first socket errors before open
       // (error → close, the sequence browsers fire). The second socket
       // succeeds normally so we can count reconnect attempts cleanly.
-      vi.stubGlobal('WebSocket', function (url: string) {
+      const WebSocketMock = function (url: string) {
         lastMockWs = new MockWebSocket(url);
         allMockWs.push(lastMockWs);
         wsCount++;
@@ -223,7 +227,11 @@ describe('EventServiceClient', () => {
           void Promise.resolve().then(() => lastMockWs.triggerOpen());
         }
         return lastMockWs;
-      });
+      };
+      WebSocketMock.OPEN = 1;
+      WebSocketMock.CLOSING = 2;
+      WebSocketMock.CLOSED = 3;
+      vi.stubGlobal('WebSocket', WebSocketMock);
 
       const client = makeClient();
       // connect() should absorb the failure and schedule a reconnect

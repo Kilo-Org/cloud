@@ -30,6 +30,18 @@ async function fetchToken(): Promise<string> {
   return parsed.token;
 }
 
+/**
+ * Clears the in-memory token cache so the next getKiloChatToken() call
+ * refetches from /api/kilo-chat/token. Call this when the server has
+ * rejected the token (e.g. 401/403 from a dependent service).
+ */
+export function clearKiloChatToken(): void {
+  cachedToken = null;
+  tokenExpiresAt = 0;
+  lastFailedAt = 0;
+  inflightRequest = null;
+}
+
 export async function getKiloChatToken(): Promise<string> {
   // Return cached token if still fresh (5 min buffer)
   if (cachedToken && Date.now() < tokenExpiresAt - 5 * 60 * 1000) {

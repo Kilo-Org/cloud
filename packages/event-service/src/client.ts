@@ -6,9 +6,19 @@ import {
   type connectQuerySchema,
 } from './schemas';
 
+export class TicketRequestError extends Error {
+  readonly status: number;
+  constructor(status: number) {
+    super(`Ticket request failed: ${status}`);
+    this.name = 'TicketRequestError';
+    this.status = status;
+  }
+}
+
 export class EventServiceClient {
   private readonly url: string;
   private readonly getToken: () => Promise<string>;
+  private readonly onUnauthorized: (() => void) | undefined;
 
   private ws: WebSocket | null = null;
   private connected = false;
@@ -24,6 +34,7 @@ export class EventServiceClient {
   constructor(config: EventServiceConfig) {
     this.url = config.url;
     this.getToken = config.getToken;
+    this.onUnauthorized = config.onUnauthorized;
   }
 
   async connect(): Promise<void> {
@@ -35,11 +46,25 @@ export class EventServiceClient {
     }
     try {
       await this.connectOnce();
-    } catch {
+    } catch (err) {
+      if (this.handleAuthFailure(err)) return;
       if (!this.destroyed) {
         this.scheduleReconnect();
       }
     }
+  }
+
+  private handleAuthFailure(err: unknown): boolean {
+    if (err instanceof TicketRequestError && (err.status === 401 || err.status === 403)) {
+      this.destroyed = true;
+      if (this.reconnectTimer !== null) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      this.onUnauthorized?.();
+      return true;
+    }
+    return false;
   }
 
   private async connectOnce(): Promise<void> {
@@ -58,7 +83,7 @@ export class EventServiceClient {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
-      throw new Error(`Ticket request failed: ${res.status}`);
+      throw new TicketRequestError(res.status);
     }
     const { ticket, userId } = connectTicketResponseSchema.parse(await res.json());
 
@@ -123,7 +148,7 @@ export class EventServiceClient {
   }
 
   isConnected(): boolean {
-    return this.connected && this.ws !== null && this.ws.readyState === 1;
+    return this.connected && this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
   subscribe(contexts: string[]): void {
@@ -167,7 +192,7 @@ export class EventServiceClient {
   }
 
   private send(message: ClientMessage): void {
-    if (this.ws && this.ws.readyState === 1) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     }
   }
@@ -198,7 +223,7 @@ export class EventServiceClient {
   private startPing(): void {
     this.stopPing();
     this.pingTimer = setInterval(() => {
-      if (this.ws && this.ws.readyState === 1) {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send('ping');
       }
     }, 15000);
@@ -227,9 +252,11 @@ export class EventServiceClient {
     this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.connectOnce().catch(() => {
+      this.connectOnce().catch(err => {
         // connectOnce() may fail before a WebSocket is created (e.g. ticket
-        // fetch failure), so onclose won't fire. Schedule another reconnect.
+        // fetch failure), so onclose won't fire. Schedule another reconnect,
+        // unless the failure is a permanent auth failure.
+        if (this.handleAuthFailure(err)) return;
         if (!this.destroyed) {
           this.scheduleReconnect();
         }

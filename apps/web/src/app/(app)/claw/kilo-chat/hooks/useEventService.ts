@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { EventServiceClient } from '@kilocode/event-service';
 import { KiloChatClient } from '@kilocode/kilo-chat';
 import { KILO_CHAT_URL, EVENT_SERVICE_URL } from '@/lib/constants';
+import { clearKiloChatToken } from '../token';
 
 /**
  * Creates and manages the EventServiceClient + KiloChatClient singleton.
@@ -10,7 +11,17 @@ import { KILO_CHAT_URL, EVENT_SERVICE_URL } from '@/lib/constants';
  */
 export function useEventService(getToken: () => Promise<string>) {
   const eventService = useMemo(
-    () => new EventServiceClient({ url: EVENT_SERVICE_URL, getToken }),
+    () =>
+      new EventServiceClient({
+        url: EVENT_SERVICE_URL,
+        getToken,
+        // Event Service rejected our token as 401/403. Drop the cached
+        // token so the next request refetches; the socket is permanently
+        // stopped by the client to avoid a reconnect storm.
+        onUnauthorized: () => {
+          clearKiloChatToken();
+        },
+      }),
     [getToken]
   );
 

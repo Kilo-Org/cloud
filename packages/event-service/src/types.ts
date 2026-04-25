@@ -28,4 +28,10 @@ export type ServerMessage = z.infer<typeof serverMessageSchema>;
 export type EventServiceConfig = {
   url: string;
   getToken: () => Promise<string>;
+  /**
+   * Called when the ticket endpoint rejects the token with 401/403.
+   * The client marks itself destroyed and stops reconnecting; the caller
+   * should clear any cached token and trigger re-authentication.
+   */
+  onUnauthorized?: () => void;
 };

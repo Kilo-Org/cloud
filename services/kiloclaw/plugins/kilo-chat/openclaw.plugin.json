@@ -1,6 +1,5 @@
 {
   "id": "kilo-chat",
-  "kind": "channel",
   "name": "Kilo Chat",
   "description": "Kilo Chat channel plugin",
   "channels": ["kilo-chat"],

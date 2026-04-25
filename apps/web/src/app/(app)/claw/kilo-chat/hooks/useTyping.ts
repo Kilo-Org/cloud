@@ -22,12 +22,17 @@ export function useTypingSender(client: KiloChatClient, conversationId: string |
 /**
  * Tracks who is typing based on incoming typing events.
  * Clears a member's typing state after 5s of no pings.
+ *
+ * Both handlers receive the Event Service context string and ignore events
+ * that do not match `expectedContext`, so leaked or stale subscriptions
+ * cannot update typing state for the wrong conversation.
  */
-export function useTypingState(currentUserId: string | null) {
+export function useTypingState(currentUserId: string | null, expectedContext: string | null) {
   const [typingMembers, setTypingMembers] = useState<Map<string, number>>(new Map());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const handleTypingEvent = useCallback(
-    (event: TypingEvent) => {
+    (ctx: string, event: TypingEvent) => {
+      if (ctx !== expectedContext) return;
       if (event.memberId === currentUserId) return;
       setTypingMembers(prev => {
         const next = new Map(prev);
@@ -46,21 +51,25 @@ export function useTypingState(currentUserId: string | null) {
       }, TYPING_DISPLAY_TIMEOUT);
       timersRef.current.set(event.memberId, timer);
     },
-    [currentUserId]
+    [currentUserId, expectedContext]
   );
-  const clearTypingForMember = useCallback((memberId: string) => {
-    const existing = timersRef.current.get(memberId);
-    if (existing) {
-      clearTimeout(existing);
-      timersRef.current.delete(memberId);
-    }
-    setTypingMembers(prev => {
-      if (!prev.has(memberId)) return prev;
-      const next = new Map(prev);
-      next.delete(memberId);
-      return next;
-    });
-  }, []);
+  const clearTypingForMember = useCallback(
+    (ctx: string, memberId: string) => {
+      if (ctx !== expectedContext) return;
+      const existing = timersRef.current.get(memberId);
+      if (existing) {
+        clearTimeout(existing);
+        timersRef.current.delete(memberId);
+      }
+      setTypingMembers(prev => {
+        if (!prev.has(memberId)) return prev;
+        const next = new Map(prev);
+        next.delete(memberId);
+        return next;
+      });
+    },
+    [expectedContext]
+  );
 
   // Clear all pending timers on unmount
   useEffect(() => {

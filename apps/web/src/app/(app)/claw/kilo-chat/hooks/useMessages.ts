@@ -380,18 +380,26 @@ export function useExecuteAction(
  *
  * Each subscription receives the fully validated typed payload from the
  * client (Zod-checked inside `KiloChatClient.on`), so no casts are needed.
+ *
+ * Event Service delivers every subscribed context to every handler, so we
+ * also validate `ctx` against the expected conversation context before
+ * mutating the cache. This protects against stale subscriptions, context
+ * leaks, or server-side routing drift.
  */
 export function useMessageCacheUpdater(
   client: KiloChatClient,
+  sandboxId: string | null,
   conversationId: string | null
 ): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || !sandboxId) return;
     const queryKey = ['kilo-chat', 'messages', conversationId];
+    const expectedContext = `/kiloclaw/${sandboxId}/${conversationId}`;
 
-    const onCreated = (_ctx: string, e: MessageCreatedEvent) => {
+    const onCreated = (ctx: string, e: MessageCreatedEvent) => {
+      if (ctx !== expectedContext) return;
       const newMessage: Message = {
         id: e.messageId,
         senderId: e.senderId,
@@ -426,7 +434,8 @@ export function useMessageCacheUpdater(
       });
     };
 
-    const onUpdated = (_ctx: string, e: MessageUpdatedEvent) => {
+    const onUpdated = (ctx: string, e: MessageUpdatedEvent) => {
+      if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return {
@@ -446,7 +455,8 @@ export function useMessageCacheUpdater(
       });
     };
 
-    const onDeleted = (_ctx: string, e: MessageDeletedEvent) => {
+    const onDeleted = (ctx: string, e: MessageDeletedEvent) => {
+      if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return {
@@ -458,7 +468,8 @@ export function useMessageCacheUpdater(
       });
     };
 
-    const onDeliveryFailed = (_ctx: string, e: MessageDeliveryFailedEvent) => {
+    const onDeliveryFailed = (ctx: string, e: MessageDeliveryFailedEvent) => {
+      if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return {
@@ -470,7 +481,8 @@ export function useMessageCacheUpdater(
       });
     };
 
-    const onActionFailed = (_ctx: string, e: ActionDeliveryFailedEvent) => {
+    const onActionFailed = (ctx: string, e: ActionDeliveryFailedEvent) => {
+      if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return {
@@ -493,7 +505,8 @@ export function useMessageCacheUpdater(
       toast.error("Couldn't reach the bot — please try again");
     };
 
-    const onReactionAdded = (_ctx: string, e: ReactionAddedEvent) => {
+    const onReactionAdded = (ctx: string, e: ReactionAddedEvent) => {
+      if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return {
@@ -509,7 +522,8 @@ export function useMessageCacheUpdater(
       });
     };
 
-    const onReactionRemoved = (_ctx: string, e: ReactionRemovedEvent) => {
+    const onReactionRemoved = (ctx: string, e: ReactionRemovedEvent) => {
+      if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return {
@@ -540,5 +554,5 @@ export function useMessageCacheUpdater(
     return () => {
       for (const off of offs) off();
     };
-  }, [client, conversationId, queryClient]);
+  }, [client, sandboxId, conversationId, queryClient]);
 }

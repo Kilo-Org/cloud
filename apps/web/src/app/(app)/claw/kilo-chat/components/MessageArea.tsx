@@ -62,6 +62,11 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   // Subscribe to this conversation's events via the event-service WebSocket
   useConversationContext(eventService, sandboxId, conversationId);
 
+  // Event Service delivers subscribed contexts to every handler, so each
+  // handler must validate the incoming `ctx` against this string before
+  // applying changes to the active conversation's state.
+  const expectedContext = sandboxId ? `/kiloclaw/${sandboxId}/${conversationId}` : null;
+
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
     kiloChatClient,
     conversationId
@@ -77,8 +82,11 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const removeReaction = useRemoveReaction(kiloChatClient, conversationId, currentUserId);
   const executeAction = useExecuteAction(kiloChatClient, conversationId, currentUserId);
 
-  useMessageCacheUpdater(kiloChatClient, conversationId);
-  const { typingMembers, handleTypingEvent, clearTypingForMember } = useTypingState(currentUserId);
+  useMessageCacheUpdater(kiloChatClient, sandboxId, conversationId);
+  const { typingMembers, handleTypingEvent, clearTypingForMember } = useTypingState(
+    currentUserId,
+    expectedContext
+  );
   const sendTyping = useTypingSender(kiloChatClient, conversationId);
 
   const markRead = useMarkConversationRead(kiloChatClient);
@@ -100,11 +108,11 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       kiloChatClient.onMessageDeliveryFailed(() => {
         toast.error('Message could not be delivered to the bot');
       }),
-      kiloChatClient.onTyping((_ctx, data) => {
-        handleTypingEvent(data);
+      kiloChatClient.onTyping((ctx, data) => {
+        handleTypingEvent(ctx, data);
       }),
-      kiloChatClient.onTypingStop((_ctx, data) => {
-        clearTypingForMember(data.memberId);
+      kiloChatClient.onTypingStop((ctx, data) => {
+        clearTypingForMember(ctx, data.memberId);
       }),
     ];
     return () => offs.forEach(off => off());

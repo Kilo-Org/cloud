@@ -2235,13 +2235,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // for this sandbox. Failure is non-fatal — orphaned data is unreachable.
     if (this.env.KILO_CHAT && this.s.sandboxId) {
       try {
-        const result = await (
-          this.env.KILO_CHAT as unknown as {
-            destroySandboxData(
-              sandboxId: string
-            ): Promise<{ ok: boolean; failedConversations?: string[] }>;
-          }
-        ).destroySandboxData(this.s.sandboxId);
+        const result = await this.env.KILO_CHAT.destroySandboxData(this.s.sandboxId);
         if (!result.ok) {
           doWarn(this.s, 'kilo-chat sandbox cleanup partially failed (non-fatal)', {
             failedConversations: result.failedConversations,

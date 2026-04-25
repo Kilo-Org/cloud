@@ -3,6 +3,7 @@ import type { KiloClawApp } from './durable-objects/kiloclaw-app';
 import type { KiloClawRegistry } from './durable-objects/kiloclaw-registry';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 import type { KiloClawBillingBinding } from './kiloclaw-billing-binding';
+import type { KiloChatBinding } from './kilo-chat-binding';
 
 /**
  * Environment bindings for the KiloClaw Worker
@@ -72,7 +73,7 @@ export type KiloClawEnv = {
   KILOCHAT_BASE_URL?: string;
 
   /** Service binding to the kilo-chat worker (RPC for destroySandboxData etc.). */
-  KILO_CHAT?: Fetcher;
+  KILO_CHAT?: KiloChatBinding;
 
   // PostHog product telemetry
   NEXT_PUBLIC_POSTHOG_KEY?: string;

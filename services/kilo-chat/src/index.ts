@@ -96,7 +96,7 @@ app.post('/v1/conversations/:conversationId/typing/stop', handleStopTyping);
 app.use('/bot/v1/sandboxes/:sandboxId/*', botAuthMiddleware);
 registerBotRoutes(app);
 
-export default class extends WorkerEntrypoint<Env> {
+export class KiloChatService extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {
     return app.fetch(request, this.env, this.ctx);
   }
@@ -177,3 +177,5 @@ export default class extends WorkerEntrypoint<Env> {
     };
   }
 }
+
+export default KiloChatService;

@@ -1,11 +1,18 @@
 import { formatBriefingMarkdownForMessage } from './briefing-utils';
 import { type CommandCapableRuntime, isTimeoutExecutionError, runCommand } from './command-utils';
-import { DELIVERY_CHANNELS, DELIVERY_REASONS, DELIVERY_STATUSES } from './delivery-constants';
 
+export const DELIVERY_CHANNELS = ['telegram', 'discord', 'slack'] as const;
 export type DeliveryChannel = (typeof DELIVERY_CHANNELS)[number];
 
+export const DELIVERY_STATUSES = ['sent', 'skipped', 'failed'] as const;
 export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
+export const DELIVERY_REASONS = [
+  'missing_target',
+  'ambiguous_target',
+  'send_failed',
+  'config_unavailable',
+] as const;
 export type DeliveryReason = (typeof DELIVERY_REASONS)[number];
 
 export type BriefingDeliveryResult = {

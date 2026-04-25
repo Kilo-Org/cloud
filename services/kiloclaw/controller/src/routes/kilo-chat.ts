@@ -11,6 +11,7 @@
 
 import type { Context, Hono } from 'hono';
 import { timingSafeTokenEqual } from '../auth';
+import { FetchTimeoutError, fetchWithTimeout } from '../util/fetch-with-timeout';
 import { getBearerToken } from './gateway';
 
 export type KiloChatRouteOptions = {
@@ -21,10 +22,17 @@ export type KiloChatRouteOptions = {
   /** Base URL of the kilo-chat Worker (e.g. https://chat.kiloapps.io). */
   kiloChatBaseUrl: string;
   fetchImpl?: typeof fetch;
+  /**
+   * Upstream request timeout in milliseconds. Defaults to 30s — long enough
+   * for slow kilo-chat DO RPCs but short enough to surface a 504 to the
+   * plugin instead of letting it hang on an unresponsive worker.
+   */
+  upstreamTimeoutMs?: number;
 };
 
 const MAX_BODY_BYTES = 1 * 1024 * 1024;
 const MAX_SMALL_BODY_BYTES = 8 * 1024;
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
 
 // ──────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -168,14 +176,23 @@ async function relayRequest(
   }
 
   const fetchImpl = options.fetchImpl ?? fetch;
+  const timeoutMs = options.upstreamTimeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS;
   let upstream: Response;
   try {
-    upstream = await fetchImpl(upstreamUrl(options, config.upstreamSuffix(c)), {
-      method: config.method,
-      headers: outboundHeaders(options, contentType),
-      body,
-    });
-  } catch {
+    upstream = await fetchWithTimeout(
+      upstreamUrl(options, config.upstreamSuffix(c)),
+      {
+        method: config.method,
+        headers: outboundHeaders(options, contentType),
+        body,
+      },
+      timeoutMs,
+      fetchImpl
+    );
+  } catch (err) {
+    if (err instanceof FetchTimeoutError) {
+      return c.json({ error: 'Gateway Timeout' }, 504);
+    }
     return c.json({ error: 'Bad Gateway' }, 502);
   }
   return relay(upstream);

@@ -528,6 +528,42 @@ describe('upstream network errors return 502', () => {
   });
 });
 
+describe('upstream timeout', () => {
+  it('send route returns 504 when upstream takes longer than the configured timeout', async () => {
+    const fetchImpl = ((_url: string | URL, init?: RequestInit): Promise<Response> => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          const reason = init.signal?.reason;
+          reject(reason instanceof Error ? reason : new DOMException('aborted', 'AbortError'));
+        });
+      });
+    }) as typeof fetch;
+
+    const app = new Hono();
+    registerKiloChatSendRoute(app, {
+      expectedToken: TOKEN,
+      sandboxId: SANDBOX_ID,
+      kiloChatBaseUrl: 'https://chat.example.test',
+      fetchImpl,
+      upstreamTimeoutMs: 10,
+    });
+
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/send', {
+        method: 'POST',
+        body: JSON.stringify({ conversationId: 'c1', text: 'hi' }),
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${TOKEN}`,
+        },
+      })
+    );
+    expect(res.status).toBe(504);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe('Gateway Timeout');
+  });
+});
+
 describe('body size limits', () => {
   function makeApp(register: typeof registerKiloChatSendRoute, fetchImpl: typeof fetch) {
     const app = new Hono();

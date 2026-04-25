@@ -17,7 +17,7 @@ function parseStoredContent(rawContent: string, messageId: string): ContentBlock
   try {
     return JSON.parse(rawContent) as ContentBlock[];
   } catch (err) {
-    logger.warn('Unparseable message content', {
+    logger.error('Unparseable message content', {
       messageId,
       error: err instanceof Error ? err.message : String(err),
     });

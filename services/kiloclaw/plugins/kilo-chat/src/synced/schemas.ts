@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+// ── Length caps (shared with the UI) ────────────────────────────────
+
+/** Maximum characters allowed in a single `text` content block. */
+export const MESSAGE_TEXT_MAX_CHARS = 8000;
+/** Maximum characters allowed in a conversation title (auto or user-set). */
+export const CONVERSATION_TITLE_MAX_CHARS = 200;
+/** Maximum characters allowed in an action button label or group id. */
+export const ACTION_LABEL_MAX_CHARS = 200;
+
 // ── Primitives ──────────────────────────────────────────────────────
 
 export const ulidSchema = z.string().ulid();
@@ -10,6 +19,18 @@ export const sandboxIdSchema = z.string().regex(SANDBOX_ID_PATTERN, 'Invalid san
 // Approval decision values produced by openclaw's approval runtime. Kept in
 // lockstep with `ExecApprovalDecision` from `openclaw/plugin-sdk/approval-runtime`.
 export const execApprovalDecisionSchema = z.enum(['allow-once', 'allow-always', 'deny']);
+
+// Accepts strings up to `max` chars, trims leading/trailing whitespace, and
+// rejects values that become empty after trimming. Control characters are
+// intentionally NOT filtered — if users send garbage, so be it; the concern
+// here is only catching blank/whitespace-only titles that would render as
+// empty rows in the UI.
+const trimmedNonEmptyString = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .transform(s => s.trim())
+    .refine(s => s.length >= 1, { message: 'must not be empty or whitespace-only' });
 
 // 1-64 bytes UTF-8, no C0 (0x00-0x1F) or C1 (0x7F-0x9F) control chars.
 export const emojiSchema = z
@@ -30,7 +51,7 @@ export const emojiSchema = z
 // ── Content blocks ──────────────────────────────────────────────────
 
 export const actionItemSchema = z.object({
-  label: z.string().min(1).max(200),
+  label: z.string().min(1).max(ACTION_LABEL_MAX_CHARS),
   style: z.enum(['primary', 'danger', 'secondary']),
   value: execApprovalDecisionSchema,
 });
@@ -38,7 +59,7 @@ export const actionItemSchema = z.object({
 export const actionsBlockSchema = z
   .object({
     type: z.literal('actions'),
-    groupId: z.string().min(1).max(200),
+    groupId: z.string().min(1).max(ACTION_LABEL_MAX_CHARS),
     actions: z.array(actionItemSchema).max(10),
     resolved: z
       .object({
@@ -55,7 +76,7 @@ export const actionsBlockSchema = z
 
 export const textBlockSchema = z.object({
   type: z.literal('text'),
-  text: z.string().min(1).max(8000),
+  text: trimmedNonEmptyString(MESSAGE_TEXT_MAX_CHARS),
 });
 
 export const contentBlockSchema = z.discriminatedUnion('type', [
@@ -123,7 +144,7 @@ export const conversationDetailSchema = z.object({
 
 export const createConversationRequestSchema = z.object({
   sandboxId: sandboxIdSchema,
-  title: z.string().max(200).optional(),
+  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS).optional(),
 });
 
 export const createConversationResponseSchema = z.object({
@@ -159,11 +180,11 @@ export const deleteMessageRequestSchema = z.object({
 });
 
 export const renameConversationRequestSchema = z.object({
-  title: z.string().min(1).max(200),
+  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS),
 });
 
 export const executeActionRequestSchema = z.object({
-  groupId: z.string().min(1).max(200),
+  groupId: z.string().min(1).max(ACTION_LABEL_MAX_CHARS),
   value: execApprovalDecisionSchema,
 });
 
@@ -232,7 +253,7 @@ export const actionDeliveryFailedRequestSchema = z.object({
 });
 
 export const createBotConversationRequestSchema = z.object({
-  title: z.string().max(200).optional(),
+  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS).optional(),
   additionalMembers: z.array(z.string().min(1)).max(20).optional(),
 });
 

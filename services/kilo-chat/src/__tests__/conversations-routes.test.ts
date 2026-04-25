@@ -276,3 +276,102 @@ describe('GET /v1/conversations/:id', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('PATCH /v1/conversations/:id — rename', () => {
+  async function createAsUser(userId: string, sandboxId: string, title: string) {
+    grantSandbox(userId, sandboxId);
+    const app = makeApp(userId, 'user');
+    const res = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId, title }),
+      },
+      env
+    );
+    const { conversationId } = await res.json<{ conversationId: string }>();
+    return { app, conversationId };
+  }
+
+  it('renames a conversation with a valid title', async () => {
+    const { app, conversationId } = await createAsUser(
+      'user-rename-1',
+      'sandbox-rename-1',
+      'Original'
+    );
+    const res = await app.request(
+      `/v1/conversations/${conversationId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'New Title' }),
+      },
+      env
+    );
+    expect(res.status).toBe(200);
+    const info = await getConvStub(conversationId).getInfo();
+    expect(info?.title).toBe('New Title');
+  });
+
+  it('trims surrounding whitespace before persisting', async () => {
+    const { app, conversationId } = await createAsUser(
+      'user-rename-2',
+      'sandbox-rename-2',
+      'Original'
+    );
+    const res = await app.request(
+      `/v1/conversations/${conversationId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: '   Trimmed Title   ' }),
+      },
+      env
+    );
+    expect(res.status).toBe(200);
+    const info = await getConvStub(conversationId).getInfo();
+    expect(info?.title).toBe('Trimmed Title');
+  });
+
+  it('rejects whitespace-only titles with 400', async () => {
+    const { app, conversationId } = await createAsUser(
+      'user-rename-3',
+      'sandbox-rename-3',
+      'Original'
+    );
+    for (const bad of ['', '   ', '\t\n ']) {
+      const res = await app.request(
+        `/v1/conversations/${conversationId}`,
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ title: bad }),
+        },
+        env
+      );
+      expect(res.status, `title ${JSON.stringify(bad)} should be rejected`).toBe(400);
+    }
+    // Original title should remain unchanged
+    const info = await getConvStub(conversationId).getInfo();
+    expect(info?.title).toBe('Original');
+  });
+
+  it('rejects titles longer than the cap with 400', async () => {
+    const { app, conversationId } = await createAsUser(
+      'user-rename-4',
+      'sandbox-rename-4',
+      'Original'
+    );
+    const res = await app.request(
+      `/v1/conversations/${conversationId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'a'.repeat(201) }),
+      },
+      env
+    );
+    expect(res.status).toBe(400);
+  });
+});

@@ -502,6 +502,90 @@ describe('input size limits', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('rejects POST with whitespace-only text', async () => {
+    const { conversationId, userApp } = await createConversation('msg-blank-text-post');
+    for (const bad of ['', '   ', '\t\n ']) {
+      const res = await userApp.request(
+        '/v1/messages',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            conversationId,
+            content: [{ type: 'text', text: bad }],
+          }),
+        },
+        env
+      );
+      expect(res.status, `text ${JSON.stringify(bad)} should be rejected`).toBe(400);
+    }
+  });
+
+  it('trims surrounding whitespace on POST', async () => {
+    const { conversationId, userApp } = await createConversation('msg-trim-text-post');
+    const res = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: '  hello  ' }],
+        }),
+      },
+      env
+    );
+    expect(res.status).toBe(201);
+    const { messageId } = await res.json<{ messageId: string }>();
+
+    // Read back the message and confirm it was stored trimmed
+    const listRes = await userApp.request(
+      `/v1/conversations/${conversationId}/messages?limit=10`,
+      {},
+      env
+    );
+    const body = await listRes.json<{
+      messages: Array<{ id: string; content: Array<{ type: string; text?: string }> }>;
+    }>();
+    const stored = body.messages.find(m => m.id === messageId);
+    expect(stored).toBeDefined();
+    const textBlock = stored!.content[0];
+    expect(textBlock.type).toBe('text');
+    expect(textBlock.text).toBe('hello');
+  });
+
+  it('rejects PATCH with whitespace-only text', async () => {
+    const { conversationId, userApp } = await createConversation('msg-blank-text-patch');
+    // Seed a message first
+    const seedRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      env
+    );
+    const { messageId } = await seedRes.json<{ messageId: string }>();
+
+    for (const bad of ['', '   ', '\t\n ']) {
+      const res = await userApp.request(
+        `/v1/messages/${messageId}`,
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            conversationId,
+            content: [{ type: 'text', text: bad }],
+            timestamp: Date.now(),
+          }),
+        },
+        env
+      );
+      expect(res.status, `text ${JSON.stringify(bad)} should be rejected`).toBe(400);
+    }
+  });
 });
 
 describe('Webhook queue enqueue', () => {

@@ -20,6 +20,18 @@ export const sandboxIdSchema = z.string().regex(SANDBOX_ID_PATTERN, 'Invalid san
 // lockstep with `ExecApprovalDecision` from `openclaw/plugin-sdk/approval-runtime`.
 export const execApprovalDecisionSchema = z.enum(['allow-once', 'allow-always', 'deny']);
 
+// Accepts strings up to `max` chars, trims leading/trailing whitespace, and
+// rejects values that become empty after trimming. Control characters are
+// intentionally NOT filtered — if users send garbage, so be it; the concern
+// here is only catching blank/whitespace-only titles that would render as
+// empty rows in the UI.
+const trimmedNonEmptyString = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .transform(s => s.trim())
+    .refine(s => s.length >= 1, { message: 'must not be empty or whitespace-only' });
+
 // 1-64 bytes UTF-8, no C0 (0x00-0x1F) or C1 (0x7F-0x9F) control chars.
 export const emojiSchema = z
   .string()
@@ -64,7 +76,7 @@ export const actionsBlockSchema = z
 
 export const textBlockSchema = z.object({
   type: z.literal('text'),
-  text: z.string().min(1).max(MESSAGE_TEXT_MAX_CHARS),
+  text: trimmedNonEmptyString(MESSAGE_TEXT_MAX_CHARS),
 });
 
 export const contentBlockSchema = z.discriminatedUnion('type', [
@@ -132,7 +144,7 @@ export const conversationDetailSchema = z.object({
 
 export const createConversationRequestSchema = z.object({
   sandboxId: sandboxIdSchema,
-  title: z.string().max(CONVERSATION_TITLE_MAX_CHARS).optional(),
+  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS).optional(),
 });
 
 export const createConversationResponseSchema = z.object({
@@ -168,7 +180,7 @@ export const deleteMessageRequestSchema = z.object({
 });
 
 export const renameConversationRequestSchema = z.object({
-  title: z.string().min(1).max(CONVERSATION_TITLE_MAX_CHARS),
+  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS),
 });
 
 export const executeActionRequestSchema = z.object({
@@ -241,7 +253,7 @@ export const actionDeliveryFailedRequestSchema = z.object({
 });
 
 export const createBotConversationRequestSchema = z.object({
-  title: z.string().max(CONVERSATION_TITLE_MAX_CHARS).optional(),
+  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS).optional(),
   additionalMembers: z.array(z.string().min(1)).max(20).optional(),
 });
 

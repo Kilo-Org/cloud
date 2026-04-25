@@ -1,17 +1,5 @@
 import { z } from 'zod';
 
-// ── HTTP responses ─────────────────────────────────────────────────
-
-export const connectTicketResponseSchema = z.object({
-  ticket: z.string(),
-  userId: z.string(),
-});
-
-export const connectQuerySchema = z.object({
-  ticket: z.string().min(1),
-  userId: z.string().min(1),
-});
-
 // ── Client → Server ────────────────────────────────────────────────
 
 export const MAX_CONTEXTS = 200;

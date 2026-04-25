@@ -1,17 +1,27 @@
-import type { z } from 'zod';
 import type { ClientMessage, EventServiceConfig } from './types';
-import {
-  connectTicketResponseSchema,
-  serverMessageSchema,
-  type connectQuerySchema,
-} from './schemas';
+import { serverMessageSchema } from './schemas';
 
-export class TicketRequestError extends Error {
-  readonly status: number;
-  constructor(status: number) {
-    super(`Ticket request failed: ${status}`);
-    this.name = 'TicketRequestError';
-    this.status = status;
+/**
+ * Subprotocol format used to carry the JWT on the WebSocket handshake:
+ *   "kilo.jwt.<base64url-encoded-jwt>"
+ *
+ * JWTs contain '.' (which is a valid HTTP token char), but base64 encodings
+ * produce '/' and '+' which are not — so we base64url-encode the token before
+ * embedding it in a subprotocol identifier.
+ */
+const SUBPROTOCOL_PREFIX = 'kilo.jwt.';
+
+/**
+ * Thrown (and surfaced via {@link EventServiceConfig.onUnauthorized}) when the
+ * Event Service rejects the WebSocket upgrade with 401/403. Browsers do not
+ * expose the HTTP status of a failed WebSocket handshake, so the client
+ * treats any pre-open 'error' event as a potential auth failure and relies on
+ * the callback to trigger token refresh/sign-out.
+ */
+export class WebSocketAuthError extends Error {
+  constructor(message = 'WebSocket authentication failed') {
+    super(message);
+    this.name = 'WebSocketAuthError';
   }
 }
 
@@ -23,6 +33,12 @@ export class HandshakeTimeoutError extends Error {
 }
 
 const HANDSHAKE_TIMEOUT_MS = 10_000;
+
+function encodeBase64Url(input: string): string {
+  // btoa handles each char as a single byte; JWTs are ASCII so this is safe.
+  const base64 = btoa(input);
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
 export class EventServiceClient {
   private readonly url: string;
@@ -66,7 +82,7 @@ export class EventServiceClient {
   }
 
   private handleAuthFailure(err: unknown): boolean {
-    if (err instanceof TicketRequestError && (err.status === 401 || err.status === 403)) {
+    if (err instanceof WebSocketAuthError) {
       this.destroyed = true;
       if (this.reconnectTimer !== null) {
         clearTimeout(this.reconnectTimer);
@@ -79,30 +95,18 @@ export class EventServiceClient {
   }
 
   private async connectOnce(): Promise<void> {
-    // Close any existing socket to avoid leaking connections
+    // Close any existing socket to avoid leaking connections.
     if (this.ws) {
       const oldWs = this.ws;
       this.ws = null;
       oldWs.close();
     }
 
-    // Step 1: Exchange JWT for a single-use connection ticket
     const token = await this.getToken();
-    const httpUrl = this.url.replace(/^ws(s?):\/\//, 'http$1://');
-    const res = await fetch(`${httpUrl}/connect/ticket`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      throw new TicketRequestError(res.status);
-    }
-    const { ticket, userId } = connectTicketResponseSchema.parse(await res.json());
+    const subprotocol = `${SUBPROTOCOL_PREFIX}${encodeBase64Url(token)}`;
 
-    // Step 2: Connect WebSocket using the ticket
-    const query: z.input<typeof connectQuerySchema> = { ticket, userId };
-    const qs = new URLSearchParams({ ticket: query.ticket, userId: query.userId }).toString();
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`${this.url}/connect?${qs}`);
+      const ws = new WebSocket(`${this.url}/connect`, [subprotocol]);
       this.ws = ws;
 
       // Guard against double-resolution: the handshake timeout, the
@@ -168,9 +172,12 @@ export class EventServiceClient {
       ws.addEventListener('error', () => {
         if (this.ws !== ws) return;
         // error is always followed by close, so we only need to reject the
-        // connect promise here if we never opened.
+        // connect promise here if we never opened. The browser does not
+        // expose the HTTP status of a failed upgrade, so treat pre-open
+        // errors as potential auth failures and surface them via
+        // onUnauthorized. Callers can refresh the token and reconnect.
         if (!this.connected) {
-          settleReject(new Error('WebSocket connection failed'));
+          settleReject(new WebSocketAuthError());
         }
       });
     });
@@ -317,9 +324,7 @@ export class EventServiceClient {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connectOnce().catch(err => {
-        // connectOnce() may fail before a WebSocket is created (e.g. ticket
-        // fetch failure), so onclose won't fire. Schedule another reconnect,
-        // unless the failure is a permanent auth failure.
+        // If the handshake failed with auth rejection, stop reconnecting.
         if (this.handleAuthFailure(err)) return;
         if (!this.destroyed) {
           this.scheduleReconnect();

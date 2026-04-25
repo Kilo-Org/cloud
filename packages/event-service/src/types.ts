@@ -1,6 +1,5 @@
 import type { z } from 'zod';
 import type {
-  connectTicketResponseSchema,
   contextSubscribeMessageSchema,
   contextUnsubscribeMessageSchema,
   clientMessageSchema,
@@ -8,10 +7,6 @@ import type {
   eventMessageSchema,
   serverMessageSchema,
 } from './schemas';
-
-// ── HTTP responses ─────────────────────────────────────────────────
-
-export type ConnectTicketResponse = z.infer<typeof connectTicketResponseSchema>;
 
 // ── Client → Server ────────────────────────────────────────────────
 
@@ -31,9 +26,10 @@ export type EventServiceConfig = {
   url: string;
   getToken: () => Promise<string>;
   /**
-   * Called when the ticket endpoint rejects the token with 401/403.
-   * The client marks itself destroyed and stops reconnecting; the caller
-   * should clear any cached token and trigger re-authentication.
+   * Called when the WebSocket upgrade is rejected (typically 401/403, though
+   * browsers do not expose the HTTP status of a failed handshake). The client
+   * marks itself destroyed and stops reconnecting; the caller should clear any
+   * cached token and trigger re-authentication.
    */
   onUnauthorized?: () => void;
 };

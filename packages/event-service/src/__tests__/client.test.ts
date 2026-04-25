@@ -7,6 +7,7 @@ class MockWebSocket {
   static CLOSED = 3;
 
   readonly url: string;
+  readonly protocols: string | string[] | undefined;
   readyState = 1; // OPEN
   sent: string[] = [];
   closeCode: number | undefined;
@@ -14,8 +15,9 @@ class MockWebSocket {
 
   private listeners = new Map<string, Set<(...args: unknown[]) => void>>();
 
-  constructor(url: string) {
+  constructor(url: string, protocols?: string | string[]) {
     this.url = url;
+    this.protocols = protocols;
   }
 
   addEventListener(type: string, listener: (...args: unknown[]) => void): void {
@@ -61,16 +63,8 @@ let allMockWs: MockWebSocket[];
 
 beforeEach(() => {
   allMockWs = [];
-  // Mock the ticket endpoint — connect() does a fetch before opening the WS
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ ticket: 'test-ticket', userId: 'user-123' }),
-    })
-  );
-  const WebSocketMock = function (url: string) {
-    lastMockWs = new MockWebSocket(url);
+  const WebSocketMock = function (url: string, protocols?: string | string[]) {
+    lastMockWs = new MockWebSocket(url, protocols);
     allMockWs.push(lastMockWs);
     // Auto-trigger open asynchronously so connect() can attach handlers first
     void Promise.resolve().then(() => lastMockWs.triggerOpen());
@@ -89,17 +83,24 @@ afterEach(() => {
 function makeClient(url = 'ws://localhost:8080') {
   return new EventServiceClient({
     url,
-    getToken: () => Promise.resolve('test-token'),
+    getToken: () => Promise.resolve('header.payload.sig'),
   });
 }
 
+// Mirrors the base64url encoding used inside the client.
+function encodeBase64Url(input: string): string {
+  const base64 = btoa(input);
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 describe('EventServiceClient', () => {
-  it('connects and sends subscribe for pre-registered contexts', async () => {
+  it('passes the JWT as a subprotocol and targets /connect', async () => {
     const client = makeClient();
     client.subscribe(['room:123', 'user:456']);
     await client.connect();
 
-    expect(lastMockWs.url).toBe('ws://localhost:8080/connect?ticket=test-ticket&userId=user-123');
+    expect(lastMockWs.url).toBe('ws://localhost:8080/connect');
+    expect(lastMockWs.protocols).toEqual([`kilo.jwt.${encodeBase64Url('header.payload.sig')}`]);
     expect(client.isConnected()).toBe(true);
 
     const messages = lastMockWs.sent.map(s => JSON.parse(s) as unknown);
@@ -209,27 +210,18 @@ describe('EventServiceClient', () => {
     expect(allMockWs).toHaveLength(2);
   });
 
-  it('error+close before open schedules a single reconnect timer', async () => {
+  it('error before open calls onUnauthorized and stops reconnecting', async () => {
     vi.useFakeTimers();
     try {
-      let wsCount = 0;
-      // Override the WebSocket mock so the first socket errors before open
-      // (error → close, the sequence browsers fire). The second socket
-      // succeeds normally so we can count reconnect attempts cleanly.
-      const WebSocketMock = function (url: string) {
-        lastMockWs = new MockWebSocket(url);
+      const onUnauthorized = vi.fn();
+      const WebSocketMock = function (url: string, protocols?: string | string[]) {
+        lastMockWs = new MockWebSocket(url, protocols);
         allMockWs.push(lastMockWs);
-        wsCount++;
-        if (wsCount === 1) {
-          lastMockWs.readyState = 0; // CONNECTING
-          void Promise.resolve().then(() => {
-            lastMockWs.triggerError();
-            lastMockWs.triggerClose();
-          });
-        } else {
-          // Reconnect attempt succeeds
-          void Promise.resolve().then(() => lastMockWs.triggerOpen());
-        }
+        lastMockWs.readyState = 0; // CONNECTING
+        void Promise.resolve().then(() => {
+          lastMockWs.triggerError();
+          lastMockWs.triggerClose();
+        });
         return lastMockWs;
       };
       WebSocketMock.OPEN = 1;
@@ -237,18 +229,20 @@ describe('EventServiceClient', () => {
       WebSocketMock.CLOSED = 3;
       vi.stubGlobal('WebSocket', WebSocketMock);
 
-      const client = makeClient();
-      // connect() should absorb the failure and schedule a reconnect
-      await client.connect();
-      expect(client.isConnected()).toBe(false);
-      expect(allMockWs).toHaveLength(1);
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken: () => Promise.resolve('h.p.s'),
+        onUnauthorized,
+      });
 
-      // Advance past the max first-attempt delay. If the bug were present,
-      // two timers would fire and we'd see 3 WebSockets (original + 2
-      // reconnects). With the fix, exactly one reconnect fires.
-      await vi.advanceTimersByTimeAsync(2000);
-      expect(allMockWs).toHaveLength(2);
-      expect(client.isConnected()).toBe(true);
+      await client.connect();
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(client.isConnected()).toBe(false);
+
+      // No reconnect should be scheduled — advancing time keeps the count at 1.
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(allMockWs).toHaveLength(1);
     } finally {
       vi.useRealTimers();
     }
@@ -259,8 +253,8 @@ describe('EventServiceClient', () => {
     try {
       // Override the WebSocket mock so the socket never opens and never
       // fires error/close — i.e. stays in CONNECTING forever.
-      const WebSocketMock = function (url: string) {
-        lastMockWs = new MockWebSocket(url);
+      const WebSocketMock = function (url: string, protocols?: string | string[]) {
+        lastMockWs = new MockWebSocket(url, protocols);
         allMockWs.push(lastMockWs);
         lastMockWs.readyState = 0; // CONNECTING
         // no open, no error, no close — stall.
@@ -313,8 +307,8 @@ describe('EventServiceClient', () => {
   it('disconnect() during CONNECTING cancels the in-flight handshake', async () => {
     vi.useFakeTimers();
     try {
-      const WebSocketMock = function (url: string) {
-        lastMockWs = new MockWebSocket(url);
+      const WebSocketMock = function (url: string, protocols?: string | string[]) {
+        lastMockWs = new MockWebSocket(url, protocols);
         allMockWs.push(lastMockWs);
         lastMockWs.readyState = 0; // CONNECTING, never opens
         return lastMockWs;
@@ -326,7 +320,7 @@ describe('EventServiceClient', () => {
 
       const client = makeClient();
       const connectPromise = client.connect();
-      // Wait for the ticket fetch microtask and the WS construction.
+      // Wait for the getToken microtask and the WS construction.
       await vi.advanceTimersByTimeAsync(0);
 
       client.disconnect();
@@ -350,8 +344,8 @@ describe('EventServiceClient', () => {
     vi.useFakeTimers();
     try {
       let wsCount = 0;
-      const WebSocketMock = function (url: string) {
-        lastMockWs = new MockWebSocket(url);
+      const WebSocketMock = function (url: string, protocols?: string | string[]) {
+        lastMockWs = new MockWebSocket(url, protocols);
         allMockWs.push(lastMockWs);
         wsCount++;
         if (wsCount === 1) {
@@ -392,31 +386,5 @@ describe('EventServiceClient', () => {
     const err = new HandshakeTimeoutError();
     expect(err).toBeInstanceOf(Error);
     expect(err.name).toBe('HandshakeTimeoutError');
-  });
-
-  it('schedules reconnect after initial ticket failure', async () => {
-    vi.useFakeTimers();
-    try {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValueOnce({ ok: false, status: 503 })
-        .mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve({ ticket: 'retry-ticket', userId: 'user-123' }),
-        });
-      vi.stubGlobal('fetch', fetchMock);
-      const client = makeClient();
-
-      await expect(client.connect()).resolves.toBeUndefined();
-      expect(allMockWs).toHaveLength(0);
-
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(allMockWs).toHaveLength(1);
-      expect(lastMockWs.url).toBe(
-        'ws://localhost:8080/connect?ticket=retry-ticket&userId=user-123'
-      );
-    } finally {
-      vi.useRealTimers();
-    }
   });
 });

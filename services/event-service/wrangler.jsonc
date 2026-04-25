@@ -17,14 +17,12 @@
   ],
 
   "durable_objects": {
-    "bindings": [
-      { "name": "USER_SESSION_DO", "class_name": "UserSessionDO" },
-      { "name": "TICKET_DO", "class_name": "TicketDO" },
-    ],
+    "bindings": [{ "name": "USER_SESSION_DO", "class_name": "UserSessionDO" }],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["UserSessionDO"] },
     { "tag": "v2", "new_sqlite_classes": ["TicketDO"] },
+    { "tag": "v3", "deleted_classes": ["TicketDO"] },
   ],
 
   "secrets_store_secrets": [

@@ -163,7 +163,12 @@ export function ConversationItem({
           <>
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
               <p className="truncate text-sm font-medium">{title}</p>
-              {isUnread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
+              {isUnread && (
+                <>
+                  <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                  <span className="sr-only">Unread</span>
+                </>
+              )}
             </div>
             {/* Controls column opts back into pointer events so the kebab is
                 clickable; the time span stays transparent so clicks pass

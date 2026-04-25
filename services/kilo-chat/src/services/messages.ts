@@ -152,8 +152,8 @@ async function postCommitFanOut(
     try {
       await withDORetry(
         () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-        stub => stub.updateTitle(title),
-        'ConversationDO.updateTitle'
+        stub => stub.updateTitleInternal(title),
+        'ConversationDO.updateTitleInternal'
       );
       await Promise.allSettled(
         info.members.map(member =>

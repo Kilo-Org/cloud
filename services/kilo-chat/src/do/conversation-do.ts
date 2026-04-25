@@ -619,7 +619,13 @@ export class ConversationDO extends DurableObject<Env> {
     }
   }
 
-  updateTitle(title: string): { ok: true } {
+  /**
+   * Writes the conversation title without a membership check. Used only by
+   * internal code paths that have already authorized the change (e.g. the
+   * auto-title flow after the first bot reply commits). Human-initiated
+   * renames must go through updateTitleIfMember.
+   */
+  updateTitleInternal(title: string): { ok: true } {
     this.db.update(conversation).set({ title }).run();
     return { ok: true };
   }

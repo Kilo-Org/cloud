@@ -9,7 +9,59 @@ import { extractConversationContext, extractSandboxId, pushInstanceEvent } from 
 import { lookupSandboxOwnerUserId, userOwnsSandbox } from './sandbox-ownership';
 import { validateUserIds } from './user-lookup';
 import type { DeferCtx } from './messages';
-import type { UpdateTitleIfMemberResult } from '../do/conversation-do';
+import type { ConversationDO, UpdateTitleIfMemberResult } from '../do/conversation-do';
+
+// ─── partial-failure rollback helpers ──────────────────────────────────────
+
+type MemberAddParams = {
+  conversationId: string;
+  conversationTitle: string | null;
+  sandboxId: string;
+  joinedAt: number;
+};
+
+/**
+ * Fan out `addConversation` to each member's MembershipDO. Accumulates the
+ * member IDs whose writes succeeded into `succeededMemberIds` as they resolve
+ * so the caller can roll back only those on failure. Throws the first
+ * rejection after all writes settle.
+ */
+async function fanOutAddConversation(
+  env: Env,
+  memberIds: string[],
+  params: MemberAddParams,
+  succeededMemberIds: string[]
+): Promise<void> {
+  const settled = await Promise.allSettled(
+    memberIds.map(async id => {
+      const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(id));
+      await stub.addConversation(params);
+      succeededMemberIds.push(id);
+    })
+  );
+  for (const r of settled) {
+    if (r.status === 'rejected') throw r.reason;
+  }
+}
+
+/**
+ * Called when a conversation-creation path fails AFTER ConversationDO.initialize()
+ * has succeeded. Destroys the conversation state and removes any membership
+ * rows that were written before the failure. All rollback steps are
+ * best-effort so the original error is the one that propagates.
+ */
+async function rollbackConversationCreation(
+  env: Env,
+  convStub: DurableObjectStub<ConversationDO>,
+  conversationId: string,
+  succeededMemberIds: string[]
+): Promise<void> {
+  const membershipRemovals = succeededMemberIds.map(id => {
+    const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(id));
+    return stub.removeConversation(conversationId);
+  });
+  await Promise.allSettled([convStub.destroyAndReturnMembers(), ...membershipRemovals]);
+}
 
 // ─── createConversation ────────────────────────────────────────────────────
 
@@ -59,12 +111,13 @@ export async function createConversationFor(
     joinedAt: now,
   };
 
-  const userMembership = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
-  const botMembership = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(botId));
-  await Promise.all([
-    userMembership.addConversation(memberParams),
-    botMembership.addConversation(memberParams),
-  ]);
+  const succeededMemberIds: string[] = [];
+  try {
+    await fanOutAddConversation(env, [userId, botId], memberParams, succeededMemberIds);
+  } catch (err) {
+    await rollbackConversationCreation(env, convStub, conversationId, succeededMemberIds);
+    throw err;
+  }
 
   // Notify all human members on the instance context so their conversation list updates.
   await pushInstanceEvent(env, params.sandboxId, [userId], 'conversation.created', {
@@ -145,12 +198,14 @@ export async function createBotConversationFor(
     joinedAt: now,
   };
 
-  await Promise.all(
-    members.map(m => {
-      const stub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(m.id));
-      return stub.addConversation(memberParams);
-    })
-  );
+  const memberIds = members.map(m => m.id);
+  const succeededMemberIds: string[] = [];
+  try {
+    await fanOutAddConversation(env, memberIds, memberParams, succeededMemberIds);
+  } catch (err) {
+    await rollbackConversationCreation(env, convStub, conversationId, succeededMemberIds);
+    throw err;
+  }
 
   const humanMemberIds = members.filter(m => m.kind === 'user').map(m => m.id);
   await pushInstanceEvent(env, params.sandboxId, humanMemberIds, 'conversation.created', {

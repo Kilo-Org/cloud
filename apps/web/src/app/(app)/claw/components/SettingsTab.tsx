@@ -8,6 +8,7 @@ import {
   FileCode,
   Hash,
   Info,
+  Newspaper,
   RotateCcw,
   Save,
   Settings,
@@ -637,41 +638,46 @@ function MorningBriefingCard({
   return (
     <div className="rounded-lg border px-4 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium">Morning Briefing</p>
-            <Badge variant={statusVariant} className="px-1.5 py-0 text-[10px] leading-4">
-              {statusLabel}
-            </Badge>
+        <div className="flex items-start gap-3">
+          <Newspaper className="text-muted-foreground h-5 w-5 shrink-0" />
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">Morning Briefing</p>
+              <Badge variant={statusVariant} className="px-1.5 py-0 text-[10px] leading-4">
+                {statusLabel}
+              </Badge>
+            </div>
+            {showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone && (
+              <p className="text-muted-foreground text-xs">
+                {formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)}
+              </p>
+            )}
+            {showScheduleDetails && (
+              <p className="text-muted-foreground text-xs">
+                Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
+              </p>
+            )}
+            {showLastDelivery && (
+              <p className="text-muted-foreground text-xs">
+                Last delivery:{' '}
+                {lastDelivery
+                  .map(entry => {
+                    const channel = deliveryChannelLabel[entry.channel] ?? entry.channel;
+                    const status = deliveryStatusLabel[entry.status] ?? entry.status;
+                    if (entry.status === 'sent') {
+                      return `${channel}: ${status}`;
+                    }
+                    const reason = entry.reason
+                      ? (deliveryReasonLabel[entry.reason] ?? entry.reason)
+                      : undefined;
+                    return reason ? `${channel}: ${status} (${reason})` : `${channel}: ${status}`;
+                  })
+                  .join(' • ')}
+              </p>
+            )}
+
+            <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
           </div>
-          {showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone && (
-            <p className="text-muted-foreground text-xs">
-              {formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)}
-            </p>
-          )}
-          {showScheduleDetails && (
-            <p className="text-muted-foreground text-xs">
-              Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
-            </p>
-          )}
-          {showLastDelivery && (
-            <p className="text-muted-foreground text-xs">
-              Last delivery:{' '}
-              {lastDelivery
-                .map(entry => {
-                  const channel = deliveryChannelLabel[entry.channel] ?? entry.channel;
-                  const status = deliveryStatusLabel[entry.status] ?? entry.status;
-                  if (entry.status === 'sent') {
-                    return `${channel}: ${status}`;
-                  }
-                  const reason = entry.reason
-                    ? (deliveryReasonLabel[entry.reason] ?? entry.reason)
-                    : undefined;
-                  return reason ? `${channel}: ${status} (${reason})` : `${channel}: ${status}`;
-                })
-                .join(' • ')}
-            </p>
-          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -754,8 +760,6 @@ function MorningBriefingCard({
           Enable Morning Briefing to get a personalized briefing everyday.
         </p>
       )}
-
-      <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
 
       {requestedDay && (
         <div className="mt-3">

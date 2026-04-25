@@ -1,4 +1,4 @@
-# Shared wire-contract schemas
+# Synced wire-contract schemas
 
 These files are **auto-generated copies** of the canonical zod schemas in
 `packages/kilo-chat/src/`:

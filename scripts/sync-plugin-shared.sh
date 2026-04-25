@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sync wire-contract zod schemas from packages/kilo-chat/src/ into the
-# plugin's src/shared/ directory. The plugin is packed as a standalone npm
+# plugin's src/synced/ directory. The plugin is packed as a standalone npm
 # tarball inside the kiloclaw docker image, so it cannot depend on the
 # workspace package at build time.
 #
@@ -12,7 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SOURCE_DIR="$REPO_ROOT/packages/kilo-chat/src"
-DEST_DIR="$REPO_ROOT/services/kiloclaw/plugins/kilo-chat/src/shared"
+DEST_DIR="$REPO_ROOT/services/kiloclaw/plugins/kilo-chat/src/synced"
 
 FILES=(schemas.ts webhook-schemas.ts events.ts)
 

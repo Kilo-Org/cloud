@@ -7,6 +7,10 @@ export const ulidSchema = z.string().ulid();
 const SANDBOX_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 export const sandboxIdSchema = z.string().regex(SANDBOX_ID_PATTERN, 'Invalid sandboxId');
 
+// Approval decision values produced by openclaw's approval runtime. Kept in
+// lockstep with `ExecApprovalDecision` from `openclaw/plugin-sdk/approval-runtime`.
+export const execApprovalDecisionSchema = z.enum(['allow-once', 'allow-always', 'deny']);
+
 // 1-64 bytes UTF-8, no C0 (0x00-0x1F) or C1 (0x7F-0x9F) control chars.
 export const emojiSchema = z
   .string()
@@ -160,7 +164,7 @@ export const renameConversationRequestSchema = z.object({
 
 export const executeActionRequestSchema = z.object({
   groupId: z.string().min(1).max(200),
-  value: z.string().min(1).max(200),
+  value: execApprovalDecisionSchema,
 });
 
 export const reactionRequestBodySchema = z.object({

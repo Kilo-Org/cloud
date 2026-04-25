@@ -1,4 +1,10 @@
-import type { ContentBlock, ActionsBlock, Message, ReactionSummary } from '@kilocode/kilo-chat';
+import type {
+  ContentBlock,
+  ActionsBlock,
+  Message,
+  ReactionSummary,
+  ExecApprovalDecision,
+} from '@kilocode/kilo-chat';
 import { DurableObject } from 'cloudflare:workers';
 import { logger } from '../util/logger';
 
@@ -117,7 +123,7 @@ export type ExecuteActionParams = {
   messageId: string;
   memberId: string;
   groupId: string;
-  value: string;
+  value: ExecApprovalDecision;
 };
 
 export type ExecuteActionResult =

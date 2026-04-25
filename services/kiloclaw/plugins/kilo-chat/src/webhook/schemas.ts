@@ -1,13 +1,16 @@
 // Webhook payload zod schemas and their inferred TypeScript types.
 // Historical callers sent `message.created` payloads without a `type` field;
 // the preprocess step injects the default so the discriminated union always
-// matches. The action.executed schema narrows the shared webhook `value` to
-// the approval decision enum at the plugin boundary.
+// matches. The action.executed schema narrows `value` to the approval decision
+// enum in the single source-of-truth synced schema.
 
 import { z } from 'zod';
-import type { ExecApprovalDecision } from 'openclaw/plugin-sdk/approval-runtime';
 
-import { chatWebhookSchema, messageCreatedWebhookSchema } from '../shared/webhook-schemas.js';
+import {
+  actionExecutedWebhookSchema,
+  chatWebhookSchema,
+  messageCreatedWebhookSchema,
+} from '../synced/webhook-schemas.js';
 
 const rawObjectSchema = z.record(z.string(), z.unknown());
 
@@ -36,41 +39,14 @@ export function parseInboundPayload(raw: unknown): KiloChatInboundPayload | null
   return result.success ? result.data : null;
 }
 
-const execApprovalDecisionSchema = z.enum(['allow-once', 'allow-always', 'deny']);
+export type ActionExecutedPayload = z.infer<typeof actionExecutedWebhookSchema>;
 
-export type ActionExecutedPayload = {
-  conversationId: string;
-  messageId: string;
-  groupId: string;
-  value: ExecApprovalDecision;
-  executedBy: string;
-};
-
-// The shared webhook schema keeps `value` as a free-form string so non-approval
-// action producers can flow through. The plugin narrows it to the approval
-// decision enum at this boundary, and only requires the fields it actually
-// consumes — conversationId/messageId/executedAt are forwarded by the Worker
-// but not needed to resolve the approval.
-const actionExecutedPluginSchema = z.preprocess(
+const actionExecutedInboundSchema = z.preprocess(
   withDefaultType('action.executed'),
-  z.object({
-    type: z.literal('action.executed'),
-    conversationId: z.string().min(1),
-    messageId: z.string().min(1),
-    groupId: z.string().min(1),
-    value: execApprovalDecisionSchema,
-    executedBy: z.string().min(1),
-  })
+  actionExecutedWebhookSchema
 );
 
 export function parseActionExecutedPayload(raw: unknown): ActionExecutedPayload | null {
-  const result = actionExecutedPluginSchema.safeParse(raw);
-  if (!result.success) return null;
-  return {
-    conversationId: result.data.conversationId,
-    messageId: result.data.messageId,
-    groupId: result.data.groupId,
-    value: result.data.value,
-    executedBy: result.data.executedBy,
-  };
+  const result = actionExecutedInboundSchema.safeParse(raw);
+  return result.success ? result.data : null;
 }

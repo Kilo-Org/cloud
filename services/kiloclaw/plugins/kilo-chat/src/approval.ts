@@ -7,7 +7,7 @@ import type {
   ExpiredApprovalView,
 } from 'openclaw/plugin-sdk/approval-handler-runtime';
 import type { z } from 'zod';
-import type { actionsBlockSchema, contentBlockSchema } from './shared/schemas.js';
+import type { actionsBlockSchema, contentBlockSchema } from './synced/schemas.js';
 
 type ContentBlock = z.infer<typeof contentBlockSchema>;
 type ActionsBlock = z.infer<typeof actionsBlockSchema>;

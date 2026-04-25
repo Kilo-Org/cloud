@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { execApprovalDecisionSchema } from './schemas';
+
 // ── Inbound webhook payloads (kilo-chat → kiloclaw plugin) ──────────
 
 export const messageCreatedWebhookSchema = z.object({
@@ -14,15 +16,12 @@ export const messageCreatedWebhookSchema = z.object({
   inReplyToSender: z.string().min(1).optional(),
 });
 
-// The worker schema is intentionally open-ended on `value`; the plugin narrows
-// it to the approval decision enum. This leaves room for other action-block
-// producers without a Worker redeploy.
 export const actionExecutedWebhookSchema = z.object({
   type: z.literal('action.executed'),
   conversationId: z.string().min(1),
   messageId: z.string().min(1),
   groupId: z.string().min(1),
-  value: z.string().min(1).max(200),
+  value: execApprovalDecisionSchema,
   executedBy: z.string().min(1),
   executedAt: z.string().min(1),
 });

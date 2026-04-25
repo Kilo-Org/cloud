@@ -90,13 +90,16 @@ describe('parseActionExecutedPayload', () => {
       groupId: 'approval-123',
       value: 'allow-once',
       executedBy: 'user-1',
+      executedAt: '2026-01-01T00:00:00Z',
     });
     expect(parsed).toEqual({
+      type: 'action.executed',
       conversationId: 'c1',
       messageId: 'm1',
       groupId: 'approval-123',
       value: 'allow-once',
       executedBy: 'user-1',
+      executedAt: '2026-01-01T00:00:00Z',
     });
   });
 
@@ -104,23 +107,62 @@ describe('parseActionExecutedPayload', () => {
     expect(
       parseActionExecutedPayload({
         type: 'action.executed',
+        conversationId: 'c1',
+        messageId: 'm1',
         groupId: 'approval-123',
         value: 'maybe',
         executedBy: 'user-1',
+        executedAt: '2026-01-01T00:00:00Z',
       })
     ).toBeNull();
   });
 
   it('returns null when groupId is missing', () => {
-    expect(parseActionExecutedPayload({ value: 'deny', executedBy: 'u1' })).toBeNull();
+    expect(
+      parseActionExecutedPayload({
+        conversationId: 'c1',
+        messageId: 'm1',
+        value: 'deny',
+        executedBy: 'u1',
+        executedAt: '2026-01-01T00:00:00Z',
+      })
+    ).toBeNull();
   });
 
   it('returns null when value is missing', () => {
-    expect(parseActionExecutedPayload({ groupId: 'g1', executedBy: 'u1' })).toBeNull();
+    expect(
+      parseActionExecutedPayload({
+        conversationId: 'c1',
+        messageId: 'm1',
+        groupId: 'g1',
+        executedBy: 'u1',
+        executedAt: '2026-01-01T00:00:00Z',
+      })
+    ).toBeNull();
   });
 
   it('returns null when executedBy is missing', () => {
-    expect(parseActionExecutedPayload({ groupId: 'g1', value: 'deny' })).toBeNull();
+    expect(
+      parseActionExecutedPayload({
+        conversationId: 'c1',
+        messageId: 'm1',
+        groupId: 'g1',
+        value: 'deny',
+        executedAt: '2026-01-01T00:00:00Z',
+      })
+    ).toBeNull();
+  });
+
+  it('returns null when executedAt is missing', () => {
+    expect(
+      parseActionExecutedPayload({
+        conversationId: 'c1',
+        messageId: 'm1',
+        groupId: 'g1',
+        value: 'deny',
+        executedBy: 'u1',
+      })
+    ).toBeNull();
   });
 
   it('returns null for non-object input', () => {

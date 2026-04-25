@@ -22,7 +22,7 @@ import {
   type contentBlockSchema,
   type enrichedConversationMemberSchema,
   type messageSchema,
-} from './shared/schemas.js';
+} from './synced/schemas.js';
 
 export type ContentBlock = z.infer<typeof contentBlockSchema>;
 export type Message = z.infer<typeof messageSchema>;

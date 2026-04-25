@@ -7,7 +7,7 @@
  * enqueue, and MembershipDO maintenance in one place.
  */
 
-import type { ContentBlock } from '@kilocode/kilo-chat';
+import type { ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { deliverToBot, deliverActionExecutedToBot } from '../webhook/deliver';
@@ -373,7 +373,7 @@ export type ExecuteActionParams = {
   conversationId: string;
   messageId: string;
   groupId: string;
-  value: string;
+  value: ExecApprovalDecision;
 };
 
 export type ExecuteActionResult =

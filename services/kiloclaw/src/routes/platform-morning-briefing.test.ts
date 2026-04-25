@@ -185,6 +185,31 @@ describe('platform morning-briefing warm-up handling', () => {
     expect(runMorningBriefing).toHaveBeenCalledTimes(2);
   });
 
+  it('does not retry run when timeout occurs and returns dedicated timeout code', async () => {
+    const runMorningBriefing = vi
+      .fn<() => Promise<unknown>>()
+      .mockRejectedValue(
+        new Error('Gateway controller request failed: The operation was aborted due to timeout')
+      );
+    const env = baseEnv({ runMorningBriefing });
+
+    const response = await platform.request(
+      '/morning-briefing/run',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(504);
+    expect(await response.json()).toMatchObject({
+      code: 'morning_briefing_run_timeout',
+    });
+    expect(runMorningBriefing).toHaveBeenCalledTimes(1);
+  });
+
   it('returns warm-up payload for run timeout instead of generic 500', async () => {
     const runMorningBriefing = vi
       .fn<() => Promise<unknown>>()
@@ -206,10 +231,9 @@ describe('platform morning-briefing warm-up handling', () => {
     await vi.runAllTimersAsync();
     const response = await requestPromise;
 
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(504);
     expect(await response.json()).toMatchObject({
-      error: 'Gateway warming up, retrying shortly.',
-      code: 'gateway_warming_up',
+      code: 'morning_briefing_run_timeout',
     });
   });
 });

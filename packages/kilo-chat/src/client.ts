@@ -51,7 +51,6 @@ import type {
 // Accept any response body for fire-and-forget endpoints. The server may
 // return `{}` (200) or no body (204); the client doesn't inspect either.
 const voidSchema = z.unknown();
-const addReactionClientResponseSchema = addReactionResponseSchema;
 
 export class KiloChatClient {
   private readonly es: KiloChatClientConfig['eventService'];
@@ -176,7 +175,7 @@ export class KiloChatClient {
     return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'POST',
       body: req,
-      schema: addReactionClientResponseSchema,
+      schema: addReactionResponseSchema,
     });
   }
 

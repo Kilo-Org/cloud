@@ -53,9 +53,11 @@ export function BotStatus({ instanceStatus, presence }: BotStatusProps) {
   );
 }
 
-// Local staleness ticker: keeps re-renders scoped to BotStatus so the rest of
-// the chat UI (memoized message bubbles, etc.) is not invalidated every 10s.
-function useNowTicker(intervalMs: number): number {
+// Staleness ticker: keeps re-renders scoped to the subtree that uses it so
+// sibling components (memoized message bubbles, etc.) are not invalidated
+// every tick. Exported so MessageArea can reuse it for the send-gate that
+// reacts to presence going stale without any user interaction.
+export function useNowTicker(intervalMs: number): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), intervalMs);

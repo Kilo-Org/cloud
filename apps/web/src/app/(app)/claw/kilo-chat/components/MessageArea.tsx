@@ -26,7 +26,7 @@ import { toast } from 'sonner';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
-import { BotStatus } from './BotStatus';
+import { BotStatus, computeBotDisplay, useNowTicker } from './BotStatus';
 import { ContextUsageRing } from './ContextUsageRing';
 import { KiloChatApiError } from '@kilocode/kilo-chat';
 import { MessageCircle, ArrowDown } from 'lucide-react';
@@ -49,6 +49,23 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const presence = sandboxId ? botPresence(sandboxId) : undefined;
   const ctxUsage = botContext(conversationId);
   const queryClient = useQueryClient();
+
+  // Re-render every 10 s so the send-gate reacts to presence going stale
+  // (no `bot.status` heartbeat for >30 s) without requiring user input. The
+  // ticker is scoped here so memoized MessageBubble children are not
+  // invalidated.
+  const now = useNowTicker(10_000);
+  const botDisplay = computeBotDisplay({ instanceStatus, presence, now });
+  // Treat `idle` as sendable: idle just means no heartbeat in the last 30 s,
+  // which is a normal steady state. Only block sends once the bot is clearly
+  // `offline` (>90 s stale, explicitly offline, or instance not running) or
+  // `unknown` (no presence data at all).
+  const canSend = botDisplay.state === 'online' || botDisplay.state === 'idle';
+  const sendDisabledReason = canSend
+    ? null
+    : botDisplay.state === 'unknown'
+      ? 'Waiting for bot status…'
+      : 'Bot is offline — messages will resume when it reconnects';
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -399,6 +416,8 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
         onCancelReply={() => setReplyingTo(null)}
         assistantName={assistantName ?? undefined}
         currentUserId={currentUserId}
+        canSend={canSend}
+        disabledReason={sendDisabledReason}
       />
     </div>
   );

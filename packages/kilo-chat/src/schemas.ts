@@ -214,7 +214,7 @@ export const listMessagesQuerySchema = z.object({
 export const botStatusRequestSchema = z.object({
   online: z.boolean(),
   at: z.number(),
-  conversationId: z.string().optional(),
+  conversationId: ulidSchema.optional(),
   model: z.string().nullish(),
   provider: z.string().nullish(),
   contextTokens: z.number().nullish(),

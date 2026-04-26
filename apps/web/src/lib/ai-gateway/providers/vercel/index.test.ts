@@ -1,5 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
-import { getAnthropicProviderOptionsForVercel } from '@/lib/ai-gateway/providers/vercel';
+import {
+  getAnthropicProviderOptionsForVercel,
+  shouldRouteToVercel,
+} from '@/lib/ai-gateway/providers/vercel';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 describe('getAnthropicProviderOptionsForVercel', () => {
@@ -60,5 +63,19 @@ describe('getAnthropicProviderOptionsForVercel', () => {
     expect(getAnthropicProviderOptionsForVercel('anthropic/claude-sonnet-4.5', request)).toBe(
       undefined
     );
+  });
+});
+
+describe('shouldRouteToVercel', () => {
+  it('excludes DeepSeek models (Vercel does not provide reasoning_content passthrough)', async () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'deepseek/deepseek-v4-pro',
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    };
+
+    expect(await shouldRouteToVercel('deepseek/deepseek-v4-pro', request, 'seed')).toBe(false);
   });
 });

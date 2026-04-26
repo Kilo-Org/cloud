@@ -58,6 +58,14 @@ export async function shouldRouteToVercel(
     return false;
   }
 
+  // DeepSeek models excluded — Vercel AI Gateway routes directly to DeepSeek which rejects
+  // requests where assistant messages omit `reasoning_content` in thinking mode. OpenRouter
+  // handles that translation from `providerOptions.openrouter.reasoning_details`; Vercel does not.
+  if (requestedModel.startsWith('deepseek/')) {
+    console.debug(`[shouldRouteToVercel] DeepSeek models excluded (reasoning_content passthrough)`);
+    return false;
+  }
+
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
   const passedRandomization =
     getRandomNumber('vercel_routing_' + randomSeed, 100) < (await getVercelRoutingPercentage());

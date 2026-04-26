@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
 import { RefreshCw } from 'lucide-react';
@@ -20,6 +20,8 @@ export function SyncProvidersContent() {
   const trpc = useTRPC();
   const [lastResult, setLastResult] = useState<SyncResult | null>(null);
 
+  const lastSyncQuery = useQuery(trpc.admin.syncProviders.lastSync.queryOptions());
+
   const syncMutation = useMutation(
     trpc.admin.syncProviders.triggerSync.mutationOptions({
       onSuccess: result => {
@@ -27,6 +29,7 @@ export function SyncProvidersContent() {
         toast.success(
           `Synced ${result.total_providers} providers with ${result.total_models} total models`
         );
+        void lastSyncQuery.refetch();
       },
       onError: error => {
         toast.error(error.message || 'Sync failed');
@@ -45,6 +48,12 @@ export function SyncProvidersContent() {
         result in the database. This runs automatically via cron but can be triggered manually here.
         Mainly intended for local development use.
       </p>
+
+      {lastSyncQuery.data?.generatedAt && (
+        <div className="text-muted-foreground text-sm">
+          Last sync: {new Date(lastSyncQuery.data.generatedAt).toLocaleString()}
+        </div>
+      )}
 
       <Card>
         <CardHeader>

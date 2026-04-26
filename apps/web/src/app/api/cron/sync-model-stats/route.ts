@@ -12,9 +12,6 @@ import { CRON_SECRET } from '@/lib/config.server';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
 
-const BETTERSTACK_HEARTBEAT_URL =
-  'https://uptime.betterstack.com/api/v1/heartbeat/1zuL4cAH8Ui6JF9j8M3L8oAD';
-
 /**
  * Vercel Cron Job: Sync Model Stats
  *
@@ -94,9 +91,6 @@ export async function GET(request: NextRequest) {
 
     console.log('[sync-model-stats] Sync completed:', summary);
 
-    // Send heartbeat to BetterStack on success
-    await fetch(BETTERSTACK_HEARTBEAT_URL);
-
     return NextResponse.json(summary);
   } catch (error) {
     console.error('[sync-model-stats] Error syncing model stats:', error);
@@ -106,9 +100,6 @@ export async function GET(request: NextRequest) {
         action: 'syncing_model_stats',
       },
     });
-
-    // Send failure heartbeat to BetterStack
-    await fetch(`${BETTERSTACK_HEARTBEAT_URL}/fail`);
 
     return NextResponse.json(
       {

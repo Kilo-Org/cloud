@@ -9,6 +9,8 @@ import {
   enrichment_data,
   user_auth_provider,
   modelStats,
+  modelsByProvider,
+  api_request_log_cleanup_runs,
   cliSessions,
   cli_sessions_v2,
   credit_transactions,
@@ -1727,6 +1729,31 @@ export const adminRouter = createTRPCRouter({
     triggerSync: adminProcedure.mutation(async () => {
       const result = await syncAndStoreProviders();
       return result;
+    }),
+    lastSync: adminProcedure.query(async () => {
+      const [row] = await db
+        .select({ data: modelsByProvider.data })
+        .from(modelsByProvider)
+        .orderBy(desc(modelsByProvider.id))
+        .limit(1);
+      return row ? { generatedAt: row.data.generated_at } : null;
+    }),
+  }),
+
+  apiRequestLog: createTRPCRouter({
+    lastCleanup: adminProcedure.query(async () => {
+      const [row] = await db
+        .select()
+        .from(api_request_log_cleanup_runs)
+        .orderBy(desc(api_request_log_cleanup_runs.ran_at))
+        .limit(1);
+      return row
+        ? {
+            ranAt: row.ran_at,
+            deletedCount: row.deleted_count,
+            cutoffDate: row.cutoff_date,
+          }
+        : null;
     }),
   }),
 

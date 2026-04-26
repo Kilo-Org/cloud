@@ -905,6 +905,13 @@ export const api_request_log = pgTable(
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
 
+export const api_request_log_cleanup_runs = pgTable('api_request_log_cleanup_runs', {
+  id: serial().notNull().primaryKey(),
+  ran_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  deleted_count: integer().notNull(),
+  cutoff_date: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+});
+
 export const http_user_agent = pgTable(
   'http_user_agent',
   {

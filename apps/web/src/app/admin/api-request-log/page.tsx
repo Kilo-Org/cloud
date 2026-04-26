@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { format, subDays } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
@@ -13,6 +15,9 @@ import { Download } from 'lucide-react';
 export default function ApiRequestLogPage() {
   const today = format(new Date(), 'yyyy-MM-dd');
   const weekAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+
+  const trpc = useTRPC();
+  const lastCleanupQuery = useQuery(trpc.admin.apiRequestLog.lastCleanup.queryOptions());
 
   const [userId, setUserId] = useState('');
   const [startDate, setStartDate] = useState(weekAgo);
@@ -49,7 +54,14 @@ export default function ApiRequestLogPage() {
     <AdminPage
       breadcrumbs={<BreadcrumbItem className="hidden md:block">API Request Log</BreadcrumbItem>}
     >
-      <div className="w-full max-w-xl">
+      <div className="w-full max-w-xl space-y-4">
+        {lastCleanupQuery.data && (
+          <div className="text-muted-foreground text-sm">
+            Last cleanup: {new Date(lastCleanupQuery.data.ranAt).toLocaleString()} (deleted{' '}
+            {lastCleanupQuery.data.deletedCount} rows older than{' '}
+            {new Date(lastCleanupQuery.data.cutoffDate).toLocaleString()})
+          </div>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>Download API Request Log</CardTitle>

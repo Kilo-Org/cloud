@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { usePostHog } from 'posthog-js/react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
@@ -29,7 +28,6 @@ function ClawSettingsInner({
   organizationName?: string;
 }) {
   const { organizationId } = useClawContext();
-  const posthog = usePostHog();
 
   const personalMutations = useKiloClawMutations();
   const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
@@ -62,10 +60,6 @@ function ClawSettingsInner({
   }, []);
 
   const onConfirmUpgrade = useCallback(() => {
-    posthog?.capture('claw_redeploy_clicked', {
-      instance_status: status.status,
-      redeploy_mode: 'upgrade',
-    });
     mutations.restartMachine.mutate(
       { imageTag: 'latest' },
       {
@@ -79,7 +73,7 @@ function ClawSettingsInner({
         },
       }
     );
-  }, [mutations.restartMachine, onRedeploySuccess, posthog, status.status]);
+  }, [mutations.restartMachine, onRedeploySuccess]);
 
   return (
     <>
@@ -101,7 +95,6 @@ function ClawSettingsInner({
         open={confirmUpgrade}
         onOpenChange={open => {
           if (mutations.restartMachine.isPending) return;
-          if (!open) posthog?.capture('claw_redeploy_cancelled');
           setConfirmUpgrade(open);
         }}
         isPending={mutations.restartMachine.isPending}

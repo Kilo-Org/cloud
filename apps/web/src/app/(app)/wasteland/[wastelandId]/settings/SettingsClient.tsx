@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
@@ -87,17 +87,24 @@ export function SettingsClient({ wastelandId }: Props) {
   const isUpstreamAdmin = credential?.is_upstream_admin === true;
 
   // ── Local form state ───────────────────────────────────────────────
+  // Form values sync from the wasteland query once, on first arrival.
+  // `initialized` is a ref rather than state because flipping it during
+  // render (via setState) would cause an extra render and trip React's
+  // concurrent / strict-mode render-loop warnings. An effect runs after
+  // commit and is the canonical place to mirror server data into a
+  // controlled form's local state.
   const [name, setName] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
   const [dolthubUpstream, setDolthubUpstream] = useState('');
-  const [initialized, setInitialized] = useState(false);
+  const initializedRef = useRef(false);
 
-  if (wasteland && !initialized) {
+  useEffect(() => {
+    if (!wasteland || initializedRef.current) return;
     setName(wasteland.name);
     setVisibility(wasteland.visibility);
     setDolthubUpstream(wasteland.dolthub_upstream ?? '');
-    setInitialized(true);
-  }
+    initializedRef.current = true;
+  }, [wasteland]);
 
   // ── Mutations ──────────────────────────────────────────────────────
   const wastelandQueryKey = trpc.wasteland.getWasteland.queryKey({ wastelandId });

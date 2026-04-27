@@ -1611,9 +1611,11 @@ export const wastelandRouter = router({
 
   // ── Admin: Change rig trust level via direct upstream write ─────────
   // `wl` has no CLI command for trust-level changes, so we use the
-  // DoltHub write API to update `rigs.trust_level` on a scratch branch
-  // that we immediately merge back via auto-PR. This requires admin
-  // write access on the upstream.
+  // DoltHub write API to update `rigs.trust_level` on a scratch branch,
+  // then open + merge a PR to land the change on `main`. The DoltHub
+  // REST API has no direct branch→branch merge endpoint; the only way
+  // to reach `main` from a scratch branch is via the pulls API.
+  // This requires admin write access on the upstream.
 
   setUpstreamRigTrust: procedure
     .input(
@@ -1646,7 +1648,9 @@ export const wastelandRouter = router({
         });
       }
       const scratchBranch = `trust-${input.rigHandle}-${crypto.randomUUID().slice(0, 8)}`;
+      let orphanedPullId: string | null = null;
       try {
+        // Step 1: commit the trust-level change on a scratch branch.
         // `rigHandle` is validated by Zod to match /^[a-zA-Z0-9_-]+$/ and
         // `trustLevel` is an integer in [0,3]. Both are safe to interpolate.
         await doltApi.runWrite(
@@ -1656,6 +1660,22 @@ export const wastelandRouter = router({
           scratchBranch,
           `UPDATE rigs SET trust_level = ${input.trustLevel} WHERE handle = '${input.rigHandle}'`
         );
+        // Step 2: open a PR from scratch → main so the commit can be merged.
+        const pull = await doltApi.createPull(upstream, token, {
+          title: `[wl] set trust_level=${input.trustLevel} for ${input.rigHandle}`,
+          description: 'Automated admin write — rig trust level update.',
+          fromBranch: scratchBranch,
+          toBranch: 'main',
+        });
+        orphanedPullId = pull.pullId;
+        // Step 3: merge the PR. DoltHub's merge is async (202 ACCEPTED +
+        // polled job), but we don't need to wait here — the PR is in the
+        // merge queue and the admin UI reflects the change once the poll
+        // completes on the client side via invalidation. Clear
+        // `orphanedPullId` on success so the `finally` block doesn't try
+        // to close an already-merged PR.
+        await doltApi.mergePull(upstream, token, orphanedPullId);
+        orphanedPullId = null;
         meterEvent(ctx.env, {
           event: 'billing.api_operation',
           userId: ctx.userId,
@@ -1671,6 +1691,21 @@ export const wastelandRouter = router({
           });
         }
         throw err;
+      } finally {
+        // Clean up: if we opened a PR that didn't merge (orphanedPullId
+        // is still set), close it so it doesn't hang around on the
+        // upstream forever. Delete the scratch branch unconditionally so
+        // dead branches don't accumulate. Both are best-effort — failures
+        // here don't fail the overall operation.
+        if (orphanedPullId) {
+          await doltApi.closePull(upstream, token, orphanedPullId).catch(() => {
+            // Ignore — the caller's error path likely already handled this.
+          });
+        }
+        await doltApi.deleteBranch(upstream, token, scratchBranch).catch(() => {
+          // Branch may already be gone (merge deletes source branch on
+          // some DoltHub configurations) or never created on failure.
+        });
       }
     }),
 });

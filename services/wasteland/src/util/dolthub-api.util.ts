@@ -161,6 +161,66 @@ export async function getPull(
   };
 }
 
+// ── Create PR ──────────────────────────────────────────────────────────
+
+const CreatePullResponse = z
+  .object({
+    pull_id: z.union([z.string(), z.number()]).transform(v => String(v)),
+  })
+  .passthrough();
+
+/**
+ * Open a pull request on `upstream` proposing to merge `fromBranch` into
+ * `toBranch` (default `main`). Returns the new pull's id as a string.
+ *
+ * Used by admin operations that apply changes via `runWrite` on a scratch
+ * branch — the scratch commit has to be merged into `main` for the change
+ * to actually land, and the REST API's only path to do that is
+ * open-PR → merge-PR (there is no direct branch-to-branch merge endpoint).
+ */
+export async function createPull(
+  upstream: string,
+  token: string,
+  opts: {
+    title: string;
+    description?: string;
+    fromBranch: string;
+    toBranch?: string;
+  }
+): Promise<{ pullId: string }> {
+  const { owner, db } = parseUpstream(upstream);
+  const payload = {
+    title: opts.title,
+    description: opts.description ?? '',
+    fromBranchOwnerName: owner,
+    fromBranchRepoName: db,
+    fromBranchName: opts.fromBranch,
+    toBranchOwnerName: owner,
+    toBranchRepoName: db,
+    toBranchName: opts.toBranch ?? 'main',
+  };
+  const { status, data } = await doltFetch(`/${owner}/${db}/pulls`, token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (status >= 400) {
+    const err = z.object({ error: z.string() }).safeParse(data);
+    throw new DoltHubApiError(
+      err.success ? err.data.error : `Create pull failed (${status})`,
+      status
+    );
+  }
+  const parsed = CreatePullResponse.safeParse(data);
+  if (!parsed.success) {
+    throw new DoltHubApiError(
+      `Create pull returned unexpected shape: ${parsed.error.message}`,
+      status
+    );
+  }
+  return { pullId: parsed.data.pull_id };
+}
+
 // ── Merge PR ───────────────────────────────────────────────────────────
 
 const MergeResponse = z

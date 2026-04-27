@@ -168,18 +168,47 @@ function debugErrorResponse(c: Context<WastelandEnv>, err: unknown) {
   throw err;
 }
 
+/**
+ * Parse a JSON request body against a Zod schema. Returns the parsed data
+ * on success; on failure (non-JSON, schema mismatch) returns a 400 Response
+ * the handler can return directly.
+ *
+ * Per services/wasteland/AGENTS.md: "Always validate data at IO boundaries
+ * (HTTP responses, JSON.parse results, SSE event payloads, subprocess
+ * output) with Zod schemas." This helper is the single enforcement point
+ * for the debug routes below.
+ */
+async function parseJsonBody<T extends z.ZodTypeAny>(
+  c: Context<WastelandEnv>,
+  schema: T
+): Promise<{ data: z.infer<T> } | { response: Response }> {
+  let raw: unknown;
+  try {
+    raw = await c.req.json();
+  } catch {
+    raw = {};
+  }
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      response: c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400),
+    };
+  }
+  return { data: parsed.data };
+}
+
+/**
+ * Resolve a userId from either the `userId` query param or a JSON body
+ * field of the same name. Used by debug endpoints that don't go through
+ * the Kilo auth middleware. Hono caches `req.json()` so the same body can
+ * still be re-parsed by the calling handler via `parseJsonBody`.
+ */
 async function resolveUserId(c: Context<WastelandEnv>): Promise<string | null> {
   const q = c.req.query('userId');
   if (q) return q;
-  try {
-    const body = await c.req.json().catch(() => ({}));
-    if (typeof body === 'object' && body !== null && 'userId' in body) {
-      return String(body.userId);
-    }
-  } catch {
-    // ignore
-  }
-  return null;
+  const result = await parseJsonBody(c, z.object({ userId: z.string().optional() }).passthrough());
+  if ('response' in result) return null;
+  return result.data.userId ?? null;
 }
 
 app.get('/debug/wastelands/:wastelandId/browse', async c => {
@@ -228,20 +257,26 @@ app.get('/debug/wastelands/:wastelandId/browse-direct', async c => {
   return c.json({ itemCount: parsed.data.rows.length, items: parsed.data.rows });
 });
 
+const PostItemBody = z.object({
+  userId: z.string().optional(),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+  type: z.enum(['bug', 'docs', 'feature', 'other']).optional(),
+});
+
 app.post('/debug/wastelands/:wastelandId/post', async c => {
   const wastelandId = c.req.param('wastelandId');
-  const body = await c.req.json().catch(() => ({}));
-  const userId = body.userId ?? c.req.query('userId');
+  const parsed = await parseJsonBody(c, PostItemBody);
+  if ('response' in parsed) return parsed.response;
+  const userId = parsed.data.userId ?? c.req.query('userId');
   if (!userId) return c.json({ error: 'Missing userId' }, 400);
-  if (!body.title || !body.description) {
-    return c.json({ error: 'title and description required' }, 400);
-  }
   try {
     const result = await wantedBoard.postWantedItem(c.env, wastelandId, userId, {
-      title: body.title,
-      description: body.description,
-      priority: body.priority,
-      type: body.type,
+      title: parsed.data.title,
+      description: parsed.data.description,
+      priority: parsed.data.priority,
+      type: parsed.data.type,
     });
     return c.json(result);
   } catch (err) {
@@ -249,32 +284,46 @@ app.post('/debug/wastelands/:wastelandId/post', async c => {
   }
 });
 
+const ItemIdBody = z.object({
+  userId: z.string().optional(),
+  itemId: z.string().min(1),
+});
+
 app.post('/debug/wastelands/:wastelandId/claim', async c => {
   const wastelandId = c.req.param('wastelandId');
-  const body = await c.req.json().catch(() => ({}));
-  const userId = body.userId ?? c.req.query('userId');
+  const parsed = await parseJsonBody(c, ItemIdBody);
+  if ('response' in parsed) return parsed.response;
+  const userId = parsed.data.userId ?? c.req.query('userId');
   if (!userId) return c.json({ error: 'Missing userId' }, 400);
-  if (!body.itemId) return c.json({ error: 'itemId required' }, 400);
   try {
-    const result = await wantedBoard.claimWantedItem(c.env, wastelandId, userId, body.itemId);
+    const result = await wantedBoard.claimWantedItem(
+      c.env,
+      wastelandId,
+      userId,
+      parsed.data.itemId
+    );
     return c.json(result);
   } catch (err) {
     return debugErrorResponse(c, err);
   }
 });
 
+const DoneBody = z.object({
+  userId: z.string().optional(),
+  itemId: z.string().min(1),
+  evidence: z.string().min(1),
+});
+
 app.post('/debug/wastelands/:wastelandId/done', async c => {
   const wastelandId = c.req.param('wastelandId');
-  const body = await c.req.json().catch(() => ({}));
-  const userId = body.userId ?? c.req.query('userId');
+  const parsed = await parseJsonBody(c, DoneBody);
+  if ('response' in parsed) return parsed.response;
+  const userId = parsed.data.userId ?? c.req.query('userId');
   if (!userId) return c.json({ error: 'Missing userId' }, 400);
-  if (!body.itemId || !body.evidence) {
-    return c.json({ error: 'itemId and evidence required' }, 400);
-  }
   try {
     const result = await wantedBoard.markWantedItemDone(c.env, wastelandId, userId, {
-      itemId: body.itemId,
-      evidence: body.evidence,
+      itemId: parsed.data.itemId,
+      evidence: parsed.data.evidence,
     });
     return c.json(result);
   } catch (err) {
@@ -325,52 +374,61 @@ async function debugCallContainer(
 
 app.post('/debug/wastelands/:wastelandId/unclaim', async c => {
   const wastelandId = c.req.param('wastelandId');
-  const body = await c.req.json().catch(() => ({}));
-  const userId = body.userId ?? c.req.query('userId');
+  const parsed = await parseJsonBody(c, ItemIdBody);
+  if ('response' in parsed) return parsed.response;
+  const userId = parsed.data.userId ?? c.req.query('userId');
   if (!userId) return c.json({ error: 'Missing userId' }, 400);
-  if (!body.itemId) return c.json({ error: 'itemId required' }, 400);
   return debugCallContainer(c, wastelandId, userId, '/wl/unclaim', {
-    itemId: body.itemId,
+    itemId: parsed.data.itemId,
   });
+});
+
+const AcceptBody = z.object({
+  userId: z.string().optional(),
+  itemId: z.string().min(1),
+  quality: z.union([z.string(), z.number()]),
+  comment: z.string().optional(),
 });
 
 app.post('/debug/wastelands/:wastelandId/accept', async c => {
   const wastelandId = c.req.param('wastelandId');
-  const body = await c.req.json().catch(() => ({}));
-  const userId = body.userId ?? c.req.query('userId');
+  const parsed = await parseJsonBody(c, AcceptBody);
+  if ('response' in parsed) return parsed.response;
+  const userId = parsed.data.userId ?? c.req.query('userId');
   if (!userId) return c.json({ error: 'Missing userId' }, 400);
-  if (!body.itemId || !body.quality) {
-    return c.json({ error: 'itemId and quality required' }, 400);
-  }
   return debugCallContainer(c, wastelandId, userId, '/wl/accept', {
-    itemId: body.itemId,
-    quality: body.quality,
-    comment: body.comment,
+    itemId: parsed.data.itemId,
+    quality: parsed.data.quality,
+    comment: parsed.data.comment,
   });
+});
+
+const RejectBody = z.object({
+  userId: z.string().optional(),
+  itemId: z.string().min(1),
+  comment: z.string().min(1),
 });
 
 app.post('/debug/wastelands/:wastelandId/reject', async c => {
   const wastelandId = c.req.param('wastelandId');
-  const body = await c.req.json().catch(() => ({}));
-  const userId = body.userId ?? c.req.query('userId');
+  const parsed = await parseJsonBody(c, RejectBody);
+  if ('response' in parsed) return parsed.response;
+  const userId = parsed.data.userId ?? c.req.query('userId');
   if (!userId) return c.json({ error: 'Missing userId' }, 400);
-  if (!body.itemId || !body.comment) {
-    return c.json({ error: 'itemId and comment required' }, 400);
-  }
   return debugCallContainer(c, wastelandId, userId, '/wl/reject', {
-    itemId: body.itemId,
-    comment: body.comment,
+    itemId: parsed.data.itemId,
+    comment: parsed.data.comment,
   });
 });
 
 app.post('/debug/wastelands/:wastelandId/close', async c => {
   const wastelandId = c.req.param('wastelandId');
-  const body = await c.req.json().catch(() => ({}));
-  const userId = body.userId ?? c.req.query('userId');
+  const parsed = await parseJsonBody(c, ItemIdBody);
+  if ('response' in parsed) return parsed.response;
+  const userId = parsed.data.userId ?? c.req.query('userId');
   if (!userId) return c.json({ error: 'Missing userId' }, 400);
-  if (!body.itemId) return c.json({ error: 'itemId required' }, 400);
   return debugCallContainer(c, wastelandId, userId, '/wl/close', {
-    itemId: body.itemId,
+    itemId: parsed.data.itemId,
   });
 });
 
@@ -437,18 +495,24 @@ app.post('/debug/dolthub/:owner/:db/pulls/:pullId/merge', async c => {
   return c.json(data, res.status as 200);
 });
 
+// Accept any JSON object — DoltHub validates the PATCH fields server-side,
+// so we just forward whatever the caller sent. `.passthrough()` preserves
+// unknown fields so new DoltHub options work without a code change.
+const PatchPullBody = z.record(z.string(), z.unknown());
+
 app.patch('/debug/dolthub/:owner/:db/pulls/:pullId', async c => {
   const token = getDoltHubToken(c);
   if (!token) return c.json({ error: 'Missing DoltHub token' }, 401);
   const { owner, db, pullId } = c.req.param();
-  const body = await c.req.json().catch(() => ({}));
+  const parsed = await parseJsonBody(c, PatchPullBody);
+  if ('response' in parsed) return parsed.response;
   const res = await fetch(`${DOLTHUB_API_BASE}/${owner}/${db}/pulls/${pullId}`, {
     method: 'PATCH',
     headers: {
       authorization: `token ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(parsed.data),
   });
   const data: unknown = await res.json();
   return c.json(data, res.status as 200);
@@ -474,14 +538,19 @@ app.get('/debug/dolthub/:owner/:db/sql', async c => {
 // The write creates `to_branch` as a new branch forked from `from_branch`,
 // then commits the DML on `to_branch`. Used by E2E tests to simulate what
 // `wl` would do in production.
+const WriteBody = z.object({
+  q: z.string().optional(),
+});
+
 app.post('/debug/dolthub/:owner/:db/write/:fromBranch/:toBranch', async c => {
   const token = getDoltHubToken(c);
   if (!token) return c.json({ error: 'Missing DoltHub token' }, 401);
   const { owner, db, fromBranch, toBranch } = c.req.param();
-  const body = await c.req.json().catch(() => ({}));
-  const sql = body.q ?? c.req.query('q');
+  const parsed = await parseJsonBody(c, WriteBody);
+  if ('response' in parsed) return parsed.response;
+  const sql = parsed.data.q ?? c.req.query('q');
   if (!sql) return c.json({ error: 'Missing q (SQL) in body or query' }, 400);
-  const url = `${DOLTHUB_API_BASE}/${owner}/${db}/write/${encodeURIComponent(fromBranch)}/${encodeURIComponent(toBranch)}?q=${encodeURIComponent(String(sql))}`;
+  const url = `${DOLTHUB_API_BASE}/${owner}/${db}/write/${encodeURIComponent(fromBranch)}/${encodeURIComponent(toBranch)}?q=${encodeURIComponent(sql)}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { authorization: `token ${token}` },
@@ -490,22 +559,36 @@ app.post('/debug/dolthub/:owner/:db/write/:fromBranch/:toBranch', async c => {
   return c.json(data, res.status as 200);
 });
 
+const CreatePullBody = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  fromBranchOwner: z.string().min(1),
+  fromBranchDb: z.string().optional(),
+  fromBranchRepo: z.string().optional(),
+  fromBranch: z.string().min(1),
+  toBranchOwner: z.string().optional(),
+  toBranchDb: z.string().optional(),
+  toBranchRepo: z.string().optional(),
+  toBranch: z.string().optional(),
+});
+
 // Create a pull request. Used after a write to submit a branch upstream.
 app.post('/debug/dolthub/:owner/:db/pulls', async c => {
   const token = getDoltHubToken(c);
   if (!token) return c.json({ error: 'Missing DoltHub token' }, 401);
   const { owner, db } = c.req.param();
-  const body = await c.req.json().catch(() => ({}));
+  const parsed = await parseJsonBody(c, CreatePullBody);
+  if ('response' in parsed) return parsed.response;
   // DoltHub wants camelCase params on POST /pulls
   const payload = {
-    title: body.title,
-    description: body.description ?? '',
-    fromBranchOwnerName: body.fromBranchOwner,
-    fromBranchRepoName: body.fromBranchDb ?? body.fromBranchRepo,
-    fromBranchName: body.fromBranch,
-    toBranchOwnerName: body.toBranchOwner ?? owner,
-    toBranchRepoName: body.toBranchDb ?? body.toBranchRepo ?? db,
-    toBranchName: body.toBranch ?? 'main',
+    title: parsed.data.title,
+    description: parsed.data.description ?? '',
+    fromBranchOwnerName: parsed.data.fromBranchOwner,
+    fromBranchRepoName: parsed.data.fromBranchDb ?? parsed.data.fromBranchRepo,
+    fromBranchName: parsed.data.fromBranch,
+    toBranchOwnerName: parsed.data.toBranchOwner ?? owner,
+    toBranchRepoName: parsed.data.toBranchDb ?? parsed.data.toBranchRepo ?? db,
+    toBranchName: parsed.data.toBranch ?? 'main',
   };
   const res = await fetch(`${DOLTHUB_API_BASE}/${owner}/${db}/pulls`, {
     method: 'POST',

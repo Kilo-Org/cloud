@@ -25,6 +25,10 @@ export function useScrollSpy(
   const { scrollRootId, stickyHeaderId } = options;
   const [activeId, setActiveId] = useState<string>(sectionIds[0] ?? '');
   const suppressRef = useRef(false);
+  // Tracked so the re-enable timer can be cleared on unmount — otherwise
+  // a pending timer fires after the component is gone and calls
+  // suppressRef.current = false on a ref that no one reads any more.
+  const suppressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Dedupe / stabilize the section-id list so the observer isn't torn
   // down on every render just because the caller passed `foo.map(...)`.
@@ -57,12 +61,24 @@ export function useScrollSpy(
       if (el) observer.observe(el);
     }
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (suppressTimerRef.current !== null) {
+        clearTimeout(suppressTimerRef.current);
+        suppressTimerRef.current = null;
+      }
+    };
   }, [stableIds, scrollRootId, stickyHeaderId]);
 
   function scrollTo(id: string) {
     const el = document.getElementById(id);
     if (!el) return;
+    // Resolve the scroll root up front so we can bail BEFORE suppressing
+    // the observer — otherwise a missing root would exit with suppressRef
+    // left `true` forever and the spy would stop updating until remount.
+    const root = scrollRootId ? document.getElementById(scrollRootId) : null;
+    if (scrollRootId && !root) return;
+
     // Resolve the header fresh each click so late-mounting content
     // (e.g. an AdminViewingBanner) can't leave us with a stale 0.
     const header = stickyHeaderId ? document.getElementById(stickyHeaderId) : null;
@@ -71,9 +87,7 @@ export function useScrollSpy(
     setActiveId(id);
     suppressRef.current = true;
 
-    if (scrollRootId) {
-      const root = document.getElementById(scrollRootId);
-      if (!root) return;
+    if (root) {
       const top =
         el.getBoundingClientRect().top -
         root.getBoundingClientRect().top +
@@ -87,9 +101,14 @@ export function useScrollSpy(
     }
 
     // Re-enable observer after scroll settles so it doesn't thrash the
-    // active indicator on the way there.
-    setTimeout(() => {
+    // active indicator on the way there. Track the timer id so the
+    // unmount cleanup can cancel a pending re-enable.
+    if (suppressTimerRef.current !== null) {
+      clearTimeout(suppressTimerRef.current);
+    }
+    suppressTimerRef.current = setTimeout(() => {
       suppressRef.current = false;
+      suppressTimerRef.current = null;
     }, 1000);
   }
 

@@ -101,13 +101,12 @@ export class UserSessionDO extends DurableObject<Env> {
 
       for (const ws of sockets) {
         const state = this.getState(ws);
-        if (state.contexts.has(context)) {
+        if (!state.contexts.has(context)) continue;
+        try {
+          ws.send(text);
           delivered = true;
-          try {
-            ws.send(text);
-          } catch {
-            // Connection dead — hibernation will clean up
-          }
+        } catch {
+          // Connection dead — hibernation will clean up
         }
       }
       return delivered;

@@ -542,7 +542,7 @@
           "dateTimeColDataType": "timestamp",
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
-          "extrapolate": true,
+          "extrapolate": false,
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -650,7 +650,7 @@
           "dateTimeColDataType": "timestamp",
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
-          "extrapolate": true,
+          "extrapolate": false,
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1014,7 +1014,7 @@
         "type": "vertamedia-clickhouse-datasource",
         "uid": "${DS_KILOCLAW}"
       },
-      "description": "Average disk fill percentage (double7 / double8) across selected hosts. Climbs toward 100% indicate hosts at risk of running out of space.",
+      "description": "Average disk fill percentage (double7 / double8) across selected hosts. Climbs toward 100% indicate hosts at risk of running out of space. Extrapolation is disabled because this is an AVG of a ratio — extrapolating the last partial bucket would distort the value rather than estimate a missing tail.",
       "fieldConfig": {
         "defaults": {
           "color": {

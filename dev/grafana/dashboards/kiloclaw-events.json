@@ -1304,7 +1304,7 @@
           "dateTimeColDataType": "timestamp",
           "dateTimeType": "DATETIME",
           "editorMode": "sql",
-          "extrapolate": true,
+          "extrapolate": false,
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
